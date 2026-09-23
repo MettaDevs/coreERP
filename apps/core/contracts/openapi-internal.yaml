@@ -29,9 +29,9 @@ info:
     - **App module** (`appId` + `serviceToken` + `tenantHeader`), diverifikasi
       `AuthenticateAppService`.
     - **Klien integrasi** (`integrationClient`): sistem di luar CoreERP, misalnya aplikasi
-      finance pelanggan yang membaca feed posting. Token `Bearer <id klien>.<rahasia>` milik satu
-      tenant, dengan cakupan sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
-      menerimanya menyebutnya di `security` beserta cakupan yang dibutuhkan. Di salinan sandbox
+      finance pelanggan yang membaca feed posting. Token `Bearer <client_id>.<secret>` milik satu
+      tenant, dengan scope sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
+      menerimanya menyebutnya di `security` beserta scope yang dibutuhkan. Di salinan sandbox
       seluruh endpoint klien integrasi menjawab 503.
     - **Pusat admin** (`controlPlaneToken`): perintah dari konsol operator vendor.
 
@@ -81,13 +81,13 @@ paths:
       security:
       - integrationClient: []
       description: |
-        Cakupan `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
-        awalan jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
+        Scope `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
+        prefix jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
 
         Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
-        ulang pada **setiap** tarikan sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
-        jadi tidak ada kursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
-        posting yang terbit di tengah tarikan muncul pada tarikan berikutnya di tempat urutannya.
+        ulang pada **setiap** pull sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
+        jadi tidak ada cursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
+        posting yang terbit di tengah pull muncul pada pull berikutnya di tempat urutannya.
 
         Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
         dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
@@ -114,7 +114,7 @@ paths:
           Saring menurut jenis posting. Kosongkan untuk menerima semua jenis yang diizinkan untuk
           klien Anda; itu cara yang dianjurkan.
 
-          Isi dengan salah satu nilai di bawah, atau awalan yang diakhiri `.*` untuk semua jenis dari
+          Isi dengan salah satu nilai di bawah, atau prefix yang diakhiri `.*` untuk semua jenis dari
           satu modul, misalnya `asset.*`:
 
           - `asset.acquisition` — penerimaan aset diselesaikan
@@ -165,7 +165,7 @@ paths:
                       has_more:
                         type: boolean
                         description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu
-                          tarik lagi.
+                          pull lagi.
               examples:
                 perolehan:
                   summary: Satu penerimaan ambulans, langsung ke hutang
@@ -272,7 +272,7 @@ paths:
       security:
       - integrationClient: []
       description: |
-        Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
+        Scope `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
         finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
 
         Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
@@ -280,7 +280,7 @@ paths:
         pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
         posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
 
-        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404.
       parameters:
       - name: posting_id
         in: path
@@ -341,7 +341,7 @@ paths:
       security:
       - integrationClient: []
       description: |
-        Hanya klien integrasi dengan cakupan `vendors.read`. Module di dalam CoreERP membaca
+        Hanya klien integrasi dengan scope `vendors.read`. Module di dalam CoreERP membaca
         vendor lewat kontrak in-process, bukan lewat rute ini.
 
         Vendor adalah party di buku alamat yang memegang peran vendor pada satu entitas legal.
@@ -442,7 +442,7 @@ paths:
       - integrationClient: []
       description: |
         Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
-        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        scope `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
         legal entity tidak dikembalikan di sini.
 
         Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
@@ -453,9 +453,9 @@ paths:
         `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
         `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
 
-        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
-        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
-        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari sinkron terakhir, kirim
+        sebagai `updated_since` pada sinkron berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Sinkron penuh tanpa
         `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
       parameters:
       - name: updated_since
@@ -1867,15 +1867,15 @@ webhooks:
       summary: Posting finance yang dikirim ke klien mode push
       description: |
         CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
-        badan yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
-        dengan urutan tarikan, per klien.
+        body yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
+        dengan urutan pull, per klien.
 
-        **Tanda tangan.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
-        `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan klien sebagai
-        kunci. Pembaca wajib memverifikasinya dan menolak stempel waktu yang terlalu jauh dari jamnya
-        sendiri. `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
+        **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
+        `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Pembaca
+        wajib memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
+        `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
 
-        **Jawaban.** 2xx dihitung terkirim; bila badannya `FinancePostingAck` yang sah, ack itu
+        **Jawaban.** 2xx dihitung terkirim; bila body-nya `FinancePostingAck` yang sah, ack itu
         diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
         `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
         jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
@@ -1908,7 +1908,7 @@ webhooks:
               $ref: '#/components/schemas/FinancePosting'
       responses:
         '200':
-          description: Diterima. Badan opsional; bila berupa ack yang sah, posting berstatus akhir.
+          description: Diterima. Body opsional; bila berupa ack yang sah, posting berstatus akhir.
           content:
             application/json:
               schema:
@@ -1919,10 +1919,10 @@ components:
       type: http
       scheme: bearer
       description: |
-        Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
+        Token klien integrasi berbentuk `<client_id>.<secret>`, diterbitkan admin tenant di
         Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
         header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
-        allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
+        allowlist, atau scope yang kurang ditolak. Rate limit per klien
         (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
     appId:
       type: apiKey
@@ -2045,8 +2045,8 @@ components:
       - adjusts_posting_id
       - details
       description: |
-        Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai tarikan dan
-        dorongan (`webhooks.financePosting`).
+        Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai mode pull dan
+        mode push (`webhooks.financePosting`).
       properties:
         contract_version:
           type: integer

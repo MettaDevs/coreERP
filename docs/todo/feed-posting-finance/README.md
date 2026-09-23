@@ -58,7 +58,7 @@ field kontrak lain di repo ini.
 | `settlement_mode` | Kebijakan jurnal perolehan: langsung ke hutang atau lewat akun perantara | Accrue liability on product receipt (F&O) |
 | **Cutover** | Tanggal mulai posting dikirim, per entitas legal | Tanggal go-live migrasi |
 | **Pembaca** | Sistem yang menerima feed, misalnya old-finance | Consumer |
-| **Mode pengiriman** | `pull`: pembaca menarik dari CoreERP. `push`: CoreERP mengirim ke endpoint pembaca. | OData/API (tarik), business events/webhooks (dorong) |
+| **Mode pengiriman** | `pull`: pembaca memanggil API CoreERP. `push`: CoreERP mengirim ke endpoint pembaca. | OData/API (pull), business events/webhooks (push) |
 | **Presisi mata uang** | Jumlah desimal untuk nilai dan untuk harga satuan, per mata uang | Amount/Unit-Amount Rounding Precision (BC) |
 | **Pratinjau posting** | Jurnal yang akan terbit, beserta masalahnya, ditampilkan sebelum pengguna mengonfirmasi | Preview Posting dan Journal Check (BC) |
 
@@ -68,7 +68,7 @@ field kontrak lain di repo ini.
 | --- | --- | --- |
 | K-01 | **Kontrak CoreERP yang jadi acuan.** Old-finance yang menyesuaikan diri. Modul `api_finance` di old-finance belum pernah dipakai dan tidak dijadikan acuan. | Satu kontrak untuk banyak pembaca. Kalau kontrak mengikuti satu pembaca, pembaca berikutnya harus dibuatkan jalur khusus. |
 | K-02 | **Engine di Core**, bukan di control-plane. Control-plane hanya menerima angka kesehatan lewat laporan agent. | Data keuangan tenant tidak boleh keluar dari server tempat datanya berada. Postingnya juga harus tabel Core, karena module tidak boleh membuat tabel Core (`ModuleTanpaKerangkaTest`). |
-| K-03 | **Pengiriman selalu lewat HTTPS dan tidak bergantung pada letak jaringan.** Ada dua mode, dipilih per klien integrasi: `pull` (default: pembaca menarik, lalu ack) dan `push` (CoreERP mengirim ke endpoint HTTPS pembaca dengan tanda tangan HMAC dan retry bertahap; respons 2xx dihitung sebagai ack). Bentuk payload, status, dan idempotensi sama di kedua mode. Posting yang belum di-ack disajikan atau dikirim ulang sampai di-ack. Tidak memakai kursor "id terakhir". | Pembaca bisa di server yang sama, di jaringan lain, atau di cloud. Dynamics juga menyediakan dua jalur: API untuk menarik, dan business events (F&O) atau webhooks (BC) untuk mendorong. Old-finance mulai dengan `pull` karena ia belum punya API dan bisa mati saat update. Kursor id bisa melewatkan baris yang commit-nya terlambat, sedangkan model ack tidak. |
+| K-03 | **Pengiriman selalu lewat HTTPS dan tidak bergantung pada letak jaringan.** Ada dua mode, dipilih per klien integrasi: `pull` (default: pembaca memanggil API, lalu ack) dan `push` (CoreERP mengirim ke endpoint HTTPS pembaca dengan signature HMAC dan retry bertahap; respons 2xx yang membawa body ack dihitung sebagai ack, lihat [Mode `push`](#mode-push)). Bentuk payload, status, dan idempotensi sama di kedua mode. Posting yang belum di-ack disajikan ulang pada setiap pull; di mode push, kiriman yang gagal dikirim ulang. Tidak memakai cursor "id terakhir". | Pembaca bisa di server yang sama, di jaringan lain, atau di cloud. Dynamics juga menyediakan dua jalur: API untuk pull, dan business events (F&O) atau webhooks (BC) untuk push. Old-finance mulai dengan `pull` karena ia belum punya API dan bisa mati saat update. Cursor id bisa melewatkan baris yang commit-nya terlambat, sedangkan model ack tidak. |
 | K-04 | **Posting membawa `journal_lines` siap impor.** CoreERP menyimpan pemetaan ke **kode akun milik finance pelanggan**, seperti aplikasi payroll yang mengekspor jurnal ke software akuntansi. | Semua aplikasi finance bisa mengimpor jurnal. Tidak semua bisa memetakan data aset sendiri. |
 | K-05 | **Daftar akun referensi di Core**, per tenant dan opsional per entitas legal. Setiap akun punya `external_id` yang tidak boleh berubah (di old-finance: `Akun_ID`). Diimpor lewat CSV, dipilih lewat dropdown. | Ganti nama atau nomor akun tetap aman karena pemetaan menunjuk ID, bukan nomor. Tabel ini kelak diambil alih modul Finance sebagai master COA tanpa mengubah pemakainya. |
 | K-06 | **Vendor master dibangun di Core, mengikuti Dynamics**: vendor adalah party di Global Address Book dengan peran `vendor`, per entitas legal. Pembaca yang menyinkronkan vendor dari Core ke sistemnya. | Keputusan pemilik produk. Skema perolehan langsung ke hutang wajib membawa vendor. |
@@ -88,7 +88,7 @@ field kontrak lain di repo ini.
 | K-20 | **Presisi uang adalah setelan per mata uang**, dengan dua nilai: presisi **nilai** dan presisi **harga satuan**. Nilai baris dibulatkan ke presisi nilai **di sumber, per baris**, lalu jurnal disusun dari nilai yang sudah bulat. Selisih yang disengaja (misalnya pembulatan total) masuk baris akun pembulatan yang eksplisit. Header kontrak membawa `currency: {code, decimals}`. Nilai default IDR (0 atau 2) diputuskan konsultan. | Tidak ada aturan akuntansi yang mewajibkan 2 desimal. ISO 4217 memberi IDR 2 desimal, tetapi BC mengatur presisi per mata uang (di data demonya IDR memakai 0 desimal untuk nilai dan 3 untuk harga satuan). Sistem lama tidak pernah seimbang karena front office menyimpan lebih banyak desimal daripada finance. Aturannya: presisi pengirim tidak boleh lebih halus dari presisi penerima. |
 | K-21 | **Posting membawa empat waktu**: `posting_date` (tanggal akuntansi, yang menentukan hari), `document_date` (tanggal di dokumen sumber), `occurred_at` (jam kejadian, dengan zona waktu), dan `published_at` (jam posting terbit, dengan zona waktu). | BC memisahkan *Posting Date* dan *Document Date* di G/L Entry dari *Created At* di G/L Register. F&O memisahkan *accounting date* dari *created date and time*. Transaksi jam 23:50 yang divalidasi 00:12 tetap masuk hari yang benar, dan kedua jamnya tetap tercatat untuk audit. |
 | K-22 | **Masalah posting ditampilkan per baris, sebelum konfirmasi, dengan jalan pintas ke perbaikannya.** Jurnal tidak seimbang dianggap bug penerbit: dilempar sebagai exception dan dilaporkan ke SigNoz, bukan diserahkan ke pengguna. | BC punya *Preview Posting* dan kotak *Journal Check* (jumlah baris diperiksa, baris bermasalah, total masalah, masalah pada baris aktif), dan matriks *General Posting Setup* menandai akun wajib yang kosong. Sistem lama hanya memunculkan notifikasi, lalu pengguna harus mencari sendiri. |
-| K-23 | **Satu endpoint untuk semua jenis posting**: `/finance-postings`, disaring dengan `posting_type`. Klien integrasi bisa dibatasi per awalan jenis (misalnya hanya `asset.*`). Posting kasir kelak cukup menerbitkan `posting_type: cashier.receipt` ke feed yang sama. | BC mengekspos `journals`/`journalLines` dan `generalLedgerEntries` secara umum, bukan per modul. Endpoint per modul berarti N kontrak, dan pembaca harus menarik dari N tempat. Nama resource mengikuti aturan kata benda jamak kebab-case, dengan penyaringan lewat query parameter. |
+| K-23 | **Satu endpoint untuk semua jenis posting**: `/finance-postings`, disaring dengan `posting_type`. Klien integrasi bisa dibatasi per prefix jenis (misalnya hanya `asset.*`). Posting kasir kelak cukup menerbitkan `posting_type: cashier.receipt` ke feed yang sama. | BC mengekspos `journals`/`journalLines` dan `generalLedgerEntries` secara umum, bukan per modul. Endpoint per modul berarti N kontrak, dan pembaca harus melakukan pull dari N tempat. Nama resource mengikuti aturan kata benda jamak kebab-case, dengan penyaringan lewat query parameter. |
 | K-24 | **Number sequence hanya untuk dokumen dan identitas** (aset, penerimaan, mutasi, work order, vendor, pekerja). **Master setup diketik manual** (group aset, buku penyusutan, lokasi, jenis, kondisi, dan sejenisnya). Group aset dan buku penyusutan diubah **sebelum** bridging. Master setup lain menyusul **setelah** bridging. | BC hanya menomori aset tetap dan asuransi di Fixed Asset Setup. FA Class, FA Location, dan kode FA Posting Group diketik manual. D365 juga mengetik *Group ID* fixed asset group secara manual. Kode group dan buku ikut di payload dan tertanam di tabel penerjemah pembaca, jadi lebih murah diubah sebelum pembaca memakainya. |
 
 ## Alur
@@ -102,7 +102,7 @@ koreksi nilai ───────┤   (satu transaksi)   held / pending      
 post penyusutan ─────┤                      posted / rejected          konektor lain (nanti)
 reversal ────────────┘                      manual
                                                  │
-                                   agent ──▶ control-plane: jumlah pending/ditolak, tarikan terakhir
+                                   agent ──▶ control-plane: jumlah pending/ditolak, pull terakhir
 ```
 
 Posting ditulis **dalam transaksi database yang sama** dengan dokumen sumbernya. Penerimaan yang
@@ -212,7 +212,7 @@ Kode alasan penolakan: `PERIOD_CLOSED`, `UNKNOWN_ACCOUNT`, `UNKNOWN_DIMENSION`, 
 
 ### Mode `push`
 
-Untuk pembaca yang tidak bisa atau tidak mau menarik, CoreERP mengirim setiap posting sebagai
+Untuk pembaca yang tidak bisa atau tidak mau melakukan pull, CoreERP mengirim setiap posting sebagai
 `POST` ke URL HTTPS milik pembaca:
 
 - Body = bentuk posting yang sama persis. Header membawa `X-CoreERP-Event-Timestamp` dan
@@ -231,7 +231,7 @@ Untuk pembaca yang tidak bisa atau tidak mau menarik, CoreERP mengirim setiap po
 | Status | Arti | Disajikan ke pembaca? |
 | --- | --- | --- |
 | `held` | Ditahan di CoreERP: pemetaan akun kosong, akun nonaktif, atau dimensi tidak bisa dibentuk. Alasannya dicatat. | Tidak |
-| `pending` | Siap ditarik | Ya, berulang sampai di-ack |
+| `pending` | Siap di-pull atau dikirim | Ya, berulang sampai di-ack |
 | `posted` | Pembaca sudah membukukan | Tidak |
 | `rejected` | Pembaca menolak, dengan kode alasan | Tidak |
 | `manual` | Bertanggal sebelum cutover, atau ditandai manual oleh pengguna dengan alasan | Tidak |
@@ -375,9 +375,9 @@ Hasil studi halaman *Vendors* di F&O dan BC (TODO 2.1), dan bentuk yang dibangun
 
 - **Layar pantau di Core**: daftar posting per status, detail jurnal, alasan tahan/tolak dalam
   bentuk yang sama dengan pratinjau (masalah per baris dan jalan pintas ke perbaikannya), aksi
-  "tandai manual" dengan alasan, "validasi ulang", dan riwayat tarik, kirim, dan ack.
+  "tandai manual" dengan alasan, "validasi ulang", dan riwayat pull, kirim, dan ack.
 - **Laporan agent** membawa `finance_feed`: jumlah `pending`, `held`, `rejected`, umur posting
-  `pending` tertua, dan waktu tarikan terakhir. Control-plane menampilkannya di halaman site,
+  `pending` tertua, dan waktu pull terakhir. Control-plane menampilkannya di halaman site,
   supaya masalah terlihat sebelum klien menelepon.
 
 ## Di luar cakupan
@@ -398,7 +398,7 @@ Hasil studi halaman *Vendors* di F&O dan BC (TODO 2.1), dan bentuk yang dibangun
 | Konsultan akuntansi | Isi posting group per group aset | Posting tertahan (`held`) sampai terisi, tapi pengembangan bisa jalan |
 | Konsultan akuntansi | Konfirmasi akun PPN Masukan, Hutang, dan penyeimbang saldo awal | Uji terima |
 | Konsultan akuntansi | Presisi nilai IDR: 0 atau 2 desimal, dan presisi harga satuan (K-20) | Setelan presisi sebelum uji terima. Selama belum diputuskan, default 2. |
-| Tim old-finance | Job tarik, tabel penerjemah (akun, vendor, dimensi, entitas legal), faktur dari posting `direct_payable` tanpa jurnal kedua, ack, tanpa fallback | Uji terima E2E |
+| Tim old-finance | Job pull, tabel penerjemah (akun, vendor, dimensi, entitas legal), faktur dari posting `direct_payable` tanpa jurnal kedua, ack, tanpa fallback | Uji terima E2E |
 | Tim old-finance | Instance dev untuk uji E2E | Uji terima E2E |
 
 ## Kriteria terima

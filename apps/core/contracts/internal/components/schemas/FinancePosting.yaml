@@ -4,8 +4,8 @@ required: [contract_version, posting_id, posting_type, settlement_mode, legal_en
   posting_date, document_date, occurred_at, published_at, source_document, vendor,
   vendor_invoice_reference, journal_lines, totals, reverses_posting_id, adjusts_posting_id, details]
 description: |
-  Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai tarikan dan
-  dorongan (`webhooks.financePosting`).
+  Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai mode pull dan
+  mode push (`webhooks.financePosting`).
 properties:
   contract_version: { type: integer, enum: [1] }
   posting_id:

@@ -113,8 +113,8 @@ type Form = {
 };
 
 const MODE_LABEL: Record<Mode, string> = {
-    pull: 'Tarik (pembaca menarik)',
-    push: 'Dorong (CoreERP mengirim)',
+    pull: 'Pull',
+    push: 'Push',
 };
 
 function waktu(value: string | null): string {
@@ -207,7 +207,7 @@ function ClientSheet({
             if (result.token || result.signing_secret) {
                 onSecrets({
                     title: client
-                        ? 'Rahasia penanda tangan baru'
+                        ? 'Signing secret baru'
                         : `Klien ${result.data.name} dibuat`,
                     token: result.token ?? null,
                     signing_secret: result.signing_secret ?? null,
@@ -270,10 +270,10 @@ function ClientSheet({
                                 </NativeSelectOption>
                             </NativeSelect>
                             <FieldDescription>
-                                Tarik: aplikasi finance mengambil posting dan
-                                mengakuinya. Dorong: CoreERP mengirim tiap
-                                posting ke URL aplikasi finance dengan tanda
-                                tangan.
+                                Pull: aplikasi finance memanggil API CoreERP
+                                untuk mengambil posting, lalu mengirim ack.
+                                Push: CoreERP mengirim setiap posting ke URL
+                                aplikasi finance, dengan signature HMAC.
                             </FieldDescription>
                         </Field>
                         {form.delivery_mode === 'push' && (
@@ -292,7 +292,7 @@ function ClientSheet({
                             </Field>
                         )}
                         <FieldSet data-invalid={Boolean(error('scopes'))}>
-                            <FieldLegend>Izin</FieldLegend>
+                            <FieldLegend>Scope</FieldLegend>
                             {Object.entries(scopes).map(([code, label]) => (
                                 <Field key={code} orientation="horizontal">
                                     <Checkbox
@@ -337,7 +337,7 @@ function ClientSheet({
                                 }
                             />
                             <FieldDescription>
-                                Awalan jenis posting, pisahkan dengan koma.
+                                Prefix jenis posting, pisahkan dengan koma.
                                 Kosong berarti semua jenis.
                             </FieldDescription>
                             <FieldError>
@@ -437,7 +437,7 @@ function SecretsDialog({
                     {secrets.signing_secret && (
                         <>
                             <SecretValue
-                                label="Rahasia penanda tangan"
+                                label="Signing secret"
                                 value={secrets.signing_secret}
                             />
                             <p className="text-sm text-muted-foreground">
@@ -447,7 +447,7 @@ function SecretsDialog({
                                 </span>
                                 : HMAC-SHA256 atas{' '}
                                 <span className="font-mono">
-                                    &lt;timestamp&gt;.&lt;badan&gt;
+                                    &lt;timestamp&gt;.&lt;body&gt;
                                 </span>
                                 .
                             </p>
@@ -513,7 +513,8 @@ export default function IntegrationClients({
             if (result.data.ok) {
                 toast.success(result.data.message);
             } else {
-                toast.error(result.data.message);
+                // Sebab kegagalan perlu dibaca dan disalin ke tim aplikasi finance.
+                toast.error(result.data.message, { duration: 10_000 });
             }
         } catch (caught) {
             toast.error(errorText(caught, 'Kirim uji belum berhasil.'));
@@ -532,7 +533,7 @@ export default function IntegrationClients({
                     <CardHeader>
                         <CardTitle>Klien terdaftar</CardTitle>
                         <CardDescription>
-                            Setiap klien memakai token sendiri dengan izin yang
+                            Setiap klien memakai token sendiri dengan scope yang
                             sempit. Mencabut klien berlaku pada permintaan
                             berikutnya.
                         </CardDescription>
@@ -564,7 +565,7 @@ export default function IntegrationClients({
                                         <TableRow>
                                             <TableHead>Nama</TableHead>
                                             <TableHead>Mode</TableHead>
-                                            <TableHead>Izin</TableHead>
+                                            <TableHead>Scope</TableHead>
                                             <TableHead>Jenis posting</TableHead>
                                             <TableHead>
                                                 Terakhir dipakai
@@ -589,10 +590,11 @@ export default function IntegrationClients({
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {client.delivery_mode ===
-                                                    'push'
-                                                        ? 'Dorong'
-                                                        : 'Tarik'}
+                                                    {
+                                                        MODE_LABEL[
+                                                            client.delivery_mode
+                                                        ]
+                                                    }
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs">
                                                     {client.scopes.join(', ')}
@@ -670,15 +672,14 @@ export default function IntegrationClients({
                                                                                 action(
                                                                                     client,
                                                                                     'rotate-signing-secret',
-                                                                                    `Rahasia penanda tangan baru untuk ${client.name}`,
-                                                                                    'Rahasia diganti.',
+                                                                                    `Signing secret baru untuk ${client.name}`,
+                                                                                    'Signing secret diganti.',
                                                                                 )
                                                                             }
                                                                         >
                                                                             Ganti
-                                                                            rahasia
-                                                                            penanda
-                                                                            tangan
+                                                                            signing
+                                                                            secret
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem
                                                                             onSelect={() =>

@@ -186,7 +186,7 @@ const NO_FILTERS: Filters = {
 const STATUS = new Map<string, { label: string; variant: BadgeVariant }>(
     Object.entries({
         held: { label: 'Tertahan', variant: 'destructive' },
-        pending: { label: 'Menunggu ditarik', variant: 'secondary' },
+        pending: { label: 'Menunggu aplikasi finance', variant: 'secondary' },
         posted: { label: 'Sudah dibukukan', variant: 'default' },
         rejected: { label: 'Ditolak', variant: 'destructive' },
         manual: { label: 'Manual', variant: 'outline' },
@@ -831,7 +831,7 @@ function StatusNote({
                         {posting.problem_count > 0
                             ? `${COUNT.format(posting.problem_count)} masalah di pemeriksaan posting harus diperbaiki`
                             : 'Masalah di pemeriksaan posting harus diperbaiki'}{' '}
-                        sebelum posting ini dapat ditarik aplikasi finance.
+                        sebelum posting ini dapat sampai ke aplikasi finance.
                         {canManage &&
                             ' Setelah diperbaiki, pilih Validasi ulang.'}
                     </p>
@@ -982,8 +982,8 @@ function eventNote(event: PostingEvent): string {
 function servedSummary(posting: Posting): string {
     const served =
         posting.served_count > 0
-            ? `Ditarik aplikasi finance ${COUNT.format(posting.served_count)} kali, terakhir ${formatDateTime(posting.last_served_at)}.`
-            : 'Belum pernah ditarik aplikasi finance.';
+            ? `Di-pull aplikasi finance ${COUNT.format(posting.served_count)} kali, terakhir ${formatDateTime(posting.last_served_at)}.`
+            : 'Belum pernah di-pull aplikasi finance.';
 
     return posting.acknowledged_at
         ? `${served} Hasilnya dikonfirmasi ${formatDateTime(posting.acknowledged_at)}.`
@@ -1340,7 +1340,7 @@ function MarkManualDialog({
                             <AlertDescription>
                                 <p>
                                     {posting.served_count > 0
-                                        ? `Aplikasi finance sudah menarik posting ini ${COUNT.format(posting.served_count)} kali, terakhir ${formatDateTime(posting.last_served_at)}, tetapi belum mengonfirmasi hasilnya.`
+                                        ? `Posting ini sudah di-pull aplikasi finance ${COUNT.format(posting.served_count)} kali, terakhir ${formatDateTime(posting.last_served_at)}, tetapi hasilnya belum dikonfirmasi.`
                                         : 'Posting ini sudah dikirim ke aplikasi finance, tetapi hasilnya belum dikonfirmasi.'}{' '}
                                     Periksa di aplikasi finance lebih dulu
                                     supaya jurnalnya tidak tercatat dua kali.
@@ -1353,7 +1353,7 @@ function MarkManualDialog({
                                 ? 'Bila masalahnya dapat diperbaiki, misalnya akun yang belum dipetakan, perbaiki lalu pilih Validasi ulang supaya posting ini tetap dikirim otomatis.'
                                 : posting.status === 'rejected'
                                   ? 'Aplikasi finance sudah menolak posting ini. Setelah ditandai manual, bukukan transaksinya sendiri di aplikasi finance pada periode yang masih terbuka.'
-                                  : 'Aplikasi finance belum pernah menarik posting ini. Setelah ditandai manual, posting ini tidak akan disajikan kepadanya.'}
+                                  : 'Posting ini belum pernah sampai ke aplikasi finance. Setelah ditandai manual, posting ini tidak akan disajikan kepadanya.'}
                         </p>
                     )}
                     <Field data-invalid={Boolean(errors.reason)}>

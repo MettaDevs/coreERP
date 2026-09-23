@@ -115,7 +115,7 @@ paths:
         tenantHeader: []
       description: |
         Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
-        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        scope `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
         legal entity tidak dikembalikan di sini.
 
         Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
@@ -126,9 +126,9 @@ paths:
         `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
         `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
 
-        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
-        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
-        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari sinkron terakhir, kirim
+        sebagai `updated_since` pada sinkron berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Sinkron penuh tanpa
         `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
       parameters:
       - name: updated_since
