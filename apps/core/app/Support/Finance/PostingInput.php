@@ -16,7 +16,7 @@ final readonly class PostingInput
 {
     /**
      * @param  array{id: string, number: string, name: string}|null  $vendor
-     * @param  array{module: string, type: string, number: ?string, description: ?string, id: ?string}  $sourceDocument
+     * @param  array{module: string, type: string, number: ?string, description: ?string, id: ?string, url: ?string}  $sourceDocument
      * @param  list<array{line_no: int, account_id: ?string, debit: string, credit: string, description: ?string, org_unit_id: ?string, mapping: ?array{label: string, fix_url: ?string}}>  $lines
      * @param  array<string, mixed>  $details
      */
