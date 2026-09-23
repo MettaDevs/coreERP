@@ -15,6 +15,7 @@ dijelaskan di sini hanya yang khas modul ini.
 | `k6/maintenance.js` | Setup maintenance, dan perlombaan penggantian kaitan | dijalankan pada runtime baru |
 | `k6/depreciation.js` | Proposal, finalisasi, dan saldo penyusutan; perlombaan finalisasi | dijalankan pada runtime baru |
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
+| `k6/posting-group.js` | Posting group aset: perlombaan pembuatan dan arsip tanggal berlaku, akun dan group tenant lain | dijalankan pada runtime baru |
 | `verify.sql` | Oracle kebenaran modul, dibaca langsung dari database | dipakai sebagai gate |
 | `check-manifest.py` | Pemeriksa `app.yaml`; tidak ada hubungannya dengan beban | — |
 
@@ -81,6 +82,18 @@ docker run --rm -i --network core-loadtest_default `
   -e RUN_ID=gate-dep-race-1 -e FIXTURE=g1 `
   grafana/k6:0.55.0 run /scripts/aset/depreciation.js
 
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-pg-race-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/posting-group.js
+
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
+  -e RUN_ID=gate-pg-sat-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/posting-group.js
+
 docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\apperp\management-aset\loadtest\verify.sql
 ```
 
@@ -99,6 +112,7 @@ kembali aset dan ketiga periode yang sama alih-alih menumbuhkan data.
 | `attribute-race` | Apakah Values dan nilai aset tetap cocok saat diubah bersamaan? | 0 nilai di luar Values |
 | `transition-race` | Apakah dua transisi dari versi yang sama dapat sama-sama menang? | 0 `transition_double_wins` |
 | `finalize-race` | Apakah satu periode dapat menambah saldo buku dua kali? | 0 posting kedua, akumulasi tetap |
+| `race` (`posting-group.js`) | Apakah dua penyimpanan pertama untuk group dan tanggal yang sama, atau penyimpanan dan arsip yang bersamaan, dapat berakhir 500 atau baris campuran? | 0 `server_errors`, 0 `posting_group_mixed_rows` |
 | `latency` | Berapa concurrency yang masih memenuhi SLO? | p95/p99 per jenis operasi |
 
 Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode. Karena itu gate latensi
@@ -110,13 +124,15 @@ Tiga sumber terpisah, tidak ada yang memakai kode yang sedang diuji sebagai haki
 
 1. **`verify.sql` modul** — langsung ke database: kode ganda per tenant, `creation_key` ganda,
    anak yang menunjuk induk tenant lain, anak yatim, prefix kode yang tertukar antar reference,
-   baris modul yang menunjuk tenant yang tidak ada, dan tiap kode terikat ke satu baris terbitan
-   Number Sequence.
+   baris modul yang menunjuk tenant yang tidak ada, tiap kode terikat ke satu baris terbitan
+   Number Sequence (kecuali group aset dan buku penyusutan, yang kodenya diketik dan diperiksa
+   bentuknya), dan posting group yang menunjuk akun tenant lain.
 2. **`verify.sql` Core** — batas tenant, materialisasi sequence per entitlement, dan terbitan nomor
    yang menembus batas tenant.
 3. **Probe di dalam k6** — sesi tenant A membaca record tenant B (harus 404), menulis anak di bawah
    induk tenant B (harus 422), memindahkan status work order tenant B (harus 404), memfinalkan
-   periode penyusutan tenant B (harus 404), dan tenant yang role-nya dipersempit ke satu duty
+   periode penyusutan tenant B (harus 404), menulis posting group tenant B (harus 404) atau
+   memakai akun tenant B (harus 422), dan tenant yang role-nya dipersempit ke satu duty
    membuka master atau permukaan sebelahnya (harus 403). Semuanya berjalan **selama** beban penuh,
    bukan sesudahnya.
 

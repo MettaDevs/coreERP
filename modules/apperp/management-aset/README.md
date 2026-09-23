@@ -227,9 +227,11 @@ bukan nomor, supaya impor ulang daftar akun tidak memutus pemetaan.
 | PPN Masukan | bila dipakai | penerimaan yang membawa PPN |
 | Penyeimbang saldo awal | bila dipakai | saldo awal saat cutover |
 
-Sel akun wajib yang kosong, dan sel yang menunjuk akun nonaktif, ditandai merah, beserta
-ringkasan jumlah group yang belum lengkap. Akun yang kosong tidak menghalangi transaksi aset;
-posting yang membutuhkannya tertahan di Core dengan jalan pintas ke layar ini (K-18, K-22).
+Sel akun wajib yang kosong ditandai merah, begitu pula sel yang menunjuk akun yang tidak bisa
+dipakai lagi (tidak ada di daftar akun, nonaktif, atau kini khusus satu entitas legal), beserta
+ringkasan jumlah group yang perlu dibenahi; keduanya sama-sama menahan posting. Akun yang kosong
+tidak menghalangi transaksi aset; posting yang membutuhkannya tertahan di Core dengan jalan pintas
+ke layar ini (K-18, K-22).
 
 - Hanya akun aktif yang berlaku untuk semua entitas legal yang dapat dipilih, karena posting
   group berlaku untuk seluruh tenant.

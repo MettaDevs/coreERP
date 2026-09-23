@@ -328,7 +328,8 @@ dan dimensi lokasi mewarisi dari induk.
   - [x] 8.1.5 Tanda merah di setiap sel akun wajib yang masih kosong, seperti *General Posting Setup* BC, plus ringkasan jumlah group yang belum lengkap di atas matriks.
     Wajib: harga perolehan, akumulasi, beban penyusutan, lawan hutang. Perantara, PPN Masukan, dan penyeimbang saldo
     awal hanya dipakai keadaan tertentu, jadi tidak ditandai; posting yang membutuhkannya tetap tertahan. Sel yang
-    menunjuk akun nonaktif juga merah.
+    menunjuk akun yang tidak bisa dipakai lagi (tidak ada di daftar akun, nonaktif, atau kini khusus satu entitas)
+    juga merah, dan group-nya ikut dihitung di ringkasan, karena posting-nya sama-sama tertahan.
 - [x] 8.2 Cara perolehan (K-12).
   - [x] 8.2.1 Konstanta `pembelian`, `hibah`, `saldo_awal` (`Support/AcquisitionMethod`).
   - [x] 8.2.2 Untuk sekarang, semua cara memakai kolom akun yang sama. Tulis titik perluasannya di kode supaya akun per cara bisa ditambah nanti.
@@ -355,6 +356,9 @@ dan dimensi lokasi mewarisi dari induk.
   - [x] 8.6.3 Buku `none` tidak pernah menghasilkan posting (`DepreciationEndToEndTest`, termasuk lewat pembalikan). Yang
     diuji hari ini ekspor lama; "Post penyusutan" (11.2) wajib memakai aturan yang sama.
   - [x] 8.6.4 Kode group aset dan buku penyusutan diketik manual, unik per tenant, dan tidak bisa diubah setelah dipakai posting (`KodeKetikMasterSetupTest`).
+  - [x] 8.6.5 Uji beban posting group (`loadtest/k6/posting-group.js`): balapan pembuatan dan arsip tanggal yang sama,
+    group dan akun tenant lain. 0 error 500 dan 0 baris campuran; tanpa kunci pada baris group, 66 error 500 dalam 30
+    detik. Hasil dan batas kejujurannya di `apps/core/loadtest/README.md`.
 - [x] 8.7 Kode manual untuk group aset dan buku penyusutan (K-24). **Wajib selesai sebelum 15.1.**
   - [x] 8.7.1 Form group aset dan buku penyusutan menerima kode yang diketik (huruf besar, angka, `-`), misalnya `KENDARAAN`, `KOMERSIAL`. Paling panjang 30 karakter, sama dengan nomor operating unit; di form, huruf kecil dijadikan besar dan spasi menjadi `-`.
   - [x] 8.7.2 Hentikan pemakaian referensi `management-aset.group-aset` dan `management-aset.buku-penyusutan` di `app.yaml` untuk kode baru. Referensinya jangan dihapus dulu, supaya tenant yang sudah menyetelnya tidak rusak (N-1). Buku starter kini lahir sebagai `KOMERSIAL` dan `FISKAL`.

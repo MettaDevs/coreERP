@@ -137,6 +137,9 @@ dilanggar, dan angkanya dicatat.
 | Probe penyusutan di dalam k6 | proposal dan finalisasi yang diulang, saldo buku, batas tenant, eskalasi hak | `SELFTEST=1` pada `depreciation.js` → lihat tabel rincian di bawah, exit 99 |
 | `verify.sql` (module) — transisi status | baris status log di luar grafik `WorkOrderStatus` | satu baris `draft` → `ditutup` disuntik → pemeriksaan naik ke 1, exit 3; baris dihapus, exit kembali 0 |
 | `verify.sql` (module) — saldo buku | akumulasi buku aset versus jumlah periode final miliknya | satu periode final bernilai 1 disuntik → pemeriksaan naik ke 1, exit 3; baris dihapus, exit kembali 0 |
+| `posting_group_mixed_rows` dan probe posting group | baris posting group campuran A/B, tulis ke group tenant lain, akun tenant lain diterima | `SELFTEST=1` pada `posting-group.js` → 3.701 dari 4.229 pembacaan balik dan 128 probe tercatat, exit 99 |
+| `server_errors` pada balapan posting group | pembuatan kedua untuk group dan tanggal yang sama menabrak indeks unik | controller **tanpa** `lockForUpdate` disalin sementara ke keempat container → 66 error 500 dalam 30 detik, semuanya 23505 `aset_m_posting_group_berlaku_unique`, exit 99; container dibuat ulang dari image |
+| `verify.sql` (module) — posting group dan kode diketik | akun tenant lain atau yang tidak ada di kolom akun; bentuk kode group aset dan buku penyusutan | satu baris ber-akun tenant lain disuntik dan satu kode group diubah menjadi `pg salah` → kedua pemeriksaan naik ke 1, exit 3; dipulihkan, exit kembali 0 |
 
 `SELFTEST=1` merusak **permintaan**, bukan produknya: probe lintas tenant diarahkan ke record
 milik sendiri, probe eskalasi memakai sesi yang memang berhak, dan penulis balapan mengirim
@@ -312,6 +315,52 @@ yang baru (`transisi status work order di luar grafik`, `akumulasi buku aset tid
 jumlah periode final`) dan `posting export penyusutan ganda`, yang setelah 3.055 balapan
 finalisasi tetap nol. `verify.sql` Core: 12 pemeriksaan, semuanya 0, 95.576 nomor terbit tanpa
 satu pun ganda.
+
+### Gate kebenaran posting group aset — LULUS (area 8 feed posting finance)
+
+Diukur **23 September 2026** pada mesin yang sama, image `erp-core-app:a8-posting-group` yang
+dibangun dari branch area 8, `FIXTURE=pg1` (128 tenant baru). Skenarionya
+`modules/apperp/management-aset/loadtest/k6/posting-group.js`.
+
+`RUN_ID=pg-race-1`: 32 VU dipusatkan pada 4 tenant dan 4 group, 90 detik. Setiap detik seluruh VU
+satu group menulis tanggal berlaku baru yang sama, dan sebagian VU mengarsipkan tanggal tetap yang
+sedang ditulis VU lain.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `server_errors` (termasuk pembuatan kedua yang menabrak indeks unik) | 0 |
+| `posting_group_mixed_rows` | 0 dari 38.625 pembacaan balik |
+| `correctness_violations` (probe group dan akun tenant lain) | 0 |
+| PUT pertama ke tanggal baru yang didahului VU lain | 653, sementara yang menang 319 — balapannya benar-benar terjadi |
+| Arsip yang berebut dengan penulis | 27 |
+| Permintaan gagal | 0 |
+
+`RUN_ID=pg-sat-2`: 1000 VU, 128 tenant, 90 detik.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` | 0 |
+| `posting_group_mixed_rows` | 0 dari 1.268 pembacaan balik |
+| `server_errors` | 0 |
+| Iterasi / request | 615 / 6.318 |
+| Timeout klien (batas 60 detik) | 1.746 — kapasitas, bukan cacat |
+
+`verify.sql` module: semua pemeriksaan 0, termasuk tiga pemeriksaan posting group dan
+pemeriksaan kode diketik. Dua di antaranya ditahan skema, bukan kode, dan dicatat sebagai itu:
+suntikan baris ganda ditolak `aset_m_posting_group_berlaku_unique`, dan suntikan group tenant
+lain ditolak kunci asing `aset_m_posting_group_tenant_id_group_aset_id_foreign`.
+
+**Batas kejujuran run ini.** Throughput sekitar 35 request per detik, sepertiga dari 10 September:
+host sedang menjalankan suite test modul dan language server PHP milik editor. Angka latensinya
+karena itu bukan pengukuran gate dan tidak sebanding dengan tabel lain di halaman ini. Sebagai
+pembanding biaya satu permintaan tanpa antrean, `RUN_ID=pg-base-1` (1 VU, 20 detik) mengukur baca
+p50 114 ms / p95 181 ms dan tulis p50 92 ms / p95 151 ms. Timeout pada saturasi adalah antrean
+1000 VU di depan 128 worker, bukan endpoint yang lambat.
+
+`verify.sql` Core pada run yang sama gagal di satu pemeriksaan, `boundary tenant tidak lengkap`
+(128 dari 128): pemeriksaan itu masih menuntut baris `tenant_deployments`, yang tidak lagi ditulis
+pendaftaran sejak registry environment. Itu oracle yang tertinggal, bukan tenant setengah jadi;
+seluruh pemeriksaan Core lainnya 0.
 
 ### Gate latensi work order dan penyusutan (F7-03 sisa)
 

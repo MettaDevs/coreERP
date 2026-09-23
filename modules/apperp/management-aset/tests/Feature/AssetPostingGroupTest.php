@@ -70,7 +70,7 @@ class AssetPostingGroupTest extends TestCase
         $matriks = $this->pengguna(['read'])->getJson(self::API)->assertOk();
 
         $this->assertSame(2, DB::table('aset_m_posting_group')->where('group_aset_id', $kendaraan)->count());
-        $matriks->assertJsonPath('data.incomplete_groups', 1)
+        $matriks->assertJsonPath('data.groups_needing_attention', 1)
             ->assertJsonPath('data.accounts.0', ['column' => 'acquisition_account_id', 'label' => 'Harga perolehan', 'required' => true])
             ->assertJsonPath('data.accounts.4', ['column' => 'clearing_account_id', 'label' => 'Perantara', 'required' => false])
             ->assertJsonPath('data.account_details.'.$this->akun['hutang_lain'].'.code', '2-1200');
@@ -138,6 +138,38 @@ class AssetPostingGroupTest extends TestCase
         // Pemilih akun hanya menawarkan akun aktif yang berlaku untuk semua entitas.
         $pilihan = $this->pengguna(['read'])->getJson(self::API.'/akun?q=1-23')->assertOk()->collect('data')->pluck('code')->all();
         $this->assertSame(['1-2300'], $pilihan);
+    }
+
+    public function test_an_account_changed_after_mapping_flags_its_group_without_blocking_the_row(): void
+    {
+        $group = $this->group('KENDARAAN');
+        $this->simpan($group, '2026-01-01', $this->wajib())->assertCreated();
+        $this->pengguna(['read'])->getJson(self::API)
+            ->assertJsonPath('data.groups_needing_attention', 0)
+            ->assertJsonPath('data.groups.0.unusable_accounts', []);
+
+        // Impor ulang daftar akun menonaktifkan satu akun dan menjadikan akun lain khusus satu entitas.
+        $entitas = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $entitas, 'legal_entity');
+        FinanceReferenceAccount::query()->whereKey($this->akun['akumulasi'])->update(['active' => false]);
+        FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['legal_entity_id' => $entitas]);
+
+        // Tidak ada kolom kosong, tetapi posting-nya akan tertahan, jadi group-nya tetap dihitung.
+        $this->pengguna(['read'])->getJson(self::API)
+            ->assertJsonPath('data.groups_needing_attention', 1)
+            ->assertJsonPath('data.groups.0.missing', [])
+            ->assertJsonPath('data.groups.0.unusable_accounts', ['accumulated_depreciation_account_id', 'payable_account_id']);
+
+        // Kolom yang tidak diubah tidak diperiksa ulang, jadi kolom lain tetap bisa diperbaiki.
+        $this->simpan($group, '2026-01-01', [...$this->wajib(), 'payable_account_id' => $this->akun['hutang_lain']])->assertOk();
+        // Akun yang sama tetap ditolak begitu dipilih untuk kolom yang berubah.
+        $this->simpan($group, '2026-01-01', [...$this->wajib(), 'payable_account_id' => $this->akun['hutang_lain'], 'depreciation_expense_account_id' => $this->akun['hutang']])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['depreciation_expense_account_id' => 'khusus satu entitas legal']);
+
+        $this->pengguna(['read'])->getJson(self::API)
+            ->assertJsonPath('data.groups_needing_attention', 1)
+            ->assertJsonPath('data.groups.0.unusable_accounts', ['accumulated_depreciation_account_id']);
     }
 
     public function test_an_archived_row_leaves_the_matrix_and_its_date_can_be_used_again(): void

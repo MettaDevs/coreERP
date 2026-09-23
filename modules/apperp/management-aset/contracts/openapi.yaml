@@ -6201,7 +6201,7 @@ components:
           - today
           - accounts
           - groups
-          - incomplete_groups
+          - groups_needing_attention
           - account_details
           properties:
             today:
@@ -6235,6 +6235,7 @@ components:
                 - current
                 - rows
                 - missing
+                - unusable_accounts
                 properties:
                   id:
                     $ref: '#/components/schemas/Ulid'
@@ -6259,8 +6260,16 @@ components:
                     type: array
                     items:
                       type: string
-            incomplete_groups:
-              description: Jumlah group yang akun wajibnya belum lengkap hari ini.
+                  unusable_accounts:
+                    description: 'Kolom baris yang berlaku yang menunjuk akun yang tidak bisa dipakai posting: tidak ada lagi
+                      di daftar akun, nonaktif, atau kini khusus satu entitas legal. Hanya terjadi bila daftar akun berubah
+                      sesudah dipetakan; posting yang memakainya tertahan di Core.'
+                    type: array
+                    items:
+                      type: string
+            groups_needing_attention:
+              description: 'Jumlah group yang posting-nya akan tertahan dengan baris yang berlaku hari ini: `missing` atau
+                `unusable_accounts`-nya tidak kosong.'
               type: integer
             account_details:
               description: Akun yang dipakai matriks, berkunci id.

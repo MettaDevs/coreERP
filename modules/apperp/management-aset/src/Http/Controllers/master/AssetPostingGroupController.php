@@ -52,8 +52,10 @@ class AssetPostingGroupController extends Controller
             }
         }
 
+        $details = $this->daftarAkun->banyak($tenantId, array_values($accountIds));
+
         $groups = [];
-        $incomplete = 0;
+        $needingAttention = 0;
         foreach (GroupAset::query()->orderBy('kode')->get(['id', 'kode', 'nama', 'aktif']) as $group) {
             /** @var list<AssetPostingGroup> $history */
             $history = array_values(($rows->get($group->getKey()) ?? collect())->all());
@@ -65,8 +67,9 @@ class AssetPostingGroupController extends Controller
                 }
             }
             $missing = $current?->missingRequiredAccounts() ?? AssetPostingGroup::REQUIRED_ACCOUNTS;
-            if ($missing !== []) {
-                $incomplete++;
+            $unusable = $current ? $this->unusableAccounts($current, $details) : [];
+            if ($missing !== [] || $unusable !== []) {
+                $needingAttention++;
             }
 
             $groups[] = [
@@ -77,6 +80,7 @@ class AssetPostingGroupController extends Controller
                 'current' => $current ? $this->present($current) : null,
                 'rows' => array_map(fn (AssetPostingGroup $row): array => $this->present($row), $history),
                 'missing' => $missing,
+                'unusable_accounts' => $unusable,
             ];
         }
 
@@ -92,8 +96,8 @@ class AssetPostingGroupController extends Controller
                 array_values(AssetPostingGroup::ACCOUNTS),
             ),
             'groups' => $groups,
-            'incomplete_groups' => $incomplete,
-            'account_details' => (object) $this->daftarAkun->banyak($tenantId, array_values($accountIds)),
+            'groups_needing_attention' => $needingAttention,
+            'account_details' => (object) $details,
         ]]);
     }
 
@@ -159,10 +163,11 @@ class AssetPostingGroupController extends Controller
     }
 
     /**
-     * Akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif. Akun yang
-     * dinonaktifkan sesudah dipetakan tetap boleh tinggal di kolom yang tidak diubah, supaya
-     * baris lama masih dapat disimpan untuk memperbaiki kolom lain; posting yang memakainya tetap
-     * tertahan di Core sampai akunnya diganti.
+     * Akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif. Kolom yang
+     * tidak diubah tidak diperiksa ulang: akun yang sesudah dipetakan dinonaktifkan, dihapus, atau
+     * dijadikan khusus satu entitas oleh impor ulang daftar akun tetap boleh tinggal, supaya baris
+     * lama masih dapat disimpan untuk memperbaiki kolom lain. Posting yang memakainya tetap
+     * tertahan di Core sampai akunnya diganti, dan matriks menandainya.
      *
      * @param  array<string, ?string>  $accounts
      */
@@ -171,7 +176,7 @@ class AssetPostingGroupController extends Controller
         $known = $this->daftarAkun->banyak($tenantId, array_values(array_unique(array_filter($accounts))));
         $errors = [];
         foreach ($accounts as $column => $accountId) {
-            if ($accountId === null) {
+            if ($accountId === null || $existing?->getAttribute($column) === $accountId) {
                 continue;
             }
             $account = $known[$accountId] ?? null;
@@ -180,13 +185,39 @@ class AssetPostingGroupController extends Controller
                 $errors[$column] = sprintf('Akun %s tidak ada di daftar akun.', strtolower($label));
             } elseif ($account['legal_entity_id'] !== null) {
                 $errors[$column] = sprintf('Akun %s %s khusus satu entitas legal. Posting group berlaku untuk semua entitas, jadi pilih akun yang berlaku untuk semua entitas.', $account['code'], $account['name']);
-            } elseif (! $account['active'] && $existing?->getAttribute($column) !== $accountId) {
+            } elseif (! $account['active']) {
                 $errors[$column] = sprintf('Akun %s %s nonaktif.', $account['code'], $account['name']);
             }
         }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * Kolom baris yang menunjuk akun yang tidak bisa dipakai posting: hilang dari daftar akun,
+     * nonaktif, atau kini khusus satu entitas legal. Akun seperti itu hanya bisa muncul bila daftar
+     * akun berubah sesudah dipetakan, karena penyimpanan menolaknya. Posting yang memakainya
+     * tertahan di Core, jadi group-nya ikut dihitung perlu dibenahi walau tidak ada kolom kosong.
+     *
+     * @param  array<string, array{active: bool, legal_entity_id: ?string}>  $details
+     * @return list<string>
+     */
+    private function unusableAccounts(AssetPostingGroup $row, array $details): array
+    {
+        $unusable = [];
+        foreach (array_keys(AssetPostingGroup::ACCOUNTS) as $column) {
+            $accountId = $row->getAttribute($column);
+            if (! is_string($accountId)) {
+                continue;
+            }
+            $account = $details[$accountId] ?? null;
+            if ($account === null || ! $account['active'] || $account['legal_entity_id'] !== null) {
+                $unusable[] = $column;
+            }
+        }
+
+        return $unusable;
     }
 
     /** @return array<string, mixed> */

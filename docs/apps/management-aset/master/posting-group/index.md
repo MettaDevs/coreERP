@@ -36,7 +36,7 @@ Setiap kolom akun menyimpan id `finance_reference_accounts`, tanpa foreign key. 
 
 | Endpoint | Gunanya |
 | --- | --- |
-| `GET /api/v1/posting-group-aset` | Matriks: setiap group dengan baris yang berlaku hari ini, riwayatnya, dan akun wajib yang kosong |
+| `GET /api/v1/posting-group-aset` | Matriks: setiap group dengan baris yang berlaku hari ini, riwayatnya, akun wajib yang kosong, dan akun yang tidak bisa dipakai lagi |
 | `GET /api/v1/posting-group-aset/akun?q=` | Pemilih akun: akun aktif yang berlaku untuk semua entitas legal |
 | `PUT /api/v1/posting-group-aset/{group}/{tanggal}` | Menyimpan satu baris; tanggal baru menjadi baris baru |
 | `DELETE /api/v1/posting-group-aset/{group}/{tanggal}` | Mengarsipkan satu baris |
@@ -54,15 +54,19 @@ Kodenya `fixed-asset-posting-profiles` karena itulah kode yang sudah terdaftar d
 
 Duty-nya `management-aset.fixed-asset-posting-profiles.manage`, **terpisah** dari duty lain (keputusan pemilik produk, 22 September 2026). Akun jurnal menentukan ke mana uang dicatat; role yang sudah ada tidak boleh diam-diam ikut dapat mengubahnya hanya karena duty lamanya bertambah isi.
 
+Akibatnya pada tenant yang sudah ada sebelum rilis ini: role Owner menyimpan salinan duty saat tenant mendaftar, dan sinkronisasi katalog tidak menambahkan duty baru ke role mana pun. Layar tetap terlihat, karena `.view` masih ikut duty setup aset tetap yang lama, tetapi hanya untuk dilihat (tombolnya **Lihat**, bukan **Atur**) sampai admin tenant menambahkan duty `fixed-asset-posting-profiles.manage` ke sebuah role. Tenant yang mendaftar sesudah rilis mendapatkannya lewat role Owner.
+
 ## Aturan yang dijaga, dan alasannya
 
 **Baris dipilih menurut tanggal posting, bukan tanggal hari ini.** Posting memakai baris dengan `effective_from` terbesar yang tidak melewati tanggal postingnya (`AssetPostingAccounts::effective()`). Akun group bisa berganti, misalnya saat konsultan memecah akun kendaraan. Posting tertahan bertanggal sebelum pergantian yang divalidasi ulang sesudahnya tetap harus masuk ke akun lama.
 
-**Menyimpan adalah `PUT` ke alamat pasangan group dan tanggal.** Baris tidak punya kode, identitasnya pasangan itu. Mengulang permintaan yang sama karena jaringan putus memperbarui baris yang sama, bukan membuat baris kedua, jadi tidak perlu `Idempotency-Key`. Dua penyimpanan pertama yang bersamaan untuk tanggal yang sama berjalan berurutan lewat kunci pada baris group aset; tanpa kunci itu yang kedua menabrak indeks unik sebagai 500.
+**Menyimpan adalah `PUT` ke alamat pasangan group dan tanggal.** Baris tidak punya kode, identitasnya pasangan itu. Mengulang permintaan yang sama karena jaringan putus memperbarui baris yang sama, bukan membuat baris kedua, jadi tidak perlu `Idempotency-Key`. Dua penyimpanan pertama yang bersamaan untuk tanggal yang sama berjalan berurutan lewat kunci pada baris group aset; tanpa kunci itu yang kedua menabrak indeks unik sebagai 500. Uji beban membuktikannya: tanpa kunci, 66 error 500 dalam 30 detik; dengan kunci, 0 dalam 90 detik (`apps/core/loadtest/README.md`).
 
 **Hanya akun yang berlaku untuk semua entitas legal.** Posting group berlaku untuk seluruh tenant. Akun khusus satu entitas akan tertahan di Core dengan `ACCOUNT_OTHER_LEGAL_ENTITY` begitu dipakai posting entitas lain, jadi ia ditolak sejak disimpan.
 
-**Akun nonaktif ditolak, kecuali sudah ada di kolom itu sebelumnya.** Akun yang dinonaktifkan sesudah dipetakan tidak boleh menghalangi perbaikan kolom lain di baris yang sama. Selnya ditandai merah, dan posting yang memakainya tetap tertahan sampai akunnya diganti.
+**Akun nonaktif ditolak, tetapi kolom yang tidak diubah tidak diperiksa ulang.** Daftar akun bisa berubah sesudah dipetakan: akun dinonaktifkan, hilang, atau dijadikan khusus satu entitas oleh impor ulang. Perubahan itu tidak boleh menghalangi perbaikan kolom lain di baris yang sama, jadi hanya kolom yang nilainya berubah yang diperiksa.
+
+**Ringkasan menghitung setiap group yang posting-nya akan tertahan, bukan hanya yang kolomnya kosong.** Sel yang menunjuk akun yang tidak bisa dipakai lagi ditandai merah seperti sel kosong, dan group-nya ikut dihitung (`unusable_accounts`, `groups_needing_attention`). Tanpa itu, ringkasan bisa hilang padahal posting group itu tetap tertahan, dan orang berhenti melihat sel merahnya.
 
 **Kolom kosong tidak menghalangi transaksi aset.** Penerimaan dan penyusutan tetap berjalan; posting yang membutuhkan akun kosong tertahan di Core dengan jalan pintas ke layar ini (K-18, K-22). Kesalahan pemetaan tidak boleh menghentikan pekerjaan operasional.
 
@@ -86,6 +90,7 @@ Duty-nya `management-aset.fixed-asset-posting-profiles.manage`, **terpisah** dar
 | `src/Support/AcquisitionMethod.php` | Cara perolehan |
 | `ui/asset-posting-group/AssetPostingGroupPage.tsx` | Layar matriks dan form per tanggal berlaku |
 | `tests/Feature/AssetPostingGroupTest.php` | Test aturan di atas |
+| `loadtest/k6/posting-group.js`, `loadtest/verify.sql` | Uji beban: balapan pembuatan dan arsip tanggal yang sama, akun dan group tenant lain |
 
 ## Halaman terkait
 

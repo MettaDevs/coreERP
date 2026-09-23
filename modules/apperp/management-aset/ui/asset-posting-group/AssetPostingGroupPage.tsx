@@ -71,18 +71,37 @@ type Group = {
     current: PostingRow | null;
     rows: PostingRow[];
     missing: string[];
+    unusable_accounts: string[];
 };
 
 type Matrix = {
     today: string;
     accounts: AccountColumn[];
     groups: Group[];
-    incomplete_groups: number;
+    groups_needing_attention: number;
     account_details: Record<string, Account>;
 };
 
 /** Nilai pilihan "tidak dipetakan"; `Select` tidak punya pilihan kosong bawaan. */
 const NONE = '__none__';
+
+/**
+ * Kenapa akun yang sudah dipetakan tidak bisa dipakai posting, atau `null` bila bisa. Hanya terjadi
+ * bila daftar akun berubah sesudah dipetakan; posting yang memakainya tertahan di Core.
+ */
+function accountProblem(account: Account | undefined): string | null {
+    if (account === undefined) {
+        return 'Tidak ada di daftar akun';
+    }
+
+    if (!account.active) {
+        return 'Nonaktif';
+    }
+
+    return account.legal_entity_id === null
+        ? null
+        : 'Khusus satu entitas legal';
+}
 
 function accountOf(row: PostingRow | null, column: string): string | null {
     const value = row?.[column];
@@ -203,7 +222,7 @@ function Summary({ matrix }: { matrix: Matrix }) {
         .filter((account) => account.required)
         .map((account) => account.label.toLowerCase());
 
-    if (matrix.incomplete_groups === 0) {
+    if (matrix.groups_needing_attention === 0) {
         return (
             <p className="text-muted-foreground text-sm">
                 Semua group sudah punya akun wajib yang berlaku hari ini.
@@ -217,13 +236,13 @@ function Summary({ matrix }: { matrix: Matrix }) {
             className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
         >
             <p className="font-medium">
-                {matrix.incomplete_groups} dari {matrix.groups.length} group
-                belum lengkap.
+                {matrix.groups_needing_attention} dari {matrix.groups.length}{' '}
+                group perlu dibenahi.
             </p>
             <p className="mt-1">
-                Akun wajib ({required.join(', ')}) masih kosong di sel yang
-                ditandai merah. Posting aset dari group itu akan tertahan sampai
-                akunnya diisi.
+                Sel merah menandai akun wajib ({required.join(', ')}) yang masih
+                kosong, atau akun yang tidak bisa dipakai lagi. Posting aset
+                dari group itu akan tertahan sampai akunnya dibenahi.
             </p>
         </div>
     );
@@ -327,9 +346,8 @@ function AccountCell({
     details: Record<string, Account>;
 }) {
     const account = accountId ? details[accountId] : undefined;
-    const problem =
-        (accountId === null && column.required) ||
-        (accountId !== null && (account === undefined || !account.active));
+    const reason = accountId === null ? null : accountProblem(account);
+    const problem = (accountId === null && column.required) || reason !== null;
     const className = problem
         ? 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'
         : undefined;
@@ -356,16 +374,14 @@ function AccountCell({
                     <span className="block max-w-56 truncate text-sm">
                         {account.name}
                     </span>
-                    {!account.active && (
+                    {reason && (
                         <span className="block text-xs font-medium">
-                            Nonaktif
+                            {reason}
                         </span>
                     )}
                 </>
             ) : (
-                <span className="text-sm font-medium">
-                    Tidak ada di daftar akun
-                </span>
+                <span className="text-sm font-medium">{reason}</span>
             )}
         </TableCell>
     );
@@ -790,6 +806,7 @@ function AccountField({
         ];
     }, [results, known, value]);
     const current = value ? known[value] : undefined;
+    const reason = value ? accountProblem(current) : null;
 
     if (disabled) {
         return (
@@ -825,9 +842,9 @@ function AccountField({
                     onChange(next === null || next === NONE ? null : next)
                 }
             />
-            {current && !current.active && (
+            {reason && (
                 <FieldDescription>
-                    Akun ini nonaktif. Posting yang memakainya tertahan sampai
+                    {reason}. Posting yang memakai akun ini tertahan sampai
                     akunnya diganti.
                 </FieldDescription>
             )}
