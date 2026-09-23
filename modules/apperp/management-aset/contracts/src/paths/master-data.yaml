@@ -313,6 +313,130 @@
         $ref: '#/components/responses/NotFound'
       '422':
         $ref: '#/components/responses/ValidationError'
+/api/v1/posting-group-aset:
+  get:
+    tags:
+    - Master data
+    operationId: listPostingGroupAset
+    summary: Matriks posting group aset beserta riwayat tanggal berlakunya
+    description: |
+      Permission `management-aset.fixed-asset-posting-profiles.read`. Satu entri per group aset
+      yang belum diarsipkan: baris yang berlaku hari ini (`current`), seluruh baris bertanggal
+      berlaku, dan akun wajib yang masih kosong (`missing`). Posting memakai baris dengan
+      `effective_from` terbesar yang tidak melewati tanggal postingnya. `account_details`
+      menerjemahkan id akun menjadi nomor dan nama dari daftar akun referensi Core.
+    responses:
+      '200':
+        description: Matriks posting group
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostingGroupAsetMatrix'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+/api/v1/posting-group-aset/akun:
+  get:
+    tags:
+    - Master data
+    operationId: searchPostingGroupAsetAccounts
+    summary: Akun untuk pemilih akun posting group
+    description: |
+      Permission `management-aset.fixed-asset-posting-profiles.read`. Hanya akun aktif yang
+      berlaku untuk semua entitas legal, karena posting group berlaku untuk seluruh tenant. Paling
+      banyak 20 akun, dicocokkan dengan nomor, nama, atau `external_id`.
+    parameters:
+    - name: q
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 100
+    responses:
+      '200':
+        description: Akun yang cocok
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferenceAccountList'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+/api/v1/posting-group-aset/{groupAset}/{effectiveFrom}:
+  parameters:
+  - name: groupAset
+    in: path
+    required: true
+    schema:
+      $ref: '#/components/schemas/Ulid'
+  - name: effectiveFrom
+    in: path
+    required: true
+    description: Tanggal berlaku, `Y-m-d`. Bentuk lain tidak cocok dengan rutenya dan dijawab 404.
+    schema:
+      type: string
+      format: date
+  put:
+    tags:
+    - Master data
+    operationId: upsertPostingGroupAset
+    summary: Menyimpan akun satu group aset untuk satu tanggal berlaku
+    description: |
+      Satu baris diidentifikasi pasangan group dan tanggal berlaku, jadi mengulang permintaan yang
+      sama tidak menambah baris dan tidak memerlukan `Idempotency-Key`. Baris untuk tanggal baru
+      butuh `management-aset.fixed-asset-posting-profiles.create`; baris yang sudah ada butuh
+      `...update`. Kolom akun yang tidak dikirim dikosongkan.
+
+      Setiap akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif.
+      Akun yang dinonaktifkan sesudah dipetakan boleh tetap di kolom yang tidak diubah, supaya
+      baris lama masih dapat disimpan untuk memperbaiki kolom lain.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostingGroupAsetAccounts'
+    responses:
+      '200':
+        description: Baris yang sudah ada diperbarui
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostingGroupAsetRowResponse'
+      '201':
+        description: Baris untuk tanggal berlaku baru dibuat
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostingGroupAsetRowResponse'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+  delete:
+    tags:
+    - Master data
+    operationId: archivePostingGroupAset
+    summary: Mengarsipkan satu baris posting group
+    description: |
+      Permission `management-aset.fixed-asset-posting-profiles.archive`. Posting yang tanggalnya
+      jatuh di masa berlaku baris ini lalu memakai baris sebelumnya, atau tertahan bila tidak ada.
+      Tanggal yang sama boleh dipakai lagi untuk baris baru.
+    responses:
+      '204':
+        description: Baris diarsipkan
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
 /api/v1/jenis-aset/{id}/atribut:
   parameters:
   - $ref: '#/components/parameters/RecordId'

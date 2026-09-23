@@ -316,28 +316,44 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
 aset bisa dipetakan ke akun referensi, buku menentukan boleh di-post atau tidak lewat satu saklar,
 dan dimensi lokasi mewarisi dari induk.
 
-- [ ] 8.1 Posting group aset, menggantikan placeholder `ui/pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage.tsx`.
-  - [ ] 8.1.1 Tabel `aset_m_posting_group`: `group_aset_id`, `effective_from`, dan tujuh kolom akun (ID daftar akun referensi): harga perolehan, akumulasi, beban penyusutan, lawan hutang, perantara, PPN Masukan, penyeimbang saldo awal.
-  - [ ] 8.1.2 Unik (`tenant_id`, `group_aset_id`, `effective_from`).
-  - [ ] 8.1.3 Controller + rute, dengan akun dipilih lewat kontrak `DaftarAkun`.
-  - [ ] 8.1.4 UI tabel matriks gaya FA Posting Groups BC: baris group, kolom akun, dan riwayat tanggal berlaku.
-  - [ ] 8.1.5 Tanda merah di setiap sel akun wajib yang masih kosong, seperti *General Posting Setup* BC, plus ringkasan jumlah group yang belum lengkap di atas matriks.
-- [ ] 8.2 Cara perolehan (K-12).
-  - [ ] 8.2.1 Konstanta `pembelian`, `hibah`, `saldo_awal`.
-  - [ ] 8.2.2 Untuk sekarang, semua cara memakai kolom akun yang sama. Tulis titik perluasannya di kode supaya akun per cara bisa ditambah nanti.
-- [ ] 8.3 Pewarisan dimensi lokasi (K-08).
-  - [ ] 8.3.1 Satu fungsi bersama: naik lewat `parent_id` sampai menemukan `org_unit_id`.
-  - [ ] 8.3.2 Pakai di `PembuatAset::dimensiLokasi` dan `MutasiAsetController::dimensiLokasi`.
-  - [ ] 8.3.3 Jaga dari siklus parent (batas kedalaman).
-- [ ] 8.4 Lebur `export_to_backoffice` ke `posting_layer` (K-15).
-  - [ ] 8.4.1 Migration data: buku dengan `export_to_backoffice = false` dan layer bukan `none` → tinjau satu per satu. Buku pajak → `none`.
-  - [ ] 8.4.2 Hapus saklar dari UI (`ui/master/masters.ts`) dan dari `BukuPenyusutanController`.
+- [x] 8.1 Posting group aset, menggantikan placeholder `ui/pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage.tsx`.
+  Layarnya **Master data › Posting group aset** (`ui/asset-posting-group/`), halamannya
+  `docs/apps/management-aset/master/posting-group/`.
+  - [x] 8.1.1 Tabel `aset_m_posting_group`: `group_aset_id`, `effective_from`, dan tujuh kolom akun (ID daftar akun referensi): harga perolehan, akumulasi, beban penyusutan, lawan hutang, perantara, PPN Masukan, penyeimbang saldo awal.
+  - [x] 8.1.2 Unik (`tenant_id`, `group_aset_id`, `effective_from`), parsial `WHERE deleted_at IS NULL` supaya tanggal
+    yang barisnya diarsipkan boleh dipakai lagi.
+  - [x] 8.1.3 Controller + rute, dengan akun dipilih lewat kontrak `DaftarAkun`. Simpan adalah `PUT` ke alamat pasangan
+    group dan tanggal (tanpa kunci idempotensi); hanya akun aktif yang berlaku untuk semua entitas legal.
+  - [x] 8.1.4 UI tabel matriks gaya FA Posting Groups BC: baris group, kolom akun, dan riwayat tanggal berlaku.
+  - [x] 8.1.5 Tanda merah di setiap sel akun wajib yang masih kosong, seperti *General Posting Setup* BC, plus ringkasan jumlah group yang belum lengkap di atas matriks.
+    Wajib: harga perolehan, akumulasi, beban penyusutan, lawan hutang. Perantara, PPN Masukan, dan penyeimbang saldo
+    awal hanya dipakai keadaan tertentu, jadi tidak ditandai; posting yang membutuhkannya tetap tertahan. Sel yang
+    menunjuk akun nonaktif juga merah.
+- [x] 8.2 Cara perolehan (K-12).
+  - [x] 8.2.1 Konstanta `pembelian`, `hibah`, `saldo_awal` (`Support/AcquisitionMethod`).
+  - [x] 8.2.2 Untuk sekarang, semua cara memakai kolom akun yang sama. Tulis titik perluasannya di kode supaya akun per cara bisa ditambah nanti.
+    Titiknya `AssetPostingAccounts::acquisitionAccount()`.
+- [x] 8.3 Pewarisan dimensi lokasi (K-08).
+  - [x] 8.3.1 Satu fungsi bersama (`Services/LocationDimension`): naik lewat `parent_id` sampai menemukan `org_unit_id`.
+  - [x] 8.3.2 Pakai di `PembuatAset::dimensiLokasi` dan `MutasiAsetController::dimensiLokasi`.
+  - [x] 8.3.3 Jaga dari siklus parent (batas kedalaman). Batas 32 tingkat dan kunjungan ulang; keduanya dilaporkan ke
+    pemantauan kesalahan tanpa menggagalkan penerimaan atau mutasi.
+- [~] 8.4 Lebur `export_to_backoffice` ke `posting_layer` (K-15).
+  - [x] 8.4.1 Migration data: buku dengan `export_to_backoffice = false` dan layer bukan `none` → tinjau satu per satu. Buku pajak → `none`.
+    Peninjauannya: saklar itu bawaannya mati sejak 12 Agustus karena bridge belum ada, jadi `false` tidak membawa
+    keputusan untuk ditiru. Yang diubah hanya buku `tax`; buku `FISKAL` bawaan kini lahir sebagai `none`.
+  - [x] 8.4.2 Hapus saklar dari UI (`ui/master/masters.ts`) dan dari `BukuPenyusutanController`. API menolaknya dengan
+    422. Ekspor penyusutan lama kini membaca lapisan posting, dan pembalikannya diekspor hanya bila periode aslinya
+    diekspor.
   - [ ] 8.4.3 Kolom lama dibiarkan sampai rilis berikutnya (aturan N-1), lalu dihapus.
-- [ ] 8.5 `app.yaml`: entry point, permission, privilege, dan duty posting group. Hapus entry point placeholder lama atau alihkan ke halaman baru. Kode kontrak lama jangan diganti nama.
-- [ ] 8.6 Test.
-  - [ ] 8.6.1 Pemetaan bertanggal berlaku terbaca sesuai tanggal posting.
-  - [ ] 8.6.2 Lokasi ruang tanpa pemetaan mewarisi dari lantai.
-  - [ ] 8.6.3 Buku `none` tidak pernah menghasilkan posting.
+- [x] 8.5 `app.yaml`: entry point, permission, privilege, dan duty posting group. Hapus entry point placeholder lama atau alihkan ke halaman baru. Kode kontrak lama jangan diganti nama.
+  Entry point form lama kini membuka halaman baru; ditambah entry point API, izin `create`/`update`/`archive`,
+  privilege `maintain`/`retire`, dan duty tersendiri `fixed-asset-posting-profiles.manage`.
+- [x] 8.6 Test.
+  - [x] 8.6.1 Pemetaan bertanggal berlaku terbaca sesuai tanggal posting (`AssetPostingGroupTest`).
+  - [x] 8.6.2 Lokasi ruang tanpa pemetaan mewarisi dari lantai (`LokasiAsetTest`, saat diterima dan saat dimutasi).
+  - [x] 8.6.3 Buku `none` tidak pernah menghasilkan posting (`DepreciationEndToEndTest`, termasuk lewat pembalikan). Yang
+    diuji hari ini ekspor lama; "Post penyusutan" (11.2) wajib memakai aturan yang sama.
   - [x] 8.6.4 Kode group aset dan buku penyusutan diketik manual, unik per tenant, dan tidak bisa diubah setelah dipakai posting (`KodeKetikMasterSetupTest`).
 - [x] 8.7 Kode manual untuk group aset dan buku penyusutan (K-24). **Wajib selesai sebelum 15.1.**
   - [x] 8.7.1 Form group aset dan buku penyusutan menerima kode yang diketik (huruf besar, angka, `-`), misalnya `KENDARAAN`, `KOMERSIAL`. Paling panjang 30 karakter, sama dengan nomor operating unit; di form, huruf kecil dijadikan besar dan spasi menjadi `-`.

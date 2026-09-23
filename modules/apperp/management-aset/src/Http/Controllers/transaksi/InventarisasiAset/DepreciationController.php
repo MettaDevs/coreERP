@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationExport;
@@ -277,7 +278,7 @@ class DepreciationController extends Controller
                 ->where('aset_tr_buku_aset.id', $period->buku_aset_id)
                 ->select(
                     'aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code',
-                    'buku.export_to_backoffice',
+                    'buku.posting_layer',
                 )->toBase()->first();
             // Penambahan dikerjakan database, bukan PHP, dan itu menahan kehilangan pembaruan:
             // pada `finalize()` yang terkunci hanya periodenya, sehingga dua periode milik satu
@@ -293,9 +294,10 @@ class DepreciationController extends Controller
                 'net_book_value' => -(float) $period->amount,
             ]);
             $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $period->legal_entity_id, 'buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'usage_org_unit_id' => $period->usage_org_unit_id, 'period_starts_on' => $period->period_starts_on, 'period_ends_on' => $period->period_ends_on, 'amount' => $period->amount, 'currency_code' => $book->currency_code, 'acquisition_value' => $book->acquisition_value, 'accumulated_depreciation' => round((float) $book->accumulated_depreciation + (float) $period->amount, 2), 'net_book_value' => round((float) $book->net_book_value - (float) $period->amount, 2), 'status' => 'final'];
-            // Buku pajak lazimnya tidak diekspor, supaya backoffice tidak menjurnal dua
-            // kali untuk aset yang sama. Periodenya tetap final dan tercatat.
-            $exported = $book->buku_id === null || (bool) $book->export_to_backoffice;
+            // Buku memorandum (`posting_layer = none`) tidak pernah diekspor, supaya backoffice
+            // tidak menjurnal dua kali untuk aset yang sama; buku fiskal lazimnya memorandum.
+            // Periodenya tetap final dan tercatat. Satu saklar, bukan dua (K-15).
+            $exported = $book->buku_id === null || $book->posting_layer !== BukuPenyusutan::POSTING_LAYER_NONE;
             $export = null;
             if ($exported) {
                 $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period->id, 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
@@ -332,8 +334,14 @@ class DepreciationController extends Controller
                 'net_book_value' => (float) $original->amount,
             ]);
             $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $original->legal_entity_id, 'buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'currency_code' => $book->currency_code, 'status' => 'reversal', 'reverses_period_id' => $original->id, 'reason' => $data['reason']];
-            $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period['id'], 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
-            $this->saveExport($export, $payload);
+            // Pembalikan diekspor hanya bila periode aslinya dulu diekspor. Sebelumnya pembalikan
+            // selalu diekspor, sehingga backoffice menerima pembalikan atas jurnal yang tidak
+            // pernah ia terima (K-15).
+            $export = null;
+            if (DepreciationExport::query()->where('depreciation_period_id', $original->id)->exists()) {
+                $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period['id'], 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
+                $this->saveExport($export, $payload);
+            }
 
             return ['period' => $period, 'export' => $export];
         });

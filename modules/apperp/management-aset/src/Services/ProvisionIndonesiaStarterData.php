@@ -476,8 +476,6 @@ final class ProvisionIndonesiaStarterData
                 'keterangan' => $item['description'],
                 'aktif' => true,
                 'posting_layer' => $item['posting_layer'],
-                // Finance/backoffice belum memiliki kontrak posting untuk app ini.
-                'export_to_backoffice' => false,
                 'round_off_depreciation' => 0,
                 // Tidak ada buku starter yang diberi umur manfaat universal. Buku fiskal
                 // mendapat profil berversi lewat matriks; buku komersial tetap menunggu

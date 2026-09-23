@@ -37,7 +37,7 @@ export type Permission =
     | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
     | 'management-aset.fixed-asset-parameters.read'
-    | 'management-aset.fixed-asset-posting-profiles.read'
+    | `management-aset.fixed-asset-posting-profiles.${MasterAction}`
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
 export function permission(
@@ -600,13 +600,7 @@ export const MASTERS: MasterConfig[] = [
                     { value: 'tax', label: 'Fiskal' },
                     { value: 'none', label: 'Memorandum' },
                 ],
-                help: 'Buku komersial mengikuti kebijakan akuntansi tenant/legal entity. Buku fiskal memakai referensi pajak yang berversi; metode dan masa manfaat keduanya boleh berbeda.',
-            },
-            {
-                name: 'export_to_backoffice',
-                label: 'Ekspor ke Finance',
-                type: 'boolean',
-                help: 'Saat ini hanya menyiapkan bridge tanpa jurnal. Biarkan mati sampai kontrak posting dan kepemilikan COA Finance tersedia.',
+                help: 'Buku Memorandum dihitung dan dilaporkan, tetapi tidak pernah di-post ke aplikasi finance. Lapisan lain di-post. Buku fiskal lazimnya Memorandum, supaya penyusutan aset yang sama tidak dijurnal dua kali.',
             },
             {
                 name: 'round_off_depreciation',

@@ -75,6 +75,9 @@ const WorkOrderPage = lazy(
 const PengaturanAsetTetapPlaceholderPage = lazy(
     () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage'),
 );
+const AssetPostingGroupPage = lazy(
+    () => import('./asset-posting-group/AssetPostingGroupPage'),
+);
 
 /**
  * Dokumen siklus hidup aset, berkunci id entri menunya.
@@ -173,7 +176,7 @@ export default function App({
     ) {
         return (
             <main>
-                <PengaturanAsetTetapPlaceholderPage kind="posting-profiles" />
+                <AssetPostingGroupPage permissions={permissions} />
             </main>
         );
     }

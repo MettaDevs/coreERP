@@ -163,11 +163,18 @@ Sebagian master membawa kolom sendiri di luar `kode`/`nama`/`keterangan`/`aktif`
 | `capitalization_threshold` | Di bawah nilai ini aset tetap dicatat, tetapi bukunya tidak menyusut |
 
 Sifat harta — berwujud, tidak berwujud, hak guna — sengaja tidak disimpan pada group.
-Klasifikasi itu menentukan akun, dan akun ditentukan posting profile milik Finance, bukan
-modul ini; ia juga konstan per group sehingga tidak pernah memisahkan apa pun yang belum
+Klasifikasi itu menentukan akun, dan akun ditentukan posting group aset (di bawah), bukan
+field group; ia juga konstan per group sehingga tidak pernah memisahkan apa pun yang belum
 dipisahkan oleh group itu sendiri. Aset yang perlu dibedakan sifatnya dibedakan dengan
 membuat group tersendiri. Kolom lama `major_type` sudah dibuang dan field bernama itu
 ditolak oleh API.
+
+**Buku penyusutan** membawa `posting_layer`, satu-satunya saklar posting (K-15 feed posting
+finance): buku `none` (memorandum) dihitung dan dilaporkan tetapi tidak pernah di-post ke aplikasi
+finance, lapisan lain di-post. Saklar `export_to_backoffice` yang dulu ada dilebur ke sini karena
+dua saklar yang maknanya tumpang tindih pernah menghasilkan pembalikan yang terekspor padahal
+aslinya tidak; API kini menolak field itu dengan 422. Buku fiskal lazimnya memorandum, supaya
+penyusutan aset yang sama tidak dijurnal dua kali, dan buku `FISKAL` bawaan lahir sebagai `none`.
 
 **Profil penyusutan** membawa aturan penyusutannya sendiri (`method`, `frequency`, `year_basis`, `convention`, `useful_life_periods`, `rate_percent`, `manual_schedule`). Field mana yang wajib bergantung pada `method`, dan divalidasi sebagai aturan per field sehingga klien menerima pesan yang tepat sasaran.
 
@@ -193,7 +200,7 @@ Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr
 
 Pohon lokasi sengaja **terpisah** dari struktur organisasi. "Di mana benda ini berada" dan "siapa yang bertanggung jawab" adalah dua pertanyaan berbeda yang berubah karena sebab berbeda: reorganisasi tidak memindahkan barang, dan memindahkan barang tidak mengubah struktur organisasi. Menyatukan keduanya membuat riwayat lokasi rusak setiap kali unit kerja digabung, dan membatasi kedalaman lokasi pada unit organisasi terkecil — padahal stock opname butuh sampai tingkat ruangan atau rak.
 
-Keduanya dihubungkan lewat satu field opsional, `m_lokasi_aset.org_unit_id`; padanan toggle **Update asset dimension** pada Functional location type di F&O. Saat aset diterima atau dimutasi, `financial_dimension_org_unit_id` pada aset diisi dari unit milik lokasinya, dan jatuh kembali ke unit pengguna bila lokasi tidak dipetakan. Nilainya **disalin, bukan dilihat saat dibaca**: mengubah pemetaan lokasi kelak tidak menulis ulang pembebanan aset yang sudah berjalan.
+Keduanya dihubungkan lewat satu field opsional, `m_lokasi_aset.org_unit_id`; padanan toggle **Update asset dimension** pada Functional location type di F&O. Saat aset diterima atau dimutasi, `financial_dimension_org_unit_id` pada aset diisi dari unit milik lokasinya. Lokasi yang tidak dipetakan mewarisi unit lokasi induk terdekat yang dipetakan (K-08): satu poli bisa tersebar di beberapa ruang, dan cukup lantainya yang dipetakan. Baru bila tidak ada satu pun lokasi di jalur ke akar yang dipetakan, aset memakai unit penggunanya. Aturannya satu, `Services/LocationDimension`, dipakai penerimaan dan mutasi; pendakiannya dibatasi 32 tingkat dan berhenti pada siklus, yang hanya mungkin bila datanya rusak karena penulisan lokasi menolak siklus, lalu melaporkannya. Nilainya **disalin, bukan dilihat saat dibaca**: mengubah pemetaan lokasi kelak tidak menulis ulang pembebanan aset yang sudah berjalan.
 
 Aturan yang berlaku pada master berinduk:
 
@@ -201,6 +208,38 @@ Aturan yang berlaku pada master berinduk:
 - Induk wajib berada pada tenant yang sama dan belum diarsipkan. Selain divalidasi aplikasi, database menegakkannya lewat foreign key gabungan `(tenant_id, <induk>_id)` → `(tenant_id, id)`, sehingga induk lintas tenant tidak mungkin tersimpan.
 - Induk tidak dapat diarsipkan selama masih dipakai anak yang belum diarsipkan; API menjawab `409` dengan kode `referenced_by_children`. Penanda `aktif` tidak memengaruhi aturan ini — yang dijaga adalah referensi yang masih hidup, bukan status pakainya.
 - Daftar anak dapat disaring dengan `?<induk>_id=<ULID>`, dan setiap record anak menyertakan ringkasan induk (`id`, `kode`, `nama`) agar UI tidak perlu permintaan tambahan. Induk yang sudah diarsipkan tetap disertakan supaya asal data tidak hilang.
+
+### Posting group aset
+
+Layar **Master data › Posting group aset** memetakan tiap group aset ke tujuh akun dari daftar
+akun referensi Core, gaya *FA Posting Groups* Business Central. Tabelnya `aset_m_posting_group`,
+satu baris per group dan tanggal berlaku; posting memakai baris dengan `effective_from` terbesar
+yang tidak melewati tanggal postingnya (`Services/AssetPostingAccounts`). Akun disimpan sebagai id,
+bukan nomor, supaya impor ulang daftar akun tidak memutus pemetaan.
+
+| Kolom | Wajib | Dipakai |
+| --- | --- | --- |
+| Harga perolehan | ya | penerimaan, saldo awal, koreksi nilai |
+| Akumulasi penyusutan | ya | penyusutan, saldo awal |
+| Beban penyusutan | ya | penyusutan |
+| Lawan hutang | ya | penerimaan pada mode `direct_payable`, bawaan setiap entitas legal |
+| Perantara | bila dipakai | penerimaan pada mode `clearing` |
+| PPN Masukan | bila dipakai | penerimaan yang membawa PPN |
+| Penyeimbang saldo awal | bila dipakai | saldo awal saat cutover |
+
+Sel akun wajib yang kosong, dan sel yang menunjuk akun nonaktif, ditandai merah, beserta
+ringkasan jumlah group yang belum lengkap. Akun yang kosong tidak menghalangi transaksi aset;
+posting yang membutuhkannya tertahan di Core dengan jalan pintas ke layar ini (K-18, K-22).
+
+- Hanya akun aktif yang berlaku untuk semua entitas legal yang dapat dipilih, karena posting
+  group berlaku untuk seluruh tenant.
+- Menyimpan adalah `PUT /api/v1/posting-group-aset/{group}/{tanggal}`, jadi mengulangnya tidak
+  menambah baris. Tanggal baru butuh `management-aset.fixed-asset-posting-profiles.create`,
+  baris yang ada butuh `.update`, mengarsipkan butuh `.archive`; ketiganya di bawah duty
+  `management-aset.fixed-asset-posting-profiles.manage`, terpisah dari duty lain supaya role
+  lama tidak diam-diam dapat mengubah akun jurnal.
+- Cara perolehan (`pembelian`, `hibah`, `saldo_awal`, K-12) hari ini memakai akun harga perolehan
+  yang sama; `AssetPostingAccounts::acquisitionAccount()` tempat akun per cara kelak dipilih.
 
 ### Hak akses
 

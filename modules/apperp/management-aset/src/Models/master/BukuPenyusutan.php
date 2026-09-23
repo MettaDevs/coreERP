@@ -14,8 +14,12 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * pada `MasterData`. `round_off_depreciation` di-cast `decimal:2`, jadi Eloquent
  * memulangkannya sebagai string dan bukan float.
  *
+ * `posting_layer` satu-satunya saklar posting (K-15): buku `none` tidak pernah di-post ke aplikasi
+ * finance. Kolom `export_to_backoffice` masih ada di tabel hanya supaya rilis sebelumnya tetap bisa
+ * berjalan di atas skema ini (aturan N-1); tidak ada kode yang membaca atau menulisnya lagi, dan
+ * kolomnya dibuang satu rilis kemudian (TODO 8.4.3).
+ *
  * @property string $posting_layer
- * @property bool $export_to_backoffice
  * @property string $round_off_depreciation
  * @property ?string $depreciation_profile_id
  * @property ?string $alternative_profile_id
@@ -23,7 +27,13 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 class BukuPenyusutan extends MasterData
 {
     /** Lapisan pembukuan; `none` berarti buku memorandum. */
-    public const POSTING_LAYERS = ['current', 'operations', 'tax', 'none'];
+    public const POSTING_LAYERS = ['current', 'operations', 'tax', self::POSTING_LAYER_NONE];
+
+    /**
+     * Buku memorandum: dihitung dan dilaporkan, tetapi tidak pernah di-post. Padanan "Post to
+     * general ledger = No" di F&O, yang dengan sendirinya menjadikan posting layer *None*.
+     */
+    public const POSTING_LAYER_NONE = 'none';
 
     /**
      * Delapan konvensi yang sama dengan F&O. Konvensi menentukan kapan penyusutan
@@ -44,14 +54,13 @@ class BukuPenyusutan extends MasterData
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
-        'posting_layer', 'export_to_backoffice', 'round_off_depreciation',
+        'posting_layer', 'round_off_depreciation',
         'depreciation_profile_id', 'alternative_profile_id',
     ];
 
     protected function casts(): array
     {
         return [...parent::casts(),
-            'export_to_backoffice' => 'boolean',
             'round_off_depreciation' => 'decimal:2',
         ];
     }

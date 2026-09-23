@@ -320,7 +320,7 @@ class PenerimaanAsetTest extends TestCase
         DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $buku, 'tenant_id' => $this->tenantId, 'creation_key' => 'buku-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku komersial', 'aktif' => true,
-            'posting_layer' => 'current', 'export_to_backoffice' => false,
+            'posting_layer' => 'current',
             'depreciation_profile_id' => $profil, 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('aset_m_group_buku_penyusutan')->insert([

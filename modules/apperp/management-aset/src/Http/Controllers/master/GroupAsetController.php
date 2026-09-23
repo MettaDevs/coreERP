@@ -56,7 +56,7 @@ class GroupAsetController extends MasterDataController
             // kehilangan klasifikasi ketika beralih ke reference ID.
             'tipe_harta' => ['prohibited'],
             // Sifat harta dibuang dari group: ia tidak menggerakkan apa pun di sini, dan
-            // akun ditentukan posting profile milik Finance. Menolaknya lebih baik
+            // akun ditentukan posting group aset. Menolaknya lebih baik
             // daripada menerima diam-diam, karena client lama yang mengirim `low_value`
             // sebenarnya bermaksud menandai barang non-kapitalisasi — maksud yang
             // sekarang hanya terekam benar lewat `property_type`.

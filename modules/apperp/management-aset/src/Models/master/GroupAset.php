@@ -32,8 +32,9 @@ class GroupAset extends MasterData
      * dan barang ekstrakomptabel pada penatausahaan barang di Indonesia.
      *
      * Sifat harta — berwujud, tidak berwujud, hak guna — sengaja tidak disimpan di sini.
-     * Klasifikasi itu menentukan akun, dan akun ditentukan posting profile milik Finance,
-     * bukan modul ini. Aset yang perlu dibedakan sifatnya dibedakan dengan group sendiri.
+     * Klasifikasi itu menentukan akun, dan akun ditentukan posting group aset
+     * (`AssetPostingGroup`), bukan field group. Aset yang perlu dibedakan sifatnya dibedakan
+     * dengan group sendiri.
      */
     public const PROPERTY_TYPE = ['fixed_aset', 'inventory_item', 'other'];
 

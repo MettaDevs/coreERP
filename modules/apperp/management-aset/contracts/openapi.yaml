@@ -460,6 +460,130 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/v1/posting-group-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listPostingGroupAset
+      summary: Matriks posting group aset beserta riwayat tanggal berlakunya
+      description: |
+        Permission `management-aset.fixed-asset-posting-profiles.read`. Satu entri per group aset
+        yang belum diarsipkan: baris yang berlaku hari ini (`current`), seluruh baris bertanggal
+        berlaku, dan akun wajib yang masih kosong (`missing`). Posting memakai baris dengan
+        `effective_from` terbesar yang tidak melewati tanggal postingnya. `account_details`
+        menerjemahkan id akun menjadi nomor dan nama dari daftar akun referensi Core.
+      responses:
+        '200':
+          description: Matriks posting group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostingGroupAsetMatrix'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/posting-group-aset/akun:
+    get:
+      tags:
+      - Master data
+      operationId: searchPostingGroupAsetAccounts
+      summary: Akun untuk pemilih akun posting group
+      description: |
+        Permission `management-aset.fixed-asset-posting-profiles.read`. Hanya akun aktif yang
+        berlaku untuk semua entitas legal, karena posting group berlaku untuk seluruh tenant. Paling
+        banyak 20 akun, dicocokkan dengan nomor, nama, atau `external_id`.
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        '200':
+          description: Akun yang cocok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferenceAccountList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/posting-group-aset/{groupAset}/{effectiveFrom}:
+    parameters:
+    - name: groupAset
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    - name: effectiveFrom
+      in: path
+      required: true
+      description: Tanggal berlaku, `Y-m-d`. Bentuk lain tidak cocok dengan rutenya dan dijawab 404.
+      schema:
+        type: string
+        format: date
+    put:
+      tags:
+      - Master data
+      operationId: upsertPostingGroupAset
+      summary: Menyimpan akun satu group aset untuk satu tanggal berlaku
+      description: |
+        Satu baris diidentifikasi pasangan group dan tanggal berlaku, jadi mengulang permintaan yang
+        sama tidak menambah baris dan tidak memerlukan `Idempotency-Key`. Baris untuk tanggal baru
+        butuh `management-aset.fixed-asset-posting-profiles.create`; baris yang sudah ada butuh
+        `...update`. Kolom akun yang tidak dikirim dikosongkan.
+
+        Setiap akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif.
+        Akun yang dinonaktifkan sesudah dipetakan boleh tetap di kolom yang tidak diubah, supaya
+        baris lama masih dapat disimpan untuk memperbaiki kolom lain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostingGroupAsetAccounts'
+      responses:
+        '200':
+          description: Baris yang sudah ada diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostingGroupAsetRowResponse'
+        '201':
+          description: Baris untuk tanggal berlaku baru dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostingGroupAsetRowResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archivePostingGroupAset
+      summary: Mengarsipkan satu baris posting group
+      description: |
+        Permission `management-aset.fixed-asset-posting-profiles.archive`. Posting yang tanggalnya
+        jatuh di masa berlaku baris ini lalu memakai baris sebelumnya, atau tertahan bila tidak ada.
+        Tanggal yang sama boleh dipakai lagi untuk baris baru.
+      responses:
+        '204':
+          description: Baris diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/jenis-aset/{id}/atribut:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -5854,7 +5978,11 @@ components:
       type: object
       properties:
         posting_layer:
-          description: Lapisan posting buku ini. `tax` lazim dipakai buku fiskal.
+          description: |
+            Lapisan posting buku ini, dan satu-satunya saklar posting (K-15): buku `none`
+            (memorandum) dihitung dan dilaporkan tetapi tidak pernah di-post ke aplikasi finance;
+            lapisan lain di-post. Buku fiskal lazimnya `none`, supaya penyusutan aset yang sama tidak
+            dijurnal dua kali. Field `export_to_backoffice` yang dulu ada ditolak dengan 422.
           type: string
           enum:
           - current
@@ -5862,13 +5990,6 @@ components:
           - tax
           - none
           default: current
-        export_to_backoffice:
-          description: |
-            App ini belum menjurnal. Saat aktif, field ini hanya menyiapkan bridge internal;
-            pengiriman ke Finance baru boleh dilakukan setelah kontrak posting dan ownership
-            COA tersedia.
-          type: boolean
-          default: false
         round_off_depreciation:
           description: Kelipatan nominal pembulatan penyusutan. Nol berarti tanpa pembulatan.
           type:
@@ -6001,6 +6122,192 @@ components:
                 id:
                   $ref: '#/components/schemas/Ulid'
             - $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+    PostingGroupAsetAccounts:
+      type: object
+      description: |
+        Tujuh akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
+        bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
+      additionalProperties: false
+      properties:
+        acquisition_account_id:
+          description: Harga perolehan. Wajib.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        accumulated_depreciation_account_id:
+          description: Akumulasi penyusutan. Wajib.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        depreciation_expense_account_id:
+          description: Beban penyusutan. Wajib.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        payable_account_id:
+          description: Lawan hutang untuk mode `direct_payable`, bawaan setiap entitas legal. Wajib.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        clearing_account_id:
+          description: Perantara, hanya untuk entitas legal bermode `clearing`.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        input_vat_account_id:
+          description: PPN Masukan, hanya untuk penerimaan yang membawa PPN.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        opening_balance_offset_account_id:
+          description: Penyeimbang saldo awal, hanya untuk saldo awal saat cutover.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    PostingGroupAsetRow:
+      allOf:
+      - type: object
+        required:
+        - group_aset_id
+        - effective_from
+        - missing
+        properties:
+          group_aset_id:
+            $ref: '#/components/schemas/Ulid'
+          effective_from:
+            type: string
+            format: date
+          missing:
+            description: Akun wajib yang masih kosong di baris ini, urut seperti kolom matriks.
+            type: array
+            items:
+              type: string
+      - $ref: '#/components/schemas/PostingGroupAsetAccounts'
+    PostingGroupAsetRowResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/PostingGroupAsetRow'
+    PostingGroupAsetMatrix:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: object
+          required:
+          - today
+          - accounts
+          - groups
+          - incomplete_groups
+          - account_details
+          properties:
+            today:
+              type: string
+              format: date
+            accounts:
+              description: Kolom matriks, urut, dengan label dan apakah akunnya wajib.
+              type: array
+              items:
+                type: object
+                required:
+                - column
+                - label
+                - required
+                properties:
+                  column:
+                    type: string
+                  label:
+                    type: string
+                  required:
+                    type: boolean
+            groups:
+              type: array
+              items:
+                type: object
+                required:
+                - id
+                - kode
+                - nama
+                - aktif
+                - current
+                - rows
+                - missing
+                properties:
+                  id:
+                    $ref: '#/components/schemas/Ulid'
+                  kode:
+                    type: string
+                  nama:
+                    type: string
+                  aktif:
+                    type: boolean
+                  current:
+                    description: Baris yang berlaku hari ini, atau `null`.
+                    oneOf:
+                    - $ref: '#/components/schemas/PostingGroupAsetRow'
+                    - type: 'null'
+                  rows:
+                    description: Seluruh baris yang belum diarsipkan, tanggal berlaku terbaru lebih dulu.
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostingGroupAsetRow'
+                  missing:
+                    description: Akun wajib yang kosong pada baris yang berlaku; seluruh akun wajib bila belum ada baris.
+                    type: array
+                    items:
+                      type: string
+            incomplete_groups:
+              description: Jumlah group yang akun wajibnya belum lengkap hari ini.
+              type: integer
+            account_details:
+              description: Akun yang dipakai matriks, berkunci id.
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/ReferenceAccount'
+    ReferenceAccount:
+      type: object
+      description: Satu akun dari daftar akun referensi Core (K-05).
+      required:
+      - id
+      - external_id
+      - code
+      - name
+      - type
+      - active
+      - legal_entity_id
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        external_id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+          - balance_sheet
+          - profit_loss
+        active:
+          type: boolean
+        legal_entity_id:
+          description: '`null` berarti berlaku untuk semua entitas legal tenant.'
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    ReferenceAccountList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceAccount'
     TipeAtributFields:
       type: object
       properties:

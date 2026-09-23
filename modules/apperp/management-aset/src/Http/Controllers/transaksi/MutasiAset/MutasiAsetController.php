@@ -14,12 +14,12 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
-use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\LocationDimension;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
@@ -612,15 +612,10 @@ class MutasiAsetController extends Controller
         return $value === null ? null : (string) $value;
     }
 
+    /** Pewarisan dimensi dari lokasi, dengan aturan yang sama seperti penerimaan (K-08). */
     private function dimensiLokasi(?string $locationId): ?string
     {
-        if (! $locationId) {
-            return null;
-        }
-
-        // `withTrashed()`: lokasi yang sudah diarsipkan tetap membawa pemetaan dimensinya,
-        // sama seperti pada jalur penerimaan dan penempatan.
-        return LokasiAset::withTrashed()->where('id', $locationId)->toBase()->value('org_unit_id');
+        return app(LocationDimension::class)->resolve($locationId);
     }
 
     private function staleVersion(): JsonResponse

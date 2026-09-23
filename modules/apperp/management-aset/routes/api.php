@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\HealthController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\AssetPostingGroupController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupBukuPenyusutanController;
@@ -186,6 +187,15 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     Route::put('tipe-atribut/{id}/nilai', [TipeAtributNilaiController::class, 'replace']);
     Route::get('group-aset/{id}/buku-penyusutan', [GroupBukuPenyusutanController::class, 'index']);
     Route::put('group-aset/{id}/buku-penyusutan', [GroupBukuPenyusutanController::class, 'replace']);
+
+    // Posting group aset (TODO 8.1): satu baris per group dan tanggal berlaku, disimpan dengan
+    // PUT ke alamat pasangan itu sehingga pengulangan permintaan tidak menambah baris.
+    Route::get('posting-group-aset', [AssetPostingGroupController::class, 'index']);
+    Route::get('posting-group-aset/akun', [AssetPostingGroupController::class, 'accounts']);
+    Route::put('posting-group-aset/{groupAset}/{effectiveFrom}', [AssetPostingGroupController::class, 'upsert'])
+        ->where('effectiveFrom', '\d{4}-\d{2}-\d{2}');
+    Route::delete('posting-group-aset/{groupAset}/{effectiveFrom}', [AssetPostingGroupController::class, 'archive'])
+        ->where('effectiveFrom', '\d{4}-\d{2}-\d{2}');
     Route::post('penyusutan/proposal', [DepreciationController::class, 'propose']);
     Route::post('penyusutan/proposal-massal', [DepreciationController::class, 'bulk']);
     Route::get('penyusutan', [DepreciationController::class, 'index']);

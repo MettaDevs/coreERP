@@ -61,8 +61,10 @@ ui:
         - id: fixed-aset-parameters
           label: Parameter aset tetap
           permission: management-aset.fixed-asset-parameters.read
+        # Label memakai istilah Business Central (FA Posting Groups); kode izin tetap
+        # `fixed-asset-posting-profiles` karena kode adalah kontrak, bukan label.
         - id: fixed-aset-posting-profiles
-          label: Profil posting aset
+          label: Posting group aset
           permission: management-aset.fixed-asset-posting-profiles.read
       maintenance:
         # Urutan ini adalah alur setup awal: dasar pekerjaan, checklist dan
@@ -407,8 +409,11 @@ security:
       name: Layar parameter aset tetap
       type: form
     - code: management-aset.fixed-asset-posting-profiles.form
-      name: Layar profil posting aset
+      name: Layar posting group aset
       type: form
+    - code: management-aset.fixed-asset-posting-profiles.api
+      name: API posting group aset
+      type: api
   permissions:
     - code: management-aset.model-aset.read
       name: Lihat model aset
@@ -925,9 +930,21 @@ security:
       entry_point: management-aset.fixed-asset-parameters.form
       access: read
     - code: management-aset.fixed-asset-posting-profiles.read
-      name: Lihat profil posting aset
+      name: Lihat posting group aset
       entry_point: management-aset.fixed-asset-posting-profiles.form
       access: read
+    - code: management-aset.fixed-asset-posting-profiles.create
+      name: Tambah baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: create
+    - code: management-aset.fixed-asset-posting-profiles.update
+      name: Ubah akun posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: update
+    - code: management-aset.fixed-asset-posting-profiles.archive
+      name: Arsipkan baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: delete
   privileges:
     - code: management-aset.model-aset.maintain
       name: Pelihara model aset
@@ -1253,9 +1270,19 @@ security:
       permissions:
         - management-aset.fixed-asset-parameters.read
     - code: management-aset.fixed-asset-posting-profiles.view
-      name: Lihat profil posting aset
+      name: Lihat posting group aset
       permissions:
         - management-aset.fixed-asset-posting-profiles.read
+    - code: management-aset.fixed-asset-posting-profiles.maintain
+      name: Pelihara posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.read
+        - management-aset.fixed-asset-posting-profiles.create
+        - management-aset.fixed-asset-posting-profiles.update
+    - code: management-aset.fixed-asset-posting-profiles.retire
+      name: Arsipkan posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.archive
   duties:
     - code: management-aset.model-aset.manage
       name: Kelola model aset
@@ -1418,6 +1445,14 @@ security:
       privileges:
         - management-aset.fixed-asset-parameters.view
         - management-aset.fixed-asset-posting-profiles.view
+    # Duty tersendiri, bukan tambahan pada duty yang sudah ada: role yang sudah memegang duty
+    # lama tidak boleh diam-diam dapat mengubah akun jurnal (keputusan pemilik produk,
+    # 22 September 2026).
+    - code: management-aset.fixed-asset-posting-profiles.manage
+      name: Kelola posting group aset
+      privileges:
+        - management-aset.fixed-asset-posting-profiles.maintain
+        - management-aset.fixed-asset-posting-profiles.retire
 number_sequences:
   references:
     - code: management-aset.model-aset

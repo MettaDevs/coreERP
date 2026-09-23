@@ -58,7 +58,7 @@ graph TD
 | `sebab-kerusakan` | Akar penyebab kerusakan saat WO ditutup | [Master work order](/apps/management-aset/master/work-order/) |
 | `tindakan-perbaikan` | Tindakan teknis yang dilakukan untuk memperbaiki | [Master work order](/apps/management-aset/master/work-order/) |
 | `fixed-asset-parameters` | Parameter global aset (Layar placeholder informatif) | [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) |
-| `fixed-asset-posting-profiles` | Profil posting COA (Layar placeholder menunggu Finance) | [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) |
+| `fixed-asset-posting-profiles` | Posting group aset: akun jurnal per group dan tanggal berlaku | [Posting group aset](/apps/management-aset/master/posting-group/) |
 
 ---
 
