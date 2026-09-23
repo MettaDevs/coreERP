@@ -228,8 +228,8 @@ final class AssetMutationReport implements ReportDefinition
             return [
                 'nomor' => (string) ($nomor++),
                 'tanggal_mutasi' => $this->formatDate($row->effective_on),
-                'nomor_bukti' => 'MUT-'.substr((string) $row->id, -8),
-                'no_bukti' => 'MUT-'.substr((string) $row->id, -8),
+                'nomor_bukti' => '—',
+                'no_bukti' => '—',
                 'kode_aset' => (string) ($row->asset_kode ?? '—'),
                 'asset_kode' => (string) ($row->asset_kode ?? '—'),
                 'nama_aset' => (string) ($row->asset_nama ?? '—'),
