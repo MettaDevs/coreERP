@@ -29,9 +29,9 @@ info:
     - **App module** (`appId` + `serviceToken` + `tenantHeader`), diverifikasi
       `AuthenticateAppService`.
     - **Klien integrasi** (`integrationClient`): sistem di luar CoreERP, misalnya aplikasi
-      finance pelanggan yang membaca feed posting. Token `Bearer <id klien>.<rahasia>` milik satu
-      tenant, dengan cakupan sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
-      menerimanya menyebutnya di `security` beserta cakupan yang dibutuhkan. Di salinan sandbox
+      finance pelanggan yang membaca feed posting. Token `Bearer <client_id>.<secret>` milik satu
+      tenant, dengan scope sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
+      menerimanya menyebutnya di `security` beserta scope yang dibutuhkan. Di salinan sandbox
       seluruh endpoint klien integrasi menjawab 503.
     - **Pusat admin** (`controlPlaneToken`): perintah dari konsol operator vendor.
 

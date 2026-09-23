@@ -8,6 +8,7 @@ use App\Models\TenantMembership;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Integration\PushDestination;
 use App\Support\Integration\SignedPush;
+use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,14 +21,14 @@ use RuntimeException;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 /**
- * Klien integrasi tenant (TODO 4.4): terbitkan token, atur cakupan dan mode pengiriman, cabut.
+ * Klien integrasi tenant (TODO 4.4): terbitkan token, atur scope dan mode pengiriman, cabut.
  *
  * Hanya owner dan admin, termasuk untuk melihat daftarnya: yang tampil di sini adalah siapa yang
  * boleh membaca jurnal keuangan tenant dari luar CoreERP.
  *
- * Token dan rahasia penanda tangan ditampilkan **sekali**, di jawaban yang menerbitkannya. Yang
- * disimpan hanya digest token; rahasia penanda tangan disimpan terenkripsi karena CoreERP sendiri
- * yang memakainya untuk menandatangani kiriman `push`.
+ * Token dan signing secret ditampilkan **sekali**, di jawaban yang menerbitkannya. Yang disimpan
+ * hanya digest token; signing secret disimpan terenkripsi karena CoreERP sendiri yang memakainya
+ * untuk membuat signature kiriman `push`.
  */
 final class IntegrationClientController extends Controller
 {
@@ -82,8 +83,8 @@ final class IntegrationClientController extends Controller
         $client = $this->milik($membership, $integrationClient, aktif: true);
         $data = $this->validated($request, $membership->tenant_id, $tujuan, $client);
 
-        // Berpindah ke push menerbitkan rahasia penanda tangan baru; berpindah ke pull membuangnya,
-        // supaya klien pull tidak menyimpan rahasia yang tidak dipakai siapa pun.
+        // Berpindah ke push menerbitkan signing secret baru; berpindah ke pull membuangnya, supaya
+        // klien pull tidak menyimpan secret yang tidak dipakai siapa pun.
         $penandaBaru = $data['delivery_mode'] === IntegrationClient::PUSH && $client->signing_secret === null
             ? Str::random(48)
             : null;
@@ -125,7 +126,7 @@ final class IntegrationClientController extends Controller
     {
         $client = $this->milik($this->admin($request), $integrationClient, aktif: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
-            throw ValidationException::withMessages(['delivery_mode' => 'Rahasia penanda tangan hanya dipakai klien mode push.']);
+            throw ValidationException::withMessages(['delivery_mode' => 'Signing secret hanya dipakai klien mode push.']);
         }
         $penanda = Str::random(48);
         $client->fill(['signing_secret' => $penanda])->save();
@@ -134,8 +135,8 @@ final class IntegrationClientController extends Controller
     }
 
     /**
-     * Mengirim satu kiriman uji bertanda tangan ke URL push, supaya penerima dapat memastikan
-     * verifikasi tanda tangannya benar sebelum posting sungguhan dikirim.
+     * Mengirim satu kiriman uji dengan signature ke URL push, supaya penerima dapat memastikan
+     * verifikasi signature-nya benar sebelum posting sungguhan dikirim.
      */
     public function testPush(Request $request, IntegrationClient $integrationClient, SignedPush $push, ActiveEnvironment $lingkungan): JsonResponse
     {
@@ -164,7 +165,7 @@ final class IntegrationClientController extends Controller
                 'duration_ms' => $durasi,
                 'message' => $jawaban->successful()
                     ? 'Penerima menjawab '.$jawaban->status().'.'
-                    : 'Penerima menjawab '.$jawaban->status().'. Periksa verifikasi tanda tangan di sisi penerima.',
+                    : 'Penerima menjawab '.$jawaban->status().'. Periksa verifikasi signature di sisi penerima.',
             ]]);
         } catch (ConnectionException|RuntimeException $kegagalan) {
             return response()->json(['data' => [
@@ -172,10 +173,22 @@ final class IntegrationClientController extends Controller
                 'status' => null,
                 'duration_ms' => (int) round((hrtime(true) - $mulai) / 1_000_000),
                 'message' => $kegagalan instanceof ConnectionException
-                    ? 'Tujuan tidak dapat dijangkau: '.$kegagalan->getMessage()
+                    ? 'Tujuan tidak dapat dijangkau: '.$this->connectionCause($kegagalan)
                     : $kegagalan->getMessage(),
             ]]);
         }
+    }
+
+    /**
+     * Pesan cURL utuh membawa kode galat, tautan dokumentasi cURL, dan URL tujuan yang sudah tampil
+     * di layar. Admin hanya butuh sebabnya, misalnya "Could not resolve host: finance.contoh".
+     */
+    private function connectionCause(ConnectionException $failure): string
+    {
+        $previous = $failure->getPrevious();
+        $cause = $previous instanceof ConnectException ? ($previous->getHandlerContext()['error'] ?? null) : null;
+
+        return is_string($cause) && $cause !== '' ? $cause : $failure->getMessage();
     }
 
     /**

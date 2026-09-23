@@ -5,7 +5,7 @@ post:
   security:
     - integrationClient: []
   description: |
-    Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
+    Scope `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
     finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
 
     Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
@@ -13,7 +13,7 @@ post:
     pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
     posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
 
-    Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+    Posting yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404.
   parameters:
     - name: posting_id
       in: path

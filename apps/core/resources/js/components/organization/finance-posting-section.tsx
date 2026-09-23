@@ -210,7 +210,9 @@ export function FinancePostingSection({
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                     <Badge variant={setting.enabled ? 'default' : 'outline'}>
-                        {setting.enabled ? 'Feed aktif' : 'Feed tidak aktif'}
+                        {setting.enabled
+                            ? 'Pengiriman aktif'
+                            : 'Pengiriman tidak aktif'}
                     </Badge>
                     <span className="text-muted-foreground">
                         Cutover {tanggal(setting.cutover_date)} · Mode hari ini:{' '}
@@ -218,9 +220,9 @@ export function FinancePostingSection({
                     </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    Selama feed tidak aktif, posting dari entitas ini tidak
-                    dikirim ke aplikasi finance. Posting bertanggal sebelum
-                    cutover juga tidak dikirim, karena riwayat itu sudah
+                    Selama pengiriman tidak aktif, posting dari entitas ini
+                    tidak dikirim ke aplikasi finance. Posting bertanggal
+                    sebelum cutover juga tidak dikirim, karena riwayat itu sudah
                     dijurnal manual.
                 </p>
 

@@ -5,7 +5,7 @@ get:
   security:
     - integrationClient: []
   description: |
-    Hanya klien integrasi dengan cakupan `vendors.read`. Module di dalam CoreERP membaca
+    Hanya klien integrasi dengan scope `vendors.read`. Module di dalam CoreERP membaca
     vendor lewat kontrak in-process, bukan lewat rute ini.
 
     Vendor adalah party di buku alamat yang memegang peran vendor pada satu entitas legal.

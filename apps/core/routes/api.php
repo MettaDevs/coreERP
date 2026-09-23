@@ -34,7 +34,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  * Dibaca module dan sistem di luar CoreERP sekaligus.
  *
  * Module human-resources memakai kredensial app seperti rute lain di atas. Pembaca feed posting
- * finance memakai token klien integrasi dengan cakupan yang disebut di parameter middleware, dan
+ * finance memakai token klien integrasi dengan scope yang disebut di parameter middleware, dan
  * menyinkronkan tabel penerjemahnya dari rute yang sama. Lihat AuthenticateInternalCaller.
  */
 Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-caller:operating-units.read'])->group(function (): void {
@@ -50,7 +50,7 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
 });
 
 /*
- * Feed posting finance untuk pembaca mode `pull`. Menarik dan mengakui adalah dua cakupan berbeda:
+ * Feed posting finance untuk pembaca mode `pull`. Membaca dan mengirim ack adalah dua scope berbeda:
  * pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.
  */
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.read'])->group(function (): void {

@@ -11,18 +11,18 @@ use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Mengirim satu badan JSON ke URL klien `push`, bertanda tangan (K-03).
+ * Mengirim satu body JSON ke URL klien `push`, dengan signature (K-03).
  *
- * Tanda tangannya mengikuti pola yang sudah dipakai `PublishWorkflowEvents`, supaya pembaca yang
+ * Signature-nya mengikuti pola yang sudah dipakai `PublishWorkflowEvents`, supaya pembaca yang
  * sudah memverifikasi event workflow tidak perlu belajar cara kedua:
  *
  * - `X-CoreERP-Event-Timestamp`: detik Unix saat dikirim.
- * - `X-CoreERP-Event-Signature`: HMAC-SHA256 heksadesimal atas `<timestamp>.<badan mentah>`,
- *   dengan rahasia penanda tangan klien sebagai kunci.
- * - `X-CoreERP-Client-Id`: id klien, supaya pembaca yang melayani beberapa tenant tahu rahasia
+ * - `X-CoreERP-Event-Signature`: HMAC-SHA256 heksadesimal atas `<timestamp>.<raw body>`,
+ *   dengan signing secret klien sebagai key.
+ * - `X-CoreERP-Client-Id`: id klien, supaya pembaca yang melayani beberapa tenant tahu secret
  *   mana yang dipakai memverifikasi.
  *
- * Pembaca wajib menolak stempel waktu yang terlalu jauh dari jamnya sendiri, supaya kiriman yang
+ * Pembaca wajib menolak timestamp yang terlalu jauh dari jamnya sendiri, supaya kiriman yang
  * disadap tidak dapat diputar ulang.
  */
 final class SignedPush

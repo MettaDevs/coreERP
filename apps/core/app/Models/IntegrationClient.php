@@ -41,12 +41,12 @@ class IntegrationClient extends Model
     public const REVOKED = 'revoked';
 
     /**
-     * Cakupan yang dapat diberikan. Sengaja sempit dan per sumber daya: pembaca yang hanya perlu
-     * menarik posting tidak perlu dapat mengakui (`ack`), dan sebaliknya.
+     * Scope yang dapat diberikan. Sengaja sempit dan per sumber daya: pembaca yang hanya perlu
+     * membaca posting tidak perlu dapat mengirim `ack`, dan sebaliknya.
      */
     public const SCOPES = [
-        'finance-postings.read' => 'Menarik posting finance',
-        'finance-postings.ack' => 'Mengakui posting (dibukukan atau ditolak)',
+        'finance-postings.read' => 'Membaca posting finance',
+        'finance-postings.ack' => 'Mengirim ack posting (dibukukan atau ditolak)',
         'vendors.read' => 'Membaca vendor',
         'operating-units.read' => 'Membaca operating unit dan nomornya',
     ];

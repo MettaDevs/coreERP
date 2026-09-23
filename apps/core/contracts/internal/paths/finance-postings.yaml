@@ -5,13 +5,13 @@ get:
   security:
     - integrationClient: []
   description: |
-    Cakupan `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
-    awalan jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
+    Scope `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
+    prefix jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
 
     Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
-    ulang pada **setiap** tarikan sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
-    jadi tidak ada kursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
-    posting yang terbit di tengah tarikan muncul pada tarikan berikutnya di tempat urutannya.
+    ulang pada **setiap** pull sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
+    jadi tidak ada cursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
+    posting yang terbit di tengah pull muncul pada pull berikutnya di tempat urutannya.
 
     Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
     dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
@@ -32,7 +32,7 @@ get:
         Saring menurut jenis posting. Kosongkan untuk menerima semua jenis yang diizinkan untuk
         klien Anda; itu cara yang dianjurkan.
 
-        Isi dengan salah satu nilai di bawah, atau awalan yang diakhiri `.*` untuk semua jenis dari
+        Isi dengan salah satu nilai di bawah, atau prefix yang diakhiri `.*` untuk semua jenis dari
         satu modul, misalnya `asset.*`:
 
         - `asset.acquisition` — penerimaan aset diselesaikan
@@ -70,7 +70,7 @@ get:
                   count: { type: integer }
                   has_more:
                     type: boolean
-                    description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu tarik lagi.
+                    description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu pull lagi.
           examples:
             perolehan:
               summary: Satu penerimaan ambulans, langsung ke hutang

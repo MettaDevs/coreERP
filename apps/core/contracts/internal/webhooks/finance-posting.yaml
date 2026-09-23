@@ -4,15 +4,15 @@ post:
   summary: Posting finance yang dikirim ke klien mode push
   description: |
     CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
-    badan yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
-    dengan urutan tarikan, per klien.
+    body yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
+    dengan urutan pull, per klien.
 
-    **Tanda tangan.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
-    `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan klien sebagai
-    kunci. Pembaca wajib memverifikasinya dan menolak stempel waktu yang terlalu jauh dari jamnya
-    sendiri. `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
+    **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
+    `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Pembaca
+    wajib memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
+    `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
 
-    **Jawaban.** 2xx dihitung terkirim; bila badannya `FinancePostingAck` yang sah, ack itu
+    **Jawaban.** 2xx dihitung terkirim; bila body-nya `FinancePostingAck` yang sah, ack itu
     diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
     `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
     jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
@@ -39,7 +39,7 @@ post:
         schema: { $ref: '#/components/schemas/FinancePosting' }
   responses:
     '200':
-      description: Diterima. Badan opsional; bila berupa ack yang sah, posting berstatus akhir.
+      description: Diterima. Body opsional; bila berupa ack yang sah, posting berstatus akhir.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/FinancePostingAck' }

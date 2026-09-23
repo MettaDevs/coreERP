@@ -1267,7 +1267,10 @@ const organizationHierarchyNodeTypes: NodeTypes = {
     organization: OrganizationHierarchyFlowNode,
 };
 
-function buildHierarchyGraph(version: Version): {
+function buildHierarchyGraph(
+    version: Version,
+    operatingUnitTypes: Props['operatingUnitTypes'],
+): {
     nodes: OrganizationHierarchyFlowNode[];
     edges: Edge[];
 } {
@@ -1368,7 +1371,11 @@ function buildHierarchyGraph(version: Version): {
         data: {
             label: node.organization.name,
             classification: node.organization.classification,
-            operatingUnitType: node.organization.operating_unit?.type ?? null,
+            // Label tipe, bukan kodenya: daftar operating unit memakai label yang sama.
+            operatingUnitType: node.organization.operating_unit
+                ? (operatingUnitTypes[node.organization.operating_unit.type] ??
+                  node.organization.operating_unit.type)
+                : null,
             operatingUnitNumber:
                 node.organization.operating_unit?.number ?? null,
             needsNumber: perluNomor(node.organization.operating_unit),
@@ -1390,8 +1397,14 @@ function buildHierarchyGraph(version: Version): {
     return { nodes, edges };
 }
 
-function HierarchyCanvas({ version }: { version: Version }) {
-    const graph = buildHierarchyGraph(version);
+function HierarchyCanvas({
+    version,
+    operatingUnitTypes,
+}: {
+    version: Version;
+    operatingUnitTypes: Props['operatingUnitTypes'];
+}) {
+    const graph = buildHierarchyGraph(version, operatingUnitTypes);
 
     return (
         <div className="overflow-hidden rounded-xl border border-border bg-background shadow-xs">
@@ -1924,6 +1937,9 @@ export default function OrganizationPage({
 
                                             <HierarchyCanvas
                                                 version={version}
+                                                operatingUnitTypes={
+                                                    operatingUnitTypes
+                                                }
                                             />
 
                                             <div className="space-y-3 pt-2">

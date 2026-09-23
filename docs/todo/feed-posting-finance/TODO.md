@@ -62,11 +62,13 @@ dari sebuah department bisa ditemukan (K-07).
   - [x] 1.2.1 Tambah `number` ke `$fillable` di `apps/core/app/Models/OperatingUnit.php`.
   - [x] 1.2.2 Format: huruf besar, angka, `-`. Tanpa spasi.
   - [x] 1.2.3 Nomor boleh diubah. Riwayat posting menyimpan nomor pada saat terbit (snapshot).
-- [~] 1.3 Layar organisasi (`apps/core/resources/js/pages/settings/organization.tsx`).
-  - [~] 1.3.1 Field "Nomor unit" pada form operating unit.
-  - [~] 1.3.2 Tampilkan nomor di pohon hierarki.
-  - [~] 1.3.3 Tanda peringatan pada BU/department yang belum bernomor, karena posting untuk unit itu akan tertahan.
-  - [ ] 1.3.4 Verifikasi di browser: buat unit bernomor, ubah nomor, dan lihat tanda di daftar dan pohon hierarki.
+- [x] 1.3 Layar organisasi (`apps/core/resources/js/pages/settings/organization.tsx`).
+  - [x] 1.3.1 Field "Nomor unit" pada form operating unit.
+  - [x] 1.3.2 Tampilkan nomor di pohon hierarki.
+  - [x] 1.3.3 Tanda peringatan pada BU/department yang belum bernomor, karena posting untuk unit itu akan tertahan.
+  - [x] 1.3.4 Verifikasi di browser: buat unit bernomor, ubah nomor, dan lihat tanda di daftar dan pohon hierarki.
+    Diverifikasi 23 September 2026: nomor berspasi ditolak, nomor bisa diubah, dan tanda "Belum bernomor" tampil di
+    daftar dan pohon. Satu cacat diperbaiki: pohon hierarki menampilkan kode tipe (`business_unit`), bukan labelnya.
 - [x] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Support/Modules/Contracts/`).
   - [x] 1.4.1 `unitOperasi()` mengembalikan `tipe` dan `nomor` selain `id` dan `nama`.
   - [x] 1.4.2 Metode baru `unitBisnisInduk(tenant, orgUnitIds, tanggal)`: BU induk dari org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
@@ -85,7 +87,7 @@ dari sebuah department bisa ditemukan (K-07).
 ### 2. [~] Core: vendor master gaya Dynamics
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** vendor bisa dibuat per entitas legal
-sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan ditarik pembaca lewat
+sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan dibaca pembaca lewat
 `/internal/v1/vendors` (K-06).
 
 - [x] 2.1 Catatan studi: halaman *Vendors* di F&O dan BC.
@@ -97,11 +99,13 @@ sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan ditarik pe
   - [x] 2.2.2 Unik (`tenant_id`, `legal_entity_id`, `number`), juga (`tenant_id`, `legal_entity_id`, `party_id`): satu party paling banyak satu vendor per entitas legal.
   - [x] 2.2.3 Setiap vendor mendaftarkan baris di `party_role_registrations` dengan `role_code = vendor`.
 - [x] 2.3 Nomor vendor lewat number sequence Core: referensi `core.vendor` milik baris app `core` berstatus `internal` (tidak tampil di katalog), per entitas legal, bawaan `VND-000001`, boleh manual. Urutan tenant lahir saat vendor pertama disimpan atau saat layar Nomor dokumen dibuka, jadi formatnya bisa disesuaikan sebelum nomor pertama terbit.
-- [~] 2.4 Layar Core (Buku alamat › Vendor).
+- [x] 2.4 Layar Core (Buku alamat › Vendor).
   - [x] 2.4.1 Daftar vendor dengan filter entitas legal dan status.
   - [x] 2.4.2 Form buat/ubah. Party bisa dipilih dari yang ada atau dibuat baru.
   - [x] 2.4.3 Akses: semua anggota melihat, owner/admin membuat dan mengubah (keputusan pemilik produk, 22 September 2026). Permission, privilege, dan duty tersendiri menyusul bila layar ini perlu dibuka untuk peran lain.
-  - [ ] 2.4.4 Verifikasi di browser: buat vendor baru, pilih party yang sudah ada, nomor manual, ubah nama, nonaktifkan.
+  - [x] 2.4.4 Verifikasi di browser: buat vendor baru, pilih party yang sudah ada, nomor manual, ubah nama, nonaktifkan.
+    Diverifikasi 23 September 2026. Mengganti nama mengganti nama party, jadi vendor lain yang memakai party yang sama
+    ikut berganti nama. Itu memang bentuk buku alamat, bukan cacat.
 - [x] 2.5 Kontrak module `DaftarVendor`.
   - [x] 2.5.1 `aktif(tenantId, legalEntityId, cari)` dan `satu(tenantId, vendorId)` mengembalikan `{id, number, name, tax_number, status, legal_entity_id}`.
   - [x] 2.5.2 Bind di `apps/core/app/Support/Modules/CoreServices.php`.
@@ -128,7 +132,7 @@ di sisi finance berperilaku seperti di PRD (K-05).
   - [x] 3.2.3 Akun yang hilang dari berkas **tidak** otomatis dinonaktifkan. Laporan impor menyebutnya, dan pengguna memutuskan.
   - [x] 3.2.4 Validasi: `type` wajib salah satu dari dua nilai, dan `external_id` tidak boleh ganda dalam satu berkas.
   - [x] 3.2.5 Laporan hasil: baru, berubah, tidak ada di berkas, ditolak (beserta baris dan alasannya).
-- [~] 3.3 Layar Core: daftar akun, pencarian, impor, dan riwayat impor (Data referensi › Daftar akun).
+- [x] 3.3 Layar Core: daftar akun, pencarian, impor, dan riwayat impor (Data referensi › Daftar akun).
 - [x] 3.4 Kontrak module `DaftarAkun`.
   - [x] 3.4.1 `cari(tenant, legalEntityId, kata)` untuk dropdown, hanya akun aktif.
   - [x] 3.4.2 `satu(tenant, accountId)` mengembalikan `{id, external_id, code, name, type, active, legal_entity_id}`, termasuk akun nonaktif. Ditambah `banyak(tenant, ids)` untuk layar matriks.
@@ -138,7 +142,9 @@ di sisi finance berperilaku seperti di PRD (K-05).
   - [x] 3.5.2 Ganti nomor dengan `external_id` sama: pemetaan tetap, nomor baru terbaca.
   - [~] 3.5.3 Hapus lalu buat ulang dengan `external_id` baru: akun lama tetap ada, pengguna menonaktifkannya, dan posting yang memakainya tertahan. Bagian "tertahan" diuji di area 6.
   - [x] 3.5.4 Akun tenant lain tidak terlihat.
-- [ ] 3.6 Verifikasi di browser: impor, pratinjau berkas salah, dan nonaktifkan akun.
+- [x] 3.6 Verifikasi di browser: impor, pratinjau berkas salah, dan nonaktifkan akun.
+  Diverifikasi 23 September 2026: berkas salah ditolak seluruhnya dengan galat per baris dan tombol Terapkan nonaktif,
+  berkas benar berpemisah `;` diterapkan, riwayat impor mencatat pelaku, dan akun bisa dinonaktifkan lalu diaktifkan.
 
 ---
 
@@ -158,14 +164,17 @@ jaringan pembaca tidak berpengaruh (K-03).
   - [x] 4.2.3 Isi atribut request `coreerp.tenant_id` dari klien. Jangan pernah dari URL, query, atau body.
   - [x] 4.2.4 Daftarkan alias di `apps/core/bootstrap/app.php`, beserta rate limiter tersendiri.
 - [x] 4.3 Gerbang environment: kalau `ActiveEnvironment::outboundAllowed()` false, semua rute klien integrasi menjawab 503 dengan alasan dari `refusalReason()`.
-- [~] 4.4 Layar Core (Identity & access › Klien integrasi): terbitkan token (tampil sekali), cabut, ubah scope, awalan jenis, IP, dan mode pengiriman, lihat `last_used_at`. Untuk `push`: tombol "Kirim uji" ke `push_url`.
-- [x] 4.6 Ekspos mode `pull` lewat Traefik: pastikan path `/api/internal/v1/...` terjangkau dengan TLS di domain server klien (`deploy/traefik`), tanpa membuka path lain. Diperiksa 22 September 2026, tidak perlu perubahan: di SaaS router `core` di `deploy/traefik/dynamic/coreerp.yaml` meneruskan seluruh path, dan di server klien `core-proxy` (Caddy) di `deploy/compose.edition.yaml` melakukan hal yang sama dengan sertifikat Let's Encrypt. Path internal dijaga token, cakupan, dan allowlist IP, bukan oleh proxy.
+- [x] 4.4 Layar Core (Identity & access › Klien integrasi): terbitkan token (tampil sekali), cabut, ubah scope, prefix jenis, IP, dan mode pengiriman, lihat `last_used_at`. Untuk `push`: tombol "Kirim uji" ke `push_url`.
+- [x] 4.6 Ekspos mode `pull` lewat Traefik: pastikan path `/api/internal/v1/...` terjangkau dengan TLS di domain server klien (`deploy/traefik`), tanpa membuka path lain. Diperiksa 22 September 2026, tidak perlu perubahan: di SaaS router `core` di `deploy/traefik/dynamic/coreerp.yaml` meneruskan seluruh path, dan di server klien `core-proxy` (Caddy) di `deploy/compose.edition.yaml` melakukan hal yang sama dengan sertifikat Let's Encrypt. Path internal dijaga token, scope, dan allowlist IP, bukan oleh proxy.
 - [x] 4.5 Test (`IntegrationClientTest`).
   - [x] 4.5.1 Token salah, dicabut, atau dari IP asing ditolak.
   - [x] 4.5.2 Scope kurang menghasilkan 403.
   - [x] 4.5.3 Environment sandbox menghasilkan 503.
   - [x] 4.5.4 Tenant tidak bisa ditimpa lewat header.
-- [ ] 4.7 Verifikasi di browser: buat klien, salin token, cabut, dan kirim uji mode push.
+- [x] 4.7 Verifikasi di browser: buat klien, salin token, cabut, dan kirim uji mode push.
+  Diverifikasi 23 September 2026, dengan dua perbaikan. Istilah baku tidak lagi diterjemahkan: Pull/Push, Scope,
+  Prefix, dan Signing secret, sebelumnya Tarik/Dorong, Izin, Awalan, dan Rahasia penanda tangan. Kirim uji yang gagal
+  kini hanya menyebut sebabnya dari cURL, misalnya "Could not resolve host", dan toast-nya bertahan 10 detik.
 
 ---
 
@@ -178,7 +187,7 @@ terbaca per mata uang (K-10, K-16, K-20).
 - [x] 5.1 Migration.
   - [x] 5.1.1 `finance_posting_settings`: `legal_entity_id` (unik), `tenant_id`, `enabled`, `cutover_date`. Database menolak feed aktif tanpa cutover.
   - [x] 5.1.2 `finance_settlement_modes`: `legal_entity_id`, `mode` (`direct_payable` / `clearing`), `effective_from`. Unik (`legal_entity_id`, `effective_from`).
-- [~] 5.2 Layar Core di halaman entitas legal: aktif/tidak, tanggal cutover, dan riwayat mode beserta tanggal berlakunya.
+- [x] 5.2 Layar Core di halaman entitas legal: aktif/tidak, tanggal cutover, dan riwayat mode beserta tanggal berlakunya.
 - [x] 5.3 Kontrak module `SetelanPostingFinance`: `modePenyelesaian(legalEntityId, tanggal)` dan `cutover(legalEntityId)`. Id entitas yang tidak ada dilempar sebagai `RuntimeException`.
 - [x] 5.4 Test (`FinancePostingSettingsTest`).
   - [x] 5.4.1 Mode terbaca sesuai tanggal berlaku.
@@ -188,21 +197,28 @@ terbaca per mata uang (K-10, K-16, K-20).
   - [x] 5.5.1 Tabel `currency_precisions`: `tenant_id`, `currency_code` (ISO 4217), `amount_decimals`, `unit_amount_decimals`. Unik (`tenant_id`, `currency_code`).
   - [x] 5.5.2 Default IDR: `amount_decimals = 2` sampai konsultan memutuskan (0 atau 2), `unit_amount_decimals = 3`.
   - [~] 5.5.3 Layar Core untuk mengubahnya (Data referensi › Mata uang). Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
+    Layarnya terverifikasi 23 September 2026. Aturan "hanya posting sesudahnya" belum dipenuhi: Validasi ulang dan
+    penilaian ulang cutover membaca ulang posting lama dengan presisi yang baru. Setelah IDR diturunkan dari 2 ke 0,
+    nilai `"…00"` ditolak, Validasi ulang menjawab 422, dan menyimpan setelan posting entitas menjawab 500 setelah
+    setelannya tersimpan.
   - [x] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(tenant, currencyCode)`, `hargaSatuan(tenant, currencyCode)`, dan `bulatkan(tenant, nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
   - [x] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
-- [ ] 5.6 Verifikasi di browser: setelan posting di halaman entitas legal dan halaman Mata uang.
+- [x] 5.6 Verifikasi di browser: setelan posting di halaman entitas legal dan halaman Mata uang.
+  Diverifikasi 23 September 2026: mengaktifkan tanpa cutover ditolak, tanggal mode ganda ditolak, dan presisi IDR
+  2 → 0 tersimpan dengan contoh nilai yang ikut berubah. Label "Feed aktif" diganti "Pengiriman aktif". Cacat
+  presisi yang ditemukan dicatat di 5.5.3.
 
 ---
 
 ### 6. [x] Core: feed posting
 
 **Tempat:** `apps/core` · **Setelah:** 1, 3, 4, 5 · **Selesai bila:** module bisa menerbitkan
-posting dalam transaksinya sendiri, pembaca bisa menarik dan ack sesuai kontrak di PRD, dan
+posting dalam transaksinya sendiri, pembaca bisa pull dan ack sesuai kontrak di PRD, dan
 tidak ada posting yang hilang atau dobel.
 
 - [x] 6.1 Migration `finance_postings`.
   - [x] 6.1.1 Kolom: `id`, `tenant_id`, `legal_entity_id`, `posting_id` (unik per tenant), `posting_type`, `source_module`, `source_type`, `source_number`, `posting_date`, `settlement_mode` (nullable), `status`, `held_reason`, `payload` (json, bentuk kontrak lengkap), `total_debit`, `total_credit`, `reverses_posting_id`, `adjusts_posting_id`, `external_reference`, `reason_code`, `reason`, `acknowledged_at`, `served_count`, `last_served_at`, timestamps. `held_reason` menjadi `hold_reasons` (daftar masalah per baris), ditambah `manual_reason`, `input` (permintaan asli module, untuk membentuk ulang posting yang tertahan), dan `input_hash`. Tiga tabel pendamping: `finance_posting_lines`, `finance_posting_deliveries` (mode push), `finance_posting_events` (riwayat).
-  - [x] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk penarikan, ditambah `published_at` sesuai urutan tarikan.
+  - [x] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk pull, ditambah `published_at` sesuai urutan pull.
 - [x] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Support/Modules/Contracts/`.
   - [x] 6.2.1 `terbitkan(array $posting)` menerima jenis, entitas legal, tanggal, dokumen sumber, vendor, dan baris jurnal dengan `account_id` referensi + `org_unit_id` sumber dimensi. Ditambah `pratinjau()` (pemeriksaan sama tanpa menyimpan, untuk K-22) dan `status()`.
   - [x] 6.2.2 Dipanggil **di dalam** transaksi pemanggil. Tidak membuka transaksi sendiri; dipanggil di luar transaksi dilempar sebagai `LogicException`.
@@ -220,8 +236,8 @@ tidak ada posting yang hilang atau dobel.
   - [x] 6.3.9 Kolom dimensi global di tabel baris (`business_unit_code`, `department_code`) untuk laporan cepat, di samping payload JSON.
 - [x] 6.4 `GET /internal/v1/finance-postings` (mode `pull`, satu endpoint untuk semua jenis, K-23).
   - [x] 6.4.1 Hanya `pending`, urut `posting_date` lalu waktu terbit, `limit` maksimal 500.
-  - [x] 6.4.4 Filter `posting_type` (mendukung awalan seperti `asset.*`) dan `legal_entity`, selalu dipersempit oleh `posting_type_prefixes` milik klien.
-  - [x] 6.4.2 Naikkan `served_count` dan `last_served_at`, dan catat waktu tarikan terakhir per klien.
+  - [x] 6.4.4 Filter `posting_type` (mendukung prefix seperti `asset.*`) dan `legal_entity`, selalu dipersempit oleh `posting_type_prefixes` milik klien.
+  - [x] 6.4.2 Naikkan `served_count` dan `last_served_at`, dan catat waktu pull terakhir per klien.
   - [x] 6.4.3 Posting disajikan ulang sampai di-ack.
 - [x] 6.5 `POST /internal/v1/finance-postings/{posting_id}/ack`.
   - [x] 6.5.1 `posted` wajib `external_reference`. `rejected` wajib `reason_code` dari daftar di PRD, plus `reason`.
@@ -233,13 +249,13 @@ tidak ada posting yang hilang atau dobel.
   - [x] 6.7.2 Pastikan `apps/core/contracts/check-contract-coverage.py` lulus. Rute ditulis sebagai path literal berkutip tunggal. Ditambah `ContractYamlTest`: kontrak harus terbaca parser YAML yang ketat, karena PyYAML diam-diam menerima deskripsi berkoma di dalam `{ … }`.
 - [x] 6.8 Test (`FinancePostingFeedTest`, 22 test; payload dicocokkan dengan skema OpenAPI).
   - [x] 6.8.1 Penerbitan di dalam transaksi yang di-rollback tidak meninggalkan posting.
-  - [x] 6.8.2 Posting yang terbit selama penarikan berlangsung tetap tersaji di tarikan berikutnya.
+  - [x] 6.8.2 Posting yang terbit selama pull berlangsung tetap tersaji di pull berikutnya.
   - [x] 6.8.3 Ack ganda aman. Ack bertentangan menghasilkan 409.
   - [x] 6.8.4 `held` → perbaiki pemetaan → validasi ulang → `pending`.
   - [x] 6.8.5 Dimensi sesuai jenis akun.
   - [x] 6.8.6 Tenant terisolasi.
   - [x] 6.8.7 Nilai dengan skala lebih halus dari presisi mata uang ditolak.
-  - [x] 6.8.8 Klien dengan awalan `asset.` tidak pernah menerima jenis lain.
+  - [x] 6.8.8 Klien dengan prefix `asset.` tidak pernah menerima jenis lain.
 - [x] 6.10 Mode `push` (K-03), `finance-postings:push` setiap menit.
   - [x] 6.10.1 Job antrean yang mengirim posting `pending` milik klien `push` ke `push_url`, dengan header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature` (HMAC-SHA256), mengikuti pola `apps/core/app/Console/Commands/PublishWorkflowEvents.php`.
   - [x] 6.10.2 Respons 2xx + body ack → diproses sama dengan `POST .../ack`. 2xx tanpa ack: terkirim, tetap `pending` sampai di-ack lewat API.
@@ -259,9 +275,9 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
 `FinancePostingMonitorController`, test `FinancePostingMonitorTest`.
 
 - [x] 7.1 Daftar posting: filter status, jenis, entitas legal, dan rentang tanggal. Kolom umur `pending`.
-- [x] 7.2 Detail: dokumen sumber (tautan ke modul), baris jurnal beserta dimensi, alasan tahan/tolak, dan riwayat tarik/ack.
+- [x] 7.2 Detail: dokumen sumber (tautan ke modul), baris jurnal beserta dimensi, alasan tahan/tolak, dan riwayat pull/ack.
   - Tautan dokumen dari `source_document.url` opsional yang dikirim module lewat `PenerbitPosting`, karena hanya module yang tahu alamat layarnya. Hanya jalur relatif yang diterima, dan nilainya tidak ikut payload pembaca. Module belum mengirimnya; itu bagian 9.7 dan 11.2.
-  - Riwayat tarik hanya jumlah penyajian dan waktu terakhirnya: identitas klien penarik per posting tidak pernah disimpan (6.4).
+  - Riwayat pull hanya jumlah penyajian dan waktu terakhirnya: klien mana yang melakukan pull tidak pernah disimpan per posting (6.4).
 - [x] 7.3 Aksi.
   - [x] 7.3.1 "Validasi ulang" untuk `held`.
   - [x] 7.3.2 "Tandai manual" dengan alasan wajib, untuk `held`, `pending`, dan `rejected`. Posting `pending` yang sudah pernah disajikan memunculkan peringatan bahwa pembaca mungkin sudah membukukannya. Status diperiksa ulang di dalam kunci baris, dan penilaian ulang cutover tidak membatalkan tanda dari pengguna.
@@ -427,7 +443,7 @@ docs` bersih.
 - [~] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. `asset.acquisition` sudah ada di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`); empat lainnya menyusul bersama area modulnya.
 - [ ] 13.2 Halaman `docs/dev` untuk feed posting: penerbit, status, validasi, penahanan, dan panduan menambah jenis posting dari modul lain.
 - [ ] 13.3 Halaman `docs/apps/management-aset`: posting group, cara perolehan, saldo awal, dan "Post penyusutan".
-- [x] 13.4 Panduan untuk pembaca: urutan sinkron (akun → vendor → unit → tarik posting → ack), tabel penerjemah, dan larangan fallback. Terbit tanpa login di portal `/docs` (spesifikasi Integrasi · Finance), ditulis di `apps/core/contracts/internal/integrasi-finance.yaml`.
+- [x] 13.4 Panduan untuk pembaca: urutan sinkron (akun → vendor → unit → pull posting → ack), tabel penerjemah, dan larangan fallback. Terbit tanpa login di portal `/docs` (spesifikasi Integrasi · Finance), ditulis di `apps/core/contracts/internal/integrasi-finance.yaml`.
 - [ ] 13.5 Daftarkan halaman di `docs/.vitepress/config.ts`, lalu build bersih.
 - [ ] 13.6 Tandai bagian "Kontrak ke backoffice" di `docs/todo/managementaset/03-penyusutan-dan-bridge-backoffice.md` sebagai digantikan.
 
@@ -458,8 +474,8 @@ manual) · **Selesai bila:** skenario area 16 lulus. Kontrak CoreERP yang menjad
   - [ ] 15.1.4 Vendor Core → `Supplier_ID`.
 - [ ] 15.2 Ekspor daftar akun ke CSV sesuai templat area 3.2.1, dengan `external_id` = `Akun_ID`.
 - [ ] 15.3 Sinkron vendor dan unit dari Core (`GET /vendors`, `GET /operating-units`).
-- [ ] 15.4 Job terjadwal penarik posting.
-  - [ ] 15.4.1 Tarik `pending`, dan simpan dengan `UNIQUE(posting_id)`.
+- [ ] 15.4 Job terjadwal untuk pull posting.
+  - [ ] 15.4.1 Pull posting `pending`, dan simpan dengan `UNIQUE(posting_id)`.
   - [ ] 15.4.2 Jurnal diambil dari `journal_lines`. Jangan menjurnal dari `details`.
   - [ ] 15.4.3 Tanggal diambil dari `posting_date`, bukan jam server Windows. `occurred_at` dan `published_at` disimpan apa adanya, lengkap dengan offset zona waktunya.
   - [ ] 15.4.4 Nilai diterima sebagai string desimal sesuai `currency.decimals`. Presisi kolom di old-finance harus sama atau lebih halus. Tidak boleh dibulatkan ulang.

@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Validator;
 /**
  * Menerapkan ack pembaca ke satu posting (TODO 6.5 dan 6.10.2).
  *
- * Satu kelas untuk dua jalan masuk — `POST …/ack` pada mode tarik dan badan jawaban pada mode
- * dorong — supaya aturan idempotensinya tidak pernah berbeda di antara keduanya:
+ * Satu kelas untuk dua jalan masuk — `POST …/ack` pada mode pull dan body jawaban pada mode
+ * push — supaya aturan idempotensinya tidak pernah berbeda di antara keduanya:
  *
  * - Posting `pending` menerima `posted` atau `rejected` dan berhenti di sana.
  * - Ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab tanpa perubahan.

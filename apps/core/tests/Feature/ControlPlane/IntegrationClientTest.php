@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Integration\PushDestination;
 use Database\Seeders\AppCatalogSeeder;
+use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
@@ -190,6 +191,25 @@ class IntegrationClientTest extends TestCase
             ->assertOk()->assertJsonPath('data.ok', false);
 
         $this->assertSame([], $dikirim);
+    }
+
+    public function test_test_push_to_an_unknown_host_reports_the_cause_without_curl_noise(): void
+    {
+        Http::fake(function (HttpRequest $request) {
+            throw new ConnectException(
+                'cURL error 6: Could not resolve host: finance.example.invalid (see https://curl.se/libcurl/c/libcurl-errors.html) for https://finance.example.invalid/hook',
+                $request->toPsrRequest(),
+                null,
+                ['errno' => 6, 'error' => 'Could not resolve host: finance.example.invalid'],
+            );
+        });
+        $id = (string) $this->buat(['delivery_mode' => 'push', 'push_url' => 'https://finance.example.invalid/hook'])->json('data.id');
+
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/test-push")
+            ->assertOk()
+            ->assertJsonPath('data.ok', false)
+            ->assertJsonPath('data.status', null)
+            ->assertJsonPath('data.message', 'Tujuan tidak dapat dijangkau: Could not resolve host: finance.example.invalid');
     }
 
     public function test_di_saas_url_push_ke_jaringan_privat_ditolak_tetapi_di_on_prem_boleh(): void
