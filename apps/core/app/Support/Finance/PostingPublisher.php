@@ -68,8 +68,8 @@ final class PostingPublisher
             throw new LogicException('PenerbitPosting::terbitkan harus dipanggil di dalam transaksi dokumen sumbernya.');
         }
 
-        $masukan = $this->normalize($input);
-        $ada = $this->cari($masukan->tenantId, $masukan->postingId);
+        $ada = $this->existing($input);
+        $masukan = $this->normalize($input, $ada?->currency_decimals);
         if ($ada !== null) {
             return $this->hasilYangAda($ada, $masukan);
         }
@@ -96,8 +96,8 @@ final class PostingPublisher
      */
     public function preview(array $input): array
     {
-        $masukan = $this->normalize($input);
-        $ada = $this->cari($masukan->tenantId, $masukan->postingId);
+        $ada = $this->existing($input);
+        $masukan = $this->normalize($input, $ada?->currency_decimals);
         if ($ada !== null) {
             return $this->hasilYangAda($ada, $masukan);
         }
@@ -133,7 +133,8 @@ final class PostingPublisher
 
     /**
      * Membentuk ulang posting `held` setelah pemetaannya diperbaiki (TODO 6.6). `posting_id`, jam
-     * terbit, dan isi jurnalnya tetap; yang dibaca ulang hanya akun, dimensi, dan cutover.
+     * terbit, isi jurnal, dan presisinya tetap. Seluruh masukan dibaca ulang terhadap data hari ini:
+     * akun, dimensi, vendor, entitas legal, dan cutover.
      */
     public function revalidate(FinancePosting $posting, ?int $userId = null): FinancePosting
     {
@@ -214,7 +215,14 @@ final class PostingPublisher
 
                     if ($posting->status !== FinancePosting::PENDING) {
                         $sebelum = $posting->status;
-                        $berubah += $this->terapkanUlang($posting, 'cutover_reevaluated', $userId)->status !== $sebelum ? 1 : 0;
+                        try {
+                            $berubah += $this->terapkanUlang($posting, 'cutover_reevaluated', $userId)->status !== $sebelum ? 1 : 0;
+                        } catch (PostingTidakSah $kegagalan) {
+                            // Setelan entitasnya sudah tersimpan. Posting yang tidak dapat dibentuk
+                            // ulang, misalnya karena vendornya sudah diarsipkan, tetap di statusnya
+                            // dan tampil di layar pantau; posting lain tetap dinilai ulang.
+                            report($kegagalan);
+                        }
                     }
                 }
             });
@@ -222,8 +230,14 @@ final class PostingPublisher
         return $berubah;
     }
 
-    /** @param  array<string, mixed>  $input */
-    public function normalize(array $input): PostingInput
+    /**
+     * @param  array<string, mixed>  $input
+     * @param  int|null  $amountDecimals  Presisi posting yang sudah terbit. Posting lama dibentuk ulang
+     *                                    dengan presisi saat ia terbit, bukan presisi mata uang yang
+     *                                    berlaku sekarang: perubahan presisi hanya berlaku untuk
+     *                                    posting berikutnya (K-20, TODO 5.5.3).
+     */
+    public function normalize(array $input, ?int $amountDecimals = null): PostingInput
     {
         $tenant = $this->wajib($input, 'tenant_id', 26);
         $postingId = $this->wajib($input, 'posting_id', 120);
@@ -250,7 +264,7 @@ final class PostingPublisher
             throw new PostingTidakSah('currency_code harus kode ISO 4217 tiga huruf.');
         }
         try {
-            $desimal = $this->presisi->amountDecimals($tenant, $mataUang);
+            $desimal = $amountDecimals ?? $this->presisi->amountDecimals($tenant, $mataUang);
         } catch (RuntimeException $kegagalan) {
             throw new PostingTidakSah($kegagalan->getMessage(), 0, $kegagalan);
         }
@@ -550,12 +564,12 @@ final class PostingPublisher
 
     private function terapkanUlang(FinancePosting $posting, string $peristiwa, ?int $userId): FinancePosting
     {
-        $masukan = $this->normalize($posting->input);
+        $masukan = $this->normalize($posting->input, $posting->currency_decimals);
         $nilai = $this->evaluate($masukan, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String()));
 
         return DB::transaction(function () use ($posting, $nilai, $peristiwa, $userId): FinancePosting {
             $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
-            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci)) {
+            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci) || $this->markedByUser($terkunci)) {
                 return $terkunci;
             }
             $dari = $terkunci->status;
@@ -577,7 +591,7 @@ final class PostingPublisher
     {
         DB::transaction(function () use ($posting, $alasan, $userId): void {
             $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
-            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci)) {
+            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci) || $this->markedByUser($terkunci)) {
                 return;
             }
             $dari = $terkunci->status;
@@ -640,7 +654,7 @@ final class PostingPublisher
                 'org_unit_id' => $this->teks($line, 'org_unit_id', 26, false, sprintf('Baris %d org_unit_id', $no)),
                 'mapping' => is_array($mapping) ? [
                     'label' => $this->wajib($mapping, 'label', 200, sprintf('Baris %d mapping.label', $no)),
-                    'fix_url' => $this->teks($mapping, 'fix_url', 500, false, sprintf('Baris %d mapping.fix_url', $no)),
+                    'fix_url' => $this->pathInsideApp($this->teks($mapping, 'fix_url', 500, false, sprintf('Baris %d mapping.fix_url', $no)), sprintf('Baris %d mapping.fix_url', $no)),
                 ] : null,
             ];
         }
@@ -728,6 +742,34 @@ final class PostingPublisher
             && ($posting->served_count > 0 || $posting->deliveries()->exists());
     }
 
+    /**
+     * Tanda manual dari pengguna hanya diubah pengguna. Validasi ulang dan penilaian ulang cutover
+     * memilih posting sebelum menguncinya; pengguna yang menandainya di antara keduanya mungkin
+     * sudah membukukannya sendiri, dan posting yang kembali `pending` akan dibukukan pembaca untuk
+     * kedua kalinya.
+     */
+    private function markedByUser(FinancePosting $posting): bool
+    {
+        return $posting->status === FinancePosting::MANUAL && $posting->manual_reason === FinancePosting::MANUAL_USER;
+    }
+
+    /**
+     * Posting yang sudah terbit dengan `posting_id` masukan ini, dicari sebelum masukannya
+     * dinormalkan supaya presisinya dapat dipakai. Masukan yang belum sah tidak menemukan apa pun,
+     * lalu ditolak `normalize()` seperti biasa.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function existing(array $input): ?FinancePosting
+    {
+        $tenant = $input['tenant_id'] ?? null;
+        $postingId = $input['posting_id'] ?? null;
+
+        return is_string($tenant) && is_string($postingId) && $tenant !== '' && $postingId !== ''
+            ? $this->cari($tenant, $postingId)
+            : null;
+    }
+
     private function cari(string $tenantId, string $postingId): ?FinancePosting
     {
         return FinancePosting::query()->where('tenant_id', $tenantId)->where('posting_id', $postingId)->first();
@@ -803,6 +845,19 @@ final class PostingPublisher
         $url = $this->teks($sumber, 'url', 255, false, 'source_document.url');
         if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
             throw new PostingTidakSah('source_document.url harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /management-aset/inventarisasi-aset/penerimaan/01J….');
+        }
+
+        return $url;
+    }
+
+    /**
+     * `mapping.fix_url` menjadi tautan di layar pantau, sama seperti `source_document.url`, jadi
+     * dijaga dengan aturan yang sama: jalur di dalam aplikasi, tanpa skema dan tanpa host.
+     */
+    private function pathInsideApp(?string $url, string $field): ?string
+    {
+        if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
+            throw new PostingTidakSah($field.' harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /m/management-aset/posting-groups/KENDARAAN.');
         }
 
         return $url;

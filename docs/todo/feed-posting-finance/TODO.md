@@ -175,6 +175,9 @@ jaringan pembaca tidak berpengaruh (K-03).
   Diverifikasi 23 September 2026, dengan dua perbaikan. Istilah baku tidak lagi diterjemahkan: Pull/Push, Scope,
   Prefix, dan Signing secret, sebelumnya Tarik/Dorong, Izin, Awalan, dan Rahasia penanda tangan. Kirim uji yang gagal
   kini hanya menyebut sebabnya dari cURL, misalnya "Could not resolve host", dan toast-nya bertahan 10 detik.
+- [ ] 4.8 Pemeriksaan tujuan push (`PushDestination`) di SaaS hanya meresolusi IPv4 (`gethostbynamel`), dan klien HTTP
+  meresolusi ulang saat mengirim. Host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang
+  diganti di antara pemeriksaan dan pengiriman. Perlu resolusi A dan AAAA, dan pengiriman ke alamat yang sudah diperiksa.
 
 ---
 
@@ -196,17 +199,19 @@ terbaca per mata uang (K-10, K-16, K-20).
 - [x] 5.5 Presisi mata uang (K-20). Padanannya *Currency Card* BC. Master mata uang penuh tetap `FIN-20`.
   - [x] 5.5.1 Tabel `currency_precisions`: `tenant_id`, `currency_code` (ISO 4217), `amount_decimals`, `unit_amount_decimals`. Unik (`tenant_id`, `currency_code`).
   - [x] 5.5.2 Default IDR: `amount_decimals = 2` sampai konsultan memutuskan (0 atau 2), `unit_amount_decimals = 3`.
-  - [~] 5.5.3 Layar Core untuk mengubahnya (Data referensi › Mata uang). Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
-    Layarnya terverifikasi 23 September 2026. Aturan "hanya posting sesudahnya" belum dipenuhi: Validasi ulang dan
-    penilaian ulang cutover membaca ulang posting lama dengan presisi yang baru. Setelah IDR diturunkan dari 2 ke 0,
-    nilai `"…00"` ditolak, Validasi ulang menjawab 422, dan menyimpan setelan posting entitas menjawab 500 setelah
-    setelannya tersimpan.
+  - [x] 5.5.3 Layar Core untuk mengubahnya (Data referensi › Mata uang). Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
+    Layarnya terverifikasi 23 September 2026, dan verifikasi itu menemukan aturan "hanya posting sesudahnya" belum
+    dipenuhi: Validasi ulang dan penilaian ulang cutover membaca ulang posting lama dengan presisi yang baru. Setelah
+    IDR diturunkan dari 2 ke 0, nilai `"…00"` ditolak, dan menyimpan setelan posting entitas menjawab 500 setelah
+    setelannya tersimpan. Diperbaiki di hari yang sama. Posting yang sudah terbit dibentuk ulang dan diterbitkan ulang
+    dengan presisi saat ia terbit (`currency_decimals`). Penilaian ulang cutover melaporkan posting yang gagal dibentuk
+    ulang lalu lanjut ke posting berikutnya, tidak berhenti dengan 500.
   - [x] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(tenant, currencyCode)`, `hargaSatuan(tenant, currencyCode)`, dan `bulatkan(tenant, nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
   - [x] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
 - [x] 5.6 Verifikasi di browser: setelan posting di halaman entitas legal dan halaman Mata uang.
   Diverifikasi 23 September 2026: mengaktifkan tanpa cutover ditolak, tanggal mode ganda ditolak, dan presisi IDR
   2 → 0 tersimpan dengan contoh nilai yang ikut berubah. Label "Feed aktif" diganti "Pengiriman aktif". Cacat
-  presisi yang ditemukan dicatat di 5.5.3.
+  presisi yang ditemukan dicatat dan diperbaiki di 5.5.3.
 
 ---
 
@@ -262,6 +267,10 @@ tidak ada posting yang hilang atau dobel.
   - [x] 6.10.3 408, 429, 5xx, atau timeout → kirim ulang dengan jeda yang makin panjang, dengan batas waktu total yang dicatat di setelan (`coreerp.finance_push_retry_hours`). 4xx lain dan 3xx (redirect tidak diikuti) → tandai gagal kirim, tampil di layar pantau.
   - [x] 6.10.4 Urutan kirim per klien sama dengan urutan `pull`. Satu posting yang gagal tidak menahan posting lain milik klien lain.
   - [x] 6.10.5 Tidak mengirim apa pun kalau `ActiveEnvironment::outboundAllowed()` false.
+    Batasnya: jawaban itu bergantung pada environment yang terikat. Yang mengikatnya hanya middleware HTTP, sedangkan
+    penjadwal yang menjalankan `finance-postings:push` tidak, sehingga di sana jawabannya selalu "boleh". Ini aturan
+    yang sudah tertulis di docblock `ActiveEnvironment`: environment non-produksi belum boleh dibuat sebelum job dan
+    perintah membawa id environment. Push ikut aturan itu, dan tidak menambah penjagaan sendiri.
   - [x] 6.10.6 Test: tanda tangan benar, retry pada 5xx, berhenti pada 4xx, dan tidak ada kiriman di sandbox.
 
 ---
@@ -281,6 +290,11 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
 - [x] 7.3 Aksi.
   - [x] 7.3.1 "Validasi ulang" untuk `held`.
   - [x] 7.3.2 "Tandai manual" dengan alasan wajib, untuk `held`, `pending`, dan `rejected`. Posting `pending` yang sudah pernah disajikan memunculkan peringatan bahwa pembaca mungkin sudah membukukannya. Status diperiksa ulang di dalam kunci baris, dan penilaian ulang cutover tidak membatalkan tanda dari pengguna.
+    Sejak 23 September 2026 tanda pengguna juga diperiksa di dalam kunci baris Validasi ulang dan penilaian ulang.
+    Sebelumnya, tanda yang jatuh di antara saat posting dipilih dan saat barisnya dikunci bisa tertimpa, lalu
+    posting kembali `pending` dan dibukukan pembaca untuk kedua kalinya.
+  - [ ] 7.3.4 Kirim ulang kiriman push yang `failed`. Hari ini posting itu tetap `pending` tetapi tidak dikirim lagi ke
+    klien tersebut. Jalan keluar yang ada hanya Tandai manual, atau pembaca melakukan pull lewat API.
   - [x] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
 - [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut. **Menunggu katalog izin Core.** Sampai katalog itu ada, layar dan aksinya dijaga `canManageAccess()` = owner/admin, termasuk untuk melihat (keputusan pemilik produk, 23 September 2026).
 - [x] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
