@@ -84,6 +84,8 @@ info:
        - Bila `posting_id` sudah tersimpan, jangan bukukan lagi; kirim ulang ack-nya saja.
        - Terjemahkan akun, dimensi, vendor, dan entitas legal. Kode yang tidak dikenal berarti
          posting **ditolak** — jangan pernah memakai akun atau vendor cadangan.
+       - `posting_type` yang belum dikenal aplikasi Anda juga ditolak, dengan kode `INVALID`.
+         Daftarnya ada di bagian **Jenis posting** di bawah.
        - Bukukan dari `journal_lines`, dengan `posting_date` sebagai tanggal jurnal.
        - Kirim ack (langkah 5).
     3. Ulangi selama `meta.has_more` bernilai `true`.
@@ -154,6 +156,38 @@ info:
     | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, selama 24 jam |
     | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
 
+    ## Jenis posting (posting_type)
+
+    Setiap posting membawa `posting_type` berbentuk `<modul>.<peristiwa>`: modul yang menerbitkan
+    posting dan peristiwa yang membuatnya terbit. Daftar lengkapnya:
+
+    | `posting_type` | Terbit saat | Tersedia |
+    | --- | --- | --- |
+    | `asset.acquisition` | Penerimaan aset diselesaikan | Belum |
+    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
+    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
+    | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
+    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
+
+    **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Selama semuanya
+    masih *Belum*, `GET /finance-postings` menjawab daftar kosong.
+
+    Menyaring di `GET /finance-postings`:
+
+    | Parameter | Hasil |
+    | --- | --- |
+    | Tanpa `posting_type` | Semua jenis yang diizinkan untuk klien Anda — cara yang dianjurkan |
+    | `posting_type=asset.depreciation` | Hanya penyusutan |
+    | `posting_type=asset.*` | Semua jenis dari modul aset |
+
+    Daftar ini terbuka: jenis baru dapat ditambahkan tanpa versi kontrak baru.
+
+    - Klien yang dibatasi awalan, misalnya `asset.`, baru menerima jenis dari modul lain setelah
+      admin tenant menambahkan awalannya (misalnya `cashier.`) di pengaturan klien integrasi.
+    - Klien tanpa awalan menerima semua jenis, termasuk jenis baru dari modul mana pun.
+    - Jenis yang belum dikenal aplikasi Anda ditolak lewat ack dengan kode `INVALID`, tidak
+      diabaikan.
+
     ## Aturan data
 
     - **Nilai uang** adalah string desimal dengan jumlah desimal persis `currency.decimals`,
@@ -165,14 +199,6 @@ info:
       dari sana.
     - **Koreksi** membawa `adjusts_posting_id`, dan **pembalikan** membawa `reverses_posting_id`,
       yaitu `posting_id` posting yang dikoreksi atau dibalik.
-
-    | `posting_type` | Terbit saat |
-    | --- | --- |
-    | `asset.acquisition` | Penerimaan aset diselesaikan |
-    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi |
-    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed |
-    | `asset.depreciation` | Proses "Post penyusutan" satu periode |
-    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik |
 
     ## Kesalahan umum
 
@@ -240,7 +266,21 @@ paths:
           type: string
           maxLength: 80
           pattern: ^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$
-        description: Jenis lengkap (`asset.acquisition`) atau awalan dengan `.*` (`asset.*`).
+        example: asset.*
+        description: |
+          Saring menurut jenis posting. Kosongkan untuk menerima semua jenis yang diizinkan untuk
+          klien Anda; itu cara yang dianjurkan.
+
+          Isi dengan salah satu nilai di bawah, atau awalan yang diakhiri `.*` untuk semua jenis dari
+          satu modul, misalnya `asset.*`:
+
+          - `asset.acquisition` — penerimaan aset diselesaikan
+          - `asset.acquisition_adjustment` — nilai perolehan dikoreksi
+          - `asset.opening_balance` — saldo awal aset lama saat mulai memakai feed
+          - `asset.depreciation` — proses "Post penyusutan" satu periode
+          - `asset.depreciation_reversal` — penyusutan satu periode dibalik
+
+          Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
       - name: legal_entity
         in: query
         required: false
@@ -758,13 +798,7 @@ components:
           maxLength: 120
           description: Tetap untuk satu dokumen sumber. Pembaca wajib menjaga `UNIQUE(posting_id)`.
         posting_type:
-          type: string
-          maxLength: 80
-          description: |
-            `asset.acquisition`, `asset.acquisition_adjustment`, `asset.opening_balance`,
-            `asset.depreciation`, atau `asset.depreciation_reversal`. Jenis baru dapat terbit
-            (misalnya `cashier.receipt`) di bawah awalan yang diizinkan klien; pembaca menolak jenis
-            yang belum dikenalnya dengan `INVALID`, tidak mengabaikannya.
+          $ref: '#/components/schemas/PostingType'
         settlement_mode:
           type:
           - string
@@ -1092,6 +1126,34 @@ components:
           - 'null'
           format: date-time
           description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
+    PostingType:
+      type: string
+      maxLength: 80
+      pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$
+      description: |
+        Jenis posting, berbentuk `<modul>.<peristiwa>`: modul yang menerbitkan posting dan peristiwa
+        yang membuatnya terbit.
+
+        | Nilai | Terbit saat | Tersedia |
+        | --- | --- | --- |
+        | `asset.acquisition` | Penerimaan aset diselesaikan | Belum |
+        | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
+        | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
+        | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
+        | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
+
+        **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Selama semuanya
+        masih *Belum*, feed tidak berisi posting apa pun.
+
+        Daftar ini terbuka: jenis baru dapat ditambahkan, misalnya dari modul lain, tanpa versi kontrak
+        baru. Jenis yang belum dikenal aplikasi Anda ditolak lewat ack dengan kode `INVALID`, tidak
+        diabaikan.
+      examples:
+      - asset.acquisition
+      - asset.acquisition_adjustment
+      - asset.opening_balance
+      - asset.depreciation
+      - asset.depreciation_reversal
     ValidationError:
       type: object
       required:

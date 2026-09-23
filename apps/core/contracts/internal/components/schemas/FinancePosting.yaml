@@ -12,14 +12,7 @@ properties:
     type: string
     maxLength: 120
     description: Tetap untuk satu dokumen sumber. Pembaca wajib menjaga `UNIQUE(posting_id)`.
-  posting_type:
-    type: string
-    maxLength: 80
-    description: |
-      `asset.acquisition`, `asset.acquisition_adjustment`, `asset.opening_balance`,
-      `asset.depreciation`, atau `asset.depreciation_reversal`. Jenis baru dapat terbit
-      (misalnya `cashier.receipt`) di bawah awalan yang diizinkan klien; pembaca menolak jenis
-      yang belum dikenalnya dengan `INVALID`, tidak mengabaikannya.
+  posting_type: { $ref: '#/components/schemas/PostingType' }
   settlement_mode:
     type: [string, 'null']
     enum: [direct_payable, clearing, null]
