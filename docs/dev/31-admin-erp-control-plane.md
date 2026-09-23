@@ -95,6 +95,51 @@ diubah boleh berbeda.
 Galat ke agen selalu `{"error": "<kode>"}` tanpa kalimat penjelas. Menyebut bagian mana yang salah mengajari
 penyerang bagian mana yang sudah benar.
 
+### Laporan agen: daftar tertutup, dan yang menjadi riwayat
+
+Isi laporan adalah skema `Report` di kontrak agen, dan `app/Sites/SiteReports.php` menolak seluruh laporan bila
+satu kunci saja berada di luar skema itu — di tingkat atas maupun di dalam objeknya. Itu yang menegakkan "data yang
+boleh keluar dari server klien", bukan kebiasaan agen.
+
+Laporan terakhir selalu menimpa `sites.last_report`, dan itu yang dibaca layar. Baris `site_reports` hanya lahir
+ketika isinya berubah, dengan mengabaikan kunci yang bergerak tanpa ada yang terjadi pada servernya — daftarnya
+`SiteReports::VOLATILE`. Heartbeat per menit yang semuanya menjadi riwayat berarti ratusan ribu baris per situs per
+tahun, dan baris di sini tidak dihapus.
+
+Kunci baru di laporan diubah di tiga tempat, dan konsol harus lebih dulu menerimanya: agen di server klien diperbarui
+sesudah konsol, jadi konsol yang belum mengenal kuncinya menolak seluruh laporan, sementara laporan agen lama tanpa
+kunci itu harus tetap sah.
+
+| Tempat | Isinya |
+| --- | --- |
+| `contracts/openapi-agent.yaml`, skema `Report` | Bentuknya, beserta arti `null` dan arti kunci yang tidak ada |
+| `SiteReports::TOP_LEVEL` dan aturan validasinya | Yang diterima konsol |
+| `susun_laporan` di `deploy/agent/coreerp-agent` | Yang dikirim agen, disusun kunci demi kunci |
+
+### Kesehatan feed posting finance
+
+Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, dan jam
+tarikan terakhir oleh aplikasi finance klinik. Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
+klinik tidak keluar dari servernya (keputusan K-02 di
+[feed posting finance](../todo/feed-posting-finance/README.md)). Angkanya dijumlahkan untuk seluruh tenant di server
+itu.
+
+- **Sumbernya Core di server klien**, lewat `php artisan finance-postings:summary` di container `core-app`. Agen
+  memanggilnya dengan compose dan image yang dicatat `update.sh` sesudah terbukti sehat — jalan yang sama dengan
+  `tenant:bootstrap-site` — dengan batas waktu, lalu menyusun ulang objeknya kunci demi kunci. Kunci yang kelak
+  ditambahkan Core tidak ikut terkirim sebelum agen dan kontraknya menyebutnya. Bentuknya skema `FinanceFeed` di
+  kontrak agen, dan test Core mencocokkan keluaran perintah itu dengan skema yang sama.
+- **`null` dan kunci yang tidak ada adalah dua keadaan.** `null` berarti agen tidak mendapat ringkasan dari Core:
+  belum ada rilis yang sehat, Core tidak menjawab dalam batasnya, atau rilis Core belum punya perintahnya. Kunci yang
+  tidak ada berarti agen lama. Layar menyebut keduanya berbeda, karena tindakannya berbeda.
+- **Bukan riwayat.** `finance_feed` ada di `SiteReports::VOLATILE`: angkanya bergerak bersama transaksi klinik, dan
+  riwayat posting yang sebenarnya sudah dicatat Core di server itu (`finance_posting_events`).
+- **Dinilai di satu tempat**, `app/Sites/FinanceFeedHealth.php`: merah bila ada posting `rejected` atau `held`, atau
+  bila posting `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` (sehari; alasannya di kelas itu). Umurnya
+  dihitung terhadap `server_time` laporan yang sama, jadi selisih jam server klien terhadap konsol tidak ikut.
+- **Tampil di rincian server klien** (`/situs/{id}`), bagian "Feed posting finance", dengan peringatan di atas
+  halaman bila perlu perhatian. Rincian dan tindak lanjutnya tetap di layar Pantau posting pada aplikasi server itu.
+
 ## Layar dan rutenya
 
 Alamat rute berbahasa Indonesia, nama kelas dan method berbahasa Inggris. `/situs` tampil sebagai "Server

@@ -1,5 +1,6 @@
 import { Badge } from '@apperp/ui/badge';
 import {
+    financeFeedStateLabels,
     fleetStateLabels,
     installStateLabels,
     kindLabels,
@@ -126,6 +127,31 @@ export function InstallStateBadge({ state }: { state: string }) {
     return (
         <Badge variant="outline" className={classes}>
             {labelFor(installStateLabels, state)}
+        </Badge>
+    );
+}
+
+/**
+ * Kesehatan feed posting finance satu server klien.
+ *
+ * Merah hanya `attention`: ada posting yang ditolak atau tertahan, atau yang menunggu ditarik terlalu lama — jurnal
+ * yang belum dibukukan aplikasi finance klinik, dan yang harus ditanyakan sebelum klinik menelepon. Kuning
+ * `unreadable`, karena yang diketahui hanya bahwa Core tidak menjawab. Abu untuk yang belum dilaporkan atau belum
+ * dipakai.
+ */
+export function FinanceFeedBadge({ state }: { state: string }) {
+    const classes =
+        state === 'healthy'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            : state === 'attention'
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              : state === 'unreadable'
+                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
+                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+    return (
+        <Badge variant="outline" className={classes}>
+            {labelFor(financeFeedStateLabels, state)}
         </Badge>
     );
 }

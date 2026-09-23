@@ -220,6 +220,16 @@ di bagian "Data yang boleh keluar dari server klien" pada rancangan. Log, trace,
 setelan rahasia tidak pernah dikirim. Pengujian `02` membuktikannya dari muatan yang diterima admin.erp
 tiruan, yang menolak kunci di luar skema dengan 422.
 
+`finance_feed` — jumlah posting finance per status, jam terbit posting `pending` tertua, dan jam tarikan
+terakhir — satu-satunya kunci yang datang dari Core. `baca_ringkasan_feed` menjalankan
+`php artisan finance-postings:summary` di `core-app` dengan compose dan image yang dicatat `update.sh` sesudah
+terbukti sehat, dibatasi 20 detik lewat `timeout` supaya Core yang macet tidak menahan laporan, lalu menyusun
+ulang objeknya kunci demi kunci: jumlah wajib bilangan bulat tidak negatif, waktu wajib UTC berakhiran `Z`, dan
+kunci lain di keluaran Core dibuang. Bila ringkasannya tidak didapat — belum ada rilis sehat, `.env` tidak ada,
+batas waktunya habis, rilis Core belum punya perintahnya, atau keluarannya tidak berbentuk — yang dikirim `null`,
+bukan angka nol, dan laporannya tetap terkirim. Pengujian `09d` membuktikan penyusunan ulangnya, `null`-nya, dan
+batas waktunya.
+
 ## Yang perlu diketahui sebelum dipakai
 
 - **Kunci publik rilis dipercaya pada pemasangan pertama.** Setelah repo privat tidak ada jalur kedua

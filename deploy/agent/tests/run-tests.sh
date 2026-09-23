@@ -688,6 +688,10 @@ uji_02_laporan() {
         '[{"service":"core-app","state":"running","health":"healthy"},{"service":"core-db","state":"running","health":null}]'
     pastikan 'sisa disk data terbaca' jq -e '.disk.data_free_bytes | type == "number"' <<< "$laporan"
     sama 'belum ada rilis terpasang' "$(jq -c '[.edition, .release, .last_operation]' <<< "$laporan")" '[null,null,null]'
+    # Kuncinya ada dan bernilai null — bukan hilang seperti pada agen lama, dan bukan jumlah nol yang tidak pernah
+    # dibaca dari mana pun.
+    sama 'belum ada rilis sehat: finance_feed null' "$(jq -c '[has("finance_feed"), .finance_feed]' <<< "$laporan")" '[true,null]'
+    sama 'belum ada rilis sehat: Core tidak ditanya' "$(grep -c 'finance-postings:summary' "$FAKE_DOCKER_LOG" || true)" 0
     sama 'interval dari admin.erp tersimpan' "$(jq -r .interval_seconds "$COREERP_HOME/agent/site.json")" 60
 
     # Tanpa --now, putaran yang datang sebelum interval habis tidak menghubungi admin.erp.
@@ -1132,6 +1136,78 @@ uji_09c_lisensi_diwajibkan() {
     rm -f "$berkas_env"
 }
 
+uji_09d_ringkasan_feed() {
+    local berkas_env="$COREERP_HOME/.env" diharapkan mulai lama sah keluaran
+
+    # feed KETERANGAN DIHARAPKAN [VAR=nilai ...] — finance_feed di laporan yang diterima admin.erp tiruan sesudah
+    # satu putaran, dengan Core tiruan yang disetel VAR. Setiap laporan tetap sesuai skema Report.
+    feed() {
+        local keterangan="$1" harapan="$2"
+        shift 2
+        env "$@" bash "$AGEN" run --now
+        sama "$keterangan" "$(laporan_terakhir | jq -c '[has("finance_feed"), .finance_feed]')" "[true,$harapan]"
+        sama "$keterangan: laporan sesuai skema Report" "$(validasi Report "$(laporan_terakhir)")" '[]'
+    }
+
+    pastikan 'rilis sehat sudah dicatat pengujian sebelumnya' test -s "$COREERP_HOME/keadaan/versi-sehat"
+    pastikan 'compose sehat sudah dicatat pengujian sebelumnya' test -f "$COREERP_HOME/keadaan/compose-sehat.yaml"
+
+    # 09c meninggalkan server tanpa .env. Compose tidak dapat dijalankan tanpanya, jadi Core tidak ditanya.
+    : > "$FAKE_DOCKER_LOG"
+    feed '.env tidak ada: null' null
+    sama '.env tidak ada: Core tidak ditanya' "$(grep -c 'finance-postings:summary' "$FAKE_DOCKER_LOG" || true)" 0
+
+    printf 'APP_ENV=production\n' > "$berkas_env"
+    sah='{"counts":{"held":1,"pending":3,"posted":120,"rejected":2,"manual":4},"oldest_pending_at":"2026-09-20T03:00:00Z","last_pulled_at":"2026-09-23T08:00:00Z"}'
+
+    # Core yang kelak menambah kunci — nomor posting, isi jurnal, status baru — tidak membuat kunci itu ikut keluar.
+    : > "$FAKE_DOCKER_JSON_LOG"
+    feed 'ringkasan disusun ulang kunci demi kunci' "$sah" \
+        FAKE_DOCKER_RINGKASAN='{"counts":{"held":1,"pending":3,"posted":120,"rejected":2,"manual":4,"draft":9},"oldest_pending_at":"2026-09-20T03:00:00Z","last_pulled_at":"2026-09-23T08:00:00Z","oldest_pending_posting_id":"AST-ACQ-0007","journal_lines":[{"account":"Hutang Usaha","credit":"555000000.00"}]}'
+    harus_gagal 'isi jurnal dari Core tidak ada di laporan' grep -qE 'Hutang Usaha|AST-ACQ-0007|draft' <<< "$(laporan_terakhir)"
+
+    diharapkan="$(jq -cn --arg i "$(cat "$COREERP_HOME/keadaan/versi-sehat")" --arg env "$berkas_env" \
+        --arg c "$COREERP_HOME/keadaan/compose-sehat.yaml" \
+        '[$i, ["compose","--project-name","coreerp","--env-file",$env,"-f",$c,"exec","-T","core-app","php","artisan","finance-postings:summary"]]')"
+    sama 'Core ditanya lewat compose dan image yang dicatat update.sh' \
+        "$(jq -c 'select(.args | index("finance-postings:summary")) | [.edition_image, .args]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
+
+    feed 'belum ada posting dan tarikan: nol dan null, bukan null' \
+        '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
+
+    # Yang tidak didapat dari Core dilaporkan null. Laporannya sendiri tetap diterima.
+    feed 'rilis Core tanpa perintahnya: null' null FAKE_DOCKER_RINGKASAN_EXIT=1
+    feed 'peringatan PHP di stdout sebelum JSON: null' null \
+        FAKE_DOCKER_RINGKASAN="PHP Deprecated:  Contoh in /var/www/html/vendor/contoh.php on line 1"$'\n'"$sah"
+
+    while IFS='~' read -r keterangan keluaran; do
+        [ -n "$keterangan" ] || continue
+        feed "$keterangan: null" null FAKE_DOCKER_RINGKASAN="$keluaran"
+    done <<'KASUS'
+bukan JSON~Illuminate\Database\QueryException: relation "finance_postings" does not exist
+kosong~
+dua nilai JSON~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null} {"lagi":1}
+larik~[1,2,3]
+counts bukan objek~{"counts":[0,0,0,0,0],"oldest_pending_at":null,"last_pulled_at":null}
+satu status hilang~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0},"oldest_pending_at":null,"last_pulled_at":null}
+jumlah negatif~{"counts":{"held":-1,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}
+jumlah pecahan~{"counts":{"held":1.5,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}
+jumlah berupa teks~{"counts":{"held":"1","pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}
+waktu dengan zona lain~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00:00+07:00","last_pulled_at":null}
+waktu tanpa detik~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00Z","last_pulled_at":null}
+tarikan terakhir tidak disebut~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null}
+KASUS
+
+    # Core yang macet tidak menahan laporan: batasnya habis, finance_feed null, dan laporannya tetap terkirim jauh
+    # sebelum Core tiruan selesai tidur.
+    mulai="$(date +%s)"
+    feed 'Core macet: null' null COREERP_AGENT_BATAS_RINGKASAN_DETIK=1 FAKE_DOCKER_RINGKASAN_JEDA=8 FAKE_DOCKER_RINGKASAN="$sah"
+    lama=$(( $(date +%s) - mulai ))
+    pastikan "Core macet: putaran selesai dalam batasnya, bukan menunggu Core ($lama detik)" test "$lama" -lt 6
+
+    rm -f "$berkas_env"
+}
+
 uji_10_putar_kunci() {
     local s id op lama baru sebelum
 
@@ -1334,7 +1410,9 @@ uji_11_install() {
         sama "$keterangan: rilis tidak diunduh" \
             "$(admin_keadaan | jq --argjson n "$sebelum" '[.requests[$n:][] | select(.method == "GET")] | length')" 0
         sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
-        sama "$keterangan: docker compose exec tidak dipanggil" "$(grep -c ' exec ' "$FAKE_DOCKER_LOG" || true)" 0
+        # Satu-satunya exec yang boleh: ringkasan feed hanya-baca milik laporan, bukan langkah pemasangan.
+        sama "$keterangan: docker compose exec tidak dipanggil" \
+            "$(grep ' exec ' "$FAKE_DOCKER_LOG" | grep -cv ' exec -T core-app php artisan finance-postings:summary$' || true)" 0
         tanpa_hash "$keterangan"
     done <<'KASUS'
 edition tidak ada~del(.edition)~edition dan release wajib ada
@@ -1607,7 +1685,8 @@ uji_14_operasi_asing() {
 
     op="$(operasi "$id")"
     sama 'operasi di luar daftar tertutup ditolak' "$(jq -c '[.status, .failure_message]' <<< "$op")" '["failed","operasi tidak dikenal"]'
-    sama 'docker tidak dipanggil selain membaca keadaan' "$(grep -cv -e '^compose --project-name coreerp ps' -e '^info' "$FAKE_DOCKER_LOG" || true)" 0
+    sama 'docker tidak dipanggil selain membaca keadaan' "$(grep -cv -e '^compose --project-name coreerp ps' -e '^info' \
+        -e ' exec -T core-app php artisan finance-postings:summary$' "$FAKE_DOCKER_LOG" || true)" 0
 }
 
 uji_15_bootstrap_tenant() {
@@ -2366,7 +2445,7 @@ uji_19_agent_env() {
 
     # Daftar yang diterima diturunkan dari kode: setiap COREERP_* yang dibaca agen atau update.sh diterima,
     # kecuali yang sengaja dikecualikan — dan yang dikecualikan memang masih dibaca kode.
-    dikecualikan=(COREERP_HOME COREERP_UPDATE_SCRIPT COREERP_LEWATI_PERIKSA_CADANGAN)
+    dikecualikan=(COREERP_HOME COREERP_UPDATE_SCRIPT COREERP_AGENT_BATAS_RINGKASAN_DETIK COREERP_LEWATI_PERIKSA_CADANGAN)
     kunci_kode="$(grep -ohE '\$\{COREERP_[A-Z0-9_]+' "$AGEN" "$UPDATE_SH" | cut -c3- | sort -u)"
 
     for kunci in "${dikecualikan[@]}"; do
@@ -2949,6 +3028,7 @@ uji '08 409 menghentikan laporan langkah tanpa membunuh update.sh' uji_08_409
 uji '09 install_license: tanda tangan salah, situs lain, dan versi 1 ditolak; versi 2 yang sah terpasang' uji_09_lisensi_operasi
 uji '09b lisensi di jawaban laporan: dipasang lewat pemeriksaan yang sama; yang ditolak tidak mengubah apa pun' uji_09b_lisensi_laporan
 uji '09c license_required dari .env: true hanya bentuk persis di baris terakhir, null bila tidak terbaca' uji_09c_lisensi_diwajibkan
+uji '09d finance_feed: dari Core lewat compose sehat, disusun ulang kunci demi kunci, null bila tidak terbaca atau macet' uji_09d_ringkasan_feed
 uji '10 rotate_key: kunci lama ditolak, kunci baru diterima' uji_10_putar_kunci
 uji '10b rotate_key yang jawabannya hilang dipulihkan dengan kunci tertunda' uji_10b_rotasi_jawaban_hilang
 uji '11 install: rilis, lalu tenant:bootstrap-site dengan hash lewat stdin; parameter tidak sah ditolak; aman diulang' uji_11_install

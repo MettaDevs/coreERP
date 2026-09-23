@@ -45,7 +45,7 @@ BERKAS_AGEN = ('coreerp-agent', 'coreerp-agent.service', 'coreerp-agent.timer', 
 
 KATA_KUNCI_SKEMA = {
     'type', 'properties', 'required', 'additionalProperties', 'enum', 'maxLength', 'minLength',
-    'maxItems', 'items', 'pattern', 'format', 'description', '$ref',
+    'maxItems', 'items', 'pattern', 'format', 'description', '$ref', 'minimum',
 }
 POLA_DATE_TIME = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$')
 POLA_DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
@@ -151,6 +151,10 @@ class Kontrak:
                 galat.append(f'{jalur}: bukan date-time')
             if skema.get('format') == 'date' and not POLA_DATE.match(nilai):
                 galat.append(f'{jalur}: bukan date')
+
+        if isinstance(nilai, (int, float)) and not isinstance(nilai, bool):
+            if 'minimum' in skema and nilai < skema['minimum']:
+                galat.append(f'{jalur}: lebih kecil dari {skema["minimum"]}')
 
         if isinstance(nilai, list):
             if 'maxItems' in skema and len(nilai) > skema['maxItems']:

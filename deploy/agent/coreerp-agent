@@ -83,9 +83,10 @@ BERKAS_KUNCI_PUTARAN="$FOLDER_AGEN/run.lock"
 # dengan aturannya sendiri, dan nilai yang dibaca berbeda di dua tempat adalah cacat yang sama dengan yang
 # diperbaiki di sini.
 #
-# Yang sengaja tidak ada di daftar: COREERP_HOME (berkas ini tinggal di bawahnya), COREERP_UPDATE_SCRIPT
-# (seam pengujian, bukan setelan), dan COREERP_LEWATI_PERIKSA_CADANGAN (melewati pemeriksaan adalah
-# keputusan satu kali jalan; di berkas ia diam-diam berlaku untuk setiap pembaruan sesudahnya).
+# Yang sengaja tidak ada di daftar: COREERP_HOME (berkas ini tinggal di bawahnya), COREERP_UPDATE_SCRIPT dan
+# COREERP_AGENT_BATAS_RINGKASAN_DETIK (seam pengujian, bukan setelan), dan COREERP_LEWATI_PERIKSA_CADANGAN
+# (melewati pemeriksaan adalah keputusan satu kali jalan; di berkas ia diam-diam berlaku untuk setiap pembaruan
+# sesudahnya).
 SETELAN_DIIZINKAN=(
     COREERP_PROYEK
     COREERP_FOLDER_CADANGAN
@@ -161,6 +162,12 @@ FOLDER_KEADAAN_UPDATE="$RUMAH/keadaan"
 DETAK_DETIK="${COREERP_AGENT_DETAK_DETIK:-300}"
 [[ "$DETAK_DETIK" =~ ^[1-9][0-9]*$ ]] || DETAK_DETIK=300
 
+# Batas menunggu ringkasan feed posting finance dari Core pada setiap laporan. Core yang macet — database terkunci
+# migrasi, container yang menggantung — tidak boleh menahan laporan: laporan yang tidak pernah terkirim membuat
+# seluruh server terlihat "Tidak melapor" di admin.erp, bukan hanya feed-nya.
+BATAS_RINGKASAN_DETIK="${COREERP_AGENT_BATAS_RINGKASAN_DETIK:-20}"
+[[ "$BATAS_RINGKASAN_DETIK" =~ ^[1-9][0-9]*$ ]] || BATAS_RINGKASAN_DETIK=20
+
 SEMENTARA=''
 ALASAN=''
 
@@ -203,7 +210,7 @@ TEKS
 periksa_perintah() {
     local kurang=() satu
 
-    for satu in curl jq openssl sha256sum flock docker base64 df; do
+    for satu in curl jq openssl sha256sum flock docker base64 df timeout; do
         command -v "$satu" >/dev/null 2>&1 || kurang+=("$satu")
     done
 
@@ -603,14 +610,70 @@ lisensi_diwajibkan() {
     fi
 }
 
+# baca_ringkasan_feed TUJUAN — menulis `finance_feed` untuk laporan: objek ringkasan, atau `null`.
+#
+# Ringkasan feed posting finance datang dari Core lewat `php artisan finance-postings:summary` — jalan yang sama
+# dengan `tenant:bootstrap-site`: container `core-app`, compose dan image yang dicatat update.sh sesudah terbukti
+# sehat. Tanpa endpoint HTTP dan tanpa kredensial baru di server ini.
+#
+# Keluarannya tidak diteruskan apa adanya. Objeknya disusun ulang kunci demi kunci di sini, dengan bentuk yang
+# diperiksa: jumlah bilangan bulat tidak negatif, waktu UTC berakhiran Z. Kunci yang kelak ditambahkan Core —
+# nomor posting, nama akun, nilai uang — tidak ikut keluar dari server ini sebelum agen dan kontraknya sendiri
+# menyebutnya.
+#
+# `null`, bukan objek kosong atau angka nol, bila ringkasannya tidak didapat: belum ada rilis yang terbukti sehat,
+# .env tidak ada, Core tidak menjawab dalam BATAS_RINGKASAN_DETIK, rilis Core belum punya perintahnya, atau
+# keluarannya tidak berbentuk. Nol berarti "tidak ada posting", dan itu klaim yang tidak diketahui kebenarannya.
+# Laporannya sendiri tetap dikirim.
+baca_ringkasan_feed() {
+    local tujuan="$1" mentah="$SEMENTARA/ringkasan-feed.json" compose_sehat versi_sehat image_sehat=''
+
+    compose_sehat="$FOLDER_KEADAAN_UPDATE/compose-sehat.yaml"
+    versi_sehat="$FOLDER_KEADAAN_UPDATE/versi-sehat"
+    [ ! -f "$versi_sehat" ] || image_sehat="$(cat "$versi_sehat" 2>/dev/null || true)"
+
+    # stdin dari /dev/null: `compose exec` meneruskan stdin, dan `run --now` dari terminal tidak boleh
+    # menunggunya. `9>&-`: Core yang tertinggal sesudah batas waktunya tidak ikut memegang kunci putaran.
+    if [ -n "$image_sehat" ] && [ -f "$compose_sehat" ] && [ -f "$BERKAS_ENV" ] \
+        && EDITION_IMAGE="$image_sehat" timeout --kill-after=5 "$BATAS_RINGKASAN_DETIK" \
+            docker compose --project-name "$PROYEK" --env-file "$BERKAS_ENV" -f "$compose_sehat" \
+            exec -T core-app php artisan finance-postings:summary < /dev/null > "$mentah" 2>/dev/null 9>&- \
+        && jq -cs '
+            def jumlah: if type == "number" and . >= 0 and . == floor then . else error("jumlah") end;
+            def waktu:
+                if . == null then null
+                elif type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") then .
+                else error("waktu") end;
+            if length == 1 and (.[0] | type) == "object" and (.[0].counts | type) == "object"
+                and (.[0] | has("oldest_pending_at") and has("last_pulled_at"))
+            then .[0] else error("bentuk") end
+            | {
+                counts: {
+                    held: (.counts.held | jumlah),
+                    pending: (.counts.pending | jumlah),
+                    posted: (.counts.posted | jumlah),
+                    rejected: (.counts.rejected | jumlah),
+                    manual: (.counts.manual | jumlah)
+                },
+                oldest_pending_at: (.oldest_pending_at | waktu),
+                last_pulled_at: (.last_pulled_at | waktu)
+              }' "$mentah" > "$tujuan" 2>/dev/null; then
+        return 0
+    fi
+
+    printf 'null' > "$tujuan"
+}
+
 # Setiap kunci laporan disebut satu per satu. Tidak ada `+ $keadaan` atau salinan utuh dari berkas
 # lain: kunci baru di state.json tidak boleh ikut keluar hanya karena seseorang menambahkannya di sana.
 susun_laporan() {
-    local tujuan="$1" sekarang kontainer data cadangan lisensi wajib
+    local tujuan="$1" sekarang kontainer feed data cadangan lisensi wajib
 
     sekarang="$(sekarang_utc)"
     kontainer="$SEMENTARA/kontainer.json"
     baca_kontainer "$kontainer"
+    feed="$SEMENTARA/finance-feed.json"
+    baca_ringkasan_feed "$feed"
 
     data="$(ruang_bebas "$(folder_data)")"
     cadangan="$(ruang_bebas "$FOLDER_CADANGAN")"
@@ -628,7 +691,8 @@ susun_laporan() {
         --argjson permanen "$permanen" \
         --argjson wajib "$wajib" \
         --slurpfile keadaan "$BERKAS_KEADAAN" \
-        --slurpfile kontainer "$kontainer" '
+        --slurpfile kontainer "$kontainer" \
+        --slurpfile feed "$feed" '
         def angka($s): if ($s | test("^[0-9]+$")) then ($s | tonumber) else null end;
         def teks($s): if ($s | type) == "string" and $s != "" then $s else null end;
         ($keadaan[0] // {}) as $k
@@ -656,7 +720,8 @@ susun_laporan() {
             certificate_expires_at: null,
             license_expires_at: teks($lisensi),
             license_perpetual: $permanen,
-            license_required: $wajib
+            license_required: $wajib,
+            finance_feed: $feed[0]
           }
         | if .containers == null then del(.containers) else . end' > "$tujuan"
 }

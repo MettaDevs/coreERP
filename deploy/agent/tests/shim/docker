@@ -42,6 +42,12 @@
 #   FAKE_DOCKER_STDIN           berkas tempat stdin terakhir disalin persis, untuk membuktikan hash lewat stdin
 #   FAKE_DOCKER_GEMA_STDIN      1 mencetak stdin ke keluaran — Core yang keliru — untuk menguji saringan agen
 #   FAKE_DOCKER_BOOTSTRAP_EXIT  kode keluar; bukan 0 menirukan Core yang menolak
+#
+# finance-postings:summary menjawab ringkasan feed posting finance, seperti Core:
+#
+#   FAKE_DOCKER_RINGKASAN       keluaran stdout persis, boleh kosong; tanpanya ringkasan sah dengan semua jumlah nol
+#   FAKE_DOCKER_RINGKASAN_EXIT  kode keluar; bukan 0 menirukan rilis Core yang belum punya perintahnya
+#   FAKE_DOCKER_RINGKASAN_JEDA  detik tidur sebelum menjawab, untuk Core yang macet
 
 set -euo pipefail
 
@@ -324,6 +330,19 @@ case "${1:-}" in
                         ;;
                     'core-app php artisan tenant:bootstrap-site'*)
                         printf 'Tenant dilahirkan.\nKata sandi sementara: %s\n' "${FAKE_KATA_SANDI:-RahasiaSementara-123}"
+                        ;;
+                    'core-app php artisan finance-postings:summary')
+                        [ -z "${FAKE_DOCKER_RINGKASAN_JEDA:-}" ] || sleep "$FAKE_DOCKER_RINGKASAN_JEDA"
+
+                        # Rilis Core yang belum punya perintahnya menjawab seperti Symfony Console.
+                        if [ "${FAKE_DOCKER_RINGKASAN_EXIT:-0}" != 0 ]; then
+                            printf '\n  ERROR  Command "finance-postings:summary" is not defined.\n\n' >&2
+                            exit "$FAKE_DOCKER_RINGKASAN_EXIT"
+                        fi
+
+                        # `-`, bukan `:-`: FAKE_DOCKER_RINGKASAN yang disetel kosong menirukan Core yang tidak mencetak apa pun.
+                        bawaan='{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
+                        printf '%s\n' "${FAKE_DOCKER_RINGKASAN-$bawaan}"
                         ;;
                 esac
                 ;;

@@ -119,6 +119,32 @@ export const installStateLabels: Record<string, string> = {
     revoked: 'Dicabut',
 };
 
+/**
+ * Status posting finance, dengan kata yang sama persis dengan layar Pantau posting di Core. Operator dan admin klinik
+ * yang membicarakan satu posting lewat telepon harus menyebutnya dengan kata yang sama.
+ */
+export const financePostingStatusLabels: Record<string, string> = {
+    held: 'Tertahan',
+    pending: 'Menunggu ditarik',
+    rejected: 'Ditolak',
+    manual: 'Manual',
+    posted: 'Sudah dibukukan',
+};
+
+/**
+ * Kesehatan feed posting finance satu server klien, dinilai `FinanceFeedHealth` di server.
+ *
+ * `unreadable` berbunyi "Tidak terbaca", bukan "Bermasalah": yang diketahui konsol hanya bahwa agen tidak mendapat
+ * ringkasan dari Core — feed-nya sendiri bisa saja sehat.
+ */
+export const financeFeedStateLabels: Record<string, string> = {
+    not_reported: 'Belum dilaporkan',
+    unreadable: 'Tidak terbaca',
+    unused: 'Belum dipakai',
+    healthy: 'Sehat',
+    attention: 'Perlu perhatian',
+};
+
 /** Tempat sebuah lingkungan berjalan — kolom `environments.hosting`. */
 export const hostingLabels: Record<string, string> = {
     provider: 'Server kita',

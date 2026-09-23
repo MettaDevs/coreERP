@@ -9,6 +9,7 @@ use ControlPlane\Models\SiteReport;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * Menerima laporan heartbeat situs.
@@ -24,18 +25,28 @@ use Illuminate\Support\Facades\Validator;
  *
  * Laporan terakhir selalu menimpa `sites.last_report`. Baris `site_reports` hanya lahir ketika isinya
  * berbeda dari baris sebelumnya — dengan mengabaikan jam laporan dan sisa disk, yang berubah setiap
- * menit tanpa ada yang terjadi.
+ * menit tanpa ada yang terjadi, dan ringkasan feed posting finance, yang berubah mengikuti transaksi klinik.
  */
 final class SiteReports
 {
     private const TOP_LEVEL = [
         'site_id', 'agent_version', 'created_at', 'server_time', 'edition', 'release', 'image', 'digest',
         'containers', 'disk', 'last_backup', 'last_operation', 'certificate_expires_at', 'license_expires_at',
-        'license_required', 'license_perpetual',
+        'license_required', 'license_perpetual', 'finance_feed',
     ];
 
-    /** Kunci yang berubah tanpa ada yang terjadi; tidak ikut menentukan apakah laporan "berubah". */
-    private const VOLATILE = ['created_at', 'server_time', 'disk'];
+    /**
+     * Kunci yang berubah tanpa ada yang terjadi pada servernya; tidak ikut menentukan apakah laporan "berubah".
+     *
+     * `finance_feed` ikut di sini karena angkanya bergerak bersama pekerjaan klinik — setiap posting yang terbit,
+     * setiap ack, dan setiap tarikan pembaca — bukan bersama keadaan server. Menjadikannya riwayat berarti satu
+     * baris `site_reports` per beberapa menit per situs, padahal riwayat posting yang sebenarnya sudah dicatat Core
+     * di server itu sendiri (`finance_posting_events`). Yang dibaca layar hanya laporan terakhir.
+     */
+    private const VOLATILE = ['created_at', 'server_time', 'disk', 'finance_feed'];
+
+    /** Bentuk waktu di `finance_feed`: UTC berakhiran `Z`, satu-satunya bentuk yang dikirim agen. */
+    private const FEED_TIME = 'date_format:Y-m-d\TH:i:s\Z';
 
     /**
      * @param  array<mixed>  $payload
@@ -43,6 +54,16 @@ final class SiteReports
      */
     public function validate(array $payload, Site $site): array
     {
+        // Isi ringkasan feed wajib lengkap hanya bila ringkasannya ada. `required_with` tidak cukup: ia menganggap
+        // `{}` kosong, sehingga ringkasan tanpa satu kunci pun lolos sebagai ringkasan.
+        $feed = is_array($payload['finance_feed'] ?? null);
+        $feedCounts = [];
+
+        foreach (FinanceFeedHealth::STATUSES as $status) {
+            // Integer JSON sungguhan: `"3"` berarti agen meneruskan teks yang tidak diperiksanya.
+            $feedCounts['report.finance_feed.counts.'.$status] = [Rule::requiredIf($feed), 'integer:strict', 'min:0'];
+        }
+
         $validator = Validator::make(['report' => $payload], [
             'report' => ['required', 'array:'.implode(',', self::TOP_LEVEL)],
             'report.site_id' => ['required', 'string', 'in:'.$site->id],
@@ -79,6 +100,13 @@ final class SiteReports
             // membedakannya dari lisensi yang hilang. Perbedaan itu menentukan apakah konsol
             // menerbitkan lisensi baru setiap jeda perpanjangan.
             'report.license_perpetual' => ['nullable', 'boolean:strict'],
+            // Ringkasan feed posting finance dari Core di server klien: jumlah per status dan dua waktu, tanpa isi
+            // jurnal. `null` berarti agen tidak mendapatkannya dari Core; kunci yang tidak ada berarti agen lama.
+            'report.finance_feed' => ['nullable', 'array:counts,oldest_pending_at,last_pulled_at'],
+            'report.finance_feed.counts' => [Rule::requiredIf($feed), 'array:'.implode(',', FinanceFeedHealth::STATUSES)],
+            ...$feedCounts,
+            'report.finance_feed.oldest_pending_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
+            'report.finance_feed.last_pulled_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
         ]);
 
         if ($validator->fails()) {

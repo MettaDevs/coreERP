@@ -189,7 +189,10 @@ Daftar tertutup. Yang tidak ada di sini tidak dikirim:
 - waktu, ukuran, dan hasil cadangan terakhir;
 - hasil operasi terakhir beserta langkah tempat ia berhenti;
 - tanggal habis sertifikat dan lisensi;
-- selisih jam server terhadap admin.erp.
+- selisih jam server terhadap admin.erp;
+- kesehatan feed posting finance: jumlah posting per status, jam terbit posting `pending` tertua, dan jam
+  tarikan terakhir — tanpa nomor posting, akun, atau nilai uang
+  ([feed posting finance](/todo/feed-posting-finance/), K-02).
 
 **Tidak pernah dikirim:** isi tabel, dump database, log aplikasi, trace, nama pengguna, dan
 setelan rahasia. Log dan trace mungkin memuat data pasien; mereka tetap di server klien.
