@@ -250,25 +250,31 @@ tidak ada posting yang hilang atau dobel.
 
 ---
 
-### 7. [ ] Core: layar pantau posting
+### 7. [~] Core: layar pantau posting
 
 **Tempat:** `apps/core` · **Setelah:** 6 · **Selesai bila:** pengguna finance di sisi CoreERP bisa
 melihat, menelusuri, dan menindaklanjuti setiap posting tanpa membuka database.
 
-- [ ] 7.1 Daftar posting: filter status, jenis, entitas legal, dan rentang tanggal. Kolom umur `pending`.
-- [ ] 7.2 Detail: dokumen sumber (tautan ke modul), baris jurnal beserta dimensi, alasan tahan/tolak, dan riwayat tarik/ack.
-- [ ] 7.3 Aksi.
-  - [ ] 7.3.1 "Validasi ulang" untuk `held`.
-  - [ ] 7.3.2 "Tandai manual" dengan alasan wajib, untuk `held`, `pending`, dan `rejected`.
-  - [ ] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
-- [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut.
-- [ ] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
-- [ ] 7.6 Komponen "pemeriksaan posting" bersama, gaya *Journal Check* BC (K-22). Dipakai di layar pantau, pratinjau penerimaan (9.3), dan pratinjau "Post penyusutan" (11.2.7).
-  - [ ] 7.6.1 Tiga angka: baris diperiksa, baris bermasalah, total masalah. Tombol "Tampilkan baris bermasalah saja".
-  - [ ] 7.6.2 Tabel baris jurnal: akun, debit, kredit, dimensi, dan saldo berjalan di bawahnya.
-  - [ ] 7.6.3 Masalah per baris dari alasan terstruktur 6.3.6: objek yang bermasalah, pesannya, dan tombol jalan pintas ke layar perbaikannya.
-  - [ ] 7.6.4 Tombol "Validasi ulang" setelah perbaikan.
-  - [ ] 7.6.5 Endpoint pratinjau di Core: bentuk posting dari data yang belum disimpan, dengan validasi yang sama dengan 6.3, tanpa menulis apa pun.
+Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting), controller
+`FinancePostingMonitorController`, test `FinancePostingMonitorTest`.
+
+- [x] 7.1 Daftar posting: filter status, jenis, entitas legal, dan rentang tanggal. Kolom umur `pending`.
+- [x] 7.2 Detail: dokumen sumber (tautan ke modul), baris jurnal beserta dimensi, alasan tahan/tolak, dan riwayat tarik/ack.
+  - Tautan dokumen dari `source_document.url` opsional yang dikirim module lewat `PenerbitPosting`, karena hanya module yang tahu alamat layarnya. Hanya jalur relatif yang diterima, dan nilainya tidak ikut payload pembaca. Module belum mengirimnya; itu bagian 9.7 dan 11.2.
+  - Riwayat tarik hanya jumlah penyajian dan waktu terakhirnya: identitas klien penarik per posting tidak pernah disimpan (6.4).
+- [x] 7.3 Aksi.
+  - [x] 7.3.1 "Validasi ulang" untuk `held`.
+  - [x] 7.3.2 "Tandai manual" dengan alasan wajib, untuk `held`, `pending`, dan `rejected`. Posting `pending` yang sudah pernah disajikan memunculkan peringatan bahwa pembaca mungkin sudah membukukannya. Status diperiksa ulang di dalam kunci baris, dan penilaian ulang cutover tidak membatalkan tanda dari pengguna.
+  - [x] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
+- [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut. **Menunggu katalog izin Core.** Sampai katalog itu ada, layar dan aksinya dijaga `canManageAccess()` = owner/admin, termasuk untuk melihat (keputusan pemilik produk, 23 September 2026).
+- [x] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
+- [~] 7.6 Komponen "pemeriksaan posting" bersama, gaya *Journal Check* BC (K-22). Dipakai di layar pantau, pratinjau penerimaan (9.3), dan pratinjau "Post penyusutan" (11.2.7).
+  - Letaknya `apps/core/resources/js/components/finance/posting-check.tsx`, bukan paket `@apperp/ui`: UI module ikut dikompilasi dan dicek tipe oleh Core dengan alias `@/`, sedangkan mengubah SDK menuntut alur vendoring tarball. Layar module memakainya lewat `import { PostingCheck } from '@/components/finance/posting-check'`.
+  - [x] 7.6.1 Tiga angka: baris diperiksa, baris bermasalah, total masalah. Tombol "Tampilkan baris bermasalah saja".
+  - [x] 7.6.2 Tabel baris jurnal: akun, debit, kredit, dimensi, dan saldo berjalan di bawahnya.
+  - [x] 7.6.3 Masalah per baris dari alasan terstruktur 6.3.6: objek yang bermasalah, pesannya, dan tombol jalan pintas ke layar perbaikannya.
+  - [x] 7.6.4 Tombol "Validasi ulang" setelah perbaikan.
+  - [ ] 7.6.5 Endpoint pratinjau di Core: bentuk posting dari data yang belum disimpan, dengan validasi yang sama dengan 6.3, tanpa menulis apa pun. Logikanya sudah ada sebagai `PenerbitPosting::pratinjau()` (6.2). Dalam satu runtime, layar module memanggilnya lewat controller module-nya sendiri, jadi endpoint HTTP di Core mungkin tidak diperlukan; diputuskan bersama 9.3.
 
 ---
 

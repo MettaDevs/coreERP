@@ -14,6 +14,7 @@ import {
     FileText,
     KeyRound,
     LayoutDashboard,
+    ListChecks,
     Hash,
     Map,
     MapPin,
@@ -298,6 +299,23 @@ export function AppSidebar() {
                                         label: 'Atur nomor',
                                         icon: Hash,
                                         href: '/settings/number-sequences',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Posting finance',
+                                icon: ListChecks,
+                                href: '/settings/finance-postings',
+                                children: [
+                                    {
+                                        label: 'Pantau posting',
+                                        icon: ListChecks,
+                                        href: '/settings/finance-postings',
                                     },
                                 ],
                             },

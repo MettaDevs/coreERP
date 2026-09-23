@@ -74,6 +74,12 @@ class FinancePosting extends Model
 
     public const MANUAL_USER = 'user';
 
+    /**
+     * Status yang boleh ditandai manual oleh pengguna (TODO 7.3.2). `posted` tidak termasuk: pembaca
+     * sudah membukukannya, jadi menandainya manual berarti jurnal kedua.
+     */
+    public const MARKABLE_MANUAL = [self::HELD, self::PENDING, self::REJECTED];
+
     /** Kode alasan penolakan dari pembaca (PRD, bagian Endpoint). */
     public const REJECTION_CODES = [
         'PERIOD_CLOSED', 'UNKNOWN_ACCOUNT', 'UNKNOWN_DIMENSION', 'UNKNOWN_VENDOR', 'UNKNOWN_LEGAL_ENTITY', 'INVALID',

@@ -145,6 +145,33 @@ final class PostingPublisher
     }
 
     /**
+     * Menandai posting sebagai dibukukan manual oleh pengguna (TODO 7.3.2). Alasannya wajib dan
+     * tercatat bersama pelakunya di riwayat posting; `manual_reason` hanya menyimpan bahwa
+     * penandanya pengguna, karena kolom itu dijaga CHECK dan dibaca penilaian ulang cutover.
+     *
+     * Status diperiksa ulang di dalam kunci baris: ack pembaca bisa tiba di antara layar dibuka dan
+     * tombol ditekan. Posting `pending` yang sudah pernah disajikan tetap boleh ditandai — pengguna
+     * yang memutuskan, dan layar pantau memperingatkan bahwa pembaca mungkin sudah membukukannya.
+     * Ack yang tiba sesudahnya dijawab konflik oleh `PostingAcknowledger`.
+     *
+     * @throws StatusPostingBerubah Status posting tidak lagi mengizinkannya.
+     */
+    public function markManual(FinancePosting $posting, string $reason, int $userId): FinancePosting
+    {
+        return DB::transaction(function () use ($posting, $reason, $userId): FinancePosting {
+            $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
+            if (! in_array($terkunci->status, FinancePosting::MARKABLE_MANUAL, true)) {
+                throw new StatusPostingBerubah(sprintf('Posting %s berstatus %s dan tidak dapat ditandai manual.', $terkunci->posting_id, $terkunci->status));
+            }
+            $dari = $terkunci->status;
+            $terkunci->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_USER, 'hold_reasons' => null])->save();
+            FinancePostingEvent::catat($terkunci, 'marked_manual', $dari, FinancePosting::MANUAL, userId: $userId, data: ['reason' => $reason]);
+
+            return $terkunci;
+        });
+    }
+
+    /**
      * Menilai ulang posting satu entitas legal setelah feed diaktifkan, dimatikan, atau cutover-nya
      * diubah. Yang disentuh hanya posting yang belum pernah sampai ke pembaca: `held`, `manual`
      * karena cutover atau feed mati, dan `pending` yang belum pernah ditarik atau dikirim. Posting
@@ -246,6 +273,7 @@ final class PostingPublisher
             'number' => $this->teks($sumber, 'number', 80, false, 'source_document.number'),
             'description' => $this->teks($sumber, 'description', 255, false, 'source_document.description'),
             'id' => $this->teks($sumber, 'id', 64, false, 'source_document.id'),
+            'url' => $this->tautanDokumen($sumber),
         ];
 
         $membalik = $this->teks($input, 'reverses_posting_id', 120, false);
@@ -760,6 +788,24 @@ final class PostingPublisher
     private function objekUnit(string $id, string $nama): array
     {
         return ['type' => 'organization', 'id' => $id, 'label' => $nama];
+    }
+
+    /**
+     * Alamat layar dokumen sumber, untuk tautan di layar pantau (TODO 7.2). Module yang memberikannya
+     * karena hanya module yang tahu alamat layarnya sendiri. Tidak ikut payload pembaca, dan hanya
+     * jalur relatif di dalam aplikasi: tautan ke host lain dari data posting akan menjadi pintu
+     * pengalihan ke luar CoreERP.
+     *
+     * @param  array<mixed>  $sumber
+     */
+    private function tautanDokumen(array $sumber): ?string
+    {
+        $url = $this->teks($sumber, 'url', 255, false, 'source_document.url');
+        if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
+            throw new PostingTidakSah('source_document.url harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /management-aset/inventarisasi-aset/penerimaan/01J….');
+        }
+
+        return $url;
     }
 
     /** @return array{label: string, url: string} */

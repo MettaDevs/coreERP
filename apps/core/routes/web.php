@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\Docs\DocsPortalController;
 use App\Http\Controllers\Finance\CurrencyPrecisionController;
+use App\Http\Controllers\Finance\FinancePostingMonitorController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\Finance\IntegrationClientController;
 use App\Http\Controllers\Finance\ReferenceAccountController;
@@ -248,6 +249,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
     // Vendor: party berperan vendor per entitas legal, dipakai dokumen penerimaan dan feed posting.
     Route::get('settings/vendors', [VendorController::class, 'index'])->name('vendors.index');
+    // Pantau posting finance: daftar, detail jurnal, dan tindak lanjut posting yang tertahan.
+    Route::get('settings/finance-postings', [FinancePostingMonitorController::class, 'index'])->name('finance-postings.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -375,6 +378,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
         Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');
         Route::patch('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
+        Route::get('finance-postings/{financePosting}', [FinancePostingMonitorController::class, 'show'])->name('finance-postings.show');
+        Route::post('finance-postings/{financePosting}/revalidate', [FinancePostingMonitorController::class, 'revalidate'])->middleware('throttle:30,1')->name('finance-postings.revalidate');
+        Route::post('finance-postings/{financePosting}/mark-manual', [FinancePostingMonitorController::class, 'markManual'])->middleware('throttle:30,1')->name('finance-postings.mark-manual');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

@@ -28,7 +28,8 @@ namespace App\Support\Modules\Contracts;
  *     'vendor_id' => '01J…',                   // opsional
  *     'vendor_invoice_reference' => null,      // opsional
  *     'source_document' => ['module' => 'management-aset', 'type' => 'penerimaan-aset',
- *                           'number' => 'PNA-2026-09-0007', 'description' => '…', 'id' => '01J…'],
+ *                           'number' => 'PNA-2026-09-0007', 'description' => '…', 'id' => '01J…',
+ *                           'url' => '/management-aset/inventarisasi-aset/penerimaan/01J…'], // url opsional
  *     'reverses_posting_id' => null,           // opsional, `posting_id` yang dibalik
  *     'adjusts_posting_id' => null,            // opsional, `posting_id` yang dikoreksi
  *     'lines' => [[
@@ -45,6 +46,10 @@ namespace App\Support\Modules\Contracts;
  *
  * `mapping` menamai asal akun baris itu. Bila akunnya kosong atau nonaktif, masalah yang
  * ditampilkan memakai label itu dan tautan perbaikannya — Core tidak tahu posting group module.
+ *
+ * `source_document.url` adalah alamat layar dokumen itu di module, dipakai layar pantau posting
+ * untuk menautkannya. Alasannya sama: Core tidak tahu alamat layar module. Hanya jalur relatif yang
+ * diawali satu `/`; tidak ikut disajikan ke pembaca.
  *
  * Setiap hasil berbentuk:
  *
