@@ -192,6 +192,7 @@ export default withMermaid({
             { text: 'Dokumen cetak, layout, dan ekspor', link: '/dev/23-document-rendering' },
             { text: 'API dan integration bridge', link: '/dev/04-api-and-integration' },
             { text: 'Integrasi sistem eksternal', link: '/dev/12-external-module-integration' },
+            { text: 'Feed posting finance', link: '/dev/34-feed-posting-finance' },
             { text: 'Kustomisasi dan addon', link: '/dev/05-customization-and-addons' },
           ],
         },
