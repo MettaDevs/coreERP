@@ -40,7 +40,7 @@ final class FinancePostingSettingController extends Controller
             'enabled' => ['required', 'boolean'],
             'cutover_date' => ['nullable', 'date_format:Y-m-d', 'required_if_accepted:enabled'],
         ], [
-            'cutover_date.required_if_accepted' => 'Isi tanggal cutover sebelum mengaktifkan feed. Tanpa cutover, seluruh riwayat yang sudah dijurnal manual ikut terkirim.',
+            'cutover_date.required_if_accepted' => 'Isi tanggal cutover sebelum mengaktifkan pengiriman posting. Tanpa cutover, seluruh riwayat yang sudah dijurnal manual ikut terkirim.',
         ]);
 
         FinancePostingSetting::query()->updateOrCreate(
