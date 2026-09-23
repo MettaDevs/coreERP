@@ -511,7 +511,6 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
 - **Pemeriksaan tujuan push hanya meresolusi IPv4 (TODO 4.8).** `PushDestination` memakai `gethostbynamel()`, dan klien HTTP meresolusi lagi saat mengirim. Di SaaS, host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang diganti di antara pemeriksaan dan pengiriman.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
-- **Pemantauan feed di admin.erp (TODO area 14)** belum ada. Kesehatan feed hanya terlihat di layar pantau tenant.
 
 ## Di mana kodenya
 
@@ -553,6 +552,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - [Number sequence](14-number-sequences.md) — nomor vendor `core.vendor`, reference milik Core.
 - [UI modul di dalam shell](27-ui-modul-dalam-shell.md) — alamat layar module untuk `source_document.url` dan `mapping.fix_url`.
 - [Pelaporan kesalahan](28-pelaporan-kesalahan.md) — ke mana `PostingTidakSah` pergi.
+- [admin.erp](31-admin-erp-control-plane.md#kesehatan-feed-posting-finance) — ringkasan jumlah per status, `pending` tertua, dan pull terakhir tiap server klien (`finance-postings:summary`).
 - [Integrasi sistem eksternal](12-external-module-integration.md) — aturan umum sistem luar yang bertukar data dengan module.
 - [Healthcare finance subledger](17-healthcare-finance-subledger.md) — rancangan posting ke Finance/GL yang lebih luas.
 - [Penyusutan dan bridge backoffice](../todo/managementaset/03-penyusutan-dan-bridge-backoffice.md) — kontrak ekspor lama yang digantikan feed ini.
