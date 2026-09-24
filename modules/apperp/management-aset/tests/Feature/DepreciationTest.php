@@ -21,7 +21,7 @@ class DepreciationTest extends TestCase
         $this->tenantId = $this->buatTenantUji();
     }
 
-    public function test_proposal_uses_usage_unit_effective_at_period_end_and_final_export_has_no_gl(): void
+    public function test_proposal_uses_usage_unit_effective_at_period_end_and_finalising_twice_adds_once(): void
     {
         [$book, $usageUnit] = $this->book();
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize']);
@@ -29,18 +29,17 @@ class DepreciationTest extends TestCase
 
         $this->assertSame($usageUnit, $period['usage_org_unit_id']);
         $result = $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk()->json('data');
-        $payload = json_decode($result['export']['payload'], true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame($usageUnit, $payload['usage_org_unit_id']);
-        $this->assertArrayNotHasKey('debit', $payload);
-        $this->assertArrayNotHasKey('credit', $payload);
-        $this->assertArrayNotHasKey('coa', $payload);
+        $this->assertSame(['final', null], [$result['period']['status'], $result['period']['posted_posting_id']]);
 
         $retry = $this
             ->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')
             ->assertOk()
             ->json('data');
         $this->assertSame($period['id'], $retry['period']['id']);
-        $this->assertSame(1, DB::table('aset_tr_export_penyusutan')->where('depreciation_period_id', $period['id'])->count());
+        $this->assertSame('100.00', (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('accumulated_depreciation'));
+        // Finalisasi tidak lagi menulis ekspor lama; penyusutan sampai ke finance lewat "Post
+        // penyusutan" (feed posting finance, TODO 11.4).
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
     }
 
     public function test_reversal_creates_a_new_final_period_without_rewriting_the_original(): void

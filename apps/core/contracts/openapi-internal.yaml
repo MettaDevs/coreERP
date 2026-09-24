@@ -337,6 +337,181 @@ paths:
                     meta:
                       count: 1
                       has_more: false
+                penyusutan:
+                  summary: Post penyusutan Oktober 2026 buku komersial, satu klinik dengan dua poli
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-DEP-01J9Z2AAAAAAAAAAAAAAAAAAAA-01J9Z3BBBBBBBBBBBBBBBBBBBB-20261031-1
+                      posting_type: asset.depreciation
+                      settlement_mode: null
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-31'
+                      document_date: '2026-10-31'
+                      occurred_at: '2026-11-02T08:30:00+07:00'
+                      published_at: '2026-11-02T01:30:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: penyusutan
+                        number: null
+                        description: Penyusutan buku KOMERSIAL s.d. 31/10/2026
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '6510'
+                          code: 6-5100
+                          name: Beban Penyusutan Kendaraan
+                        debit: '2500000.00'
+                        credit: '0.00'
+                        description: Beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                        - code: DEPARTMENT
+                          display_name: Department
+                          value_code: POLI-UMUM
+                          value_display_name: Poli Umum
+                          value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD
+                      - line_no: 2
+                        account:
+                          external_id: '6510'
+                          code: 6-5100
+                          name: Beban Penyusutan Kendaraan
+                        debit: '1200000.00'
+                        credit: '0.00'
+                        description: Beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                        - code: DEPARTMENT
+                          display_name: Department
+                          value_code: UGD
+                          value_display_name: UGD
+                          value_id: 01J9Z2EEEEEEEEEEEEEEEEEEEE
+                      - line_no: 3
+                        account:
+                          external_id: '1459'
+                          code: 1-2390
+                          name: Akumulasi Penyusutan - Kendaraan
+                        debit: '0.00'
+                        credit: '3700000.00'
+                        description: Akumulasi penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '3700000.00'
+                        credit: '3700000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0012
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          period_starts_on: '2026-10-01'
+                          period_ends_on: '2026-10-31'
+                          depreciation_amount: '2500000.00'
+                        - asset_code: KEND-0015
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          period_starts_on: '2026-10-01'
+                          period_ends_on: '2026-10-31'
+                          depreciation_amount: '1200000.00'
+                    meta:
+                      count: 1
+                      has_more: false
+                pembalikan_penyusutan:
+                  summary: Penyusutan Oktober satu ambulans dibalik, bertanggal periode asalnya
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-DRV-01J9Z6T2V4X6Z8B0D2F4H6K8M0
+                      posting_type: asset.depreciation_reversal
+                      settlement_mode: null
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-31'
+                      document_date: '2026-10-31'
+                      occurred_at: '2026-11-10T14:05:00+07:00'
+                      published_at: '2026-11-10T07:05:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: penyusutan
+                        number: null
+                        description: 'Pembalikan penyusutan KEND-0012 s.d. 31/10/2026: Salah periode'
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1459'
+                          code: 1-2390
+                          name: Akumulasi Penyusutan - Kendaraan
+                        debit: '2500000.00'
+                        credit: '0.00'
+                        description: Pembalikan akumulasi penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '6510'
+                          code: 6-5100
+                          name: Beban Penyusutan Kendaraan
+                        debit: '0.00'
+                        credit: '2500000.00'
+                        description: Pembalikan beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                        - code: DEPARTMENT
+                          display_name: Department
+                          value_code: POLI-UMUM
+                          value_display_name: Poli Umum
+                          value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD
+                      totals:
+                        debit: '2500000.00'
+                        credit: '2500000.00'
+                      reverses_posting_id: AST-DEP-01J9Z2AAAAAAAAAAAAAAAAAAAA-01J9Z3BBBBBBBBBBBBBBBBBBBB-20261031-1
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0012
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          period_starts_on: '2026-10-01'
+                          period_ends_on: '2026-10-31'
+                          depreciation_amount: '2500000.00'
+                    meta:
+                      count: 1
+                      has_more: false
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -2534,8 +2709,8 @@ components:
         | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
         | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
         | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
-        | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
-        | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
+        | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
+        | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |
 
         **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
         *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.

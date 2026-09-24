@@ -15,6 +15,10 @@ use Illuminate\Support\Carbon;
  * `external_reference` diisi backoffice setelah menerima. Satu periode hanya boleh punya satu
  * baris di sini; itulah yang menahan penjurnalan ganda.
  *
+ * **Tidak lagi ditulis sejak feed posting finance area 11** (TODO 11.4): penyusutan sampai ke
+ * aplikasi finance lewat proses "Post penyusutan" (`DepreciationPosting`). Tabel dan riwayatnya
+ * dibiarkan dan tetap dapat dibaca; penghapusannya diputuskan terpisah.
+ *
  * @property string $id
  * @property string $tenant_id
  * @property string $posting_id

@@ -127,8 +127,8 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 | `tr_mutasi_aset` | Header berita acara serah terima: tanggal, tujuan, kedua pihak, dan alasan. |
 | `tr_mutasi_aset_details` | Satu aset per baris. `asal_*` kosong selama draf dan dibekukan saat dokumen diselesaikan. |
 | `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. |
-| `tr_penyusutan_aset` | Proposal, finalisasi, dan reversal penyusutan per periode. |
-| `tr_export_penyusutan` | Bukti export penyusutan ke backoffice. |
+| `tr_penyusutan_aset` | Proposal, finalisasi, dan reversal penyusutan per periode. `posted_posting_id` menyebut posting finance yang membawanya — `asset.depreciation` dari "Post penyusutan" untuk periode asli, `asset.depreciation_reversal` untuk baris pembalik — dan kosong berarti belum di-post (area 11). |
+| `tr_export_penyusutan` | Bukti export penyusutan ke backoffice. Tidak lagi ditulis sejak area 11; tabel dan riwayatnya dibiarkan. |
 | `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. |
 | `tr_perencanaan_aset` | Header perencanaan aset per entitas legal dan unit kerja. |
 | `tr_perencanaan_aset_details` | Rincian jenis aset, jumlah, harga perkiraan, dan spesifikasi yang diminta. |

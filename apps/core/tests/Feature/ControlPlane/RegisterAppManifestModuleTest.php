@@ -48,10 +48,15 @@ class RegisterAppManifestModuleTest extends TestCase
         // (`fixed-asset-posting-profiles.api`), +3 permission (create/update/archive), +2
         // privilege (maintain/retire), dan +1 duty (`fixed-asset-posting-profiles.manage`),
         // tersendiri supaya role lama tidak diam-diam dapat mengubah akun jurnal.
+        //
+        // 24 September 2026, "Post penyusutan" (feed posting finance area 11): +1 permission
+        // (`penyusutan.post`, invoke), +1 privilege (`penyusutan.post-to-finance`), dan +1 duty
+        // (`penyusutan.finance-posting`), tersendiri supaya role yang mengelola penyusutan tidak
+        // diam-diam dapat mengirim jurnalnya ke aplikasi finance.
         'entry_points' => 69,
-        'permissions' => 132,
-        'privileges' => 70,
-        'duties' => 37,
+        'permissions' => 133,
+        'privileges' => 71,
+        'duties' => 38,
         'number_sequence_references' => 31,
         'workflow_types' => 2,
         'reports' => 4,

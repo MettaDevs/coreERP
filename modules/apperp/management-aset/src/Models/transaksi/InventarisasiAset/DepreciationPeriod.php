@@ -18,6 +18,9 @@ use Illuminate\Support\Carbon;
  *
  * `amount` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan float.
  *
+ * `posted_posting_id` menyebut posting finance yang membawa periode ini (TODO 11.1): proses "Post
+ * penyusutan" untuk periode asli, pembalikannya untuk baris pembalik. Kosong berarti belum di-post.
+ *
  * @property string $id
  * @property string $tenant_id
  * @property string $buku_aset_id
@@ -28,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string $amount
  * @property string $status
  * @property ?string $reverses_period_id
+ * @property ?string $posted_posting_id
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
@@ -40,7 +44,7 @@ class DepreciationPeriod extends Model
 
     protected $fillable = [
         'tenant_id', 'buku_aset_id', 'legal_entity_id', 'usage_org_unit_id',
-        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id',
+        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id', 'posted_posting_id',
     ];
 
     /** @return array<string, string> */

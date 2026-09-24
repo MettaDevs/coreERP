@@ -455,35 +455,54 @@ situ, dan `asset.opening_balance` terbit.
 
 ---
 
-### 11. [ ] Modul aset: posting penyusutan
+### 11. [x] Modul aset: posting penyusutan
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 6, 8 · **Selesai bila:** satu proses
 "Post penyusutan" menghasilkan satu posting ringkas yang totalnya sama persis dengan register,
 reversal menghasilkan jurnal balik, dan ekspor lama berhenti ditulis.
 
-- [ ] 11.1 Penanda di periode.
-  - [ ] 11.1.1 Migration: `posted_posting_id` (nullable) pada `aset_tr_penyusutan_aset`.
-  - [ ] 11.1.2 Periode final tanpa `posted_posting_id` = belum di-post.
-- [ ] 11.2 Proses "Post penyusutan".
-  - [ ] 11.2.1 Input: entitas legal, buku, `period_ends_on`.
-  - [ ] 11.2.2 Kumpulkan periode original `final` yang belum di-post. Kunci baris dengan `lockForUpdate`.
-  - [ ] 11.2.3 Bulatkan per aset, lalu ringkas per (akun beban, BU, department) dan (akun akumulasi, BU).
-  - [ ] 11.2.4 Satu posting. `posting_id` deterministik dari entitas + buku + tanggal akhir + nomor urut proses.
-  - [ ] 11.2.5 Isi `posted_posting_id` pada semua periode yang ikut.
-  - [ ] 11.2.6 Buku `none` ditolak dengan pesan jelas.
-  - [ ] 11.2.7 Rute, permission, dan UI tombol di layar penyusutan. Sebelum konfirmasi, tampilkan pratinjau dengan komponen 7.6: jurnal ringkas, jumlah aset yang ikut, total yang harus sama dengan register, dan masalahnya.
-  - [ ] 11.2.8 `posting_date` = `period_ends_on`, `document_date` = `period_ends_on`, `occurred_at` = jam proses dijalankan.
-- [ ] 11.3 Reversal (`DepreciationController::reverse`).
-  - [ ] 11.3.1 Kalau periode asal sudah di-post → terbitkan `asset.depreciation_reversal` yang merujuk posting asal, dengan baris balik untuk porsi aset itu saja.
-  - [ ] 11.3.2 Kalau periode asal belum di-post → tidak ada posting.
-  - [ ] 11.3.3 Hormati `posting_layer`, sehingga asimetri yang ada sekarang hilang.
-- [ ] 11.4 Hentikan penulisan `aset_tr_export_penyusutan` di `finalize` dan `reverse`. Tabel dan riwayatnya dibiarkan dan tetap bisa dibaca. Penghapusannya diputuskan terpisah.
-- [ ] 11.5 Test.
-  - [ ] 11.5.1 Total posting sama dengan jumlah periode di register, sampai ke sen.
-  - [ ] 11.5.2 Dua proses paralel untuk buku dan periode yang sama → satu berhasil, satu kosong.
-  - [ ] 11.5.3 Reversal setelah post menghasilkan jurnal balik yang merujuk posting asal.
-  - [ ] 11.5.4 Reversal sebelum post tidak menghasilkan posting.
-  - [ ] 11.5.5 `DepreciationScaleTest` tetap dalam anggarannya.
+Keputusan pemilik produk, 24 September 2026: K-29 (pembalikan bertanggal periode asal), K-30
+(ringkasan per group aset + dimensi), K-31 (hanya buku yang mem-post perolehan yang mengirim
+penyusutan), K-32 (nilai lebih halus dari presisi menahan proses).
+
+- [x] 11.1 Penanda di periode.
+  - [x] 11.1.1 Migration: `posted_posting_id` (nullable) pada `aset_tr_penyusutan_aset`.
+    Ditambah indeks `(tenant_id, legal_entity_id, period_ends_on)` untuk kueri proses post.
+  - [x] 11.1.2 Periode final tanpa `posted_posting_id` = belum di-post.
+    Baris pembalik ikut ditandai dengan posting pembaliknya.
+- [x] 11.2 Proses "Post penyusutan" (`Services/DepreciationPosting`).
+  - [x] 11.2.1 Input: entitas legal, buku, `period_ends_on`.
+    Cakupan unit pengguna menyaring periode yang ikut; pengguna tanpa wewenang di entitas itu ditolak 403.
+  - [x] 11.2.2 Kumpulkan periode original `final` yang belum di-post. Kunci baris dengan `lockForUpdate`.
+    Proses satu buku antre di kunci baris master bukunya; periode dikunci lalu dibaca ulang, dan periode yang
+    sudah dibalik tidak ikut. Hanya aset yang group-nya mem-post perolehan lewat buku itu yang ikut (K-31).
+  - [x] 11.2.3 Bulatkan per aset, lalu ringkas per (akun beban, BU, department) dan (akun akumulasi, BU).
+    Diringkas per group aset + dimensi (K-30). Nilai periode sudah berpresisi sumber, jadi tidak dibulatkan
+    lagi; yang lebih halus dari presisi mata uang menahan proses (K-32).
+  - [x] 11.2.4 Satu posting. `posting_id` deterministik dari entitas + buku + tanggal akhir + nomor urut proses.
+    `AST-DEP-<entitas legal>-<buku>-<YYYYMMDD>-<nomor urut>`.
+  - [x] 11.2.5 Isi `posted_posting_id` pada semua periode yang ikut.
+  - [x] 11.2.6 Buku `none` ditolak dengan pesan jelas.
+  - [x] 11.2.7 Rute, permission, dan UI tombol di layar penyusutan. Sebelum konfirmasi, tampilkan pratinjau dengan komponen 7.6: jurnal ringkas, jumlah aset yang ikut, total yang harus sama dengan register, dan masalahnya.
+    `GET penyusutan/posting/pratinjau`, `POST penyusutan/posting`; izin `management-aset.penyusutan.post`
+    (invoke) dengan privilege dan duty sendiri; lembar "Post penyusutan" memakai `PostingCheck`.
+  - [x] 11.2.8 `posting_date` = `period_ends_on`, `document_date` = `period_ends_on`, `occurred_at` = jam proses dijalankan.
+- [x] 11.3 Reversal (`DepreciationController::reverse`).
+  - [x] 11.3.1 Kalau periode asal sudah di-post → terbitkan `asset.depreciation_reversal` yang merujuk posting asal, dengan baris balik untuk porsi aset itu saja.
+    `AST-DRV-<id baris pembalik>`, bertanggal periode asal (K-29).
+  - [x] 11.3.2 Kalau periode asal belum di-post → tidak ada posting.
+  - [x] 11.3.3 Hormati `posting_layer`, sehingga asimetri yang ada sekarang hilang.
+    Pembalikan mengikuti `posted_posting_id` periode aslinya, bukan lapisan buku hari ini.
+- [x] 11.4 Hentikan penulisan `aset_tr_export_penyusutan` di `finalize` dan `reverse`. Tabel dan riwayatnya dibiarkan dan tetap bisa dibaca. Penghapusannya diputuskan terpisah.
+- [x] 11.5 Test (`DepreciationPostingTest`).
+  - [x] 11.5.1 Total posting sama dengan jumlah periode di register, sampai ke sen.
+  - [x] 11.5.2 Dua proses paralel untuk buku dan periode yang sama → satu berhasil, satu kosong.
+    Berurutan di test feature; berbarengan di profil `post-race` uji beban.
+  - [x] 11.5.3 Reversal setelah post menghasilkan jurnal balik yang merujuk posting asal.
+  - [x] 11.5.4 Reversal sebelum post tidak menghasilkan posting.
+  - [x] 11.5.5 `DepreciationScaleTest` tetap dalam anggarannya.
+  - [x] 11.5.6 Uji beban `loadtest/k6/depreciation.js` dengan proses post dan balapannya. Rinciannya di
+    `apps/core/loadtest/README.md`.
 
 ---
 

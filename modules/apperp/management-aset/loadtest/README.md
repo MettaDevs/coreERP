@@ -13,7 +13,7 @@ dijelaskan di sini hanya yang khas modul ini.
 | --- | --- | --- |
 | `k6/master-data.js` | Penjenuhan master + transaksi: CRUD, idempotency, batas tenant, eskalasi hak | dijalankan pada runtime baru |
 | `k6/maintenance.js` | Setup maintenance, dan perlombaan penggantian kaitan | dijalankan pada runtime baru |
-| `k6/depreciation.js` | Proposal, finalisasi, dan saldo penyusutan; perlombaan finalisasi | dijalankan pada runtime baru |
+| `k6/depreciation.js` | Proposal, finalisasi, "Post penyusutan", dan saldo penyusutan; perlombaan finalisasi dan perlombaan post | dijalankan pada runtime baru |
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
 | `k6/posting-group.js` | Posting group aset: perlombaan pembuatan dan arsip tanggal berlaku, akun dan group tenant lain | dijalankan pada runtime baru |
 | `k6/receipt-posting.js` | Penyelesaian penerimaan dan jurnalnya — perolehan untuk pembelian, saldo awal untuk aset lama: perlombaan menyelesaikan dokumen yang sama, beban serentak dengan impor saldo awal dari CSV, pratinjau dan penyelesaian dokumen tenant lain | dijalankan pada runtime baru |
@@ -73,7 +73,7 @@ docker run --rm -i --network core-loadtest_default `
 
 docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
   -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
-  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=64 -e VUS=256 -e DURATION=90s `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
   -e RUN_ID=gate-dep-sat-1 -e FIXTURE=g1 `
   grafana/k6:0.55.0 run /scripts/aset/depreciation.js
 
@@ -81,6 +81,13 @@ docker run --rm -i --network core-loadtest_default `
   -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
   -e BASE_URL=http://lb -e PROFILE=finalize-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
   -e RUN_ID=gate-dep-race-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/depreciation.js
+
+# Perlombaan "Post penyusutan": FIXTURE wajib baru, periode yang sudah di-post tidak dapat dibalapkan lagi.
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=post-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-dep-post-race-1 -e FIXTURE=pr1 `
   grafana/k6:0.55.0 run /scripts/aset/depreciation.js
 
 docker run --rm -i --network core-loadtest_default `
@@ -114,7 +121,9 @@ docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\a
 dengan residu 0, garis lurus sisa umur, masa manfaat tiga periode, dan round-off 100 pada matriks
 group x buku. Nilainya karena itu wajib 300, 300, 400 dan saldo akhirnya akumulasi 1.000 dengan
 nilai buku 0. Kunci seed-nya diikat ke `FIXTURE`, bukan ke `RUN_ID`, supaya run berikutnya memakai
-kembali aset dan ketiga periode yang sama alih-alih menumbuhkan data.
+kembali aset dan ketiga periode yang sama alih-alih menumbuhkan data. Feed posting finance entitas
+legalnya dinyalakan dengan cutover 1 Januari 2026, seperti `receipt-posting.js`: tanpanya setiap jurnal
+tercatat `manual` dan penerbit tidak pernah menilai baris jurnal penyusutan.
 
 ## Profil
 
@@ -124,7 +133,8 @@ kembali aset dan ketiga periode yang sama alih-alih menumbuhkan data.
 | `link-race` | Apakah dua penulis yang berebut kaitan yang sama saling merusak? | 0 himpunan gabungan |
 | `attribute-race` | Apakah Values dan nilai aset tetap cocok saat diubah bersamaan? | 0 nilai di luar Values |
 | `transition-race` | Apakah dua transisi dari versi yang sama dapat sama-sama menang? | 0 `transition_double_wins` |
-| `finalize-race` | Apakah satu periode dapat menambah saldo buku dua kali? | 0 posting kedua, akumulasi tetap |
+| `finalize-race` | Apakah satu periode dapat menambah saldo buku dua kali? | 0 jawaban berbeda, akumulasi tetap |
+| `post-race` (`depreciation.js`) | Apakah dua "Post penyusutan" untuk periode yang sama dapat sama-sama menerbitkan posting — beban dua kali di aplikasi finance? | 0 `post_serentak_dua_posting`, 0 `server_errors`, dan `verify.sql`: total tiap posting penyusutan sama dengan periode yang ditandainya |
 | `race` (`posting-group.js`) | Apakah dua penyimpanan pertama untuk group dan tanggal yang sama, atau penyimpanan dan arsip yang bersamaan, dapat berakhir 500 atau baris campuran? | 0 `server_errors`, 0 `posting_group_mixed_rows` |
 | `race` (`receipt-posting.js`) | Apakah dua penyelesaian dokumen penerimaan yang sama dapat sama-sama menang — aset kembar dan jurnal perolehan atau saldo awal dua kali? | 0 `correctness_violations`, 0 `server_errors`, dan `verify.sql`: tepat satu posting berjenis benar per penerimaan selesai, akumulasi jurnal saldo awal sama dengan register |
 | `latency` | Berapa concurrency yang masih memenuhi SLO? | p95/p99 per jenis operasi |
@@ -143,13 +153,17 @@ Tiga sumber terpisah, tidak ada yang memakai kode yang sedang diuji sebagai haki
    bentuknya), posting group yang menunjuk akun tenant lain, dan jurnal perolehan: tepat satu
    posting per penerimaan selesai di tenant yang sama, tidak ada posting tanpa penerimaan selesai,
    debit posting sama dengan nilai register ditambah PPN, dan jumlah aset sama dengan jumlah unit.
+   Untuk jurnal penyusutan: periode yang ditandai di-post menunjuk posting berjenis benar, total
+   tiap posting penyusutan sama dengan periode yang ditandainya, dan pembalikan mengikuti periode
+   aslinya.
 2. **`verify.sql` Core** — batas tenant, materialisasi sequence per entitlement, dan terbitan nomor
    yang menembus batas tenant.
 3. **Probe di dalam k6** — sesi tenant A membaca record tenant B (harus 404), menulis anak di bawah
    induk tenant B (harus 422), memindahkan status work order tenant B (harus 404), memfinalkan
    periode penyusutan tenant B (harus 404), menulis posting group tenant B (harus 404) atau
    memakai akun tenant B (harus 422), membaca pratinjau jurnal atau menyelesaikan penerimaan
-   tenant B (harus 404), dan tenant yang role-nya dipersempit ke satu duty
+   tenant B (harus 404), memeriksa "Post penyusutan" atas entitas legal dan buku tenant B (harus
+   403, 422, atau tanpa satu periode pun), dan tenant yang role-nya dipersempit ke satu duty
    membuka master atau permukaan sebelahnya (harus 403). Semuanya berjalan **selama** beban penuh,
    bukan sesudahnya.
 
@@ -168,12 +182,22 @@ Ketiganya sudah dibuktikan bisa merah; caranya dan angkanya ada di README stack.
   sebanding begitu tabelnya jauh lebih besar; angka kebenarannya tetap sebanding.
 - Penyusutan diuji pada satu aset per tenant dengan satu buku. Tutup bulan massal
   (`penyusutan/proposal-massal`) dan aset dengan beberapa buku sekaligus belum diukur di bawah beban.
+- "Post penyusutan" di bawah beban karena itu selalu satu aset per periode: ringkasan jurnal banyak
+  group dan unit, buku kedua yang tidak mengirim, dan penghalang presisi diuji test feature
+  (`DepreciationPostingTest`). Pembalikan yang selesai di sela pembacaan pertama dan kunci proses post
+  diuji deterministik di sana juga, bukan dibalapkan di bawah beban: jendelanya terlalu sempit untuk
+  terkena secara acak.
+- Jurnal balik penyusutan (`asset.depreciation_reversal`) hanya terbit lewat SELFTEST profil
+  saturation, tidak pernah di run sungguhan: pembalikan menggeser saldo fixture untuk selamanya. Pada
+  area 11 SELFTEST itu menerbitkan tiga jurnal balik dengan beban ringan (16 VU) dan `verify.sql` tetap
+  0. Jalurnya diuji test feature; pemeriksaan `verify.sql`-nya dibuktikan merah lewat suntikan (README
+  stack).
 - Satu sesi dipakai banyak VU (limiter login berlaku per email + IP). Yang tidak diuji karenanya:
   pembuatan sesi serentak dalam jumlah besar.
-- Jurnal perolehan dan saldo awal pada uji beban selalu `held`: tenant uji beban tidak punya
-  hierarki manajemen, jadi BU tidak dapat diturunkan. Satu posting per penerimaan, debit yang sama
-  dengan register, dan batas tenant tetap digate; jalur `pending` dengan akun dan BU terisi diuji oleh
-  test feature, bukan di bawah beban.
+- Jurnal perolehan, saldo awal, dan penyusutan pada uji beban selalu `held`: tenant uji beban tidak
+  punya hierarki manajemen, jadi BU tidak dapat diturunkan. Satu posting per penerimaan atau periode,
+  total yang sama dengan register, dan batas tenant tetap digate; jalur `pending` dengan akun dan BU
+  terisi diuji oleh test feature, bukan di bawah beban.
 - Group uji beban hanya punya satu buku, jadi saldo awal yang angkanya berbeda per buku (K-28) dan
   penyusutan lanjutan sesudah cutover diuji oleh test feature (`OpeningBalanceTest`), bukan di bawah
   beban.

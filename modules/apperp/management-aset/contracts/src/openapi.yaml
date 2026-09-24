@@ -37,7 +37,7 @@ tags:
 - name: Mutasi aset
   description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Penyusutan
-  description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
+  description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke aplikasi finance.
 - name: Reference data
   description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
 - name: Laporan

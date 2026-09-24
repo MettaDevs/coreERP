@@ -344,6 +344,49 @@ posting_saldo_awal_tidak_sama_dengan_register as (
           join aset_tr_buku_aset b on b.aset_id = x.id and b.book_code = a->>'book'
       ), 0)
 ),
+penyusutan_di_post_tanpa_posting as (
+    -- Periode yang ditandai sudah di-post (area 11) wajib menunjuk posting finance yang benar-benar
+    -- ada di tenant yang sama, berjenis sesuai barisnya: `asset.depreciation` untuk periode asli,
+    -- `asset.depreciation_reversal` untuk baris pembalik. Penanda tanpa posting berarti register
+    -- mengira beban sudah sampai ke buku besar padahal tidak.
+    select count(*) as n
+    from aset_tr_penyusutan_aset p
+    where p.posted_posting_id is not null
+      and not exists (
+          select 1 from finance_postings f
+          where f.tenant_id = p.tenant_id
+            and f.posting_id = p.posted_posting_id
+            and f.posting_type = case when p.reverses_period_id is null then 'asset.depreciation' else 'asset.depreciation_reversal' end
+      )
+),
+posting_penyusutan_tidak_sama_dengan_register as (
+    -- Total satu posting `asset.depreciation` wajib sama persis dengan jumlah periode register yang
+    -- ditandainya (K-14, TODO 11.5.1). Periode yang ikut dua proses post, atau posting yang terbit
+    -- tanpa menandai periodenya, muncul di sini sebagai selisih.
+    select count(*) as n
+    from finance_postings f
+    where f.posting_type = 'asset.depreciation'
+      and f.source_module = 'management-aset'
+      and f.total_debit <> coalesce((
+          select sum(p.amount) from aset_tr_penyusutan_aset p
+          where p.tenant_id = f.tenant_id and p.posted_posting_id = f.posting_id and p.reverses_period_id is null
+      ), 0)
+),
+pembalikan_penyusutan_tidak_mengikuti_asal as (
+    -- Pembalikan mengikuti periode aslinya (TODO 11.3): jurnal balik terbit tepat bila periode
+    -- aslinya sudah di-post, merujuk posting asal itu, dan bernilai sama dengan periode aslinya.
+    -- Periode yang dibalik sebelum di-post lalu ikut proses post juga muncul di sini.
+    select count(*) as n
+    from aset_tr_penyusutan_aset r
+    join aset_tr_penyusutan_aset o on o.tenant_id = r.tenant_id and o.id = r.reverses_period_id
+    left join finance_postings f on f.tenant_id = r.tenant_id and f.posting_id = r.posted_posting_id
+    where (o.posted_posting_id is null) <> (r.posted_posting_id is null)
+       or (r.posted_posting_id is not null and (
+              f.id is null
+              or f.reverses_posting_id is distinct from o.posted_posting_id
+              or f.total_debit <> o.amount
+          ))
+),
 aset_penerimaan_tidak_sesuai_jumlah as (
     select count(*) as n
     from aset_tr_penerimaan_aset p
@@ -417,6 +460,9 @@ union all select 'penerimaan selesai tanpa tepat satu posting perolehan', n from
 union all select 'posting perolehan tanpa penerimaan selesai di tenant yang sama', n from posting_perolehan_tanpa_penerimaan_selesai
 union all select 'debit posting perolehan tidak sama dengan register ditambah PPN', n from posting_perolehan_tidak_sama_dengan_register
 union all select 'akumulasi jurnal saldo awal tidak sama dengan register', n from posting_saldo_awal_tidak_sama_dengan_register
+union all select 'periode ditandai di-post tanpa posting berjenis benar', n from penyusutan_di_post_tanpa_posting
+union all select 'total posting penyusutan tidak sama dengan register', n from posting_penyusutan_tidak_sama_dengan_register
+union all select 'pembalikan penyusutan tidak mengikuti periode aslinya', n from pembalikan_penyusutan_tidak_mengikuti_asal
 union all select 'jumlah aset penerimaan tidak sama dengan jumlah unit barisnya', n from aset_penerimaan_tidak_sesuai_jumlah
 union all select 'posting group ganda untuk group dan tanggal yang sama', n from posting_group_ganda
 union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
@@ -436,6 +482,9 @@ union all select 'aset_m_posting_group', count(*), count(distinct tenant_id) fro
 union all select 'aset_tr_penerimaan_aset', count(*), count(distinct tenant_id) from aset_tr_penerimaan_aset
 union all select 'finance_postings asset.acquisition', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.acquisition'
 union all select 'finance_postings asset.opening_balance', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.opening_balance'
+union all select 'finance_postings asset.depreciation', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.depreciation'
+union all select 'finance_postings asset.depreciation_reversal', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.depreciation_reversal'
+union all select 'aset_tr_penyusutan_aset sudah di-post', count(*), count(distinct tenant_id) from aset_tr_penyusutan_aset where posted_posting_id is not null
 union all select 'aset_m_kondisi_aset', count(*), count(distinct tenant_id) from aset_m_kondisi_aset
 union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) from aset_m_pabrikan_aset
 union all select 'aset_m_item_checklist_maintenance', count(*), count(distinct tenant_id) from aset_m_item_checklist_maintenance
