@@ -1307,9 +1307,8 @@ export default function PenerimaanDetailPage({
 
                                 <FieldDescription>
                                     {saldoAwal
-                                        ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. '
-                                        : ''}
-                                    Nilai dan PPN diisi per unit, bukan total.
+                                        ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. Nilai dan akumulasi diisi per unit, bukan total. '
+                                        : 'Nilai dan PPN diisi per unit, bukan total. '}
                                     Ambang kapitalisasi group dibandingkan
                                     terhadap nilai satu aset — dua puluh kursi
                                     lima ratus ribu tidak melewati ambang

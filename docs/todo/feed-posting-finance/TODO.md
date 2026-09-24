@@ -419,25 +419,39 @@ dan PPN, untuk kedua mode.
 
 ---
 
-### 10. [ ] Modul aset: saldo awal
+### 10. [x] Modul aset: saldo awal
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 8, 9 · **Selesai bila:** aset lama
 bisa dimasukkan dengan akumulasi penyusutan sampai cutover, penyusutan berikutnya melanjutkan dari
 situ, dan `asset.opening_balance` terbit.
 
-- [ ] 10.1 Desain: penerimaan dengan `cara_perolehan = saldo_awal`.
-  - [ ] 10.1.1 Baris membawa `akumulasi_per_unit` dan `periode_berjalan` (jumlah periode yang sudah disusutkan).
-  - [ ] 10.1.2 Tanggal penerimaan harus sama dengan, atau sebelum, cutover entitas legalnya.
-  - [ ] 10.1.3 Vendor dan PPN tidak berlaku.
-- [ ] 10.2 Migration kolom baris dan kolom `elapsed_periods_offset` pada `aset_tr_buku_aset`.
-- [ ] 10.3 `PembuatAset::buatBuku` menerima akumulasi dan offset. Nilai buku = perolehan − akumulasi.
-- [ ] 10.4 `DepreciationCalculator` menambahkan offset ke hitungan periode berjalan.
-- [ ] 10.5 Posting `asset.opening_balance`: Dr harga perolehan, Cr akumulasi, Cr penyeimbang, per group + BU.
-- [ ] 10.6 (Opsional) impor CSV untuk saldo awal massal, yang membuat penerimaan jenis saldo awal.
-- [ ] 10.7 Test.
-  - [ ] 10.7.1 Penyusutan periode pertama setelah cutover sama dengan penyusutan periode ke-(offset+1).
-  - [ ] 10.7.2 Jurnal saldo awal seimbang, dengan nilai buku di akun penyeimbang.
-  - [ ] 10.7.3 Tanggal setelah cutover ditolak.
+- [x] 10.1 Desain: penerimaan dengan `cara_perolehan = saldo_awal`.
+  - [x] 10.1.1 Baris membawa `akumulasi_per_unit` dan `periode_berjalan` (jumlah periode yang sudah disusutkan).
+    Keduanya angka buku yang di-post, sekaligus bawaan buku lain; buku yang berbeda diisi di `saldo_awal_buku` (K-28).
+    Akumulasi berpresisi nilai mata uang, jadi tidak pernah dibulatkan; bersama residu ia tidak boleh melebihi nilai
+    per unit, dan periode berjalan tidak boleh melebihi masa manfaat buku yang memakainya.
+  - [x] 10.1.2 Tanggal penerimaan harus sama dengan, atau sebelum, cutover entitas legalnya.
+    Tanggal itu tanggal perolehan asli; jurnalnya bertanggal cutover (K-27). Entitas tanpa cutover ditahan saat diselesaikan.
+  - [x] 10.1.3 Vendor dan PPN tidak berlaku.
+- [x] 10.2 Migration kolom baris dan kolom `elapsed_periods_offset` pada `aset_tr_buku_aset`.
+  Ditambah `opening_accumulated_depreciation`, supaya akumulasi = saldo awal + periode final tetap dapat diperiksa `verify.sql`.
+- [x] 10.3 `PembuatAset::buatBuku` menerima akumulasi dan offset. Nilai buku = perolehan − akumulasi.
+  Penyusutannya tidak mulai sebelum cutover.
+- [x] 10.4 `DepreciationCalculator` menambahkan offset ke hitungan periode berjalan.
+  Ditambahkan di `DepreciationController` (usulan tunggal dan massal), tempat periode berjalan dihitung; kalkulatornya tetap.
+- [x] 10.5 Posting `asset.opening_balance`: Dr harga perolehan, Cr akumulasi, Cr penyeimbang, per group + BU.
+  `AST-OPB-<id penerimaan>`, bertanggal cutover; akumulasinya dari buku yang di-post.
+- [x] 10.6 (Opsional) impor CSV untuk saldo awal massal, yang membuat penerimaan jenis saldo awal.
+  Dikerjakan bersama area ini (keputusan pemilik produk, 24 September 2026): `POST /penerimaan-aset/impor-saldo-awal`,
+  pratinjau lalu terapkan, semua atau tidak sama sekali, satu draf per tanggal perolehan, tanggal siap pakai, dan lokasi.
+- [x] 10.7 Test (`OpeningBalanceTest`, `OpeningBalanceImportTest`).
+  - [x] 10.7.1 Penyusutan periode pertama setelah cutover sama dengan penyusutan periode ke-(offset+1).
+  - [x] 10.7.2 Jurnal saldo awal seimbang, dengan nilai buku di akun penyeimbang.
+  - [x] 10.7.3 Tanggal setelah cutover ditolak.
+  - [x] 10.7.4 Uji beban `loadtest/k6/receipt-posting.js` dengan saldo awal dan impor CSV.
+    Lulus 24 September 2026: balapan 32 VU (217 menang, 125 di antaranya saldo awal; 855 kalah) dan saturasi 1000 VU
+    di 128 tenant (212 saldo awal, 107 impor), 0 pelanggaran dan 0 error 5xx; `verify.sql` modul 0 pada 376 posting
+    `asset.opening_balance` bertanggal cutover dan 644 `asset.acquisition`. Rinciannya di `apps/core/loadtest/README.md`.
 
 ---
 

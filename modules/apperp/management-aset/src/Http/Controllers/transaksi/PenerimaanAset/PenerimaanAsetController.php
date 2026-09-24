@@ -447,7 +447,7 @@ class PenerimaanAsetController extends Controller
      */
     private function drafImpor(string $awalanKunci): array
     {
-        return PenerimaanAset::query()
+        return array_values(PenerimaanAset::query()
             ->where('creation_key', 'like', str_replace(['%', '_'], ['\\%', '\\_'], $awalanKunci).'%')
             ->orderBy('kode')
             ->toBase()
@@ -459,7 +459,7 @@ class PenerimaanAsetController extends Controller
                 'tanggal_siap_pakai' => $baris->tanggal_siap_pakai === null ? null : substr((string) $baris->tanggal_siap_pakai, 0, 10),
                 'status' => (string) $baris->status,
             ])
-            ->all();
+            ->all());
     }
 
     /**
@@ -975,11 +975,11 @@ class PenerimaanAsetController extends Controller
                 }
             }
 
-            $data['details'][$indeks]['saldo_awal_buku'] = $perBuku === [] ? null : array_values(array_map(
+            $data['details'][$indeks]['saldo_awal_buku'] = $perBuku === [] ? null : array_map(
                 static fn (string $bukuId, array $angka): array => ['buku_id' => $bukuId, 'akumulasi_per_unit' => $angka['akumulasi'], 'periode_berjalan' => $angka['periode']],
                 array_keys($perBuku),
                 $perBuku,
-            ));
+            );
         }
         if ($pesan !== []) {
             throw ValidationException::withMessages($pesan);
@@ -1256,7 +1256,12 @@ class PenerimaanAsetController extends Controller
             ->where(self::TABEL_BARIS.'.penerimaan_aset_id', $penerimaanId)
             ->orderBy(self::TABEL_BARIS.'.line_number')
             ->toBase()
-            ->get();
+            ->get()
+            // Query builder membaca kolom JSON sebagai teks; angka per buku dipulangkan dalam bentuk
+            // yang sama dengan yang diterima permintaan.
+            ->each(static function (stdClass $baris): void {
+                $baris->saldo_awal_buku = $baris->saldo_awal_buku === null ? null : OpeningBalance::overrides($baris->saldo_awal_buku);
+            });
     }
 
     private function staleVersion(): JsonResponse

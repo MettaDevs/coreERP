@@ -29,6 +29,12 @@ use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
  *
  * Isi baris tidak divalidasi di sini selain bentuknya. Draf yang tersusun melewati aturan yang sama
  * persis dengan layar penerimaan, dan kesalahannya dipetakan kembali ke nomor baris berkas.
+ *
+ * @phpstan-type HasilBaca array{
+ *     rows: int,
+ *     receipts: list<array{header: array{tanggal: string, tanggal_siap_pakai: ?string, lokasi_aset_id: ?string, lokasi: ?string}, details: list<array<string, mixed>>, lines: list<int>}>,
+ *     rejected: list<array{line: int, field: ?string, reason: string}>,
+ * }
  */
 final class OpeningBalanceImport
 {
@@ -44,13 +50,7 @@ final class OpeningBalanceImport
     /** Kolom angka yang boleh diisi per buku, ditulis `<kolom>:<KODE BUKU>`. */
     private const PER_BUKU = ['akumulasi_per_unit', 'periode_berjalan'];
 
-    /**
-     * @return array{
-     *     rows: int,
-     *     receipts: list<array{header: array{tanggal: string, tanggal_siap_pakai: ?string, lokasi_aset_id: ?string, lokasi: ?string}, details: list<array<string, mixed>>, lines: list<int>}>,
-     *     rejected: list<array{line: int, field: ?string, reason: string}>,
-     * }
-     */
+    /** @return HasilBaca */
     public function read(string $contents): array
     {
         $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents) ?? $contents;
@@ -101,7 +101,7 @@ final class OpeningBalanceImport
     /**
      * @param  list<array{line: int, cells: array<string, string>}>  $baris
      * @param  list<string>  $kolom
-     * @return array{rows: int, receipts: list<array<string, mixed>>, rejected: list<array{line: int, field: ?string, reason: string}>}
+     * @return HasilBaca
      */
     private function susun(array $baris, array $kolom, string $pemisah): array
     {
@@ -295,7 +295,7 @@ final class OpeningBalanceImport
         return preg_match('/^\d+(\.\d+)?$/', $nilai) === 1 ? $nilai : null;
     }
 
-    /** @return array{rows: int, receipts: list<array<string, mixed>>, rejected: list<array{line: int, field: ?string, reason: string}>} */
+    /** @return HasilBaca */
     private static function tolakBerkas(string $alasan): array
     {
         return ['rows' => 0, 'receipts' => [], 'rejected' => [['line' => 1, 'field' => null, 'reason' => $alasan]]];

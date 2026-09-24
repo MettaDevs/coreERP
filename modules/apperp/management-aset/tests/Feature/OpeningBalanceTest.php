@@ -67,7 +67,9 @@ class OpeningBalanceTest extends TestCase
         // Buku aset lahir dengan akumulasinya masing-masing, dan penyusutannya mulai di cutover.
         $this->assertSame(['60000000.00', '60000000.00', 24, '60000000.00', '2026-01-01'], $this->bukuAset($id, $komersial));
         $this->assertSame(['30000000.00', '30000000.00', 24, '90000000.00', '2026-01-01'], $this->bukuAset($id, $fiskal));
-        $this->lihat($id)->assertJsonPath('data.posting.status', 'pending')->assertJsonPath('data.cara_perolehan', 'saldo_awal');
+        $this->lihat($id)->assertJsonPath('data.posting.status', 'pending')->assertJsonPath('data.cara_perolehan', 'saldo_awal')
+            // Angka per buku dipulangkan sebagai daftar, bukan teks JSON: layar memetakannya baris demi baris.
+            ->assertJsonPath('data.details.0.saldo_awal_buku', [['buku_id' => $fiskal, 'akumulasi_per_unit' => '30000000', 'periode_berjalan' => 24]]);
     }
 
     public function test_depreciation_after_cutover_continues_at_period_offset_plus_one(): void
@@ -95,6 +97,13 @@ class OpeningBalanceTest extends TestCase
         // Buku fiskal berlanjut dari angkanya sendiri: 36 juta / (96 − 24) = 500 ribu.
         $fiskalJanuari = $this->usulkan($this->idBukuAset($id, $fiskal), '2026-01-01', '2026-01-31')->assertCreated();
         $this->assertSame(500000.0, (float) $fiskalJanuari->json('data.amount'));
+
+        // Tutup bulan massal memakai offset yang sama: 17,25 juta / (48 − 25) = 750 ribu. Tanpa
+        // offset hitungannya 17,25 juta / 47.
+        $februari = $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson(self::API.'penyusutan/proposal-massal', ['period_starts_on' => '2026-02-01', 'period_ends_on' => '2026-02-28', 'buku_id' => $komersial])
+            ->assertCreated();
+        $this->assertSame([750000.0], array_map(static fn (array $periode): float => (float) $periode['amount'], $februari->json('data.periode')));
     }
 
     public function test_an_acquisition_date_after_cutover_is_refused_when_saved_and_when_completed(): void

@@ -121,6 +121,9 @@ Semuanya di bawah `/api/v1`:
 | `GET /penerimaan-aset/{id}/ringkasan` | Berapa aset yang akan lahir, dan mana yang tak akan disusutkan | `penerimaan-aset.read` |
 | `GET /penerimaan-aset/{id}/pratinjau-posting` | Jurnal perolehan yang akan terbit, masalahnya, dan hal yang menolak penyelesaian | `penerimaan-aset.read` |
 | `GET /penerimaan-aset/vendor?legal_entity_id=` | Vendor aktif entitas legal itu, untuk pemilih vendor | `penerimaan-aset.read` |
+| `GET /penerimaan-aset/buku?group_aset_id=` | Buku yang akan lahir untuk aset group itu, buku yang di-post lebih dulu, untuk isian saldo awal per buku | `penerimaan-aset.read` |
+| `POST /penerimaan-aset/impor-saldo-awal` | Impor saldo awal dari CSV: pratinjau, atau draf saldo awal dengan `apply=1` | `penerimaan-aset.create` |
+| `GET /penerimaan-aset/impor-saldo-awal/templat` | Baris judul templat CSV impor saldo awal | `penerimaan-aset.create` |
 | `PUT /penerimaan-aset/{id}/aset` | Mengisi nomor seri seluruh aset dokumen sekaligus | `aset.update` |
 | `GET /aset/{id}` | Detail aset lengkap dengan nilai atribut dan bukunya | `aset.read` |
 | `PATCH /aset/{id}` | Koreksi data aset | `aset.update` |
@@ -301,6 +304,28 @@ Kepala dokumen membawa **cara perolehan** (`pembelian` bawaan, atau `hibah`), **
 **Yang tidak menolak**: pemetaan akun yang kosong atau nonaktif, dan unit tanpa nomor. Postingnya terbit sebagai `held` dan penerimaannya tetap selesai (K-18); setelah pemetaannya dibenahi, Validasi ulang melepasnya. Penerimaan bernilai nol tidak menerbitkan posting.
 
 `PostingTidakSah` dari Core adalah bug penerbit (K-22): dilaporkan ke pemantauan kesalahan, transaksinya dibatalkan, dan layar menerima 500 `posting_failed` dengan pesan yang dapat dibaca.
+
+## Saldo awal aset lama
+
+Aset yang sudah berjalan di sistem lama masuk lewat penerimaan ber-cara perolehan **saldo awal** (area 10). Tanggal terimanya diisi tanggal perolehan asli, paling lambat cutover entitas legal; vendor, faktur, dan PPN tidak berlaku. Tiap baris membawa **akumulasi per unit** dan **periode berjalan** — jumlah periode yang sudah disusutkan sampai cutover — untuk buku yang di-post ke finance. Angka itu juga bawaan buku lain; buku yang angkanya berbeda, lazimnya buku fiskal, diisi tersendiri di bagian *Saldo awal per buku* (K-28, mengikuti transaksi aset per buku di F&O dan BC).
+
+Menyelesaikannya menerbitkan `asset.opening_balance` (`AST-OPB-<id penerimaan>`) **bertanggal cutover**, dengan tanggal perolehan asli sebagai tanggal dokumennya (K-27): posting bertanggal sebelum cutover akan berstatus `manual` dan tidak pernah sampai ke finance.
+
+| Baris | Akun dari posting group | Nilai |
+| --- | --- | --- |
+| Debit, per group dan unit dimensi | Harga perolehan | Jumlah nilai baris |
+| Kredit, per group dan unit dimensi | Akumulasi penyusutan | Akumulasi buku yang di-post × jumlah |
+| Kredit, per group dan unit dimensi | Penyeimbang saldo awal | Nilai bukunya: nilai − akumulasi |
+
+Setiap buku aset lahir dengan akumulasinya sendiri (`accumulated_depreciation` = `opening_accumulated_depreciation`), nilai buku = perolehan − akumulasi, dan `elapsed_periods_offset` = periode berjalannya. Penyusutan berikutnya tidak dapat diusulkan untuk periode sebelum cutover, dan periode pertama sesudahnya dihitung sebagai periode ke-(offset + 1): garis lurus sisa umur membagi nilai buku sisanya ke sisa masa manfaat.
+
+Selain aturan penerimaan biasa, yang menolak penyelesaian saldo awal: entitas legal yang **belum punya cutover**, dan **tanggal perolehan sesudah cutover** — aset itu dicatat sebagai pembelian atau hibah. Saat disimpan, akumulasi ditambah residu tidak boleh melebihi nilai per unit, dan periode berjalan tidak boleh melebihi masa manfaat buku yang memakainya.
+
+### Impor dari CSV
+
+Untuk memindahkan banyak aset sekaligus, **Impor saldo awal** di daftar penerimaan membaca berkas CSV (kolom `tanggal`, `tanggal_siap_pakai`, `lokasi`, `nama`, `group`, `jenis`, `kondisi`, `jumlah`, `nilai_per_unit`, `residu_per_unit`, `akumulasi_per_unit`, `periode_berjalan`, `keterangan`, ditambah `akumulasi_per_unit:<KODE BUKU>` dan `periode_berjalan:<KODE BUKU>` untuk buku yang berbeda). Master ditulis dengan kodenya. Berkas bertitik koma dibaca seperti Excel berbahasa Indonesia: titik pemisah ribuan, koma pemisah desimal.
+
+Berkas diperiksa lebih dulu. Pratinjaunya menyebut draf yang akan lahir — satu per tanggal perolehan, tanggal siap pakai, dan lokasi — atau baris yang ditolak beserta nomor baris dan alasannya; setiap draf melewati aturan yang sama persis dengan layar. Draf baru dibuat setelah pratinjaunya bersih, semuanya atau tidak sama sekali, dan tetap draf: jurnal saldo awalnya terbit saat tiap draf diselesaikan.
 
 ## Aturan yang dijaga, dan alasannya
 

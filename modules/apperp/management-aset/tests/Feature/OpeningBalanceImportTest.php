@@ -98,6 +98,23 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertSame('2022-01-15', substr((string) DB::table('aset_tr_penerimaan_aset')->value('tanggal'), 0, 10));
     }
 
+    public function test_rows_at_different_locations_become_separate_drafts(): void
+    {
+        $gudang = $this->lokasi('Gudang');
+        $klinik = $this->lokasi('Klinik');
+        $csv = implode("\n", [
+            'tanggal,lokasi,nama,group,jenis,jumlah,nilai_per_unit',
+            "2022-01-15,{$gudang['kode']},Rak,KENDARAAN,{$this->jenisKode},1,1000000",
+            "2022-01-15,{$klinik['kode']},Ranjang,KENDARAAN,{$this->jenisKode},1,2000000",
+            "2022-01-15,{$gudang['kode']},Lemari,KENDARAAN,{$this->jenisKode},1,3000000",
+        ]);
+
+        // Lokasi milik kepala dokumen, jadi baris bertanggal sama di lokasi lain menjadi draf lain.
+        $this->assertSame([[2, 4], [3]], array_column($this->impor($csv)->assertOk()->json('data.receipts'), 'lines'));
+        $this->impor($csv, ['apply' => '1'])->assertCreated();
+        $this->assertSame([$gudang['id'], $klinik['id']], DB::table('aset_tr_penerimaan_aset')->orderBy('kode')->pluck('lokasi_aset_id')->all());
+    }
+
     public function test_rejected_rows_are_reported_by_line_and_nothing_is_created(): void
     {
         $csv = implode("\n", [
@@ -106,6 +123,7 @@ class OpeningBalanceImportTest extends TestCase
             "2026-02-01,Mobil baru,KENDARAAN,{$this->jenisKode},1,100000000,0,0",
             "2022-02-01,Kursi,KENDARAAN,{$this->jenisKode},1,1000000,2000000,10",
             "01-02-2022,Meja,KENDARAAN,{$this->jenisKode},dua,1000000,0,0",
+            "2022-03-01,Lemari,KENDARAAN,{$this->jenisKode},1,1000000,0,0",
         ]);
 
         $hasil = $this->impor($csv, ['apply' => '1'])->assertOk()->json('data');
@@ -117,6 +135,8 @@ class OpeningBalanceImportTest extends TestCase
             [5, 'tanggal', 'Tanggal ditulis 2022-01-15 atau 15/01/2022.'],
             [5, 'jumlah', '"dua" bukan angka.'],
         ], array_map(static fn (array $baris): array => [$baris['line'], $baris['field'], $baris['reason']], $hasil['rejected']));
+        // Baris yang sah tetap diperlihatkan, tetapi tidak dibuat: satu baris salah menahan seluruh berkas.
+        $this->assertSame([[6]], array_column($hasil['receipts'], 'lines'));
         $this->assertSame(0, DB::table('aset_tr_penerimaan_aset')->count());
     }
 
@@ -153,6 +173,18 @@ class OpeningBalanceImportTest extends TestCase
         ]);
 
         return $id;
+    }
+
+    /** @return array{id: string, kode: string} */
+    private function lokasi(string $nama): array
+    {
+        $id = (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.lokasi-aset.create'])
+            ->withHeader('Idempotency-Key', 'lokasi-'.Str::ulid())
+            ->postJson(self::API.'lokasi-aset', ['nama' => $nama])
+            ->assertCreated()
+            ->json('data.id');
+
+        return ['id' => $id, 'kode' => (string) DB::table('aset_m_lokasi_aset')->where('id', $id)->value('kode')];
     }
 
     /**
