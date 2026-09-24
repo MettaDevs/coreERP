@@ -12,6 +12,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,6 +29,7 @@ use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\OpeningBalance;
+use Modules\Apperp\ManagementAset\Services\OpeningBalanceImport;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
@@ -332,6 +334,165 @@ class PenerimaanAsetController extends Controller
     }
 
     /**
+     * Impor saldo awal aset lama dari CSV (TODO 10.6): berkas menjadi draf penerimaan saldo awal, satu
+     * per tanggal perolehan, tanggal siap pakai, dan lokasi. Tanpa `apply` hasilnya pratinjau; dengan
+     * `apply` draf benar-benar dibuat, semuanya atau tidak sama sekali, seperti impor daftar akun Core.
+     *
+     * Setiap draf melewati aturan yang sama persis dengan layar penerimaan — termasuk cutover dan angka
+     * per buku — dan kesalahannya dilaporkan per nomor baris berkas. Draf yang lahir tetap draf:
+     * pratinjau jurnal dan penyelesaiannya dilakukan per dokumen, sama seperti yang diketik di layar.
+     * Percobaan ulang dengan `Idempotency-Key` yang sama memulangkan draf yang sudah dibuat.
+     */
+    public function imporSaldoAwal(Request $request, PenerbitNomorAset $numbers, OpeningBalanceImport $impor): JsonResponse
+    {
+        $this->guard($request, 'create');
+        $form = $request->validate([
+            'file' => ['required', 'file', 'max:2048', 'extensions:csv,txt'],
+            'legal_entity_id' => ['required', 'ulid'],
+            'responsible_org_unit_id' => ['required', 'ulid'],
+            'receiving_org_unit_id' => ['nullable', 'ulid'],
+            'currency_code' => ['sometimes', 'string', 'size:3'],
+            'apply' => ['sometimes', 'boolean'],
+        ]);
+        app(OrganizationScope::class)->require($request, $form['legal_entity_id'], $form['responsible_org_unit_id']);
+        $apply = filter_var($form['apply'] ?? false, FILTER_VALIDATE_BOOL);
+        $awalanKunci = $apply ? substr($this->creationKey($request), 0, self::MAX_CREATION_KEY - 13).':impor:' : null;
+        if ($awalanKunci !== null && ($sudah = $this->drafImpor($awalanKunci)) !== []) {
+            return response()->json(['data' => ['status' => 'applied', 'rows' => null, 'receipts' => $sudah, 'rejected' => []]], 200, ['Idempotent-Replayed' => 'true']);
+        }
+        $file = $request->file('file');
+        abort_if($file === null || is_array($file), 422);
+
+        $berkas = $impor->read((string) $file->get());
+        $ditolak = $berkas['rejected'];
+        $draf = [];
+        foreach ($berkas['receipts'] as $receipt) {
+            try {
+                $data = $this->validated($request, [
+                    'legal_entity_id' => $form['legal_entity_id'],
+                    'responsible_org_unit_id' => $form['responsible_org_unit_id'],
+                    'receiving_org_unit_id' => $form['receiving_org_unit_id'] ?? null,
+                    'tanggal' => $receipt['header']['tanggal'],
+                    'tanggal_siap_pakai' => $receipt['header']['tanggal_siap_pakai'],
+                    'lokasi_aset_id' => $receipt['header']['lokasi_aset_id'],
+                    'currency_code' => $form['currency_code'] ?? 'IDR',
+                    'cara_perolehan' => AcquisitionMethod::OPENING_BALANCE,
+                    'details' => $receipt['details'],
+                ]);
+                $this->validateLookups($request, $data);
+                $draf[] = ['data' => $data, 'receipt' => $receipt];
+            } catch (ValidationException $kegagalan) {
+                foreach ($kegagalan->errors() as $kunci => $pesan) {
+                    // `details.3.nilai_per_unit` menunjuk baris keempat draf itu; kesalahan kepala
+                    // dokumen (misalnya tanggal sesudah cutover) dilaporkan pada baris pertamanya.
+                    $baris = preg_match('/^details\.(\d+)\.(.+)$/', $kunci, $cocok) === 1 ? (int) $cocok[1] : 0;
+                    $ditolak[] = ['line' => $receipt['lines'][$baris] ?? $receipt['lines'][0], 'field' => $cocok[2] ?? $kunci, 'reason' => (string) $pesan[0]];
+                    unset($cocok);
+                }
+            }
+        }
+        usort($ditolak, static fn (array $a, array $b): int => $a['line'] <=> $b['line']);
+        $ringkasan = array_map(fn (array $satu): array => $this->ringkasanImpor($this->tenant($request), $satu['receipt'], $satu['data']), $draf);
+
+        if (! $apply || $ditolak !== [] || $draf === []) {
+            $status = ! $apply ? 'preview' : 'rejected';
+
+            return response()->json(['data' => ['status' => $status, 'rows' => $berkas['rows'], 'receipts' => $ringkasan, 'rejected' => $ditolak]]);
+        }
+
+        // Nomor diterbitkan lebih dulu, di luar transaksi, seperti `store()`; draf-drafnya lalu
+        // disimpan di satu transaksi, sehingga berkas yang gagal di tengah tidak meninggalkan separuh.
+        $tenant = $this->tenant($request);
+        try {
+            foreach ($draf as $urut => $satu) {
+                $draf[$urut]['key'] = $awalanKunci.($urut + 1);
+                $draf[$urut]['kode'] = $numbers->issue('management-aset.'.self::RESOURCE, $tenant, self::RESOURCE.':'.$draf[$urut]['key'], $form['legal_entity_id']);
+            }
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
+        }
+        try {
+            DB::transaction(function () use ($request, $draf): void {
+                foreach ($draf as $satu) {
+                    $record = $this->header($request, $satu['data'], $satu['key'], $satu['kode']);
+                    (new PenerimaanAset)->forceFill($record)->save();
+                    $this->gantiBaris((string) $record['id'], $satu['data']['details']);
+                }
+            });
+        } catch (QueryException $exception) {
+            if ($this->drafImpor((string) $awalanKunci) === []) {
+                throw $exception;
+            }
+        }
+
+        return response()->json(['data' => ['status' => 'applied', 'rows' => $berkas['rows'], 'receipts' => $this->drafImpor((string) $awalanKunci), 'rejected' => []]], 201);
+    }
+
+    /** Baris judul templat impor saldo awal, untuk diisi di spreadsheet (TODO 10.6). */
+    public function templatSaldoAwal(Request $request): HttpResponse
+    {
+        $this->guard($request, 'create');
+
+        return response(implode(',', OpeningBalanceImport::HEADER)."\r\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="templat-saldo-awal-aset.csv"',
+        ]);
+    }
+
+    /**
+     * Draf yang sudah lahir dari satu impor, dikenali dari awalan kunci penciptaannya.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function drafImpor(string $awalanKunci): array
+    {
+        return PenerimaanAset::query()
+            ->where('creation_key', 'like', str_replace(['%', '_'], ['\\%', '\\_'], $awalanKunci).'%')
+            ->orderBy('kode')
+            ->toBase()
+            ->get(['id', 'kode', 'tanggal', 'tanggal_siap_pakai', 'status'])
+            ->map(static fn (stdClass $baris): array => [
+                'id' => (string) $baris->id,
+                'kode' => (string) $baris->kode,
+                'tanggal' => substr((string) $baris->tanggal, 0, 10),
+                'tanggal_siap_pakai' => $baris->tanggal_siap_pakai === null ? null : substr((string) $baris->tanggal_siap_pakai, 0, 10),
+                'status' => (string) $baris->status,
+            ])
+            ->all();
+    }
+
+    /**
+     * Ringkasan satu draf impor untuk pratinjau: baris berkas yang membentuknya, jumlah aset, dan nilai
+     * yang akan tercatat.
+     *
+     * @param  array{header: array{tanggal: string, tanggal_siap_pakai: ?string, lokasi: ?string}, lines: list<int>}  $receipt
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function ringkasanImpor(string $tenant, array $receipt, array $data): array
+    {
+        $nilai = BigDecimal::zero();
+        $akumulasi = BigDecimal::zero();
+        $aset = 0;
+        foreach ($data['details'] as $detail) {
+            $jumlah = (int) $detail['jumlah'];
+            $aset += $jumlah;
+            $nilai = $nilai->plus(app(PresisiMataUang::class)->bulatkan($tenant, (string) BigDecimal::of((string) $detail['nilai_per_unit'])->multipliedBy($jumlah), (string) $data['currency_code']));
+            $akumulasi = $akumulasi->plus(BigDecimal::of((string) $detail['akumulasi_per_unit'])->multipliedBy($jumlah));
+        }
+
+        return [
+            'tanggal' => $receipt['header']['tanggal'],
+            'tanggal_siap_pakai' => $receipt['header']['tanggal_siap_pakai'],
+            'lokasi' => $receipt['header']['lokasi'],
+            'lines' => $receipt['lines'],
+            'jumlah_aset' => $aset,
+            'nilai' => (string) $nilai,
+            'akumulasi' => (string) $akumulasi,
+        ];
+    }
+
+    /**
      * Buku yang akan lahir untuk aset satu group, dengan buku yang di-post ke finance lebih dulu, untuk
      * isian saldo awal per buku (TODO 10.1.1, K-28). Dijaga izin membaca penerimaan, bukan izin group
      * aset: yang mencatat saldo awal tidak harus boleh mengubah master.
@@ -628,13 +789,19 @@ class PenerimaanAsetController extends Controller
         return is_array($nilai) ? array_values($nilai) : [];
     }
 
-    /** @return array<string, mixed> */
-    private function validated(Request $request): array
+    /**
+     * `$input` diisi impor saldo awal: draf yang tersusun dari berkas melewati aturan yang sama persis
+     * dengan layar, dan bukan isi permintaannya sendiri (TODO 10.6).
+     *
+     * @param  array<string, mixed>|null  $input
+     * @return array<string, mixed>
+     */
+    private function validated(Request $request, ?array $input = null): array
     {
         $tenant = $this->tenant($request);
         $milikTenant = fn (string $table) => Rule::exists($table, 'id')->where('tenant_id', $tenant)->whereNull('deleted_at');
 
-        $data = $request->validate([
+        $data = validator($input ?? $request->all(), [
             'legal_entity_id' => ['required', 'ulid'],
             'responsible_org_unit_id' => ['required', 'ulid'],
             'receiving_org_unit_id' => ['nullable', 'ulid'],
@@ -674,7 +841,7 @@ class PenerimaanAsetController extends Controller
             'details.*.atribut.*.nilai' => ['present'],
         ], [
             'cara_perolehan.in' => 'Pilih pembelian, hibah, atau saldo awal.',
-        ]);
+        ])->validate();
 
         // `details` dijadikan list di sini, bukan dipercayai sudah berupa list.
         // `['required', 'array']` meloloskan objek JSON berkunci teks — `{"a": {...}}`
