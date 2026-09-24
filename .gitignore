@@ -11,10 +11,6 @@ storage/*.key
 storage/pail/
 .phpunit.cache/
 .phpunit.result.cache
-# Keluaran alat, bukan sumber. Polanya sengaja tidak berjangkar di akar: 22 berkas
-# sempat ter-commit di dalam `modules/apperp/management-aset/` justru karena pola
-# lamanya `/graphify-out` hanya cocok di akar repo.
-graphify-out/
 __pycache__/
 *.pyc
 .vite-wayfinder.stdout.log

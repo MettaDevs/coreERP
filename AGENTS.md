@@ -28,6 +28,8 @@
 - Saat menambah app atau fitur yang menyimpan/menampilkan data operasional, wajib membuka dan mengikuti **Data policy decision gate** pada `.agents/skills/coreerp-architecture/SKILL.md`. Deklarasikan policy data beserta kontraknya pada manifest hanya bila resource memang perlu dibatasi organisasi.
 - Sebelum membuat app, master, transaksi, workflow, atau integrasi baru, wajib gunakan `.agents/skills/module-discovery/SKILL.md`: cari referensi resmi Dynamics 365, buat proposal keputusan, dan tunggu persetujuan untuk pilihan material. Jika tidak ada padanan Dynamics, nyatakan dengan jelas.
 - SaaS dikelola control plane; on-prem perpetual berdiri sendiri, memakai update bertanda tangan, dan tanpa telemetry wajib.
+- **Client baru hanya lahir dari admin.erp; pendaftaran mandiri hilang di v1.** Keputusan pemilik produk, 24 September 2026. Pintu tamu `POST api/v1/business-registrations` beserta halaman `auth/register` di Core ada hanya untuk memudahkan pengembangan, dan dimatikan saat rilis v1. Jangan membangun fitur baru di atasnya dan jangan memperlakukannya sebagai jalur utama. Jalur utama adalah operator di `apps/control-plane` (`CreateCustomer` → `POST internal/v1/tenants`). Yang **tidak** ikut hilang: action `RegisterBusiness`, karena pintu internal itu juga memakainya.
+- **Production di server kami bawaannya database sendiri, sama seperti demo dan sandbox.** Keputusan pemilik produk, 24 September 2026. Operator admin.erp yang memilih saat membuat client, dan bawaannya database sendiri lewat jalur provisioning yang sama dengan demo. Database bersama (`database_name` kosong, dipisah `tenant_id`) tetap dipertahankan sebagai pilihan paket termurah, jadi jangan dibuang. Tidak ada schema per tenant: pemisahnya database, bukan schema. Selama implementasinya belum selesai, production masih lahir di database bersama; itu gap yang sedang ditutup, bukan desain.
 - Pertahankan perubahan user yang tidak terkait. Verifikasi hanya scope yang berubah dengan script Composer/NPM yang tersedia.
 - **Suite Core dijalankan paralel, dua tahap, persis seperti CI.** Dari `apps/core`:
 
@@ -101,16 +103,3 @@ Aturan module-nya sendiri adalah desain kanonik di
 
 - Setelah mengubah navigasi atau security di `app.yaml`, rebuild UI saja tidak cukup. Jalankan `app:register-manifest <id module>` melalui container `core-app` di `D:\Kerja\erp-dev`, lalu verifikasi kolom `apps.navigation` pada database runtime dan reload shell Core.
 - Saat menghapus duty yang sudah dipakai role, buat migration kecil untuk melepas relasi role-duty terlebih dahulu; baru daftarkan ulang manifest. Ini mencegah menu lama tetap tampil dari katalog Core.
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

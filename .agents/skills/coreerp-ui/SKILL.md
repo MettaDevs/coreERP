@@ -97,8 +97,8 @@ The Shell sends `theme: { appearance: 'light' | 'dark', font: 'poppins' | 'geist
 
   The two must be equal. Never verify a binary artifact by redirecting `git show HEAD:<path>` to a file in PowerShell — its redirection applies text encoding and corrupts the bytes, so the hash you compute matches nothing and points at a problem that does not exist, or hides one that does.
 - The ignored tarball is a development adapter. Release CI must publish the same version to the artifact registry.
-- Generated output is not source. `graphify-out/` and similar directories belong in `.gitignore` at the repository root (`/graphify-out`, anchored so a same-named directory deeper in the tree is not swept up by accident), not in git. Committing them makes every regeneration surface as a thousand-line diff nobody can review, and the bytes stay in history after the files are removed.
+- Generated output is not source. Generated directories belong in `.gitignore` at the repository root (anchored, e.g. `/dist`, so a same-named directory deeper in the tree is not swept up by accident), not in git. Committing them makes every regeneration surface as a thousand-line diff nobody can review, and the bytes stay in history after the files are removed.
 
 ## Checks
 
-Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint. Run `graphify update .` after repository changes.
+Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.
