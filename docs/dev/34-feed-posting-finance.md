@@ -9,7 +9,7 @@ Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, atur
 - Spesifikasi **Integrasi · Finance** di portal `/docs` aplikasi Core, terbuka tanpa login — kontrak dan panduan untuk tim pembaca. Sumbernya `apps/core/contracts/internal/integrasi-finance.yaml`.
 
 ::: info Jenis yang sudah terbit
-Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9). Saldo awal, penyusutan, pembalikan, dan koreksi nilai (area 10 sampai 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
+Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9), dan `asset.opening_balance` untuk penerimaan saldo awal aset lama, bertanggal cutover (area 10). Penyusutan, pembalikan, dan koreksi nilai (area 11 dan 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
 :::
 
 ```text
@@ -507,7 +507,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 ## Celah yang diketahui
 
-- **Baru satu jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dari penerimaan (area 9). Saldo awal, penyusutan, pembalikan, dan koreksi nilai (area 10 sampai 12) belum; jenisnya masih *Belum* di kontrak.
+- **Baru dua jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dan `asset.opening_balance` dari penerimaan (area 9 dan 10). Penyusutan, pembalikan, dan koreksi nilai (area 11 dan 12) belum; jenisnya masih *Belum* di kontrak.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PenerbitPosting::pratinjau()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.

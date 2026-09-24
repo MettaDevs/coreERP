@@ -101,13 +101,16 @@ function tokenCsrf(): string {
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const metode = (init?.method ?? 'GET').toUpperCase();
+    // Unggahan berkas memasang Content-Type multipart beserta batasnya sendiri; menimpanya
+    // dengan JSON membuat server tidak dapat membaca berkasnya.
+    const unggahan = init?.body instanceof FormData;
     // Permintaan memakai sesi Core, bukan token pembawa: tidak ada lagi header
     // `Authorization`, dan cookie sesi ikut karena permintaannya same-origin.
     const response = await fetch(`${AWALAN_API}${path}`, {
         ...init,
         credentials: 'same-origin',
         headers: {
-            'Content-Type': 'application/json',
+            ...(unggahan ? {} : { 'Content-Type': 'application/json' }),
             ...(METODE_AMAN.includes(metode)
                 ? {}
                 : { 'X-XSRF-TOKEN': tokenCsrf() }),

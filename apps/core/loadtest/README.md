@@ -142,6 +142,8 @@ dilanggar, dan angkanya dicatat.
 | `verify.sql` (module) — posting group dan kode diketik | akun tenant lain atau yang tidak ada di kolom akun; bentuk kode group aset dan buku penyusutan | satu baris ber-akun tenant lain disuntik dan satu kode group diubah menjadi `pg salah` → kedua pemeriksaan naik ke 1, exit 3; dipulihkan, exit kembali 0 |
 | Probe penerimaan di dalam k6 | pratinjau jurnal dan penyelesaian penerimaan tenant lain | `SELFTEST=1` pada `receipt-posting.js` → 48 dari 48 probe pratinjau dan 48 dari 48 probe penyelesaian tercatat, exit 99 |
 | `verify.sql` (module) — jurnal perolehan | penerimaan selesai tanpa tepat satu posting, posting tanpa penerimaan selesai, debit posting yang tidak sama dengan register ditambah PPN, jumlah aset yang tidak sama dengan unit barisnya | `posting_id` satu posting digeser → dua pemeriksaan pertama naik ke 1; debit dan kredit satu posting digeser satu sen dan satu baris mengaku satu unit lebih → dua pemeriksaan terakhir naik ke 2 dan 1, exit 3; dipulihkan, exit kembali 0. Debit yang digeser sendirian ditolak `finance_postings_balanced_check` — yang menahannya skema, bukan oracle |
+| Probe penerimaan di dalam k6 (area 10) | pratinjau jurnal dan penyelesaian penerimaan tenant lain, dengan separuh draf arena berupa saldo awal | `SELFTEST=1` pada `receipt-posting.js` → 50 dari 50 probe pratinjau dan 50 dari 50 probe penyelesaian tercatat, exit 99 |
+| `verify.sql` (module) — jurnal saldo awal | akumulasi yang dikreditkan jurnal saldo awal versus akumulasi awal buku yang di-post di register | akumulasi dan akumulasi awal satu buku yang di-post digeser satu sen bersamaan → pemeriksaan itu naik ke 1 sementara pemeriksaan saldo buku tetap 0, exit 3; dipulihkan, exit kembali 0 |
 
 `SELFTEST=1` merusak **permintaan**, bukan produknya: probe lintas tenant diarahkan ke record
 milik sendiri, probe eskalasi memakai sesi yang memang berhak, dan penulis balapan mengirim
@@ -418,6 +420,57 @@ VU yang berlomba. Kebenarannya tidak tersentuh — dokumen tetap draf, dan yang 
 tetapi pengguna menerima galat. Setup skenario ini karena itu membuat draf arena berurutan, dan
 kegagalannya dihitung terpisah lewat `number_sequence_failures`. Perbaikannya pekerjaan tersendiri
 di Number Sequence Core.
+
+### Gate kebenaran saldo awal aset — LULUS (area 10 feed posting finance)
+
+Diukur **24 September 2026** pada mesin yang sama, image `erp-core-app:a10-opening` yang dibangun
+dari branch area 10, `FIXTURE=ob1`, project compose tersendiri (`-p core-loadtest-a10`) dengan volume
+baru. Skenarionya tetap `receipt-posting.js`, kini dengan saldo awal: separuh draf arena balapan dan
+sepertiga penerimaan beban jenuh bercara `saldo_awal`, dan setiap iterasi ketujuh beban jenuh
+mengimpor dua baris saldo awal dari CSV. Setup menyetel cutover `2026-01-01` pada entitas legal
+setiap tenant.
+
+Seperti area 9, tenant uji beban tidak punya hierarki manajemen maupun pemetaan akun, jadi setiap
+jurnal berstatus `held`. Yang digate tidak bergantung pada status itu: tepat satu posting berjenis
+benar per penerimaan selesai (`AST-OPB-` untuk saldo awal), debit yang sama dengan register, akumulasi
+yang dikreditkan jurnal saldo awal sama dengan akumulasi awal buku yang di-post, jumlah aset per unit,
+dan batas tenant.
+
+`RUN_ID=ob-race-1`: 32 VU dipusatkan pada 4 tenant, 90 detik; draf arena bergantian pembelian dan
+saldo awal.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` (probe tenant lain, jenis posting, penerimaan selesai tanpa posting, jumlah aset) | 0 |
+| `server_errors` | 0 |
+| Penyelesaian yang menang / yang kalah (409 atau 422) | 217 / 855, 125 kemenangan di antaranya saldo awal |
+| `number_sequence_failures` | 5 — deadlock penerbitan nomor Core yang sama dengan area 9 |
+| Permintaan gagal | 0 |
+
+`RUN_ID=ob-sat-1`: 1000 VU, 128 tenant, 90 detik.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` (termasuk impor yang tidak melahirkan tepat dua draf) | 0 |
+| `server_errors` | 0 |
+| Penerimaan selesai menurut k6 | 714, 212 di antaranya saldo awal |
+| Impor saldo awal diterapkan menurut k6 / menurut database | 107 / 110 — tiga selesai di server sesudah kliennya menyerah, masing-masing tetap dua draf |
+| `number_sequence_failures` | 0 |
+| Timeout klien (batas 60 detik) | 1.598 — kapasitas, bukan cacat; sebanding dengan 1.667 pada area 9 |
+
+`verify.sql` module pada akhir ketiga run (race, SELFTEST, saturation): 37 pemeriksaan, semuanya 0.
+1.020 penerimaan selesai — 644 pembelian dan 376 saldo awal — membawa 644 posting `asset.acquisition`
+dan 376 posting `asset.opening_balance`, seluruh posting saldo awal bertanggal cutover; 2.040 aset,
+tepat dua per penerimaan. `verify.sql` Core: 51.570 nomor terbit tanpa satu pun ganda; satu-satunya
+yang merah tetap `boundary tenant tidak lengkap` (128 dari 128), oracle yang masih menuntut
+`tenant_deployments` (lihat area 8).
+
+2.050 nomor aset terbit untuk 2.040 aset. Kesepuluh sisanya tercatat atas kunci draf yang belum
+selesai, dan asalnya dilacak lewat log API: delapan dari probe SELFTEST, yang sengaja menyelesaikan
+draf milik sendiri dengan `version` 999 — nomor aset terbit sebelum syarat versi diperiksa di dalam
+transaksi — dan dua dari penerbitan yang gagal di unit kedua (`number_sequence_failed`). Kunci
+penerbitannya deterministik per draf dan unit, jadi penyelesaian yang sah kelak memakai nomor yang
+sama, bukan nomor baru. Perilaku ini sudah ada sejak area 9.
 
 ### Gate latensi work order dan penyusutan (F7-03 sisa)
 

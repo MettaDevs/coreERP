@@ -12,6 +12,10 @@
 # Vendor adalah vendor milik Core (K-06), disimpan sebagai `vendor_id` dan dibaca ulang namanya,
 # bukan disalin sebagai teks bebas. Sejak area 9 feed posting finance, menyelesaikan penerimaan
 # juga menerbitkan jurnal perolehan `asset.acquisition` di transaksi yang sama.
+#
+# Sejak area 10, penerimaan ber-`cara_perolehan` `saldo_awal` mencatat aset lama saat cutover:
+# barisnya membawa akumulasi penyusutan dan periode berjalan per buku, dan penyelesaiannya
+# menerbitkan `asset.opening_balance` bertanggal cutover entitas legalnya.
 /api/v1/penerimaan-aset:
   get:
     tags:
@@ -55,11 +59,21 @@
     operationId: createAsetReceipt
     summary: Membuat draf penerimaan; belum ada aset yang lahir sampai diselesaikan
     description: |
-      Kepala dokumen membawa `cara_perolehan` (`pembelian` atau `hibah`; bawaan `pembelian`,
-      saldo awal belum lewat penerimaan), `vendor_id` (vendor Core milik entitas legal yang
-      sama), `vendor_invoice_reference`, dan `vendor_invoice_date`. Baris membawa
-      `nilai_per_unit` dan `ppn_per_unit`, keduanya boleh memakai presisi harga satuan mata
-      uangnya (IDR bawaan 3 desimal), tidak lebih halus.
+      Kepala dokumen membawa `cara_perolehan` (`pembelian`, `hibah`, atau `saldo_awal`; bawaan
+      `pembelian`), `vendor_id` (vendor Core milik entitas legal yang sama),
+      `vendor_invoice_reference`, dan `vendor_invoice_date`. Baris membawa `nilai_per_unit` dan
+      `ppn_per_unit`, keduanya boleh memakai presisi harga satuan mata uangnya (IDR bawaan 3
+      desimal), tidak lebih halus.
+
+      **Saldo awal** (area 10, K-27, K-28) adalah aset lama saat cutover. `tanggal` berisi tanggal
+      perolehan aslinya dan tidak boleh sesudah cutover entitas legal; vendor, faktur, dan PPN
+      tidak berlaku. Baris membawa `akumulasi_per_unit` (presisi nilai mata uang) dan
+      `periode_berjalan` — jumlah periode yang sudah disusutkan sampai cutover — untuk buku yang
+      di-post ke finance, sekaligus bawaan setiap buku lain. Buku yang angkanya berbeda, lazimnya
+      buku fiskal, ditulis di `saldo_awal_buku: [{buku_id, akumulasi_per_unit, periode_berjalan}]`.
+      Akumulasi ditambah residu tidak boleh melebihi nilai per unit, dan periode berjalan tidak
+      boleh melebihi masa manfaat buku yang memakainya. Dokumen selain saldo awal tidak boleh
+      membawa angka-angka itu.
     parameters:
     - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
     responses:
@@ -79,8 +93,9 @@
           atribut tidak sesuai definisi jenis asetnya. Atribut diperiksa sudah di sini,
           bukan menunggu penyelesaian: draf yang lolos padahal mustahil diselesaikan adalah
           jebakan yang baru terbuka setelah tombol terakhir ditekan. Juga vendor milik entitas
-          legal lain, cara perolehan `saldo_awal`, mata uang yang presisinya belum disetel,
-          dan harga satuan atau PPN per unit yang lebih halus dari presisi harga satuannya.
+          legal lain, mata uang yang presisinya belum disetel, harga satuan atau PPN per unit
+          yang lebih halus dari presisi harga satuannya, dan pelanggaran aturan saldo awal di atas
+          (kuncinya menunjuk baris dan bukunya, misalnya `details.0.saldo_awal_buku.1.buku_id`).
 /api/v1/penerimaan-aset/vendor:
   get:
     tags:
@@ -110,6 +125,87 @@
         $ref: '#/components/responses/Forbidden'
       '422':
         description: '`legal_entity_id` tidak diisi atau bukan ULID.'
+/api/v1/penerimaan-aset/buku:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: listAsetReceiptBooks
+    summary: Buku yang akan lahir untuk aset satu group, untuk isian saldo awal per buku
+    description: |
+      Buku aktif di matriks group x buku, buku yang di-post ke finance lebih dulu, beserta masa
+      manfaat yang akan tersalin ke buku asetnya. Dijaga izin membaca penerimaan, bukan izin
+      group aset: yang mencatat saldo awal tidak harus boleh mengubah master.
+    parameters:
+    - name: group_aset_id
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    responses:
+      '200':
+        description: '`data` berisi `{buku_id, kode, nama, posting_layer, di_post, masa_manfaat}` per buku; `masa_manfaat` `null` bila buku itu tidak menghitung penyusutan.'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        description: '`group_aset_id` kosong, bukan ULID, atau bukan milik tenant ini.'
+/api/v1/penerimaan-aset/impor-saldo-awal:
+  post:
+    tags:
+    - Penerimaan aset
+    operationId: importOpeningBalanceReceipts
+    summary: Impor saldo awal aset lama dari CSV menjadi draf penerimaan saldo awal
+    description: |
+      `multipart/form-data`: `file` (CSV, paling besar 2 MB), `legal_entity_id`,
+      `responsible_org_unit_id`, `receiving_org_unit_id` (opsional), `currency_code` (bawaan
+      `IDR`), dan `apply`. Tanpa `apply` hasilnya pratinjau dan tidak ada yang disimpan; dengan
+      `apply=1` draf benar-benar dibuat, semuanya atau tidak sama sekali, dan `Idempotency-Key`
+      wajib — percobaan ulang dengan kunci yang sama memulangkan draf yang sudah dibuat dengan
+      header `Idempotent-Replayed: true`.
+
+      Kolom berkas: `tanggal`, `tanggal_siap_pakai`, `lokasi`, `nama`, `group`, `jenis`,
+      `kondisi`, `jumlah`, `nilai_per_unit`, `residu_per_unit`, `akumulasi_per_unit`,
+      `periode_berjalan`, `keterangan`, ditambah `akumulasi_per_unit:<KODE BUKU>` dan
+      `periode_berjalan:<KODE BUKU>` untuk buku yang angkanya berbeda. Master ditulis dengan
+      kodenya. Berkas bertitik koma dibaca seperti Excel berbahasa Indonesia (titik ribuan, koma
+      desimal); berkas berkoma memakai titik desimal. Tanggal `2022-01-15` atau `15/01/2022`.
+
+      Baris yang tanggal perolehan, tanggal siap pakai, dan lokasinya sama menjadi satu draf.
+      Setiap draf melewati aturan yang sama persis dengan `POST /penerimaan-aset`, dan
+      kesalahannya dilaporkan per nomor baris berkas. Draf yang lahir tetap draf: jurnal saldo
+      awalnya terbit saat tiap draf diselesaikan.
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    responses:
+      '200':
+        description: |
+          `data: {status, rows, receipts, rejected}`. `status` `preview` untuk pemeriksaan,
+          `rejected` bila `apply` diminta tetapi ada baris yang ditolak (tidak ada yang dibuat),
+          atau `applied` untuk permintaan ulang. `receipts` pada pratinjau berisi `{tanggal,
+          tanggal_siap_pakai, lokasi, lines, jumlah_aset, nilai, akumulasi}`; `rejected` berisi
+          `{line, field, reason}`.
+      '201':
+        description: 'Draf dibuat; `data.status` `applied` dan `receipts` berisi `{id, kode, tanggal, tanggal_siap_pakai, status}`.'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        description: Formulir tidak lengkap, berkas bukan CSV, atau `Idempotency-Key` tidak dikirim saat `apply`.
+      '503':
+        $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/penerimaan-aset/impor-saldo-awal/templat:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: openingBalanceImportTemplate
+    summary: Baris judul templat impor saldo awal
+    responses:
+      '200':
+        description: Berkas CSV berisi baris judul kolom impor saldo awal.
+        content:
+          text/csv:
+            schema:
+              type: string
+      '403':
+        $ref: '#/components/responses/Forbidden'
 /api/v1/penerimaan-aset/{id}:
   get:
     tags:
@@ -124,7 +220,8 @@
       bernilai `null` berarti unit atau keanggotaannya sudah tidak ada di Core.
 
       `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
-      keadaan jurnal perolehannya di feed posting finance sesudah diselesaikan —
+      keadaan jurnalnya di feed posting finance sesudah diselesaikan — jurnal perolehan, atau
+      jurnal saldo awal untuk `cara_perolehan` `saldo_awal` —
       `{posting_id, status, external_reference, reason_code, reason, acknowledged_at, problems}`
       — dan `null` selama masih draf atau bila penerimaannya bernilai nol.
     parameters:
@@ -217,6 +314,13 @@
       (`hibah`). Nilai baris = bulat(harga satuan × jumlah) ke presisi nilai mata uang, dan nilai
       tiap aset adalah pembagian nilai yang sudah bulat itu, jadi register dan jurnal sama persis.
       Pemetaan akun yang kosong tidak menahan penyelesaian: postingnya tertahan di Core.
+
+      **Saldo awal** menerbitkan `asset.opening_balance` (posting id `AST-OPB-<id penerimaan>`)
+      bertanggal cutover entitas legal, dengan tanggal perolehan asli sebagai tanggal dokumen:
+      harga perolehan di debit, akumulasi penyusutan buku yang di-post dan penyeimbang saldo awal
+      sebesar nilai bukunya di kredit, per group dan unit dimensi. Setiap buku aset lahir dengan
+      akumulasinya sendiri dan penyusutannya berlanjut mulai cutover, dari periode ke-(periode
+      berjalan + 1).
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:
@@ -235,7 +339,8 @@
           penyusutan yang dapat dihitung. Juga pembelian tanpa vendor pada entitas bermode
           `direct_payable` (`vendor_id`), dan group yang tidak punya buku yang di-post ke
           finance (`details.<n>.group_aset_id`) — seperti D365, yang menghentikan posting faktur
-          aset tanpa buku ber-lapisan Current.
+          aset tanpa buku ber-lapisan Current. Saldo awal ditolak (`tanggal`) bila entitas
+          legalnya belum punya cutover atau tanggal perolehannya sesudah cutover.
       '500':
         description: |
           Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
@@ -248,13 +353,15 @@
     tags:
     - Penerimaan aset
     operationId: previewAsetReceiptPosting
-    summary: Pratinjau jurnal perolehan sebelum penerimaan diselesaikan
+    summary: Pratinjau jurnal perolehan atau saldo awal sebelum penerimaan diselesaikan
     description: |
       Pemeriksaan yang sama persis dengan penerbitan, tanpa menyimpan apa pun (K-22): `lines`
       (baris jurnal dengan akun, debit, kredit, dan dimensinya), `problems` (masalah pemetaan
       per baris, beserta jalan pintas perbaikannya), `status` yang akan diperoleh posting itu,
-      `currency`, `settlement_mode`, dan `blockers` — `{field, message}` untuk hal yang akan
-      menolak penyelesaian. `status` `null` berarti tidak ada nilai yang akan dijurnal.
+      `posting_date` (tanggal penerimaan, atau cutover untuk saldo awal), `currency`,
+      `settlement_mode`, dan `blockers` — `{field, message}` untuk hal yang akan menolak
+      penyelesaian. `status` `null` berarti tidak ada nilai yang akan dijurnal, atau jurnalnya
+      belum dapat disusun karena saldo awal belum punya cutover.
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:

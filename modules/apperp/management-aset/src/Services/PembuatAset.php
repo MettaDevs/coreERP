@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -290,7 +291,67 @@ class PembuatAset
      */
     public function bukuDiPost(string $groupAsetId): ?string
     {
-        $kode = GroupBukuPenyusutan::query()
+        $buku = $this->bukuDiPostBaris($groupAsetId);
+
+        return $buku === null ? null : (string) $buku->kode;
+    }
+
+    /** Id buku yang sama dengan `bukuDiPost()`: saldo awal dicatat per id buku (TODO 10.5, K-28). */
+    public function bukuDiPostId(string $groupAsetId): ?string
+    {
+        $buku = $this->bukuDiPostBaris($groupAsetId);
+
+        return $buku === null ? null : (string) $buku->id;
+    }
+
+    /**
+     * Buku aktif di matriks group x buku — yang akan lahir untuk setiap aset group itu — dengan buku
+     * yang di-post ke finance lebih dulu, beserta masa manfaat yang akan tersalin ke buku asetnya.
+     * Layar saldo awal menampilkannya per baris, dan validasinya memeriksa angka tiap buku terhadap
+     * masa manfaat itu (TODO 10.1.1, K-28).
+     *
+     * @return list<array{buku_id: string, kode: string, nama: string, posting_layer: string, di_post: bool, masa_manfaat: ?int}>
+     */
+    public function bukuGroup(string $groupAsetId): array
+    {
+        $diPost = $this->bukuDiPostId($groupAsetId);
+        $rows = GroupBukuPenyusutan::query()
+            ->join('aset_m_buku_penyusutan as buku', function ($join): void {
+                $join->on('buku.id', '=', 'aset_m_group_buku_penyusutan.buku_id')->on('buku.tenant_id', '=', 'aset_m_group_buku_penyusutan.tenant_id');
+            })
+            ->leftJoin('aset_m_profil_penyusutan as profil', function ($join): void {
+                $join->on('profil.id', '=', DB::raw('coalesce(aset_m_group_buku_penyusutan.depreciation_profile_id, buku.depreciation_profile_id)'))
+                    ->on('profil.tenant_id', '=', 'aset_m_group_buku_penyusutan.tenant_id');
+            })
+            ->where('aset_m_group_buku_penyusutan.group_aset_id', $groupAsetId)
+            ->whereNull('buku.deleted_at')
+            ->where('buku.aktif', true)
+            ->orderBy('buku.kode')
+            ->toBase()
+            ->get([
+                'buku.id', 'buku.kode', 'buku.nama', 'buku.posting_layer',
+                DB::raw('coalesce(aset_m_group_buku_penyusutan.useful_life_periods, profil.useful_life_periods) as masa_manfaat'),
+            ]);
+
+        $buku = [];
+        foreach ($rows as $row) {
+            $buku[] = [
+                'buku_id' => (string) $row->id,
+                'kode' => (string) $row->kode,
+                'nama' => (string) $row->nama,
+                'posting_layer' => (string) $row->posting_layer,
+                'di_post' => $diPost === (string) $row->id,
+                'masa_manfaat' => $row->masa_manfaat === null ? null : (int) $row->masa_manfaat,
+            ];
+        }
+        usort($buku, static fn (array $a, array $b): int => (int) $b['di_post'] <=> (int) $a['di_post']);
+
+        return $buku;
+    }
+
+    private function bukuDiPostBaris(string $groupAsetId): ?stdClass
+    {
+        return GroupBukuPenyusutan::query()
             ->join('aset_m_buku_penyusutan as buku', function ($join): void {
                 $join->on('buku.id', '=', 'aset_m_group_buku_penyusutan.buku_id')->on('buku.tenant_id', '=', 'aset_m_group_buku_penyusutan.tenant_id');
             })
@@ -301,9 +362,7 @@ class PembuatAset
             ->orderByRaw("case buku.posting_layer when 'current' then 0 else 1 end")
             ->orderBy('buku.kode')
             ->toBase()
-            ->value('buku.kode');
-
-        return $kode === null ? null : (string) $kode;
+            ->first(['buku.id', 'buku.kode']);
     }
 
     /**
@@ -371,6 +430,11 @@ class PembuatAset
         // F&O menghitung penyusutan dari tanggal aset mulai digunakan, bukan tanggal
         // perolehan. Bila belum diisi, tanggal perolehan menjadi cadangannya.
         $placedInService = $data['placed_in_service_on'] ?? $data['acquired_on'];
+        // Saldo awal aset lama (TODO 10.3), `['starts_on' => cutover, 'amounts' =>
+        // OpeningBalance::fromLine()]`: tiap buku membawa akumulasi dan jumlah periode yang sudah
+        // disusutkan sistem lama, dan penyusutannya di sini tidak pernah mulai sebelum cutover —
+        // periode sebelum itu sudah tercakup akumulasinya.
+        $opening = $data['opening_balance'] ?? null;
 
         foreach ($rows as $row) {
             // Buku yang memang tidak menghitung tidak memerlukan profil. F&O pun tidak
@@ -389,6 +453,15 @@ class PembuatAset
             }
             $usefulLife = $row->useful_life_periods ?? $profile?->useful_life_periods;
             $convention = $row->convention ?? $profile?->convention;
+            $mulai = $calculator->startDate(
+                $placedInService,
+                $convention,
+                $this->tahunFiskal($tenantId, (string) $data['legal_entity_id'], $placedInService, $row->depreciation_profile_id, $convention),
+            )->toDateString();
+            $awal = $opening === null ? ['accumulated' => '0', 'elapsed' => 0] : OpeningBalance::pick($opening['amounts'], (string) $row->buku_id);
+            if ($opening !== null && $mulai < $opening['starts_on']) {
+                $mulai = $opening['starts_on'];
+            }
             BukuAset::query()->create([
                 'tenant_id' => $tenantId,
                 'aset_id' => $aset->id,
@@ -398,17 +471,15 @@ class PembuatAset
                 'book_code' => $row->buku_code,
                 'useful_life_periods' => $usefulLife,
                 'convention' => $convention,
-                'depreciation_start_on' => $calculator->startDate(
-                    $placedInService,
-                    $convention,
-                    $this->tahunFiskal($tenantId, (string) $data['legal_entity_id'], $placedInService, $row->depreciation_profile_id, $convention),
-                )->toDateString(),
+                'depreciation_start_on' => $mulai,
                 'depreciate' => $depreciates,
                 'round_off_depreciation' => $row->round_off_depreciation ?? 0,
                 'acquisition_value' => $data['acquisition_value'],
                 'residual_value' => $data['residual_value'] ?? 0,
-                'accumulated_depreciation' => 0,
-                'net_book_value' => $data['acquisition_value'],
+                'accumulated_depreciation' => $awal['accumulated'],
+                'opening_accumulated_depreciation' => $awal['accumulated'],
+                'elapsed_periods_offset' => $awal['elapsed'],
+                'net_book_value' => (string) BigDecimal::of((string) $data['acquisition_value'])->minus($awal['accumulated']),
                 'status' => 'active',
             ]);
         }

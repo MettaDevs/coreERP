@@ -1,23 +1,26 @@
-// Load test penerimaan aset dan jurnal perolehannya (feed posting finance, area 9), pada runtime
-// Core yang sungguhan.
+// Load test penerimaan aset dan jurnalnya (feed posting finance, area 9 dan 10), pada runtime Core
+// yang sungguhan.
 //
-// Menyelesaikan penerimaan kini melakukan tiga hal di satu transaksi: memindahkan status dokumen,
-// melahirkan aset bernomor, dan menerbitkan posting `asset.acquisition` ke feed Core. Yang dijaga
-// berkas ini:
+// Menyelesaikan penerimaan melakukan tiga hal di satu transaksi: memindahkan status dokumen,
+// melahirkan aset bernomor, dan menerbitkan posting ke feed Core — `asset.acquisition` untuk
+// pembelian, `asset.opening_balance` untuk saldo awal aset lama. Yang dijaga berkas ini:
 //
 //   PROFILE=race        Yang paling penting. Seluruh VU satu arena menyelesaikan draf yang SAMA
 //                       pada detik yang sama. Tepat satu yang boleh menang; yang lain ditolak
 //                       (409 versi usang atau 422 sudah selesai), dan dokumen itu berakhir dengan
 //                       tepat satu set aset dan tepat satu posting. Penyelesaian kedua yang lolos
-//                       berarti aset kembar dan hutang dua kali di aplikasi finance.
+//                       berarti aset kembar dan hutang — atau saldo awal — dua kali di aplikasi
+//                       finance. Separuh draf arena adalah saldo awal.
 //
-//   PROFILE=saturation  Beban serentak membuat dan menyelesaikan penerimaan di banyak tenant.
-//                       Yang digate: KEBENARAN — tidak ada 5xx aplikasi, setiap penerimaan selesai
-//                       membawa postingnya, dan tidak ada dokumen tenant lain yang terbaca atau
-//                       terselesaikan.
+//   PROFILE=saturation  Beban serentak membuat dan menyelesaikan penerimaan di banyak tenant, satu
+//                       dari tiga di antaranya saldo awal, sambil sesekali mengimpor saldo awal
+//                       dari CSV. Yang digate: KEBENARAN — tidak ada 5xx aplikasi, setiap penerimaan
+//                       selesai membawa posting berjenis yang benar, dan tidak ada dokumen tenant
+//                       lain yang terbaca atau terselesaikan.
 //
-// Oracle SQL-nya di `verify.sql`: satu posting per penerimaan selesai, jumlah debit posting sama
-// dengan nilai register ditambah PPN, dan jumlah aset sama dengan jumlah unit barisnya.
+// Oracle SQL-nya di `verify.sql`: satu posting per penerimaan selesai, debit posting sama dengan
+// nilai register ditambah PPN, akumulasi jurnal saldo awal sama dengan akumulasi awal register,
+// dan jumlah aset sama dengan jumlah unit barisnya.
 
 import { check, fail } from 'k6';
 import exec from 'k6/execution';
@@ -55,8 +58,10 @@ const timeouts = new Counter('client_timeouts');
 const raceWins = new Counter('race_wins');
 const raceLosses = new Counter('race_losses');
 const receiptsCompleted = new Counter('receipts_completed');
+const openingBalancesCompleted = new Counter('opening_balances_completed');
+const importsApplied = new Counter('imports_applied');
 // Penerbitan nomor Core yang gagal (deadlock 40P01 pada blok nomor), yang modul jawab 422. Bukan
-// cacat area 9 dan bukan gate di sini; dihitung supaya tidak tenggelam di antara 422 yang sah.
+// cacat area 9 atau 10 dan bukan gate di sini; dihitung supaya tidak tenggelam di antara 422 yang sah.
 const numberSequenceFailures = new Counter('number_sequence_failures');
 
 const correctnessThresholds = {
@@ -73,18 +78,23 @@ const umum = {
     batchPerHost: 16,
 };
 
-// Run yang tidak menyelesaikan satu dokumen pun — atau balapan tanpa pihak yang kalah — lulus semua
-// gate kebenaran tanpa menguji apa-apa, jadi keduanya ikut digate.
+// Run yang tidak menyelesaikan satu dokumen pun — atau balapan tanpa pihak yang kalah, atau tanpa
+// satu pun saldo awal — lulus semua gate kebenaran tanpa menguji apa-apa, jadi semuanya ikut digate.
 export const options =
     PROFILE === 'saturation'
         ? {
               ...umum,
-              thresholds: { ...correctnessThresholds, receipts_completed: ['count>0'] },
+              thresholds: {
+                  ...correctnessThresholds,
+                  receipts_completed: ['count>0'],
+                  opening_balances_completed: ['count>0'],
+                  imports_applied: ['count>0'],
+              },
               scenarios: { saturation: { executor: 'constant-vus', vus: VUS, duration: DURATION, gracefulStop: '60s' } },
           }
         : {
               ...umum,
-              thresholds: { ...correctnessThresholds, race_wins: ['count>0'], race_losses: ['count>0'] },
+              thresholds: { ...correctnessThresholds, race_wins: ['count>0'], race_losses: ['count>0'], opening_balances_completed: ['count>0'] },
               scenarios: { race: { executor: 'constant-vus', vus: VUS, duration: DURATION, gracefulStop: '30s' } },
           };
 
@@ -119,7 +129,32 @@ function wajibBatch(label, requests, statusSah) {
 
 // ---------------------------------------------------------------- setup
 
-function badanDraf(tenant) {
+/**
+ * Draf pembelian, atau draf saldo awal: aset lama bertanggal sebelum cutover (1 Januari 2026) tanpa
+ * vendor dan PPN, dengan akumulasi dan periode berjalan buku yang di-post (area 10).
+ */
+function badanDraf(tenant, saldoAwal = false) {
+    const baris = {
+        nama: saldoAwal ? 'Kursi tunggu lama uji beban' : 'Kursi tunggu uji beban',
+        group_aset_id: tenant.groupId,
+        jenis_aset_id: tenant.jenisId,
+        jumlah: UNITS,
+        // Harga satuan bertiga desimal: nilai barisnya dibulatkan sekali dan dibagi ke aset.
+        nilai_per_unit: '333333.333',
+        ppn_per_unit: saldoAwal ? '0' : '36666.667',
+    };
+
+    if (saldoAwal) {
+        return {
+            legal_entity_id: tenant.legalEntityId,
+            responsible_org_unit_id: tenant.orgUnitId,
+            cara_perolehan: 'saldo_awal',
+            tanggal: '2025-06-01',
+            currency_code: 'IDR',
+            details: [{ ...baris, akumulasi_per_unit: '100000.00', periode_berjalan: 12 }],
+        };
+    }
+
     return {
         legal_entity_id: tenant.legalEntityId,
         responsible_org_unit_id: tenant.orgUnitId,
@@ -127,20 +162,12 @@ function badanDraf(tenant) {
         currency_code: 'IDR',
         vendor_id: tenant.vendorId,
         vendor_invoice_reference: `INV-${RUN_ID}`,
-        details: [{
-            nama: 'Kursi tunggu uji beban',
-            group_aset_id: tenant.groupId,
-            jenis_aset_id: tenant.jenisId,
-            jumlah: UNITS,
-            // Harga satuan bertiga desimal: nilai barisnya dibulatkan sekali dan dibagi ke aset.
-            nilai_per_unit: '333333.333',
-            ppn_per_unit: '36666.667',
-        }],
+        details: [baris],
     };
 }
 
-function buatDraf(tenant, kunci) {
-    return http.post(ASET('penerimaan-aset'), JSON.stringify(badanDraf(tenant)), paramsUntuk(tenant, { tags: { op: 'create', resource: 'penerimaan-aset' } }, { 'Idempotency-Key': kunci }));
+function buatDraf(tenant, kunci, saldoAwal) {
+    return http.post(ASET('penerimaan-aset'), JSON.stringify(badanDraf(tenant, saldoAwal)), paramsUntuk(tenant, { tags: { op: 'create', resource: 'penerimaan-aset' } }, { 'Idempotency-Key': kunci }));
 }
 
 export function setup() {
@@ -154,8 +181,8 @@ export function setup() {
         [201],
     );
 
-    // 2. Pengiriman posting diaktifkan, supaya penerbit menilai pemetaan sungguhan dan tidak
-    //    berhenti di "feed mati".
+    // 2. Pengiriman posting diaktifkan dengan cutover, supaya penerbit menilai pemetaan sungguhan dan
+    //    saldo awal punya tanggal jurnal.
     wajibBatch(
         'setelan feed',
         jars.map((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01' }), paramsUntuk(tenant)]),
@@ -187,7 +214,8 @@ export function setup() {
         ]),
         [200, 201],
     );
-    // Matriks menuntut profil utama walau penyusutannya dimatikan; penerimaan tidak memakainya.
+    // Matriks menuntut profil utama walau penyusutannya dimatikan; masa manfaatnya (48 periode)
+    // juga batas periode berjalan saldo awal.
     const profil = wajibBatch(
         'profil penyusutan',
         jars.map((tenant, index) => [
@@ -213,7 +241,9 @@ export function setup() {
         ...tenant,
         vendorId: String(vendors[index].json('data.id')),
         groupId: String(groups[index].json('data.id')),
+        groupKode: String(groups[index].json('data.kode')),
         jenisId: String(jenis[index].json('data.id')),
+        jenisKode: String(jenis[index].json('data.kode')),
     }));
 
     // 4. Satu draf per tenant untuk probe lintas tenant.
@@ -244,10 +274,10 @@ export function setup() {
     });
     console.log(`setup: jurnal draf probe ${pratinjau[0].json('data.status')}, masalah ${JSON.stringify((pratinjau[0].json('data.problems') || []).map((masalah) => masalah.code))}`);
 
-    // 5. Profil race: draf yang akan diperebutkan, satu per detik run per arena. Dibuat berurutan:
-    //    pembuatan serentak dalam satu tenant menabrak deadlock penerbitan nomor Core
-    //    (`number_sequence_allocations`, 40P01) yang dijawab 422 — cacat Core yang sudah ada
-    //    sebelum area 9 dan diukur terpisah lewat `number_sequence_failures` pada saturasi.
+    // 5. Profil race: draf yang akan diperebutkan, satu per detik run per arena, bergantian pembelian
+    //    dan saldo awal. Dibuat berurutan: pembuatan serentak dalam satu tenant menabrak deadlock
+    //    penerbitan nomor Core (`number_sequence_allocations`, 40P01) yang dijawab 422 — cacat Core
+    //    yang sudah ada sebelum area 9 dan diukur terpisah lewat `number_sequence_failures`.
     const arenas = [];
 
     if (PROFILE === 'race') {
@@ -256,13 +286,14 @@ export function setup() {
             const drafts = [];
 
             for (let urut = 0; urut < RACE_DRAFTS; urut++) {
-                const draf = http.post(ASET('penerimaan-aset'), JSON.stringify(badanDraf(tenant)), paramsUntuk(jar, {}, { 'Idempotency-Key': `rcp-race-${RUN_ID}-${tenant.index}-${urut}` }));
+                const saldoAwal = urut % 2 === 1;
+                const draf = http.post(ASET('penerimaan-aset'), JSON.stringify(badanDraf(tenant, saldoAwal)), paramsUntuk(jar, {}, { 'Idempotency-Key': `rcp-race-${RUN_ID}-${tenant.index}-${urut}` }));
 
                 if (draf.status !== 200 && draf.status !== 201) {
                     fail(`setup draf arena ${tenant.index} nomor ${urut}: ${draf.status} ${String(draf.body).slice(0, 400)}`);
                 }
 
-                drafts.push(String(draf.json('data.id')));
+                drafts.push({ id: String(draf.json('data.id')), saldoAwal });
             }
 
             arenas.push({ tenantIndex: tenant.index, drafts });
@@ -287,8 +318,8 @@ function selesaikan(tenant, id, op) {
     );
 }
 
-/** Dokumen selesai wajib membawa postingnya, dan tepat `UNITS` aset. */
-function periksaSelesai(tenant, id) {
+/** Dokumen selesai wajib membawa posting berjenis yang benar, dan tepat `UNITS` aset. */
+function periksaSelesai(tenant, id, saldoAwal) {
     const dokumen = record(http.get(`${ASET('penerimaan-aset')}/${id}`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'penerimaan-aset' } })), readLatency, 'read');
 
     if (dokumen.status !== 200) {
@@ -304,6 +335,15 @@ function periksaSelesai(tenant, id) {
     if (!['pending', 'held', 'manual'].includes(status)) {
         violations.add(1, { kind: 'completed_without_posting' });
         console.error(`correctness violation: completed_without_posting ${id} (${status})`);
+    }
+
+    // Saldo awal terbit sebagai `asset.opening_balance` (`AST-OPB-`), pembelian sebagai
+    // `asset.acquisition` (`AST-ACQ-`); jenis yang tertukar berarti jurnal yang salah di buku besar.
+    const awalan = saldoAwal ? 'AST-OPB-' : 'AST-ACQ-';
+
+    if (!String(dokumen.json('data.posting.posting_id')).startsWith(awalan)) {
+        violations.add(1, { kind: 'posting_type_mismatch' });
+        console.error(`correctness violation: posting_type_mismatch ${id} (${dokumen.json('data.posting.posting_id')})`);
     }
 
     const aset = record(http.get(`${ASET('penerimaan-aset')}/${id}/aset`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'penerimaan-aset' } })), readLatency, 'read');
@@ -347,22 +387,65 @@ function probe(tenant, data) {
     }
 }
 
+/**
+ * Impor saldo awal dua baris bertanggal berbeda lewat CSV (TODO 10.6): dua draf wajib lahir, dengan
+ * nama dan kunci yang unik per iterasi supaya run tidak memakai ulang hasil iterasi lain.
+ */
+function imporSaldoAwal(tenant) {
+    const kunci = `rcp-imp-${RUN_ID}-${exec.vu.idInTest}-${exec.vu.iterationInInstance}`;
+    const csv = [
+        'tanggal,nama,group,jenis,jumlah,nilai_per_unit,akumulasi_per_unit,periode_berjalan',
+        `2024-03-01,Lemari arsip ${kunci},${tenant.groupKode},${tenant.jenisKode},1,2500000,500000,20`,
+        `15/07/2023,Meja kerja ${kunci},${tenant.groupKode},${tenant.jenisKode},2,1500000,375000,12`,
+    ].join('\n');
+    const jawab = record(
+        http.post(
+            `${ASET('penerimaan-aset')}/impor-saldo-awal`,
+            { file: http.file(csv, 'saldo-awal.csv', 'text/csv'), legal_entity_id: tenant.legalEntityId, responsible_org_unit_id: tenant.orgUnitId, apply: '1' },
+            {
+                jar: tenant.jar,
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': tenant.csrf, 'Idempotency-Key': kunci },
+                tags: { op: 'import', resource: 'penerimaan-aset' },
+                responseCallback: http.expectedStatuses(200, 201, 422),
+            },
+        ),
+        writeLatency,
+        'import',
+    );
+    check(jawab, { 'impor saldo awal diterapkan': (response) => response.status === 201 });
+
+    if (jawab.status !== 201) {
+        return;
+    }
+
+    importsApplied.add(1);
+
+    if ((jawab.json('data.receipts') || []).length !== 2) {
+        violations.add(1, { kind: 'import_receipt_count' });
+        console.error(`correctness violation: import_receipt_count ${String(jawab.body).slice(0, 300)}`);
+    }
+}
+
 function race(data) {
     const arena = data.arenas[exec.vu.idInTest % data.arenas.length];
     const tenant = tenantVu(data.tenants, arena.tenantIndex);
-    const id = arena.drafts[Math.floor(Date.now() / 1000) % arena.drafts.length];
+    const draf = arena.drafts[Math.floor(Date.now() / 1000) % arena.drafts.length];
 
-    const jawab = selesaikan(tenant, id, 'complete_race');
+    const jawab = selesaikan(tenant, draf.id, 'complete_race');
     check(jawab, { 'selesaikan dijawab 200, 409, atau 422': (response) => [200, 409, 422].includes(response.status) });
 
     if (jawab.status === 200) {
         raceWins.add(1);
         receiptsCompleted.add(1);
+
+        if (draf.saldoAwal) {
+            openingBalancesCompleted.add(1);
+        }
     } else if (jawab.status === 409 || jawab.status === 422) {
         raceLosses.add(1);
     }
 
-    periksaSelesai(tenant, id);
+    periksaSelesai(tenant, draf.id, draf.saldoAwal);
 
     if (exec.vu.iterationInInstance % 5 === 0) {
         probe(tenant, data);
@@ -372,21 +455,29 @@ function race(data) {
 function saturation(data) {
     const tenant = tenantVu(data.tenants, exec.vu.idInTest);
     const kunci = `rcp-sat-${RUN_ID}-${exec.vu.idInTest}-${exec.vu.iterationInInstance}`;
+    const saldoAwal = exec.vu.iterationInInstance % 3 === 2;
 
-    const draf = record(buatDraf(tenant, kunci), writeLatency, 'create');
+    const draf = record(buatDraf(tenant, kunci, saldoAwal), writeLatency, 'create');
     check(draf, { 'draf dibuat': (response) => response.status === 200 || response.status === 201 });
 
-    if (draf.status !== 200 && draf.status !== 201) {
-        return;
+    if (draf.status === 200 || draf.status === 201) {
+        const id = String(draf.json('data.id'));
+        const jawab = selesaikan(tenant, id, 'complete');
+        check(jawab, { 'penerimaan diselesaikan': (response) => response.status === 200 });
+
+        if (jawab.status === 200) {
+            receiptsCompleted.add(1);
+
+            if (saldoAwal) {
+                openingBalancesCompleted.add(1);
+            }
+
+            periksaSelesai(tenant, id, saldoAwal);
+        }
     }
 
-    const id = String(draf.json('data.id'));
-    const jawab = selesaikan(tenant, id, 'complete');
-    check(jawab, { 'penerimaan diselesaikan': (response) => response.status === 200 });
-
-    if (jawab.status === 200) {
-        receiptsCompleted.add(1);
-        periksaSelesai(tenant, id);
+    if (exec.vu.iterationInInstance % 7 === 3) {
+        imporSaldoAwal(tenant);
     }
 
     probe(tenant, data);
@@ -425,6 +516,8 @@ export function handleSummary(data) {
             correctness_violations: count('correctness_violations'),
             server_errors: count('server_errors'),
             receipts_completed: count('receipts_completed'),
+            opening_balances_completed: count('opening_balances_completed'),
+            imports_applied: count('imports_applied'),
         },
         balapan: {
             race_wins: count('race_wins'),

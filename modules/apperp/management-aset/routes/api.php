@@ -124,7 +124,12 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     Route::get('penerimaan-aset', [PenerimaanAsetController::class, 'index']);
     // Pemilih vendor milik Core untuk penerimaan (TODO 9.3.1); didahulukan dari `{id}`.
     Route::get('penerimaan-aset/vendor', [PenerimaanAsetController::class, 'vendor']);
+    // Buku per group untuk isian saldo awal per buku (TODO 10.1.1); didahulukan dari `{id}`.
+    Route::get('penerimaan-aset/buku', [PenerimaanAsetController::class, 'buku']);
     Route::post('penerimaan-aset', [PenerimaanAsetController::class, 'store']);
+    // Impor saldo awal aset lama dari CSV (TODO 10.6); didahulukan dari `{id}`.
+    Route::post('penerimaan-aset/impor-saldo-awal', [PenerimaanAsetController::class, 'imporSaldoAwal']);
+    Route::get('penerimaan-aset/impor-saldo-awal/templat', [PenerimaanAsetController::class, 'templatSaldoAwal']);
     Route::post('penerimaan-aset/{id}/selesaikan', [PenerimaanAsetController::class, 'selesaikan']);
     Route::get('penerimaan-aset/{id}/ringkasan', [PenerimaanAsetController::class, 'ringkasan']);
     // Pratinjau jurnal perolehan sebelum diselesaikan (TODO 9.3.2).

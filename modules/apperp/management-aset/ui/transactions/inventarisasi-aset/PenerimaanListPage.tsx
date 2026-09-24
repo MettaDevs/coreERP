@@ -18,7 +18,8 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { api, errorMessage } from '../../api';
 import { bukaDaftar } from './aset';
-import type { Penerimaan } from './penerimaan';
+import { ImporSaldoAwal } from './ImporSaldoAwal';
+import type { Context, Penerimaan } from './penerimaan';
 import {
     STATUS,
     StatusBadge,
@@ -44,8 +45,10 @@ const PILIHAN_STATUS = [
  * dicocokkan dengan surat jalan.
  */
 export default function PenerimaanListPage({
+    context,
     permissions,
 }: {
+    context: Context;
     permissions: string[];
 }) {
     const can = izin(permissions);
@@ -53,6 +56,9 @@ export default function PenerimaanListPage({
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
     const [memuat, setMemuat] = useState(true);
+    const [impor, setImpor] = useState(false);
+    // Dinaikkan sesudah impor supaya daftar dibaca ulang dengan draf yang baru lahir.
+    const [putaran, setPutaran] = useState(0);
 
     useEffect(() => {
         let dibatalkan = false;
@@ -80,7 +86,7 @@ export default function PenerimaanListPage({
         return () => {
             dibatalkan = true;
         };
-    }, [status]);
+    }, [status, putaran]);
 
     const query = search.trim().toLowerCase();
     const terlihat =
@@ -188,6 +194,15 @@ export default function PenerimaanListPage({
                         Catat penerimaan
                     </ActionButton>
                 )}
+                {can('create') && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setImpor(true)}
+                    >
+                        Impor saldo awal
+                    </Button>
+                )}
                 <Button type="button" variant="outline" onClick={bukaDaftar}>
                     Register aset
                 </Button>
@@ -223,6 +238,14 @@ export default function PenerimaanListPage({
                     />
                 </div>
             </div>
+
+            {impor && (
+                <ImporSaldoAwal
+                    context={context}
+                    onClose={() => setImpor(false)}
+                    onApplied={() => setPutaran((nilai) => nilai + 1)}
+                />
+            )}
 
             <div className="min-h-0 flex-1 overflow-auto">
                 {!memuat && !terlihat.length ? (

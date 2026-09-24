@@ -164,7 +164,7 @@ info:
     | --- | --- | --- |
     | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
     | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
-    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
+    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
     | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
     | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
 
@@ -177,6 +177,14 @@ info:
     Usaha pada `direct_payable`, akun perantara pada `clearing`, atau akun lawan hibah untuk aset
     hibah (tanpa `vendor`). Pada `direct_payable`, posting inilah hutangnya: buat faktur hutang
     dari posting ini tanpa jurnal kedua.
+
+    `asset.opening_balance` berisi saldo awal aset lama saat mulai memakai feed, satu posting per
+    dokumen saldo awal, dengan `posting_id` `AST-OPB-<id dokumen>`. `posting_date`-nya selalu
+    tanggal cutover entitas legal, dan `document_date` tanggal perolehan asli aset. Barisnya per
+    group aset dan unit organisasi: debit harga perolehan, kredit akumulasi penyusutan sampai
+    cutover, dan kredit akun penyeimbang saldo awal sebesar nilai bukunya. Tidak ada `vendor`
+    maupun PPN. Rincian per aset di `details.assets` membawa `acquisition_value`,
+    `accumulated_depreciation`, dan `net_book_value`.
 
     Menyaring di `GET /finance-postings`:
 
@@ -413,6 +421,90 @@ paths:
                           book: KOMERSIAL
                           acquisition_value: '500000000.00'
                           tax_amount: '55000000.00'
+                    meta:
+                      count: 1
+                      has_more: false
+                saldo_awal:
+                  summary: Saldo awal satu ambulans lama, bertanggal cutover
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-OPB-01J9Z4R8L3N5P7Q9S1T3V5W7Y9
+                      posting_type: asset.opening_balance
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-01-01'
+                      document_date: '2022-01-15'
+                      occurred_at: '2026-01-05T09:10:00+07:00'
+                      published_at: '2026-01-05T02:10:02+00:00'
+                      source_document:
+                        module: management-aset
+                        type: penerimaan-aset
+                        number: PNA-2026-01-0003
+                        description: Saldo awal aset PNA-2026-01-0003
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1459'
+                          code: 1-2390
+                          name: Akumulasi Penyusutan - Kendaraan
+                        debit: '0.00'
+                        credit: '200000000.00'
+                        description: Akumulasi penyusutan · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '3900'
+                          code: 3-9000
+                          name: Penyeimbang Saldo Awal
+                        debit: '0.00'
+                        credit: '300000000.00'
+                        description: Saldo awal · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '500000000.00'
+                        credit: '500000000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0003
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          acquisition_value: '500000000.00'
+                          accumulated_depreciation: '200000000.00'
+                          net_book_value: '300000000.00'
                     meta:
                       count: 1
                       has_more: false
@@ -1144,7 +1236,7 @@ components:
         | --- | --- | --- |
         | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
         | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
-        | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
+        | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
         | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
         | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
 

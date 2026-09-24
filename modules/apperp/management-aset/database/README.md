@@ -96,11 +96,18 @@ kontrak `DaftarAkun`.
 skema ini (aturan N-1), lalu dibuang.
 
 `tr_penerimaan_aset.vendor_id` menunjuk vendor milik Core (K-06), juga tanpa foreign key; keberadaan
-dan entitas legalnya diperiksa lewat kontrak `DaftarVendor`. `cara_perolehan` bernilai `pembelian`
-atau `hibah` (`saldo_awal` menyusul bersama area 10). `tr_penerimaan_aset_details.nilai_per_unit` dan
+dan entitas legalnya diperiksa lewat kontrak `DaftarVendor`. `cara_perolehan` bernilai `pembelian`,
+`hibah`, atau `saldo_awal`. `tr_penerimaan_aset_details.nilai_per_unit` dan
 `ppn_per_unit` berpresisi `decimal(24,6)` supaya harga satuan dapat memakai presisi harga satuan mata
 uangnya (K-20); nilai aset di register tetap `decimal(18,2)`, hasil pembagian nilai baris yang sudah
 dibulatkan.
+
+Saldo awal (area 10): `tr_penerimaan_aset_details.akumulasi_per_unit` dan `periode_berjalan` adalah
+angka buku yang di-post, sekaligus bawaan buku lain; `saldo_awal_buku` (JSON) mencatat buku yang
+angkanya berbeda, `[{buku_id, akumulasi_per_unit, periode_berjalan}]`. `tr_buku_aset` menyimpan
+`opening_accumulated_depreciation` terpisah dari `accumulated_depreciation`, sehingga akumulasi =
+saldo awal + periode final tetap dapat diperiksa, dan `elapsed_periods_offset` yang ditambahkan ke
+hitungan periode berjalan saat penyusutan diusulkan.
 
 `m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 

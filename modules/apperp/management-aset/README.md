@@ -260,6 +260,17 @@ posting faktur aset tanpa buku ber-lapisan Current. Pemetaan akun yang kosong ti
 postingnya tertahan di Core dan dilepas lewat Validasi ulang setelah posting group diisi.
 Rinciannya di `docs/apps/management-aset/transaction/register-aset/`.
 
+### Saldo awal aset lama
+
+Penerimaan ber-cara perolehan `saldo_awal` mencatat aset yang sudah berjalan di sistem lama (area
+10). Barisnya membawa akumulasi per unit dan periode berjalan buku yang di-post, sekaligus bawaan
+buku lain; buku yang berbeda, lazimnya fiskal, diisi tersendiri (`Services/OpeningBalance`).
+Menyelesaikannya menerbitkan `asset.opening_balance` bertanggal cutover entitas legal — debit harga
+perolehan, kredit akumulasi dan penyeimbang saldo awal — dan buku asetnya lahir dengan akumulasi dan
+offset periode, sehingga penyusutan berikutnya berlanjut dari periode ke-(offset + 1). Banyak aset
+sekaligus dapat diimpor dari CSV (`Services/OpeningBalanceImport`), yang melahirkan draf saldo awal
+setelah pratinjaunya bersih.
+
 ### Hak akses
 
 Setiap master memiliki empat permission dan satu duty tersendiri, sehingga satu master dapat dikelola tanpa ikut memberi hak pada master sebelahnya:

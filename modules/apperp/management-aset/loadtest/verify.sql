@@ -249,15 +249,15 @@ work_order_transisi_tidak_sah as (
     )
 ),
 saldo_buku_tidak_cocok_periode as (
-    -- Akumulasi penyusutan pada buku aset wajib sama dengan jumlah nilai seluruh periode final
-    -- miliknya, termasuk periode pembalik yang nilainya negatif. Penambahannya dikerjakan
-    -- `incrementEach` di dalam `finalize()`, di luar kunci buku; kalau satu periode pernah
-    -- ditambahkan dua kali — misalnya karena kunci barisnya tidak menahan dua finalisasi
-    -- serentak — baris periodenya tetap satu dan tetap sah, dan hanya perbandingan ini yang
-    -- memperlihatkannya.
+    -- Akumulasi penyusutan pada buku aset wajib sama dengan akumulasi saldo awalnya (area 10; nol
+    -- untuk aset yang lahir di sini) ditambah jumlah nilai seluruh periode final miliknya, termasuk
+    -- periode pembalik yang nilainya negatif. Penambahannya dikerjakan `incrementEach` di dalam
+    -- `finalize()`, di luar kunci buku; kalau satu periode pernah ditambahkan dua kali — misalnya
+    -- karena kunci barisnya tidak menahan dua finalisasi serentak — baris periodenya tetap satu
+    -- dan tetap sah, dan hanya perbandingan ini yang memperlihatkannya.
     select count(*) as n
     from aset_tr_buku_aset b
-    where b.accumulated_depreciation <> coalesce((
+    where b.accumulated_depreciation <> b.opening_accumulated_depreciation + coalesce((
         select sum(p.amount) from aset_tr_penyusutan_aset p
         where p.buku_aset_id = b.id and p.status = 'final'
     ), 0)
@@ -277,8 +277,9 @@ kode_diketik_tidak_sah as (
       + (select count(*) from aset_m_buku_penyusutan where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30) as n
 ),
 penerimaan_tanpa_posting as (
-    -- Jurnal perolehan terbit di transaksi yang sama dengan penyelesaian penerimaan (area 9):
-    -- setiap penerimaan selesai yang bernilai punya tepat satu posting, di tenant yang sama.
+    -- Jurnal penerimaan terbit di transaksi yang sama dengan penyelesaiannya: jurnal perolehan
+    -- (area 9), atau jurnal saldo awal untuk penerimaan saldo awal (area 10). Setiap penerimaan
+    -- selesai yang bernilai punya tepat satu posting, di tenant yang sama.
     -- Nol berarti tidak ada penerimaan yang selesai tanpa jurnal, dan tidak ada yang dijurnal dua
     -- kali karena dua penyelesaian yang berlomba sama-sama menang.
     --
@@ -295,7 +296,7 @@ penerimaan_tanpa_posting as (
       )
       and (
           select count(*) from finance_postings f
-          where f.tenant_id = p.tenant_id and f.posting_id = 'AST-ACQ-' || p.id
+          where f.tenant_id = p.tenant_id and f.posting_id = case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id
       ) <> 1
 ),
 posting_perolehan_tanpa_penerimaan_selesai as (
@@ -303,26 +304,45 @@ posting_perolehan_tanpa_penerimaan_selesai as (
     -- meninggalkan posting yatim, atau posting yang tercatat di tenant lain.
     select count(*) as n
     from finance_postings f
-    where f.posting_type = 'asset.acquisition'
+    where f.posting_type in ('asset.acquisition', 'asset.opening_balance')
       and f.source_module = 'management-aset'
       and not exists (
           select 1 from aset_tr_penerimaan_aset p
-          where p.tenant_id = f.tenant_id and 'AST-ACQ-' || p.id = f.posting_id and p.status = 'selesai'
+          where p.tenant_id = f.tenant_id and case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id = f.posting_id and p.status = 'selesai'
       )
 ),
 posting_perolehan_tidak_sama_dengan_register as (
     -- Debit posting = nilai aset di register + PPN baris yang dibulatkan ke presisi posting itu
     -- (K-20). Register adalah pembagian nilai baris yang sudah bulat, jadi keduanya harus sama
-    -- persis; selisih satu sen pun berarti register dan buku besar berpisah jalan.
+    -- persis; selisih satu sen pun berarti register dan buku besar berpisah jalan. Saldo awal
+    -- tidak ber-PPN, jadi debitnya tepat nilai register.
     select count(*) as n
     from finance_postings f
-    join aset_tr_penerimaan_aset p on p.tenant_id = f.tenant_id and 'AST-ACQ-' || p.id = f.posting_id
-    where f.posting_type = 'asset.acquisition'
+    join aset_tr_penerimaan_aset p on p.tenant_id = f.tenant_id and case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id = f.posting_id
+    where f.posting_type in ('asset.acquisition', 'asset.opening_balance')
       and f.total_debit <> (
           (select coalesce(sum(a.acquisition_value), 0) from aset_tr_aset a where a.penerimaan_aset_id = p.id)
         + (select coalesce(sum(round(d.ppn_per_unit * d.jumlah, f.currency_decimals)), 0)
            from aset_tr_penerimaan_aset_details d where d.penerimaan_aset_id = p.id)
       )
+),
+posting_saldo_awal_tidak_sama_dengan_register as (
+    -- Akumulasi yang dikreditkan jurnal saldo awal — baris ber-`mapping.reference` kolom akumulasi
+    -- penyusutan — wajib sama dengan akumulasi awal buku yang di-post di register, untuk setiap
+    -- aset yang disebut rincian posting itu (K-13, K-28). Selisih berarti buku besar membuka
+    -- saldo yang berbeda dari register, atau buku fiskal terbaca sebagai buku yang di-post.
+    select count(*) as n
+    from finance_postings f
+    where f.posting_type = 'asset.opening_balance'
+      and coalesce((
+          select sum((l->>'credit')::numeric) from jsonb_array_elements(f.input->'lines') l
+          where l->'mapping'->>'reference' like '%:accumulated_depreciation_account_id'
+      ), 0) <> coalesce((
+          select sum(b.opening_accumulated_depreciation)
+          from jsonb_array_elements(f.input->'details'->'assets') a
+          join aset_tr_aset x on x.tenant_id = f.tenant_id and x.kode = a->>'asset_code'
+          join aset_tr_buku_aset b on b.aset_id = x.id and b.book_code = a->>'book'
+      ), 0)
 ),
 aset_penerimaan_tidak_sesuai_jumlah as (
     select count(*) as n
@@ -396,6 +416,7 @@ union all select 'kode diketik group aset atau buku penyusutan tidak sah', n fro
 union all select 'penerimaan selesai tanpa tepat satu posting perolehan', n from penerimaan_tanpa_posting
 union all select 'posting perolehan tanpa penerimaan selesai di tenant yang sama', n from posting_perolehan_tanpa_penerimaan_selesai
 union all select 'debit posting perolehan tidak sama dengan register ditambah PPN', n from posting_perolehan_tidak_sama_dengan_register
+union all select 'akumulasi jurnal saldo awal tidak sama dengan register', n from posting_saldo_awal_tidak_sama_dengan_register
 union all select 'jumlah aset penerimaan tidak sama dengan jumlah unit barisnya', n from aset_penerimaan_tidak_sesuai_jumlah
 union all select 'posting group ganda untuk group dan tanggal yang sama', n from posting_group_ganda
 union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
@@ -414,6 +435,7 @@ union all select 'aset_m_group_buku_penyusutan', count(*), count(distinct tenant
 union all select 'aset_m_posting_group', count(*), count(distinct tenant_id) from aset_m_posting_group
 union all select 'aset_tr_penerimaan_aset', count(*), count(distinct tenant_id) from aset_tr_penerimaan_aset
 union all select 'finance_postings asset.acquisition', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.acquisition'
+union all select 'finance_postings asset.opening_balance', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.opening_balance'
 union all select 'aset_m_kondisi_aset', count(*), count(distinct tenant_id) from aset_m_kondisi_aset
 union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) from aset_m_pabrikan_aset
 union all select 'aset_m_item_checklist_maintenance', count(*), count(distinct tenant_id) from aset_m_item_checklist_maintenance

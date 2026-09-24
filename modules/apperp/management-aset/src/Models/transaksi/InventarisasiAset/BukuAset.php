@@ -29,6 +29,8 @@ use Illuminate\Support\Carbon;
  * @property string $acquisition_value
  * @property string $residual_value
  * @property string $accumulated_depreciation
+ * @property string $opening_accumulated_depreciation
+ * @property int $elapsed_periods_offset
  * @property string $net_book_value
  * @property string $status
  * @property ?string $closed_on
@@ -46,7 +48,7 @@ class BukuAset extends Model
         'tenant_id', 'aset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',
         'useful_life_periods', 'convention', 'depreciation_start_on', 'depreciate', 'round_off_depreciation',
         'acquisition_value', 'residual_value', 'accumulated_depreciation',
-        'net_book_value', 'status',
+        'opening_accumulated_depreciation', 'elapsed_periods_offset', 'net_book_value', 'status',
     ];
 
     /** @return array<string, string> */
@@ -56,6 +58,8 @@ class BukuAset extends Model
             'acquisition_value' => 'decimal:2',
             'residual_value' => 'decimal:2',
             'accumulated_depreciation' => 'decimal:2',
+            'opening_accumulated_depreciation' => 'decimal:2',
+            'elapsed_periods_offset' => 'integer',
             'net_book_value' => 'decimal:2',
             'useful_life_periods' => 'integer',
             'depreciation_start_on' => 'date',
