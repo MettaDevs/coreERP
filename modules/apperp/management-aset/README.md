@@ -102,8 +102,9 @@ menyelesaikan serah terimanya.
 
 Keduanya terpisah di F&O karena yang kedua **menerbitkan jurnal**: ia memindahkan saldo
 antar akun, dan karena tiap buku memposting ke lapisan sendiri, tiap buku memerlukan
-dimensinya sendiri. Modul ini tidak menjurnal sama sekali, sehingga dimensi per buku tidak
-memiliki arti di sini. Ketika Finance mulai menjurnal dari export penyusutan, di situlah ia
+dimensinya sendiri. Modul ini hanya menjurnal lewat satu buku per aset (K-31 feed posting
+finance), dan jurnal penyusutannya membaca dimensi dari unit penggunaan aset pada akhir periode,
+sehingga dimensi per buku belum memiliki arti di sini. Bila kelak dibutuhkan, di situlah ia
 menempel — satu tabel dimensi per buku aset, diisi dokumen ini, tanpa membongkar yang sudah
 ada. `financial_dimension_org_unit_id` tingkat aset tetap diperbarui: ia label pembebanan
 yang sudah dipelihara jalur penerimaan sejak awal, dan membiarkannya basi membuat data
@@ -171,7 +172,9 @@ ditolak oleh API.
 
 **Buku penyusutan** membawa `posting_layer`, satu-satunya saklar posting (K-15 feed posting
 finance): buku `none` (memorandum) dihitung dan dilaporkan tetapi tidak pernah di-post ke aplikasi
-finance, lapisan lain di-post. Saklar `export_to_backoffice` yang dulu ada dilebur ke sini karena
+finance. Dari buku lainnya, hanya buku yang di-post group-nya (`current` lebih dulu, K-26) yang
+mengirim jurnal perolehan dan penyusutan aset itu (K-31); buku lain tetap menyusut di register saja,
+supaya beban aset yang sama tidak tercatat dua kali. Saklar `export_to_backoffice` yang dulu ada dilebur ke sini karena
 dua saklar yang maknanya tumpang tindih pernah menghasilkan pembalikan yang terekspor padahal
 aslinya tidak; API kini menolak field itu dengan 422. Buku fiskal lazimnya memorandum, supaya
 penyusutan aset yang sama tidak dijurnal dua kali, dan buku `FISKAL` bawaan lahir sebagai `none`.
@@ -270,6 +273,27 @@ perolehan, kredit akumulasi dan penyeimbang saldo awal — dan buku asetnya lahi
 offset periode, sehingga penyusutan berikutnya berlanjut dari periode ke-(offset + 1). Banyak aset
 sekaligus dapat diimpor dari CSV (`Services/OpeningBalanceImport`), yang melahirkan draf saldo awal
 setelah pratinjaunya bersih.
+
+### Post penyusutan
+
+Periode yang difinalkan hanya tercatat di register. Proses **Post penyusutan** (area 11,
+`Services/DepreciationPosting`) mengirimnya ke aplikasi finance sebagai satu `asset.depreciation`
+per entitas legal, buku, dan tanggal akhir periode — padanan *depreciation proposal* F&O yang
+diposting ke buku besar. Jurnalnya bertanggal akhir periode: debit beban per group aset dan unit
+penggunaan (business unit + department), kredit akumulasi per group aset dan business unit (K-14,
+K-30). Totalnya sama persis dengan periode yang ditandainya; penyusutan yang lebih halus dari
+presisi mata uang menahan proses (K-32). Periode yang ikut ditandai `posted_posting_id`, dan proses
+berikutnya untuk buku dan periode yang sama hanya mengambil periode yang difinalkan sesudahnya,
+dengan nomor urut posting berikutnya.
+
+Pembalikan periode yang sudah di-post menerbitkan `asset.depreciation_reversal` untuk porsi aset itu
+saja, bertanggal periode asal (K-29). Periode yang dibalik sebelum di-post tidak pernah ikut proses
+post, jadi tidak butuh jurnal balik. Finalisasi dan pembalikan tidak lagi menulis ekspor lama
+`tr_export_penyusutan`; tabel dan riwayatnya dibiarkan.
+
+Izinnya `management-aset.penyusutan.post` (invoke), dengan duty sendiri
+`management-aset.penyusutan.finance-posting`: role yang mengelola penyusutan tidak otomatis boleh
+mengirim jurnalnya ke finance.
 
 ### Hak akses
 

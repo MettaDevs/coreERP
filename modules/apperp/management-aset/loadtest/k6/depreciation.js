@@ -15,14 +15,20 @@
 // 300, dan periode terakhir mengambil seluruh sisa 400 supaya nilai buku mendarat tepat di
 // residu. Saldo akhirnya akumulasi 1.000 dan nilai buku 0.
 //
+// Feed posting finance entitas legalnya menyala dengan cutover 1 Januari 2026, jadi penerbit
+// menilai pemetaan akun dan unit bisnis setiap jurnal. Tenant uji beban tidak punya keduanya,
+// sehingga jurnal perolehan dan penyusutannya `held`; yang digate tidak bergantung pada status itu.
+//
 // Setup mengusulkan dan memfinalkan ketiga periode itu, lalu memeriksa saldo akhirnya. Beban
 // penuh sesudahnya MENGULANG permintaan yang sama berkali-kali dari banyak VU sekaligus.
 // Itulah yang diuji: proposal yang diulang wajib memulangkan periode yang sama dengan nilai
-// yang sama, finalisasi yang diulang wajib memulangkan posting yang sama, dan saldo wajib
-// tidak bergeser sedikit pun — berapa kali pun ia diminta dan seberapa pun berbarengan.
+// yang sama, finalisasi yang diulang wajib memulangkan periode yang sama tanpa menambah saldo,
+// "Post penyusutan" (feed posting finance, area 11) wajib menerbitkan tepat satu posting per
+// periode — yang pertama 201, sisanya pulang kosong — dan saldo wajib tidak bergeser sedikit
+// pun, berapa kali pun ia diminta dan seberapa pun berbarengan.
 //
-//   PROFILE=saturation     Beban serentak pada seluruh permukaan penyusutan. Yang digate:
-//                          KEBENARAN.
+//   PROFILE=saturation     Beban serentak pada seluruh permukaan penyusutan, termasuk proses
+//                          post. Yang digate: KEBENARAN.
 //
 //   PROFILE=latency        Concurrency tertahan; yang digate p95/p99 per jenis operasi.
 //
@@ -31,6 +37,13 @@
 //                          `incrementEach`; kalau kuncinya tidak menahan, satu periode
 //                          menambah saldo dua kali dan tidak ada batasan basis data yang
 //                          menolaknya — baris periodenya tetap satu dan tetap sah.
+//
+//   PROFILE=post-race      Beberapa VU menjalankan "Post penyusutan" untuk entitas, buku, dan
+//                          periode yang SAMA secara bersamaan, masing-masing dua permintaan
+//                          sekaligus. Tepat satu boleh menerbitkan posting; dua posting untuk
+//                          satu periode berarti aplikasi finance membukukan beban dua kali.
+//                          Pakai FIXTURE baru: periode yang sudah di-post tidak dapat dibalapkan
+//                          lagi.
 //
 // ## Menjalankan SELFTEST: pakai FIXTURE tersendiri
 //
@@ -43,7 +56,7 @@ import { check, fail } from 'k6';
 import exec from 'k6/execution';
 import http from 'k6/http';
 import { Counter, Trend } from 'k6/metrics';
-import { FIXTURE, RUN_ID, bangunJar, paramsUntuk, sempitkanTenant, siapkanTenant, tenantVu, urlModule } from '../lib.js';
+import { BASE, FIXTURE, RUN_ID, bangunJar, paramsUntuk, sempitkanTenant, siapkanTenant, tenantVu, urlModule } from '../lib.js';
 
 const PROFILE = __ENV.PROFILE || 'saturation';
 const VUS = Number(__ENV.VUS || 1000);
@@ -51,7 +64,8 @@ const DURATION = __ENV.DURATION || '90s';
 // Balapan finalisasi sengaja dipusatkan pada sedikit tenant: menyebarnya ke puluhan tenant
 // membuat dua permintaan hampir tidak pernah bertemu pada periode yang sama.
 const RACE_TENANTS = Number(__ENV.RACE_TENANTS || 4);
-const TENANT_COUNT = PROFILE === 'finalize-race' ? RACE_TENANTS : Number(__ENV.TENANTS || 64);
+const RACE_PROFILES = ['finalize-race', 'post-race'];
+const TENANT_COUNT = RACE_PROFILES.includes(PROFILE) ? RACE_TENANTS : Number(__ENV.TENANTS || 64);
 
 const ASET = (path) => urlModule('management-aset', path);
 
@@ -74,13 +88,15 @@ const PERIODE_LUAR = ['2026-04-01', '2026-04-30'];
  * `SELFTEST=1` merusak PERMINTAAN, bukan produknya:
  *
  *   - proposal diminta untuk periode di luar masa manfaat, bukan periode yang dicatat;
- *   - finalisasi diarahkan ke periode itu, sehingga postingnya memang berbeda;
+ *   - finalisasi diarahkan ke periode itu, sehingga periode yang dipulangkan memang berbeda;
  *   - balapan finalisasi menggerakkan dua periode berbeda, bukan satu periode dua kali;
+ *   - balapan post menggerakkan dua periode berbeda, sehingga keduanya memang menerbitkan posting;
  *   - sebelum saldo dibaca, sebuah `reversal` dikirim, sehingga saldo memang bergeser;
  *   - probe lintas tenant diarahkan ke periode milik sendiri;
+ *   - probe pratinjau post lintas tenant diarahkan ke entitas dan buku milik sendiri;
  *   - probe eskalasi hak memakai sesi yang memang berhak penuh.
  *
- * Keenamnya lalu WAJIB menaikkan `correctness_violations` dan membuat run merah. Yang
+ * Ketujuhnya lalu WAJIB menaikkan `correctness_violations` dan membuat run merah. Yang
  * dibuktikan karena itu adalah pendeteksinya hidup — bukan bahwa produknya cacat.
  */
 const SELFTEST = __ENV.SELFTEST === '1';
@@ -97,6 +113,10 @@ const proposalReplays = new Counter('proposal_replays');
 const finalizeReplays = new Counter('finalize_replays');
 const balanceReads = new Counter('balance_reads');
 const finalizeRaces = new Counter('finalize_races');
+const postsCreated = new Counter('posts_created');
+const postsEmpty = new Counter('posts_empty');
+const postRaces = new Counter('post_races');
+const postProbes = new Counter('post_probes');
 const crossTenantProbes = new Counter('cross_tenant_probes');
 const scopeProbes = new Counter('permission_scope_probes');
 
@@ -120,9 +140,9 @@ const batasBatch = { setupTimeout: '20m', batch: 64, batchPerHost: 32 };
 const statistik = ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'];
 
 export const options =
-    PROFILE === 'finalize-race'
+    RACE_PROFILES.includes(PROFILE)
         ? {
-              scenarios: { finalizeRace: { executor: 'constant-vus', vus: VUS, duration: DURATION, gracefulStop: '20s' } },
+              scenarios: { race: { executor: 'constant-vus', vus: VUS, duration: DURATION, gracefulStop: '20s' } },
               thresholds: correctnessThresholds,
               summaryTrendStats: statistik,
               ...batasBatch,
@@ -170,9 +190,20 @@ export function setup() {
     // run membuat aset baru, `penyusutan/buku` memulangkan lebih dari satu baris, dan oracle
     // saldo kehilangan satu-satunya baris yang jawabannya diketahui.
     const kunci = (nama, index) => `dep-${FIXTURE}-${nama}-${index}`;
+    // Kode group aset dan buku penyusutan diketik, bukan diterbitkan nomor (K-24 feed posting finance).
+    const kodeDiketik = (awalan) => `${awalan}-${FIXTURE}`.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+
+    // Pengiriman posting diaktifkan dengan cutover, seperti `receipt-posting.js`. Tanpanya setiap
+    // jurnal tercatat `manual` karena feed-nya mati, dan penerbit tidak pernah menilai pemetaan
+    // akun maupun unit bisnis yang dibawa baris jurnal penyusutan.
+    tahap(
+        'setelan feed',
+        semua((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01' }), params(tenant)]),
+        [200],
+    );
 
     const jenisIds = idDari(tahap('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Susut jenis ${index}` }), params(tenant, kunci('jenis', index))])));
-    const groupIds = idDari(tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `Susut group ${index}` }), params(tenant, kunci('group', index))])));
+    const groupIds = idDari(tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeDiketik('SUSUT'), nama: `Susut group ${index}` }), params(tenant, kunci('group', index))])));
     const profilIds = idDari(tahap(
         'profil-penyusutan',
         semua((tenant, index) => [
@@ -189,18 +220,17 @@ export function setup() {
             params(tenant, kunci('profil', index)),
         ]),
     ));
-    // `export_to_backoffice: true` supaya finalisasi menerbitkan satu baris export. `posting_id`
-    // pada baris itu adalah oracle idempotensi yang paling tajam: finalisasi yang diulang wajib
-    // memulangkan posting yang SAMA, dan posting kedua berarti backoffice dijurnal dua kali.
+    // Lapisan current supaya buku inilah yang mem-post perolehan asetnya, dan karena itu yang
+    // mengirim penyusutannya lewat "Post penyusutan" (K-26, area 11).
     const bukuIds = idDari(tahap(
         'buku-penyusutan',
         semua((tenant, index) => [
             'POST',
             ASET('buku-penyusutan'),
             JSON.stringify({
+                kode: kodeDiketik('SUSUT-BUKU'),
                 nama: `Susut buku ${index}`,
                 posting_layer: 'current',
-                export_to_backoffice: true,
                 depreciation_profile_id: profilIds[index],
                 round_off_depreciation: 10,
             }),
@@ -231,7 +261,9 @@ export function setup() {
     );
 
     // Aset lahir dari dokumen penerimaan, bukan dari `POST /aset` — endpoint itu dibuang
-    // 18 September 2026. Dua tahap karena itu: draf dulu, lalu diselesaikan.
+    // 18 September 2026. Dua tahap karena itu: draf dulu, lalu diselesaikan. Hibah, bukan
+    // pembelian: pembelian pada mode bawaan `direct_payable` wajib bervendor (area 9), dan
+    // skenario ini tidak menguji vendor.
     const penerimaan = tahap(
         'penerimaan',
         semua((tenant, index) => [
@@ -243,6 +275,7 @@ export function setup() {
                 tanggal: '2026-01-01',
                 tanggal_siap_pakai: '2026-01-01',
                 currency_code: 'IDR',
+                cara_perolehan: 'hibah',
                 details: [
                     {
                         nama: `Aset susut ${index}`,
@@ -294,7 +327,6 @@ export function setup() {
     });
 
     const periodeIds = [];
-    const postingIds = [];
 
     for (let urutan = 0; urutan < PERIODE.length; urutan++) {
         const [mulai, selesai] = PERIODE[urutan];
@@ -325,12 +357,7 @@ export function setup() {
             if (response.json('data.period.status') !== 'final') {
                 fail(`finalisasi tenant ${index} periode ${urutan + 1} belum final`);
             }
-
-            if (!response.json('data.export.posting_id')) {
-                fail(`finalisasi tenant ${index} periode ${urutan + 1} tidak menerbitkan export`);
-            }
         });
-        postingIds.push(finalisasi.map((response) => String(response.json('data.export.posting_id'))));
     }
 
     tahap('saldo akhir', semua((tenant) => ['GET', ASET('penyusutan/buku'), null, params(tenant)]), [200]).forEach((response, index) => {
@@ -348,8 +375,8 @@ export function setup() {
             ...tenant,
             asetCode: kodeAset[index],
             asetBookId: bukuAset[index].id,
+            bukuId: bukuIds[index],
             periodeIds: periodeIds.map((periode) => periode[index]),
-            postingIds: postingIds.map((posting) => posting[index]),
         })),
         sempit,
     };
@@ -425,13 +452,14 @@ function proposalUlang(tenant, urutan) {
 }
 
 /**
- * Finalisasi yang diulang wajib memulangkan posting yang SAMA. Posting kedua berarti backoffice
- * menerima jurnal dua kali untuk satu periode penyusutan.
+ * Finalisasi yang diulang wajib memulangkan periode yang SAMA, tetap final dengan nilai yang sama.
+ * Saldo yang ditambah dua kali ditangkap `bacaSaldo()` dan oracle SQL; di sini yang dijaga adalah
+ * jawabannya.
  */
 function finalisasiUlang(tenant, urutan) {
     // SELFTEST menyuruh sistem memfinalkan periode di luar masa manfaat lebih dahulu, lalu
-    // membandingkan postingnya dengan posting periode yang dicatat. Nilainya 0, jadi saldo tidak
-    // ikut bergeser — yang dibuktikan hanya bahwa pembanding postingnya hidup.
+    // membandingkan periodenya dengan periode yang dicatat. Nilainya 0, jadi saldo tidak ikut
+    // bergeser — yang dibuktikan hanya bahwa pembandingnya hidup.
     let periodeId = tenant.periodeIds[urutan];
 
     if (SELFTEST) {
@@ -459,18 +487,18 @@ function finalisasiUlang(tenant, urutan) {
         violation('periode_tidak_final', { urutan: urutan + 1 });
     }
 
-    if (String(response.json('data.export.posting_id')) !== tenant.postingIds[urutan]) {
-        violation('finalisasi_menerbitkan_posting_lain', { urutan: urutan + 1 });
+    if (String(response.json('data.period.id')) !== tenant.periodeIds[urutan]) {
+        violation('finalisasi_memulangkan_periode_lain', { urutan: urutan + 1 });
     }
 }
 
 /**
  * Dua finalisasi periode yang sama, dikirim berbarengan. Keduanya wajib dijawab 200 dengan
- * posting yang sama: yang kalah menemukan periodenya sudah final dan memulangkan export yang
- * sudah ada, bukan menambah saldo untuk kedua kalinya.
+ * periode yang sama dan nilai yang sama: yang kalah menemukan periodenya sudah final, bukan
+ * menambah saldo untuk kedua kalinya.
  */
 function balapanFinalisasi(tenant, urutan) {
-    // SELFTEST menggerakkan dua periode berbeda: postingnya memang berbeda, dan pembandingnya
+    // SELFTEST menggerakkan dua periode berbeda: jawabannya memang berbeda, dan pembandingnya
     // wajib menangkapnya.
     const lain = (urutan + 1) % PERIODE.length;
     const kiriId = tenant.periodeIds[urutan];
@@ -490,13 +518,140 @@ function balapanFinalisasi(tenant, urutan) {
     }
 
     finalizeRaces.add(1);
-    const sama = String(kiri.json('data.export.posting_id')) === String(kanan.json('data.export.posting_id'));
+    const sama =
+        String(kiri.json('data.period.id')) === String(kanan.json('data.period.id')) &&
+        String(kiri.json('data.period.amount')) === String(kanan.json('data.period.amount'));
 
     if (!sama) {
-        violation('finalisasi_serentak_dua_posting', { urutan: urutan + 1 });
+        violation('finalisasi_serentak_berbeda', { urutan: urutan + 1 });
     }
 
-    check({ kiri, kanan }, { 'finalisasi serentak satu posting': () => sama });
+    check({ kiri, kanan }, { 'finalisasi serentak satu periode': () => sama });
+}
+
+function masukanPost(tenant, urutan) {
+    return { legal_entity_id: tenant.legalEntityId, buku_id: tenant.bukuId, period_ends_on: PERIODE[urutan][1] };
+}
+
+function mintaPost(tenant, urutan, extra) {
+    return http.post(ASET('penyusutan/posting'), JSON.stringify(masukanPost(tenant, urutan)), paramsUntuk(tenant, {
+        tags: { op: 'post', resource: 'penyusutan' },
+        responseCallback: http.expectedStatuses(200, 201),
+        ...extra,
+    }));
+}
+
+/**
+ * Isi jawaban "Post penyusutan" yang menerbitkan posting: tepat satu aset fixture dengan nilai
+ * periodenya, dan total jurnal yang sama dengan total register (K-14).
+ */
+function periksaPostTerbit(response, urutan) {
+    postsCreated.add(1);
+    const nilai = response.json('data.register_total');
+
+    if (response.json('data.assets') !== 1 || Number(nilai) !== NILAI[urutan] || Number(response.json('data.posting.total')) !== Number(nilai)) {
+        violation('post_isi_salah', { urutan: urutan + 1, aset: response.json('data.assets'), nilai, total: response.json('data.posting.total') });
+    }
+}
+
+/**
+ * "Post penyusutan" satu periode: yang pertama menerbitkan posting (201), sisanya pulang kosong
+ * (200 dengan `posting` null). Jawaban lain — termasuk 422 — berarti proses yang seharusnya lolos
+ * ditolak.
+ */
+function postPenyusutan(tenant, urutan) {
+    const response = mintaPost(tenant, urutan);
+    writeLatency.add(response.timings.duration);
+    recordFailure(response, 'post');
+
+    if (!tersedia(response)) {
+        return;
+    }
+
+    if (response.status === 201) {
+        periksaPostTerbit(response, urutan);
+    } else if (response.status === 200 && response.json('data.posting') === null) {
+        postsEmpty.add(1);
+    } else if (response.status < 500) {
+        violation('post_ditolak', { urutan: urutan + 1, status: response.status, body: String(response.body).slice(0, 200) });
+    }
+}
+
+/**
+ * Dua "Post penyusutan" untuk periode yang sama, dikirim berbarengan dari satu VU sementara VU lain
+ * di arena yang sama melakukan hal serupa. Paling banyak satu boleh menerbitkan posting; dua posting
+ * berarti aplikasi finance membukukan beban satu periode dua kali.
+ */
+function balapanPost(tenant, urutan) {
+    // SELFTEST menggerakkan dua periode berbeda: keduanya memang boleh menerbitkan posting, dan
+    // pembandingnya wajib menangkapnya sebagai dua posting.
+    const kanan = SELFTEST ? (urutan + 1) % PERIODE.length : urutan;
+    const params = paramsUntuk(tenant, {
+        tags: { op: 'post_race', resource: 'penyusutan' },
+        responseCallback: http.expectedStatuses(200, 201),
+    });
+    const jawab = http.batch([
+        ['POST', ASET('penyusutan/posting'), JSON.stringify(masukanPost(tenant, urutan)), params],
+        ['POST', ASET('penyusutan/posting'), JSON.stringify(masukanPost(tenant, kanan)), params],
+    ]);
+    jawab.forEach((response) => {
+        writeLatency.add(response.timings.duration);
+        recordFailure(response, 'post-race');
+    });
+
+    if (!jawab.every(tersedia)) {
+        return;
+    }
+
+    jawab.forEach((response, index) => {
+        if (response.status === 201) {
+            periksaPostTerbit(response, index === 0 ? urutan : kanan);
+        } else if (response.status === 200 && response.json('data.posting') === null) {
+            postsEmpty.add(1);
+        } else if (response.status < 500) {
+            violation('post_ditolak', { urutan: urutan + 1, status: response.status });
+        }
+    });
+
+    const terbit = jawab.filter((response) => response.status === 201).length;
+
+    if (terbit > 0) {
+        postRaces.add(1);
+    }
+
+    if (terbit > 1) {
+        violation('post_serentak_dua_posting', { urutan: urutan + 1 });
+    }
+}
+
+/**
+ * Pratinjau "Post penyusutan" atas entitas dan buku tenant lain tidak boleh melihat satu periode
+ * pun: jawabannya 403, 422 (bukunya tidak ditemukan di tenant ini), atau 200 tanpa aset yang ikut
+ * maupun periode yang dilewati.
+ */
+function probePostLintasTenant(data, tenant) {
+    postProbes.add(1);
+    const korban = data.tenants[(tenant.index + 1) % data.tenants.length];
+    // SELFTEST menanyakan entitas dan buku milik sendiri, yang periodenya memang terlihat.
+    const sasaran = SELFTEST ? tenant : korban;
+    const query = Object.entries(masukanPost(sasaran, 0)).map(([kunci, nilai]) => `${kunci}=${encodeURIComponent(nilai)}`).join('&');
+    const response = http.get(`${ASET('penyusutan/posting/pratinjau')}?${query}`, paramsUntuk(tenant, {
+        tags: { op: 'probe_post', resource: 'penyusutan' },
+        responseCallback: http.expectedStatuses(200, 403, 422),
+    }));
+    readLatency.add(response.timings.duration);
+    recordFailure(response, 'probe-post');
+
+    if (response.status !== 200) {
+        return;
+    }
+
+    const lewat = response.json('data.skipped') || {};
+    const terlihat = (response.json('data.assets') || 0) + Object.values(lewat).reduce((jumlah, n) => jumlah + Number(n), 0);
+
+    if (terlihat > 0) {
+        violation('post_melihat_tenant_lain', { terlihat });
+    }
 }
 
 /**
@@ -624,20 +779,30 @@ export default function (data) {
         return;
     }
 
+    if (PROFILE === 'post-race') {
+        balapanPost(tenant, urutan);
+
+        return;
+    }
+
     const roll = Math.random();
 
-    if (roll < 0.28) {
+    if (roll < 0.24) {
         proposalUlang(tenant, urutan);
-    } else if (roll < 0.5) {
+    } else if (roll < 0.42) {
         finalisasiUlang(tenant, urutan);
-    } else if (roll < 0.66) {
+    } else if (roll < 0.54) {
         balapanFinalisasi(tenant, urutan);
-    } else if (roll < 0.8) {
+    } else if (roll < 0.66) {
+        postPenyusutan(tenant, urutan);
+    } else if (roll < 0.78) {
         bacaSaldo(tenant);
-    } else if (roll < 0.9) {
+    } else if (roll < 0.87) {
         bacaDaftar(data, tenant);
-    } else if (roll < 0.97) {
+    } else if (roll < 0.92) {
         probeLintasTenant(data, tenant);
+    } else if (roll < 0.97) {
+        probePostLintasTenant(data, tenant);
     } else {
         // Pada SELFTEST probe eskalasi memakai sesi yang memang berhak penuh; daftar penyusutan
         // dijawab 200, dan itu harus terbaca sebagai eskalasi.
@@ -660,7 +825,7 @@ export function handleSummary(data) {
         selftest: SELFTEST,
         vus_configured: PROFILE === 'latency' ? Number(__ENV.LATENCY_VUS || 16) : VUS,
         tenants: TENANT_COUNT,
-        race_arenas: PROFILE === 'finalize-race' ? RACE_TENANTS : 0,
+        race_arenas: RACE_PROFILES.includes(PROFILE) ? RACE_TENANTS : 0,
         duration_s: Number((data.state?.testRunDurationMs ?? 0) / 1000).toFixed(1),
         iterations: data.metrics.iterations?.values?.count ?? 0,
         requests: data.metrics.http_reqs?.values?.count ?? 0,
@@ -671,6 +836,10 @@ export function handleSummary(data) {
             proposal_replays: data.metrics.proposal_replays?.values?.count ?? 0,
             finalize_replays: data.metrics.finalize_replays?.values?.count ?? 0,
             finalize_races: data.metrics.finalize_races?.values?.count ?? 0,
+            posts_created: data.metrics.posts_created?.values?.count ?? 0,
+            posts_empty: data.metrics.posts_empty?.values?.count ?? 0,
+            post_races: data.metrics.post_races?.values?.count ?? 0,
+            post_probes: data.metrics.post_probes?.values?.count ?? 0,
             balance_reads: data.metrics.balance_reads?.values?.count ?? 0,
             cross_tenant_probes: data.metrics.cross_tenant_probes?.values?.count ?? 0,
             permission_scope_probes: data.metrics.permission_scope_probes?.values?.count ?? 0,

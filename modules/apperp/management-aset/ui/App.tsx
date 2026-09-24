@@ -152,6 +152,10 @@ export default function App({
                     canCorrect={permissions.includes(
                         'management-aset.penyusutan.correct',
                     )}
+                    canPost={permissions.includes(
+                        'management-aset.penyusutan.post',
+                    )}
+                    context={konteks}
                 />
             </main>
         );

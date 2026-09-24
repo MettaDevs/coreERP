@@ -178,8 +178,8 @@ info:
     | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
     | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
     | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
-    | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
-    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
+    | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
+    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |
 
     **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
     *Belum* tidak pernah muncul di `GET /finance-postings` sampai modulnya menerbitkannya.
@@ -198,6 +198,22 @@ info:
     cutover, dan kredit akun penyeimbang saldo awal sebesar nilai bukunya. Tidak ada `vendor`
     maupun PPN. Rincian per aset di `details.assets` membawa `acquisition_value`,
     `accumulated_depreciation`, dan `net_book_value`.
+
+    `asset.depreciation` berisi penyusutan satu periode satu buku satu entitas legal, dari proses
+    "Post penyusutan" di modul aset, dengan `posting_id`
+    `AST-DEP-<entitas legal>-<buku>-<YYYYMMDD>-<nomor urut proses>`. `posting_date` dan
+    `document_date`-nya tanggal akhir periode. Barisnya: debit beban penyusutan per group aset dan
+    department (business unit + department), lalu kredit akumulasi penyusutan per group aset dan
+    business unit. Penyusutan yang difinalkan sesudah proses pertama terbit sebagai posting
+    berikutnya untuk periode yang sama, dengan nomor urut berikutnya. Totalnya selalu sama dengan
+    penyusutan di register aset; rincian per aset di `details.assets` membawa `depreciation_amount`.
+
+    `asset.depreciation_reversal` membalik porsi satu aset dari sebuah posting `asset.depreciation`,
+    dengan `reverses_posting_id` menunjuk posting itu dan `posting_id` `AST-DRV-<id pembalikan>`.
+    Tanggalnya tanggal periode yang dibalik, sama dengan posting asalnya, dan akun serta dimensinya
+    kebalikan baris aset itu. Bila periode itu sudah tutup di aplikasi Anda, tolak lewat ack; koreksinya
+    dibuat manual di periode yang masih terbuka. Penyusutan yang dibalik sebelum di-post tidak pernah
+    terbit, jadi tidak ada pembaliknya.
 
     Menyaring di `GET /finance-postings`:
 

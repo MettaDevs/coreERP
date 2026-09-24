@@ -200,6 +200,7 @@ security:
         - management-aset.penyusutan.create
         - management-aset.penyusutan.finalize
         - management-aset.penyusutan.correct
+        - management-aset.penyusutan.post
       requires_legal_entity: true
       requires_operating_unit: true
       allows_descendants: true
@@ -845,6 +846,10 @@ security:
       name: Koreksi penyusutan
       entry_point: management-aset.penyusutan.api
       access: correct
+    - code: management-aset.penyusutan.post
+      name: Post penyusutan ke aplikasi finance
+      entry_point: management-aset.penyusutan.api
+      access: invoke
     - code: management-aset.tipe-lokasi-aset.read
       name: Lihat tipe lokasi aset
       entry_point: management-aset.tipe-lokasi-aset.form
@@ -1215,6 +1220,9 @@ security:
     - code: management-aset.penyusutan.correct-period
       name: Koreksi penyusutan aset
       permissions: [management-aset.penyusutan.correct]
+    - code: management-aset.penyusutan.post-to-finance
+      name: Post jurnal penyusutan
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.post]
     - code: management-aset.tipe-lokasi-aset.maintain
       name: Pelihara tipe lokasi aset
       permissions:
@@ -1415,6 +1423,11 @@ security:
     - code: management-aset.penyusutan.manage
       name: Kelola penyusutan aset
       privileges: [management-aset.penyusutan.maintain, management-aset.penyusutan.correct-period]
+    # Duty tersendiri: role yang sudah memegang "Kelola penyusutan aset" tidak boleh diam-diam dapat
+    # mengirim jurnal ke aplikasi finance (keputusan pemilik produk, 22 September 2026).
+    - code: management-aset.penyusutan.finance-posting
+      name: Post penyusutan ke aplikasi finance
+      privileges: [management-aset.penyusutan.post-to-finance]
     - code: management-aset.tipe-lokasi-aset.manage
       name: Kelola tipe lokasi aset
       privileges:

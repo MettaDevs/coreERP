@@ -38,7 +38,8 @@ tags:
 - name: Mutasi aset
   description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Penyusutan
-  description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
+  description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke
+    aplikasi finance.
 - name: Reference data
   description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
 - name: Laporan
@@ -4345,6 +4346,13 @@ paths:
       - Penyusutan
       operationId: listDepreciationPeriods
       summary: Menampilkan periode penyusutan tenant aktif
+      description: |
+        Setiap periode membawa `buku_id` (master buku penyusutannya), `posting_layer` buku itu, dan
+        `posted_posting_id`. `posting_layer` `none` berarti buku itu tidak pernah mengirim penyusutan ke
+        aplikasi finance, jadi layar tidak menawarkannya di "Post penyusutan". `posted_posting_id` adalah
+        posting finance yang membawa periode itu — `asset.depreciation` untuk periode asli yang sudah
+        ikut "Post penyusutan", `asset.depreciation_reversal` untuk baris pembalik yang periode aslinya
+        sudah di-post. Kosong berarti belum di-post.
       responses:
         '200':
           description: Daftar periode
@@ -4357,30 +4365,138 @@ paths:
       responses:
         '200':
           description: Daftar Aset Book
+  /api/v1/penyusutan/posting/pratinjau:
+    get:
+      tags:
+      - Penyusutan
+      operationId: previewDepreciationPosting
+      summary: Pratinjau "Post penyusutan" satu entitas legal, buku, dan tanggal akhir periode
+      description: |
+        Pemeriksaan yang sama persis dengan proses post, tanpa menyimpan apa pun (TODO 11.2.7, K-22).
+        Jawabannya: `assets` (jumlah aset yang ikut), `register_total` (jumlah penyusutannya di
+        register, yang harus sama dengan total jurnal), `skipped` — periode yang tidak ikut, dihitung
+        per alasan: `proposed` (belum final), `posted` (sudah di-post), `reversed` (sudah dibalik), dan
+        `other_book` (jurnal asetnya dikirim lewat buku lain, K-26) — `blockers` (`{field, message}`
+        yang akan menolak proses post), dan `posting`: nomor, status yang akan diperoleh, tanggal,
+        mata uang, total, baris jurnal, dan masalah pemetaannya. `posting` `null` berarti tidak ada
+        yang perlu di-post, atau ada penghalang.
+
+        Hanya periode di dalam cakupan unit pengguna yang ikut. Pengguna yang sama sekali tidak
+        berwenang di entitas legal itu dijawab 403.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: buku_id
+        in: query
+        required: true
+        description: Master buku penyusutan.
+        schema:
+          type: string
+      - name: period_ends_on
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Pratinjau proses post
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          description: Kesalahan sistem pada penyusunan jurnal; kode kesalahan `posting_failed`
+  /api/v1/penyusutan/posting:
+    post:
+      tags:
+      - Penyusutan
+      operationId: postDepreciation
+      summary: Post penyusutan final satu entitas legal, buku, dan periode sebagai satu jurnal ringkas
+      description: |
+        Menerbitkan satu posting `asset.depreciation` untuk periode asli berstatus final yang belum
+        di-post, lalu menandai periodenya, di satu transaksi (TODO 11.2, K-14). Jurnalnya bertanggal
+        akhir periode: debit beban penyusutan per group aset dan unit penggunaan, kredit akumulasi
+        penyusutan per group aset dan business unit. `posting_id`-nya
+        `AST-DEP-<entitas legal>-<buku>-<YYYYMMDD>-<nomor urut proses>`: periode yang difinalkan
+        sesudah proses pertama ikut proses berikutnya dengan nomor urut berikutnya.
+
+        Hanya buku yang mengirim jurnal perolehan asetnya yang mengirim penyusutan; periode buku lain
+        dihitung di `skipped.other_book`. Periode yang sudah dibalik tidak pernah ikut. Pemetaan akun
+        yang kosong tidak menahan proses: posting terbit `held` dan periodenya tetap ditandai (K-18).
+
+        Bentuk jawabannya sama dengan pratinjau.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - legal_entity_id
+              - buku_id
+              - period_ends_on
+              properties:
+                legal_entity_id:
+                  type: string
+                buku_id:
+                  type: string
+                  description: Master buku penyusutan.
+                period_ends_on:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Posting terbit dan periodenya ditandai sudah di-post
+        '200':
+          description: Tidak ada periode yang perlu di-post — proses kedua untuk buku dan periode yang sama, atau proses yang
+            kalah balapan — sehingga `posting` `null`.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Buku berlapisan posting none, periode yang memakai lebih dari satu mata uang, atau penyusutan yang
+            lebih halus dari presisi mata uang (K-18, K-20).
+        '500':
+          description: Kesalahan sistem pada penyusunan jurnal; kode kesalahan `posting_failed`. Tidak ada yang berubah.
   /api/v1/penyusutan/{id}/finalisasi:
     post:
       tags:
       - Penyusutan
       operationId: finalizeDepreciation
-      summary: Mengunci subledger periode dan mengembalikan bridge internal tanpa posting GL
+      summary: Mengunci nilai satu periode dan menambahkannya ke saldo buku aset
+      description: |
+        Tidak lagi menulis ekspor penyusutan lama (TODO 11.4): jurnalnya sampai ke aplikasi finance
+        lewat "Post penyusutan". Jawabannya `{period}`.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       responses:
         '200':
-          description: Periode final; retry mengembalikan data yang sama tanpa export kedua
+          description: Periode final; retry mengembalikan periode yang sama tanpa menambah saldo kedua kali
   /api/v1/penyusutan/{id}/reversal:
     post:
       tags:
       - Penyusutan
       operationId: reverseDepreciation
       summary: Membuat pembalikan baru untuk periode final tanpa mengubah periode asal
+      description: |
+        Bila periode aslinya sudah di-post, jurnal baliknya (`asset.depreciation_reversal`, `posting_id`
+        `AST-DRV-<id baris pembalik>`) terbit di transaksi yang sama: kebalikan porsi aset itu saja,
+        bertanggal periode asal, merujuk posting asalnya (TODO 11.3). Bila belum, tidak ada posting,
+        dan periode aslinya tidak pernah ikut proses post. Jawabannya `{period, posting}`.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       responses:
-        '201': null
-        description: Pembalikan dan bridge internal dibuat tanpa posting GL
+        '201':
+          description: Pembalikan dibuat, beserta jurnal baliknya bila periode aslinya sudah di-post
         '409':
           description: Periode tidak dapat dibalik
+        '422':
+          description: Penyusutan periode asal lebih halus dari presisi mata uang yang berlaku sekarang
+        '500':
+          description: Kesalahan sistem pada penyusunan jurnal balik; kode kesalahan `posting_failed`. Tidak ada yang berubah.
   /api/internal/v1/laporan/{kode}:
     get:
       tags:

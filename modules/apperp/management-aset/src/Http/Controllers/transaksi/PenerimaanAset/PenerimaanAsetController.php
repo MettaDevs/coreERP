@@ -35,6 +35,7 @@ use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PenerimaanStatus;
+use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use Modules\Apperp\ManagementAset\Support\ValidasiAtributAset;
 use RuntimeException;
 use stdClass;
@@ -316,20 +317,7 @@ class PenerimaanAsetController extends Controller
             'posting_date' => $payload['posting_date'] ?? null,
             'settlement_mode' => $payload['settlement_mode'] ?? null,
             'currency' => $payload['currency'] ?? null,
-            'lines' => array_map(static fn (array $baris): array => [
-                'line_no' => (int) $baris['line_no'],
-                'account_code' => $baris['account']['code'] ?? null,
-                'account_name' => $baris['account']['name'] ?? null,
-                'description' => $baris['description'] ?? null,
-                'debit' => (string) $baris['debit'],
-                'credit' => (string) $baris['credit'],
-                'dimensions' => array_map(static fn (array $dimensi): array => [
-                    'code' => (string) $dimensi['code'],
-                    'display_name' => $dimensi['display_name'] ?? null,
-                    'value_code' => $dimensi['value_code'] ?? null,
-                    'value_display_name' => $dimensi['value_display_name'] ?? null,
-                ], $baris['financial_dimensions'] ?? []),
-            ], $payload['journal_lines'] ?? []),
+            'lines' => PostingCheckLines::from($payload),
             'problems' => $hasil['posting']['problems'] ?? [],
         ]]);
     }

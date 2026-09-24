@@ -29,7 +29,7 @@ Master biasa dengan kolom tambahan yang menentukan hitungan:
 
 ## Buku penyusutan dan lapisan posting
 
-`posting_layer` pada buku adalah **satu-satunya saklar posting** (K-15 feed posting finance): buku `none` (memorandum) dihitung dan dilaporkan, tetapi tidak pernah di-post ke aplikasi finance; lapisan lain di-post.
+`posting_layer` pada buku adalah **satu-satunya saklar posting** (K-15 feed posting finance): buku `none` (memorandum) dihitung dan dilaporkan, tetapi tidak pernah di-post ke aplikasi finance. Dari buku lainnya, hanya buku yang di-post group-nya — `current` lebih dulu — yang mengirim jurnal perolehan dan penyusutan aset itu (K-26, K-31); buku lain yang bukan `none` tetap menyusut di register saja.
 
 **Kenapa satu saklar:** dulu ada `export_to_backoffice` di samping lapisan posting. Dua saklar yang maknanya tumpang tindih pernah menghasilkan pembalikan yang terekspor padahal aslinya tidak. Saklar lama dilebur ke lapisan posting; API menolak field itu dengan 422, dan kolomnya dibiarkan satu rilis sebelum dibuang (aturan N-1).
 

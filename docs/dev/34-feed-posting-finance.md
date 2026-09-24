@@ -9,7 +9,7 @@ Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, atur
 - Spesifikasi **Integrasi · Finance** di portal `/docs` aplikasi Core, terbuka tanpa login — kontrak dan panduan untuk tim pembaca. Sumbernya `apps/core/contracts/internal/integrasi-finance.yaml`.
 
 ::: info Jenis yang sudah terbit
-Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9), dan `asset.opening_balance` untuk penerimaan saldo awal aset lama, bertanggal cutover (area 10). Penyusutan, pembalikan, dan koreksi nilai (area 11 dan 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
+Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9), dan `asset.opening_balance` untuk penerimaan saldo awal aset lama, bertanggal cutover (area 10). Sejak area 11, proses "Post penyusutan" menerbitkan `asset.depreciation` — satu jurnal ringkas per entitas legal, buku, dan periode — dan pembalikan periode yang sudah di-post menerbitkan `asset.depreciation_reversal`. Koreksi nilai perolehan (area 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
 :::
 
 ```text
@@ -162,7 +162,7 @@ Pemeriksaannya berlapis, dan urutannya disengaja:
 - `source_document.module` dan `source_document.type` terisi. `source_document.url`, bila ada, harus jalur di dalam aplikasi yang diawali satu `/`: tautan ke host lain dari data posting akan menjadi pintu pengalihan ke luar CoreERP.
 - Paling banyak satu dari `reverses_posting_id` dan `adjusts_posting_id`. Posting asalnya harus ada di entitas legal yang sama. Mode yang kosong diwarisi dari posting asal; mode yang berbeda dari posting asal ditolak (K-10).
 - `vendor_id` adalah vendor entitas legal yang sama, dan `requires_vendor: true` tanpa vendor ditolak. Layar module yang memilih vendor per entitas legal dan mewajibkannya, jadi vendor kosong atau salah entitas yang sampai ke penerbit adalah bug module, bukan keadaan yang diserahkan ke pengguna. Status vendor tidak diperiksa: memilih vendor aktif adalah tugas layar module lewat `DaftarVendor::aktif()`.
-- `lines` berisi sedikitnya dua baris dan paling banyak `PostingPublisher::MAX_LINES`. Jurnal yang lebih panjang harus diringkas per akun dan dimensi, seperti rencana posting penyusutan (K-14).
+- `lines` berisi sedikitnya dua baris dan paling banyak `PostingPublisher::MAX_LINES`. Jurnal yang lebih panjang harus diringkas, seperti posting penyusutan yang diringkas per group aset dan dimensi (K-14, K-30).
 - Nilai debit dan kredit adalah string desimal tanpa tanda dan tanpa pemisah ribuan. Bilangan bulat PHP diterima; float tidak. Setiap baris berisi tepat satu sisi yang tidak nol. Nilai negatif tidak ada: arah jurnal dibawa sisinya, jadi selisih negatif ditulis di sisi sebaliknya.
 - Nilai tidak boleh lebih halus dari presisi mata uang. Nilai yang lebih kasar dilengkapi nolnya — `"500000000"` menjadi `"500000000.00"` pada presisi dua.
 - Jurnal seimbang, dihitung dengan desimal pasti (`brick/math`), bukan float.
@@ -507,7 +507,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 ## Celah yang diketahui
 
-- **Baru dua jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dan `asset.opening_balance` dari penerimaan (area 9 dan 10). Penyusutan, pembalikan, dan koreksi nilai (area 11 dan 12) belum; jenisnya masih *Belum* di kontrak.
+- **Baru empat jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dan `asset.opening_balance` dari penerimaan (area 9 dan 10), serta `asset.depreciation` dan `asset.depreciation_reversal` dari "Post penyusutan" dan pembalikannya (area 11). Koreksi nilai perolehan (area 12) belum; jenisnya masih *Belum* di kontrak.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PenerbitPosting::pratinjau()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.

@@ -168,26 +168,9 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(0.0, $this->netBookValue($books[5]));
         $this->assertSame(500.0, $this->netBookValue($books[10]));
 
-        // Buku fiskal memorandum tidak diekspor, jadi backoffice tidak menjurnal dua kali.
-        $exported = DB::table('aset_tr_export_penyusutan as e')
-            ->join('aset_tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
-            ->pluck('p.buku_aset_id')->unique();
-        $this->assertTrue($exported->contains($books[10]));
-        $this->assertFalse($exported->contains($books[5]));
-    }
-
-    public function test_payload_export_tidak_membawa_resolusi_finance(): void
-    {
-        $book = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
-        $this->fastForward($book, 1);
-
-        $payload = json_decode((string) DB::table('aset_tr_export_penyusutan')->value('payload'), true);
-        // Barisnya harus benar-benar ada; tanpa ini `null` akan lolos sebagai "tidak
-        // membawa akun" dan test berhenti membuktikan apa pun.
-        $this->assertIsArray($payload, 'Buku yang mengekspor harus menghasilkan satu baris export.');
-        $this->assertArrayNotHasKey('akun', $payload);
-        $this->assertArrayNotHasKey('posting_layer', $payload);
-        $this->assertArrayNotHasKey('financial_dimension_org_unit_id', $payload);
+        // Kedua buku tidak lagi menulis ekspor. Buku fiskal memorandum juga tidak pernah di-post ke
+        // finance: proses "Post penyusutan" menolaknya (`DepreciationPostingTest`).
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
     }
 
     public function test_dasar_tahun_kalender_dan_fiskal_menghasilkan_awal_yang_berbeda(): void
@@ -263,24 +246,20 @@ class DepreciationEndToEndTest extends TestCase
     }
 
     /**
-     * Buku memorandum (`posting_layer = none`) tidak pernah menghasilkan ekspor, termasuk lewat
-     * pembalikan, dan pembalikan mengikuti periode aslinya (K-15, TODO 8.6.3). Sebelumnya
-     * pembalikan selalu diekspor, sehingga backoffice menerima pembalikan atas jurnal yang tidak
-     * pernah ia terima.
+     * Ekspor lama berhenti ditulis sejak "Post penyusutan" (feed posting finance, TODO 11.4), untuk
+     * buku yang di-post maupun memorandum, lewat finalisasi maupun pembalikan. Jurnal penyusutan kini
+     * satu posting ringkas per proses post, dan pembaliknya mengikuti apakah periode aslinya sudah
+     * di-post (`DepreciationPostingTest`).
      */
-    public function test_a_memorandum_book_never_exports_and_a_reversal_follows_its_original(): void
+    public function test_finalisasi_dan_pembalikan_tidak_lagi_menulis_ekspor(): void
     {
         $memorandum = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200);
         $this->reverse($this->finalizedPeriod($memorandum));
-        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
+        $diPost = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, diPost: true);
+        $this->reverse($this->finalizedPeriod($diPost));
 
-        $diPost = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
-        $asli = $this->finalizedPeriod($diPost);
-        $this->assertSame(1, DB::table('aset_tr_export_penyusutan')->where('depreciation_period_id', $asli)->count());
-        $this->reverse($asli);
-        $pembalikan = (string) DB::table('aset_tr_penyusutan_aset')->where('reverses_period_id', $asli)->value('id');
-        $this->assertSame(1, DB::table('aset_tr_export_penyusutan')->where('depreciation_period_id', $pembalikan)->count());
-        $this->assertSame(2, DB::table('aset_tr_export_penyusutan')->count());
+        $this->assertSame(4, DB::table('aset_tr_penyusutan_aset')->count());
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
     }
 
     // ---- penyusun skenario -------------------------------------------------
@@ -288,9 +267,7 @@ class DepreciationEndToEndTest extends TestCase
     /**
      * Menyiapkan satu aset lengkap dengan bukunya dan mengembalikan id buku aset.
      *
-     * Bukunya memorandum (`posting_layer = none`) kecuali ekspor diminta. Test yang memeriksa
-     * isi payload ekspor wajib memintanya sendiri, supaya jelas bahwa ekspor itu bagian dari
-     * skenarionya.
+     * Bukunya memorandum (`posting_layer = none`) kecuali `$diPost`, yang memberinya lapisan current.
      *
      * @param  array<string, mixed>  $profile
      */
@@ -300,7 +277,7 @@ class DepreciationEndToEndTest extends TestCase
         float $residual = 0,
         string $convention = 'full_month',
         string $placedInService = '2026-06-15',
-        bool $export = false,
+        bool $diPost = false,
     ): string {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
@@ -308,7 +285,7 @@ class DepreciationEndToEndTest extends TestCase
         $buku = $this->master('buku-penyusutan', [
             'nama' => 'Buku '.Str::random(6),
             'depreciation_profile_id' => $profilId,
-            'posting_layer' => $export ? 'current' : 'none',
+            'posting_layer' => $diPost ? 'current' : 'none',
         ]);
         $this->matrix($group, [[
             'buku_id' => $buku,

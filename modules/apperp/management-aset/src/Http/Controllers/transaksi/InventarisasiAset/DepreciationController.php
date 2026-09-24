@@ -8,16 +8,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationExport;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
+use Modules\Apperp\ManagementAset\Services\DepreciationPosting;
+use Modules\Apperp\ManagementAset\Services\DepreciationPostingFailed;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use stdClass;
 
+/**
+ * @phpstan-import-type HasilProses from DepreciationPosting
+ */
 class DepreciationController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -27,13 +31,17 @@ class DepreciationController extends Controller
             $join->on('book.id', '=', 'aset_tr_penyusutan_aset.buku_aset_id')->on('book.tenant_id', '=', 'aset_tr_penyusutan_aset.tenant_id');
         })->join('aset_tr_aset as aset', function ($join): void {
             $join->on('aset.id', '=', 'book.aset_id')->on('aset.tenant_id', '=', 'book.tenant_id');
+        })->leftJoin('aset_m_buku_penyusutan as buku', function ($join): void {
+            // Lapisan posting buku: layar hanya menawarkan buku yang memang mengirim penyusutannya ke
+            // aplikasi finance di "Post penyusutan" (K-26, K-31).
+            $join->on('buku.id', '=', 'book.buku_id')->on('buku.tenant_id', '=', 'book.tenant_id');
         });
         app(OrganizationScope::class)->query($query, $request, 'aset_tr_penyusutan_aset.legal_entity_id', 'aset_tr_penyusutan_aset.usage_org_unit_id');
         // `toBase()` menjalankan query lewat model — global scope tenant sudah tersisip di
         // dalamnya — tetapi memulangkan baris apa adanya, bukan model. Itu yang menjaga
         // jawaban HTTP tetap sama persis: tanggal tetap 'YYYY-MM-DD' dan angka tetap teks
         // seperti yang dikirim database, bukan hasil cast model.
-        $periods = $query->select('aset_tr_penyusutan_aset.*', 'book.book_code', 'aset.kode as aset_code', 'aset.currency_code')->orderByDesc('aset_tr_penyusutan_aset.period_ends_on')->toBase()->get();
+        $periods = $query->select('aset_tr_penyusutan_aset.*', 'book.book_code', 'book.buku_id', 'buku.posting_layer', 'aset.kode as aset_code', 'aset.currency_code')->orderByDesc('aset_tr_penyusutan_aset.period_ends_on')->toBase()->get();
 
         return response()->json(['data' => $periods]);
     }
@@ -251,38 +259,28 @@ class DepreciationController extends Controller
         $book->manual_schedule = $alternative->manual_schedule;
     }
 
+    /**
+     * Mengunci nilai satu periode dan menambahkannya ke saldo buku asetnya.
+     *
+     * Finalisasi tidak lagi menulis ekspor `aset_tr_export_penyusutan` (feed posting finance, TODO
+     * 11.4): penyusutan sampai ke aplikasi finance lewat proses "Post penyusutan", satu jurnal ringkas
+     * per entitas legal, buku, dan periode. Tabel ekspor dan riwayatnya dibiarkan dan tetap dapat dibaca.
+     */
     public function finalize(Request $request, string $id): JsonResponse
     {
         $this->can($request, 'finalize');
-        $tenant = $this->tenant($request);
         $scope = app(OrganizationScope::class);
-        $result = DB::transaction(function () use ($tenant, $id, $request, $scope): array {
+        $result = DB::transaction(function () use ($id, $request, $scope): array {
             $query = DepreciationPeriod::query()->where('id', $id);
             $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
             $period = $query->lockForUpdate()->toBase()->first();
             abort_unless($period !== null, 404);
             if ($period->status === 'final') {
-                // Retry finalisasi harus aman: transaksi dan export yang sudah ada
-                // dikembalikan tanpa menambah saldo atau membuat export kedua.
-                return [
-                    'period' => $period,
-                    'export' => DepreciationExport::query()
-                        ->where('depreciation_period_id', $period->id)
-                        ->toBase()->first(),
-                ];
+                // Retry finalisasi harus aman: periode yang sudah final dikembalikan tanpa
+                // menambah saldo buku untuk kedua kalinya.
+                return ['period' => $period];
             }
             DepreciationPeriod::query()->where('id', $id)->update(['status' => 'final', 'updated_at' => now()]);
-            $book = BukuAset::query()->join('aset_tr_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-            })
-                ->leftJoin('aset_m_buku_penyusutan as buku', function ($join): void {
-                    $join->on('buku.id', '=', 'aset_tr_buku_aset.buku_id')->on('buku.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-                })
-                ->where('aset_tr_buku_aset.id', $period->buku_aset_id)
-                ->select(
-                    'aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code',
-                    'buku.posting_layer',
-                )->toBase()->first();
             // Penambahan dikerjakan database, bukan PHP, dan itu menahan kehilangan pembaruan:
             // pada `finalize()` yang terkunci hanya periodenya, sehingga dua periode milik satu
             // buku boleh difinalkan bersamaan. `incrementEach()` menyusun ekspresi `kolom + n`
@@ -292,79 +290,152 @@ class DepreciationController extends Controller
             // Pembulatan `round(..., 2)` yang dulu ditulis di sini dibuang karena ia tidak
             // pernah mengubah apa pun: kedua kolom `decimal(18,2)`, dan PostgreSQL membulatkan
             // ke skala kolom saat nilainya disimpan.
-            BukuAset::query()->where('id', $book->id)->incrementEach([
+            BukuAset::query()->where('id', $period->buku_aset_id)->incrementEach([
                 'accumulated_depreciation' => (float) $period->amount,
                 'net_book_value' => -(float) $period->amount,
             ]);
-            $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $period->legal_entity_id, 'buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'usage_org_unit_id' => $period->usage_org_unit_id, 'period_starts_on' => $period->period_starts_on, 'period_ends_on' => $period->period_ends_on, 'amount' => $period->amount, 'currency_code' => $book->currency_code, 'acquisition_value' => $book->acquisition_value, 'accumulated_depreciation' => round((float) $book->accumulated_depreciation + (float) $period->amount, 2), 'net_book_value' => round((float) $book->net_book_value - (float) $period->amount, 2), 'status' => 'final'];
-            // Buku memorandum (`posting_layer = none`) tidak pernah diekspor, supaya backoffice
-            // tidak menjurnal dua kali untuk aset yang sama; buku fiskal lazimnya memorandum.
-            // Periodenya tetap final dan tercatat. Satu saklar, bukan dua (K-15).
-            $exported = $book->buku_id === null || $book->posting_layer !== BukuPenyusutan::POSTING_LAYER_NONE;
-            $export = null;
-            if ($exported) {
-                $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period->id, 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
-                $this->saveExport($export, $payload);
-            }
 
-            return ['period' => DepreciationPeriod::query()->where('id', $id)->toBase()->first(), 'export' => $export];
+            return ['period' => DepreciationPeriod::query()->where('id', $id)->toBase()->first()];
         });
 
         return response()->json(['data' => $result]);
     }
 
+    /**
+     * Membalik satu periode final dengan baris pembalik baru, tanpa mengubah periode asal.
+     *
+     * Jurnal baliknya (`asset.depreciation_reversal`) terbit di transaksi yang sama, hanya bila periode
+     * aslinya sudah di-post (TODO 11.3): pembalikan mengikuti apakah jurnal aslinya sampai ke finance,
+     * bukan lapisan posting buku hari ini, sehingga asimetri ekspor lama tidak terulang. Periode yang
+     * dibalik sebelum di-post tidak pernah ikut proses post, dan tidak butuh jurnal balik.
+     */
     public function reverse(Request $request, string $id): JsonResponse
     {
         $this->can($request, 'correct');
         $tenant = $this->tenant($request);
         $data = $request->validate(['reason' => ['required', 'string', 'max:250']]);
         $scope = app(OrganizationScope::class);
-        $result = DB::transaction(function () use ($tenant, $id, $data, $request, $scope): array {
-            $query = DepreciationPeriod::query()->where('id', $id);
-            $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
-            $original = $query->lockForUpdate()->toBase()->first();
-            abort_unless($original !== null, 404);
-            abort_unless($original->status === 'final', 409, 'Hanya periode final yang dapat dibalik.');
-            abort_if(DepreciationPeriod::query()->where('reverses_period_id', $original->id)->exists(), 409, 'Periode penyusutan ini sudah dibalik.');
-            $book = BukuAset::query()->join('aset_tr_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-            })->where('aset_tr_buku_aset.id', $original->buku_aset_id)->select('aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code')->lockForUpdate()->toBase()->first();
-            abort_unless($book !== null, 404);
-            $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id, 'legal_entity_id' => $original->legal_entity_id, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'status' => 'final', 'reverses_period_id' => $original->id, 'created_at' => now(), 'updated_at' => now()];
-            (new DepreciationPeriod)->forceFill($period)->save();
-            BukuAset::query()->where('id', $book->id)->incrementEach([
-                'accumulated_depreciation' => -(float) $original->amount,
-                'net_book_value' => (float) $original->amount,
-            ]);
-            $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $original->legal_entity_id, 'buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'currency_code' => $book->currency_code, 'status' => 'reversal', 'reverses_period_id' => $original->id, 'reason' => $data['reason']];
-            // Pembalikan diekspor hanya bila periode aslinya dulu diekspor. Sebelumnya pembalikan
-            // selalu diekspor, sehingga backoffice menerima pembalikan atas jurnal yang tidak
-            // pernah ia terima (K-15).
-            $export = null;
-            if (DepreciationExport::query()->where('depreciation_period_id', $original->id)->exists()) {
-                $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period['id'], 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
-                $this->saveExport($export, $payload);
-            }
+        try {
+            $result = DB::transaction(function () use ($tenant, $id, $data, $request, $scope): array {
+                $query = DepreciationPeriod::query()->where('id', $id);
+                $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
+                $original = $query->lockForUpdate()->toBase()->first();
+                abort_unless($original !== null, 404);
+                abort_unless($original->status === 'final', 409, 'Hanya periode final yang dapat dibalik.');
+                abort_if(DepreciationPeriod::query()->where('reverses_period_id', $original->id)->exists(), 409, 'Periode penyusutan ini sudah dibalik.');
+                $book = BukuAset::query()->join('aset_tr_aset as aset', function ($join): void {
+                    $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
+                })->where('aset_tr_buku_aset.id', $original->buku_aset_id)->select('aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code', 'aset.group_aset_id')->lockForUpdate()->toBase()->first();
+                abort_unless($book !== null, 404);
+                $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id, 'legal_entity_id' => $original->legal_entity_id, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'status' => 'final', 'reverses_period_id' => $original->id, 'created_at' => now(), 'updated_at' => now()];
+                (new DepreciationPeriod)->forceFill($period)->save();
+                BukuAset::query()->where('id', $book->id)->incrementEach([
+                    'accumulated_depreciation' => -(float) $original->amount,
+                    'net_book_value' => (float) $original->amount,
+                ]);
 
-            return ['period' => $period, 'export' => $export];
-        });
+                $posting = app(DepreciationPosting::class)->publishReversal($tenant, $original, $period['id'], $book, $data['reason']);
+                if ($posting !== null) {
+                    DepreciationPeriod::query()->where('id', $period['id'])->update(['posted_posting_id' => $posting['posting_id']]);
+                    $period['posted_posting_id'] = $posting['posting_id'];
+                }
+
+                return ['period' => $period, 'posting' => $posting === null ? null : ['posting_id' => $posting['posting_id'], 'status' => $posting['status']]];
+            });
+        } catch (DepreciationPostingFailed $kegagalan) {
+            return $this->postingFailed($kegagalan);
+        }
 
         return response()->json(['data' => $result], 201);
     }
 
     /**
-     * Menyimpan satu baris export.
-     *
-     * `payload` pada jawaban HTTP tetap berupa teks JSON seperti sebelumnya, sedangkan
-     * modelnya menyandikan sendiri lewat cast `array` — jadi yang diserahkan ke model
-     * adalah payload aslinya, bukan teks yang sudah disandikan.
-     *
-     * @param  array<string, mixed>  $export
-     * @param  array<string, mixed>  $payload
+     * Pratinjau "Post penyusutan" satu entitas legal, buku, dan tanggal akhir periode (TODO 11.2.7):
+     * jumlah aset yang ikut, total register, jurnal ringkas beserta masalahnya, dan periode yang tidak
+     * ikut beserta alasannya. Tidak menyimpan apa pun.
      */
-    private function saveExport(array $export, array $payload): void
+    public function postingPreview(Request $request): JsonResponse
     {
-        (new DepreciationExport)->forceFill([...$export, 'payload' => $payload])->save();
+        $this->can($request, 'post');
+        $data = $this->postingRequest($request);
+        try {
+            $hasil = app(DepreciationPosting::class)->preview($request, $data['legal_entity_id'], $data['buku_id'], $data['period_ends_on']);
+        } catch (DepreciationPostingFailed $kegagalan) {
+            return $this->postingFailed($kegagalan);
+        }
+
+        return response()->json(['data' => $this->postingResult($hasil)]);
+    }
+
+    /**
+     * Proses "Post penyusutan" (TODO 11.2): satu posting `asset.depreciation` untuk periode final yang
+     * belum di-post, dijawab 201. Tidak ada yang tersisa untuk di-post dijawab 200 dengan `posting`
+     * kosong — proses kedua untuk buku dan periode yang sama, atau yang kalah balapan.
+     */
+    public function post(Request $request): JsonResponse
+    {
+        $this->can($request, 'post');
+        $data = $this->postingRequest($request);
+        try {
+            $hasil = app(DepreciationPosting::class)->post($request, $data['legal_entity_id'], $data['buku_id'], $data['period_ends_on']);
+        } catch (DepreciationPostingFailed $kegagalan) {
+            return $this->postingFailed($kegagalan);
+        }
+
+        return response()->json(['data' => $this->postingResult($hasil)], $hasil['posting'] === null ? 200 : 201);
+    }
+
+    /**
+     * Masukan proses post. Cakupan unit pengguna tetap menyaring periode yang ikut; pengguna yang sama
+     * sekali tidak berwenang di entitas legal itu ditolak di sini.
+     *
+     * @return array{legal_entity_id: string, buku_id: string, period_ends_on: string}
+     */
+    private function postingRequest(Request $request): array
+    {
+        $data = $request->validate([
+            'legal_entity_id' => ['required', 'ulid'],
+            'buku_id' => ['required', 'ulid'],
+            'period_ends_on' => ['required', 'date_format:Y-m-d'],
+        ]);
+        app(OrganizationScope::class)->require($request, (string) $data['legal_entity_id'], null);
+
+        return [
+            'legal_entity_id' => (string) $data['legal_entity_id'],
+            'buku_id' => (string) $data['buku_id'],
+            'period_ends_on' => (string) $data['period_ends_on'],
+        ];
+    }
+
+    /**
+     * Hasil pratinjau atau proses post untuk layar: `posting` dipetakan ke bentuk komponen pemeriksaan
+     * posting, sama dengan pratinjau penerimaan.
+     *
+     * @param  HasilProses  $hasil
+     * @return array<string, mixed>
+     */
+    private function postingResult(array $hasil): array
+    {
+        $posting = $hasil['posting'];
+        $payload = $posting['payload'] ?? null;
+
+        return [
+            ...$hasil,
+            'posting' => $posting === null ? null : [
+                'posting_id' => $posting['posting_id'],
+                'status' => $posting['status'],
+                'posting_date' => $payload['posting_date'] ?? null,
+                'currency' => $payload['currency'] ?? null,
+                'total' => $payload['totals']['debit'] ?? null,
+                'lines' => PostingCheckLines::from($payload),
+                'problems' => $posting['problems'],
+            ],
+        ];
+    }
+
+    private function postingFailed(DepreciationPostingFailed $failure): JsonResponse
+    {
+        return response()->json(['error' => ['code' => 'posting_failed', 'message' => $failure->getMessage()]], 500);
     }
 
     private function can(Request $r, string $action): void
