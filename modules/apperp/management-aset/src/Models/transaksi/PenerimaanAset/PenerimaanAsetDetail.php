@@ -32,6 +32,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $jumlah
  * @property string $nilai_per_unit
  * @property string $residu_per_unit
+ * @property string $akumulasi_per_unit
+ * @property int $periode_berjalan
+ * @property ?list<array{buku_id: string, akumulasi_per_unit: string, periode_berjalan: int}> $saldo_awal_buku
  * @property ?string $permintaan_pembelian_detail_id
  * @property ?array<int, array<string, mixed>> $atribut
  * @property ?string $keterangan
@@ -47,6 +50,7 @@ class PenerimaanAsetDetail extends Model
         'tenant_id', 'penerimaan_aset_id', 'line_number', 'nama', 'group_aset_id',
         'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id',
         'model_number', 'jumlah', 'nilai_per_unit', 'ppn_per_unit', 'residu_per_unit',
+        'akumulasi_per_unit', 'periode_berjalan', 'saldo_awal_buku',
         'permintaan_pembelian_detail_id', 'atribut', 'keterangan',
     ];
 
@@ -60,6 +64,10 @@ class PenerimaanAsetDetail extends Model
             'nilai_per_unit' => 'decimal:6',
             'ppn_per_unit' => 'decimal:6',
             'residu_per_unit' => 'decimal:2',
+            // Saldo awal (TODO 10.1.1): akumulasi buku yang di-post, sekaligus bawaan buku lain.
+            'akumulasi_per_unit' => 'decimal:2',
+            'periode_berjalan' => 'integer',
+            'saldo_awal_buku' => 'array',
             'atribut' => 'array',
         ];
     }

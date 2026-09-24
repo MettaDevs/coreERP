@@ -18,14 +18,11 @@ final class AcquisitionMethod
 
     public const OPENING_BALANCE = 'saldo_awal';
 
-    public const ALL = [self::PURCHASE, self::GRANT, self::OPENING_BALANCE];
-
     /**
-     * Cara yang dapat dipilih di dokumen penerimaan hari ini. Saldo awal ikut bersama area 10:
-     * jurnalnya bukan `asset.acquisition` melainkan `asset.opening_balance`, dan barisnya membawa
-     * akumulasi penyusutan sampai cutover yang belum ada di penerimaan.
+     * Ketiganya dipilih di dokumen penerimaan. Saldo awal jurnalnya `asset.opening_balance`, bukan
+     * `asset.acquisition`, dan barisnya membawa akumulasi penyusutan sampai cutover (area 10).
      */
-    public const RECEIPT = [self::PURCHASE, self::GRANT];
+    public const ALL = [self::PURCHASE, self::GRANT, self::OPENING_BALANCE];
 
     /** Label untuk layar dan pesan. */
     public const LABELS = [

@@ -5,6 +5,8 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAse
 use App\Support\Modules\Contracts\DaftarVendor;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Support\Modules\Contracts\SetelanPostingFinance;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
@@ -25,6 +27,7 @@ use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\OpeningBalance;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
@@ -77,6 +80,9 @@ class PenerimaanAsetController extends Controller
      */
     private const MAX_JUMLAH_BARIS = 500;
 
+    /** Batas kewarasan periode berjalan saldo awal: seratus tahun periode bulanan. */
+    private const MAX_PERIODE_BERJALAN = 1200;
+
     public function index(Request $request): JsonResponse
     {
         $this->guard($request, 'read');
@@ -116,9 +122,9 @@ class PenerimaanAsetController extends Controller
         // Vendor milik Core: nomor dan namanya dibaca ulang, bukan disalin ke dokumen (K-06).
         $vendor = $penerimaan->vendor_id === null ? null : app(DaftarVendor::class)->satu($tenant, (string) $penerimaan->vendor_id);
         $penerimaan->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
-        // Keadaan jurnal perolehannya di feed posting finance, sesudah diselesaikan.
+        // Keadaan jurnalnya di feed posting finance, sesudah diselesaikan: perolehan, atau saldo awal.
         $penerimaan->posting = $penerimaan->status === PenerimaanStatus::SELESAI
-            ? app(PenerbitPosting::class)->status($tenant, AcquisitionPosting::postingId($id))
+            ? app(PenerbitPosting::class)->status($tenant, AcquisitionPosting::postingId($id, (string) $penerimaan->cara_perolehan))
             : null;
 
         return response()->json(['data' => $penerimaan]);
@@ -326,6 +332,21 @@ class PenerimaanAsetController extends Controller
     }
 
     /**
+     * Buku yang akan lahir untuk aset satu group, dengan buku yang di-post ke finance lebih dulu, untuk
+     * isian saldo awal per buku (TODO 10.1.1, K-28). Dijaga izin membaca penerimaan, bukan izin group
+     * aset: yang mencatat saldo awal tidak harus boleh mengubah master.
+     */
+    public function buku(Request $request): JsonResponse
+    {
+        $this->guard($request, 'read');
+        $query = $request->validate([
+            'group_aset_id' => ['required', 'ulid', Rule::exists('aset_m_group_aset', 'id')->where('tenant_id', $this->tenant($request))],
+        ]);
+
+        return response()->json(['data' => app(PembuatAset::class)->bukuGroup((string) $query['group_aset_id'])]);
+    }
+
+    /**
      * Vendor aktif satu entitas legal untuk pemilih vendor penerimaan. Vendor milik Core (K-06) dan
      * boleh dilihat semua anggota tenant, jadi yang dijaga hanya izin membaca penerimaan.
      */
@@ -393,9 +414,13 @@ class PenerimaanAsetController extends Controller
                     'key' => 'penerimaan:'.$id.':'.$line->line_number.':'.$urut,
                     'value' => $nilai['unit_values'][$urut - 1],
                     'tax' => $nilai['unit_taxes'][$urut - 1],
+                    'accumulated' => $nilai['unit_accumulated'][$urut - 1],
                 ];
             }
         }
+        // Saldo awal (TODO 10.3): buku aset lahir dengan akumulasinya, dan penyusutannya berlanjut
+        // mulai cutover. Cutover pasti ada di sini; tanpanya `blockers()` sudah menolak.
+        $cutover = $penerimaan->cara_perolehan === AcquisitionMethod::OPENING_BALANCE ? $perolehan->cutover($penerimaan) : null;
 
         try {
             foreach ($kunci as $i => $satuan) {
@@ -406,7 +431,7 @@ class PenerimaanAsetController extends Controller
         }
 
         try {
-            $changed = DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines): int {
+            $changed = DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover): int {
                 // Status dipindahkan lebih dahulu dan dengan `version` sebagai syarat. Dua
                 // penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan tidak
                 // ada cara mengetahui mana yang berlebih. Yang kalah menemukan nol baris
@@ -420,12 +445,13 @@ class PenerimaanAsetController extends Controller
 
                 $terbit = [];
                 foreach ($kunci as $satuan) {
-                    $aset = $pembuat->buat($tenant, $satuan['key'], $satuan['kode'], $this->spesifikasiAset($penerimaan, $satuan['line'], $satuan['value']));
+                    $aset = $pembuat->buat($tenant, $satuan['key'], $satuan['kode'], $this->spesifikasiAset($penerimaan, $satuan['line'], $satuan['value'], $cutover));
                     $terbit[] = [
                         'asset_code' => (string) $aset->kode,
                         'group_aset_id' => (string) $satuan['line']->group_aset_id,
                         'acquisition_value' => $satuan['value'],
                         'tax_amount' => $satuan['tax'],
+                        'accumulated_depreciation' => $satuan['accumulated'],
                     ];
                 }
                 $perolehan->publish($penerimaan, $lines, $terbit);
@@ -553,9 +579,12 @@ class PenerimaanAsetController extends Controller
      * Header memasok yang berlaku untuk seluruh kedatangan — tanggal, lokasi, unit,
      * mata uang — dan baris memasok yang membedakan barangnya.
      *
+     * `$cutover` hanya ada pada saldo awal: buku asetnya lahir dengan akumulasi dan periode
+     * berjalan dari baris ini, dan penyusutannya tidak mulai sebelum cutover (TODO 10.3).
+     *
      * @return array<string, mixed>
      */
-    private function spesifikasiAset(stdClass $penerimaan, stdClass $line, string $nilai): array
+    private function spesifikasiAset(stdClass $penerimaan, stdClass $line, string $nilai, ?string $cutover = null): array
     {
         return [
             'nama' => $line->nama,
@@ -584,6 +613,7 @@ class PenerimaanAsetController extends Controller
             'atribut' => $this->atributBaris($line),
             'penerimaan_aset_id' => $penerimaan->id,
             'penerimaan_aset_detail_id' => $line->id,
+            'opening_balance' => $cutover === null ? null : ['starts_on' => $cutover, 'amounts' => OpeningBalance::fromLine($line)],
         ];
     }
 
@@ -615,7 +645,7 @@ class PenerimaanAsetController extends Controller
             'lokasi_aset_id' => ['nullable', 'ulid', $milikTenant('aset_m_lokasi_aset')],
             'currency_code' => ['required', 'string', 'size:3'],
             'keterangan' => ['nullable', 'string', 'max:2000'],
-            'cara_perolehan' => ['sometimes', Rule::in(AcquisitionMethod::RECEIPT)],
+            'cara_perolehan' => ['sometimes', Rule::in(AcquisitionMethod::ALL)],
             'vendor_id' => ['nullable', 'ulid'],
             'vendor_invoice_reference' => ['nullable', 'string', 'max:80'],
             'vendor_invoice_date' => ['nullable', 'date_format:Y-m-d'],
@@ -631,13 +661,19 @@ class PenerimaanAsetController extends Controller
             'details.*.nilai_per_unit' => ['required', 'numeric', 'min:0'],
             'details.*.ppn_per_unit' => ['nullable', 'numeric', 'min:0'],
             'details.*.residu_per_unit' => ['nullable', 'numeric', 'min:0'],
+            'details.*.akumulasi_per_unit' => ['nullable', 'numeric', 'min:0'],
+            'details.*.periode_berjalan' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_PERIODE_BERJALAN],
+            'details.*.saldo_awal_buku' => ['sometimes', 'nullable', 'array'],
+            'details.*.saldo_awal_buku.*.buku_id' => ['required', 'ulid'],
+            'details.*.saldo_awal_buku.*.akumulasi_per_unit' => ['required', 'numeric', 'min:0'],
+            'details.*.saldo_awal_buku.*.periode_berjalan' => ['required', 'integer', 'min:0', 'max:'.self::MAX_PERIODE_BERJALAN],
             'details.*.permintaan_pembelian_detail_id' => ['nullable', 'ulid', Rule::exists('aset_tr_permintaan_pengadaan_aset_details', 'id')->where('tenant_id', $tenant)],
             'details.*.keterangan' => ['nullable', 'string', 'max:2000'],
             'details.*.atribut' => ['sometimes', 'array'],
             'details.*.atribut.*.tipe_atribut_id' => ['required', 'ulid'],
             'details.*.atribut.*.nilai' => ['present'],
         ], [
-            'cara_perolehan.in' => 'Pilih pembelian atau hibah. Saldo awal belum dapat dicatat lewat penerimaan.',
+            'cara_perolehan.in' => 'Pilih pembelian, hibah, atau saldo awal.',
         ]);
 
         // `details` dijadikan list di sini, bukan dipercayai sudah berupa list.
@@ -671,8 +707,115 @@ class PenerimaanAsetController extends Controller
         if ($pesan !== []) {
             throw ValidationException::withMessages($pesan);
         }
+        $this->validasiSaldoAwal($request, $data);
 
         return $data;
+    }
+
+    /**
+     * Aturan saldo awal (TODO 10.1, K-27, K-28), sekaligus memastikan dokumen lain tidak membawa angka
+     * saldo awal.
+     *
+     * Akumulasi diketik berpresisi nilai mata uang, jadi ia tidak pernah dibulatkan, dan bersama
+     * residunya tidak boleh melebihi nilai per unit. Periode berjalan tidak boleh melebihi masa
+     * manfaat buku yang memakainya: angka baris berlaku untuk buku yang di-post dan setiap buku yang
+     * tidak diisi tersendiri, jadi keduanya diperiksa terhadap masa manfaat masing-masing buku.
+     * Tanggal sesudah cutover sudah ditolak di sini bila cutover-nya diketahui; bila belum, penolakannya
+     * menunggu saat diselesaikan.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function validasiSaldoAwal(Request $request, array &$data): void
+    {
+        $saldoAwal = $data['cara_perolehan'] === AcquisitionMethod::OPENING_BALANCE;
+        $pesan = [];
+        if ($saldoAwal) {
+            foreach (['vendor_id', 'vendor_invoice_reference', 'vendor_invoice_date'] as $kolom) {
+                if (($data[$kolom] ?? null) !== null && $data[$kolom] !== '') {
+                    $pesan[$kolom] = 'Saldo awal tidak punya vendor maupun faktur; kosongkan isian ini.';
+                }
+            }
+            $cutover = app(SetelanPostingFinance::class)->cutover((string) $data['legal_entity_id']);
+            $masalah = $cutover === null ? null : AcquisitionPosting::masalahCutover((string) $data['tanggal'], $cutover);
+            if ($masalah !== null) {
+                $pesan['tanggal'] = $masalah;
+            }
+        }
+
+        $desimal = app(PresisiMataUang::class)->nilai($this->tenant($request), strtoupper((string) $data['currency_code']));
+        $bukuGroup = [];
+        foreach ($data['details'] as $indeks => $detail) {
+            $kunci = 'details.'.$indeks.'.';
+            $akumulasi = self::angka($detail['akumulasi_per_unit'] ?? 0);
+            $periode = (int) ($detail['periode_berjalan'] ?? 0);
+            $isian = array_values($detail['saldo_awal_buku'] ?? []);
+            $data['details'][$indeks]['akumulasi_per_unit'] = $akumulasi;
+            $data['details'][$indeks]['periode_berjalan'] = $periode;
+            $data['details'][$indeks]['saldo_awal_buku'] = null;
+            if (! $saldoAwal) {
+                if (BigDecimal::of($akumulasi)->isPositive() || $periode > 0 || $isian !== []) {
+                    $pesan[$kunci.'akumulasi_per_unit'] = 'Akumulasi dan periode berjalan hanya diisi untuk saldo awal.';
+                }
+
+                continue;
+            }
+            if (BigDecimal::of((string) $detail['ppn_per_unit'])->isPositive()) {
+                $pesan[$kunci.'ppn_per_unit'] = 'PPN tidak berlaku untuk saldo awal.';
+            }
+
+            $groupId = (string) $detail['group_aset_id'];
+            $bukuGroup[$groupId] ??= array_column(app(PembuatAset::class)->bukuGroup($groupId), null, 'buku_id');
+            $diPost = array_values(array_filter($bukuGroup[$groupId], static fn (array $buku): bool => $buku['di_post']))[0]['buku_id'] ?? null;
+            $nilai = BigDecimal::of((string) $detail['nilai_per_unit']);
+            $residu = BigDecimal::of(self::angka($detail['residu_per_unit'] ?? 0));
+
+            // Angka per buku: yang diisi tersendiri, lalu angka baris untuk sisanya.
+            $perBuku = [];
+            foreach ($isian as $urut => $buku) {
+                $kunciBuku = $kunci.'saldo_awal_buku.'.$urut.'.';
+                $bukuId = (string) $buku['buku_id'];
+                if (! isset($bukuGroup[$groupId][$bukuId])) {
+                    $pesan[$kunciBuku.'buku_id'] = 'Buku ini tidak ada di matriks group x buku group baris ini.';
+
+                    continue;
+                }
+                if ($bukuId === $diPost || isset($perBuku[$bukuId])) {
+                    $pesan[$kunciBuku.'buku_id'] = 'Angka buku yang di-post ke finance diisi di baris itu sendiri, dan tiap buku lain cukup diisi sekali.';
+
+                    continue;
+                }
+                $perBuku[$bukuId] = ['kunci' => $kunciBuku, 'akumulasi' => self::angka($buku['akumulasi_per_unit']), 'periode' => (int) $buku['periode_berjalan']];
+            }
+
+            foreach ([['kunci' => $kunci, 'akumulasi' => $akumulasi], ...array_values($perBuku)] as $angka) {
+                $koma = strpos($angka['akumulasi'], '.');
+                if ($koma !== false && strlen($angka['akumulasi']) - $koma - 1 > $desimal) {
+                    $pesan[$angka['kunci'].'akumulasi_per_unit'] = sprintf('Akumulasi paling banyak %d angka di belakang koma.', $desimal);
+                } elseif (BigDecimal::of($angka['akumulasi'])->plus($residu)->isGreaterThan($nilai)) {
+                    $pesan[$angka['kunci'].'akumulasi_per_unit'] = 'Akumulasi ditambah nilai residu tidak boleh melebihi nilai per unit.';
+                }
+            }
+            foreach ($bukuGroup[$groupId] as $bukuId => $buku) {
+                $angka = $perBuku[$bukuId] ?? ['kunci' => $kunci, 'periode' => $periode];
+                if ($buku['masa_manfaat'] !== null && $angka['periode'] > $buku['masa_manfaat']) {
+                    $pesan[$angka['kunci'].'periode_berjalan'] = sprintf(
+                        'Periode berjalan melebihi masa manfaat buku %s (%d periode).%s',
+                        $buku['kode'],
+                        $buku['masa_manfaat'],
+                        isset($perBuku[$bukuId]) || $bukuId === $diPost ? '' : ' Isi angka buku itu tersendiri.',
+                    );
+                }
+            }
+
+            $data['details'][$indeks]['saldo_awal_buku'] = $perBuku === [] ? null : array_values(array_map(
+                static fn (string $bukuId, array $angka): array => ['buku_id' => $bukuId, 'akumulasi_per_unit' => $angka['akumulasi'], 'periode_berjalan' => $angka['periode']],
+                array_keys($perBuku),
+                $perBuku,
+            ));
+        }
+        if ($pesan !== []) {
+            throw ValidationException::withMessages($pesan);
+        }
     }
 
     /**
@@ -825,6 +968,9 @@ class PenerimaanAsetController extends Controller
                 'nilai_per_unit' => $detail['nilai_per_unit'],
                 'ppn_per_unit' => $detail['ppn_per_unit'] ?? '0',
                 'residu_per_unit' => $detail['residu_per_unit'] ?? 0,
+                'akumulasi_per_unit' => $detail['akumulasi_per_unit'] ?? '0',
+                'periode_berjalan' => $detail['periode_berjalan'] ?? 0,
+                'saldo_awal_buku' => $detail['saldo_awal_buku'] ?? null,
                 'permintaan_pembelian_detail_id' => $detail['permintaan_pembelian_detail_id'] ?? null,
                 'atribut' => array_values($detail['atribut'] ?? []),
                 'keterangan' => $detail['keterangan'] ?? null,

@@ -84,7 +84,10 @@ class DepreciationController extends Controller
         if ($existing) {
             return response()->json(['data' => $existing]);
         }
-        $elapsedPeriods = DepreciationPeriod::query()->where('buku_aset_id', $book->id)->whereNull('reverses_period_id')->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
+        // Periode yang sudah disusutkan sistem lama sebelum cutover ikut dihitung (TODO 10.4):
+        // periode pertama sesudah saldo awal adalah periode ke-(offset + 1).
+        $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0)
+            + DepreciationPeriod::query()->where('buku_aset_id', $book->id)->whereNull('reverses_period_id')->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
         $calculator = app(DepreciationCalculator::class);
         // Saldo menurun berpindah ke profil alternatif begitu garis lurus sisa umur
         // menghasilkan angka lebih besar, supaya aset tetap habis di akhir masa manfaat.
@@ -164,7 +167,7 @@ class DepreciationController extends Controller
 
                 continue;
             }
-            $elapsedPeriods = DepreciationPeriod::query()
+            $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0) + DepreciationPeriod::query()
                 ->where('buku_aset_id', $book->id)
                 ->whereNull('reverses_period_id')
                 ->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();

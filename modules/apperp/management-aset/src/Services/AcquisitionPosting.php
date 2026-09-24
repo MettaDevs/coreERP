@@ -9,6 +9,7 @@ use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Modules\Apperp\ManagementAset\Models\master\AssetPostingGroup;
@@ -18,19 +19,25 @@ use RuntimeException;
 use stdClass;
 
 /**
- * Jurnal perolehan dokumen penerimaan aset, `asset.acquisition` (feed posting finance, TODO 9.4,
- * 9.6, 9.7).
+ * Jurnal dokumen penerimaan aset: `asset.acquisition` untuk pembelian dan hibah (feed posting
+ * finance, TODO 9.4, 9.6, 9.7), `asset.opening_balance` untuk saldo awal aset lama (TODO 10.5).
  *
  * Satu posting per penerimaan, terbit di dalam transaksi yang sama dengan asetnya: penerimaan yang
  * gagal disimpan tidak meninggalkan posting, dan penerimaan yang selesai pasti punya posting.
  * `posting_id`-nya diturunkan dari id penerimaan, jadi percobaan ulang tidak pernah menerbitkan
  * posting kedua.
  *
- * **Bentuk jurnalnya** (K-09, K-10, K-11):
+ * **Bentuk jurnal perolehan** (K-09, K-10, K-11):
  *
  *     Dr harga perolehan                            per group dan unit dimensi
  *     Dr PPN Masukan                                per group dan unit dimensi, bila ada PPN
  *        Cr lawan hutang | perantara | lawan hibah  per group dan unit dimensi
+ *
+ * **Bentuk jurnal saldo awal** (K-13, K-27), bertanggal cutover entitas legalnya:
+ *
+ *     Dr harga perolehan                            per group dan unit dimensi
+ *        Cr akumulasi penyusutan                    akumulasi buku yang di-post sampai cutover
+ *        Cr penyeimbang saldo awal                  nilai bukunya
  *
  * Setiap baris menyebut satu kolom posting group satu group. Itu yang membuat akunnya dapat dibaca
  * ulang ketika posting yang tertahan divalidasi ulang (`mapping.reference`, dijawab
@@ -42,13 +49,16 @@ use stdClass;
  * nilai mata uang, begitu juga PPN-nya, dan jurnal disusun dari nilai yang sudah bulat. Nilai tiap
  * aset adalah pembagian nilai baris yang sudah bulat itu, sehingga jumlah register aset sama persis
  * dengan jurnalnya: 3 × 333.333,333 menjadi 1.000.000,00 di jurnal dan 333.333,34 + 333.333,33 +
- * 333.333,33 di register.
+ * 333.333,33 di register. Akumulasi saldo awal diketik berpresisi nilai, jadi ia tidak pernah
+ * dibulatkan.
  */
 final class AcquisitionPosting
 {
     public const MODULE = 'management-aset';
 
     public const POSTING_TYPE = 'asset.acquisition';
+
+    public const OPENING_BALANCE_TYPE = 'asset.opening_balance';
 
     public const SOURCE_TYPE = 'penerimaan-aset';
 
@@ -62,6 +72,9 @@ final class AcquisitionPosting
     /** @var array<string, ?string> */
     private array $bukuDiPost = [];
 
+    /** @var array<string, ?string> */
+    private array $bukuDiPostId = [];
+
     public function __construct(
         private readonly PenerbitPosting $publisher,
         private readonly PresisiMataUang $precision,
@@ -71,15 +84,18 @@ final class AcquisitionPosting
         private readonly PembuatAset $assets,
     ) {}
 
-    public static function postingId(string $receiptId): string
+    /** `posting_id` jurnal penerimaan: `AST-OPB-` untuk saldo awal, `AST-ACQ-` untuk perolehan. */
+    public static function postingId(string $receiptId, string $method = AcquisitionMethod::PURCHASE): string
     {
-        return 'AST-ACQ-'.$receiptId;
+        return ($method === AcquisitionMethod::OPENING_BALANCE ? 'AST-OPB-' : 'AST-ACQ-').$receiptId;
     }
 
     /**
-     * Nilai dan PPN satu baris penerimaan, dibulatkan sekali, beserta pembagiannya ke tiap aset.
+     * Nilai, PPN, dan akumulasi saldo awal satu baris penerimaan, dibulatkan sekali, beserta
+     * pembagiannya ke tiap aset. Akumulasinya milik buku yang di-post ke finance; untuk baris selain
+     * saldo awal ia nol.
      *
-     * @return array{value: string, tax: string, unit_values: list<string>, unit_taxes: list<string>}
+     * @return array{value: string, tax: string, accumulated: string, unit_values: list<string>, unit_taxes: list<string>, unit_accumulated: list<string>}
      */
     public function lineAmounts(string $tenantId, string $currency, stdClass $line): array
     {
@@ -87,12 +103,16 @@ final class AcquisitionPosting
         $desimal = $this->precision->nilai($tenantId, $currency);
         $nilai = $this->precision->bulatkan($tenantId, (string) BigDecimal::of((string) $line->nilai_per_unit)->multipliedBy($jumlah), $currency);
         $pajak = $this->precision->bulatkan($tenantId, (string) BigDecimal::of((string) ($line->ppn_per_unit ?? '0'))->multipliedBy($jumlah), $currency);
+        $buku = $this->bukuDiPostId((string) $line->group_aset_id);
+        $akumulasi = $buku === null ? '0.00' : OpeningBalance::pick(OpeningBalance::fromLine($line), $buku)['accumulated'];
 
         return [
             'value' => $nilai,
             'tax' => $pajak,
+            'accumulated' => (string) BigDecimal::of($akumulasi)->multipliedBy($jumlah),
             'unit_values' => self::bagi($nilai, $jumlah, $desimal),
             'unit_taxes' => self::bagi($pajak, $jumlah, $desimal),
+            'unit_accumulated' => array_fill(0, $jumlah, $akumulasi),
         ];
     }
 
@@ -126,8 +146,13 @@ final class AcquisitionPosting
         }
 
         $cara = self::cara($receipt);
-        if (! in_array($cara, AcquisitionMethod::RECEIPT, true)) {
-            $masalah['cara_perolehan'] = 'Saldo awal belum dapat dicatat lewat penerimaan.';
+        if (! in_array($cara, AcquisitionMethod::ALL, true)) {
+            $masalah['cara_perolehan'] = 'Pilih pembelian, hibah, atau saldo awal.';
+        } elseif ($cara === AcquisitionMethod::OPENING_BALANCE) {
+            $pesan = self::masalahCutover(self::tanggal($receipt->tanggal), $this->cutover($receipt));
+            if ($pesan !== null) {
+                $masalah['tanggal'] = $pesan;
+            }
         } elseif ($cara === AcquisitionMethod::PURCHASE && ($receipt->vendor_id ?? null) === null && $this->mode($receipt) === self::DIRECT_PAYABLE) {
             $masalah['vendor_id'] = 'Pilih vendornya. Entitas legal ini mencatat pembelian aset langsung sebagai hutang ke vendor, jadi vendor wajib diisi.';
         }
@@ -147,6 +172,26 @@ final class AcquisitionPosting
     }
 
     /**
+     * Masalah tanggal perolehan saldo awal terhadap cutover entitas legalnya (TODO 10.1.2, K-27), atau
+     * `null` bila sah. Jurnal saldo awal bertanggal cutover, jadi tanpa cutover jurnalnya tidak dapat
+     * diberi tanggal, dan aset yang diperoleh sesudah cutover bukan saldo awal.
+     */
+    public static function masalahCutover(string $tanggal, ?string $cutover): ?string
+    {
+        if ($cutover === null) {
+            return 'Entitas legal ini belum punya tanggal cutover. Jurnal saldo awal bertanggal cutover, jadi atur tanggalnya dulu di Pengaturan › Organisasi › Posting ke Aplikasi Finance.';
+        }
+        if ($tanggal > $cutover) {
+            return sprintf(
+                'Tanggal perolehan saldo awal harus sama dengan atau sebelum cutover (%s). Aset yang diperoleh sesudah cutover dicatat sebagai pembelian atau hibah.',
+                Carbon::parse($cutover)->format('d/m/Y'),
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * Masukan `PenerbitPosting` untuk penerimaan ini, atau `null` bila tidak ada nilai yang dijurnal:
      * seluruh barisnya bernilai nol, dan penerbit posting menolak baris tanpa debit maupun kredit.
      *
@@ -154,16 +199,23 @@ final class AcquisitionPosting
      * jadi rinciannya dikosongkan; rincian tidak ikut menentukan isi jurnal.
      *
      * @param  Collection<int, stdClass>  $lines
-     * @param  list<array{asset_code: string, group_aset_id: string, acquisition_value: string, tax_amount: string}>|null  $assets
+     * @param  list<array{asset_code: string, group_aset_id: string, acquisition_value: string, tax_amount: string, accumulated_depreciation?: string}>|null  $assets
      * @return array<string, mixed>|null
      */
     public function input(stdClass $receipt, Collection $lines, ?array $assets = null): ?array
     {
         $tenant = (string) $receipt->tenant_id;
         $mataUang = (string) $receipt->currency_code;
-        $tanggal = self::tanggal($receipt->tanggal);
         $cara = self::cara($receipt);
-        $mode = $this->mode($receipt);
+        $saldoAwal = $cara === AcquisitionMethod::OPENING_BALANCE;
+        // Saldo awal bertanggal cutover (K-27); tanggal penerimaannya tanggal perolehan asli dan
+        // menjadi tanggal dokumen. Tanpa cutover jurnalnya tidak dapat diberi tanggal — penghalangnya
+        // sudah disebut `blockers()`.
+        $tanggal = $saldoAwal ? $this->cutover($receipt) : self::tanggal($receipt->tanggal);
+        if ($tanggal === null) {
+            return null;
+        }
+        $mode = $this->settings->modePenyelesaian((string) $receipt->legal_entity_id, $tanggal);
         $grup = $this->groups($lines);
 
         // Nilai per pasangan group dan unit dimensi, dalam urutan kemunculan barisnya.
@@ -173,14 +225,15 @@ final class AcquisitionPosting
             $unit = $this->assets->unitDimensi($groupId, $receipt->lokasi_aset_id ?? null, (string) $receipt->responsible_org_unit_id);
             $nilai = $this->lineAmounts($tenant, $mataUang, $line);
             $kunci = $groupId.'|'.$unit;
-            $kelompok[$kunci] ??= ['group' => $groupId, 'unit' => $unit, 'value' => BigDecimal::zero(), 'tax' => BigDecimal::zero()];
+            $kelompok[$kunci] ??= ['group' => $groupId, 'unit' => $unit, 'value' => BigDecimal::zero(), 'tax' => BigDecimal::zero(), 'accumulated' => BigDecimal::zero()];
             $kelompok[$kunci]['value'] = $kelompok[$kunci]['value']->plus($nilai['value']);
             $kelompok[$kunci]['tax'] = $kelompok[$kunci]['tax']->plus($nilai['tax']);
+            $kelompok[$kunci]['accumulated'] = $kelompok[$kunci]['accumulated']->plus($nilai['accumulated']);
         }
 
         $kolomDebit = $this->accounts->acquisitionColumn($cara);
         $kolomKredit = $this->accounts->offsetColumn($cara, $mode);
-        $vendor = ($receipt->vendor_id ?? null) === null ? null : $this->vendors->satu($tenant, (string) $receipt->vendor_id);
+        $vendor = $saldoAwal || ($receipt->vendor_id ?? null) === null ? null : $this->vendors->satu($tenant, (string) $receipt->vendor_id);
         $pemetaan = [];
         $kode = (string) $receipt->kode;
 
@@ -191,19 +244,29 @@ final class AcquisitionPosting
                 $baris[] = $this->baris($bagian, $kolomDebit, (string) $bagian['value'], '0', $kode.' · '.$namaGroup, $tanggal, $grup, $pemetaan);
             }
         }
+        if ($saldoAwal) {
+            foreach ($kelompok as $bagian) {
+                if (! $bagian['accumulated']->isZero()) {
+                    $namaGroup = $grup[$bagian['group']]->nama ?? $bagian['group'];
+                    $baris[] = $this->baris($bagian, 'accumulated_depreciation_account_id', '0', (string) $bagian['accumulated'], 'Akumulasi penyusutan · '.$kode.' · '.$namaGroup, $tanggal, $grup, $pemetaan);
+                }
+            }
+        }
         foreach ($kelompok as $bagian) {
-            if (! $bagian['tax']->isZero()) {
+            if (! $saldoAwal && ! $bagian['tax']->isZero()) {
                 $namaGroup = $grup[$bagian['group']]->nama ?? $bagian['group'];
                 $baris[] = $this->baris($bagian, 'input_vat_account_id', (string) $bagian['tax'], '0', 'PPN Masukan · '.$kode.' · '.$namaGroup, $tanggal, $grup, $pemetaan);
             }
         }
         foreach ($kelompok as $bagian) {
-            $total = $bagian['value']->plus($bagian['tax']);
+            // Saldo awal: yang dikreditkan ke penyeimbang adalah nilai bukunya.
+            $total = $saldoAwal ? $bagian['value']->minus($bagian['accumulated']) : $bagian['value']->plus($bagian['tax']);
             if ($total->isZero()) {
                 continue;
             }
             $namaGroup = $grup[$bagian['group']]->nama ?? $bagian['group'];
             $keterangan = match (true) {
+                $saldoAwal => 'Saldo awal · '.$kode.' · '.$namaGroup,
                 $cara === AcquisitionMethod::GRANT => 'Hibah · '.$kode.' · '.$namaGroup,
                 $vendor !== null => $vendor['name'].' · '.$kode,
                 default => $kode.' · '.$namaGroup,
@@ -215,42 +278,42 @@ final class AcquisitionPosting
             return null;
         }
 
+        $keteranganDokumen = trim((string) ($receipt->keterangan ?? ''));
+
         return [
             'tenant_id' => $tenant,
-            'posting_id' => self::postingId((string) $receipt->id),
-            'posting_type' => self::POSTING_TYPE,
+            'posting_id' => self::postingId((string) $receipt->id, $cara),
+            'posting_type' => $saldoAwal ? self::OPENING_BALANCE_TYPE : self::POSTING_TYPE,
             'legal_entity_id' => (string) $receipt->legal_entity_id,
             'currency_code' => $mataUang,
             'posting_date' => $tanggal,
-            'document_date' => ($receipt->vendor_invoice_date ?? null) !== null ? self::tanggal($receipt->vendor_invoice_date) : $tanggal,
+            'document_date' => match (true) {
+                $saldoAwal => self::tanggal($receipt->tanggal),
+                ($receipt->vendor_invoice_date ?? null) !== null => self::tanggal($receipt->vendor_invoice_date),
+                default => $tanggal,
+            },
             'occurred_at' => now()->toIso8601String(),
             'settlement_mode' => $mode,
             'requires_vendor' => $cara === AcquisitionMethod::PURCHASE && $mode === self::DIRECT_PAYABLE,
-            'vendor_id' => $receipt->vendor_id ?? null,
-            'vendor_invoice_reference' => $receipt->vendor_invoice_reference ?? null,
+            'vendor_id' => $saldoAwal ? null : ($receipt->vendor_id ?? null),
+            'vendor_invoice_reference' => $saldoAwal ? null : ($receipt->vendor_invoice_reference ?? null),
             'source_document' => [
                 'module' => self::MODULE,
                 'type' => self::SOURCE_TYPE,
                 'number' => $kode,
-                'description' => mb_substr(trim((string) ($receipt->keterangan ?? '')) !== '' ? trim((string) $receipt->keterangan) : 'Penerimaan aset '.$kode, 0, 255),
+                'description' => mb_substr($keteranganDokumen !== '' ? $keteranganDokumen : ($saldoAwal ? 'Saldo awal aset ' : 'Penerimaan aset ').$kode, 0, 255),
                 'id' => (string) $receipt->id,
                 'url' => '/management-aset/inventarisasi-aset/penerimaan/'.$receipt->id,
             ],
             'lines' => $baris,
-            'details' => $assets === null ? [] : ['assets' => array_map(fn (array $aset): array => [
-                'asset_code' => $aset['asset_code'],
-                'asset_group' => $grup[$aset['group_aset_id']]->kode ?? null,
-                'book' => $this->bukuDiPost($aset['group_aset_id']),
-                'acquisition_value' => $aset['acquisition_value'],
-                'tax_amount' => $aset['tax_amount'],
-            ], $assets)],
+            'details' => $assets === null ? [] : ['assets' => array_map(fn (array $aset): array => $this->rincianAset($aset, $grup, $saldoAwal), $assets)],
         ];
     }
 
     /**
      * Pratinjau jurnal dan masalahnya sebelum penerimaan diselesaikan (TODO 9.3.2, K-22), dengan
      * pemeriksaan yang sama persis dengan penerbitan. `posting` `null` berarti tidak ada nilai yang
-     * akan dijurnal.
+     * akan dijurnal, atau jurnalnya belum dapat disusun.
      *
      * @param  Collection<int, stdClass>  $lines
      * @return array{blockers: array<string, string>, posting: array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}|null}
@@ -277,11 +340,11 @@ final class AcquisitionPosting
     }
 
     /**
-     * Menerbitkan posting perolehan di dalam transaksi penyelesaian penerimaan. `null` bila tidak ada
-     * nilai yang dijurnal.
+     * Menerbitkan jurnal penerimaan di dalam transaksi penyelesaiannya. `null` bila tidak ada nilai
+     * yang dijurnal.
      *
      * @param  Collection<int, stdClass>  $lines
-     * @param  list<array{asset_code: string, group_aset_id: string, acquisition_value: string, tax_amount: string}>  $assets
+     * @param  list<array{asset_code: string, group_aset_id: string, acquisition_value: string, tax_amount: string, accumulated_depreciation?: string}>  $assets
      * @return array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}|null
      *
      * @throws AcquisitionPostingFailed
@@ -291,6 +354,12 @@ final class AcquisitionPosting
         $input = $this->input($receipt, $lines, $assets);
 
         return $input === null ? null : $this->atauGagal(fn (): array => $this->publisher->terbitkan($input));
+    }
+
+    /** Cutover entitas legal penerimaan (`Y-m-d`), atau `null` bila belum disetel. */
+    public function cutover(stdClass $receipt): ?string
+    {
+        return $this->settings->cutover((string) $receipt->legal_entity_id);
     }
 
     /**
@@ -315,7 +384,31 @@ final class AcquisitionPosting
     }
 
     /**
-     * @param  array{group: string, unit: string, value: BigDecimal, tax: BigDecimal}  $bagian
+     * @param  array{asset_code: string, group_aset_id: string, acquisition_value: string, tax_amount: string, accumulated_depreciation?: string}  $aset
+     * @param  array<string, stdClass>  $grup
+     * @return array<string, mixed>
+     */
+    private function rincianAset(array $aset, array $grup, bool $saldoAwal): array
+    {
+        $rincian = [
+            'asset_code' => $aset['asset_code'],
+            'asset_group' => $grup[$aset['group_aset_id']]->kode ?? null,
+            'book' => $this->bukuDiPost($aset['group_aset_id']),
+            'acquisition_value' => $aset['acquisition_value'],
+        ];
+        if (! $saldoAwal) {
+            return $rincian + ['tax_amount' => $aset['tax_amount']];
+        }
+        $akumulasi = $aset['accumulated_depreciation'] ?? '0.00';
+
+        return $rincian + [
+            'accumulated_depreciation' => $akumulasi,
+            'net_book_value' => (string) BigDecimal::of($aset['acquisition_value'])->minus($akumulasi),
+        ];
+    }
+
+    /**
+     * @param  array{group: string, unit: string, value: BigDecimal, tax: BigDecimal, accumulated: BigDecimal}  $bagian
      * @param  array<string, stdClass>  $grup
      * @param  array<string, ?AssetPostingGroup>  $pemetaan
      * @return array<string, mixed>
@@ -352,6 +445,15 @@ final class AcquisitionPosting
         }
 
         return $this->bukuDiPost[$groupId];
+    }
+
+    private function bukuDiPostId(string $groupId): ?string
+    {
+        if (! array_key_exists($groupId, $this->bukuDiPostId)) {
+            $this->bukuDiPostId[$groupId] = $this->assets->bukuDiPostId($groupId);
+        }
+
+        return $this->bukuDiPostId[$groupId];
     }
 
     private function mode(stdClass $receipt): string
