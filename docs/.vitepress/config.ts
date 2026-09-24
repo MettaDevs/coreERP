@@ -49,6 +49,8 @@ export default withMermaid({
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
+    'todo/produksi-database-sendiri/README.md':
+      'todo/produksi-database-sendiri/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -321,6 +323,14 @@ export default withMermaid({
                 {
                   text: 'Environment dan pusat admin',
                   link: '/todo/environment-dan-pusat-admin/',
+                },
+                {
+                  text: 'Production database sendiri',
+                  link: '/todo/produksi-database-sendiri/',
+                },
+                {
+                  text: 'TODO production database sendiri',
+                  link: '/todo/produksi-database-sendiri/TODO',
                 },
               ],
             },
