@@ -313,6 +313,7 @@ class PenerimaanAsetController extends Controller
                 array_values($hasil['blockers']),
             ),
             'status' => $hasil['posting']['status'] ?? null,
+            'posting_date' => $payload['posting_date'] ?? null,
             'settlement_mode' => $payload['settlement_mode'] ?? null,
             'currency' => $payload['currency'] ?? null,
             'lines' => array_map(static fn (array $baris): array => [

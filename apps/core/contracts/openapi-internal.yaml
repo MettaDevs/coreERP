@@ -2449,7 +2449,7 @@ components:
         | --- | --- | --- |
         | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
         | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
-        | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
+        | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
         | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
         | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
 

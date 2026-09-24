@@ -46,7 +46,12 @@ export default function AsetPage({
     // urutan yang sama seperti `aset/{id}/history` pada rutenya.
     if (pertama === 'penerimaan') {
         if (!kedua) {
-            return <PenerimaanListPage permissions={permissions} />;
+            return (
+                <PenerimaanListPage
+                    context={context}
+                    permissions={permissions}
+                />
+            );
         }
 
         if (kedua === 'baru') {

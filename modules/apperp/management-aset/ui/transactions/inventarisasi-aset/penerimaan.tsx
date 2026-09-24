@@ -34,6 +34,11 @@ export type BarisPenerimaan = {
     nilai_per_unit: number | string;
     ppn_per_unit: number | string;
     residu_per_unit: number | string;
+    /** Saldo awal: angka buku yang di-post ke finance, sekaligus bawaan buku lain (K-28). */
+    akumulasi_per_unit: number | string;
+    periode_berjalan: number | string;
+    /** Saldo awal: buku yang angkanya berbeda dari angka baris, lazimnya buku fiskal. */
+    saldo_awal_buku: SaldoAwalBuku[];
     permintaan_pembelian_detail_id: string;
     keterangan: string;
     /** Diisi server; kolom bacaan, bukan isian. */
@@ -83,13 +88,49 @@ export type EditablePenerimaan = Partial<Penerimaan> & {
     details: BarisPenerimaan[];
 };
 
-/** Cara aset diperoleh (K-12). Saldo awal belum lewat penerimaan. */
-export type CaraPerolehan = 'pembelian' | 'hibah';
+/** Cara aset diperoleh (K-12). Saldo awal adalah aset lama saat cutover (area 10). */
+export type CaraPerolehan = 'pembelian' | 'hibah' | 'saldo_awal';
 
 export const CARA_PEROLEHAN: { value: CaraPerolehan; label: string }[] = [
     { value: 'pembelian', label: 'Pembelian' },
     { value: 'hibah', label: 'Hibah' },
+    { value: 'saldo_awal', label: 'Saldo awal' },
 ];
+
+/** Angka saldo awal satu buku yang berbeda dari angka barisnya. */
+export type SaldoAwalBuku = {
+    buku_id: string;
+    akumulasi_per_unit: number | string;
+    periode_berjalan: number | string;
+};
+
+/** Buku yang akan lahir untuk aset satu group, buku yang di-post lebih dulu. */
+export type BukuGroup = {
+    buku_id: string;
+    kode: string;
+    nama: string;
+    posting_layer: string;
+    di_post: boolean;
+    masa_manfaat: number | null;
+};
+
+/** Laporan impor saldo awal: pratinjau, hasil, atau penolakan. */
+export type LaporanImpor = {
+    status: 'preview' | 'applied' | 'rejected';
+    rows: number | null;
+    receipts: {
+        id?: string;
+        kode?: string;
+        tanggal: string;
+        tanggal_siap_pakai: string | null;
+        lokasi?: string | null;
+        lines?: number[];
+        jumlah_aset?: number;
+        nilai?: string;
+        akumulasi?: string;
+    }[];
+    rejected: { line: number; field: string | null; reason: string }[];
+};
 
 /** Vendor milik Core (K-06). */
 export type VendorRingkas = {
@@ -118,6 +159,8 @@ export type StatusPosting = {
 export type PratinjauPosting = {
     blockers: { field: string; message: string }[];
     status: string | null;
+    /** Tanggal jurnalnya: tanggal penerimaan, atau cutover untuk saldo awal. */
+    posting_date: string | null;
     settlement_mode: string | null;
     currency: { code: string; decimals: number } | null;
     lines: PostingCheckLine[];
@@ -180,6 +223,9 @@ export const barisKosong = (): BarisPenerimaan => ({
     nilai_per_unit: '',
     ppn_per_unit: '',
     residu_per_unit: '',
+    akumulasi_per_unit: '',
+    periode_berjalan: '',
+    saldo_awal_buku: [],
     permintaan_pembelian_detail_id: '',
     keterangan: '',
 });

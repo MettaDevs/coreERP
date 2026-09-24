@@ -39,6 +39,7 @@ import {
     VendorPicker,
     labelStatusPosting,
 } from './AcquisitionPosting';
+import { OpeningBalanceBooks, useBukuGroup } from './OpeningBalanceBooks';
 import type {
     AsetTerbit,
     BarisPenerimaan,
@@ -129,6 +130,12 @@ export default function PenerimaanDetailPage({
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const anggota = useMasterOptions('reference-data/anggota');
     const panelRef = useRef<HTMLDivElement>(null);
+    // Saldo awal aset lama (area 10): tanpa vendor dan PPN, dengan akumulasi per buku.
+    const saldoAwal = record.cara_perolehan === 'saldo_awal';
+    const bukuGroup = useBukuGroup(
+        record.details.map((baris) => baris.group_aset_id),
+        saldoAwal,
+    );
 
     const readOnly = mode === 'view';
     const selesai = tersimpan?.status === 'selesai';
@@ -177,6 +184,18 @@ export default function PenerimaanDetailPage({
                         keterangan: baris.keterangan ?? '',
                         nilai_per_unit: tanpaNolBelakang(baris.nilai_per_unit),
                         ppn_per_unit: tanpaNolBelakang(baris.ppn_per_unit),
+                        akumulasi_per_unit: tanpaNolBelakang(
+                            baris.akumulasi_per_unit,
+                        ),
+                        periode_berjalan: baris.periode_berjalan ?? '',
+                        saldo_awal_buku: (baris.saldo_awal_buku ?? []).map(
+                            (buku) => ({
+                                ...buku,
+                                akumulasi_per_unit: tanpaNolBelakang(
+                                    buku.akumulasi_per_unit,
+                                ),
+                            }),
+                        ),
                     })),
                 });
             })
@@ -278,6 +297,8 @@ export default function PenerimaanDetailPage({
         0,
     );
     const hibah = record.cara_perolehan === 'hibah';
+    // Hibah tidak ditagih pemasok, dan saldo awal bukan transaksi dengan pemasok sama sekali.
+    const tanpaVendor = hibah || saldoAwal;
     // Pratinjau dokumen dan versi lain tidak pernah tampil sebagai pratinjau dokumen ini.
     const pratinjauMilikIni =
         pratinjau !== null &&
@@ -311,12 +332,13 @@ export default function PenerimaanDetailPage({
             currency_code: record.currency_code || 'IDR',
             keterangan: record.keterangan || null,
             cara_perolehan: record.cara_perolehan || 'pembelian',
-            // Hibah tidak punya pemasok yang ditagih, jadi vendor dan fakturnya tidak dikirim.
-            vendor_id: hibah ? null : record.vendor_id || null,
-            vendor_invoice_reference: hibah
+            // Hibah dan saldo awal tidak punya pemasok yang ditagih, jadi vendor dan fakturnya
+            // tidak dikirim.
+            vendor_id: tanpaVendor ? null : record.vendor_id || null,
+            vendor_invoice_reference: tanpaVendor
                 ? null
                 : record.vendor_invoice_reference || null,
-            vendor_invoice_date: hibah
+            vendor_invoice_date: tanpaVendor
                 ? null
                 : record.vendor_invoice_date || null,
             details: record.details
@@ -333,8 +355,24 @@ export default function PenerimaanDetailPage({
                     // Teks, bukan Number: harga satuan boleh bertiga desimal dan tidak
                     // boleh bergeser karena pembulatan float sebelum sampai ke server.
                     nilai_per_unit: angka(baris.nilai_per_unit),
-                    ppn_per_unit: angka(baris.ppn_per_unit),
+                    ppn_per_unit: saldoAwal ? '0' : angka(baris.ppn_per_unit),
                     residu_per_unit: Number(baris.residu_per_unit) || 0,
+                    akumulasi_per_unit: saldoAwal
+                        ? angka(baris.akumulasi_per_unit)
+                        : '0',
+                    periode_berjalan: saldoAwal
+                        ? Number(baris.periode_berjalan) || 0
+                        : 0,
+                    saldo_awal_buku: saldoAwal
+                        ? (baris.saldo_awal_buku ?? []).map((buku) => ({
+                              buku_id: buku.buku_id,
+                              akumulasi_per_unit: angka(
+                                  buku.akumulasi_per_unit,
+                              ),
+                              periode_berjalan:
+                                  Number(buku.periode_berjalan) || 0,
+                          }))
+                        : [],
                     permintaan_pembelian_detail_id:
                         baris.permintaan_pembelian_detail_id || null,
                     keterangan: baris.keterangan || null,
@@ -607,7 +645,11 @@ export default function PenerimaanDetailPage({
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field>
                                     <Input
-                                        label="Tanggal terima"
+                                        label={
+                                            saldoAwal
+                                                ? 'Tanggal perolehan'
+                                                : 'Tanggal terima'
+                                        }
                                         type="date"
                                         required
                                         readOnly={readOnly}
@@ -619,9 +661,10 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    {pesan('tanggal') && (
+                                    {(pesan('tanggal') || saldoAwal) && (
                                         <FieldDescription>
-                                            {pesan('tanggal')}
+                                            {pesan('tanggal') ??
+                                                'Tanggal aset diperoleh di sistem lama, paling lambat tanggal cutover. Jurnal saldo awalnya bertanggal cutover.'}
                                         </FieldDescription>
                                     )}
                                 </Field>
@@ -642,7 +685,9 @@ export default function PenerimaanDetailPage({
                                     />
                                     <FieldDescription>
                                         {pesan('tanggal_siap_pakai') ??
-                                            'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.'}
+                                            (saldoAwal
+                                                ? 'Tanggal aset mulai dipakai di sistem lama. Penyusutannya di sini berlanjut mulai cutover.'
+                                                : 'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.')}
                                     </FieldDescription>
                                 </Field>
 
@@ -692,9 +737,11 @@ export default function PenerimaanDetailPage({
                             value="vendor"
                             title="Cara perolehan dan vendor"
                             summary={
-                                hibah
-                                    ? 'Hibah'
-                                    : (tersimpan?.vendor?.name ?? 'Pembelian')
+                                saldoAwal
+                                    ? 'Saldo awal'
+                                    : hibah
+                                      ? 'Hibah'
+                                      : (tersimpan?.vendor?.name ?? 'Pembelian')
                             }
                         >
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -733,11 +780,13 @@ export default function PenerimaanDetailPage({
                                     )}
                                     <FieldDescription>
                                         {pesan('cara_perolehan') ??
-                                            'Hibah tidak ditagih pemasok: jurnalnya ke akun lawan hibah, bukan hutang.'}
+                                            (saldoAwal
+                                                ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
+                                                : 'Hibah tidak ditagih pemasok: jurnalnya ke akun lawan hibah, bukan hutang.')}
                                     </FieldDescription>
                                 </Field>
 
-                                {!hibah && (
+                                {!tanpaVendor && (
                                     <VendorPicker
                                         legalEntityId={
                                             tersimpan?.legal_entity_id ??
@@ -757,7 +806,7 @@ export default function PenerimaanDetailPage({
                                     />
                                 )}
 
-                                {!hibah && (
+                                {!tanpaVendor && (
                                     <Field>
                                         <Input
                                             label="Nomor faktur vendor"
@@ -785,7 +834,7 @@ export default function PenerimaanDetailPage({
                                     </Field>
                                 )}
 
-                                {!hibah && (
+                                {!tanpaVendor && (
                                     <Field>
                                         <Input
                                             label="Tanggal faktur vendor"
@@ -927,12 +976,24 @@ export default function PenerimaanDetailPage({
                                                 <TableHead className="min-w-40 text-right">
                                                     Nilai / unit
                                                 </TableHead>
-                                                <TableHead className="min-w-36 text-right">
-                                                    PPN / unit
-                                                </TableHead>
+                                                {!saldoAwal && (
+                                                    <TableHead className="min-w-36 text-right">
+                                                        PPN / unit
+                                                    </TableHead>
+                                                )}
                                                 <TableHead className="min-w-40 text-right">
                                                     Residu / unit
                                                 </TableHead>
+                                                {saldoAwal && (
+                                                    <TableHead className="min-w-40 text-right">
+                                                        Akumulasi / unit
+                                                    </TableHead>
+                                                )}
+                                                {saldoAwal && (
+                                                    <TableHead className="min-w-32 text-right">
+                                                        Periode berjalan
+                                                    </TableHead>
+                                                )}
                                                 {!readOnly && (
                                                     <TableHead className="w-12" />
                                                 )}
@@ -1074,33 +1135,35 @@ export default function PenerimaanDetailPage({
                                                                 }
                                                             />
                                                         </TableCell>
-                                                        <TableCell>
-                                                            <Input
-                                                                aria-label="PPN per unit"
-                                                                type="number"
-                                                                min={0}
-                                                                readOnly={
-                                                                    readOnly
-                                                                }
-                                                                value={String(
-                                                                    baris.ppn_per_unit ??
-                                                                        '',
-                                                                )}
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            ppn_per_unit:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </TableCell>
+                                                        {!saldoAwal && (
+                                                            <TableCell>
+                                                                <Input
+                                                                    aria-label="PPN per unit"
+                                                                    type="number"
+                                                                    min={0}
+                                                                    readOnly={
+                                                                        readOnly
+                                                                    }
+                                                                    value={String(
+                                                                        baris.ppn_per_unit ??
+                                                                            '',
+                                                                    )}
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                ppn_per_unit:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </TableCell>
+                                                        )}
                                                         <TableCell>
                                                             <Input
                                                                 aria-label="Residu per unit"
@@ -1127,6 +1190,65 @@ export default function PenerimaanDetailPage({
                                                                 }
                                                             />
                                                         </TableCell>
+                                                        {saldoAwal && (
+                                                            <TableCell>
+                                                                <Input
+                                                                    aria-label="Akumulasi per unit"
+                                                                    type="number"
+                                                                    min={0}
+                                                                    readOnly={
+                                                                        readOnly
+                                                                    }
+                                                                    value={String(
+                                                                        baris.akumulasi_per_unit ??
+                                                                            '',
+                                                                    )}
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                akumulasi_per_unit:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </TableCell>
+                                                        )}
+                                                        {saldoAwal && (
+                                                            <TableCell>
+                                                                <Input
+                                                                    aria-label="Periode berjalan"
+                                                                    type="number"
+                                                                    min={0}
+                                                                    step={1}
+                                                                    readOnly={
+                                                                        readOnly
+                                                                    }
+                                                                    value={String(
+                                                                        baris.periode_berjalan ??
+                                                                            '',
+                                                                    )}
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                periode_berjalan:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </TableCell>
+                                                        )}
                                                         {!readOnly && (
                                                             <TableCell>
                                                                 <Button
@@ -1184,6 +1306,9 @@ export default function PenerimaanDetailPage({
                                 )}
 
                                 <FieldDescription>
+                                    {saldoAwal
+                                        ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. '
+                                        : ''}
                                     Nilai dan PPN diisi per unit, bukan total.
                                     Ambang kapitalisasi group dibandingkan
                                     terhadap nilai satu aset — dua puluh kursi
@@ -1192,6 +1317,26 @@ export default function PenerimaanDetailPage({
                                 </FieldDescription>
                             </div>
                         </CollapsibleSection>
+
+                        {saldoAwal && (
+                            <CollapsibleSection
+                                value="saldo-awal"
+                                title="Saldo awal per buku"
+                                summary={`${record.details.filter((baris) => (baris.saldo_awal_buku ?? []).length > 0).length} baris diisi tersendiri`}
+                            >
+                                <OpeningBalanceBooks
+                                    details={record.details}
+                                    books={bukuGroup}
+                                    readOnly={readOnly}
+                                    pesan={pesan}
+                                    onChange={(index, saldoAwalBuku) =>
+                                        ubahBaris(index, {
+                                            saldo_awal_buku: saldoAwalBuku,
+                                        })
+                                    }
+                                />
+                            </CollapsibleSection>
+                        )}
 
                         <CollapsibleSection
                             value="pabrikan"
@@ -1278,7 +1423,11 @@ export default function PenerimaanDetailPage({
                         {mode === 'view' && (
                             <CollapsibleSection
                                 value="jurnal"
-                                title="Jurnal perolehan"
+                                title={
+                                    saldoAwal
+                                        ? 'Jurnal saldo awal'
+                                        : 'Jurnal perolehan'
+                                }
                                 summary={
                                     selesai
                                         ? labelStatusPosting(
