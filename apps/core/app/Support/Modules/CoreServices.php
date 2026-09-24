@@ -15,6 +15,7 @@ use App\Services\Modules\PenerbitNomorCore;
 use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\Finance\PostingAccountResolverRegistry;
 use App\Support\Modules\Contracts\DaftarAkun;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
@@ -27,6 +28,7 @@ use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
 use App\Support\Modules\Contracts\PenerbitPosting;
+use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
@@ -96,6 +98,10 @@ final class CoreServices
      */
     public const PEMETAAN_TUNGGAL = [
         DaftarLaporan::class => DaftarLaporanModul::class,
+        // Feed posting finance: posting yang dibentuk ulang membaca akunnya dari pemetaan module
+        // yang berlaku sekarang, supaya Validasi ulang dapat melepas posting yang tertahan karena
+        // pemetaannya dulu kosong.
+        PostingAccountResolvers::class => PostingAccountResolverRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void

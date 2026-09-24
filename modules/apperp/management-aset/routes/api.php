@@ -122,9 +122,13 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     // `ringkasan` dan `aset` didahulukan dari `{id}` supaya keduanya tidak ditelan
     // parameter — urutan yang sama seperti `aset/{id}/history`.
     Route::get('penerimaan-aset', [PenerimaanAsetController::class, 'index']);
+    // Pemilih vendor milik Core untuk penerimaan (TODO 9.3.1); didahulukan dari `{id}`.
+    Route::get('penerimaan-aset/vendor', [PenerimaanAsetController::class, 'vendor']);
     Route::post('penerimaan-aset', [PenerimaanAsetController::class, 'store']);
     Route::post('penerimaan-aset/{id}/selesaikan', [PenerimaanAsetController::class, 'selesaikan']);
     Route::get('penerimaan-aset/{id}/ringkasan', [PenerimaanAsetController::class, 'ringkasan']);
+    // Pratinjau jurnal perolehan sebelum diselesaikan (TODO 9.3.2).
+    Route::get('penerimaan-aset/{id}/pratinjau-posting', [PenerimaanAsetController::class, 'pratinjauPosting']);
     Route::get('penerimaan-aset/{id}/aset', [PenerimaanAsetController::class, 'asetTerbit']);
     Route::put('penerimaan-aset/{id}/aset', [PenerimaanAsetController::class, 'isiNomorSeri']);
     Route::get('penerimaan-aset/{id}', [PenerimaanAsetController::class, 'show']);

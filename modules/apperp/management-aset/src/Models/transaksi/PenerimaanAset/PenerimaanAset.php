@@ -52,7 +52,8 @@ class PenerimaanAset extends Model
         'tenant_id', 'creation_key', 'kode', 'legal_entity_id', 'responsible_org_unit_id',
         'receiving_org_unit_id', 'tanggal', 'tanggal_siap_pakai', 'diterima_oleh_user_id',
         'penanggung_jawab_user_id', 'lokasi_aset_id', 'currency_code', 'keterangan',
-        'status', 'version',
+        'status', 'version', 'cara_perolehan', 'vendor_id', 'vendor_invoice_reference',
+        'vendor_invoice_date',
     ];
 
     /** @return array<string, string> */
@@ -61,6 +62,7 @@ class PenerimaanAset extends Model
         return [
             'tanggal' => 'date',
             'tanggal_siap_pakai' => 'date',
+            'vendor_invoice_date' => 'date',
             'version' => 'integer',
         ];
     }

@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $clearing_account_id
  * @property ?string $input_vat_account_id
  * @property ?string $opening_balance_offset_account_id
+ * @property ?string $grant_offset_account_id
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property ?Carbon $deleted_at
@@ -39,7 +40,7 @@ class AssetPostingGroup extends Model
     use SoftDeletes;
 
     /**
-     * Tujuh akun, urut seperti kolom matriks, dengan label yang dipakai layar dan pesan masalah
+     * Delapan akun, urut seperti kolom matriks, dengan label yang dipakai layar dan pesan masalah
      * posting ("Group KENDARAAN belum punya akun beban penyusutan").
      */
     public const ACCOUNTS = [
@@ -50,6 +51,7 @@ class AssetPostingGroup extends Model
         'clearing_account_id' => 'Perantara',
         'input_vat_account_id' => 'PPN Masukan',
         'opening_balance_offset_account_id' => 'Penyeimbang saldo awal',
+        'grant_offset_account_id' => 'Lawan hibah',
     ];
 
     /**
@@ -78,6 +80,7 @@ class AssetPostingGroup extends Model
         'tenant_id', 'group_aset_id', 'effective_from',
         'acquisition_account_id', 'accumulated_depreciation_account_id', 'depreciation_expense_account_id',
         'payable_account_id', 'clearing_account_id', 'input_vat_account_id', 'opening_balance_offset_account_id',
+        'grant_offset_account_id',
     ];
 
     protected function casts(): array

@@ -69,7 +69,7 @@ class PembuatAset
             'model_aset_id' => $data['model_aset_id'] ?? null,
             'induk_aset_id' => $data['induk_aset_id'] ?? null,
             'lokasi_aset_id' => $lokasiId,
-            'financial_dimension_org_unit_id' => $this->dimensiLokasi($lokasiId) ?? $data['usage_org_unit_id'],
+            'financial_dimension_org_unit_id' => $this->dimensiLokasi($lokasiId) ?? (string) $data['usage_org_unit_id'],
             'serial_number' => $data['serial_number'] ?? null,
             'model_number' => $data['model_number'] ?? null,
             'acquired_on' => $data['acquired_on'],
@@ -259,6 +259,51 @@ class PembuatAset
     public function dimensiLokasi(?string $locationId): ?string
     {
         return app(LocationDimension::class)->resolve($locationId);
+    }
+
+    /**
+     * Unit organisasi dimensi keuangan yang akan dipakai aset baru dari group itu, dengan aturan
+     * yang sama persis seperti `buat()`: lokasi yang dipilih atau lokasi bawaan group, lalu
+     * pemetaan lokasinya (K-08), lalu unit pengguna.
+     *
+     * Dibuka ke luar untuk pratinjau posting perolehan (TODO 9.3.2): jurnal yang ditampilkan
+     * sebelum nomor aset terbit harus jatuh ke unit yang sama dengan jurnal sesudahnya.
+     */
+    public function unitDimensi(string $groupAsetId, ?string $lokasiId, string $usageOrgUnitId): string
+    {
+        $lokasiId ??= $this->bawaanGroup($groupAsetId)?->lokasi_aset_id;
+
+        return $this->dimensiLokasi($lokasiId) ?? $usageOrgUnitId;
+    }
+
+    /**
+     * Kode buku yang membawa perolehan aset group ini ke finance, atau `null` bila tidak ada.
+     *
+     * Satu buku saja, seperti Dynamics 365: F&O mengisi buku ber-lapisan Current pada purchase
+     * order dan vendor invoice, BC memakai satu depreciation book pada baris faktur. Buku lain dari
+     * matriks tetap lahir untuk aset itu, tetapi tidak menambah jurnal perolehan kedua. Urutannya
+     * lapisan `current` lebih dulu, lalu lapisan lain yang bukan `none` (K-15).
+     *
+     * `null` berarti penerimaan untuk group itu tidak dapat diselesaikan (keputusan pemilik produk,
+     * 24 September 2026, mengikuti D365 yang menghentikan posting): semua bukunya memorandum, atau
+     * matriks group x buku belum diisi.
+     */
+    public function bukuDiPost(string $groupAsetId): ?string
+    {
+        $kode = GroupBukuPenyusutan::query()
+            ->join('aset_m_buku_penyusutan as buku', function ($join): void {
+                $join->on('buku.id', '=', 'aset_m_group_buku_penyusutan.buku_id')->on('buku.tenant_id', '=', 'aset_m_group_buku_penyusutan.tenant_id');
+            })
+            ->where('aset_m_group_buku_penyusutan.group_aset_id', $groupAsetId)
+            ->whereNull('buku.deleted_at')
+            ->where('buku.aktif', true)
+            ->where('buku.posting_layer', '!=', BukuPenyusutan::POSTING_LAYER_NONE)
+            ->orderByRaw("case buku.posting_layer when 'current' then 0 else 1 end")
+            ->orderBy('buku.kode')
+            ->toBase()
+            ->value('buku.kode');
+
+        return $kode === null ? null : (string) $kode;
     }
 
     /**

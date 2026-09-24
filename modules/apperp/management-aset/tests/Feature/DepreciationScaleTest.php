@@ -50,7 +50,14 @@ class DepreciationScaleTest extends TestCase
     /** @var list<string> */
     private array $tenants = [];
 
-    private string $legalEntityId;
+    /**
+     * Satu entitas legal per tenant. Id organisasi unik di seluruh Core, jadi tenant yang berbeda
+     * tidak dapat berbagi entitas legal yang sama — dan penerimaan kini memeriksanya, karena
+     * jurnal perolehannya terbit ke entitas itu (area 9).
+     *
+     * @var array<string, string>
+     */
+    private array $legalEntityIds = [];
 
     private string $orgUnitId;
 
@@ -60,7 +67,6 @@ class DepreciationScaleTest extends TestCase
     {
         parent::setUp();
         $this->tenants = array_map(fn (): string => (string) Str::ulid(), range(1, self::TENANTS));
-        $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/fiscal-periods')) {
@@ -248,7 +254,7 @@ class DepreciationScaleTest extends TestCase
             ]]])->assertOk();
 
         $aset = $this->terimaAset($tenant, [
-            'legal_entity_id' => $this->legalEntityId,
+            'legal_entity_id' => $this->legalEntityIds[$tenant] ??= (string) Str::ulid(),
             'nama' => 'Aset skala penyusutan',
             'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
             'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',

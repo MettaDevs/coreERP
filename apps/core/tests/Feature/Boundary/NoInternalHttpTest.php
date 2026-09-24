@@ -296,6 +296,9 @@ class NoInternalHttpTest extends TestCase
                 'responsible_org_unit_id' => (string) Str::ulid(),
                 'tanggal' => '2026-07-28',
                 'currency_code' => 'IDR',
+                // Pembelian pada mode bawaan `direct_payable` membawa vendor, dan vendornya pun
+                // dibaca lewat kontrak Core di dalam proses, bukan lewat HTTP.
+                'vendor_id' => $this->pastikanVendorUji($tenantId, $legalEntityId),
                 'details' => [[
                     'nama' => 'Aset alur tanpa jaringan',
                     ...$klasifikasi,

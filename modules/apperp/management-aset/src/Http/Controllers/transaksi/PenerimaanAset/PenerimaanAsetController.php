@@ -2,6 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset;
 
+use App\Support\Modules\Contracts\DaftarVendor;
+use App\Support\Modules\Contracts\PenerbitPosting;
+use App\Support\Modules\Contracts\PresisiMataUang;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
@@ -18,13 +21,17 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
+use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
+use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
+use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PenerimaanStatus;
 use Modules\Apperp\ManagementAset\Support\ValidasiAtributAset;
+use RuntimeException;
 use stdClass;
 
 /**
@@ -105,6 +112,14 @@ class PenerimaanAsetController extends Controller
         $this->guard($request, 'read');
         $penerimaan = $this->dokumen($request, $id);
         $penerimaan->details = $this->baris($id);
+        $tenant = $this->tenant($request);
+        // Vendor milik Core: nomor dan namanya dibaca ulang, bukan disalin ke dokumen (K-06).
+        $vendor = $penerimaan->vendor_id === null ? null : app(DaftarVendor::class)->satu($tenant, (string) $penerimaan->vendor_id);
+        $penerimaan->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
+        // Keadaan jurnal perolehannya di feed posting finance, sesudah diselesaikan.
+        $penerimaan->posting = $penerimaan->status === PenerimaanStatus::SELESAI
+            ? app(PenerbitPosting::class)->status($tenant, AcquisitionPosting::postingId($id))
+            : null;
 
         return response()->json(['data' => $penerimaan]);
     }
@@ -121,6 +136,7 @@ class PenerimaanAsetController extends Controller
         $data = $this->validated($request);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         $this->validateLookups($request, $data);
+        $this->validateVendor($request, $data);
 
         // Nomor diterbitkan setelah seluruh validasi supaya permintaan yang ditolak tidak
         // membakar counter, dan sebelum transaksi supaya kegagalan Core tidak menahan
@@ -172,6 +188,7 @@ class PenerimaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $penerimaan->legal_entity_id, $penerimaan->responsible_org_unit_id);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         $this->validateLookups($request, $data);
+        $this->validateVendor($request, $data);
 
         $changed = DB::transaction(function () use ($request, $id, $version, $data): int {
             $updated = PenerimaanAset::query()
@@ -255,6 +272,75 @@ class PenerimaanAsetController extends Controller
     }
 
     /**
+     * Pratinjau jurnal perolehan sebelum penerimaan diselesaikan (TODO 9.3.2, K-22): baris jurnal
+     * yang akan terbit, dimensinya, masalah pemetaannya beserta jalan pintas perbaikannya, dan hal
+     * yang akan menolak penyelesaian. Pemeriksaannya sama persis dengan penerbitan, tanpa menyimpan
+     * apa pun, jadi yang ditampilkan di sini adalah yang akan terbit.
+     */
+    public function pratinjauPosting(Request $request, string $id): JsonResponse
+    {
+        $this->guard($request, 'read');
+        $penerimaan = $this->dokumen($request, $id);
+        abort_unless(
+            $penerimaan->status === PenerimaanStatus::DRAFT,
+            422,
+            'Penerimaan ini sudah diselesaikan; jurnalnya sudah terbit dan keadaannya ada di rincian dokumen.',
+        );
+        $lines = PenerimaanAsetDetail::query()->where('penerimaan_aset_id', $id)->orderBy('line_number')->toBase()->get();
+
+        try {
+            $hasil = $lines->isEmpty()
+                ? ['blockers' => ['details' => 'Tambahkan baris barang lebih dulu.'], 'posting' => null]
+                : app(AcquisitionPosting::class)->preview($penerimaan, $lines);
+        } catch (AcquisitionPostingFailed $kegagalan) {
+            return response()->json(['error' => ['code' => 'posting_failed', 'message' => $kegagalan->getMessage()]], 500);
+        }
+
+        $payload = $hasil['posting']['payload'] ?? null;
+
+        return response()->json(['data' => [
+            'blockers' => array_map(
+                static fn (string $field, string $message): array => ['field' => $field, 'message' => $message],
+                array_keys($hasil['blockers']),
+                array_values($hasil['blockers']),
+            ),
+            'status' => $hasil['posting']['status'] ?? null,
+            'settlement_mode' => $payload['settlement_mode'] ?? null,
+            'currency' => $payload['currency'] ?? null,
+            'lines' => array_map(static fn (array $baris): array => [
+                'line_no' => (int) $baris['line_no'],
+                'account_code' => $baris['account']['code'] ?? null,
+                'account_name' => $baris['account']['name'] ?? null,
+                'description' => $baris['description'] ?? null,
+                'debit' => (string) $baris['debit'],
+                'credit' => (string) $baris['credit'],
+                'dimensions' => array_map(static fn (array $dimensi): array => [
+                    'code' => (string) $dimensi['code'],
+                    'display_name' => $dimensi['display_name'] ?? null,
+                    'value_code' => $dimensi['value_code'] ?? null,
+                    'value_display_name' => $dimensi['value_display_name'] ?? null,
+                ], $baris['financial_dimensions'] ?? []),
+            ], $payload['journal_lines'] ?? []),
+            'problems' => $hasil['posting']['problems'] ?? [],
+        ]]);
+    }
+
+    /**
+     * Vendor aktif satu entitas legal untuk pemilih vendor penerimaan. Vendor milik Core (K-06) dan
+     * boleh dilihat semua anggota tenant, jadi yang dijaga hanya izin membaca penerimaan.
+     */
+    public function vendor(Request $request): JsonResponse
+    {
+        $this->guard($request, 'read');
+        $query = $request->validate([
+            'legal_entity_id' => ['required', 'ulid'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:100'],
+        ]);
+
+        return response()->json(['data' => app(DaftarVendor::class)->aktif($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
+    }
+
+    /**
      * Menyelesaikan penerimaan: asetnya benar-benar terdaftar.
      *
      * Izinnya `management-aset.aset.create`, bukan izin dokumen ini. Menyusun berkas
@@ -264,6 +350,13 @@ class PenerimaanAsetController extends Controller
      * Seluruh nomor aset diterbitkan lebih dulu, di luar transaksi, dengan kunci
      * idempoten yang diturunkan dari id dokumen dan nomor urut. Percobaan kedua setelah
      * jaringan putus karena itu memulangkan nomor yang sama, bukan deret baru.
+     *
+     * **Jurnal perolehannya terbit di transaksi yang sama** (feed posting finance, TODO 9.4):
+     * penerimaan yang gagal tidak meninggalkan posting, dan penerimaan yang selesai pasti punya
+     * posting. Yang menahan penyelesaian diperiksa sebelum nomor terbit — vendor wajib pada
+     * pembelian `direct_payable`, dan group yang tidak punya buku yang di-post ke finance, seperti
+     * D365 yang menghentikan posting faktur tanpa buku ber-lapisan Current. Pemetaan akun yang
+     * kosong tidak menahan: postingnya tertahan di Core, penerimaannya tetap selesai (K-18).
      */
     public function selesaikan(Request $request, string $id, PenerbitNomorAset $numbers, PembuatAset $pembuat): JsonResponse
     {
@@ -278,15 +371,29 @@ class PenerimaanAsetController extends Controller
             throw ValidationException::withMessages(['details' => 'Penerimaan tanpa baris barang tidak dapat diselesaikan.']);
         }
         $this->assertSisaPermintaan($lines, $id);
+        $perolehan = app(AcquisitionPosting::class);
+        $penghalang = $perolehan->blockers($penerimaan, $lines);
+        if ($penghalang !== []) {
+            throw ValidationException::withMessages($penghalang);
+        }
 
         $tenant = $this->tenant($request);
         // Kunci penciptaan disusun lebih dulu supaya penerbitan nomor dan penyimpanan aset
         // memakai kunci yang sama persis; itulah yang membuat percobaan ulang memulangkan
         // aset yang sudah ada alih-alih membuat kembarannya.
+        //
+        // Nilai tiap aset adalah bagian dari nilai baris yang sudah dibulatkan (K-20), supaya
+        // jumlah register sama persis dengan jurnal perolehannya.
         $kunci = [];
         foreach ($lines as $line) {
+            $nilai = $perolehan->lineAmounts($tenant, (string) $penerimaan->currency_code, $line);
             for ($urut = 1; $urut <= (int) $line->jumlah; $urut++) {
-                $kunci[] = ['line' => $line, 'key' => 'penerimaan:'.$id.':'.$line->line_number.':'.$urut];
+                $kunci[] = [
+                    'line' => $line,
+                    'key' => 'penerimaan:'.$id.':'.$line->line_number.':'.$urut,
+                    'value' => $nilai['unit_values'][$urut - 1],
+                    'tax' => $nilai['unit_taxes'][$urut - 1],
+                ];
             }
         }
 
@@ -298,24 +405,36 @@ class PenerimaanAsetController extends Controller
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         }
 
-        $changed = DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat): int {
-            // Status dipindahkan lebih dahulu dan dengan `version` sebagai syarat. Dua
-            // penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan tidak
-            // ada cara mengetahui mana yang berlebih. Yang kalah menemukan nol baris
-            // terpengaruh dan berhenti di sini.
-            $updated = PenerimaanAset::query()
-                ->where(['id' => $id, 'version' => $version, 'status' => PenerimaanStatus::DRAFT])
-                ->update(['status' => PenerimaanStatus::SELESAI, 'version' => $version + 1, 'updated_at' => now()]);
-            if (! $updated) {
-                return 0;
-            }
+        try {
+            $changed = DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines): int {
+                // Status dipindahkan lebih dahulu dan dengan `version` sebagai syarat. Dua
+                // penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan tidak
+                // ada cara mengetahui mana yang berlebih. Yang kalah menemukan nol baris
+                // terpengaruh dan berhenti di sini.
+                $updated = PenerimaanAset::query()
+                    ->where(['id' => $id, 'version' => $version, 'status' => PenerimaanStatus::DRAFT])
+                    ->update(['status' => PenerimaanStatus::SELESAI, 'version' => $version + 1, 'updated_at' => now()]);
+                if (! $updated) {
+                    return 0;
+                }
 
-            foreach ($kunci as $satuan) {
-                $pembuat->buat($tenant, $satuan['key'], $satuan['kode'], $this->spesifikasiAset($penerimaan, $satuan['line']));
-            }
+                $terbit = [];
+                foreach ($kunci as $satuan) {
+                    $aset = $pembuat->buat($tenant, $satuan['key'], $satuan['kode'], $this->spesifikasiAset($penerimaan, $satuan['line'], $satuan['value']));
+                    $terbit[] = [
+                        'asset_code' => (string) $aset->kode,
+                        'group_aset_id' => (string) $satuan['line']->group_aset_id,
+                        'acquisition_value' => $satuan['value'],
+                        'tax_amount' => $satuan['tax'],
+                    ];
+                }
+                $perolehan->publish($penerimaan, $lines, $terbit);
 
-            return $updated;
-        });
+                return $updated;
+            });
+        } catch (AcquisitionPostingFailed $kegagalan) {
+            return response()->json(['error' => ['code' => 'posting_failed', 'message' => $kegagalan->getMessage()]], 500);
+        }
         if (! $changed) {
             return $this->staleVersion();
         }
@@ -436,7 +555,7 @@ class PenerimaanAsetController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function spesifikasiAset(stdClass $penerimaan, stdClass $line): array
+    private function spesifikasiAset(stdClass $penerimaan, stdClass $line, string $nilai): array
     {
         return [
             'nama' => $line->nama,
@@ -458,7 +577,7 @@ class PenerimaanAsetController extends Controller
             'placed_in_service_on' => $penerimaan->tanggal_siap_pakai === null
                 ? null
                 : substr((string) $penerimaan->tanggal_siap_pakai, 0, 10),
-            'acquisition_value' => $line->nilai_per_unit,
+            'acquisition_value' => $nilai,
             'residual_value' => $line->residu_per_unit,
             'currency_code' => $penerimaan->currency_code,
             'keterangan' => $line->keterangan,
@@ -496,6 +615,10 @@ class PenerimaanAsetController extends Controller
             'lokasi_aset_id' => ['nullable', 'ulid', $milikTenant('aset_m_lokasi_aset')],
             'currency_code' => ['required', 'string', 'size:3'],
             'keterangan' => ['nullable', 'string', 'max:2000'],
+            'cara_perolehan' => ['sometimes', Rule::in(AcquisitionMethod::RECEIPT)],
+            'vendor_id' => ['nullable', 'ulid'],
+            'vendor_invoice_reference' => ['nullable', 'string', 'max:80'],
+            'vendor_invoice_date' => ['nullable', 'date_format:Y-m-d'],
             'details' => ['required', 'array', 'min:1'],
             'details.*.nama' => ['required', 'string', 'max:150'],
             'details.*.group_aset_id' => ['required', 'ulid', $milikTenant('aset_m_group_aset')],
@@ -506,12 +629,15 @@ class PenerimaanAsetController extends Controller
             'details.*.model_number' => ['nullable', 'string', 'max:150'],
             'details.*.jumlah' => ['required', 'integer', 'min:1', 'max:'.self::MAX_JUMLAH_BARIS],
             'details.*.nilai_per_unit' => ['required', 'numeric', 'min:0'],
+            'details.*.ppn_per_unit' => ['nullable', 'numeric', 'min:0'],
             'details.*.residu_per_unit' => ['nullable', 'numeric', 'min:0'],
             'details.*.permintaan_pembelian_detail_id' => ['nullable', 'ulid', Rule::exists('aset_tr_permintaan_pengadaan_aset_details', 'id')->where('tenant_id', $tenant)],
             'details.*.keterangan' => ['nullable', 'string', 'max:2000'],
             'details.*.atribut' => ['sometimes', 'array'],
             'details.*.atribut.*.tipe_atribut_id' => ['required', 'ulid'],
             'details.*.atribut.*.nilai' => ['present'],
+        ], [
+            'cara_perolehan.in' => 'Pilih pembelian atau hibah. Saldo awal belum dapat dicatat lewat penerimaan.',
         ]);
 
         // `details` dijadikan list di sini, bukan dipercayai sudah berupa list.
@@ -520,8 +646,67 @@ class PenerimaanAsetController extends Controller
         // baris, tempat `$index + 1` berhenti sebagai TypeError, bukan sebagai pesan
         // validasi.
         $data['details'] = array_values($data['details']);
+        $data['cara_perolehan'] ??= AcquisitionMethod::PURCHASE;
+
+        // Harga satuan dan PPN per unit boleh memakai presisi harga satuan mata uangnya (K-20),
+        // tidak lebih halus. Keduanya disimpan sebagai teks desimal, bukan float, supaya yang
+        // dikalikan saat jurnal disusun adalah angka yang diketik.
+        $mataUang = strtoupper((string) $data['currency_code']);
+        try {
+            $desimal = app(PresisiMataUang::class)->hargaSatuan($this->tenant($request), $mataUang);
+        } catch (RuntimeException $kegagalan) {
+            throw ValidationException::withMessages(['currency_code' => $kegagalan->getMessage()]);
+        }
+        $pesan = [];
+        foreach ($data['details'] as $indeks => $detail) {
+            foreach (['nilai_per_unit', 'ppn_per_unit'] as $kolom) {
+                $angka = self::angka($detail[$kolom] ?? 0);
+                $data['details'][$indeks][$kolom] = $angka;
+                $koma = strpos($angka, '.');
+                if ($koma !== false && strlen($angka) - $koma - 1 > $desimal) {
+                    $pesan['details.'.$indeks.'.'.$kolom] = sprintf('Paling banyak %d angka di belakang koma untuk %s.', $desimal, $mataUang);
+                }
+            }
+        }
+        if ($pesan !== []) {
+            throw ValidationException::withMessages($pesan);
+        }
 
         return $data;
+    }
+
+    /**
+     * Vendor harus milik Core dan milik entitas legal dokumen ini (K-06). Vendor yang sudah
+     * nonaktif tetap boleh tinggal di dokumen lama, tetapi tidak boleh dipilih baru.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function validateVendor(Request $request, array $data): void
+    {
+        if (($data['vendor_id'] ?? null) === null) {
+            return;
+        }
+        $vendor = app(DaftarVendor::class)->satu($this->tenant($request), (string) $data['vendor_id']);
+        if ($vendor === null || $vendor['legal_entity_id'] !== $data['legal_entity_id']) {
+            throw ValidationException::withMessages(['vendor_id' => 'Pilih vendor milik entitas legal penerimaan ini.']);
+        }
+    }
+
+    /**
+     * Angka dari masukan sebagai teks desimal tanpa nol di ekor. JSON mengirim angka sebagai float;
+     * mengubahnya dengan `(string)` biasa bisa memotong digit, jadi float ditulis dengan sepuluh
+     * desimal lalu dirapikan.
+     */
+    private static function angka(mixed $nilai): string
+    {
+        $teks = match (true) {
+            is_string($nilai) => trim($nilai),
+            is_int($nilai) => (string) $nilai,
+            is_float($nilai) => sprintf('%.10F', $nilai),
+            default => '0',
+        };
+
+        return str_contains($teks, '.') ? rtrim(rtrim($teks, '0'), '.') : $teks;
     }
 
     /**
@@ -602,6 +787,7 @@ class PenerimaanAsetController extends Controller
             'responsible_org_unit_id' => $data['responsible_org_unit_id'],
             'tanggal' => $data['tanggal'],
             'currency_code' => strtoupper((string) $data['currency_code']),
+            'cara_perolehan' => $data['cara_perolehan'],
             'status' => $new ? PenerimaanStatus::DRAFT : null,
             'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null,
@@ -615,6 +801,9 @@ class PenerimaanAsetController extends Controller
             'penanggung_jawab_user_id' => $data['penanggung_jawab_user_id'] ?? null,
             'lokasi_aset_id' => $data['lokasi_aset_id'] ?? null,
             'keterangan' => $data['keterangan'] ?? null,
+            'vendor_id' => $data['vendor_id'] ?? null,
+            'vendor_invoice_reference' => $data['vendor_invoice_reference'] ?? null,
+            'vendor_invoice_date' => $data['vendor_invoice_date'] ?? null,
         ];
     }
 
@@ -634,6 +823,7 @@ class PenerimaanAsetController extends Controller
                 'model_number' => $detail['model_number'] ?? null,
                 'jumlah' => $detail['jumlah'],
                 'nilai_per_unit' => $detail['nilai_per_unit'],
+                'ppn_per_unit' => $detail['ppn_per_unit'] ?? '0',
                 'residu_per_unit' => $detail['residu_per_unit'] ?? 0,
                 'permintaan_pembelian_detail_id' => $detail['permintaan_pembelian_detail_id'] ?? null,
                 'atribut' => array_values($detail['atribut'] ?? []),

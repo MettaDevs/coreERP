@@ -6,6 +6,7 @@ namespace Modules\Apperp\ManagementAset;
 
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderList;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
+use Modules\Apperp\ManagementAset\Services\PostingGroupAccountResolver;
 
 /**
  * Penyedia layanan module Management Aset.
@@ -86,6 +88,11 @@ final class ModuleServiceProvider extends ServiceProvider
         // pendaftaran ini Core tidak tahu module punya laporan, dan ia jatuh ke jalur HTTP
         // lama — alamat yang sudah tidak ada.
         $this->app->make(DaftarLaporan::class)->daftarkan($this->app->make(PenyediaLaporan::class));
+
+        // Posting finance modul ini yang tertahan dibentuk ulang Core dengan akun posting group yang
+        // berlaku saat itu. Tanpa pendaftaran ini, mengisi kolom posting group yang dulu kosong tidak
+        // pernah melepas postingnya lewat Validasi ulang.
+        $this->app->make(PostingAccountResolvers::class)->register($this->app->make(PostingGroupAccountResolver::class));
 
         // Tidak ada lagi alias `coreerp-event`. Dua panggilan balik HTTP yang memakainya —
         // keputusan workflow dan penyediaan data awal tenant — keduanya sudah menjadi event

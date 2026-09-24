@@ -15,6 +15,9 @@ use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
  */
 final class AssetPostingAccounts
 {
+    /** Mode penyelesaian entitas legal yang mengkreditkan perolehan ke perantara (K-10). */
+    public const CLEARING = 'clearing';
+
     /**
      * Baris posting group yang berlaku bagi `$groupAsetId` pada tanggal posting (`Y-m-d`): baris
      * dengan `effective_from` terbesar yang tidak melewati tanggal itu. `null` bila group belum
@@ -38,10 +41,37 @@ final class AssetPostingAccounts
      */
     public function acquisitionAccount(AssetPostingGroup $postingGroup, string $method): ?string
     {
+        $akun = $postingGroup->getAttribute($this->acquisitionColumn($method));
+
+        return is_string($akun) ? $akun : null;
+    }
+
+    /** Kolom akun debit perolehan untuk satu cara perolehan; hari ini selalu harga perolehan (K-12). */
+    public function acquisitionColumn(string $method): string
+    {
         if (! in_array($method, AcquisitionMethod::ALL, true)) {
             throw new InvalidArgumentException(sprintf('Cara perolehan "%s" tidak dikenal.', $method));
         }
 
-        return $postingGroup->acquisition_account_id;
+        return 'acquisition_account_id';
+    }
+
+    /**
+     * Kolom akun kredit perolehan: dari mana nilai aset itu datang (TODO 9.4.2).
+     *
+     * Pembelian dikreditkan ke lawan hutang pada mode `direct_payable` — posting inilah hutangnya,
+     * dan aplikasi finance membuat faktur dari sana tanpa jurnal kedua — atau ke perantara pada mode
+     * `clearing`, tempat aplikasi finance membuat faktur sendiri (K-10). Hibah tidak punya pemasok
+     * yang ditagih, jadi lawannya kolom sendiri (keputusan pemilik produk, 24 September 2026). Saldo
+     * awal memakai penyeimbang saldo awal (K-13).
+     */
+    public function offsetColumn(string $method, string $settlementMode): string
+    {
+        return match ($method) {
+            AcquisitionMethod::PURCHASE => $settlementMode === self::CLEARING ? 'clearing_account_id' : 'payable_account_id',
+            AcquisitionMethod::GRANT => 'grant_offset_account_id',
+            AcquisitionMethod::OPENING_BALANCE => 'opening_balance_offset_account_id',
+            default => throw new InvalidArgumentException(sprintf('Cara perolehan "%s" tidak dikenal.', $method)),
+        };
     }
 }

@@ -16,11 +16,14 @@ use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingPusher;
 use App\Support\Modules\Contracts\PenerbitPosting;
+use App\Support\Modules\Contracts\PostingAccountResolver;
+use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\PostingTidakSah;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use RuntimeException;
@@ -236,6 +239,65 @@ class FinancePostingFeedTest extends TestCase
         $this->assertSame('Hutang Usaha Pihak Ketiga', $posting->payload['journal_lines'][1]['account']['name']);
         $this->assertSame($held['payload']['published_at'], $posting->payload['published_at']);
         $this->assertDatabaseHas('finance_posting_events', ['event' => 'revalidated', 'from_status' => 'held', 'to_status' => 'pending', 'user_id' => $this->owner->id]);
+    }
+
+    public function test_revalidation_reads_the_account_from_the_module_mapping_in_force_now(): void
+    {
+        $resolver = new class implements PostingAccountResolver
+        {
+            /** @var array<string, string> */
+            public array $mapping = [];
+
+            public bool $broken = false;
+
+            public function moduleId(): string
+            {
+                return 'management-aset';
+            }
+
+            public function account(string $tenantId, string $reference, string $postingDate): ?string
+            {
+                if ($this->broken) {
+                    throw new RuntimeException('Pemeta akun rusak.');
+                }
+
+                return $this->mapping[$reference] ?? null;
+            }
+        };
+        app(PostingAccountResolvers::class)->register($resolver);
+
+        // Group belum dipetakan saat penerimaan diselesaikan: posting tertahan, dokumennya tetap sah.
+        $masukan = $this->perolehan();
+        $masukan['lines'][0]['account_id'] = null;
+        $masukan['lines'][0]['mapping'] = ['label' => 'Group KENDARAAN · harga perolehan', 'reference' => 'posting-group:KENDARAAN:acquisition_account_id'];
+        $held = $this->terbitkan($masukan);
+        $this->assertSame('held', $held['status']);
+        $this->assertSame('ACCOUNT_NOT_MAPPED', $held['problems'][0]['code']);
+
+        // Pemeta yang gagal dilaporkan, dan posting dibentuk ulang dari akun yang tersimpan.
+        Exceptions::fake();
+        $resolver->broken = true;
+        $posting = app(PostingPublisher::class)->revalidate(FinancePosting::query()->firstOrFail(), $this->owner->id);
+        $this->assertSame('held', $posting->status);
+        Exceptions::assertReported(RuntimeException::class);
+
+        $resolver->broken = false;
+        $resolver->mapping['posting-group:KENDARAAN:acquisition_account_id'] = $this->akun['aset'];
+        $posting = app(PostingPublisher::class)->revalidate($posting->refresh(), $this->owner->id);
+
+        $this->assertSame('pending', $posting->status);
+        $this->assertSame('1-2300', $posting->payload['journal_lines'][0]['account']['code']);
+        $this->assertSame($this->akun['aset'], $posting->input['lines'][0]['account_id']);
+        // Nilai, unit, dan baris lain tidak disusun ulang; hanya akunnya.
+        $this->assertSame($held['payload']['totals'], $posting->payload['totals']);
+        $this->assertSame($held['payload']['journal_lines'][1], $posting->payload['journal_lines'][1]);
+
+        // Module yang menerbitkan ulang dokumen yang sama dengan pemetaan terbaru mendapat posting
+        // yang sudah ada, bukan penolakan "isi jurnal berbeda".
+        $masukan['lines'][0]['account_id'] = $this->akun['aset'];
+        $ulang = $this->terbitkan($masukan);
+        $this->assertFalse($ulang['created']);
+        $this->assertSame('pending', $ulang['status']);
     }
 
     public function test_sebelum_cutover_dan_feed_mati_menjadi_manual_lalu_dinilai_ulang_saat_setelan_berubah(): void
