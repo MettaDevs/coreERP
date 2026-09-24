@@ -11,6 +11,7 @@ use App\Models\IntegrationClient;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Integration\SignedPush;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -27,7 +28,8 @@ use RuntimeException;
  *
  * Urutan kirim per klien sama dengan urutan tarikan. Posting yang sedang menunggu jeda menahan
  * posting sesudahnya **untuk klien itu saja**; klien lain tidak ikut tertahan. Posting yang gagal
- * permanen tidak menahan apa pun — ia sudah keluar dari antrean dan menunggu tangan manusia.
+ * permanen tidak menahan apa pun — ia sudah keluar dari antrean dan menunggu tangan manusia, yang
+ * dapat mengembalikannya ke antrean lewat `resend()`.
  */
 final class PostingPusher
 {
@@ -72,6 +74,63 @@ final class PostingPusher
             'failed' => $jumlah[self::FAILED] ?? 0,
             'skipped' => null,
         ];
+    }
+
+    /**
+     * Alasan kiriman ini tidak dapat dikirim ulang, dalam bahasa pengguna, atau `null` bila boleh.
+     * Yang boleh hanya kiriman `failed` untuk posting yang masih `pending`, ke klien yang masih akan
+     * mengirimnya: aktif, bermode push, dan prefix jenisnya mencakup posting itu. Kiriman untuk klien
+     * yang tidak lagi mengirim akan menunggu di antrean selamanya.
+     */
+    public function resendRefusal(FinancePostingDelivery $delivery, FinancePosting $posting, ?IntegrationClient $client): ?string
+    {
+        if ($delivery->status !== FinancePostingDelivery::FAILED) {
+            return 'Kiriman ini tidak sedang gagal, jadi tidak perlu dikirim ulang.';
+        }
+        if ($posting->status !== FinancePosting::PENDING) {
+            return 'Posting ini tidak lagi menunggu aplikasi finance, jadi tidak dikirim ulang.';
+        }
+        if ($client === null || $client->status !== IntegrationClient::ACTIVE || $client->delivery_mode !== IntegrationClient::PUSH || $client->push_url === null) {
+            return 'Klien integrasi ini sudah dicabut atau tidak lagi memakai push.';
+        }
+        $query = FinancePosting::query()->whereKey($posting->id);
+        FinancePosting::batasiUntukKlien($query, $client);
+
+        return $query->exists() ? null : 'Klien integrasi ini tidak lagi menerima jenis posting ini.';
+    }
+
+    /**
+     * Mengembalikan kiriman yang `failed` ke antrean (TODO 7.3.4). Tidak ada yang dikirim di sini:
+     * putaran `finance-postings:push` berikutnya yang mengirimnya, dalam urutan klien itu. Jumlah
+     * percobaan dan batas waktunya dihitung dari nol, supaya kiriman ulang mendapat jeda dan batas
+     * waktu yang sama dengan kiriman pertama. Percobaan sebelumnya tetap tercatat di riwayat.
+     *
+     * @throws StatusPostingBerubah Kiriman, posting, atau kliennya berubah sejak diperiksa.
+     */
+    public function resend(FinancePostingDelivery $delivery, int $userId): FinancePostingDelivery
+    {
+        return DB::transaction(function () use ($delivery, $userId): FinancePostingDelivery {
+            // Posting dikunci lebih dulu, urutan yang sama dengan tandai manual dan ack.
+            $posting = FinancePosting::query()->lockForUpdate()->findOrFail($delivery->finance_posting_id);
+            $locked = FinancePostingDelivery::query()->lockForUpdate()->findOrFail($delivery->id);
+            $client = IntegrationClient::query()->find($locked->integration_client_id);
+            if ($client === null || $this->resendRefusal($locked, $posting, $client) !== null) {
+                throw new StatusPostingBerubah(sprintf('Kiriman %s tidak lagi dapat dikirim ulang.', $locked->id));
+            }
+
+            $previous = ['client' => $client->name, 'previous_attempts' => $locked->attempts, 'previous_status_code' => $locked->last_status_code];
+            $locked->fill([
+                'status' => FinancePostingDelivery::RETRYING,
+                'attempts' => 0,
+                'first_attempt_at' => null,
+                'next_attempt_at' => null,
+                'last_status_code' => null,
+                'last_error' => null,
+            ])->save();
+            FinancePostingEvent::catat($posting, 'push_resend_requested', $posting->status, $posting->status, $client->id, $userId, $previous);
+
+            return $locked;
+        });
     }
 
     /** @return list<string> */

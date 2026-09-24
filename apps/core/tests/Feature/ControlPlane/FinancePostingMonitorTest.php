@@ -3,14 +3,19 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Models\Environment;
 use App\Models\FinancePosting;
+use App\Models\FinancePostingDelivery;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceReferenceAccount;
+use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Finance\PostingPublisher;
+use App\Support\Finance\PostingPusher;
 use App\Support\Finance\StatusPostingBerubah;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PostingTidakSah;
@@ -19,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
@@ -278,6 +284,125 @@ class FinancePostingMonitorTest extends TestCase
         app(PostingPublisher::class)->markManual($diLayar, 'Terlambat', $this->owner->id);
     }
 
+    public function test_a_failed_push_delivery_is_resent_on_the_next_run_with_a_fresh_retry_window(): void
+    {
+        $clientId = $this->pushClient();
+        Http::fake(['finance.example.test/*' => Http::sequence()->push(['message' => 'akun tidak dikenal'], 422)->push('', 200)]);
+        $this->terbitkan($this->perolehan());
+        $id = (string) FinancePosting::query()->value('id');
+        $pusher = app(PostingPusher::class);
+        $this->assertSame(1, $pusher->run()['failed']);
+        // A failed delivery has left the queue: later runs do not send it again on their own.
+        $pusher->run();
+        Http::assertSentCount(1);
+
+        $delivery = (string) $this->actingAs($this->owner)->getJson("/api/v1/finance-postings/{$id}")->assertOk()
+            ->assertJsonPath('data.deliveries.0.status', 'failed')
+            ->assertJsonPath('data.deliveries.0.resendable', true)
+            ->json('data.deliveries.0.id');
+
+        $this->postJson("/api/v1/finance-postings/{$id}/deliveries/{$delivery}/resend")->assertOk()
+            ->assertJsonPath('data.status', 'pending');
+        $row = FinancePostingDelivery::query()->findOrFail($delivery);
+        $this->assertSame(['retrying', 0, null, null, null, null], [
+            $row->status, $row->attempts, $row->first_attempt_at, $row->next_attempt_at, $row->last_status_code, $row->last_error,
+        ]);
+        $events = $this->getJson("/api/v1/finance-postings/{$id}")->assertOk()
+            ->assertJsonPath('data.deliveries.0.resendable', false)
+            ->json('data.events');
+        $resend = collect($events)->firstWhere('event', 'push_resend_requested');
+        $this->assertSame('Owner PT Metta', $resend['actor']);
+        $this->assertSame(['client' => 'Old-finance push', 'previous_attempts' => 1, 'previous_status_code' => 422], $resend['data']);
+        $this->assertDatabaseHas('finance_posting_events', [
+            'finance_posting_id' => $id, 'event' => 'push_resend_requested', 'user_id' => $this->owner->id, 'integration_client_id' => $clientId,
+        ]);
+        // Already back in the queue, so a second click is refused.
+        $this->postJson("/api/v1/finance-postings/{$id}/deliveries/{$delivery}/resend")
+            ->assertStatus(422)->assertJsonValidationErrors('delivery');
+
+        $this->assertSame(1, $pusher->run()['sent']);
+        Http::assertSentCount(2);
+        $this->assertSame(['delivered', 1], [$row->refresh()->status, $row->attempts]);
+    }
+
+    public function test_resend_is_refused_when_the_delivery_would_never_be_sent(): void
+    {
+        $clientId = $this->pushClient();
+        Http::fake(['finance.example.test/*' => Http::response(['message' => 'akun tidak dikenal'], 422)]);
+        $this->terbitkan($this->perolehan());
+        $posting = FinancePosting::query()->firstOrFail();
+        app(PostingPusher::class)->run();
+        $delivery = (string) FinancePostingDelivery::query()->value('id');
+        $resend = fn (): TestResponse => $this->actingAs($this->owner)
+            ->postJson("/api/v1/finance-postings/{$posting->id}/deliveries/{$delivery}/resend");
+        $refused = function (string $message) use ($resend, $delivery): void {
+            $resend()->assertStatus(422)->assertJsonPath('errors.delivery.0', $message);
+            $this->assertSame('failed', FinancePostingDelivery::query()->whereKey($delivery)->value('status'));
+        };
+
+        $client = IntegrationClient::query()->findOrFail($clientId);
+        $client->update(['posting_type_prefixes' => ['vendor.']]);
+        $refused('Klien integrasi ini tidak lagi menerima jenis posting ini.');
+        $client->update(['posting_type_prefixes' => ['asset.'], 'delivery_mode' => 'pull']);
+        $refused('Klien integrasi ini sudah dicabut atau tidak lagi memakai push.');
+        $client->update(['delivery_mode' => 'push', 'status' => 'revoked']);
+        $refused('Klien integrasi ini sudah dicabut atau tidak lagi memakai push.');
+        $client->update(['status' => 'active']);
+
+        // Another posting's delivery, another tenant, or a plain member cannot reach it at all.
+        $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-0002']));
+        $other = (string) FinancePosting::query()->where('posting_id', 'AST-ACQ-0002')->value('id');
+        $this->actingAs($this->owner)->postJson("/api/v1/finance-postings/{$other}/deliveries/{$delivery}/resend")->assertNotFound();
+        $this->actingAs($this->pemilik('owner@lain.test', 'PT Lain'))->postJson("/api/v1/finance-postings/{$posting->id}/deliveries/{$delivery}/resend")->assertNotFound();
+        $member = User::factory()->create();
+        TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $member->id, 'system_role' => 'member', 'status' => 'active',
+        ]);
+        $this->actingAs($member)->postJson("/api/v1/finance-postings/{$posting->id}/deliveries/{$delivery}/resend")->assertForbidden();
+
+        $this->actingAs($this->owner)->postJson("/api/v1/finance-postings/{$posting->id}/mark-manual", ['reason' => 'Dibukukan tangan'])->assertOk();
+        $refused('Posting ini tidak lagi menunggu aplikasi finance, jadi tidak dikirim ulang.');
+    }
+
+    public function test_resend_in_a_sandbox_copy_is_refused(): void
+    {
+        $this->pushClient();
+        Http::fake(['finance.example.test/*' => Http::response(['message' => 'akun tidak dikenal'], 422)]);
+        $this->terbitkan($this->perolehan());
+        $posting = FinancePosting::query()->firstOrFail();
+        app(PostingPusher::class)->run();
+        $delivery = (string) FinancePostingDelivery::query()->value('id');
+        $sandbox = Environment::create([
+            'tenant_id' => $this->membership->tenant_id, 'kind' => 'sandbox', 'name' => 'Uji sandbox',
+            'slug' => 'uji-sandbox', 'database_name' => null, 'hosting' => Environment::HOSTING_PROVIDER,
+            'status' => 'active', 'outbound_allowed' => false,
+        ]);
+        // The scheduler does not know its environment yet, so a delivery put back in the queue here
+        // would really be sent. The screen is where a sandbox copy is recognised.
+        $this->app->instance(ActiveEnvironment::KEY, $sandbox->id);
+
+        $this->actingAs($this->owner)->postJson("/api/v1/finance-postings/{$posting->id}/deliveries/{$delivery}/resend")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.delivery.0', app(ActiveEnvironment::class)->refusalReason());
+        $this->assertSame('failed', FinancePostingDelivery::query()->whereKey($delivery)->value('status'));
+    }
+
+    public function test_resend_rechecks_the_delivery_inside_the_row_lock(): void
+    {
+        $this->pushClient();
+        Http::fake(['finance.example.test/*' => Http::response(['message' => 'akun tidak dikenal'], 422)]);
+        $this->terbitkan($this->perolehan());
+        app(PostingPusher::class)->run();
+        $onScreen = FinancePostingDelivery::query()->firstOrFail();
+        // The reader acknowledged the posting through the API after the screen was opened.
+        FinancePosting::query()->whereKey($onScreen->finance_posting_id)->update([
+            'status' => 'posted', 'external_reference' => 'JV-2026-0003', 'acknowledged_at' => now(),
+        ]);
+
+        $this->expectException(StatusPostingBerubah::class);
+        app(PostingPusher::class)->resend($onScreen, $this->owner->id);
+    }
+
     public function test_posting_tenant_lain_menjawab_404(): void
     {
         $this->terbitkan($this->perolehan());
@@ -341,6 +466,15 @@ class FinancePostingMonitorTest extends TestCase
                 ['account_id' => $this->akun['akumulasi'], 'debit' => '0', 'credit' => '1250000.00', 'org_unit_id' => $this->poli->id],
             ],
         ];
+    }
+
+    /** A push client for `asset.` postings, created through the screen's API. Returns its id. */
+    private function pushClient(): string
+    {
+        return (string) $this->actingAs($this->owner)->postJson('/api/v1/integration-clients', [
+            'name' => 'Old-finance push', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook',
+            'scopes' => ['finance-postings.read', 'finance-postings.ack'], 'posting_type_prefixes' => ['asset.'], 'allowed_ips' => [],
+        ])->assertCreated()->json('data.id');
     }
 
     /** @param  array<string, mixed>  $masukan */

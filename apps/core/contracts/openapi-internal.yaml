@@ -1879,8 +1879,9 @@ webhooks:
         diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
         `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
         jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
-        4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
-        Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
+        4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau,
+        tempat pengguna dapat mengirimnya ulang setelah penyebabnya diperbaiki. Pembaca tetap wajib
+        menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
       parameters:
       - name: X-CoreERP-Event-Timestamp
         in: header

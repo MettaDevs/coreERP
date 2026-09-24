@@ -381,6 +381,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('finance-postings/{financePosting}', [FinancePostingMonitorController::class, 'show'])->name('finance-postings.show');
         Route::post('finance-postings/{financePosting}/revalidate', [FinancePostingMonitorController::class, 'revalidate'])->middleware('throttle:30,1')->name('finance-postings.revalidate');
         Route::post('finance-postings/{financePosting}/mark-manual', [FinancePostingMonitorController::class, 'markManual'])->middleware('throttle:30,1')->name('finance-postings.mark-manual');
+        Route::post('finance-postings/{financePosting}/deliveries/{delivery}/resend', [FinancePostingMonitorController::class, 'resendDelivery'])->middleware('throttle:30,1')->name('finance-postings.deliveries.resend');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

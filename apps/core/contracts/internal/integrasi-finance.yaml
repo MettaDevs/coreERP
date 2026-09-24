@@ -166,7 +166,7 @@ info:
     | `2xx` dengan body ack | Ack diterapkan, posting selesai |
     | `2xx` tanpa body ack | Dianggap terkirim; posting tetap `pending` sampai Anda meng-ack lewat API |
     | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, selama 24 jam |
-    | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
+    | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP, tempat pengguna dapat mengirimnya ulang setelah penyebabnya diperbaiki. Redirect tidak diikuti. |
 
     ## Jenis posting (posting_type)
 

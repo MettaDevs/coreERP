@@ -126,6 +126,7 @@ Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PenerbitPosting`, di 
 | `GET /api/v1/finance-postings/{id}` | Detail satu posting | Owner atau admin |
 | `POST /api/v1/finance-postings/{id}/revalidate` | Validasi ulang | Owner atau admin |
 | `POST /api/v1/finance-postings/{id}/mark-manual` | Tandai manual, `reason` wajib | Owner atau admin |
+| `POST /api/v1/finance-postings/{id}/deliveries/{delivery}/resend` | Kirim ulang kiriman push yang `failed` | Owner atau admin |
 | `GET`, `PUT /api/v1/organizations/{organization}/finance-posting` | Setelan feed satu entitas legal; `PUT` memicu penilaian ulang cutover | Membaca: semua anggota tenant. Mengubah: owner atau admin. |
 | `/api/v1/integration-clients…` | Klien integrasi: terbitkan, ubah, cabut, token baru, signing secret baru, kirim uji | Owner atau admin |
 
@@ -312,10 +313,16 @@ Posting yang ditolak tidak diberi tanggal ulang (K-17). Tanggal akuntansi tidak 
 | 2xx dengan body ack yang sah | `delivered` | Ack diterapkan seperti `POST …/ack` |
 | 2xx tanpa body ack | `delivered` | Tetap `pending` sampai di-ack lewat API, dan tidak dikirim lagi ke klien itu |
 | 408, 429, 5xx, atau tidak terjangkau, termasuk nama host yang tidak dapat diselesaikan | `retrying`, dicoba lagi dengan jeda 1, 2, 4, … sampai 60 menit | Tetap `pending` |
-| Masih gagal sesudah `coreerp.finance_push_retry_hours` sejak percobaan pertama (bawaan 24 jam, `COREERP_FINANCE_PUSH_RETRY_HOURS`) | `failed` | Tetap `pending`, tampil di layar pantau |
-| 3xx, 4xx lain, atau tujuan ditolak `PushDestination` | `failed` | Tetap `pending`, tampil di layar pantau |
+| Masih gagal sesudah `coreerp.finance_push_retry_hours` sejak percobaan pertama (bawaan 24 jam, `COREERP_FINANCE_PUSH_RETRY_HOURS`) | `failed` | Tetap `pending`, tampil di layar pantau dan dapat dikirim ulang dari sana |
+| 3xx, 4xx lain, atau tujuan ditolak `PushDestination` | `failed` | Tetap `pending`, tampil di layar pantau dan dapat dikirim ulang dari sana |
 
 **Urutan per klien.** Posting yang sedang menunggu jeda menahan posting sesudahnya, untuk klien itu saja, supaya pembaca menerima dalam urutan yang sama dengan pull. Klien lain tidak ikut tertahan. Posting yang `failed` tidak menahan apa pun: ia sudah keluar dari antrean dan menunggu tindakan manusia.
+
+**Kirim ulang** (`PostingPusher::resend()`, dari layar pantau) mengembalikan kiriman `failed` ke antrean sebagai `retrying`, dengan jumlah percobaan, percobaan pertama, dan jadwal percobaan berikutnya dikosongkan. Tidak ada yang dikirim saat tombol ditekan; putaran `finance-postings:push` berikutnya yang mengirimnya, dalam urutan klien itu, dengan jeda dan batas waktu percobaan yang dihitung dari nol. Riwayat mencatat `push_resend_requested` beserta penggunanya, nama kliennya, dan jumlah percobaan sebelumnya.
+
+- Yang boleh dikirim ulang hanya kiriman `failed` untuk posting yang masih `pending`, ke klien yang masih akan mengirimnya: aktif, bermode push, dan prefix jenisnya mencakup posting itu. Kiriman untuk klien yang tidak lagi mengirim akan menunggu di antrean selamanya, jadi ditolak dengan alasannya. Detail posting mengirim `resendable` per kiriman dari pemeriksaan yang sama (`PostingPusher::resendRefusal()`), sehingga tombolnya hanya tampil bila permintaannya akan diterima.
+- Pemeriksaan diulang di dalam kunci baris, posting lebih dulu lalu kirimannya, urutan yang sama dengan tandai manual dan ack.
+- Di salinan sandbox, kirim ulang ditolak di layar dengan alasan dari `refusalReason()`. Penjadwal belum tahu environment-nya sendiri (lihat [Celah yang diketahui](#celah-yang-diketahui)), jadi kiriman yang dikembalikan ke antrean di sana akan benar-benar dikirim.
 
 **Tujuan push** diperiksa `PushDestination`, saat klien disimpan dan lagi setiap kali mengirim, karena DNS dapat diganti sesudah URL disimpan:
 
@@ -367,7 +374,7 @@ Sistem di luar CoreERP masuk lewat klien integrasi, bukan kredensial app. Kreden
 - **Detail**: dokumen sumber dengan nama app dari katalog, baris jurnal dan dimensinya, masalah per baris, alasan penolakan, riwayat beserta nama pelakunya, dan jejak kiriman push.
 - Nama dan kode entitas legal diterjemahkan saat dibaca, bukan disalin dari posting. Entitas yang berganti nama tampil dengan nama barunya.
 - Tautan ke dokumen sumber diambil dari `input.source_document.url`, tidak pernah dari `payload`: pembaca tidak menerimanya.
-- **Aksinya hanya Validasi ulang dan Tandai manual.** Tidak ada aksi mengubah tanggal atau nilai (K-17): posting yang keliru diperbaiki dengan posting koreksi dari dokumen sumbernya, bukan disunting di sini.
+- **Aksinya hanya Validasi ulang, Tandai manual, dan Kirim ulang untuk kiriman push yang gagal.** Tidak ada aksi mengubah tanggal atau nilai (K-17): posting yang keliru diperbaiki dengan posting koreksi dari dokumen sumbernya, bukan disunting di sini. Kirim ulang tampil di baris kiriman pada jejak kiriman push; aturannya ada di [Mode push](#mode-push).
 
 Tampilan jurnal dan masalahnya dikerjakan komponen `apps/core/resources/js/components/finance/posting-check.tsx`, gaya *Journal Check* BC (K-22): jumlah baris diperiksa, baris bermasalah, dan total masalah; saringan baris bermasalah; saldo berjalan; dan tombol jalan pintas ke layar perbaikan yang terbuka di tab baru, supaya setelah memperbaiki pengguna tinggal kembali dan menekan Validasi ulang. Komponen itu juga disiapkan untuk pratinjau penerimaan aset (TODO 9.3) dan "Post penyusutan" (TODO 11.2.7). Letaknya di Core, bukan di paket `@apperp/ui`, karena UI module ikut dikompilasi Core dengan alias `@/`, sedangkan mengubah SDK menuntut alur vendoring tarball.
 
@@ -497,6 +504,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Tenant terisolasi | `FinancePostingFeedTest::test_tenant_terisolasi_dan_posting_id_boleh_sama_di_tenant_lain`, `FinancePostingMonitorTest::test_posting_tenant_lain_menjawab_404` |
 | Scope pull dan ack terpisah | `FinancePostingFeedTest::test_cakupan_tarik_dan_ack_terpisah`, `IntegrationClientTest::test_cakupan_yang_kurang_menghasilkan_403` |
 | Push: signature dan ack di jawaban | `FinancePostingFeedTest::test_push_bertanda_tangan_dan_ack_di_jawaban_menutup_posting` |
+| Push: kirim ulang kiriman yang gagal, syaratnya, sandbox, dan kunci baris | `FinancePostingMonitorTest::test_a_failed_push_delivery_is_resent_on_the_next_run_with_a_fresh_retry_window`, `test_resend_is_refused_when_the_delivery_would_never_be_sent`, `test_resend_in_a_sandbox_copy_is_refused`, `test_resend_rechecks_the_delivery_inside_the_row_lock` |
 | Push: jeda, gagal, redirect, dan urutan per klien | `FinancePostingFeedTest::test_push_5xx_dicoba_lagi_dengan_jeda_4xx_berhenti_dan_urutan_per_klien_dijaga`, `test_push_batas_waktu_habis_dan_redirect_menjadi_gagal`, `test_in_saas_a_host_that_stops_resolving_is_retried_and_a_private_one_fails` |
 | Salinan sandbox | `FinancePostingFeedTest::test_salinan_sandbox_tidak_mengirim_apa_pun`, `IntegrationClientTest::test_salinan_sandbox_menjawab_503_dengan_alasannya`, `test_kirim_uji_di_sandbox_tidak_mengirim_apa_pun` |
 | Token, pencabutan, IP, dan tenant dari klien | `IntegrationClientTest::test_klien_pull_menerima_token_sekali_dan_hanya_digest_yang_disimpan`, `test_token_salah_atau_dicabut_ditolak`, `test_menerbitkan_ulang_token_mematikan_token_lama`, `test_alamat_di_luar_allowlist_ditolak`, `test_tenant_tidak_dapat_ditimpa_lewat_header` |
@@ -511,7 +519,6 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - **Belum ada module yang menerbitkan posting.** Modul aset sudah menyiapkan kode group aset dan buku penyusutan yang diketik manual (TODO 8.7) dan [posting group aset](/apps/management-aset/master/posting-group/) beserta pewarisan dimensi lokasi (area 8). Penerimaan, saldo awal, penyusutan, dan koreksi nilai (area 9 sampai 12) yang menerbitkan posting belum dikerjakan. Semua jenis di kontrak masih *Belum*.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Endpoint pratinjau HTTP (TODO 7.6.5)** belum ada. Logikanya sudah tersedia sebagai `PenerbitPosting::pratinjau()`, dan layar module dapat memanggilnya lewat controller module-nya sendiri.
-- **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
 
 ## Di mana kodenya

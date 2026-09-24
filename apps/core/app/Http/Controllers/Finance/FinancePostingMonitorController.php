@@ -13,7 +13,9 @@ use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Finance\PostingPublisher;
+use App\Support\Finance\PostingPusher;
 use App\Support\Finance\StatusPostingBerubah;
 use App\Support\Modules\Contracts\PostingTidakSah;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +27,8 @@ use Inertia\Response;
 
 /**
  * Layar pantau posting finance (TODO area 7): daftar, detail jurnal beserta masalahnya, riwayat,
- * dan tindak lanjut posting yang tertahan atau perlu dibukukan manual — tanpa membuka database.
+ * dan tindak lanjut posting yang tertahan, perlu dibukukan manual, atau gagal terkirim lewat push —
+ * tanpa membuka database.
  *
  * Hanya owner dan admin, termasuk untuk melihat: isinya jurnal keuangan tenant. Core belum punya
  * katalog izin sendiri, jadi izin terpisah untuk melihat dan menindak (TODO 7.4) menunggu katalog
@@ -101,7 +104,7 @@ final class FinancePostingMonitorController extends Controller
         ]);
     }
 
-    public function show(Request $request, FinancePosting $financePosting): JsonResponse
+    public function show(Request $request, FinancePosting $financePosting, PostingPusher $pusher): JsonResponse
     {
         $membership = $this->admin($request);
         $posting = $this->milik($membership, $financePosting);
@@ -115,6 +118,11 @@ final class FinancePostingMonitorController extends Controller
             ->where('tenant_id', $membership->tenant_id)
             ->whereIn('id', $events->pluck('integration_client_id')->merge($deliveries->pluck('integration_client_id'))->filter()->unique()->values())
             ->pluck('name', 'id');
+        $deliveryClients = IntegrationClient::query()
+            ->where('tenant_id', $membership->tenant_id)
+            ->whereIn('id', $deliveries->pluck('integration_client_id')->unique()->values())
+            ->get()
+            ->keyBy('id');
         $payload = $posting->payload ?? [];
 
         return response()->json(['data' => $this->present($posting, $this->entitasLegal($membership->tenant_id)) + [
@@ -159,6 +167,7 @@ final class FinancePostingMonitorController extends Controller
                 'data' => $event->data ?? (object) [],
             ])->values()->all(),
             'deliveries' => $deliveries->map(static fn (FinancePostingDelivery $kiriman): array => [
+                'id' => $kiriman->id,
                 'client' => (string) ($klien[$kiriman->integration_client_id] ?? $kiriman->integration_client_id),
                 'status' => $kiriman->status,
                 'attempts' => $kiriman->attempts,
@@ -167,6 +176,7 @@ final class FinancePostingMonitorController extends Controller
                 'last_attempt_at' => $kiriman->last_attempt_at?->toIso8601String(),
                 'next_attempt_at' => $kiriman->next_attempt_at?->toIso8601String(),
                 'delivered_at' => $kiriman->delivered_at?->toIso8601String(),
+                'resendable' => $pusher->resendRefusal($kiriman, $posting, $deliveryClients->get($kiriman->integration_client_id)) === null,
             ])->values()->all(),
         ]]);
     }
@@ -213,6 +223,34 @@ final class FinancePostingMonitorController extends Controller
         }
 
         return response()->json(['data' => $this->present($hasil, $this->entitasLegal($membership->tenant_id))]);
+    }
+
+    /**
+     * Mengembalikan kiriman push yang gagal ke antrean (TODO 7.3.4). Pengirimannya sendiri terjadi
+     * pada putaran `finance-postings:push` berikutnya, bukan di permintaan ini.
+     */
+    public function resendDelivery(Request $request, FinancePosting $financePosting, FinancePostingDelivery $delivery, PostingPusher $pusher, ActiveEnvironment $environment): JsonResponse
+    {
+        $membership = $this->admin($request);
+        $posting = $this->milik($membership, $financePosting);
+        abort_unless($delivery->finance_posting_id === $posting->id, 404);
+        // Penjadwal belum tahu environment-nya sendiri (lihat docblock ActiveEnvironment), jadi
+        // salinan sandbox dijaga di sini: kiriman yang dikembalikan ke antrean akan benar-benar dikirim.
+        if (! $environment->outboundAllowed()) {
+            throw ValidationException::withMessages(['delivery' => $environment->refusalReason()]);
+        }
+        $refusal = $pusher->resendRefusal($delivery, $posting, IntegrationClient::query()->find($delivery->integration_client_id));
+        if ($refusal !== null) {
+            throw ValidationException::withMessages(['delivery' => $refusal]);
+        }
+
+        try {
+            $pusher->resend($delivery, (int) $request->user()?->getAuthIdentifier());
+        } catch (StatusPostingBerubah) {
+            throw ValidationException::withMessages(['delivery' => 'Status kiriman ini baru saja berubah. Muat ulang halaman lalu periksa lagi.']);
+        }
+
+        return response()->json(['data' => $this->present($posting->refresh(), $this->entitasLegal($membership->tenant_id))]);
     }
 
     private function admin(Request $request): TenantMembership

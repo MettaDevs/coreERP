@@ -114,6 +114,7 @@ type PostingEvent = {
     data: Record<string, unknown>;
 };
 type Delivery = {
+    id: string;
     client: string;
     status: string;
     attempts: number;
@@ -122,6 +123,7 @@ type Delivery = {
     last_attempt_at: string | null;
     next_attempt_at: string | null;
     delivered_at: string | null;
+    resendable: boolean;
 };
 type SourceDocument = {
     module: string;
@@ -234,6 +236,7 @@ const EVENT = new Map([
     ['push_delivered', 'Terkirim ke aplikasi finance'],
     ['push_retrying', 'Gagal terkirim, akan dicoba lagi'],
     ['push_failed', 'Gagal terkirim'],
+    ['push_resend_requested', 'Dijadwalkan untuk dikirim ulang'],
 ]);
 
 const DELIVERY = new Map<string, { label: string; variant: BadgeVariant }>([
@@ -960,6 +963,8 @@ function eventNote(event: PostingEvent): string {
     const attempts = readNumber(event.data, 'attempts');
     const statusCode = readNumber(event.data, 'status_code');
     const retryIn = readNumber(event.data, 'retry_in_minutes');
+    const client = readText(event.data, 'client');
+    const previousAttempts = readNumber(event.data, 'previous_attempts');
 
     return [
         reason && `Alasan: ${reason}`,
@@ -972,6 +977,9 @@ function eventNote(event: PostingEvent): string {
         attempts !== null && `Percobaan ke-${attempts}`,
         statusCode !== null && `Kode jawaban ${statusCode}`,
         retryIn !== null && `Dicoba lagi dalam ${retryIn} menit`,
+        client && `Ke ${client}`,
+        previousAttempts !== null &&
+            `Sebelumnya gagal setelah ${COUNT.format(previousAttempts)} percobaan`,
     ]
         .filter(
             (part): part is string => typeof part === 'string' && part !== '',
@@ -990,7 +998,17 @@ function servedSummary(posting: Posting): string {
         : served;
 }
 
-function DeliveryTable({ deliveries }: { deliveries: Delivery[] }) {
+function DeliveryTable({
+    deliveries,
+    canManage,
+    busy,
+    onResend,
+}: {
+    deliveries: Delivery[];
+    canManage: boolean;
+    busy: boolean;
+    onResend: (delivery: Delivery) => void;
+}) {
     return (
         <div className="overflow-x-auto rounded-lg border">
             <Table>
@@ -1040,11 +1058,34 @@ function DeliveryTable({ deliveries }: { deliveries: Delivery[] }) {
                                                     )}
                                                 </span>
                                             )}
+                                            {delivery.status === 'retrying' &&
+                                                !delivery.next_attempt_at &&
+                                                !delivery.last_error && (
+                                                    <span className="block">
+                                                        Menunggu giliran dikirim
+                                                    </span>
+                                                )}
                                             {delivery.last_error && (
                                                 <span className="block text-destructive">
                                                     {delivery.last_error}
                                                 </span>
                                             )}
+                                            {canManage &&
+                                                delivery.resendable && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-2"
+                                                        disabled={busy}
+                                                        onClick={() =>
+                                                            onResend(delivery)
+                                                        }
+                                                    >
+                                                        <RefreshCw />
+                                                        Kirim ulang
+                                                    </Button>
+                                                )}
                                         </>
                                     )}
                                 </TableCell>
@@ -1092,7 +1133,17 @@ function EventTable({ events }: { events: PostingEvent[] }) {
     );
 }
 
-function PostingHistory({ detail }: { detail: PostingDetail }) {
+function PostingHistory({
+    detail,
+    canManage,
+    busy,
+    onResend,
+}: {
+    detail: PostingDetail;
+    canManage: boolean;
+    busy: boolean;
+    onResend: (delivery: Delivery) => void;
+}) {
     return (
         <section className="space-y-4">
             <div className="space-y-1">
@@ -1106,7 +1157,12 @@ function PostingHistory({ detail }: { detail: PostingDetail }) {
                     <h4 className="text-sm font-medium">
                         Pengiriman ke aplikasi finance
                     </h4>
-                    <DeliveryTable deliveries={detail.deliveries} />
+                    <DeliveryTable
+                        deliveries={detail.deliveries}
+                        canManage={canManage}
+                        busy={busy}
+                        onResend={onResend}
+                    />
                 </div>
             )}
             <div className="space-y-2">
@@ -1148,6 +1204,7 @@ function PostingDetailCard({
     onClose,
     onRevalidate,
     onMarkManual,
+    onResend,
 }: {
     posting: Posting | null;
     detail: PostingDetail | null;
@@ -1159,6 +1216,7 @@ function PostingDetailCard({
     onClose: () => void;
     onRevalidate: (posting: Posting) => void;
     onMarkManual: (posting: Posting) => void;
+    onResend: (posting: Posting, delivery: Delivery) => void;
 }) {
     return (
         <Card>
@@ -1248,7 +1306,12 @@ function PostingDetailCard({
                                 }
                             />
                         </section>
-                        <PostingHistory detail={detail} />
+                        <PostingHistory
+                            detail={detail}
+                            canManage={canManage}
+                            busy={busy}
+                            onResend={(delivery) => onResend(detail, delivery)}
+                        />
                     </>
                 ) : (
                     !error && <DetailSkeleton />
@@ -1527,6 +1590,33 @@ export default function FinancePostings({
         setMarking(posting);
     };
 
+    const resend = async (posting: Posting, delivery: Delivery) => {
+        setBusyId(posting.id);
+
+        try {
+            const result = await apiJson<{ data: Posting }>(
+                `/api/v1/finance-postings/${posting.id}/deliveries/${delivery.id}/resend`,
+                { method: 'POST' },
+            );
+            refresh(result.data);
+            toast.success(
+                `Posting ${result.data.posting_id} dijadwalkan untuk dikirim ulang ke ${delivery.client}.`,
+            );
+        } catch (caught) {
+            // 422 berarti kiriman ini tidak lagi dapat dikirim ulang, misalnya aplikasi finance
+            // sudah mengonfirmasinya lewat API; tampilkan keadaan terbarunya.
+            if (caught instanceof CoreApiError && caught.status === 422) {
+                refresh();
+            }
+
+            toast.error(
+                actionError(caught, 'Kiriman belum dijadwalkan ulang.'),
+            );
+        } finally {
+            setBusyId(null);
+        }
+    };
+
     return (
         <>
             <Head title="Pantau posting" />
@@ -1652,6 +1742,7 @@ export default function FinancePostings({
                         onClose={() => setSelectedId(null)}
                         onRevalidate={revalidate}
                         onMarkManual={openMarkManual}
+                        onResend={resend}
                     />
                 )}
             </main>

@@ -298,8 +298,12 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
     Sejak 23 September 2026 tanda pengguna juga diperiksa di dalam kunci baris Validasi ulang dan penilaian ulang.
     Sebelumnya, tanda yang jatuh di antara saat posting dipilih dan saat barisnya dikunci bisa tertimpa, lalu
     posting kembali `pending` dan dibukukan pembaca untuk kedua kalinya.
-  - [ ] 7.3.4 Kirim ulang kiriman push yang `failed`. Hari ini posting itu tetap `pending` tetapi tidak dikirim lagi ke
+  - [x] 7.3.4 Kirim ulang kiriman push yang `failed`. Hari ini posting itu tetap `pending` tetapi tidak dikirim lagi ke
     klien tersebut. Jalan keluar yang ada hanya Tandai manual, atau pembaca melakukan pull lewat API.
+    Tombol "Kirim ulang" di baris kiriman pada detail posting mengembalikan kiriman ke antrean; putaran push berikutnya
+    yang mengirimnya, dengan jeda dan batas waktu percobaan dari nol. Hanya untuk posting `pending` ke klien yang masih
+    aktif, bermode push, dan prefix-nya mencakup posting itu. Ditolak di salinan sandbox, dan tercatat di riwayat
+    beserta penggunanya.
   - [x] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
 - [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut. **Menunggu katalog izin Core.** Sampai katalog itu ada, layar dan aksinya dijaga `canManageAccess()` = owner/admin, termasuk untuk melihat (keputusan pemilik produk, 23 September 2026).
 - [x] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
