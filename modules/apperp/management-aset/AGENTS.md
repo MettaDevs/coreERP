@@ -9,7 +9,8 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 ## Struktur fitur
 
 - Setiap fitur atau halaman baru wajib memiliki folder sendiri pada API dan UI. Jangan menambahkan controller, model, page, atau komponen khusus fitur ke root bersama.
-- API menaruh kode khusus fitur di `api/app/Http/Controllers/<fitur>/` dan `api/app/Models/<fitur>/`. UI menaruh page, form, konfigurasi, dan komponen khususnya di `ui/src/<fitur>/`.
+- API menaruh kode khusus fitur di `src/Http/Controllers/transaksi/<Fitur>/` dan `src/Models/transaksi/<Fitur>/` (master di `master/`). UI menaruh page, form, konfigurasi, dan komponen khususnya di `ui/transactions/<fitur>/`.
+- Rute fitur ada di `routes/api/<fitur>.php`, satu berkas per fitur, dimuat otomatis oleh `routes/api.php` di bawah prefix dan middleware yang sama. Nama berkasnya bahasa Inggris seperti nama kode lain; alamat URL-nya tetap. Rute spesifik yang harus didahulukan dari `{id}` (misalnya `penerimaan-aset/vendor`) ditaruh di berkas yang sama, sebelum rute `{id}`-nya.
 - Kode lintas fitur saja yang boleh tetap di root/shared: controller dan model dasar, middleware, service integrasi, support, shell aplikasi, API client, dan style global.
 - Nama folder fitur memakai nama domain yang konsisten pada API dan UI. Jika fitur tumbuh, tambahkan subfolder lokal seperti `Components`, `Requests`, atau `Services` di dalam folder fitur; jangan membuat folder global baru hanya untuk satu fitur.
 - Detail pola dan contoh berada di `docs/agent.md` dan `docs/skills/struktur-fitur.md`.
@@ -34,7 +35,7 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 
 1. Tabel baru mengikuti bentuk yang sama: `id` ULID, `tenant_id`, `creation_key`, `kode`, `nama`, `keterangan`, `aktif`, soft delete, `unique(tenant_id, kode)`, `unique(tenant_id, creation_key)`.
 2. Foreign key ke master lain wajib **gabungan dengan `tenant_id`** — `(tenant_id, parent_id)` → `(tenant_id, id)` — sehingga induk lintas tenant ditolak database, bukan hanya validasi aplikasi. Tabel induk perlu `unique(tenant_id, id)`.
-3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
+3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya, lalu slug-nya didaftarkan di `$masters` pada `routes/api/master-data.php`. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
 4. `app.yaml` wajib menambah empat lapis Dynamics 365 secara terpisah — entry point, permission, privilege, duty — plus satu reference nomor. Kode privilege tidak boleh sama dengan kode permission.
 5. Perbarui `contracts/src/` (lalu `python contracts/bundle.py`), `README.md`, dan `database/README.md` pada perubahan yang sama.
 

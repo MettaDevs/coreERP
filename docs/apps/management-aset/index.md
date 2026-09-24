@@ -19,7 +19,7 @@ App bisnis pertama. Mengelola entitas, kategori, dan maintenance aset perusahaan
 
 ## Domain yang dimiliki
 
-**Milik app ini** — master data aset, register aset, penyusutan, setup dan pelaksanaan maintenance, serta dokumen siklus aset. Daftar master yang berlaku ada di `routes/api.php` pada array `$masters`; jumlahnya berubah seiring modul tumbuh, jadi angkanya tidak disalin ke sini.
+**Milik app ini** — master data aset, register aset, penyusutan, setup dan pelaksanaan maintenance, serta dokumen siklus aset. Daftar master yang berlaku ada di `routes/api/master-data.php` pada array `$masters`; jumlahnya berubah seiring modul tumbuh, jadi angkanya tidak disalin ke sini.
 
 Klasifikasi aset memakai **dua sumbu yang saling lepas**, mengikuti model Dynamics 365 F&O: **group aset** membawa perlakuan uang (penyusutan, kelompok harta fiskal, pembebanan), **jenis aset** membawa perlakuan teknis (atribut, pekerjaan maintenance). Keduanya ditunjuk langsung dari aset, dan tidak ada yang menyaring yang lain. Rantai lama `group → kategori → jenis → entitas` sudah dibongkar.
 
