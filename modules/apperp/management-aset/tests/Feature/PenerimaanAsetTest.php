@@ -39,6 +39,9 @@ class PenerimaanAsetTest extends TestCase
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
+        // Jurnal perolehan terbit saat penerimaan diselesaikan, jadi entitas legalnya harus ada di
+        // Core, dan pembelian pada mode bawaan `direct_payable` membawa vendor (TODO 9.2.1).
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         Http::preventStrayRequests();
     }
 
@@ -282,6 +285,7 @@ class PenerimaanAsetTest extends TestCase
             'tanggal' => '2026-07-01',
             'tanggal_siap_pakai' => '2026-07-01',
             'currency_code' => 'IDR',
+            'vendor_id' => $this->pastikanVendorUji($this->tenantId, $this->legalEntityId),
             'details' => $details,
         ];
     }

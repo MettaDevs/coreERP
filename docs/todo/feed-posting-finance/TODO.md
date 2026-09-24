@@ -367,36 +367,55 @@ dan dimensi lokasi mewarisi dari induk.
 
 ---
 
-### 9. [ ] Modul aset: penerimaan dan posting perolehan
+### 9. [x] Modul aset: penerimaan dan posting perolehan
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 2, 6, 8 · **Selesai bila:**
 menyelesaikan penerimaan menerbitkan `asset.acquisition` dalam transaksi yang sama, dengan vendor
 dan PPN, untuk kedua mode.
 
-- [ ] 9.1 Migration penerimaan.
-  - [ ] 9.1.1 Header: `vendor_id` (nullable), `cara_perolehan` (default `pembelian`), `vendor_invoice_reference` (nullable).
-  - [ ] 9.1.2 Baris: `ppn_per_unit` decimal(18,2) default 0.
-- [ ] 9.2 Validasi saat selesai.
-  - [ ] 9.2.1 Vendor wajib kalau mode pada tanggal penerimaan adalah `direct_payable` dan caranya `pembelian`.
-  - [ ] 9.2.2 PPN tidak boleh negatif.
-- [ ] 9.3 UI `ui/transactions/inventarisasi-aset/PenerimaanDetailPage.tsx`.
-  - [ ] 9.3.1 Pilih vendor (dari `DaftarVendor`), cara perolehan, referensi faktur, dan PPN per baris.
-  - [ ] 9.3.2 Pratinjau posting sebelum tombol "Selesaikan", memakai komponen 7.6: baris jurnal yang akan terbit, dimensinya, dan masalahnya (misalnya group belum dipetakan) beserta jalan pintas perbaikannya.
-- [ ] 9.6 Pembulatan di sumber (K-20): nilai per baris = bulat(`nilai_per_unit` × `jumlah`) ke presisi nilai mata uang (5.5.4), begitu juga PPN per baris. Jurnal disusun dari nilai yang sudah bulat. `nilai_per_unit` boleh memakai presisi harga satuan.
-- [ ] 9.4 Penerbitan di `PenerimaanAsetController::selesaikan`.
-  - [ ] 9.4.1 Satu posting per penerimaan, dengan `posting_id` deterministik dari ID penerimaan.
-  - [ ] 9.4.2 Baris: Dr harga perolehan per group + BU, Dr PPN Masukan per BU, Cr hutang atau perantara sesuai mode.
-  - [ ] 9.4.3 `posting_date` = `tanggal` penerimaan, **bukan** tanggal siap pakai. `document_date` = tanggal faktur vendor kalau diisi, selain itu `tanggal` penerimaan. `occurred_at` = jam penerimaan diselesaikan.
-  - [ ] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
-  - [ ] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
-- [ ] 9.7 Pembungkus `PenerbitPosting` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `PostingTidakSah` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
-- [ ] 9.5 Test.
-  - [ ] 9.5.1 Mode `direct_payable`: jurnal seperti di PRD, seimbang, dengan vendor.
-  - [ ] 9.5.2 Mode `clearing`: kredit ke perantara, vendor boleh kosong.
-  - [ ] 9.5.3 Group belum dipetakan → penerimaan tetap selesai, posting `held`.
-  - [ ] 9.5.4 Gagal di tengah transaksi → tidak ada aset dan tidak ada posting.
-  - [ ] 9.5.5 Selesai diulang → tetap satu posting.
-  - [ ] 9.5.6 Harga satuan berdesimal (3 × 333.333,333) → jurnal seimbang di presisi mata uang.
+- [x] 9.1 Migration penerimaan.
+  - [x] 9.1.1 Header: `vendor_id` (nullable), `cara_perolehan` (default `pembelian`), `vendor_invoice_reference` (nullable).
+    Ditambah `vendor_invoice_date`, karena 9.4.3 memakai tanggal faktur sebagai `document_date`.
+  - [x] 9.1.2 Baris: `ppn_per_unit` decimal(18,2) default 0.
+    Dibuat `decimal(24,6)`, dan `nilai_per_unit` dilebarkan ke presisi yang sama: keduanya harga per unit, yang
+    boleh memakai presisi harga satuan mata uangnya (K-20, 9.5.6).
+- [x] 9.2 Validasi saat selesai.
+  - [x] 9.2.1 Vendor wajib kalau mode pada tanggal penerimaan adalah `direct_payable` dan caranya `pembelian`.
+  - [x] 9.2.2 PPN tidak boleh negatif.
+  - [x] 9.2.3 Group tanpa buku yang di-post ke finance menolak penyelesaian, mengikuti D365 (K-26). Diperiksa
+    sebelum nomor aset terbit, dan tampil lebih dulu di pratinjau.
+- [x] 9.3 UI `ui/transactions/inventarisasi-aset/PenerimaanDetailPage.tsx`.
+  - [x] 9.3.1 Pilih vendor (dari `DaftarVendor`), cara perolehan, referensi faktur, dan PPN per baris.
+  - [x] 9.3.2 Pratinjau posting sebelum tombol "Selesaikan", memakai komponen 7.6: baris jurnal yang akan terbit, dimensinya, dan masalahnya (misalnya group belum dipetakan) beserta jalan pintas perbaikannya.
+    Endpointnya di module, `GET /penerimaan-aset/{id}/pratinjau-posting`, sekaligus menutup 7.6.5. Dialog
+    konfirmasi menyebut penghalangnya dan menonaktifkan tombolnya selama ada.
+- [x] 9.6 Pembulatan di sumber (K-20): nilai per baris = bulat(`nilai_per_unit` × `jumlah`) ke presisi nilai mata uang (5.5.4), begitu juga PPN per baris. Jurnal disusun dari nilai yang sudah bulat. `nilai_per_unit` boleh memakai presisi harga satuan.
+- [x] 9.4 Penerbitan di `PenerimaanAsetController::selesaikan`.
+  - [x] 9.4.1 Satu posting per penerimaan, dengan `posting_id` deterministik dari ID penerimaan.
+  - [x] 9.4.2 Baris: Dr harga perolehan per group + BU, Dr PPN Masukan per BU, Cr hutang atau perantara sesuai mode.
+    Ketiganya per group dan unit dimensi aset (Core yang menurunkan BU-nya), supaya setiap baris menyebut satu
+    kolom posting group dan akunnya dapat dibaca ulang saat divalidasi ulang. Hibah dikreditkan ke lawan hibah (K-25).
+  - [x] 9.4.3 `posting_date` = `tanggal` penerimaan, **bukan** tanggal siap pakai. `document_date` = tanggal faktur vendor kalau diisi, selain itu `tanggal` penerimaan. `occurred_at` = jam penerimaan diselesaikan.
+  - [x] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
+  - [x] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
+    Jurnalnya sekali per aset lewat satu buku yang di-post, bukan sekali per buku (K-26).
+- [x] 9.7 Pembungkus `PenerbitPosting` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `PostingTidakSah` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
+- [x] 9.5 Test (`AcquisitionPostingTest`).
+  - [x] 9.5.1 Mode `direct_payable`: jurnal seperti di PRD, seimbang, dengan vendor.
+  - [x] 9.5.2 Mode `clearing`: kredit ke perantara, vendor boleh kosong.
+  - [x] 9.5.3 Group belum dipetakan → penerimaan tetap selesai, posting `held`.
+    Sesudah posting group diisi, Validasi ulang di Core melepasnya: Core membaca ulang akun lewat
+    `mapping.reference` dan `PostingAccountResolver` (celah area 6 yang ditemukan di sini).
+  - [x] 9.5.4 Gagal di tengah transaksi → tidak ada aset dan tidak ada posting.
+  - [x] 9.5.5 Selesai diulang → tetap satu posting.
+  - [x] 9.5.6 Harga satuan berdesimal (3 × 333.333,333) → jurnal seimbang di presisi mata uang.
+    Nilai asetnya 333.333,34 + 333.333,33 + 333.333,33, jadi register sama persis dengan jurnal.
+  - [x] 9.5.7 Uji beban `loadtest/k6/receipt-posting.js`: penyelesaian serentak, balapan menyelesaikan dokumen yang
+    sama, dan oracle SQL satu posting per penerimaan yang nilainya sama dengan register.
+    Lulus 24 September 2026: balapan 32 VU (234 menang, 1.001 kalah) dan saturasi 1000 VU di 128 tenant,
+    0 pelanggaran dan 0 error 5xx; `verify.sql` modul 0 pada 1.014 posting untuk 1.014 penerimaan selesai.
+    Probe dan empat pemeriksaan SQL barunya sudah dibuktikan bisa merah. Rinciannya di `apps/core/loadtest/README.md`.
+    Temuan di luar area ini: deadlock penerbitan nomor Core saat banyak dokumen dibuat serentak dalam satu tenant.
 
 ---
 

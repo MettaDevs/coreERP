@@ -13,6 +13,8 @@ use App\Models\LegalEntity;
 use App\Models\Organization;
 use App\Models\Vendor;
 use App\Support\BusinessUnitResolver;
+use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\PostingTidakSah;
 use Brick\Math\BigDecimal;
 use Brick\Math\Exception\MathException;
@@ -39,6 +41,10 @@ use Throwable;
  *
  * Nama dan nomor akun, unit, vendor, serta entitas legal disalin ke payload **pada saat terbit**.
  * Mengganti nama sesudahnya tidak mengubah posting yang sudah terbit.
+ *
+ * Posting yang belum sampai ke pembaca dibentuk ulang dari masukan yang tersimpan, dengan satu
+ * pengecualian: baris yang membawa `mapping.reference` membaca akunnya dari pemetaan module yang
+ * berlaku sekarang (`PostingAccountResolver`), supaya pemetaan yang baru diisi ikut terpakai.
  */
 final class PostingPublisher
 {
@@ -56,6 +62,8 @@ final class PostingPublisher
         private readonly MoneyPrecision $presisi,
         private readonly PostingSettings $setelan,
         private readonly BusinessUnitResolver $businessUnits,
+        private readonly PostingAccountResolvers $pemetaAkun,
+        private readonly PelaksanaUntukTenant $pelaksana,
     ) {}
 
     /**
@@ -564,10 +572,11 @@ final class PostingPublisher
 
     private function terapkanUlang(FinancePosting $posting, string $peristiwa, ?int $userId): FinancePosting
     {
-        $masukan = $this->normalize($posting->input, $posting->currency_decimals);
+        $input = $this->akunTerkini($posting);
+        $masukan = $this->normalize($input, $posting->currency_decimals);
         $nilai = $this->evaluate($masukan, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String()));
 
-        return DB::transaction(function () use ($posting, $nilai, $peristiwa, $userId): FinancePosting {
+        return DB::transaction(function () use ($posting, $input, $masukan, $nilai, $peristiwa, $userId): FinancePosting {
             $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
             if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci) || $this->markedByUser($terkunci)) {
                 return $terkunci;
@@ -578,6 +587,11 @@ final class PostingPublisher
                 'manual_reason' => $nilai['manual_reason'],
                 'hold_reasons' => $nilai['status'] === FinancePosting::HELD ? $nilai['problems'] : null,
                 'payload' => $nilai['payload'],
+                // Akun yang dibaca ulang menjadi bagian masukan posting ini. Tanpa itu, module yang
+                // menerbitkan ulang dokumen yang sama dengan pemetaan terbaru akan ditolak sebagai
+                // "isi jurnal berbeda", padahal isinya persis yang sekarang tersimpan.
+                'input' => $input,
+                'input_hash' => $masukan->hash,
             ])->save();
             $terkunci->lines()->delete();
             $this->simpanBaris($terkunci, $nilai['lines']);
@@ -585,6 +599,45 @@ final class PostingPublisher
 
             return $terkunci;
         });
+    }
+
+    /**
+     * Masukan tersimpan dengan akun setiap baris ber-`mapping.reference` dibaca ulang dari module
+     * pemilik dokumen sumbernya. Hanya akun: nilai, unit, dan susunan baris tetap.
+     *
+     * Pemeta yang gagal tidak menghentikan pembentukan ulang. Kegagalannya dilaporkan dan baris itu
+     * memakai akun yang tersimpan, karena penilaian ulang cutover memproses banyak posting sekaligus
+     * dan satu module yang rusak tidak boleh menahan posting module lain.
+     *
+     * @return array<string, mixed>
+     */
+    private function akunTerkini(FinancePosting $posting): array
+    {
+        $input = $posting->input;
+        $modul = $input['source_document']['module'] ?? null;
+        $pemeta = is_string($modul) ? $this->pemetaAkun->for($modul) : null;
+        $baris = $input['lines'] ?? null;
+        if ($pemeta === null || ! is_array($baris)) {
+            return $input;
+        }
+
+        $tanggal = $posting->posting_date->toDateString();
+        foreach ($baris as $indeks => $line) {
+            $kunci = is_array($line) ? ($line['mapping']['reference'] ?? null) : null;
+            if (! is_string($kunci) || $kunci === '') {
+                continue;
+            }
+            try {
+                $input['lines'][$indeks]['account_id'] = $this->pelaksana->jalankanUntuk(
+                    $posting->tenant_id,
+                    fn (): ?string => $pemeta->account($posting->tenant_id, $kunci, $tanggal),
+                );
+            } catch (Throwable $kegagalan) {
+                report($kegagalan);
+            }
+        }
+
+        return $input;
     }
 
     private function jadikanManual(FinancePosting $posting, string $alasan, ?int $userId): void
@@ -645,6 +698,11 @@ final class PostingPublisher
             $kredit = $kredit->plus($k);
 
             $mapping = $line['mapping'] ?? null;
+            if (is_array($mapping)) {
+                // Kunci pemetaan hanya dipakai saat posting dibentuk ulang; di sini cukup dipastikan
+                // bentuknya, supaya masukan yang tersimpan tidak membawa sesuatu yang tidak terbaca.
+                $this->teks($mapping, 'reference', 200, false, sprintf('Baris %d mapping.reference', $no));
+            }
             $hasil[] = [
                 'line_no' => $no,
                 'account_id' => $this->teks($line, 'account_id', 26, false, sprintf('Baris %d account_id', $no)),

@@ -318,7 +318,9 @@ class DepreciationEndToEndTest extends TestCase
 
         $aset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
 
-        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->value('id');
+        // Buku memorandum saja tidak cukup untuk menerima aset (area 9), jadi penerimaan menambah
+        // buku uji yang di-post tetapi tidak menyusut. Yang dikembalikan tetap buku skenario ini.
+        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->where('buku_id', $buku)->value('id');
     }
 
     /**

@@ -203,7 +203,7 @@ paths:
                           name: Aset Tetap - Kendaraan
                         debit: '500000000.00'
                         credit: '0.00'
-                        description: KEND-0012 Ambulans
+                        description: PNA-2026-09-0007 · Kendaraan
                         financial_dimensions:
                         - code: BUSINESS_UNIT
                           display_name: Business unit
@@ -217,7 +217,7 @@ paths:
                           name: PPN Masukan
                         debit: '55000000.00'
                         credit: '0.00'
-                        description: PPN KEND-0012
+                        description: PPN Masukan · PNA-2026-09-0007 · Kendaraan
                         financial_dimensions:
                         - code: BUSINESS_UNIT
                           display_name: Business unit
@@ -231,7 +231,7 @@ paths:
                           name: Hutang Usaha
                         debit: '0.00'
                         credit: '555000000.00'
-                        description: PT Karoseri Sehat
+                        description: PT Karoseri Sehat · PNA-2026-09-0007
                         financial_dimensions:
                         - code: BUSINESS_UNIT
                           display_name: Business unit
@@ -2447,14 +2447,14 @@ components:
 
         | Nilai | Terbit saat | Tersedia |
         | --- | --- | --- |
-        | `asset.acquisition` | Penerimaan aset diselesaikan | Belum |
+        | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
         | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
         | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
         | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
         | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
 
-        **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Selama semuanya
-        masih *Belum*, feed tidak berisi posting apa pun.
+        **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
+        *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.
 
         Daftar ini terbuka: jenis baru dapat ditambahkan, misalnya dari modul lain, tanpa versi kontrak
         baru. Jenis yang belum dikenal aplikasi Anda ditolak lewat ack dengan kode `INVALID`, tidak

@@ -98,21 +98,21 @@ get:
                         account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
                         debit: '500000000.00'
                         credit: '0.00'
-                        description: KEND-0012 Ambulans
+                        description: PNA-2026-09-0007 · Kendaraan
                         financial_dimensions:
                           - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
                       - line_no: 2
                         account: { external_id: '1501', code: 1-1500, name: PPN Masukan }
                         debit: '55000000.00'
                         credit: '0.00'
-                        description: PPN KEND-0012
+                        description: PPN Masukan · PNA-2026-09-0007 · Kendaraan
                         financial_dimensions:
                           - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
                       - line_no: 3
                         account: { external_id: '2110', code: 2-1100, name: Hutang Usaha }
                         debit: '0.00'
                         credit: '555000000.00'
-                        description: PT Karoseri Sehat
+                        description: PT Karoseri Sehat · PNA-2026-09-0007
                         financial_dimensions:
                           - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
                     totals: { debit: '555000000.00', credit: '555000000.00' }

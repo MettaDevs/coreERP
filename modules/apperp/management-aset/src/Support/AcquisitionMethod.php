@@ -19,4 +19,18 @@ final class AcquisitionMethod
     public const OPENING_BALANCE = 'saldo_awal';
 
     public const ALL = [self::PURCHASE, self::GRANT, self::OPENING_BALANCE];
+
+    /**
+     * Cara yang dapat dipilih di dokumen penerimaan hari ini. Saldo awal ikut bersama area 10:
+     * jurnalnya bukan `asset.acquisition` melainkan `asset.opening_balance`, dan barisnya membawa
+     * akumulasi penyusutan sampai cutover yang belum ada di penerimaan.
+     */
+    public const RECEIPT = [self::PURCHASE, self::GRANT];
+
+    /** Label untuk layar dan pesan. */
+    public const LABELS = [
+        self::PURCHASE => 'Pembelian',
+        self::GRANT => 'Hibah',
+        self::OPENING_BALANCE => 'Saldo awal',
+    ];
 }

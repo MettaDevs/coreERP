@@ -1413,7 +1413,7 @@ GroupBukuPenyusutanList:
 PostingGroupAsetAccounts:
   type: object
   description: |
-    Tujuh akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
+    Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
     bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
   additionalProperties: false
   properties:
@@ -1449,6 +1449,11 @@ PostingGroupAsetAccounts:
       - type: 'null'
     opening_balance_offset_account_id:
       description: Penyeimbang saldo awal, hanya untuk saldo awal saat cutover.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    grant_offset_account_id:
+      description: Lawan hibah, hanya untuk penerimaan dengan cara perolehan `hibah`; hibah tidak dikreditkan ke hutang.
       oneOf:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'

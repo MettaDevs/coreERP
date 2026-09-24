@@ -9,8 +9,9 @@
 # ribu tetap dua puluh aset lima ratus ribu, dan tidak melewati ambang sepuluh juta hanya
 # karena datang bersamaan.
 #
-# Vendor sengaja tidak ada. Menyalin namanya sebagai teks bebas akan menjadi kolom yang
-# harus dibersihkan kemudian.
+# Vendor adalah vendor milik Core (K-06), disimpan sebagai `vendor_id` dan dibaca ulang namanya,
+# bukan disalin sebagai teks bebas. Sejak area 9 feed posting finance, menyelesaikan penerimaan
+# juga menerbitkan jurnal perolehan `asset.acquisition` di transaksi yang sama.
 /api/v1/penerimaan-aset:
   get:
     tags:
@@ -53,6 +54,12 @@
     - Penerimaan aset
     operationId: createAsetReceipt
     summary: Membuat draf penerimaan; belum ada aset yang lahir sampai diselesaikan
+    description: |
+      Kepala dokumen membawa `cara_perolehan` (`pembelian` atau `hibah`; bawaan `pembelian`,
+      saldo awal belum lewat penerimaan), `vendor_id` (vendor Core milik entitas legal yang
+      sama), `vendor_invoice_reference`, dan `vendor_invoice_date`. Baris membawa
+      `nilai_per_unit` dan `ppn_per_unit`, keduanya boleh memakai presisi harga satuan mata
+      uangnya (IDR bawaan 3 desimal), tidak lebih halus.
     parameters:
     - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
     responses:
@@ -71,7 +78,38 @@
           Master di luar tenant, kombinasi pabrikan x model x jenis tidak sah, atau nilai
           atribut tidak sesuai definisi jenis asetnya. Atribut diperiksa sudah di sini,
           bukan menunggu penyelesaian: draf yang lolos padahal mustahil diselesaikan adalah
-          jebakan yang baru terbuka setelah tombol terakhir ditekan.
+          jebakan yang baru terbuka setelah tombol terakhir ditekan. Juga vendor milik entitas
+          legal lain, cara perolehan `saldo_awal`, mata uang yang presisinya belum disetel,
+          dan harga satuan atau PPN per unit yang lebih halus dari presisi harga satuannya.
+/api/v1/penerimaan-aset/vendor:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: listAsetReceiptVendors
+    summary: Vendor aktif satu entitas legal untuk pemilih vendor penerimaan
+    description: |
+      Vendor milik Core (K-06), dibaca lewat kontrak `DaftarVendor`. Semua anggota tenant boleh
+      melihat vendor, jadi yang diperiksa hanya izin membaca penerimaan.
+    parameters:
+    - name: legal_entity_id
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    - name: q
+      in: query
+      required: false
+      description: Dicocokkan dengan nomor atau nama vendor.
+      schema:
+        type: string
+        maxLength: 100
+    responses:
+      '200':
+        description: '`data` berisi `{id, number, name, tax_number, status, legal_entity_id}` per vendor, paling banyak 20.'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        description: '`legal_entity_id` tidak diisi atau bukan ULID.'
 /api/v1/penerimaan-aset/{id}:
   get:
     tags:
@@ -84,6 +122,11 @@
       `penanggung_jawab_nama`), dan tiap baris membawa nama master yang dirujuknya. Nama
       dibaca dari Core saat permintaan dilayani, bukan disimpan sebagai snapshot. Nama
       bernilai `null` berarti unit atau keanggotaannya sudah tidak ada di Core.
+
+      `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
+      keadaan jurnal perolehannya di feed posting finance sesudah diselesaikan —
+      `{posting_id, status, external_reference, reason_code, reason, acknowledged_at, problems}`
+      — dan `null` selama masih draf atau bila penerimaannya bernilai nol.
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:
@@ -167,6 +210,13 @@
 
       Nomor seri dibiarkan kosong: kardusnya belum dibuka. Ia diisi sesudahnya lewat
       `PUT /penerimaan-aset/{id}/aset`.
+
+      **Jurnal perolehan terbit di transaksi yang sama** (`asset.acquisition`, posting id
+      `AST-ACQ-<id penerimaan>`): harga perolehan dan PPN Masukan per group dan unit dimensi,
+      lawannya lawan hutang (`direct_payable`), perantara (`clearing`), atau lawan hibah
+      (`hibah`). Nilai baris = bulat(harga satuan × jumlah) ke presisi nilai mata uang, dan nilai
+      tiap aset adalah pembagian nilai yang sudah bulat itu, jadi register dan jurnal sama persis.
+      Pemetaan akun yang kosong tidak menahan penyelesaian: postingnya tertahan di Core.
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:
@@ -182,9 +232,40 @@
         description: |
           Dokumen tanpa baris, sudah selesai, melebihi sisa permintaan pembelian yang
           dirujuknya (pesannya menyebut sisanya), atau groupnya belum memiliki profil
-          penyusutan yang dapat dihitung.
+          penyusutan yang dapat dihitung. Juga pembelian tanpa vendor pada entitas bermode
+          `direct_payable` (`vendor_id`), dan group yang tidak punya buku yang di-post ke
+          finance (`details.<n>.group_aset_id`) — seperti D365, yang menghentikan posting faktur
+          aset tanpa buku ber-lapisan Current.
+      '500':
+        description: |
+          Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
+          `posting_failed`. Transaksinya dibatalkan: tidak ada aset yang terdaftar, dan
+          kesalahannya sudah dilaporkan ke pemantauan kesalahan.
       '503':
         $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/penerimaan-aset/{id}/pratinjau-posting:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: previewAsetReceiptPosting
+    summary: Pratinjau jurnal perolehan sebelum penerimaan diselesaikan
+    description: |
+      Pemeriksaan yang sama persis dengan penerbitan, tanpa menyimpan apa pun (K-22): `lines`
+      (baris jurnal dengan akun, debit, kredit, dan dimensinya), `problems` (masalah pemetaan
+      per baris, beserta jalan pintas perbaikannya), `status` yang akan diperoleh posting itu,
+      `currency`, `settlement_mode`, dan `blockers` — `{field, message}` untuk hal yang akan
+      menolak penyelesaian. `status` `null` berarti tidak ada nilai yang akan dijurnal.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Pratinjau jurnal perolehan
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Penerimaan yang sudah selesai; jurnalnya sudah terbit dan keadaannya ada di rincian dokumen
+      '500':
+        description: Kesalahan sistem pada penyusunan jurnal; kode kesalahan `posting_failed`
 /api/v1/penerimaan-aset/{id}/aset:
   get:
     tags:

@@ -46,7 +46,7 @@ class PenerimaanAsetDetail extends Model
     protected $fillable = [
         'tenant_id', 'penerimaan_aset_id', 'line_number', 'nama', 'group_aset_id',
         'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id',
-        'model_number', 'jumlah', 'nilai_per_unit', 'residu_per_unit',
+        'model_number', 'jumlah', 'nilai_per_unit', 'ppn_per_unit', 'residu_per_unit',
         'permintaan_pembelian_detail_id', 'atribut', 'keterangan',
     ];
 
@@ -56,7 +56,9 @@ class PenerimaanAsetDetail extends Model
         return [
             'line_number' => 'integer',
             'jumlah' => 'integer',
-            'nilai_per_unit' => 'decimal:2',
+            // Harga satuan boleh lebih halus dari nilai jurnal (K-20); kolomnya decimal(24,6).
+            'nilai_per_unit' => 'decimal:6',
+            'ppn_per_unit' => 'decimal:6',
             'residu_per_unit' => 'decimal:2',
             'atribut' => 'array',
         ];

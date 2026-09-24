@@ -119,6 +119,8 @@ Semuanya di bawah `/api/v1`:
 | `POST /penerimaan-aset` | Draf dokumen penerimaan (wajib `Idempotency-Key`) | `penerimaan-aset.create` |
 | `POST /penerimaan-aset/{id}/selesaikan` | Melahirkan asetnya; satu unit satu aset bernomor | `aset.create` |
 | `GET /penerimaan-aset/{id}/ringkasan` | Berapa aset yang akan lahir, dan mana yang tak akan disusutkan | `penerimaan-aset.read` |
+| `GET /penerimaan-aset/{id}/pratinjau-posting` | Jurnal perolehan yang akan terbit, masalahnya, dan hal yang menolak penyelesaian | `penerimaan-aset.read` |
+| `GET /penerimaan-aset/vendor?legal_entity_id=` | Vendor aktif entitas legal itu, untuk pemilih vendor | `penerimaan-aset.read` |
 | `PUT /penerimaan-aset/{id}/aset` | Mengisi nomor seri seluruh aset dokumen sekaligus | `aset.update` |
 | `GET /aset/{id}` | Detail aset lengkap dengan nilai atribut dan bukunya | `aset.read` |
 | `PATCH /aset/{id}` | Koreksi data aset | `aset.update` |
@@ -275,6 +277,30 @@ Punya permission belum cukup. Setiap pembacaan dan penulisan aset masih disaring
 Core menyusun daftar badan hukum dan unit kerja yang boleh diakses pengguna, dan modul membacanya lewat kontrak `KonteksPermintaan`. Kueri disaring berdasarkan daftar itu. Dua orang dengan permission yang sama persis tetap melihat daftar aset yang berbeda sesuai unit kerja mereka. **Jangan pernah mempercayai id organisasi yang dikirim dari browser.**
 
 ---
+
+## Jurnal perolehan
+
+Menyelesaikan penerimaan juga menerbitkan jurnal perolehan `asset.acquisition` ke [feed posting finance](/dev/34-feed-posting-finance), **di transaksi yang sama** dengan asetnya (`Services/AcquisitionPosting`, TODO 9.4). Penerimaan yang gagal tidak meninggalkan posting, dan penerimaan yang selesai pasti punya posting. `posting_id`-nya `AST-ACQ-<id penerimaan>`, jadi percobaan ulang tidak menerbitkan posting kedua.
+
+| Baris | Akun dari posting group | Nilai |
+| --- | --- | --- |
+| Debit, per group dan unit dimensi | Harga perolehan | Jumlah nilai baris penerimaan |
+| Debit, per group dan unit dimensi, bila ada PPN | PPN Masukan | Jumlah PPN baris penerimaan |
+| Kredit, per group dan unit dimensi | Lawan hutang (`direct_payable`), perantara (`clearing`), atau lawan hibah (`hibah`) | Nilai + PPN |
+
+Kepala dokumen membawa **cara perolehan** (`pembelian` bawaan, atau `hibah`), **vendor** milik Core, **nomor dan tanggal faktur vendor**; baris membawa **PPN per unit**. `posting_date` adalah tanggal terima, `document_date` tanggal faktur bila diisi, `occurred_at` jam penyelesaian.
+
+**Pembulatan di sumber, dan register sama persis dengan jurnal** (K-20). Harga satuan dan PPN per unit boleh memakai presisi harga satuan mata uangnya (IDR bawaan 3 desimal). Nilai baris = bulat(harga satuan × jumlah) ke presisi nilai (IDR bawaan 2 desimal), dan nilai tiap aset adalah pembagian nilai yang sudah bulat itu: sisa pembulatannya dibagikan satu sen ke aset pertama. Tiga kursi × 333.333,333 menjadi 1.000.000,00 di jurnal dan 333.333,34 + 333.333,33 + 333.333,33 di register. Tanpa pembagian itu, register menjumlah 999.999,99 sementara hutangnya 1.000.000,00, dan selisih satu sen itu tidak pernah hilang.
+
+**Yang menolak penyelesaian**, diperiksa sebelum nomor aset terbit dan ditampilkan lebih dulu di pratinjau:
+
+- **Pembelian tanpa vendor** pada entitas legal bermode `direct_payable`, mode bawaan entitas yang belum disetel (TODO 9.2.1). Pada mode itu posting inilah hutangnya, dan hutang tanpa pemasok tidak dapat dibayar.
+- **Group tanpa buku yang di-post ke finance**: semua buku di matriks group × buku memorandum (`posting_layer = none`), atau matriksnya kosong. Mengikuti Dynamics 365 (keputusan pemilik produk, 24 September 2026, K-26): F&O hanya menerima buku berlapisan Current pada purchase order dan vendor invoice dan menghentikan posting bila tidak ada, BC menolak faktur aset yang depreciation book-nya tidak terintegrasi ke G/L. Jurnal perolehan dibuat **sekali per aset**, lewat satu buku yang di-post (`current` lebih dulu), bukan sekali per buku.
+- **Mata uang** yang presisinya belum disetel, atau presisi nilainya lebih halus dari dua desimal register aset.
+
+**Yang tidak menolak**: pemetaan akun yang kosong atau nonaktif, dan unit tanpa nomor. Postingnya terbit sebagai `held` dan penerimaannya tetap selesai (K-18); setelah pemetaannya dibenahi, Validasi ulang melepasnya. Penerimaan bernilai nol tidak menerbitkan posting.
+
+`PostingTidakSah` dari Core adalah bug penerbit (K-22): dilaporkan ke pemantauan kesalahan, transaksinya dibatalkan, dan layar menerima 500 `posting_failed` dengan pesan yang dapat dibaca.
 
 ## Aturan yang dijaga, dan alasannya
 
