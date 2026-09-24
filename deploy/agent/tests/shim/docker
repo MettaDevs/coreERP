@@ -341,7 +341,7 @@ case "${1:-}" in
                         fi
 
                         # `-`, bukan `:-`: FAKE_DOCKER_RINGKASAN yang disetel kosong menirukan Core yang tidak mencetak apa pun.
-                        bawaan='{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
+                        bawaan='{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null}'
                         printf '%s\n' "${FAKE_DOCKER_RINGKASAN-$bawaan}"
                         ;;
                 esac

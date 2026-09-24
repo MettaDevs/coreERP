@@ -10,6 +10,7 @@ use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Finance\PostingFeedSummary;
+use App\Support\Finance\PostingPusher;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,7 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 0, 'pending' => 0, 'posted' => 0, 'rejected' => 0, 'manual' => 0],
             'oldest_pending_at' => null,
             'last_pulled_at' => null,
+            'last_pushed_at' => null,
         ], $this->ringkasan());
     }
 
@@ -84,6 +86,7 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 1, 'pending' => 3, 'posted' => 1, 'rejected' => 2, 'manual' => 1],
             'oldest_pending_at' => '2026-09-19T22:15:00Z',
             'last_pulled_at' => '2026-09-23T08:30:00Z',
+            'last_pushed_at' => null,
         ], $this->ringkasan());
     }
 
@@ -113,6 +116,38 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 0, 'pending' => 1, 'posted' => 1, 'rejected' => 0, 'manual' => 0],
             'oldest_pending_at' => '2026-09-22T05:30:00Z',
             'last_pulled_at' => '2026-09-23T06:45:10Z',
+            'last_pushed_at' => null,
+        ], $this->ringkasan());
+    }
+
+    /**
+     * Push terakhir adalah kiriman terakhir yang dijawab 2xx oleh pembaca, lewat jalur kirim yang sungguhan. Kiriman
+     * yang masih dicoba lagi atau gagal sesudahnya tidak menggesernya: yang ditanyakan kapan pembaca terakhir menerima.
+     */
+    public function test_the_last_push_a_reader_accepted_is_reported_and_failed_ones_are_not(): void
+    {
+        $this->posting($this->le, FinancePosting::PENDING, '2026-09-22 01:00:00', postingId: 'AST-ACQ-0001');
+        $this->posting($this->le, FinancePosting::PENDING, '2026-09-22 05:30:00', postingId: 'AST-ACQ-0002');
+        $this->actingAs($this->owner)->postJson('/api/v1/integration-clients', [
+            'name' => 'Old-finance push', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook',
+            'scopes' => ['finance-postings.read', 'finance-postings.ack'], 'posting_type_prefixes' => ['asset.'], 'allowed_ips' => [],
+        ])->assertCreated();
+        Http::fake(['finance.example.test/*' => Http::sequence()
+            ->push('', 200)
+            ->push('sibuk', 503)
+            ->push(['message' => 'akun tidak dikenal'], 422)]);
+        $pusher = app(PostingPusher::class);
+
+        $this->travelTo(Carbon::parse('2026-09-23 06:50:00', 'UTC'));
+        $this->assertSame(['sent' => 1, 'retrying' => 1], array_intersect_key($pusher->run(), ['sent' => 0, 'retrying' => 0]));
+        $this->travelTo(Carbon::parse('2026-09-23 07:30:00', 'UTC'));
+        $this->assertSame(1, $pusher->run()['failed']);
+
+        $this->assertSame([
+            'counts' => ['held' => 0, 'pending' => 2, 'posted' => 0, 'rejected' => 0, 'manual' => 0],
+            'oldest_pending_at' => '2026-09-22T01:00:00Z',
+            'last_pulled_at' => null,
+            'last_pushed_at' => '2026-09-23T06:50:00Z',
         ], $this->ringkasan());
     }
 

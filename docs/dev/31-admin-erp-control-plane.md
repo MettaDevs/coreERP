@@ -118,8 +118,9 @@ kunci itu harus tetap sah.
 
 ### Kesehatan feed posting finance
 
-Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, dan jam
-pull terakhir oleh aplikasi finance klinik. Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
+Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, jam pull
+terakhir oleh aplikasi finance klinik, dan jam kiriman push terakhir yang diterimanya. Tidak ada nomor posting, akun,
+maupun nilai uang — jurnal keuangan
 klinik tidak keluar dari servernya (keputusan K-02 di
 [feed posting finance](../todo/feed-posting-finance/README.md)). Angkanya dijumlahkan untuk seluruh tenant di server
 itu.
@@ -132,6 +133,12 @@ itu.
 - **`null` dan kunci yang tidak ada adalah dua keadaan.** `null` berarti agen tidak mendapat ringkasan dari Core:
   belum ada rilis yang sehat, Core tidak menjawab dalam batasnya, atau rilis Core belum punya perintahnya. Kunci yang
   tidak ada berarti agen lama. Layar menyebut keduanya berbeda, karena tindakannya berbeda.
+- **`last_pushed_at` tidak wajib.** Ia jam kiriman mode push terakhir yang dijawab 2xx oleh pembaca. Agen
+  menyebutnya hanya bila keluaran Core menyebutnya, dan konsol menerima `finance_feed` dengan atau tanpa kunci itu.
+  Kuncinya tidak ada berarti Core atau agennya belum mengenal push, bukan belum pernah ada push; karena itu baris
+  "Push terakhir diterima" hanya tampil bila kuncinya ada (`pushReported`). Baris ini tidak menilai apa pun; ia
+  memberi operator tanda lebih awal bahwa pembaca mode push berhenti menerima, sebelum posting `pending`-nya
+  melewati ambang sehari.
 - **Bukan riwayat.** `finance_feed` ada di `SiteReports::VOLATILE`: angkanya bergerak bersama transaksi klinik, dan
   riwayat posting yang sebenarnya sudah dicatat Core di server itu (`finance_posting_events`).
 - **Dinilai di satu tempat**, `app/Sites/FinanceFeedHealth.php`: merah bila ada posting `rejected` atau `held`, atau

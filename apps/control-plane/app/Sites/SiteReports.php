@@ -100,13 +100,15 @@ final class SiteReports
             // membedakannya dari lisensi yang hilang. Perbedaan itu menentukan apakah konsol
             // menerbitkan lisensi baru setiap jeda perpanjangan.
             'report.license_perpetual' => ['nullable', 'boolean:strict'],
-            // Ringkasan feed posting finance dari Core di server klien: jumlah per status dan dua waktu, tanpa isi
+            // Ringkasan feed posting finance dari Core di server klien: jumlah per status dan waktunya, tanpa isi
             // jurnal. `null` berarti agen tidak mendapatkannya dari Core; kunci yang tidak ada berarti agen lama.
-            'report.finance_feed' => ['nullable', 'array:counts,oldest_pending_at,last_pulled_at'],
+            'report.finance_feed' => ['nullable', 'array:counts,oldest_pending_at,last_pulled_at,last_pushed_at'],
             'report.finance_feed.counts' => [Rule::requiredIf($feed), 'array:'.implode(',', FinanceFeedHealth::STATUSES)],
             ...$feedCounts,
             'report.finance_feed.oldest_pending_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
             'report.finance_feed.last_pulled_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
+            // Tidak wajib: agen yang lebih lama, atau Core yang lebih lama di bawah agen baru, tidak menyebutnya.
+            'report.finance_feed.last_pushed_at' => ['nullable', self::FEED_TIME],
         ]);
 
         if ($validator->fails()) {

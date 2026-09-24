@@ -1137,7 +1137,7 @@ uji_09c_lisensi_diwajibkan() {
 }
 
 uji_09d_ringkasan_feed() {
-    local berkas_env="$COREERP_HOME/.env" diharapkan mulai lama sah keluaran
+    local berkas_env="$COREERP_HOME/.env" diharapkan mulai lama sah keluaran dengan_push
 
     # feed KETERANGAN DIHARAPKAN [VAR=nilai ...] — finance_feed di laporan yang diterima admin.erp tiruan sesudah
     # satu putaran, dengan Core tiruan yang disetel VAR. Setiap laporan tetap sesuai skema Report.
@@ -1173,7 +1173,13 @@ uji_09d_ringkasan_feed() {
         "$(jq -c 'select(.args | index("finance-postings:summary")) | [.edition_image, .args]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
 
     feed 'belum ada posting dan pull: nol dan null, bukan null' \
-        '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
+        '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null}'
+
+    # Push terakhir ikut bila Core menyebutnya. Rilis Core lama tidak menyebutnya, dan kuncinya lalu tidak ada —
+    # bukan null, yang berarti "belum pernah ada push yang diterima".
+    dengan_push="$(jq -c '. + {last_pushed_at: "2026-09-23T07:58:00Z"}' <<< "$sah")"
+    feed 'push terakhir dari Core ikut' "$dengan_push" FAKE_DOCKER_RINGKASAN="$dengan_push"
+    feed 'Core lama tanpa push terakhir: kuncinya tidak ada' "$sah" FAKE_DOCKER_RINGKASAN="$sah"
 
     # Yang tidak didapat dari Core dilaporkan null. Laporannya sendiri tetap diterima.
     feed 'rilis Core tanpa perintahnya: null' null FAKE_DOCKER_RINGKASAN_EXIT=1
@@ -1195,6 +1201,7 @@ jumlah pecahan~{"counts":{"held":1.5,"pending":0,"posted":0,"rejected":0,"manual
 jumlah berupa teks~{"counts":{"held":"1","pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}
 waktu dengan zona lain~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00:00+07:00","last_pulled_at":null}
 waktu tanpa detik~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00Z","last_pulled_at":null}
+push terakhir dengan zona lain~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":"2026-09-23T14:58:00+07:00"}
 pull terakhir tidak disebut~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null}
 KASUS
 

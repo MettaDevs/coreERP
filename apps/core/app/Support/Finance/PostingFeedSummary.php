@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Finance;
 
 use App\Models\FinancePosting;
+use App\Models\FinancePostingDelivery;
 use App\Models\IntegrationClient;
 use Illuminate\Support\Carbon;
 
@@ -12,9 +13,10 @@ use Illuminate\Support\Carbon;
  * Ringkasan kesehatan feed posting finance untuk admin.erp (TODO feed posting finance 14.1, K-02).
  *
  * Yang keluar dari sini hanya angka dan waktu: jumlah posting per status, jam terbit posting `pending`
- * tertua, dan jam pull terakhir. Tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
- * nilai uang. Ringkasan ini dibawa agen situs ke admin.erp, sedangkan data keuangan tenant tidak boleh keluar
- * dari server tempat datanya berada (K-02). Pembacanya perintah `finance-postings:summary`.
+ * tertua, jam pull terakhir, dan jam kiriman push terakhir yang diterima pembaca. Tidak ada nomor posting,
+ * dokumen sumber, akun, dimensi, vendor, maupun nilai uang. Ringkasan ini dibawa agen situs ke admin.erp,
+ * sedangkan data keuangan tenant tidak boleh keluar dari server tempat datanya berada (K-02). Pembacanya
+ * perintah `finance-postings:summary`.
  *
  * **Lingkupnya seluruh database ini, dijumlahkan lintas tenant.** admin.erp menampilkannya per server klien,
  * dan satu server klien hari ini melayani satu tenant. Memecahnya per tenant berarti menaruh id tenant di
@@ -41,7 +43,7 @@ final class PostingFeedSummary
     ];
 
     /**
-     * @return array{counts: array<string, int>, oldest_pending_at: ?string, last_pulled_at: ?string}
+     * @return array{counts: array<string, int>, oldest_pending_at: ?string, last_pulled_at: ?string, last_pushed_at: ?string}
      */
     public function read(): array
     {
@@ -61,6 +63,9 @@ final class PostingFeedSummary
             'oldest_pending_at' => $this->utc(FinancePosting::query()->where('status', FinancePosting::PENDING)->min('published_at')),
             // Klien mode pull mana pun, termasuk yang sudah dicabut: pull terakhirnya tetap pull terakhir yang terjadi.
             'last_pulled_at' => $this->utc(IntegrationClient::query()->max('last_pulled_at')),
+            // Kiriman push yang dijawab 2xx, ke klien mana pun. Yang gagal atau masih dicoba lagi tidak dihitung: yang
+            // ditanyakan admin.erp adalah kapan pembaca terakhir menerima, padanan pull terakhir untuk mode push.
+            'last_pushed_at' => $this->utc(FinancePostingDelivery::query()->max('delivered_at')),
         ];
     }
 

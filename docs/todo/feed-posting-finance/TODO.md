@@ -514,8 +514,12 @@ site di admin.erp menampilkan kesehatan feed tiap server klien.
   tidak menjawab "Tidak terbaca", dan feed yang belum dipakai "Belum dipakai".
 - [x] 14.5 Test di kedua sisi.
   `FinanceFeedSummaryTest` di Core, `FinanceFeedReportTest` di konsol, dan kasus 09d di `deploy/agent/tests/run-tests.sh`.
-- [ ] 14.6 Klien mode push belum terwakili: "Pull terakhir" hanya menghitung pull, jadi push yang gagal hanya terlihat
+- [x] 14.6 Klien mode push belum terwakili: "Pull terakhir" hanya menghitung pull, jadi push yang gagal hanya terlihat
   sebagai `pending` yang menua. Pertimbangkan jam kiriman push terakhir di ringkasan.
+  Ringkasan kini membawa `last_pushed_at`: jam kiriman push terakhir yang dijawab 2xx oleh pembaca; kiriman yang gagal
+  atau masih dicoba lagi tidak dihitung. Kuncinya tidak wajib di kontrak agen: agen menyebutnya hanya bila keluaran
+  Core menyebutnya, dan konsol menampilkan "Push terakhir diterima" hanya bila kuncinya ada, supaya Core atau agen
+  lama tidak terbaca "belum pernah". Dibuktikan `FinanceFeedSummaryTest`, `FinanceFeedReportTest`, dan kasus 09d.
 
 ---
 

@@ -85,6 +85,9 @@ type FinanceFeed = {
     oldestPendingAt: string | null;
     oldestPendingSeconds: number | null;
     lastPulledAt: string | null;
+    lastPushedAt: string | null;
+    /** Core dan agen di server ini sudah melaporkan push; tanpanya `lastPushedAt` bukan berarti belum pernah. */
+    pushReported: boolean;
     alerts: string[];
     pendingAlertHours: number;
 };
@@ -792,6 +795,7 @@ function FinanceFeedSection({
     const hint = feedStateHint(feed, reported);
     const pendingOld = feed.alerts.includes('pending_old');
     const pulled = relativeTime(feed.lastPulledAt);
+    const pushed = relativeTime(feed.lastPushedAt);
 
     return (
         <Section
@@ -870,6 +874,13 @@ function FinanceFeedSection({
                                 ? `${dateTimeText(feed.lastPulledAt)}${pulled ? ` (${pulled})` : ''}`
                                 : 'Belum pernah di-pull'}
                         </Row>
+                        {feed.pushReported && (
+                            <Row label="Push terakhir diterima">
+                                {feed.lastPushedAt
+                                    ? `${dateTimeText(feed.lastPushedAt)}${pushed ? ` (${pushed})` : ''}`
+                                    : 'Belum pernah ada push yang diterima'}
+                            </Row>
+                        )}
                     </dl>
                 </>
             )}

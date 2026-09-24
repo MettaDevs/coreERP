@@ -28,6 +28,8 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'ringkasan lengkap' => [self::feed(['held' => 1, 'pending' => 3, 'posted' => 120, 'rejected' => 2, 'manual' => 4], '2026-09-20T03:00:00Z', '2026-09-23T07:55:00Z')];
         yield 'belum ada posting dan pull' => [self::feed([], null, null)];
         yield 'tidak terbaca dari Core' => [null];
+        yield 'dengan push terakhir' => [[...self::feed(['pending' => 1, 'posted' => 9], '2026-09-23T07:00:00Z', null), 'last_pushed_at' => '2026-09-23T07:58:00Z']];
+        yield 'push belum pernah diterima' => [[...self::feed(['pending' => 1], '2026-09-23T07:00:00Z', null), 'last_pushed_at' => null]];
     }
 
     /** @param  array<string, mixed>|null  $feed */
@@ -78,6 +80,7 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'pull terakhir tidak disebut' => [array_diff_key($sah, ['last_pulled_at' => true])];
         yield 'waktu dengan zona lain' => [[...$sah, 'oldest_pending_at' => '2026-09-20T10:00:00+07:00']];
         yield 'waktu hanya tanggal' => [[...$sah, 'last_pulled_at' => '2026-09-23']];
+        yield 'waktu push dengan zona lain' => [[...$sah, 'last_pushed_at' => '2026-09-23T14:58:00+07:00']];
         yield 'objek kosong' => [(object) []];
         yield 'larik kosong' => [[]];
         yield 'bukan objek' => ['sehat'];
@@ -193,7 +196,39 @@ class FinanceFeedReportTest extends SiteTestCase
                 ->where('site.financeFeed.counts', ['held' => 0, 'pending' => 4, 'posted' => 90, 'rejected' => 1, 'manual' => 0])
                 ->where('site.financeFeed.oldestPendingAt', '2026-09-23T06:30:00+00:00')
                 ->where('site.financeFeed.oldestPendingSeconds', 5400)
-                ->where('site.financeFeed.lastPulledAt', '2026-09-23T07:59:00+00:00'));
+                ->where('site.financeFeed.lastPulledAt', '2026-09-23T07:59:00+00:00')
+                ->where('site.financeFeed.lastPushedAt', null)
+                ->where('site.financeFeed.pushReported', false));
+    }
+
+    /**
+     * Jam push terakhir hanya tampil bila Core dan agennya menyebutnya. Kunci yang tidak ada berarti tidak diketahui,
+     * dan halaman tidak boleh membacanya sebagai "belum pernah ada push yang diterima".
+     */
+    public function test_the_last_accepted_push_reaches_the_site_page_only_when_reported(): void
+    {
+        $site = $this->enrolledSite();
+        $feed = self::feed(['pending' => 1, 'posted' => 9], '2026-09-23T07:00:00Z', null);
+
+        $this->agent('POST', '/api/agent/v1/report', $site, $this->report($site, [
+            'server_time' => self::SERVER_TIME,
+            'finance_feed' => [...$feed, 'last_pushed_at' => '2026-09-23T07:58:00Z'],
+        ]))->assertOk();
+        $this->actingAs($this->operator())->get("/situs/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('site.financeFeed.lastPushedAt', '2026-09-23T07:58:00+00:00')
+                ->where('site.financeFeed.pushReported', true));
+
+        $this->agent('POST', '/api/agent/v1/report', $site, $this->report($site, [
+            'server_time' => self::SERVER_TIME,
+            'finance_feed' => [...$feed, 'last_pushed_at' => null],
+        ]))->assertOk();
+        $this->get("/situs/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('site.financeFeed.lastPushedAt', null)
+                ->where('site.financeFeed.pushReported', true));
     }
 
     /**

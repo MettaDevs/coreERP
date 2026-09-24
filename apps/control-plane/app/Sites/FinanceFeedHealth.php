@@ -11,7 +11,8 @@ use Illuminate\Support\Carbon;
  * finance area 14).
  *
  * Angkanya disusun Core di server klien (`finance-postings:summary`) dan dibawa agen: jumlah posting per status, jam
- * terbit posting `pending` tertua, dan jam pull terakhir pembaca. Konsol tidak pernah melihat isi jurnalnya (K-02);
+ * terbit posting `pending` tertua, jam pull terakhir pembaca, dan jam push terakhir yang diterima pembaca bila Core dan
+ * agennya sudah mengenalnya (`pushReported`). Konsol tidak pernah melihat isi jurnalnya (K-02);
  * rinciannya ada di layar Posting finance › Pantau posting pada aplikasi server itu. Yang dikerjakan di sini hanya
  * menilai angka itu, supaya layar dan test membaca penilaian yang sama.
  *
@@ -43,7 +44,7 @@ final class FinanceFeedHealth
 
     /**
      * @param  ?array<string, mixed>  $report  laporan agen terakhir, `sites.last_report`, yang sudah lolos `SiteReports::validate()`
-     * @return array{state: string, counts: ?array<string, int>, oldestPendingAt: ?string, oldestPendingSeconds: ?int, lastPulledAt: ?string, alerts: list<string>, pendingAlertHours: int}
+     * @return array{state: string, counts: ?array<string, int>, oldestPendingAt: ?string, oldestPendingSeconds: ?int, lastPulledAt: ?string, lastPushedAt: ?string, pushReported: bool, alerts: list<string>, pendingAlertHours: int}
      */
     public static function fromReport(?array $report): array
     {
@@ -52,6 +53,8 @@ final class FinanceFeedHealth
             'oldestPendingAt' => null,
             'oldestPendingSeconds' => null,
             'lastPulledAt' => null,
+            'lastPushedAt' => null,
+            'pushReported' => false,
             'alerts' => [],
             'pendingAlertHours' => self::PENDING_ALERT_HOURS,
         ];
@@ -75,6 +78,9 @@ final class FinanceFeedHealth
 
         $oldestPendingAt = self::time($feed['oldest_pending_at'] ?? null);
         $lastPulledAt = self::time($feed['last_pulled_at'] ?? null);
+        // Kunci yang tidak ada berarti Core atau agennya belum mengenal push; `null` berarti belum pernah ada push
+        // yang diterima pembaca. Keduanya dibedakan supaya layar tidak menulis "belum pernah" atas nama yang tidak tahu.
+        $lastPushedAt = self::time($feed['last_pushed_at'] ?? null);
 
         // Umur terhadap jam server klien di laporan yang sama, bukan jam konsol. Kedua waktunya dari jam yang sama,
         // jadi selisih jam server klien terhadap konsol tidak ikut; yang terbaca adalah umurnya saat laporan terakhir.
@@ -109,6 +115,8 @@ final class FinanceFeedHealth
             'oldestPendingAt' => $oldestPendingAt?->toIso8601String(),
             'oldestPendingSeconds' => $oldestPendingSeconds,
             'lastPulledAt' => $lastPulledAt?->toIso8601String(),
+            'lastPushedAt' => $lastPushedAt?->toIso8601String(),
+            'pushReported' => array_key_exists('last_pushed_at', $feed),
             'alerts' => $alerts,
             'pendingAlertHours' => self::PENDING_ALERT_HOURS,
         ];

@@ -621,6 +621,9 @@ lisensi_diwajibkan() {
 # nomor posting, nama akun, nilai uang — tidak ikut keluar dari server ini sebelum agen dan kontraknya sendiri
 # menyebutnya.
 #
+# `last_pushed_at` hanya ikut bila Core menyebutnya. Rilis Core yang lebih lama belum mengenalnya, dan `null`
+# di sana berarti "belum pernah ada push yang diterima" — klaim yang tidak boleh dibuat atas nama Core itu.
+#
 # `null`, bukan objek kosong atau angka nol, bila ringkasannya tidak didapat: belum ada rilis yang terbukti sehat,
 # .env tidak ada, Core tidak menjawab dalam BATAS_RINGKASAN_DETIK, rilis Core belum punya perintahnya, atau
 # keluarannya tidak berbentuk. Nol berarti "tidak ada posting", dan itu klaim yang tidak diketahui kebenarannya.
@@ -657,7 +660,9 @@ baca_ringkasan_feed() {
                 },
                 oldest_pending_at: (.oldest_pending_at | waktu),
                 last_pulled_at: (.last_pulled_at | waktu)
-              }' "$mentah" > "$tujuan" 2>/dev/null; then
+              }
+              + (if has("last_pushed_at") then {last_pushed_at: (.last_pushed_at | waktu)} else {} end)' \
+            "$mentah" > "$tujuan" 2>/dev/null; then
         return 0
     fi
 
