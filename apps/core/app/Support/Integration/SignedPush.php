@@ -27,7 +27,7 @@ use RuntimeException;
  */
 final class SignedPush
 {
-    public function __construct(private readonly PushDestination $tujuan) {}
+    public function __construct(private readonly PushDestination $destination) {}
 
     /** @return array{timestamp: string, signature: string} */
     public static function sign(string $secret, string $body, ?int $timestamp = null): array
@@ -42,24 +42,36 @@ final class SignedPush
 
     /**
      * @throws RuntimeException Klien bukan mode push, atau tujuannya ditolak aturan PushDestination.
-     * @throws ConnectionException Tujuan tidak terjangkau atau melewati batas waktu.
+     * @throws ConnectionException Tujuan tidak terjangkau, nama host-nya tidak dapat diselesaikan, atau
+     *                             melewati batas waktu.
      */
     public function send(IntegrationClient $client, string $body): Response
     {
         if ($client->delivery_mode !== IntegrationClient::PUSH || $client->push_url === null || $client->signing_secret === null) {
             throw new RuntimeException('Klien integrasi ini tidak memakai mode push.');
         }
-        $tolak = $this->tujuan->reject($client->push_url);
-        if ($tolak !== null) {
-            throw new RuntimeException($tolak);
+        $destination = $this->destination->inspect($client->push_url);
+        if ($destination['unresolved']) {
+            // Sama dengan cURL yang gagal meresolusi nama host: bisa gangguan DNS sesaat, jadi dicoba
+            // lagi, bukan ditolak permanen.
+            throw new ConnectionException((string) $destination['rejection']);
+        }
+        if ($destination['rejection'] !== null) {
+            throw new RuntimeException($destination['rejection']);
         }
 
         $tanda = self::sign($client->signing_secret, $body);
 
         // Redirect tidak diikuti: tujuan yang sudah lolos PushDestination bisa mengalihkan ke
         // jaringan privat, dan pengalihan itu tidak pernah diperiksa. Jawaban 3xx dihitung gagal.
+        // Di SaaS, cURL dipatok ke alamat yang baru saja diperiksa dan tidak meresolusi lagi.
+        $options = ['allow_redirects' => false];
+        if ($destination['resolve'] !== []) {
+            $options['curl'] = [CURLOPT_RESOLVE => $destination['resolve']];
+        }
+
         return Http::acceptJson()
-            ->withOptions(['allow_redirects' => false])
+            ->withOptions($options)
             ->connectTimeout(3)
             ->timeout(10)
             ->withBody($body, 'application/json')

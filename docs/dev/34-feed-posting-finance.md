@@ -311,7 +311,7 @@ Posting yang ditolak tidak diberi tanggal ulang (K-17). Tanggal akuntansi tidak 
 | --- | --- | --- |
 | 2xx dengan body ack yang sah | `delivered` | Ack diterapkan seperti `POST …/ack` |
 | 2xx tanpa body ack | `delivered` | Tetap `pending` sampai di-ack lewat API, dan tidak dikirim lagi ke klien itu |
-| 408, 429, 5xx, atau tidak terjangkau | `retrying`, dicoba lagi dengan jeda 1, 2, 4, … sampai 60 menit | Tetap `pending` |
+| 408, 429, 5xx, atau tidak terjangkau, termasuk nama host yang tidak dapat diselesaikan | `retrying`, dicoba lagi dengan jeda 1, 2, 4, … sampai 60 menit | Tetap `pending` |
 | Masih gagal sesudah `coreerp.finance_push_retry_hours` sejak percobaan pertama (bawaan 24 jam, `COREERP_FINANCE_PUSH_RETRY_HOURS`) | `failed` | Tetap `pending`, tampil di layar pantau |
 | 3xx, 4xx lain, atau tujuan ditolak `PushDestination` | `failed` | Tetap `pending`, tampil di layar pantau |
 
@@ -321,6 +321,9 @@ Posting yang ditolak tidak diberi tanggal ulang (K-17). Tanggal akuntansi tidak 
 
 - Wajib `https://`, karena yang terkirim jurnal keuangan dan data vendor.
 - Di SaaS — ketika `coreerp.base_domain` terisi — alamat yang menunjuk jaringan privat atau rentang khusus ditolak. URL itu diketik admin tenant, sedangkan server SaaS melayani banyak tenant; tanpa aturan ini satu tenant dapat membuat server kita memanggil jaringan dalamnya sendiri (SSRF). Di on-prem aturan ini tidak berlaku, karena aplikasi finance pelanggan lazim berada di LAN yang sama.
+- Nama host diselesaikan ke alamat IPv4 (resolver sistem) **dan** IPv6 (AAAA dari DNS). Satu alamat terlarang sudah cukup untuk menolak, jadi host dengan IPv4 publik tetap ditolak bila salah satu IPv6-nya privat.
+- Saat mengirim di SaaS, cURL dipatok ke alamat yang baru saja diperiksa lewat `CURLOPT_RESOLVE` dan tidak meresolusi nama host sekali lagi. DNS yang diganti di antara pemeriksaan dan pengiriman karena itu tidak berpengaruh. Nama host dipakai apa adanya di entri itu, karena cURL mencocokkannya dengan host di URL, termasuk titik di ujung nama.
+- Nama host yang tidak menghasilkan satu alamat pun ditolak saat klien disimpan. Saat mengirim, ia diperlakukan seperti tujuan yang tidak terjangkau dan dicoba lagi, karena gangguan DNS bisa sesaat.
 
 **Kirim uji** (`POST /api/v1/integration-clients/{id}/test-push`) mengirim body uji dengan signature (`type: coreerp.integration.test`), bukan posting, supaya penerima dapat memastikan verifikasi signature-nya benar sebelum posting sungguhan dikirim.
 
@@ -494,10 +497,10 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Tenant terisolasi | `FinancePostingFeedTest::test_tenant_terisolasi_dan_posting_id_boleh_sama_di_tenant_lain`, `FinancePostingMonitorTest::test_posting_tenant_lain_menjawab_404` |
 | Scope pull dan ack terpisah | `FinancePostingFeedTest::test_cakupan_tarik_dan_ack_terpisah`, `IntegrationClientTest::test_cakupan_yang_kurang_menghasilkan_403` |
 | Push: signature dan ack di jawaban | `FinancePostingFeedTest::test_push_bertanda_tangan_dan_ack_di_jawaban_menutup_posting` |
-| Push: jeda, gagal, redirect, dan urutan per klien | `FinancePostingFeedTest::test_push_5xx_dicoba_lagi_dengan_jeda_4xx_berhenti_dan_urutan_per_klien_dijaga`, `test_push_batas_waktu_habis_dan_redirect_menjadi_gagal` |
+| Push: jeda, gagal, redirect, dan urutan per klien | `FinancePostingFeedTest::test_push_5xx_dicoba_lagi_dengan_jeda_4xx_berhenti_dan_urutan_per_klien_dijaga`, `test_push_batas_waktu_habis_dan_redirect_menjadi_gagal`, `test_in_saas_a_host_that_stops_resolving_is_retried_and_a_private_one_fails` |
 | Salinan sandbox | `FinancePostingFeedTest::test_salinan_sandbox_tidak_mengirim_apa_pun`, `IntegrationClientTest::test_salinan_sandbox_menjawab_503_dengan_alasannya`, `test_kirim_uji_di_sandbox_tidak_mengirim_apa_pun` |
 | Token, pencabutan, IP, dan tenant dari klien | `IntegrationClientTest::test_klien_pull_menerima_token_sekali_dan_hanya_digest_yang_disimpan`, `test_token_salah_atau_dicabut_ditolak`, `test_menerbitkan_ulang_token_mematikan_token_lama`, `test_alamat_di_luar_allowlist_ditolak`, `test_tenant_tidak_dapat_ditimpa_lewat_header` |
-| URL push, SSRF di SaaS, dan signing secret | `IntegrationClientTest::test_klien_push_wajib_https_dan_rahasia_penanda_tangan_disimpan_terenkripsi`, `test_di_saas_url_push_ke_jaringan_privat_ditolak_tetapi_di_on_prem_boleh`, `test_pindah_mode_mengatur_rahasia_penanda_tangan`, `test_kirim_uji_ditandatangani_hmac_atas_stempel_dan_badan`, `test_test_push_to_an_unknown_host_reports_the_cause_without_curl_noise` |
+| URL push, SSRF di SaaS, dan signing secret | `IntegrationClientTest::test_klien_push_wajib_https_dan_rahasia_penanda_tangan_disimpan_terenkripsi`, `test_di_saas_url_push_ke_jaringan_privat_ditolak_tetapi_di_on_prem_boleh`, `test_in_saas_one_private_ipv6_address_rejects_a_host_with_a_public_ipv4_address`, `test_in_saas_a_send_is_pinned_to_the_addresses_just_checked`, `test_pindah_mode_mengatur_rahasia_penanda_tangan`, `test_kirim_uji_ditandatangani_hmac_atas_stempel_dan_badan`, `test_test_push_to_an_unknown_host_reports_the_cause_without_curl_noise` |
 | Layar pantau: akses, saringan, detail, dan tautan dokumen | `FinancePostingMonitorTest::test_hanya_owner_dan_admin_yang_dapat_melihat_dan_menindak`, `test_saringan_status_jenis_entitas_tanggal_dan_pencarian`, `test_detail_memuat_baris_jurnal_masalah_per_baris_dan_riwayat_dengan_nama_pelaku`, `test_tautan_dokumen_sumber_hanya_jalur_relatif_dan_tidak_ikut_isi_untuk_pembaca` |
 | Setelan feed, mode per tanggal, dan presisi | `FinancePostingSettingsTest` |
 | Daftar jenis posting dan contoh payload di kontrak | `DocsPortalTest::test_daftar_jenis_posting_punya_bagian_sendiri_dan_sama_di_setiap_tempat`, `test_contoh_payload_di_panduan_cocok_dengan_skemanya_dan_seimbang` |
@@ -509,7 +512,6 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Endpoint pratinjau HTTP (TODO 7.6.5)** belum ada. Logikanya sudah tersedia sebagai `PenerbitPosting::pratinjau()`, dan layar module dapat memanggilnya lewat controller module-nya sendiri.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
-- **Pemeriksaan tujuan push hanya meresolusi IPv4 (TODO 4.8).** `PushDestination` memakai `gethostbynamel()`, dan klien HTTP meresolusi lagi saat mengirim. Di SaaS, host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang diganti di antara pemeriksaan dan pengiriman.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
 
 ## Di mana kodenya

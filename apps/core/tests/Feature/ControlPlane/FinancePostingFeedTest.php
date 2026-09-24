@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingPusher;
+use App\Support\Integration\PushDestination;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PostingTidakSah;
 use Database\Seeders\AppCatalogSeeder;
@@ -592,6 +593,33 @@ class FinancePostingFeedTest extends TestCase
         $this->assertSame(['failed', 302], $status['AST-ACQ-A']);
         $this->assertSame(['failed', 503], $status['AST-ACQ-B']);
         Http::assertSentCount(2);
+    }
+
+    public function test_in_saas_a_host_that_stops_resolving_is_retried_and_a_private_one_fails(): void
+    {
+        $addresses = ['203.0.113.20'];
+        $this->app->instance(PushDestination::class, new PushDestination(function () use (&$addresses): array {
+            return $addresses;
+        }));
+        config(['coreerp.base_domain' => 'erp.example.test']);
+        $this->klienPush();
+        Http::fake();
+        $this->terbitkan($this->perolehan());
+        $pusher = app(PostingPusher::class);
+
+        // A lookup that returns nothing may be a passing DNS fault, the same as cURL failing to resolve.
+        $addresses = [];
+        $this->assertSame(1, $pusher->run()['retrying']);
+        $delivery = FinancePostingDelivery::query()->firstOrFail();
+        $this->assertSame('retrying', $delivery->status);
+        $this->assertStringContainsString('Nama host tujuan tidak dapat diselesaikan.', (string) $delivery->last_error);
+
+        // A host that now points at a private network is refused for good.
+        $addresses = ['10.0.0.5'];
+        $this->travel(2)->minutes();
+        $this->assertSame(1, $pusher->run()['failed']);
+        $this->assertSame('failed', $delivery->refresh()->status);
+        Http::assertNothingSent();
     }
 
     public function test_salinan_sandbox_tidak_mengirim_apa_pun(): void

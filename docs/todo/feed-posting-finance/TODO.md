@@ -150,7 +150,7 @@ di sisi finance berperilaku seperti di PRD (K-05).
 
 ---
 
-### 4. [~] Core: klien integrasi dan autentikasinya
+### 4. [x] Core: klien integrasi dan autentikasinya
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** pembaca eksternal bisa diberi token
 bercakupan sempit, dengan mode pengiriman `pull` atau `push`, dan ditolak di salinan sandbox. Letak
@@ -177,9 +177,12 @@ jaringan pembaca tidak berpengaruh (K-03).
   Diverifikasi 23 September 2026, dengan dua perbaikan. Istilah baku tidak lagi diterjemahkan: Pull/Push, Scope,
   Prefix, dan Signing secret, sebelumnya Tarik/Dorong, Izin, Awalan, dan Rahasia penanda tangan. Kirim uji yang gagal
   kini hanya menyebut sebabnya dari cURL, misalnya "Could not resolve host", dan toast-nya bertahan 10 detik.
-- [ ] 4.8 Pemeriksaan tujuan push (`PushDestination`) di SaaS hanya meresolusi IPv4 (`gethostbynamel`), dan klien HTTP
+- [x] 4.8 Pemeriksaan tujuan push (`PushDestination`) di SaaS hanya meresolusi IPv4 (`gethostbynamel`), dan klien HTTP
   meresolusi ulang saat mengirim. Host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang
   diganti di antara pemeriksaan dan pengiriman. Perlu resolusi A dan AAAA, dan pengiriman ke alamat yang sudah diperiksa.
+  Kini A dari resolver sistem ditambah AAAA dari DNS, dan satu alamat terlarang menolak seluruh host. Kiriman dipatok ke
+  alamat yang baru diperiksa lewat `CURLOPT_RESOLVE`, jadi cURL tidak meresolusi lagi. Nama host yang tidak dapat
+  diselesaikan saat mengirim dicoba lagi seperti tujuan yang tidak terjangkau, bukan langsung gagal.
 
 ---
 

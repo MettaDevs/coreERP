@@ -235,6 +235,72 @@ class IntegrationClientTest extends TestCase
             ->assertCreated();
     }
 
+    public function test_in_saas_one_private_ipv6_address_rejects_a_host_with_a_public_ipv4_address(): void
+    {
+        $addresses = [];
+        $this->app->instance(PushDestination::class, new PushDestination(function () use (&$addresses): array {
+            return $addresses;
+        }));
+        config(['coreerp.base_domain' => 'erp.example.test']);
+
+        foreach (['fd00::5', 'fe80::1', '::1', '::ffff:10.0.0.5', '64:ff9b::a00:5', 'fec0::1', 'ff02::1'] as $i => $ipv6) {
+            $addresses = ['203.0.113.20', $ipv6];
+            $this->buat(['name' => 'Privat '.$i, 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook'])
+                ->assertStatus(422)->assertJsonValidationErrors('push_url');
+        }
+        $this->buat(['name' => 'Literal', 'delivery_mode' => 'push', 'push_url' => 'https://[fd00::5]/hook'])
+            ->assertStatus(422)->assertJsonValidationErrors('push_url');
+
+        $addresses = ['203.0.113.20', '2001:db8::20'];
+        $this->buat(['name' => 'Publik', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook'])
+            ->assertCreated();
+        // A host with only a public IPv6 address is reachable too.
+        $addresses = ['2001:db8::20'];
+        $this->buat(['name' => 'Hanya IPv6', 'delivery_mode' => 'push', 'push_url' => 'https://v6.example.test/hook'])
+            ->assertCreated();
+    }
+
+    public function test_in_saas_a_send_is_pinned_to_the_addresses_just_checked(): void
+    {
+        $addresses = ['203.0.113.20', '2001:db8::20'];
+        $lookups = 0;
+        $this->app->instance(PushDestination::class, new PushDestination(function () use (&$addresses, &$lookups): array {
+            $lookups++;
+
+            return $addresses;
+        }));
+        $pins = [];
+        Http::fake(function (HttpRequest $request, array $options) use (&$pins) {
+            $pins[] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+            return Http::response([], 200);
+        });
+        config(['coreerp.base_domain' => 'erp.example.test']);
+        $id = (string) $this->buat(['delivery_mode' => 'push', 'push_url' => 'https://finance.example.test:8443/hook'])
+            ->assertCreated()->json('data.id');
+
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/test-push")
+            ->assertOk()->assertJsonPath('data.ok', true);
+        // One lookup when saved and one when sent. cURL gets the addresses of the second lookup and
+        // does not resolve the host again.
+        $this->assertSame(2, $lookups);
+        $this->assertSame([['finance.example.test:8443:203.0.113.20,[2001:db8::20]']], $pins);
+
+        // DNS now points somewhere private: the next send is refused before anything goes out.
+        $addresses = ['10.0.0.5'];
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/test-push")
+            ->assertOk()->assertJsonPath('data.ok', false)
+            ->assertJsonPath('data.message', 'URL tujuan menunjuk jaringan privat. Dari layanan SaaS, aplikasi finance harus dapat dijangkau lewat alamat publik.');
+        $this->assertCount(1, $pins);
+
+        // Off SaaS the rule does not apply, so nothing is resolved or pinned.
+        config(['coreerp.base_domain' => null]);
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/test-push")
+            ->assertOk()->assertJsonPath('data.ok', true);
+        $this->assertSame(3, $lookups);
+        $this->assertSame([['finance.example.test:8443:203.0.113.20,[2001:db8::20]'], null], $pins);
+    }
+
     public function test_pindah_mode_mengatur_rahasia_penanda_tangan(): void
     {
         $id = (string) $this->buat()->json('data.id');
