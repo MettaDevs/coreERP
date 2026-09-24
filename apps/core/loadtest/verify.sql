@@ -63,10 +63,17 @@ where s.tenant_id <> r.tenant_id;
 
 -- Jumlah sequence yang dimaterialisasi harus sama dengan jumlah reference milik app yang
 -- benar-benar dibeli tenant itu — tidak kurang, dan tidak satu pun milik app tetangga.
+--
+-- Reference milik Core sendiri (`app_id = 'core'`, misalnya `core.vendor`) dikecualikan dari
+-- keempat pemeriksaan sequence di bawah: ia tidak dibeli, lahir saat record pertamanya dibuat,
+-- dan bawaannya ditetapkan Core (`VND-`, 1-999999, scope entitas legal), bukan bawaan app.
+-- Skenario yang membuat vendor — penerimaan aset sejak area 9 — memunculkannya.
 insert into hasil_core
 select 'jumlah sequence tenant tidak sesuai entitlement', count(*)
 from (select distinct tenant_id from pengguna_run) r
-where (select count(*) from tenant_number_sequences s where s.tenant_id = r.tenant_id)
+where (select count(*) from tenant_number_sequences s
+       join app_number_sequence_references ref on ref.id = s.reference_id
+       where s.tenant_id = r.tenant_id and ref.app_id <> 'core')
    <> (select count(*)
        from app_number_sequence_references ref
        join tenant_app_entitlements e on e.app_id = ref.app_id
@@ -77,7 +84,8 @@ select 'sequence milik app yang tidak dibeli', count(*)
 from tenant_number_sequences s
 join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_id
 join app_number_sequence_references ref on ref.id = s.reference_id
-where not exists (
+where ref.app_id <> 'core'
+  and not exists (
     select 1 from tenant_app_entitlements e
     where e.tenant_id = s.tenant_id and e.app_id = ref.app_id and e.status = 'active'
 );
@@ -90,23 +98,25 @@ select 'default sequence bukan aktif 0-19999', count(*)
 from tenant_number_sequences s
 join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_id
 join app_number_sequence_references ref on ref.id = s.reference_id
-where s.status <> 'active'
+where ref.app_id <> 'core' and (
+      s.status <> 'active'
    or s.minimum_number <> 0
    or s.maximum_number <> 19999
    or not (ref.allowed_scopes::jsonb ? s.scope_type)
    or s.is_continuous
-   or s.allow_manual;
+   or s.allow_manual);
 
 insert into hasil_core
 select 'prefix sequence tidak sesuai reference', count(*)
 from tenant_number_sequences s
 join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_id
 join app_number_sequence_references ref on ref.id = s.reference_id
-where (ref.default_prefix is not null and (
+where ref.app_id <> 'core' and (
+      (ref.default_prefix is not null and (
            s.segments->0->>'type' <> 'constant'
         or s.segments->0->>'value' <> ref.default_prefix
       ))
-   or (ref.default_prefix is null and json_array_length(s.segments) <> 1);
+   or (ref.default_prefix is null and json_array_length(s.segments) <> 1));
 
 insert into hasil_core
 select 'tenant-reference ganda', count(*)

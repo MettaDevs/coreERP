@@ -175,14 +175,21 @@ info:
 
     | `posting_type` | Terbit saat | Tersedia |
     | --- | --- | --- |
-    | `asset.acquisition` | Penerimaan aset diselesaikan | Belum |
+    | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
     | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
     | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Belum |
     | `asset.depreciation` | Proses "Post penyusutan" satu periode | Belum |
     | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Belum |
 
-    **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Selama semuanya
-    masih *Belum*, `GET /finance-postings` menjawab daftar kosong.
+    **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
+    *Belum* tidak pernah muncul di `GET /finance-postings` sampai modulnya menerbitkannya.
+
+    `asset.acquisition` berisi satu posting per penerimaan aset, dengan `posting_id`
+    `AST-ACQ-<id penerimaan>`. Barisnya per group aset dan unit organisasi: debit harga
+    perolehan, debit PPN Masukan bila ada PPN, dan kredit sebesar keduanya ke lawannya — Hutang
+    Usaha pada `direct_payable`, akun perantara pada `clearing`, atau akun lawan hibah untuk aset
+    hibah (tanpa `vendor`). Pada `direct_payable`, posting inilah hutangnya: buat faktur hutang
+    dari posting ini tanpa jurnal kedua.
 
     Menyaring di `GET /finance-postings`:
 

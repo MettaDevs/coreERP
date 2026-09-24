@@ -211,7 +211,7 @@ Aturan yang berlaku pada master berinduk:
 
 ### Posting group aset
 
-Layar **Master data › Posting group aset** memetakan tiap group aset ke tujuh akun dari daftar
+Layar **Master data › Posting group aset** memetakan tiap group aset ke delapan akun dari daftar
 akun referensi Core, gaya *FA Posting Groups* Business Central. Tabelnya `aset_m_posting_group`,
 satu baris per group dan tanggal berlaku; posting memakai baris dengan `effective_from` terbesar
 yang tidak melewati tanggal postingnya (`Services/AssetPostingAccounts`). Akun disimpan sebagai id,
@@ -226,6 +226,7 @@ bukan nomor, supaya impor ulang daftar akun tidak memutus pemetaan.
 | Perantara | bila dipakai | penerimaan pada mode `clearing` |
 | PPN Masukan | bila dipakai | penerimaan yang membawa PPN |
 | Penyeimbang saldo awal | bila dipakai | saldo awal saat cutover |
+| Lawan hibah | bila dipakai | penerimaan dengan cara perolehan hibah |
 
 Sel akun wajib yang kosong ditandai merah, begitu pula sel yang menunjuk akun yang tidak bisa
 dipakai lagi (tidak ada di daftar akun, nonaktif, atau kini khusus satu entitas legal), beserta
@@ -242,6 +243,22 @@ ke layar ini (K-18, K-22).
   lama tidak diam-diam dapat mengubah akun jurnal.
 - Cara perolehan (`pembelian`, `hibah`, `saldo_awal`, K-12) hari ini memakai akun harga perolehan
   yang sama; `AssetPostingAccounts::acquisitionAccount()` tempat akun per cara kelak dipilih.
+
+### Penerimaan dan jurnal perolehan
+
+Menyelesaikan dokumen penerimaan juga menerbitkan jurnal perolehan `asset.acquisition` ke feed
+posting finance Core, di transaksi yang sama (`Services/AcquisitionPosting`): debit harga
+perolehan dan PPN Masukan per group dan unit dimensi, kredit ke lawan hutang, perantara, atau
+lawan hibah menurut cara perolehan dan mode penyelesaian entitas legalnya. Kepala dokumen
+membawa cara perolehan, vendor milik Core, dan nomor serta tanggal faktur vendor; baris membawa
+PPN per unit. Nilai baris dibulatkan sekali ke presisi mata uang, dan nilai tiap aset adalah
+pembagian nilai yang sudah bulat itu, jadi register dan jurnal selalu sama persis.
+
+Penyelesaian ditolak untuk pembelian tanpa vendor pada mode `direct_payable`, dan untuk group
+yang tidak punya buku yang di-post ke finance — mengikuti Dynamics 365, yang menghentikan
+posting faktur aset tanpa buku ber-lapisan Current. Pemetaan akun yang kosong tidak menolak:
+postingnya tertahan di Core dan dilepas lewat Validasi ulang setelah posting group diisi.
+Rinciannya di `docs/apps/management-aset/transaction/register-aset/`.
 
 ### Hak akses
 

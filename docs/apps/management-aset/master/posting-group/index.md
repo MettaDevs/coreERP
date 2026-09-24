@@ -2,7 +2,7 @@
 
 Halaman ini untuk developer. Perilaku dasar master ada di [Master data](/apps/management-aset/master/), dan feed yang memakai akun-akun ini ada di [Feed posting finance](/dev/34-feed-posting-finance).
 
-Posting group menjawab satu pertanyaan: **jurnal aset dari group ini masuk ke akun mana.** Satu baris adalah tujuh akun untuk satu group aset, berlaku sejak satu tanggal. Padanannya *FA Posting Groups* di Business Central dan *fixed asset posting profile* di F&O.
+Posting group menjawab satu pertanyaan: **jurnal aset dari group ini masuk ke akun mana.** Satu baris adalah delapan akun untuk satu group aset, berlaku sejak satu tanggal. Padanannya *FA Posting Groups* di Business Central dan *fixed asset posting profile* di F&O.
 
 Penerimaan, saldo awal, dan "Post penyusutan" (area 9 sampai 11 feed posting finance) membaca akunnya dari sini. Selama akunnya kosong, posting yang membutuhkannya tertahan di Core.
 
@@ -29,6 +29,7 @@ Posting group tidak menyimpan akun, hanya menunjuknya. Nomor dan nama akun tetap
 | `clearing_account_id` | bila dipakai | Perantara pada mode `clearing` |
 | `input_vat_account_id` | bila dipakai | PPN Masukan, untuk penerimaan yang membawa PPN (K-11) |
 | `opening_balance_offset_account_id` | bila dipakai | Penyeimbang saldo awal saat cutover (K-13) |
+| `grant_offset_account_id` | bila dipakai | Lawan hibah: kredit penerimaan dengan cara perolehan `hibah` (K-25) |
 
 Setiap kolom akun menyimpan id `finance_reference_accounts`, tanpa foreign key. Indeks uniknya `(tenant_id, group_aset_id, effective_from) WHERE deleted_at IS NULL`.
 
@@ -72,7 +73,9 @@ Akibatnya pada tenant yang sudah ada sebelum rilis ini: role Owner menyimpan sal
 
 **Hanya empat akun yang ditandai wajib.** Perantara, PPN Masukan, dan penyeimbang saldo awal hanya dipakai keadaan tertentu. Tanda merah untuk keadaan yang tidak pernah terjadi di sebuah tenant hanya melatih orang mengabaikan tanda itu. Kekurangannya tetap tertangkap saat posting yang membutuhkannya terbit.
 
-**Cara perolehan belum membedakan akun.** Pembelian, hibah, dan saldo awal (`Support/AcquisitionMethod`) hari ini memakai akun harga perolehan yang sama (K-12). Bila kelak dibedakan, kolomnya ditambahkan di sini dan dipilih di `AssetPostingAccounts::acquisitionAccount()`, bukan di setiap penerbit.
+**Cara perolehan belum membedakan akun debit, tetapi membedakan lawannya.** Pembelian, hibah, dan saldo awal (`Support/AcquisitionMethod`) hari ini memakai akun harga perolehan yang sama (K-12). Lawannya berbeda: pembelian ke lawan hutang (`direct_payable`) atau perantara (`clearing`), hibah ke lawan hibah, saldo awal ke penyeimbang saldo awal (`AssetPostingAccounts::offsetColumn()`). Hibah punya kolom sendiri karena tidak ada pemasok yang ditagih; mencatatnya sebagai hutang membuat aplikasi finance membuat faktur yang tidak pernah akan dibayar (keputusan pemilik produk, 24 September 2026, K-25).
+
+**Akun dibaca ulang saat posting tertahan divalidasi ulang.** Setiap baris jurnal aset membawa kunci `posting-group:<group>:<kolom>` (`mapping.reference`). Core menanyakan kunci itu ke `Services/PostingGroupAccountResolver` saat posting dibentuk ulang, jadi mengisi kolom yang dulu kosong benar-benar melepas postingnya lewat Validasi ulang.
 
 ## Yang datang dari Core
 
@@ -86,7 +89,8 @@ Akibatnya pada tenant yang sudah ada sebelum rilis ini: role Owner menyimpan sal
 | `database/migrations/2026_09_23_100000_create_aset_posting_group_table.php` | Tabel dan indeks unik parsial |
 | `src/Models/master/AssetPostingGroup.php` | Tujuh kolom akun, label, dan akun wajib |
 | `src/Http/Controllers/master/AssetPostingGroupController.php` | Matriks, pemilih akun, simpan, dan arsip |
-| `src/Services/AssetPostingAccounts.php` | Baris yang berlaku menurut tanggal posting, dan akun per cara perolehan |
+| `src/Services/AssetPostingAccounts.php` | Baris yang berlaku menurut tanggal posting, akun debit dan kolom lawan per cara perolehan |
+| `src/Services/PostingGroupAccountResolver.php` | Akun posting group yang berlaku, untuk posting yang dibentuk ulang Core |
 | `src/Support/AcquisitionMethod.php` | Cara perolehan |
 | `ui/asset-posting-group/AssetPostingGroupPage.tsx` | Layar matriks dan form per tanggal berlaku |
 | `tests/Feature/AssetPostingGroupTest.php` | Test aturan di atas |

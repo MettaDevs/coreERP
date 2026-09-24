@@ -34,15 +34,23 @@ import EditShield from '../../_shared/EditShield';
 import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import {
+    AcquisitionJournal,
+    VendorPicker,
+    labelStatusPosting,
+} from './AcquisitionPosting';
 import type {
     AsetTerbit,
     BarisPenerimaan,
+    CaraPerolehan,
     Context,
     EditablePenerimaan,
     Penerimaan,
+    PratinjauPosting,
     Ringkasan,
 } from './penerimaan';
 import {
+    CARA_PEROLEHAN,
     StatusBadge,
     barisKosong,
     bolehMendaftarkan,
@@ -68,6 +76,10 @@ type Mode = 'create' | 'view' | 'edit';
  * **Nomor seri tidak diminta di sini.** Kardusnya belum dibuka saat dokumen diketik.
  * Setelah dokumen selesai, tab "Aset terbit" mendaftar aset yang lahir darinya supaya
  * nomor serinya diketik berurutan sambil membaca stikernya.
+ *
+ * **Jurnal perolehan dilihat sebelum diselesaikan** (feed posting finance, TODO 9.3): baris
+ * jurnal, dimensinya, dan masalahnya tampil selama draf, dan hal yang akan menolak penyelesaian
+ * disebut lebih dulu, bukan baru muncul setelah tombol terakhir ditekan.
  */
 export default function PenerimaanDetailPage({
     context,
@@ -97,6 +109,14 @@ export default function PenerimaanDetailPage({
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
+    // Pratinjau disimpan bersama versi dokumen yang melahirkannya: pratinjau versi lama tidak
+    // boleh tampil sebagai pratinjau versi baru, dan "sedang memuat" cukup berarti versinya
+    // belum sama.
+    const [pratinjau, setPratinjau] = useState<{
+        id: string;
+        versi: number;
+        data: PratinjauPosting | null;
+    } | null>(null);
 
     const lokasi = useMasterOptions('lokasi-aset');
     const grup = useMasterOptions('group-aset');
@@ -139,6 +159,12 @@ export default function PenerimaanDetailPage({
                         result.data.penanggung_jawab_user_id ?? '',
                     lokasi_aset_id: result.data.lokasi_aset_id ?? '',
                     keterangan: result.data.keterangan ?? '',
+                    cara_perolehan: result.data.cara_perolehan ?? 'pembelian',
+                    vendor_id: result.data.vendor_id ?? '',
+                    vendor_invoice_reference:
+                        result.data.vendor_invoice_reference ?? '',
+                    vendor_invoice_date:
+                        result.data.vendor_invoice_date?.slice(0, 10) ?? '',
                     details: (result.data.details ?? []).map((baris) => ({
                         ...barisKosong(),
                         ...baris,
@@ -149,6 +175,8 @@ export default function PenerimaanDetailPage({
                         permintaan_pembelian_detail_id:
                             baris.permintaan_pembelian_detail_id ?? '',
                         keterangan: baris.keterangan ?? '',
+                        nilai_per_unit: tanpaNolBelakang(baris.nilai_per_unit),
+                        ppn_per_unit: tanpaNolBelakang(baris.ppn_per_unit),
                     })),
                 });
             })
@@ -184,6 +212,33 @@ export default function PenerimaanDetailPage({
             dibatalkan = true;
         };
     }, [penerimaanId, selesai, tersimpan?.version]);
+
+    // Pratinjau jurnal perolehan untuk draf yang sedang dilihat. Dibaca ulang setiap versi
+    // dokumen berubah, karena jurnalnya disusun dari isi dokumen yang tersimpan.
+    useEffect(() => {
+        if (!penerimaanId || selesai || mode !== 'view' || !tersimpan) {
+            return;
+        }
+
+        let dibatalkan = false;
+        const versi = tersimpan.version;
+        const id = penerimaanId;
+        api<{ data: PratinjauPosting }>(
+            `/penerimaan-aset/${penerimaanId}/pratinjau-posting`,
+        )
+            .then(
+                (result) =>
+                    !dibatalkan &&
+                    setPratinjau({ id, versi, data: result.data }),
+            )
+            .catch(
+                () => !dibatalkan && setPratinjau({ id, versi, data: null }),
+            );
+
+        return () => {
+            dibatalkan = true;
+        };
+    }, [penerimaanId, selesai, mode, tersimpan]);
 
     useEffect(() => {
         if (!penerimaanId || !selesai) {
@@ -222,6 +277,15 @@ export default function PenerimaanDetailPage({
         (jumlah, baris) => jumlah + (Number(baris.jumlah) || 0),
         0,
     );
+    const hibah = record.cara_perolehan === 'hibah';
+    // Pratinjau dokumen dan versi lain tidak pernah tampil sebagai pratinjau dokumen ini.
+    const pratinjauMilikIni =
+        pratinjau !== null &&
+        pratinjau.id === penerimaanId &&
+        pratinjau.versi === tersimpan?.version;
+    const pratinjauSekarang = pratinjauMilikIni ? pratinjau.data : null;
+    const memuatPratinjau = mode === 'view' && !selesai && !pratinjauMilikIni;
+    const penghalang = pratinjauSekarang?.blockers ?? [];
 
     async function simpan() {
         if (!context.legal_entity_id) {
@@ -246,6 +310,15 @@ export default function PenerimaanDetailPage({
             lokasi_aset_id: record.lokasi_aset_id || null,
             currency_code: record.currency_code || 'IDR',
             keterangan: record.keterangan || null,
+            cara_perolehan: record.cara_perolehan || 'pembelian',
+            // Hibah tidak punya pemasok yang ditagih, jadi vendor dan fakturnya tidak dikirim.
+            vendor_id: hibah ? null : record.vendor_id || null,
+            vendor_invoice_reference: hibah
+                ? null
+                : record.vendor_invoice_reference || null,
+            vendor_invoice_date: hibah
+                ? null
+                : record.vendor_invoice_date || null,
             details: record.details
                 .filter((baris) => baris.nama && baris.group_aset_id)
                 .map((baris) => ({
@@ -257,7 +330,10 @@ export default function PenerimaanDetailPage({
                     model_aset_id: baris.model_aset_id || null,
                     model_number: baris.model_number || null,
                     jumlah: Number(baris.jumlah) || 0,
-                    nilai_per_unit: Number(baris.nilai_per_unit) || 0,
+                    // Teks, bukan Number: harga satuan boleh bertiga desimal dan tidak
+                    // boleh bergeser karena pembulatan float sebelum sampai ke server.
+                    nilai_per_unit: angka(baris.nilai_per_unit),
+                    ppn_per_unit: angka(baris.ppn_per_unit),
                     residu_per_unit: Number(baris.residu_per_unit) || 0,
                     permintaan_pembelian_detail_id:
                         baris.permintaan_pembelian_detail_id || null,
@@ -516,7 +592,12 @@ export default function PenerimaanDetailPage({
                     )}
 
                     <CollapsibleSectionGroup
-                        defaultValue={['kedatangan', 'barang']}
+                        defaultValue={[
+                            'kedatangan',
+                            'vendor',
+                            'barang',
+                            'jurnal',
+                        ]}
                     >
                         <CollapsibleSection
                             value="kedatangan"
@@ -604,6 +685,129 @@ export default function PenerimaanDetailPage({
                                         </FieldDescription>
                                     )}
                                 </Field>
+                            </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection
+                            value="vendor"
+                            title="Cara perolehan dan vendor"
+                            summary={
+                                hibah
+                                    ? 'Hibah'
+                                    : (tersimpan?.vendor?.name ?? 'Pembelian')
+                            }
+                        >
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field>
+                                    {readOnly ? (
+                                        <Input
+                                            label="Cara perolehan"
+                                            readOnly
+                                            value={
+                                                CARA_PEROLEHAN.find(
+                                                    (cara) =>
+                                                        cara.value ===
+                                                        record.cara_perolehan,
+                                                )?.label ?? 'Pembelian'
+                                            }
+                                        />
+                                    ) : (
+                                        <Select
+                                            label="Cara perolehan"
+                                            required
+                                            items={CARA_PEROLEHAN}
+                                            value={
+                                                record.cara_perolehan ??
+                                                'pembelian'
+                                            }
+                                            ariaLabel="Cara perolehan"
+                                            portalContainer={panelRef}
+                                            onValueChange={(cara) =>
+                                                setRecord({
+                                                    ...record,
+                                                    cara_perolehan: (cara ??
+                                                        'pembelian') as CaraPerolehan,
+                                                })
+                                            }
+                                        />
+                                    )}
+                                    <FieldDescription>
+                                        {pesan('cara_perolehan') ??
+                                            'Hibah tidak ditagih pemasok: jurnalnya ke akun lawan hibah, bukan hutang.'}
+                                    </FieldDescription>
+                                </Field>
+
+                                {!hibah && (
+                                    <VendorPicker
+                                        legalEntityId={
+                                            tersimpan?.legal_entity_id ??
+                                            context.legal_entity_id
+                                        }
+                                        value={record.vendor_id ?? ''}
+                                        saved={tersimpan?.vendor ?? null}
+                                        readOnly={readOnly}
+                                        error={pesan('vendor_id')}
+                                        portal={panelRef}
+                                        onChange={(vendorId) =>
+                                            setRecord({
+                                                ...record,
+                                                vendor_id: vendorId,
+                                            })
+                                        }
+                                    />
+                                )}
+
+                                {!hibah && (
+                                    <Field>
+                                        <Input
+                                            label="Nomor faktur vendor"
+                                            maxLength={80}
+                                            readOnly={readOnly}
+                                            value={
+                                                record.vendor_invoice_reference ??
+                                                ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    vendor_invoice_reference:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                        {pesan('vendor_invoice_reference') && (
+                                            <FieldDescription>
+                                                {pesan(
+                                                    'vendor_invoice_reference',
+                                                )}
+                                            </FieldDescription>
+                                        )}
+                                    </Field>
+                                )}
+
+                                {!hibah && (
+                                    <Field>
+                                        <Input
+                                            label="Tanggal faktur vendor"
+                                            type="date"
+                                            readOnly={readOnly}
+                                            value={
+                                                record.vendor_invoice_date ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    vendor_invoice_date:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <FieldDescription>
+                                            {pesan('vendor_invoice_date') ??
+                                                'Menjadi tanggal dokumen jurnalnya. Kosongkan bila fakturnya belum datang.'}
+                                        </FieldDescription>
+                                    </Field>
+                                )}
                             </div>
                         </CollapsibleSection>
 
@@ -720,10 +924,13 @@ export default function PenerimaanDetailPage({
                                                 <TableHead className="w-24 text-right">
                                                     Jumlah
                                                 </TableHead>
-                                                <TableHead className="w-40 text-right">
+                                                <TableHead className="min-w-40 text-right">
                                                     Nilai / unit
                                                 </TableHead>
-                                                <TableHead className="w-40 text-right">
+                                                <TableHead className="min-w-36 text-right">
+                                                    PPN / unit
+                                                </TableHead>
+                                                <TableHead className="min-w-40 text-right">
                                                     Residu / unit
                                                 </TableHead>
                                                 {!readOnly && (
@@ -869,6 +1076,33 @@ export default function PenerimaanDetailPage({
                                                         </TableCell>
                                                         <TableCell>
                                                             <Input
+                                                                aria-label="PPN per unit"
+                                                                type="number"
+                                                                min={0}
+                                                                readOnly={
+                                                                    readOnly
+                                                                }
+                                                                value={String(
+                                                                    baris.ppn_per_unit ??
+                                                                        '',
+                                                                )}
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            ppn_per_unit:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input
                                                                 aria-label="Residu per unit"
                                                                 type="number"
                                                                 min={0}
@@ -950,11 +1184,11 @@ export default function PenerimaanDetailPage({
                                 )}
 
                                 <FieldDescription>
-                                    Nilai diisi per unit, bukan total. Ambang
-                                    kapitalisasi group dibandingkan terhadap
-                                    nilai satu aset — dua puluh kursi lima ratus
-                                    ribu tidak melewati ambang sepuluh juta
-                                    hanya karena datang bersamaan.
+                                    Nilai dan PPN diisi per unit, bukan total.
+                                    Ambang kapitalisasi group dibandingkan
+                                    terhadap nilai satu aset — dua puluh kursi
+                                    lima ratus ribu tidak melewati ambang
+                                    sepuluh juta hanya karena datang bersamaan.
                                 </FieldDescription>
                             </div>
                         </CollapsibleSection>
@@ -1040,6 +1274,33 @@ export default function PenerimaanDetailPage({
                                 </FieldDescription>
                             </Field>
                         </CollapsibleSection>
+
+                        {mode === 'view' && (
+                            <CollapsibleSection
+                                value="jurnal"
+                                title="Jurnal perolehan"
+                                summary={
+                                    selesai
+                                        ? labelStatusPosting(
+                                              tersimpan?.posting?.status ??
+                                                  null,
+                                          )
+                                        : penghalang.length > 0
+                                          ? 'Belum dapat diselesaikan'
+                                          : labelStatusPosting(
+                                                pratinjauSekarang?.status ??
+                                                    null,
+                                            )
+                                }
+                            >
+                                <AcquisitionJournal
+                                    pratinjau={pratinjauSekarang}
+                                    memuat={memuatPratinjau}
+                                    selesai={selesai}
+                                    posting={tersimpan?.posting ?? null}
+                                />
+                            </CollapsibleSection>
+                        )}
 
                         {selesai && (
                             <CollapsibleSection
@@ -1146,15 +1407,25 @@ export default function PenerimaanDetailPage({
                             Selesaikan penerimaan ini?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {totalAset} aset akan terdaftar dengan kodenya
-                            masing-masing dan mulai disusutkan. Nomor aset tidak
-                            dapat ditarik kembali, dan dokumen ini tidak dapat
-                            diubah lagi sesudahnya.
+                            {penghalang.length > 0
+                                ? 'Penerimaan ini belum dapat diselesaikan. Benahi dulu hal berikut, lalu coba lagi.'
+                                : `${totalAset} aset akan terdaftar dengan kodenya masing-masing dan mulai disusutkan, dan jurnal perolehannya terbit bersamaan. Nomor aset tidak dapat ditarik kembali, dan dokumen ini tidak dapat diubah lagi sesudahnya.`}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {penghalang.map((blocker) => (
+                        <p
+                            key={blocker.field}
+                            className="text-destructive text-sm"
+                        >
+                            {blocker.message}
+                        </p>
+                    ))}
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void selesaikan()}>
+                        <AlertDialogAction
+                            onClick={() => void selesaikan()}
+                            disabled={penghalang.length > 0}
+                        >
                             Selesaikan
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -1185,4 +1456,21 @@ export default function PenerimaanDetailPage({
             </AlertDialog>
         </div>
     );
+}
+
+/**
+ * Nilai dari API tersimpan dengan enam angka di belakang koma; nol di ujungnya tidak berarti apa-apa
+ * dan hanya membuat 15000000.000000 terbaca seperti angka lain.
+ */
+function tanpaNolBelakang(nilai: number | string | undefined): string {
+    const teks = String(nilai ?? '');
+
+    return teks.includes('.') ? teks.replace(/\.?0+$/, '') : teks;
+}
+
+/** Angka isian sebagai teks desimal apa adanya; kosong berarti nol. */
+function angka(nilai: number | string | undefined): string {
+    const teks = String(nilai ?? '').trim();
+
+    return teks === '' ? '0' : teks;
 }

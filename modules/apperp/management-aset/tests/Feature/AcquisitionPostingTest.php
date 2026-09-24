@@ -280,6 +280,10 @@ class AcquisitionPostingTest extends TestCase
     {
         $group = $this->group('KENDARAAN', 'Kendaraan');
         $id = $this->draf(['vendor_id' => null], [$this->baris($group, 1, 1_000_000)]);
+        // Pratinjau tetap menampilkan jurnalnya dan menyebut vendor sebagai penghalang, bukan 500.
+        $this->pratinjau($id)->assertOk()
+            ->assertJsonPath('data.blockers.0.field', 'vendor_id')
+            ->assertJsonCount(2, 'data.lines');
         $this->selesaikan($id)->assertStatus(422)->assertJsonValidationErrors(['vendor_id' => 'Pilih vendornya.']);
 
         $lain = $this->organisasi(['classification' => 'legal_entity', 'name' => 'PT Metta Lain', 'company_code' => 'LAIN', 'country_code' => 'ID']);

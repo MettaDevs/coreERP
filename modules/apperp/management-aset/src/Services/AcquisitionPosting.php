@@ -263,6 +263,12 @@ final class AcquisitionPosting
             return ['blockers' => $blockers, 'posting' => null];
         }
         $input = $this->input($receipt, $lines);
+        // Vendor yang wajib tetapi kosong sudah disebut sebagai penghalang di atas. Diteruskan ke
+        // penerbit, syarat itu menjadi `PostingTidakSah` — bug penerbit — dan pratinjau berhenti
+        // tepat pada dokumen yang paling butuh melihat jurnalnya.
+        if ($input !== null && isset($blockers['vendor_id'])) {
+            $input['requires_vendor'] = false;
+        }
 
         return [
             'blockers' => $blockers,

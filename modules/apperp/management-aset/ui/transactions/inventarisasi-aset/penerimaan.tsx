@@ -1,4 +1,8 @@
 import { router } from '@inertiajs/react';
+import type {
+    PostingCheckLine,
+    PostingCheckProblem,
+} from '@/components/finance/posting-check';
 import { Badge } from '@apperp/ui/badge';
 import type { FieldConfig } from '../../master/fields';
 
@@ -28,6 +32,7 @@ export type BarisPenerimaan = {
     model_number: string;
     jumlah: number | string;
     nilai_per_unit: number | string;
+    ppn_per_unit: number | string;
     residu_per_unit: number | string;
     permintaan_pembelian_detail_id: string;
     keterangan: string;
@@ -54,6 +59,14 @@ export type Penerimaan = {
     lokasi_aset_id: string | null;
     currency_code: string;
     keterangan: string | null;
+    cara_perolehan: CaraPerolehan;
+    vendor_id: string | null;
+    vendor_invoice_reference: string | null;
+    vendor_invoice_date: string | null;
+    /** Vendor milik Core, dibaca ulang saat dokumen dibuka. */
+    vendor?: VendorRingkas | null;
+    /** Keadaan jurnal perolehannya di feed posting finance, sesudah diselesaikan. */
+    posting?: StatusPosting | null;
     jumlah_baris?: number;
     jumlah_aset?: number;
     lokasi_aset_kode?: string | null;
@@ -68,6 +81,47 @@ export type Penerimaan = {
 
 export type EditablePenerimaan = Partial<Penerimaan> & {
     details: BarisPenerimaan[];
+};
+
+/** Cara aset diperoleh (K-12). Saldo awal belum lewat penerimaan. */
+export type CaraPerolehan = 'pembelian' | 'hibah';
+
+export const CARA_PEROLEHAN: { value: CaraPerolehan; label: string }[] = [
+    { value: 'pembelian', label: 'Pembelian' },
+    { value: 'hibah', label: 'Hibah' },
+];
+
+/** Vendor milik Core (K-06). */
+export type VendorRingkas = {
+    id: string;
+    number: string;
+    name: string;
+    status: string;
+};
+
+/** Keadaan jurnal perolehan di feed posting finance. */
+export type StatusPosting = {
+    posting_id: string;
+    status: string;
+    external_reference: string | null;
+    reason_code: string | null;
+    reason: string | null;
+    acknowledged_at: string | null;
+    problems: PostingCheckProblem[];
+};
+
+/**
+ * Pratinjau jurnal perolehan sebelum diselesaikan: baris jurnal, masalahnya, status yang akan
+ * diperoleh, dan hal yang menolak penyelesaian. `status` `null` berarti tidak ada nilai yang
+ * dijurnal.
+ */
+export type PratinjauPosting = {
+    blockers: { field: string; message: string }[];
+    status: string | null;
+    settlement_mode: string | null;
+    currency: { code: string; decimals: number } | null;
+    lines: PostingCheckLine[];
+    problems: PostingCheckProblem[];
 };
 
 /** Satu peringatan ambang kapitalisasi, satu baris dokumen. */
@@ -124,6 +178,7 @@ export const barisKosong = (): BarisPenerimaan => ({
     model_number: '',
     jumlah: 1,
     nilai_per_unit: '',
+    ppn_per_unit: '',
     residu_per_unit: '',
     permintaan_pembelian_detail_id: '',
     keterangan: '',
@@ -143,6 +198,10 @@ export const penerimaanKosong = (context: Context): EditablePenerimaan => ({
     lokasi_aset_id: '',
     currency_code: 'IDR',
     keterangan: '',
+    cara_perolehan: 'pembelian',
+    vendor_id: '',
+    vendor_invoice_reference: '',
+    vendor_invoice_date: '',
     details: [barisKosong()],
 });
 

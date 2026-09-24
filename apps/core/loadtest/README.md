@@ -140,6 +140,8 @@ dilanggar, dan angkanya dicatat.
 | `posting_group_mixed_rows` dan probe posting group | baris posting group campuran A/B, tulis ke group tenant lain, akun tenant lain diterima | `SELFTEST=1` pada `posting-group.js` → 3.701 dari 4.229 pembacaan balik dan 128 probe tercatat, exit 99 |
 | `server_errors` pada balapan posting group | pembuatan kedua untuk group dan tanggal yang sama menabrak indeks unik | controller **tanpa** `lockForUpdate` disalin sementara ke keempat container → 66 error 500 dalam 30 detik, semuanya 23505 `aset_m_posting_group_berlaku_unique`, exit 99; container dibuat ulang dari image |
 | `verify.sql` (module) — posting group dan kode diketik | akun tenant lain atau yang tidak ada di kolom akun; bentuk kode group aset dan buku penyusutan | satu baris ber-akun tenant lain disuntik dan satu kode group diubah menjadi `pg salah` → kedua pemeriksaan naik ke 1, exit 3; dipulihkan, exit kembali 0 |
+| Probe penerimaan di dalam k6 | pratinjau jurnal dan penyelesaian penerimaan tenant lain | `SELFTEST=1` pada `receipt-posting.js` → 48 dari 48 probe pratinjau dan 48 dari 48 probe penyelesaian tercatat, exit 99 |
+| `verify.sql` (module) — jurnal perolehan | penerimaan selesai tanpa tepat satu posting, posting tanpa penerimaan selesai, debit posting yang tidak sama dengan register ditambah PPN, jumlah aset yang tidak sama dengan unit barisnya | `posting_id` satu posting digeser → dua pemeriksaan pertama naik ke 1; debit dan kredit satu posting digeser satu sen dan satu baris mengaku satu unit lebih → dua pemeriksaan terakhir naik ke 2 dan 1, exit 3; dipulihkan, exit kembali 0. Debit yang digeser sendirian ditolak `finance_postings_balanced_check` — yang menahannya skema, bukan oracle |
 
 `SELFTEST=1` merusak **permintaan**, bukan produknya: probe lintas tenant diarahkan ke record
 milik sendiri, probe eskalasi memakai sesi yang memang berhak, dan penulis balapan mengirim
@@ -361,6 +363,61 @@ p50 114 ms / p95 181 ms dan tulis p50 92 ms / p95 151 ms. Timeout pada saturasi 
 (128 dari 128): pemeriksaan itu masih menuntut baris `tenant_deployments`, yang tidak lagi ditulis
 pendaftaran sejak registry environment. Itu oracle yang tertinggal, bukan tenant setengah jadi;
 seluruh pemeriksaan Core lainnya 0.
+
+### Gate kebenaran penerimaan dan jurnal perolehan — LULUS (area 9 feed posting finance)
+
+Diukur **24 September 2026** pada mesin yang sama, image `erp-core-app:a9-receipt` yang dibangun
+dari branch area 9, `FIXTURE=rp1`. Skenarionya
+`modules/apperp/management-aset/loadtest/k6/receipt-posting.js`. Stack-nya project compose
+tersendiri (`-p core-loadtest-a9`) dengan volume baru: penerimaan yang diselesaikan sebelum
+migration area 9 memang tidak punya posting, dan oracle perolehannya memerah pada volume lama.
+
+Tenant uji beban tidak punya hierarki manajemen, jadi BU tidak dapat diturunkan dan setiap jurnal
+perolehan berstatus `held` (`BUSINESS_UNIT_UNRESOLVED`, `ACCOUNT_NOT_MAPPED`). Yang digate tidak
+bergantung pada status itu: satu posting per penerimaan selesai, debit yang sama dengan register
+ditambah PPN, jumlah aset per unit, dan batas tenant.
+
+`RUN_ID=rcp-race-4`: 32 VU dipusatkan pada 4 tenant, 90 detik. Setiap detik seluruh VU satu tenant
+menyelesaikan draf yang sama.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` (probe tenant lain, penerimaan selesai tanpa posting, jumlah aset) | 0 |
+| `server_errors` | 0 |
+| Penyelesaian yang menang / yang kalah (409 atau 422) | 234 / 1.001 — balapannya benar-benar terjadi |
+| `number_sequence_failures` | 18 — lihat temuan di bawah |
+| Permintaan gagal | 0 |
+
+`RUN_ID=rcp-sat-1`: 1000 VU, 128 tenant, 90 detik. Setiap iterasi membuat draf, menyelesaikannya,
+memeriksa posting dan asetnya, lalu mem-probe dokumen tenant lain.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` | 0 |
+| `server_errors` | 0 |
+| Penerimaan selesai menurut k6 / menurut database | 657 / 716 — 59 selesai di server sesudah kliennya menyerah, dan masing-masing tetap membawa tepat satu posting |
+| `number_sequence_failures` | 0 |
+| Timeout klien (batas 60 detik) | 1.667 — kapasitas, bukan cacat; sebanding dengan 1.746 pada run area 8 |
+
+`verify.sql` module pada akhir kedua run: semua pemeriksaan 0. 1.014 posting `asset.acquisition`
+untuk 1.014 penerimaan selesai di 115 tenant, 2.028 aset (tepat dua per penerimaan), dan tidak satu
+pun nomor penerimaan atau aset terbit dua kali. `verify.sql` Core: 52.171 nomor terbit tanpa satu
+pun ganda; satu-satunya yang merah tetap `boundary tenant tidak lengkap` (128 dari 128), oracle yang
+masih menuntut `tenant_deployments` (lihat area 8).
+
+Empat pemeriksaan sequence Core sempat merah 4 dari 4 pada run race. Penyebabnya oracle, bukan
+tenant: skenario ini yang pertama membuat vendor, dan vendor bernomor dari reference milik Core
+sendiri, `core.vendor` — tidak dibeli, dengan bawaan yang ditetapkan Core (`VND-`, 1-999999, scope
+entitas legal). Keempat pemeriksaan kini mengecualikan reference ber-`app_id = 'core'`.
+
+**Temuan di luar area 9: deadlock penerbitan nomor.** Membuat 150 draf penerimaan serentak dalam
+satu tenant (batch k6, 16 per host) memunculkan `SQLSTATE 40P01` pada `number_sequence_allocations`,
+yang modul jawab 422 `number_sequence_failed` dengan pesan SQL mentah. Balapan penyelesaian memicunya
+juga: nomor aset diterbitkan sebelum transaksi dokumen, dengan kunci idempoten yang sama untuk setiap
+VU yang berlomba. Kebenarannya tidak tersentuh — dokumen tetap draf, dan yang berikutnya menang —
+tetapi pengguna menerima galat. Setup skenario ini karena itu membuat draf arena berurutan, dan
+kegagalannya dihitung terpisah lewat `number_sequence_failures`. Perbaikannya pekerjaan tersendiri
+di Number Sequence Core.
 
 ### Gate latensi work order dan penyusutan (F7-03 sisa)
 

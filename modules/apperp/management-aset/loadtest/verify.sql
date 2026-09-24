@@ -276,6 +276,61 @@ kode_diketik_tidak_sah as (
         (select count(*) from aset_m_group_aset where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30)
       + (select count(*) from aset_m_buku_penyusutan where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30) as n
 ),
+penerimaan_tanpa_posting as (
+    -- Jurnal perolehan terbit di transaksi yang sama dengan penyelesaian penerimaan (area 9):
+    -- setiap penerimaan selesai yang bernilai punya tepat satu posting, di tenant yang sama.
+    -- Nol berarti tidak ada penerimaan yang selesai tanpa jurnal, dan tidak ada yang dijurnal dua
+    -- kali karena dua penyelesaian yang berlomba sama-sama menang.
+    --
+    -- Penerimaan yang diselesaikan sebelum migration area 9 memang tidak punya posting, dan
+    -- dokumennya tidak menyimpan kapan ia selesai. Volume yang masih berisi penerimaan selesai
+    -- dari masa itu karenanya memerah di sini; jalankan gate ini pada volume yang lahir sesudahnya.
+    select count(*) as n
+    from aset_tr_penerimaan_aset p
+    where p.status = 'selesai'
+      and p.deleted_at is null
+      and exists (
+          select 1 from aset_tr_penerimaan_aset_details d
+          where d.penerimaan_aset_id = p.id and (d.nilai_per_unit > 0 or d.ppn_per_unit > 0)
+      )
+      and (
+          select count(*) from finance_postings f
+          where f.tenant_id = p.tenant_id and f.posting_id = 'AST-ACQ-' || p.id
+      ) <> 1
+),
+posting_perolehan_tanpa_penerimaan_selesai as (
+    -- Posting perolehan tanpa penerimaan selesai di tenant yang sama berarti transaksi yang batal
+    -- meninggalkan posting yatim, atau posting yang tercatat di tenant lain.
+    select count(*) as n
+    from finance_postings f
+    where f.posting_type = 'asset.acquisition'
+      and f.source_module = 'management-aset'
+      and not exists (
+          select 1 from aset_tr_penerimaan_aset p
+          where p.tenant_id = f.tenant_id and 'AST-ACQ-' || p.id = f.posting_id and p.status = 'selesai'
+      )
+),
+posting_perolehan_tidak_sama_dengan_register as (
+    -- Debit posting = nilai aset di register + PPN baris yang dibulatkan ke presisi posting itu
+    -- (K-20). Register adalah pembagian nilai baris yang sudah bulat, jadi keduanya harus sama
+    -- persis; selisih satu sen pun berarti register dan buku besar berpisah jalan.
+    select count(*) as n
+    from finance_postings f
+    join aset_tr_penerimaan_aset p on p.tenant_id = f.tenant_id and 'AST-ACQ-' || p.id = f.posting_id
+    where f.posting_type = 'asset.acquisition'
+      and f.total_debit <> (
+          (select coalesce(sum(a.acquisition_value), 0) from aset_tr_aset a where a.penerimaan_aset_id = p.id)
+        + (select coalesce(sum(round(d.ppn_per_unit * d.jumlah, f.currency_decimals)), 0)
+           from aset_tr_penerimaan_aset_details d where d.penerimaan_aset_id = p.id)
+      )
+),
+aset_penerimaan_tidak_sesuai_jumlah as (
+    select count(*) as n
+    from aset_tr_penerimaan_aset p
+    where p.status = 'selesai'
+      and (select count(*) from aset_tr_aset a where a.penerimaan_aset_id = p.id)
+          <> (select coalesce(sum(d.jumlah), 0) from aset_tr_penerimaan_aset_details d where d.penerimaan_aset_id = p.id)
+),
 posting_group_ganda as (
     -- Ditahan skema, bukan kode: indeks unik parsial `(tenant_id, group_aset_id, effective_from)
     -- WHERE deleted_at IS NULL`. Yang dijaga kode adalah jawabannya — tanpa kunci pada baris
@@ -338,6 +393,10 @@ union all select 'detail/checklist/status log work order lintas tenant atau yati
 union all select 'transisi status work order di luar grafik', n from work_order_transisi_tidak_sah
 union all select 'akumulasi buku aset tidak sama dengan jumlah periode final', n from saldo_buku_tidak_cocok_periode
 union all select 'kode diketik group aset atau buku penyusutan tidak sah', n from kode_diketik_tidak_sah
+union all select 'penerimaan selesai tanpa tepat satu posting perolehan', n from penerimaan_tanpa_posting
+union all select 'posting perolehan tanpa penerimaan selesai di tenant yang sama', n from posting_perolehan_tanpa_penerimaan_selesai
+union all select 'debit posting perolehan tidak sama dengan register ditambah PPN', n from posting_perolehan_tidak_sama_dengan_register
+union all select 'jumlah aset penerimaan tidak sama dengan jumlah unit barisnya', n from aset_penerimaan_tidak_sesuai_jumlah
 union all select 'posting group ganda untuk group dan tanggal yang sama', n from posting_group_ganda
 union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
 union all select 'posting group menunjuk akun tenant lain atau yang tidak ada', n from posting_group_akun_asing;
@@ -353,6 +412,8 @@ union all select 'aset_m_tipe_lokasi_aset', count(*), count(distinct tenant_id) 
 union all select 'aset_m_buku_penyusutan', count(*), count(distinct tenant_id) from aset_m_buku_penyusutan
 union all select 'aset_m_group_buku_penyusutan', count(*), count(distinct tenant_id) from aset_m_group_buku_penyusutan
 union all select 'aset_m_posting_group', count(*), count(distinct tenant_id) from aset_m_posting_group
+union all select 'aset_tr_penerimaan_aset', count(*), count(distinct tenant_id) from aset_tr_penerimaan_aset
+union all select 'finance_postings asset.acquisition', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.acquisition'
 union all select 'aset_m_kondisi_aset', count(*), count(distinct tenant_id) from aset_m_kondisi_aset
 union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) from aset_m_pabrikan_aset
 union all select 'aset_m_item_checklist_maintenance', count(*), count(distinct tenant_id) from aset_m_item_checklist_maintenance

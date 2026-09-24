@@ -8,8 +8,8 @@ Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, atur
 - [TODO feed posting finance](../todo/feed-posting-finance/TODO.md) — butir kerja dan keadaannya.
 - Spesifikasi **Integrasi · Finance** di portal `/docs` aplikasi Core, terbuka tanpa login — kontrak dan panduan untuk tim pembaca. Sumbernya `apps/core/contracts/internal/integrasi-finance.yaml`.
 
-::: warning Belum ada module yang menerbitkan posting
-Per 23 September 2026 modul aset belum memanggil `PenerbitPosting` — area 9 sampai 12 di TODO belum dikerjakan — dan module lain juga belum. Feed di server mana pun karena itu kosong. Perilaku di halaman ini dibuktikan test Core yang menyusun masukan module sendiri. Perbarui peringatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) ketika jenis pertama benar-benar terbit.
+::: info Jenis yang sudah terbit
+Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9). Saldo awal, penyusutan, pembalikan, dan koreksi nilai (area 10 sampai 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
 :::
 
 ```text
@@ -246,6 +246,7 @@ Di sisi pembaca, idempotensinya `UNIQUE(posting_id)`. Posting yang sama bisa sam
 - Masukan yang dulu sah bisa kini ditolak — misalnya vendornya sudah diarsipkan. Controller melaporkan `PostingTidakSah` itu ke pemantauan kesalahan, lalu menjawab 422 "Posting ini tidak dapat dibentuk ulang".
 - Perubahannya ditulis di dalam kunci baris (`lockForUpdate`). Posting yang di antaranya sudah `posted` atau `rejected`, yang sudah sampai ke pembaca, atau yang baru ditandai manual oleh pengguna, dibiarkan. Posting dipilih sebelum dikunci, jadi tanda pengguna yang jatuh di antaranya hanya terlihat di dalam kunci.
 - Peristiwa `revalidated` dicatat bersama penggunanya.
+- **Akun dibaca ulang dari pemetaan module**, bukan hanya dari masukan yang tersimpan. Baris yang membawa `mapping.reference` menanyakan akunnya ke module pemilik dokumen sumber lewat `PostingAccountResolver`, yang didaftarkan module ke `PostingAccountResolvers` saat boot. Tanpa itu, posting yang tertahan karena pemetaannya dulu kosong (`ACCOUNT_NOT_MAPPED`) tidak pernah lepas: masukan yang tersimpan tetap menyebut akun kosong walaupun posting group sudah diisi. Hanya akun yang dibaca ulang; nilai, unit, dan susunan baris tetap. Masukan dan hash-nya ikut diperbarui, supaya module yang menerbitkan ulang dokumen yang sama dengan pemetaan terbaru mendapat posting yang sama, bukan penolakan "isi jurnal berbeda". Pemeta yang gagal dilaporkan ke pemantauan kesalahan dan baris itu memakai akun yang tersimpan. Padanannya source document framework F&O: distribusi akuntansi diturunkan ulang dari setelan yang berlaku selama jurnalnya belum ditransfer.
 
 `posting_id` tidak berganti karena dokumennya sama, dan pembaca mengenali dokumen itu dari `posting_id`-nya.
 
@@ -378,7 +379,7 @@ Satu endpoint melayani semua jenis (K-23). Menambah jenis tidak membutuhkan tabe
 
 ### 2. Susun masukan di pembungkus sisi module
 
-Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, mengikuti pola `modules/apperp/management-aset/src/Services/KalenderFiskalAset.php`: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `PostingTidakSah` menjadi pesan untuk pengguna (rencana TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php`. Yang perlu diperhatikan:
+Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, seperti `modules/apperp/management-aset/src/Services/AcquisitionPosting.php` untuk penerimaan aset: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `PostingTidakSah` menjadi pesan untuk pengguna (TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php`. Yang perlu diperhatikan:
 
 - **`tenant_id`** dari `KonteksTenant::tenantId()`, tidak pernah dari permintaan.
 - **`posting_id` deterministik dari dokumen sumbernya**, misalnya kode singkat jenisnya ditambah id dokumen, seperti `AST-ACQ-…` pada contoh kontrak. Menyelesaikan dokumen yang sama dua kali harus menghasilkan `posting_id` yang sama, supaya idempotensi bekerja. Proses yang boleh dijalankan berulang untuk periode yang sama membutuhkan nomor urut proses di dalam `posting_id`, seperti rencana "Post penyusutan" (TODO 11.2.4). Paling panjang 120 karakter.
@@ -389,7 +390,7 @@ Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, mengikuti pol
 - **`lines[].account_id`** adalah id akun dari `DaftarAkun`, diambil dari pemetaan module — bukan nomor akun, karena nomor dapat berubah pada impor ulang (K-05). Kirim `null` bila pemetaannya belum ada: posting akan `held`, bukan dilempar.
 - **Nilai** dibulatkan per baris lewat `PresisiMataUang::bulatkan()` sebelum dijumlah, lalu jurnal disusun dari nilai yang sudah bulat. Jangan memakai `round()` PHP atau float. Tidak ada nilai negatif: selisih negatif ditulis di sisi sebaliknya.
 - **`lines[].org_unit_id`** adalah operating unit yang menanggung baris itu, sumber kedua dimensinya. Untuk akun laba rugi, unit itu harus department.
-- **`lines[].mapping`**: `label` menamai asal akun baris itu, misalnya "Group KENDARAAN · akun aset", dan `fix_url` jalur layar pemetaan di module. Keduanya dipakai pesan masalah dan tombol "Buka pemetaan akun" di layar pantau dan pratinjau, dan tidak ikut `payload`. `fix_url` yang bukan jalur di dalam aplikasi ditolak, sama seperti `source_document.url`.
+- **`lines[].mapping`**: `label` menamai asal akun baris itu, misalnya "Group KENDARAAN · harga perolehan", dan `fix_url` jalur layar pemetaan di module. Keduanya dipakai pesan masalah dan tombol "Buka pemetaan akun" di layar pantau dan pratinjau, dan tidak ikut `payload`. `fix_url` yang bukan jalur di dalam aplikasi ditolak, sama seperti `source_document.url`. `reference` adalah kunci pemetaan dalam bahasa module (modul aset: `posting-group:<group>:<kolom>`); isi bersama pendaftaran `PostingAccountResolver` di penyedia layanan module, supaya [Validasi ulang](#validasi-ulang) membaca akun dari pemetaan terbaru. Karena itu satu baris sebaiknya menyebut satu pemetaan: baris yang menjumlahkan dua pemetaan tidak dapat dibaca ulang.
 - **`details`** objek bebas, hanya informasi untuk pelacakan. Pembaca tidak boleh menjurnal dari sana. Harga satuan dengan presisi yang lebih halus hanya boleh muncul di sini, tidak pernah di baris jurnal.
 
 ### 3. Terbitkan di dalam transaksi dokumen
@@ -481,6 +482,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Masalah pemetaan menahan posting, dengan jalan pintasnya | `FinancePostingFeedTest::test_pemetaan_kosong_akun_nonaktif_dan_unit_tanpa_nomor_menahan_posting` |
 | Pratinjau memeriksa sama tanpa menyimpan | `FinancePostingFeedTest::test_pratinjau_memeriksa_sama_tanpa_menyimpan` |
 | Validasi ulang | `FinancePostingFeedTest::test_validasi_ulang_setelah_pemetaan_diperbaiki_memindahkan_held_ke_pending`, `FinancePostingMonitorTest::test_validasi_ulang_hanya_untuk_posting_tertahan` |
+| Validasi ulang membaca akun dari pemetaan module yang berlaku | `FinancePostingFeedTest::test_revalidation_reads_the_account_from_the_module_mapping_in_force_now`; ujung ke ujung dari modul aset di `AcquisitionPostingTest::test_an_unmapped_group_still_completes_and_the_posting_is_released_once_mapped` |
 | Cutover, feed mati, dan penilaian ulang | `FinancePostingFeedTest::test_sebelum_cutover_dan_feed_mati_menjadi_manual_lalu_dinilai_ulang_saat_setelan_berubah` |
 | Posting yang sudah terbit tetap pada presisinya saat presisi mata uang diturunkan | `FinancePostingFeedTest::test_lowering_currency_precision_keeps_published_postings_at_their_own_precision` |
 | Tanda manual yang jatuh di antara pemilihan dan kunci tidak tertimpa | `FinancePostingFeedTest::test_revalidation_and_cutover_reevaluation_keep_a_manual_mark_made_meanwhile` |
@@ -505,9 +507,9 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 ## Celah yang diketahui
 
-- **Belum ada module yang menerbitkan posting.** Modul aset sudah menyiapkan kode group aset dan buku penyusutan yang diketik manual (TODO 8.7) dan [posting group aset](/apps/management-aset/master/posting-group/) beserta pewarisan dimensi lokasi (area 8). Penerimaan, saldo awal, penyusutan, dan koreksi nilai (area 9 sampai 12) yang menerbitkan posting belum dikerjakan. Semua jenis di kontrak masih *Belum*.
+- **Baru satu jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dari penerimaan (area 9). Saldo awal, penyusutan, pembalikan, dan koreksi nilai (area 10 sampai 12) belum; jenisnya masih *Belum* di kontrak.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
-- **Endpoint pratinjau HTTP (TODO 7.6.5)** belum ada. Logikanya sudah tersedia sebagai `PenerbitPosting::pratinjau()`, dan layar module dapat memanggilnya lewat controller module-nya sendiri.
+- **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PenerbitPosting::pratinjau()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
 - **Pemeriksaan tujuan push hanya meresolusi IPv4 (TODO 4.8).** `PushDestination` memakai `gethostbynamel()`, dan klien HTTP meresolusi lagi saat mengirim. Di SaaS, host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang diganti di antara pemeriksaan dan pengiriman.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
@@ -518,6 +520,8 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | --- | --- |
 | `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php` | Kontrak module: bentuk masukan dan hasil |
 | `apps/core/app/Support/Modules/Contracts/PostingTidakSah.php` | Exception untuk bug penerbit |
+| `apps/core/app/Support/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
+| `apps/core/app/Support/Finance/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
 | `apps/core/app/Services/Modules/PenerbitPostingCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Support/Modules/CoreServices.php` |
 | `apps/core/app/Support/Finance/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |
 | `apps/core/app/Support/Finance/PostingInput.php` | Masukan yang sudah dinormalkan, beserta hash-nya |
