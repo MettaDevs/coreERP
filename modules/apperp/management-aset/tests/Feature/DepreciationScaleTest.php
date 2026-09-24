@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -31,9 +32,9 @@ use Tests\TestCase;
  *
  * **Ditandai `lambat` dan dikecualikan dari pemeriksaan tiap pull request.** Sapuannya 40
  * kombinasi yang masing-masing dijalankan sampai akhir masa manfaat — 460 periode, sekitar
- * 920 permintaan HTTP — dan itu 56 detik, tujuh persen dari seluruh suite dalam satu method.
- * Dengan dua pekerja di CI, satu pekerja menjalankannya sendirian sementara yang lain sudah
- * selesai; itulah ekor yang menggantung di akhir tiap run.
+ * 1.280 permintaan HTTP bersama penyusun skenarionya — dan itu 30 sampai 60 detik di mesin
+ * pengembang dalam satu method. Dengan dua pekerja di CI, satu pekerja menjalankannya sendirian
+ * sementara yang lain sudah selesai; itulah ekor yang menggantung di akhir tiap run.
  *
  * Ia tetap dijalankan penuh pada jadwal mingguan. Yang dijaganya berubah jarang — kalkulator
  * penyusutan — sedangkan biayanya dibayar pada setiap perubahan apa pun. Ini penjadwalan
@@ -58,6 +59,22 @@ class DepreciationScaleTest extends TestCase
      * @var array<string, string>
      */
     private array $legalEntityIds = [];
+
+    /**
+     * Satu pengguna per tenant, disusun sekali pada pemakaian pertama dan dipakai oleh setiap
+     * permintaan berikutnya.
+     *
+     * Sebelumnya tiap permintaan memanggil `sebagaiPengguna`, yang membangun rantai role → duty →
+     * privilege → permission baru setiap kali: sekitar 1.280 rantai pada method terbesar, semuanya
+     * di dalam satu transaksi yang tidak pernah di-commit. Query izin yang berjalan pada setiap
+     * permintaan ikut memindai semuanya, dan begitu autovacuum lewat di tengah run, statistik tabel
+     * izin tercatat nol baris — planner lalu memilih nested loop dan satu query izin naik dari
+     * milidetik ke detik. Yang diuji di sini aritmetika penyusutan, bukan izin per langkah, jadi
+     * izinnya cukup disusun sekali.
+     *
+     * @var array<string, User>
+     */
+    private array $users = [];
 
     private string $orgUnitId;
 
@@ -148,7 +165,7 @@ class DepreciationScaleTest extends TestCase
                 round((float) DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $tenant)->sum('amount'), 2),
                 'total penyusutan tenant '.$tenant,
             );
-            $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.read'])
+            $this->actingAsTenant($tenant)
                 ->getJson('/api/modules/management-aset/v1/penyusutan')->assertOk()->assertJsonCount(18, 'data');
         }
 
@@ -246,7 +263,7 @@ class DepreciationScaleTest extends TestCase
             'depreciation_profile_id' => $this->profil($tenant, $profile),
             'alternative_profile_id' => $alternative ? $this->profil($tenant, $alternative) : null,
         ]);
-        $this->sebagaiPengguna($tenant, $this->permissionsFor('group-aset'))
+        $this->actingAsTenant($tenant)
             ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
                 'buku_id' => $buku,
                 'useful_life_periods' => $profile['useful_life_periods'] ?? null,
@@ -270,7 +287,7 @@ class DepreciationScaleTest extends TestCase
     {
         $start = Carbon::parse('2026-07-01')->addMonthsNoOverflow($monthOffset - 1);
 
-        return $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.create'])
+        return $this->actingAsTenant($tenant)
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
                 'buku_aset_id' => $book,
                 'period_starts_on' => $start->toDateString(),
@@ -284,7 +301,7 @@ class DepreciationScaleTest extends TestCase
     {
         $proposal->assertSuccessful();
         $id = (string) $proposal->json('data.id');
-        $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.finalize'])
+        $this->actingAsTenant($tenant)
             ->postJson('/api/modules/management-aset/v1/penyusutan/'.$id.'/finalisasi')->assertOk();
 
         return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
@@ -303,7 +320,7 @@ class DepreciationScaleTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function master(string $tenant, string $resource, array $payload): string
     {
-        return $this->sebagaiPengguna($tenant, $this->permissionsFor($resource))
+        return $this->actingAsTenant($tenant)
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, array_filter($payload, fn ($value) => $value !== null)))
             ->assertCreated()->json('data.id');
@@ -318,6 +335,35 @@ class DepreciationScaleTest extends TestCase
             'year_basis' => 'calendar',
             ...$profile,
         ]);
+    }
+
+    /** Permintaan berikutnya datang dari pengguna tetap milik tenant ini; lihat `$users`. */
+    private function actingAsTenant(string $tenant): static
+    {
+        if (! isset($this->users[$tenant])) {
+            $this->sebagaiPenggunaBernama('sweep-'.$tenant, $tenant, $this->sweepPermissions());
+            $this->users[$tenant] = User::findOrFail($this->idPengguna('sweep-'.$tenant));
+        }
+
+        return $this->actingAs($this->users[$tenant]);
+    }
+
+    /**
+     * Izin yang dipakai sapuan: master yang disusun tiap skenario dan tiga langkah penyusutan.
+     *
+     * @return list<string>
+     */
+    private function sweepPermissions(): array
+    {
+        return [
+            ...$this->permissionsFor('group-aset'),
+            ...$this->permissionsFor('jenis-aset'),
+            ...$this->permissionsFor('buku-penyusutan'),
+            ...$this->permissionsFor('profil-penyusutan'),
+            'management-aset.penyusutan.read',
+            'management-aset.penyusutan.create',
+            'management-aset.penyusutan.finalize',
+        ];
     }
 
     /** @return list<string> */
