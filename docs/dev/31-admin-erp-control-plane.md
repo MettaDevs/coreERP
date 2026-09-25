@@ -118,8 +118,9 @@ kunci itu harus tetap sah.
 
 ### Kesehatan feed posting finance
 
-Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, dan jam
-pull terakhir oleh aplikasi finance klinik. Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
+Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, jam
+pull terakhir oleh aplikasi finance klinik, dan untuk klien mode push jam kiriman push terakhir yang diterima serta
+jumlah kiriman yang berhenti gagal (`last_pushed_at`, `failed_pushes`, TODO feed posting 14.6). Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
 klinik tidak keluar dari servernya (keputusan K-02 di
 [feed posting finance](../todo/feed-posting-finance/README.md)). Angkanya dijumlahkan untuk seluruh tenant di server
 itu.
@@ -131,11 +132,14 @@ itu.
   kontrak agen, dan test Core mencocokkan keluaran perintah itu dengan skema yang sama.
 - **`null` dan kunci yang tidak ada adalah dua keadaan.** `null` berarti agen tidak mendapat ringkasan dari Core:
   belum ada rilis yang sehat, Core tidak menjawab dalam batasnya, atau rilis Core belum punya perintahnya. Kunci yang
-  tidak ada berarti agen lama. Layar menyebut keduanya berbeda, karena tindakannya berbeda.
+  tidak ada berarti agen lama. Layar menyebut keduanya berbeda, karena tindakannya berbeda. Dua angka push datang
+  berpasangan dan boleh tidak ada meski `finance_feed` ada: Core di server klien bisa lebih lama dari agennya, dan
+  layar menulis "Belum dilaporkan" untuk keduanya, bukan nol.
 - **Bukan riwayat.** `finance_feed` ada di `SiteReports::VOLATILE`: angkanya bergerak bersama transaksi klinik, dan
   riwayat posting yang sebenarnya sudah dicatat Core di server itu (`finance_posting_events`).
-- **Dinilai di satu tempat**, `app/Sites/FinanceFeedHealth.php`: merah bila ada posting `rejected` atau `held`, atau
-  bila posting `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` (sehari; alasannya di kelas itu). Umurnya
+- **Dinilai di satu tempat**, `app/Sites/FinanceFeedHealth.php`: merah bila ada posting `rejected` atau `held`,
+  kiriman push yang gagal (hanya yang postingnya masih `pending` dan kliennya belum dicabut), atau bila posting
+  `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` (sehari; alasannya di kelas itu). Umurnya
   dihitung terhadap `server_time` laporan yang sama, jadi selisih jam server klien terhadap konsol tidak ikut.
 - **Tampil di rincian server klien** (`/situs/{id}`), bagian "Feed posting finance", dengan peringatan di atas
   halaman bila perlu perhatian. Rincian dan tindak lanjutnya tetap di layar Pantau posting pada aplikasi server itu.

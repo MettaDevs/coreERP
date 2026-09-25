@@ -1175,6 +1175,17 @@ uji_09d_ringkasan_feed() {
     feed 'belum ada posting dan pull: nol dan null, bukan null' \
         '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
 
+    # Angka push (TODO 14.6) ikut bila Core mengirim keduanya, diperiksa bentuknya seperti angka lain. Core yang
+    # hanya menyebut salah satunya tidak membuat laporan tanpa pasangannya: keduanya tidak ikut.
+    feed 'angka push dari Core ikut' \
+        '{"counts":{"held":1,"pending":3,"posted":120,"rejected":2,"manual":4},"oldest_pending_at":"2026-09-20T03:00:00Z","last_pulled_at":"2026-09-23T08:00:00Z","last_pushed_at":"2026-09-24T01:00:00Z","failed_pushes":2}' \
+        FAKE_DOCKER_RINGKASAN='{"counts":{"held":1,"pending":3,"posted":120,"rejected":2,"manual":4},"oldest_pending_at":"2026-09-20T03:00:00Z","last_pulled_at":"2026-09-23T08:00:00Z","last_pushed_at":"2026-09-24T01:00:00Z","failed_pushes":2}'
+    feed 'belum pernah ada push: null dan nol ikut' \
+        '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null,"failed_pushes":0}' \
+        FAKE_DOCKER_RINGKASAN='{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null,"failed_pushes":0}'
+    feed 'hanya satu kunci push dari Core: keduanya tidak ikut' "$sah" \
+        FAKE_DOCKER_RINGKASAN='{"counts":{"held":1,"pending":3,"posted":120,"rejected":2,"manual":4},"oldest_pending_at":"2026-09-20T03:00:00Z","last_pulled_at":"2026-09-23T08:00:00Z","failed_pushes":2}'
+
     # Yang tidak didapat dari Core dilaporkan null. Laporannya sendiri tetap diterima.
     feed 'rilis Core tanpa perintahnya: null' null FAKE_DOCKER_RINGKASAN_EXIT=1
     feed 'peringatan PHP di stdout sebelum JSON: null' null \
@@ -1196,6 +1207,9 @@ jumlah berupa teks~{"counts":{"held":"1","pending":0,"posted":0,"rejected":0,"ma
 waktu dengan zona lain~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00:00+07:00","last_pulled_at":null}
 waktu tanpa detik~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00Z","last_pulled_at":null}
 pull terakhir tidak disebut~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null}
+push gagal negatif~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null,"failed_pushes":-1}
+push gagal berupa teks~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":null,"failed_pushes":"2"}
+jam push dengan zona lain~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null,"last_pushed_at":"2026-09-24T08:00:00+07:00","failed_pushes":0}
 KASUS
 
     # Core yang macet tidak menahan laporan: batasnya habis, finance_feed null, dan laporannya tetap terkirim jauh

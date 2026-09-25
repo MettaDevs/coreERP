@@ -10,6 +10,7 @@ use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Finance\PostingFeedSummary;
+use App\Support\Finance\PostingPusher;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,8 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 0, 'pending' => 0, 'posted' => 0, 'rejected' => 0, 'manual' => 0],
             'oldest_pending_at' => null,
             'last_pulled_at' => null,
+            'last_pushed_at' => null,
+            'failed_pushes' => 0,
         ], $this->ringkasan());
     }
 
@@ -84,6 +87,8 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 1, 'pending' => 3, 'posted' => 1, 'rejected' => 2, 'manual' => 1],
             'oldest_pending_at' => '2026-09-19T22:15:00Z',
             'last_pulled_at' => '2026-09-23T08:30:00Z',
+            'last_pushed_at' => null,
+            'failed_pushes' => 0,
         ], $this->ringkasan());
     }
 
@@ -113,7 +118,44 @@ class FinanceFeedSummaryTest extends TestCase
             'counts' => ['held' => 0, 'pending' => 1, 'posted' => 1, 'rejected' => 0, 'manual' => 0],
             'oldest_pending_at' => '2026-09-22T05:30:00Z',
             'last_pulled_at' => '2026-09-23T06:45:10Z',
+            'last_pushed_at' => null,
+            'failed_pushes' => 0,
         ], $this->ringkasan());
+    }
+
+    /**
+     * Klien mode push (TODO 14.6), lewat pengirim yang sungguhan: kiriman yang diterima mengisi jam push terakhir,
+     * dan kiriman yang ditolak berhenti gagal. Yang gagal hanya dihitung selama postingnya masih `pending` dan
+     * kliennya belum dicabut — sesudah itu tidak ada lagi yang menunggu tangan manusia.
+     */
+    public function test_push_yang_diterima_dan_yang_gagal_tercermin_di_ringkasan(): void
+    {
+        $this->posting($this->le, FinancePosting::PENDING, '2026-09-22 01:00:00', '2026-09-10', 'AST-ACQ-A');
+        $this->posting($this->le, FinancePosting::PENDING, '2026-09-22 02:00:00', '2026-09-11', 'AST-ACQ-B');
+        $this->actingAs($this->owner)->postJson('/api/v1/integration-clients', [
+            'name' => 'Old-finance push', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook',
+            'scopes' => ['finance-postings.read', 'finance-postings.ack'], 'posting_type_prefixes' => ['asset.'], 'allowed_ips' => [],
+        ])->assertCreated();
+        Http::fake(['finance.example.test/*' => Http::sequence()
+            ->push(['message' => 'akun tidak dikenal'], 422)
+            ->push('', 200)]);
+
+        $this->travelTo(Carbon::parse('2026-09-23 06:45:10', 'UTC'));
+        $this->assertSame(['sent' => 1, 'failed' => 1], array_intersect_key(app(PostingPusher::class)->run(), ['sent' => 0, 'failed' => 0]));
+
+        $ringkasan = $this->ringkasan();
+        $this->assertSame('2026-09-23T06:45:10Z', $ringkasan['last_pushed_at']);
+        $this->assertSame(1, $ringkasan['failed_pushes']);
+
+        FinancePosting::query()->where('posting_id', 'AST-ACQ-A')->update(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_USER]);
+        $this->assertSame(0, $this->ringkasan()['failed_pushes'], 'Posting yang sudah ditandai manual tidak lagi menunggu.');
+
+        FinancePosting::query()->where('posting_id', 'AST-ACQ-A')->update(['status' => FinancePosting::PENDING, 'manual_reason' => null]);
+        $this->assertSame(1, $this->ringkasan()['failed_pushes']);
+        IntegrationClient::query()->update(['revoked_at' => now()]);
+        $ringkasan = $this->ringkasan();
+        $this->assertSame(0, $ringkasan['failed_pushes'], 'Klien yang dicabut tidak lagi menandai feed.');
+        $this->assertSame('2026-09-23T06:45:10Z', $ringkasan['last_pushed_at'], 'Push terakhir tetap push terakhir yang terjadi.');
     }
 
     /**

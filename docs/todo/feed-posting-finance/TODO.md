@@ -608,8 +608,13 @@ site di admin.erp menampilkan kesehatan feed tiap server klien.
   tidak menjawab "Tidak terbaca", dan feed yang belum dipakai "Belum dipakai".
 - [x] 14.5 Test di kedua sisi.
   `FinanceFeedSummaryTest` di Core, `FinanceFeedReportTest` di konsol, dan kasus 09d di `deploy/agent/tests/run-tests.sh`.
-- [ ] 14.6 Klien mode push belum terwakili: "Pull terakhir" hanya menghitung pull, jadi push yang gagal hanya terlihat
+- [x] 14.6 Klien mode push belum terwakili: "Pull terakhir" hanya menghitung pull, jadi push yang gagal hanya terlihat
   sebagai `pending` yang menua. Pertimbangkan jam kiriman push terakhir di ringkasan.
+  Keputusan pemilik produk 25 September 2026: push terakhir dan jumlah gagal. Ringkasan membawa `last_pushed_at` dan
+  `failed_pushes` (kiriman gagal yang postingnya masih `pending` dan kliennya belum dicabut); agen meneruskan keduanya
+  hanya bila Core mengirim keduanya, dan konsol menandai feed `push_failed`. Test di ketiga sisi:
+  `FinanceFeedSummaryTest::test_push_yang_diterima_dan_yang_gagal_tercermin_di_ringkasan` (lewat `PostingPusher`
+  sungguhan), `FinanceFeedReportTest`, dan kasus 09d `run-tests.sh`.
 
 ---
 

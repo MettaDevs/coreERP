@@ -619,7 +619,8 @@ lisensi_diwajibkan() {
 # Keluarannya tidak diteruskan apa adanya. Objeknya disusun ulang kunci demi kunci di sini, dengan bentuk yang
 # diperiksa: jumlah bilangan bulat tidak negatif, waktu UTC berakhiran Z. Kunci yang kelak ditambahkan Core —
 # nomor posting, nama akun, nilai uang — tidak ikut keluar dari server ini sebelum agen dan kontraknya sendiri
-# menyebutnya.
+# menyebutnya. `last_pushed_at` dan `failed_pushes` hanya ikut bila Core mengirim keduanya: rilis Core yang lebih
+# lama dari agen ini belum punya angka push, dan laporannya tetap sah tanpa keduanya.
 #
 # `null`, bukan objek kosong atau angka nol, bila ringkasannya tidak didapat: belum ada rilis yang terbukti sehat,
 # .env tidak ada, Core tidak menjawab dalam BATAS_RINGKASAN_DETIK, rilis Core belum punya perintahnya, atau
@@ -657,7 +658,10 @@ baca_ringkasan_feed() {
                 },
                 oldest_pending_at: (.oldest_pending_at | waktu),
                 last_pulled_at: (.last_pulled_at | waktu)
-              }' "$mentah" > "$tujuan" 2>/dev/null; then
+              }
+              + (if has("last_pushed_at") and has("failed_pushes")
+                 then {last_pushed_at: (.last_pushed_at | waktu), failed_pushes: (.failed_pushes | jumlah)}
+                 else {} end)' "$mentah" > "$tujuan" 2>/dev/null; then
         return 0
     fi
 
