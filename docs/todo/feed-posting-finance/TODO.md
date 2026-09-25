@@ -337,7 +337,7 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
 
 ---
 
-### 8. [~] Modul aset: setup posting
+### 8. [x] Modul aset: setup posting
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 1, 3 · **Selesai bila:** setiap group
 aset bisa dipetakan ke akun referensi, buku menentukan boleh di-post atau tidak lewat satu saklar,
@@ -366,14 +366,17 @@ dan dimensi lokasi mewarisi dari induk.
   - [x] 8.3.2 Pakai di `PembuatAset::dimensiLokasi` dan `MutasiAsetController::dimensiLokasi`.
   - [x] 8.3.3 Jaga dari siklus parent (batas kedalaman). Batas 32 tingkat dan kunjungan ulang; keduanya dilaporkan ke
     pemantauan kesalahan tanpa menggagalkan penerimaan atau mutasi.
-- [~] 8.4 Lebur `export_to_backoffice` ke `posting_layer` (K-15).
+- [x] 8.4 Lebur `export_to_backoffice` ke `posting_layer` (K-15).
   - [x] 8.4.1 Migration data: buku dengan `export_to_backoffice = false` dan layer bukan `none` → tinjau satu per satu. Buku pajak → `none`.
     Peninjauannya: saklar itu bawaannya mati sejak 12 Agustus karena bridge belum ada, jadi `false` tidak membawa
     keputusan untuk ditiru. Yang diubah hanya buku `tax`; buku `FISKAL` bawaan kini lahir sebagai `none`.
   - [x] 8.4.2 Hapus saklar dari UI (`ui/master/masters.ts`) dan dari `BukuPenyusutanController`. API menolaknya dengan
     422. Ekspor penyusutan lama kini membaca lapisan posting, dan pembalikannya diekspor hanya bila periode aslinya
     diekspor.
-  - [ ] 8.4.3 Kolom lama dibiarkan sampai rilis berikutnya (aturan N-1), lalu dihapus.
+  - [x] 8.4.3 Kolom lama dibiarkan sampai rilis berikutnya (aturan N-1), lalu dihapus.
+    Rilis 0.9.0 adalah rilis pertama tanpa pembaca kolom itu (belum dirakit per 25 September 2026); migration
+    `2026_09_25_100000_drop_export_to_backoffice_from_depreciation_books` membuangnya sesudahnya. Rilis yang
+    memuatnya hanya boleh dibatalkan ke 0.9.0 atau sesudahnya.
 - [x] 8.5 `app.yaml`: entry point, permission, privilege, dan duty posting group. Hapus entry point placeholder lama atau alihkan ke halaman baru. Kode kontrak lama jangan diganti nama.
   Entry point form lama kini membuka halaman baru; ditambah entry point API, izin `create`/`update`/`archive`,
   privilege `maintain`/`retire`, dan duty tersendiri `fixed-asset-posting-profiles.manage`.
