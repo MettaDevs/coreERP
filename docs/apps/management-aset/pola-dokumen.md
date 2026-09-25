@@ -68,7 +68,7 @@ Jangan menulis "delapan master data" atau "dua puluh sembilan reference". Angka 
 
 Tunjuk sumbernya:
 
-> Daftar master yang berlaku ada di `routes/api.php` pada array `$masters`.
+> Daftar master yang berlaku ada di `routes/api/master-data.php` pada array `$masters`.
 
 Hal yang sama berlaku untuk daftar kolom, daftar permission, dan versi paket.
 
