@@ -9,7 +9,7 @@ Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, atur
 - Spesifikasi **Integrasi · Finance** di portal `/docs` aplikasi Core, terbuka tanpa login — kontrak dan panduan untuk tim pembaca. Sumbernya `apps/core/contracts/internal/integrasi-finance.yaml`.
 
 ::: info Jenis yang sudah terbit
-Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9), dan `asset.opening_balance` untuk penerimaan saldo awal aset lama, bertanggal cutover (area 10). Sejak area 11, proses "Post penyusutan" menerbitkan `asset.depreciation` — satu jurnal ringkas per entitas legal, buku, dan periode — dan pembalikan periode yang sudah di-post menerbitkan `asset.depreciation_reversal`. Koreksi nilai perolehan (area 12) belum, begitu juga module lain. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
+Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali penerimaan aset diselesaikan (area 9), dan `asset.opening_balance` untuk penerimaan saldo awal aset lama, bertanggal cutover (area 10). Sejak area 11, proses "Post penyusutan" menerbitkan `asset.depreciation` — satu jurnal ringkas per entitas legal, buku, dan periode — dan pembalikan periode yang sudah di-post menerbitkan `asset.depreciation_reversal`. Sejak area 12, koreksi nilai perolehan aset yang belum disusutkan menerbitkan `asset.acquisition_adjustment` yang merujuk jurnal perolehannya. Module lain belum menerbitkan apa pun. Perbarui catatan ini bersama kolom **Tersedia** di kontrak (lihat [menambah jenis posting](#menambah-jenis-posting-dari-modul-lain)) setiap kali jenis baru benar-benar terbit.
 :::
 
 ```text
@@ -384,7 +384,7 @@ Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, seperti `modu
 - **`tenant_id`** dari `KonteksTenant::tenantId()`, tidak pernah dari permintaan.
 - **`posting_id` deterministik dari dokumen sumbernya**, misalnya kode singkat jenisnya ditambah id dokumen, seperti `AST-ACQ-…` pada contoh kontrak. Menyelesaikan dokumen yang sama dua kali harus menghasilkan `posting_id` yang sama, supaya idempotensi bekerja. Proses yang boleh dijalankan berulang untuk periode yang sama membutuhkan nomor urut proses di dalam `posting_id`, seperti rencana "Post penyusutan" (TODO 11.2.4). Paling panjang 120 karakter.
 - **Tanggal.** `posting_date` adalah tanggal akuntansi dari dokumen, bukan dari jam server. `document_date` tanggal di dokumen. `occurred_at` jam kejadian dengan offset zona waktu (K-21).
-- **`settlement_mode` dan `requires_vendor`.** Bila jurnal jenis ini bergantung pada kebijakan penyelesaian, baca `SetelanPostingFinance::modePenyelesaian()` pada tanggal dokumennya, dan kirim `requires_vendor: true` untuk pembelian dengan `direct_payable`. Penerbit tidak membaca setelan mode untuk posting baru; ia mempercayai module. Untuk koreksi dan pembalikan, kosongkan mode: penerbit mewarisinya dari posting asal.
+- **`settlement_mode` dan `requires_vendor`.** Bila jurnal jenis ini bergantung pada kebijakan penyelesaian, baca `SetelanPostingFinance::modePenyelesaian()` pada tanggal dokumennya, dan kirim `requires_vendor: true` untuk pembelian dengan `direct_payable`. Penerbit tidak membaca setelan mode untuk posting baru; ia mempercayai module. Untuk koreksi dan pembalikan, kosongkan mode: penerbit mewarisinya dari posting asal. Koreksi yang akun lawannya bergantung pada mode itu, seperti koreksi nilai perolehan aset, membaca mode posting asal dari `PenerbitPosting::status()` lalu mengirimnya — jangan menghitungnya lagi dari setelan, karena setelan dapat berubah sesudah posting asal terbit. Mode yang berbeda dari posting asal dilempar sebagai `PostingTidakSah`.
 - **Vendor** dari `DaftarVendor` milik entitas legal itu.
 - **`source_document`**: `module` berisi id module, `type`, `number`, `description`, `id`, dan `url` opsional. `url` adalah jalur layar dokumen itu di module, `/<id module>/<id entri menu>/…` (lihat [UI modul di dalam shell](27-ui-modul-dalam-shell.md)). `url` dan `id` tidak ikut `payload`; `url` hanya dipakai layar pantau untuk menautkan dokumennya.
 - **`lines[].account_id`** adalah id akun dari `DaftarAkun`, diambil dari pemetaan module — bukan nomor akun, karena nomor dapat berubah pada impor ulang (K-05). Kirim `null` bila pemetaannya belum ada: posting akan `held`, bukan dilempar.
@@ -405,7 +405,7 @@ Panggil `PenerbitPosting::terbitkan()` di dalam `DB::transaction` yang sama deng
 
 Satu hal yang mudah terlewat: untuk entitas legal yang feed-nya mati, atau dokumen bertanggal sebelum cutover, pratinjau menjawab `manual` **tanpa** masalah, karena cutover diperiksa sebelum pemetaan. Pratinjau tidak menunjukkan pemetaan yang kurang pada keadaan itu.
 
-`PenerbitPosting::status()` mengembalikan keadaan posting untuk ditampilkan di dokumen sumbernya, termasuk nomor voucher pembaca dan daftar masalahnya.
+`PenerbitPosting::status()` mengembalikan keadaan posting untuk ditampilkan di dokumen sumbernya, termasuk nomor voucher pembaca, daftar masalahnya, dan `settlement_mode` yang tercatat saat posting itu terbit.
 
 ### 5. Daftarkan jenisnya di kontrak
 
@@ -507,7 +507,6 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 ## Celah yang diketahui
 
-- **Baru empat jenis yang terbit.** Modul aset menerbitkan `asset.acquisition` dan `asset.opening_balance` dari penerimaan (area 9 dan 10), serta `asset.depreciation` dan `asset.depreciation_reversal` dari "Post penyusutan" dan pembalikannya (area 11). Koreksi nilai perolehan (area 12) belum; jenisnya masih *Belum* di kontrak.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PenerbitPosting::pratinjau()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.

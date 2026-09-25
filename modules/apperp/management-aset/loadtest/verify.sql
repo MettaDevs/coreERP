@@ -311,17 +311,36 @@ posting_perolehan_tanpa_penerimaan_selesai as (
           where p.tenant_id = f.tenant_id and case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id = f.posting_id and p.status = 'selesai'
       )
 ),
+koreksi_nilai as (
+    -- Jurnal koreksi nilai perolehan (area 12), satu baris per posting: `AST-ADJ-<id aset>-<urut>`.
+    -- ULID tidak memuat tanda hubung, jadi bagian ketiga dan keempat `posting_id` adalah id aset dan
+    -- nomor urutnya.
+    select k.tenant_id,
+           split_part(k.posting_id, '-', 3) as aset_id,
+           split_part(k.posting_id, '-', 4)::int as urut,
+           (k.input->'details'->'assets'->0->>'acquisition_value_before')::numeric as sebelum,
+           (k.input->'details'->'assets'->0->>'acquisition_value_after')::numeric as sesudah,
+           (k.input->'details'->'assets'->0->>'adjustment_amount')::numeric as selisih,
+           k.total_debit, k.adjusts_posting_id, k.settlement_mode
+    from finance_postings k
+    where k.posting_type = 'asset.acquisition_adjustment'
+      and k.source_module = 'management-aset'
+),
 posting_perolehan_tidak_sama_dengan_register as (
-    -- Debit posting = nilai aset di register + PPN baris yang dibulatkan ke presisi posting itu
-    -- (K-20). Register adalah pembagian nilai baris yang sudah bulat, jadi keduanya harus sama
-    -- persis; selisih satu sen pun berarti register dan buku besar berpisah jalan. Saldo awal
-    -- tidak ber-PPN, jadi debitnya tepat nilai register.
+    -- Debit posting = nilai perolehan asal aset di register + PPN baris yang dibulatkan ke presisi
+    -- posting itu (K-20). Register adalah pembagian nilai baris yang sudah bulat, jadi keduanya harus
+    -- sama persis; selisih satu sen pun berarti register dan buku besar berpisah jalan. Saldo awal
+    -- tidak ber-PPN, jadi debitnya tepat nilai register. Nilai asal = nilai register hari ini dikurangi
+    -- selisih setiap jurnal koreksinya (area 12); koreksi atas jurnal asal yang dicatat manual tidak
+    -- berjurnal (K-35), dan run uji beban tidak pernah membuatnya.
     select count(*) as n
     from finance_postings f
     join aset_tr_penerimaan_aset p on p.tenant_id = f.tenant_id and case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id = f.posting_id
     where f.posting_type in ('asset.acquisition', 'asset.opening_balance')
       and f.total_debit <> (
-          (select coalesce(sum(a.acquisition_value), 0) from aset_tr_aset a where a.penerimaan_aset_id = p.id)
+          (select coalesce(sum(a.acquisition_value - coalesce((
+               select sum(k.selisih) from koreksi_nilai k where k.tenant_id = a.tenant_id and k.aset_id = a.id
+           ), 0)), 0) from aset_tr_aset a where a.penerimaan_aset_id = p.id)
         + (select coalesce(sum(round(d.ppn_per_unit * d.jumlah, f.currency_decimals)), 0)
            from aset_tr_penerimaan_aset_details d where d.penerimaan_aset_id = p.id)
       )
@@ -386,6 +405,48 @@ pembalikan_penyusutan_tidak_mengikuti_asal as (
               or f.reverses_posting_id is distinct from o.posted_posting_id
               or f.total_debit <> o.amount
           ))
+),
+nilai_asal_terkoreksi as (
+    -- Aset yang punya jurnal koreksi, dengan jurnal perolehan asalnya: nilai aset itu di rincian jurnal
+    -- asal, dan mode yang tercatat di sana.
+    select a.tenant_id, a.id as aset_id, a.acquisition_value as register, f.posting_id as asal, f.settlement_mode,
+           (select (x->>'acquisition_value')::numeric from jsonb_array_elements(f.input->'details'->'assets') x
+            where x->>'asset_code' = a.kode limit 1) as awal
+    from aset_tr_aset a
+    join aset_tr_penerimaan_aset p on p.tenant_id = a.tenant_id and p.id = a.penerimaan_aset_id
+    join finance_postings f on f.tenant_id = a.tenant_id and f.posting_id = case p.cara_perolehan when 'saldo_awal' then 'AST-OPB-' else 'AST-ACQ-' end || p.id
+    where exists (select 1 from koreksi_nilai k where k.tenant_id = a.tenant_id and k.aset_id = a.id)
+),
+koreksi_nilai_rantai_putus as (
+    -- Tiap koreksi berangkat dari nilai sesudah koreksi sebelumnya — koreksi pertama dari nilai di
+    -- jurnal perolehan asalnya — dan jurnalnya sebesar selisih itu, merujuk jurnal asal dengan mode
+    -- yang sama (K-10, K-33). Dua koreksi serentak yang membaca nilai lama muncul di sini sebagai
+    -- "sebelum" yang tidak sama dengan "sesudah" pendahulunya.
+    select count(*) as n
+    from koreksi_nilai k
+    left join koreksi_nilai s on s.tenant_id = k.tenant_id and s.aset_id = k.aset_id and s.urut = k.urut - 1
+    left join nilai_asal_terkoreksi o on o.tenant_id = k.tenant_id and o.aset_id = k.aset_id
+    where k.sebelum is distinct from case when k.urut = 1 then o.awal else s.sesudah end
+       or k.selisih <> k.sesudah - k.sebelum
+       or k.total_debit <> abs(k.selisih)
+       or k.adjusts_posting_id is distinct from o.asal
+       or k.settlement_mode is distinct from o.settlement_mode
+),
+koreksi_nilai_tidak_sampai_register as (
+    -- Nilai sesudah koreksi terakhir, dan nilai asal ditambah seluruh selisihnya, sama dengan nilai
+    -- register hari ini. Koreksi yang mengubah register tanpa jurnal, atau jurnal tanpa perubahan
+    -- register, membuat buku besar dan register berpisah.
+    select count(*) as n
+    from nilai_asal_terkoreksi o
+    where o.register is distinct from (select k.sesudah from koreksi_nilai k where k.tenant_id = o.tenant_id and k.aset_id = o.aset_id order by k.urut desc limit 1)
+       or o.register is distinct from o.awal + (select sum(k.selisih) from koreksi_nilai k where k.tenant_id = o.tenant_id and k.aset_id = o.aset_id)
+),
+koreksi_nilai_nomor_bolong as (
+    -- Nomor urut koreksi satu aset 1, 2, 3, … tanpa lubang. Nomor ganda sudah ditolak indeks unik
+    -- `(tenant_id, posting_id)`; yang tersisa dijaga kunci baris aset.
+    select count(*) as n from (
+        select tenant_id, aset_id from koreksi_nilai group by 1, 2 having count(*) <> max(urut)
+    ) d
 ),
 aset_penerimaan_tidak_sesuai_jumlah as (
     select count(*) as n
@@ -463,6 +524,9 @@ union all select 'akumulasi jurnal saldo awal tidak sama dengan register', n fro
 union all select 'periode ditandai di-post tanpa posting berjenis benar', n from penyusutan_di_post_tanpa_posting
 union all select 'total posting penyusutan tidak sama dengan register', n from posting_penyusutan_tidak_sama_dengan_register
 union all select 'pembalikan penyusutan tidak mengikuti periode aslinya', n from pembalikan_penyusutan_tidak_mengikuti_asal
+union all select 'rantai koreksi nilai perolehan terputus atau tidak merujuk jurnal asalnya', n from koreksi_nilai_rantai_putus
+union all select 'koreksi nilai perolehan tidak sampai ke register', n from koreksi_nilai_tidak_sampai_register
+union all select 'nomor urut koreksi nilai perolehan bolong', n from koreksi_nilai_nomor_bolong
 union all select 'jumlah aset penerimaan tidak sama dengan jumlah unit barisnya', n from aset_penerimaan_tidak_sesuai_jumlah
 union all select 'posting group ganda untuk group dan tanggal yang sama', n from posting_group_ganda
 union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
@@ -484,6 +548,7 @@ union all select 'finance_postings asset.acquisition', count(*), count(distinct 
 union all select 'finance_postings asset.opening_balance', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.opening_balance'
 union all select 'finance_postings asset.depreciation', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.depreciation'
 union all select 'finance_postings asset.depreciation_reversal', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.depreciation_reversal'
+union all select 'finance_postings asset.acquisition_adjustment', count(*), count(distinct tenant_id) from finance_postings where posting_type = 'asset.acquisition_adjustment'
 union all select 'aset_tr_penyusutan_aset sudah di-post', count(*), count(distinct tenant_id) from aset_tr_penyusutan_aset where posted_posting_id is not null
 union all select 'aset_m_kondisi_aset', count(*), count(distinct tenant_id) from aset_m_kondisi_aset
 union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) from aset_m_pabrikan_aset

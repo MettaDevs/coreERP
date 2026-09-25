@@ -2,8 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
+use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -14,14 +16,19 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AtributAset
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
+use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustment;
+use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustmentFailed;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 class AsetController extends Controller
 {
     private const RESOURCE = 'aset';
+
+    private const VALUE_LOCKED = 'Nilai perolehan dan residu tidak dapat diubah setelah ada periode penyusutan. Balikkan periodenya terlebih dahulu.';
 
     public function index(Request $request): JsonResponse
     {
@@ -81,6 +88,11 @@ class AsetController extends Controller
             'nama' => ['sometimes', ...$rules['nama']],
             'jenis_aset_id' => ['sometimes', ...$rules['jenis_aset_id']],
             'acquisition_value' => ['sometimes', ...$rules['acquisition_value']],
+            // Koreksi nilai perolehan menerbitkan jurnal koreksi (TODO 12): alasannya ikut ke keterangan
+            // jurnal, dan tanggalnya hari koreksi dilakukan menurut jam pengguna (K-34, K-36). Keduanya
+            // baru wajib bila nilainya benar-benar berubah; lihat `adjustmentBlockers()`.
+            'reason' => ['nullable', 'string', 'max:250'],
+            'adjustment_date' => ['nullable', 'date_format:Y-m-d'],
             // Ditolak lebih awal dengan pesan yang menjelaskan alasannya, bukan diabaikan
             // diam-diam sehingga pengguna mengira group sudah berganti.
             'group_aset_id' => ['prohibited'],
@@ -92,71 +104,145 @@ class AsetController extends Controller
             'Aset tidak dapat menjadi induk dirinya sendiri.'
         );
 
-        $periods = DepreciationPeriod::query()
-            ->join('aset_tr_buku_aset as book', function ($join): void {
-                $join->on('book.id', '=', 'aset_tr_penyusutan_aset.buku_aset_id')->on('book.tenant_id', '=', 'aset_tr_penyusutan_aset.tenant_id');
-            })
-            ->where('book.aset_id', $aset->id)
-            ->exists();
+        $periods = $this->hasPeriods($aset->id);
         $touchesValue = array_key_exists('acquisition_value', $data) || array_key_exists('residual_value', $data);
         abort_if(
             $periods && $touchesValue,
             409,
-            'Nilai perolehan dan residu tidak dapat diubah setelah ada periode penyusutan. Balikkan periodenya terlebih dahulu.'
+            self::VALUE_LOCKED
         );
 
-        $aset = DB::transaction(function () use ($aset, $data, $tenantId, $periods, $touchesValue, $pembuat): Aset {
-            // Satu aset dapat dikoreksi dari beberapa instance API sekaligus. Kunci
-            // register aset lebih dulu agar penggantian baris atribut tidak saling
-            // menyelip di antara delete dan insert.
-            $asetTerkunci = Aset::query()
-                ->where('id', $aset->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        try {
+            [$aset, $koreksi] = DB::transaction(function () use ($aset, $data, $tenantId, $periods, $touchesValue, $pembuat): array {
+                // Satu aset dapat dikoreksi dari beberapa instance API sekaligus. Kunci
+                // register aset lebih dulu agar penggantian baris atribut tidak saling
+                // menyelip di antara delete dan insert — dan supaya nomor urut jurnal
+                // koreksinya tidak pernah dipakai dua kali.
+                $asetTerkunci = Aset::query()
+                    ->where('id', $aset->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            abort_unless(
-                StatusAset::bolehDikoreksi($asetTerkunci->lifecycle_state),
-                409,
-                'Aset yang sudah dilepas tidak dapat diubah.'
-            );
-
-            if (array_intersect(array_keys($data), ['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id']) !== []) {
-                $this->assertModelCombination(
-                    array_key_exists('jenis_aset_id', $data) ? $data['jenis_aset_id'] : $asetTerkunci->jenis_aset_id,
-                    array_key_exists('pabrikan_aset_id', $data) ? $data['pabrikan_aset_id'] : $asetTerkunci->pabrikan_aset_id,
-                    array_key_exists('model_aset_id', $data) ? $data['model_aset_id'] : $asetTerkunci->model_aset_id,
+                abort_unless(
+                    StatusAset::bolehDikoreksi($asetTerkunci->lifecycle_state),
+                    409,
+                    'Aset yang sudah dilepas tidak dapat diubah.'
                 );
-            }
 
-            $asetTerkunci->update(array_intersect_key($data, array_flip([
-                'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id',
-                'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value', 'keterangan',
-            ])));
+                // Selisih dihitung dari nilai yang terkunci, bukan dari yang dibaca sebelum transaksi:
+                // koreksi serentak kedua melihat nilai yang sudah dikoreksi yang pertama.
+                $sebelum = (string) $asetTerkunci->acquisition_value;
+                $koreksiNilai = array_key_exists('acquisition_value', $data)
+                    && ! BigDecimal::of((string) $data['acquisition_value'])->isEqualTo($sebelum);
+                if ($koreksiNilai && ($masalah = $this->adjustmentBlockers($asetTerkunci, $data)) !== []) {
+                    throw ValidationException::withMessages($masalah);
+                }
 
-            if ($touchesValue) {
-                $this->applyValueChange($asetTerkunci, $data);
-            }
-            // Tanggal mulai digunakan hanya boleh menggeser buku yang belum menyusut.
-            // Buku yang sudah berjalan memakai tanggal itu sebagai dasar periode yang
-            // terlanjur final, jadi menggesernya membuat riwayatnya tidak konsisten.
-            if (array_key_exists('placed_in_service_on', $data) && ! $periods) {
-                $this->recalculateStartDates($asetTerkunci, $tenantId);
-            }
-            // Mengganti jenis aset mengganti definisi atributnya, jadi nilainya wajib
-            // dikirim ulang: nilai lama milik jenis lama tidak dapat dipercaya lagi.
-            if (array_key_exists('atribut', $data) || array_key_exists('jenis_aset_id', $data)) {
-                AtributAset::query()->where('aset_id', $asetTerkunci->id)->delete();
-                $pembuat->simpanAtribut($asetTerkunci, ['jenis_aset_id' => $asetTerkunci->jenis_aset_id, 'atribut' => $data['atribut'] ?? []], $tenantId);
-            }
+                if (array_intersect(array_keys($data), ['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id']) !== []) {
+                    $this->assertModelCombination(
+                        array_key_exists('jenis_aset_id', $data) ? $data['jenis_aset_id'] : $asetTerkunci->jenis_aset_id,
+                        array_key_exists('pabrikan_aset_id', $data) ? $data['pabrikan_aset_id'] : $asetTerkunci->pabrikan_aset_id,
+                        array_key_exists('model_aset_id', $data) ? $data['model_aset_id'] : $asetTerkunci->model_aset_id,
+                    );
+                }
 
-            return $asetTerkunci;
-        });
+                $asetTerkunci->update(array_intersect_key($data, array_flip([
+                    'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id',
+                    'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value', 'keterangan',
+                ])));
+
+                if ($touchesValue) {
+                    $this->applyValueChange($asetTerkunci, $data);
+                }
+                // Tanggal mulai digunakan hanya boleh menggeser buku yang belum menyusut.
+                // Buku yang sudah berjalan memakai tanggal itu sebagai dasar periode yang
+                // terlanjur final, jadi menggesernya membuat riwayatnya tidak konsisten.
+                if (array_key_exists('placed_in_service_on', $data) && ! $periods) {
+                    $this->recalculateStartDates($asetTerkunci, $tenantId);
+                }
+                // Mengganti jenis aset mengganti definisi atributnya, jadi nilainya wajib
+                // dikirim ulang: nilai lama milik jenis lama tidak dapat dipercaya lagi.
+                if (array_key_exists('atribut', $data) || array_key_exists('jenis_aset_id', $data)) {
+                    AtributAset::query()->where('aset_id', $asetTerkunci->id)->delete();
+                    $pembuat->simpanAtribut($asetTerkunci, ['jenis_aset_id' => $asetTerkunci->jenis_aset_id, 'atribut' => $data['atribut'] ?? []], $tenantId);
+                }
+
+                // Jurnal koreksinya terbit di transaksi yang sama: nilai yang gagal dijurnal tidak berubah,
+                // dan nilai yang berubah pasti membawa jurnalnya — atau catatan kenapa tidak (K-35).
+                $koreksi = $koreksiNilai
+                    ? app(AcquisitionAdjustment::class)->publish($asetTerkunci, $sebelum, (string) $data['acquisition_value'], (string) $data['adjustment_date'], trim((string) $data['reason']))
+                    : null;
+
+                return [$asetTerkunci, $koreksi];
+            });
+        } catch (AcquisitionAdjustmentFailed $kegagalan) {
+            return $this->adjustmentFailed($kegagalan);
+        }
 
         $aset->refresh();
 
         return response()->json(['data' => [
             ...$this->present($aset),
             'atribut' => $this->attributesOf($aset->id),
+            'adjustment' => $koreksi === null ? null : [
+                'note' => $koreksi['note'],
+                'posting' => $koreksi['posting'] === null ? null : [
+                    'posting_id' => $koreksi['posting']['posting_id'],
+                    'status' => $koreksi['posting']['status'],
+                ],
+            ],
+        ]]);
+    }
+
+    /**
+     * Pratinjau koreksi nilai perolehan (TODO 12, K-36): selisihnya, jurnal koreksi yang akan terbit
+     * beserta masalahnya, atau catatan kenapa tidak ada jurnal. Penghalangnya sama dengan yang ditegakkan
+     * saat menyimpan, kecuali alasan yang boleh masih kosong selama pengguna mengetik. Tidak menyimpan apa pun.
+     */
+    public function adjustmentPreview(Request $request, string $id): JsonResponse
+    {
+        $this->requirePermission($request, 'update');
+        $aset = app(OrganizationScope::class)->asetQuery(Aset::query(), $request)->findOrFail($id);
+        $rules = $this->rules($this->tenantId($request));
+        $data = $request->validate([
+            'acquisition_value' => $rules['acquisition_value'],
+            'adjustment_date' => ['nullable', 'date_format:Y-m-d'],
+            'reason' => ['nullable', 'string', 'max:250'],
+        ]);
+        $sebelum = (string) $aset->acquisition_value;
+        $sesudah = (string) $data['acquisition_value'];
+
+        $masalah = match (true) {
+            ! StatusAset::bolehDikoreksi($aset->lifecycle_state) => ['acquisition_value' => 'Aset yang sudah dilepas tidak dapat diubah.'],
+            $this->hasPeriods($aset->id) => ['acquisition_value' => self::VALUE_LOCKED],
+            default => array_diff_key($this->adjustmentBlockers($aset, $data), ['reason' => true]),
+        };
+        try {
+            $hasil = $masalah === [] && ! BigDecimal::of($sesudah)->isEqualTo($sebelum)
+                ? app(AcquisitionAdjustment::class)->preview($aset, $sesudah, (string) $data['adjustment_date'], trim((string) ($data['reason'] ?? '')))
+                : ['difference' => (string) BigDecimal::of($sesudah)->minus($sebelum), 'note' => null, 'posting' => null];
+        } catch (AcquisitionAdjustmentFailed $kegagalan) {
+            return $this->adjustmentFailed($kegagalan);
+        }
+        $posting = $hasil['posting'];
+        $payload = $posting['payload'] ?? null;
+
+        return response()->json(['data' => [
+            'before' => $sebelum,
+            'after' => $sesudah,
+            'difference' => $hasil['difference'],
+            'currency_code' => $aset->currency_code,
+            'blockers' => array_map(static fn (string $field, string $message): array => ['field' => $field, 'message' => $message], array_keys($masalah), array_values($masalah)),
+            'note' => $hasil['note'],
+            'posting' => $posting === null ? null : [
+                'posting_id' => $posting['posting_id'],
+                'status' => $posting['status'],
+                'posting_date' => $payload['posting_date'] ?? null,
+                'currency' => $payload['currency'] ?? null,
+                'total' => $payload['totals']['debit'] ?? null,
+                'lines' => PostingCheckLines::from($payload),
+                'problems' => $posting['problems'],
+            ],
         ]]);
     }
 
@@ -200,8 +286,10 @@ class AsetController extends Controller
             'induk_aset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'serial_number' => ['nullable', 'string', 'max:150'], 'model_number' => ['nullable', 'string', 'max:150'],
             'placed_in_service_on' => ['nullable', 'date'],
-            'acquisition_value' => ['required', 'numeric', 'min:0'],
-            'residual_value' => ['nullable', 'numeric', 'min:0'],
+            // Kolomnya berpresisi dua desimal: nilai yang lebih halus akan dibulatkan database tanpa kabar,
+            // dan register tidak lagi sama dengan yang diketik pengguna.
+            'acquisition_value' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
+            'residual_value' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
             'keterangan' => ['nullable', 'string', 'max:2000'],
             // Bentuk atribut divalidasi di sini; isinya divalidasi terhadap definisi
             // milik jenis aset, yang hanya diketahui saat berjalan.
@@ -268,6 +356,49 @@ class AsetController extends Controller
                 'model_aset_id' => 'Model ini hanya dapat dipakai pada jenis aset yang sudah dikaitkan dengannya.',
             ]);
         }
+    }
+
+    /** Aset ini sudah punya periode penyusutan di buku mana pun. */
+    private function hasPeriods(string $asetId): bool
+    {
+        return DepreciationPeriod::query()
+            ->join('aset_tr_buku_aset as book', function ($join): void {
+                $join->on('book.id', '=', 'aset_tr_penyusutan_aset.buku_aset_id')->on('book.tenant_id', '=', 'aset_tr_penyusutan_aset.tenant_id');
+            })
+            ->where('book.aset_id', $asetId)
+            ->exists();
+    }
+
+    /**
+     * Yang menahan koreksi nilai perolehan, berkunci field; kosong berarti boleh.
+     *
+     * Alasan wajib karena ikut ke keterangan jurnal koreksi (K-36). Tanggalnya hari koreksi dilakukan
+     * menurut jam pengguna (K-34): layar mengirim tanggal lokalnya sendiri, dan server hanya menerima
+     * hari ini plus-minus satu hari. Selisih itu menampung zona waktu mana pun tanpa membuka jalan untuk
+     * memundurkan tanggal jurnal.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function adjustmentBlockers(Aset $aset, array $data): array
+    {
+        $masalah = [];
+        if (trim((string) ($data['reason'] ?? '')) === '') {
+            $masalah['reason'] = 'Tulis alasan koreksi nilai perolehan. Alasannya ikut ke keterangan jurnal koreksi di aplikasi finance.';
+        }
+        $tanggal = $data['adjustment_date'] ?? null;
+        if (! is_string($tanggal) || $tanggal === '') {
+            $masalah['adjustment_date'] = 'Tanggal koreksi belum terkirim. Muat ulang halaman, lalu simpan lagi.';
+        } elseif (abs(Carbon::parse($tanggal)->startOfDay()->diffInDays(now()->startOfDay(), false)) > 1) {
+            $masalah['adjustment_date'] = 'Tanggal koreksi harus tanggal hari ini: jurnal koreksi masuk ke periode yang sedang berjalan.';
+        }
+
+        return $masalah + app(AcquisitionAdjustment::class)->blockers($aset, (string) $data['acquisition_value']);
+    }
+
+    private function adjustmentFailed(AcquisitionAdjustmentFailed $failure): JsonResponse
+    {
+        return response()->json(['error' => ['code' => 'posting_failed', 'message' => $failure->getMessage()]], 500);
     }
 
     private function requirePermission(Request $request, string $action): void

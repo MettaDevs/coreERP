@@ -32,6 +32,24 @@
     - Lifecycle aset
     operationId: updateAset
     summary: Mengoreksi data aset; group tidak dapat diganti dan nilai perolehan terkunci setelah ada periode penyusutan
+    description: |
+      Field yang tidak dikirim tidak berubah. `acquisition_value` dan `residual_value` paling banyak dua
+      desimal, seperti kolom register-nya.
+
+      **Koreksi nilai perolehan** (feed posting finance, area 12). Bila `acquisition_value` berbeda dari
+      nilai sekarang, `reason` wajib (maks. 250 karakter, ikut ke keterangan jurnal) dan
+      `adjustment_date` wajib: tanggal hari koreksi dilakukan menurut jam pengguna (`Y-m-d`), yang hanya
+      diterima bila berjarak paling jauh satu hari dari tanggal server. Selisihnya terbit sebagai
+      `asset.acquisition_adjustment` (`AST-ADJ-<id aset>-<nomor urut>`) di transaksi yang sama, merujuk
+      jurnal perolehan aset itu lewat `adjusts_posting_id` dan memakai akun lawan jurnal itu: hutang
+      atau perantara menurut mode yang tercatat di jurnal asal, lawan hibah, atau penyeimbang saldo awal.
+      Selisih yang lebih halus dari presisi mata uang ditolak 422.
+
+      Jawaban membawa `adjustment`: `null` bila nilai perolehan tidak berubah, atau
+      `{note, posting}`. `posting` berisi `{posting_id, status}` jurnal koreksi yang terbit; `null`
+      bersama `note` yang menjelaskan sebabnya bila aset tidak punya jurnal perolehan, atau bila jurnal
+      perolehannya dicatat manual — koreksinya juga dicatat manual di aplikasi finance, dan register tetap
+      berubah.
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:
@@ -45,6 +63,53 @@
         description: Aset sudah dilepas, atau nilainya terkunci oleh periode penyusutan
       '422':
         $ref: '#/components/responses/ValidationError'
+      '500':
+        description: Jurnal koreksi gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); tidak ada yang berubah
+/api/v1/aset/{id}/pratinjau-koreksi:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: previewAsetAcquisitionAdjustment
+    summary: Pratinjau jurnal koreksi nilai perolehan sebelum disimpan
+    description: |
+      Tanpa menyimpan apa pun. Butuh izin `management-aset.aset.update`. `data` berisi `before`,
+      `after`, `difference`, `currency_code`, `blockers` (daftar `{field, message}` — aset sudah dilepas,
+      sudah ada periode penyusutan, tanggal koreksi di luar hari ini, atau selisih lebih halus dari
+      presisi), `note` (kenapa tidak ada jurnal, bila begitu), dan `posting`: jurnal koreksi yang akan
+      terbit `{posting_id, status, posting_date, currency, total, lines, problems}`, atau `null`. Alasan
+      yang masih kosong tidak menjadi penghalang di sini; ia baru diwajibkan saat menyimpan.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: acquisition_value
+      in: query
+      required: true
+      schema:
+        type: number
+        minimum: 0
+    - name: adjustment_date
+      in: query
+      required: false
+      description: Tanggal hari ini menurut jam pengguna.
+      schema:
+        type: string
+        format: date
+    - name: reason
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 250
+    responses:
+      '200':
+        description: Pratinjau koreksi
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '500':
+        description: Jurnal koreksi tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
 /api/v1/aset/{id}/history:
   get:
     tags:

@@ -206,7 +206,7 @@ class SiklusHidupAsetTest extends TestCase
         // Sebelum ada periode, koreksi nilai ikut menyesuaikan buku asetnya.
         $lain = $this->bookedAset();
         $asetLain = (string) DB::table('aset_tr_buku_aset')->where('id', $lain)->value('aset_id');
-        $this->correct($asetLain, ['acquisition_value' => 2_400_000])->assertOk();
+        $this->correct($asetLain, ['acquisition_value' => 2_400_000, 'reason' => 'Faktur ternyata 2.400.000', 'adjustment_date' => now()->toDateString()])->assertOk();
         $this->assertSame(2_400_000.0, (float) DB::table('aset_tr_buku_aset')->where('id', $lain)->value('net_book_value'));
     }
 

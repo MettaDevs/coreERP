@@ -222,7 +222,7 @@
       `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
       keadaan jurnalnya di feed posting finance sesudah diselesaikan — jurnal perolehan, atau
       jurnal saldo awal untuk `cara_perolehan` `saldo_awal` —
-      `{posting_id, status, external_reference, reason_code, reason, acknowledged_at, problems}`
+      `{posting_id, status, settlement_mode, external_reference, reason_code, reason, acknowledged_at, problems}`
       — dan `null` selama masih draf atau bila penerimaannya bernilai nol.
     parameters:
     - $ref: '#/components/parameters/RecordId'

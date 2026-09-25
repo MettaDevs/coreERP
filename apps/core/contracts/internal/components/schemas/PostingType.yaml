@@ -8,7 +8,7 @@ description: |
   | Nilai | Terbit saat | Tersedia |
   | --- | --- | --- |
   | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
-  | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
+  | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Sudah |
   | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
   | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
   | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |

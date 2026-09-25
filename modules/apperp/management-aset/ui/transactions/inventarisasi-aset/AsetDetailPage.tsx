@@ -18,6 +18,12 @@ import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
+import {
+    AcquisitionAdjustmentPreview,
+    pesanKoreksi,
+    tanggalHariIni,
+} from './AcquisitionAdjustmentPreview';
+import type { HasilKoreksi } from './AcquisitionAdjustmentPreview';
 import type { Aset, RincianAset, Context, Placement } from './aset';
 import {
     CLASSIFICATION,
@@ -82,8 +88,16 @@ export default function AsetDetailPage({
     >({});
     const [placements, setPlacements] = useState<Placement[]>([]);
     const [aset, setAset] = useState<Aset[]>([]);
+    const [alasanKoreksi, setAlasanKoreksi] = useState('');
 
     const readOnly = mode === 'view';
+    // Nilai perolehan yang berubah menerbitkan jurnal koreksi (TODO 12): alasannya wajib, dan
+    // pratinjau jurnalnya tampil sebelum disimpan (K-36).
+    const nilaiBerubah =
+        !readOnly &&
+        detail !== null &&
+        values.acquisition_value.trim() !== '' &&
+        Number(values.acquisition_value) !== Number(detail.acquisition_value);
     const typeId = String(references.jenis_aset_id ?? '');
     const groupId = String(references.group_aset_id ?? '');
     const attributes =
@@ -255,25 +269,37 @@ export default function AsetDetailPage({
         setMenyimpan(true);
 
         try {
-            await api(`/aset/${asetId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    ...Object.fromEntries(
-                        EDITABLE.map((field) => [
-                            field.name,
-                            payloadValue(field, references[field.name]),
-                        ]),
-                    ),
-                    nama: values.nama,
-                    induk_aset_id: parentAsetId || null,
-                    serial_number: values.serial_number || null,
-                    model_number: values.model_number || null,
-                    placed_in_service_on: values.placed_in_service_on || null,
-                    keterangan: values.keterangan || null,
-                    atribut: attributePayload(),
-                }),
-            });
-            toast.success('Koreksi aset disimpan.');
+            const jawab = await api<{ data: { adjustment: HasilKoreksi } }>(
+                `/aset/${asetId}`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        ...Object.fromEntries(
+                            EDITABLE.map((field) => [
+                                field.name,
+                                payloadValue(field, references[field.name]),
+                            ]),
+                        ),
+                        nama: values.nama,
+                        induk_aset_id: parentAsetId || null,
+                        serial_number: values.serial_number || null,
+                        model_number: values.model_number || null,
+                        placed_in_service_on:
+                            values.placed_in_service_on || null,
+                        keterangan: values.keterangan || null,
+                        atribut: attributePayload(),
+                        // Hanya dikirim bila berubah: nilai yang sama tidak menerbitkan apa pun.
+                        ...(nilaiBerubah
+                            ? {
+                                  acquisition_value: values.acquisition_value,
+                                  reason: alasanKoreksi,
+                                  adjustment_date: tanggalHariIni(),
+                              }
+                            : {}),
+                    }),
+                },
+            );
+            toast.success(pesanKoreksi(jawab.data.adjustment));
             bukaAset(String(asetId));
         } catch (caught) {
             toast.error(errorMessage(caught, 'Koreksi belum dapat disimpan.'));
@@ -389,7 +415,10 @@ export default function AsetDetailPage({
                         <Button
                             type="button"
                             onClick={() => void simpan()}
-                            disabled={menyimpan}
+                            disabled={
+                                menyimpan ||
+                                (nilaiBerubah && !alasanKoreksi.trim())
+                            }
                         >
                             {menyimpan ? 'Menyimpan…' : 'Simpan koreksi'}
                         </Button>
@@ -486,10 +515,10 @@ export default function AsetDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                {/* Nilai perolehan dan tanggal perolehan hanya diisi saat
-                                    penerimaan: mengubahnya sesudah buku punya periode
-                                    berjalan ditolak server, dan menampilkannya sebagai
-                                    isian pada koreksi hanya mengundang penolakan itu. */}
+                                {/* Tanggal perolehan milik dokumen penerimaan dan tidak dikoreksi
+                                    di sini. Nilai perolehan boleh dikoreksi selama belum ada
+                                    periode penyusutan; koreksinya menerbitkan jurnal koreksi ke
+                                    aplikasi finance (TODO 12). */}
                                 {textField('acquired_on', 'Tanggal perolehan', {
                                     type: 'date',
                                     readOnly: true,
@@ -513,15 +542,38 @@ export default function AsetDetailPage({
                                         perolehan.
                                     </FieldDescription>
                                 </Field>
-                                {textField(
-                                    'acquisition_value',
-                                    'Nilai perolehan',
-                                    {
-                                        type: 'number',
-                                        min: '0',
-                                        step: '0.01',
-                                        readOnly: true,
-                                    },
+                                <Field>
+                                    <Input
+                                        label="Nilai perolehan"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        readOnly={readOnly}
+                                        value={values.acquisition_value}
+                                        onChange={(event) =>
+                                            setValue(
+                                                'acquisition_value',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    {!readOnly && (
+                                        <FieldDescription>
+                                            Mengubahnya menerbitkan jurnal
+                                            koreksi ke aplikasi finance. Hanya
+                                            dapat diubah sebelum ada periode
+                                            penyusutan.
+                                        </FieldDescription>
+                                    )}
+                                </Field>
+                                {nilaiBerubah && asetId && (
+                                    <AcquisitionAdjustmentPreview
+                                        asetId={asetId}
+                                        after={values.acquisition_value}
+                                        currencyCode={values.currency_code}
+                                        reason={alasanKoreksi}
+                                        onReasonChange={setAlasanKoreksi}
+                                    />
                                 )}
                                 {textField('currency_code', 'Mata uang', {
                                     maxLength: 3,
@@ -548,10 +600,9 @@ export default function AsetDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                // Sesudah aset diterima, penempatan berpindah
-                                lewat // dokumen mutasi — bukan lewat koreksi.
-                                Yang tampil di // sini keadaan sekarang, dan
-                                namanya, bukan idnya.
+                                {/* Sesudah aset diterima, penempatan berpindah lewat
+                                    dokumen mutasi — bukan lewat koreksi. Yang tampil di
+                                    sini keadaan sekarang, dan namanya, bukan idnya. */}
                                 <dl className="grid gap-3 sm:grid-cols-2">
                                     {[
                                         [

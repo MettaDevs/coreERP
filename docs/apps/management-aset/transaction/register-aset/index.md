@@ -126,7 +126,8 @@ Semuanya di bawah `/api/v1`:
 | `GET /penerimaan-aset/impor-saldo-awal/templat` | Baris judul templat CSV impor saldo awal | `penerimaan-aset.create` |
 | `PUT /penerimaan-aset/{id}/aset` | Mengisi nomor seri seluruh aset dokumen sekaligus | `aset.update` |
 | `GET /aset/{id}` | Detail aset lengkap dengan nilai atribut dan bukunya | `aset.read` |
-| `PATCH /aset/{id}` | Koreksi data aset | `aset.update` |
+| `PATCH /aset/{id}` | Koreksi data aset; koreksi nilai perolehan juga menerbitkan jurnal koreksinya | `aset.update` |
+| `GET /aset/{id}/pratinjau-koreksi` | Selisih dan jurnal koreksi nilai perolehan yang akan terbit, beserta yang menahannya | `aset.update` |
 | `GET /aset/{id}/history` | Riwayat penempatan dan mutasi | `aset.read` |
 | `POST /mutasi-aset/{id}/selesaikan` | Memindahkan aset ke lokasi atau unit lain | `aset.mutate` |
 
@@ -327,13 +328,29 @@ Untuk memindahkan banyak aset sekaligus, **Impor saldo awal** di daftar penerima
 
 Berkas diperiksa lebih dulu. Pratinjaunya menyebut draf yang akan lahir — satu per tanggal perolehan, tanggal siap pakai, dan lokasi — atau baris yang ditolak beserta nomor baris dan alasannya; setiap draf melewati aturan yang sama persis dengan layar. Draf baru dibuat setelah pratinjaunya bersih, semuanya atau tidak sama sekali, dan tetap draf: jurnal saldo awalnya terbit saat tiap draf diselesaikan.
 
+## Koreksi nilai perolehan
+
+Nilai perolehan aset yang belum disusutkan dapat dikoreksi dari layar detail aset, misalnya karena fakturnya ternyata 510 juta padahal tercatat 500 juta. Menyimpannya menerbitkan jurnal koreksi `asset.acquisition_adjustment` ke [feed posting finance](/dev/34-feed-posting-finance) **di transaksi yang sama** (`Services/AcquisitionAdjustment`, TODO 12): nilai yang gagal dijurnal tidak berubah, dan nilai yang berubah pasti membawa jurnalnya — atau sebab kenapa tidak ada.
+
+| Baris | Akun dari posting group | Nilai naik | Nilai turun |
+| --- | --- | --- | --- |
+| Harga perolehan | Harga perolehan | Debit selisih | Kredit selisih |
+| Lawan jurnal asal | Lawan hutang atau perantara menurut mode jurnal perolehannya, lawan hibah, atau penyeimbang saldo awal | Kredit selisih | Debit selisih |
+
+- **Akun lawannya mengikuti jurnal perolehan asalnya** (K-33), dan untuk pembelian modenya juga. Mode dibaca dari posting asal, bukan dari setelan hari ini: aset yang dibeli saat entitasnya `direct_payable` tetap dikoreksi ke hutang walaupun entitas itu kini `clearing` (K-10). Koreksi pembelian `direct_payable` membawa vendor jurnal asalnya: nilai naik berarti tagihan tambahan, nilai turun nota kredit.
+- **Bertanggal hari koreksi**, bukan tanggal perolehan (K-34): koreksi masuk ke periode yang masih terbuka. Layar mengirim tanggal lokal penggunanya, dan server hanya menerima hari ini plus-minus satu hari.
+- **Satu posting per koreksi**, `AST-ADJ-<id aset>-<nomor urut koreksi>`, dengan `adjusts_posting_id` menunjuk `AST-ACQ-…` atau `AST-OPB-…` dan dimensi aset itu saat dikoreksi. Baris asetnya dikunci selama koreksi, jadi dua koreksi serentak tidak pernah memakai nomor urut yang sama, dan yang kedua menghitung selisihnya dari nilai yang sudah dikoreksi yang pertama.
+- **Tanpa posting, register tetap berubah** (K-35), bila jurnal perolehannya dicatat manual — bertanggal sebelum cutover atau terbit saat feed mati — atau aset itu tidak punya jurnal perolehan sama sekali. Layar menyebut sebabnya.
+
+Sebelum disimpan, layar menampilkan jurnal koreksinya beserta masalahnya (`GET /aset/{id}/pratinjau-koreksi`, K-36), dan **alasan koreksi wajib**: alasannya ikut ke keterangan jurnal (`source_document.description` dan `details.reason`). Yang menolak koreksi: aset yang sudah punya periode penyusutan (409, seperti sebelumnya), aset yang sudah dilepas, alasan kosong, tanggal selain hari ini, nilai dengan lebih dari dua desimal, dan selisih yang lebih halus dari presisi mata uangnya. Pemetaan akun yang kosong tidak menolak: jurnalnya terbit `held` dan koreksinya tetap tersimpan (K-18).
+
 ## Aturan yang dijaga, dan alasannya
 
 **Group tidak bisa diganti setelah aset dibuat.** Buku penyusutan sudah terbentuk dari matriks group × buku saat penerimaan. Mengganti group berarti bukunya salah tanpa ada yang menyadari. Permintaan yang mencoba mengubahnya ditolak dengan pesan yang menjelaskan alasannya.
 
 **Nama aset wajib, sedangkan kode aset adalah identitas sistem.** Kode diterbitkan Core dan stabil sebagai referensi dokumen. Nama menjelaskan benda yang dilihat petugas di lapangan, sehingga daftar aset dan pencarian tidak memaksa pengguna menghafal kode atau nomor seri.
 
-**Nilai perolehan tidak bisa diubah setelah ada periode penyusutan.** Periode yang sudah jalan dihitung dari nilai itu. Kalau memang harus diubah, periodenya dibalik dulu di modul penyusutan.
+**Nilai perolehan tidak bisa diubah setelah ada periode penyusutan.** Periode yang sudah jalan dihitung dari nilai itu. Kalau memang harus diubah, periodenya dibalik dulu di modul penyusutan. Sebelum itu, mengubahnya menerbitkan jurnal koreksi (lihat [Koreksi nilai perolehan](#koreksi-nilai-perolehan)).
 
 **Tanggal mulai dipakai hanya bisa digeser kalau belum ada penyusutan.** Alasannya sama.
 
@@ -376,7 +393,9 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 
 | Berkas | Isinya |
 | --- | --- |
-| `src/Http/Controllers/transaksi/InventarisasiAset/AssetController.php` | Register aset, koreksi, dan history |
+| `src/Http/Controllers/transaksi/InventarisasiAset/AsetController.php` | Register aset, koreksi, pratinjau koreksi nilai, dan history |
+| `src/Services/AcquisitionAdjustment.php` | Jurnal koreksi nilai perolehan |
+| `ui/transactions/inventarisasi-aset/AcquisitionAdjustmentPreview.tsx` | Pratinjau dan alasan koreksi nilai di detail aset |
 | `src/Http/Controllers/transaksi/MutasiAset/MutasiAsetController.php` | Dokumen mutasi dan penyelesaian serah terima |
 | `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
 | `src/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |

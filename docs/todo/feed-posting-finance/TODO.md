@@ -512,13 +512,28 @@ penyusutan), K-32 (nilai lebih halus dari presisi menahan proses).
 sebelum ada penyusutan menerbitkan `asset.acquisition_adjustment` dengan mode yang diwarisi dari
 posting perolehan.
 
-- [ ] 12.1 `AsetController::applyValueChange` menerbitkan posting selisih, dengan `adjusts_posting_id` = posting perolehan aset itu.
-- [ ] 12.2 Mode diambil dari posting asal, bukan dari setelan hari ini.
-- [ ] 12.3 Selisih negatif menghasilkan jurnal arah sebaliknya.
-- [ ] 12.4 Test.
-  - [ ] 12.4.1 500 → 510 menghasilkan Dr aset 10 / Cr hutang 10.
-  - [ ] 12.4.2 Mode diganti setelah perolehan → koreksi tetap mengikuti mode asal.
-  - [ ] 12.4.3 Aset yang sudah disusutkan tetap ditolak (409), seperti sekarang.
+Keputusan pemilik produk, 25 September 2026: K-33 (akun lawan jurnal asal, termasuk hibah dan saldo
+awal), K-34 (bertanggal hari koreksi), K-35 (jurnal asal manual → koreksi manual), K-36 (pratinjau dan
+alasan wajib).
+
+- [x] 12.1 `AsetController::applyValueChange` menerbitkan posting selisih, dengan `adjusts_posting_id` = posting perolehan aset itu.
+  Terbit dari `AsetController::update` lewat `Services/AcquisitionAdjustment`, di transaksi yang sama dengan
+  `applyValueChange` dan sesudah baris asetnya dikunci. `AST-ADJ-<id aset>-<nomor urut koreksi>`, merujuk
+  `AST-ACQ-…` atau `AST-OPB-…`; satu aset per posting, dengan dimensi aset itu saat dikoreksi.
+- [x] 12.2 Mode diambil dari posting asal, bukan dari setelan hari ini.
+  `PenerbitPosting::status()` kini ikut mengembalikan `settlement_mode` yang tercatat saat terbit.
+- [x] 12.3 Selisih negatif menghasilkan jurnal arah sebaliknya.
+- [x] 12.4 Test (`AcquisitionAdjustmentTest`).
+  - [x] 12.4.1 500 → 510 menghasilkan Dr aset 10 / Cr hutang 10.
+  - [x] 12.4.2 Mode diganti setelah perolehan → koreksi tetap mengikuti mode asal.
+  - [x] 12.4.3 Aset yang sudah disusutkan tetap ditolak (409), seperti sekarang.
+  - [x] 12.4.4 Uji beban `loadtest/k6/receipt-posting.js` dengan koreksi serentak atas aset yang sama.
+    Profil `adjust-race` dan koreksi di profil saturation; hasil dan pembuktian merahnya di
+    `apps/core/loadtest/README.md`.
+- [x] 12.5 Pratinjau koreksi di layar aset (K-36): `GET aset/{id}/pratinjau-koreksi` dengan komponen 7.6,
+  alasan wajib, dan tanggal lokal pengguna yang diterima server hanya hari ini plus-minus satu hari (K-34).
+- [x] 12.6 Jurnal asal `manual` atau tidak ada → register tetap berubah tanpa posting, dan layar menjelaskan
+  sebabnya (K-35).
 
 ---
 
@@ -528,7 +543,7 @@ posting perolehan.
 **Selesai bila:** pembaca baru bisa membangun konsumen hanya dari dokumen, dan `npx vitepress build
 docs` bersih.
 
-- [~] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. `asset.acquisition` sudah ada di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`); empat lainnya menyusul bersama area modulnya.
+- [~] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. Kelima jenis sudah punya contoh di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`); contoh bermode `clearing` untuk perolehan dan koreksinya belum ada.
 - [x] 13.2 Halaman `docs/dev` untuk feed posting: penerbit, status, validasi, penahanan, dan panduan menambah jenis posting dari modul lain.
   Ditulis di `docs/dev/34-feed-posting-finance.md`, beserta tabel aturan → test dan daftar celah yang masih terbuka.
 - [ ] 13.3 Halaman `docs/apps/management-aset`: posting group, cara perolehan, saldo awal, dan "Post penyusutan".
