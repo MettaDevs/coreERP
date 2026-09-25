@@ -63,7 +63,7 @@ Satu proses = satu entitas legal × satu buku × satu tanggal akhir periode = sa
 
 Beberapa larangan pada register aset berasal dari sini:
 
-- Nilai perolehan dan nilai sisa **tidak bisa diubah** kalau sudah ada periode penyusutan. Balikkan periodenya dulu.
+- Nilai perolehan dan nilai sisa **tidak bisa diubah** kalau sudah ada periode penyusutan. Balikkan periodenya dulu. Sebelum ada periode, koreksi nilai perolehan menerbitkan jurnal koreksinya sendiri (`asset.acquisition_adjustment`, lihat [Koreksi nilai perolehan](/apps/management-aset/transaction/register-aset/#koreksi-nilai-perolehan)).
 - Tanggal mulai dipakai hanya bisa digeser kalau **belum ada** periode. Buku yang sudah berjalan memakai tanggal itu sebagai dasar periode yang terlanjur final.
 
 ## Yang datang dari Core

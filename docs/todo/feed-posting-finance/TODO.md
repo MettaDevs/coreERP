@@ -559,16 +559,23 @@ alasan wajib).
 
 ---
 
-### 13. [~] Kontrak dan dokumentasi
+### 13. [x] Kontrak dan dokumentasi
 
 **Tempat:** `apps/core/contracts`, `docs/` · **Setelah:** 6, dan diperbarui di setiap area modul ·
 **Selesai bila:** pembaca baru bisa membangun konsumen hanya dari dokumen, dan `npx vitepress build
 docs` bersih.
 
-- [~] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. Kelima jenis sudah punya contoh di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`); contoh bermode `clearing` untuk perolehan dan koreksinya belum ada.
+- [x] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. Kelima jenis punya contoh di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`).
+  Perolehan punya contoh `direct_payable` dan `clearing` (`perolehan_clearing`: kredit ke akun perantara,
+  vendor tetap ikut bila penerimaannya membawa vendor). Koreksi pada `clearing` hanya berbeda akun
+  kreditnya; itu dijelaskan di panduan dan tabel "Jenis posting dan jurnalnya" di PRD, tanpa contoh kedua.
+  Penyusutan dan pembaliknya tidak bergantung mode (`settlement_mode: null`).
 - [x] 13.2 Halaman `docs/dev` untuk feed posting: penerbit, status, validasi, penahanan, dan panduan menambah jenis posting dari modul lain.
   Ditulis di `docs/dev/34-feed-posting-finance.md`, beserta tabel aturan → test dan daftar celah yang masih terbuka.
-- [ ] 13.3 Halaman `docs/apps/management-aset`: posting group, cara perolehan, saldo awal, dan "Post penyusutan".
+- [x] 13.3 Halaman `docs/apps/management-aset`: posting group, cara perolehan, saldo awal, dan "Post penyusutan".
+  Ditulis bersama area 8–12: `master/posting-group` (akun dan contoh jurnal per kolom), `transaction/register-aset`
+  (jurnal perolehan dengan cara perolehan, saldo awal, dan koreksi nilai perolehan), dan
+  `transaction/penyusutan` ("Post penyusutan", pembalikan, dan hubungannya dengan koreksi).
 - [x] 13.4 Panduan untuk pembaca: urutan sinkron (akun → vendor → unit → pull posting → ack), tabel penerjemah, dan larangan fallback. Terbit tanpa login di portal `/docs` (spesifikasi Integrasi · Finance), ditulis di `apps/core/contracts/internal/integrasi-finance.yaml`.
 - [x] 13.5 Daftarkan halaman di `docs/.vitepress/config.ts`, lalu build bersih.
 - [x] 13.6 Tandai bagian "Kontrak ke backoffice" di `docs/todo/managementaset/03-penyusutan-dan-bridge-backoffice.md` sebagai digantikan.
