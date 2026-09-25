@@ -163,7 +163,7 @@ info:
     | `posting_type` | Terbit saat | Tersedia |
     | --- | --- | --- |
     | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
-    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
+    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Sudah |
     | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
     | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
     | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |
@@ -177,6 +177,19 @@ info:
     Usaha pada `direct_payable`, akun perantara pada `clearing`, atau akun lawan hibah untuk aset
     hibah (tanpa `vendor`). Pada `direct_payable`, posting inilah hutangnya: buat faktur hutang
     dari posting ini tanpa jurnal kedua.
+
+    `asset.acquisition_adjustment` mengoreksi nilai perolehan satu aset sebelum aset itu disusutkan,
+    dengan `adjusts_posting_id` menunjuk jurnal perolehannya (`AST-ACQ-…` atau `AST-OPB-…`) dan
+    `posting_id` `AST-ADJ-<id aset>-<nomor urut koreksi>`. Tanggalnya hari koreksi dilakukan, bukan
+    tanggal jurnal asalnya. Barisnya satu pasang untuk selisihnya: harga perolehan dan akun lawan jurnal
+    asal — Hutang Usaha atau akun perantara menurut `settlement_mode` jurnal asal (selalu sama dengan
+    jurnal asalnya, walaupun setelan entitas sudah berganti), akun lawan hibah, atau akun penyeimbang saldo
+    awal. Nilai naik mendebit harga perolehan; nilai turun membalik arahnya. Tidak ada PPN. Pada
+    `direct_payable` posting ini membawa `vendor` jurnal asal: nilai naik berarti tagihan tambahan, nilai
+    turun berarti nota kredit atas faktur yang sama. Rincian di `details.assets` membawa
+    `acquisition_value_before`, `acquisition_value_after`, dan `adjustment_amount` bertanda; alasan
+    koreksinya di `details.reason` dan `source_document.description`. Jurnal perolehan yang dicatat
+    manual tidak pernah dikoreksi lewat feed.
 
     `asset.opening_balance` berisi saldo awal aset lama saat mulai memakai feed, satu posting per
     dokumen saldo awal, dengan `posting_id` `AST-OPB-<id dokumen>`. `posting_date`-nya selalu
@@ -437,6 +450,81 @@ paths:
                           book: KOMERSIAL
                           acquisition_value: '500000000.00'
                           tax_amount: '55000000.00'
+                    meta:
+                      count: 1
+                      has_more: false
+                koreksi_perolehan:
+                  summary: Faktur ambulans ternyata 510 juta, dikoreksi seminggu kemudian dengan mode
+                    jurnal asalnya
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-ADJ-01J9Z5D4E6F8G0H2J4K6M8N0P2-1
+                      posting_type: asset.acquisition_adjustment
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-05'
+                      document_date: '2026-10-05'
+                      occurred_at: '2026-10-05T10:15:00+07:00'
+                      published_at: '2026-10-05T03:15:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: koreksi-nilai-aset
+                        number: KEND-0012
+                        description: 'Koreksi nilai perolehan KEND-0012: Faktur ternyata 510.000.000'
+                      vendor:
+                        id: 01J9Z2BBBBBBBBBBBBBBBBBBBB
+                        number: VND-000123
+                        name: PT Karoseri Sehat
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '10000000.00'
+                        credit: '0.00'
+                        description: Koreksi nilai perolehan · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '2110'
+                          code: 2-1100
+                          name: Hutang Usaha
+                        debit: '0.00'
+                        credit: '10000000.00'
+                        description: PT Karoseri Sehat · koreksi KEND-0012
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '10000000.00'
+                        credit: '10000000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X8
+                      details:
+                        assets:
+                        - asset_code: KEND-0012
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          acquisition_value_before: '500000000.00'
+                          acquisition_value_after: '510000000.00'
+                          adjustment_amount: '10000000.00'
+                        reason: Faktur ternyata 510.000.000
                     meta:
                       count: 1
                       has_more: false
@@ -1426,7 +1514,7 @@ components:
         | Nilai | Terbit saat | Tersedia |
         | --- | --- | --- |
         | `asset.acquisition` | Penerimaan aset diselesaikan | Sudah |
-        | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Belum |
+        | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi | Sudah |
         | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
         | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
         | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |

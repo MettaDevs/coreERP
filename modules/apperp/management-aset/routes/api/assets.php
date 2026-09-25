@@ -17,5 +17,7 @@ Route::get('aset', [AsetController::class, 'index']);
 // — dan seluruh pekerjaannya kini dikerjakan dokumen mutasi, yang membawa nomor,
 // berita acara, dan riwayat penempatan yang menyebut buktinya.
 Route::get('aset/{id}/history', [AsetController::class, 'history']);
+// Pratinjau jurnal koreksi nilai perolehan sebelum disimpan (TODO 12, K-36).
+Route::get('aset/{id}/pratinjau-koreksi', [AsetController::class, 'adjustmentPreview']);
 Route::get('aset/{id}', [AsetController::class, 'show']);
 Route::patch('aset/{id}', [AsetController::class, 'update']);

@@ -108,6 +108,13 @@ docker run --rm -i --network core-loadtest_default `
   -e RUN_ID=gate-dep-post-race-1 -e FIXTURE=pr1 `
   grafana/k6:0.55.0 run /scripts/aset/depreciation.js
 
+# Skenario perlombaan koreksi nilai perolehan — 32 VU mengoreksi aset yang sama pada detik yang sama.
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=adjust-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-adj-race-1 -e FIXTURE=ar1 `
+  grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js
+
 # Oracle SQL, dua-duanya pada database yang sama.
 docker compose exec -T db psql -U core_erp -d core_erp -f - < verify.sql
 docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\apperp\management-aset\loadtest\verify.sql
@@ -544,6 +551,71 @@ merah:** `post_isi_salah` (jumlah aset atau total jawaban post yang salah) dan `
 sah yang dijawab 4xx). Keduanya tidak punya bentuk permintaan yang dapat merusaknya tanpa mengubah
 pembandingnya, sama seperti pemeriksaan prefix pada F7-03; totalnya tetap dijaga dari sisi database
 oleh pemeriksaan `verify.sql` yang sudah terbukti merah.
+
+### Gate kebenaran koreksi nilai perolehan — LULUS (area 12 feed posting finance)
+
+Diukur **25 September 2026** pada mesin yang sama, image `erp-core-app:a12-koreksi` yang dibangun
+dari branch area 12, project compose tersendiri (`-p core-loadtest-a12`) dengan volume baru.
+Skenarionya `receipt-posting.js`, kini dengan koreksi nilai perolehan: profil baru `adjust-race`
+membuat seluruh VU satu arena mengoreksi aset yang sama pada detik yang sama, dan profil saturation
+mengoreksi sebagian aset yang baru lahir. Separuh aset arena berasal dari saldo awal, jadi kedua akun
+lawan — hutang dan penyeimbang saldo awal — ikut dibalapkan.
+
+Koreksi serentak tidak saling menolak; semuanya sah dan dijalankan berurutan di bawah kunci baris
+aset. Karena itu balapan ini tidak punya pihak yang kalah untuk dihitung. Cacat yang dicari justru
+tidak kelihatan dari jawaban API: koreksi yang menghitung selisih dari nilai lama tetap dijawab 200.
+Yang menangkapnya tiga pemeriksaan `verify.sql` baru, yaitu:
+
+- rantai "sebelum" tiap koreksi sama dengan "sesudah" pendahulunya, berpangkal pada nilai di jurnal
+  perolehan asal;
+- nilai asal ditambah seluruh selisih sama dengan register;
+- nomor urut koreksi tanpa lubang.
+
+Pemeriksaan debit jurnal perolehan kini membandingkan dengan nilai asal (register dikurangi selisih
+koreksinya), bukan register hari ini.
+
+`RUN_ID=adj-race-1`: 32 VU dipusatkan pada 4 tenant, 12 aset per tenant, 90 detik.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` (nilai yang tidak tersimpan, posting koreksi yang salah nomor atau status) | 0 |
+| `server_errors` / koreksi sah yang ditolak | 0 / 0 |
+| Koreksi yang menerbitkan jurnal | 2.355, atas 48 aset |
+| Iterasi / request | 2.355 / 3.455 |
+| Permintaan gagal | 0 |
+| Write p50 / p95 | 878 ms / 2.436 ms — 8 VU antre di kunci baris aset yang sama, sesuai rancangannya |
+
+`RUN_ID=adj-sat-1`: 1000 VU, 128 tenant, 90 detik.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` | 0 |
+| `server_errors` / koreksi sah yang ditolak | 0 / 0 |
+| Penerimaan selesai / saldo awal / impor CSV | 625 / 139 / 105 |
+| Koreksi yang menerbitkan jurnal menurut k6 | 143 |
+| Iterasi / request | 972 / 8.108 |
+| Timeout klien (batas 60 detik) | 1.694 — kapasitas, bukan cacat; sebanding dengan 1.598 pada area 10 dan 1.541 pada area 11 |
+
+`SELFTEST=1` pada `adjust-race` (`adj-race-st-1`, 16 VU, 20 detik) mengarahkan probe lintas tenant ke
+aset arena sendiri: 111 dari 111 probe pratinjau koreksi dan 111 dari 111 probe koreksi tercatat
+sebagai pelanggaran, exit 99. Ketiga pemeriksaan `verify.sql` baru dibuktikan merah pada database
+yang sama, dengan tiga aset berbeda:
+
+| Kerusakan yang disuntik | Pemeriksaan yang memerah |
+| --- | --- |
+| "Sebelum" koreksi kedua digeser satu sen | rantai koreksi terputus |
+| Register satu aset berubah satu sen tanpa jurnal | koreksi tidak sampai ke register; debit posting perolehan |
+| Nomor koreksi terakhir melompat lima | nomor urut bolong; rantai koreksi terputus |
+
+Setelah dipulihkan, gate kembali lulus.
+
+`verify.sql` module sesudah seluruh rangkaian (race, SELFTEST, saturation): semua pemeriksaan 0.
+3.031 posting `asset.acquisition_adjustment` atas 239 aset; tiap rantai tersambung dari jurnal
+perolehannya sampai register, termasuk koreksi yang selesai di server sesudah kliennya menyerah.
+Seperti area 9–11, tenant uji beban tidak punya pemetaan akun, jadi setiap jurnal koreksi berstatus
+`held`. `verify.sql` Core: 53.048 nomor terbit tanpa satu pun ganda; satu-satunya yang merah tetap
+`boundary tenant tidak lengkap` (136 dari 136), oracle yang masih menuntut `tenant_deployments`
+(lihat area 8).
 
 ### Gate latensi work order dan penyusutan (F7-03 sisa)
 

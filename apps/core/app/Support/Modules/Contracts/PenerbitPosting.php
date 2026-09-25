@@ -93,7 +93,10 @@ interface PenerbitPosting
     /**
      * Keadaan satu posting untuk ditampilkan di dokumen sumbernya, atau `null` bila belum terbit.
      *
-     * @return array{posting_id: string, status: string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
+     * `settlement_mode` adalah mode yang tercatat saat posting itu terbit. Koreksinya memilih akun
+     * lawan dari mode ini, bukan dari setelan hari ini (K-10).
+     *
+     * @return array{posting_id: string, status: string, settlement_mode: ?string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
      */
     public function status(string $tenantId, string $postingId): ?array;
 }

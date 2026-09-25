@@ -16,7 +16,7 @@ dijelaskan di sini hanya yang khas modul ini.
 | `k6/depreciation.js` | Proposal, finalisasi, "Post penyusutan", dan saldo penyusutan; perlombaan finalisasi dan perlombaan post | dijalankan pada runtime baru |
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
 | `k6/posting-group.js` | Posting group aset: perlombaan pembuatan dan arsip tanggal berlaku, akun dan group tenant lain | dijalankan pada runtime baru |
-| `k6/receipt-posting.js` | Penyelesaian penerimaan dan jurnalnya — perolehan untuk pembelian, saldo awal untuk aset lama: perlombaan menyelesaikan dokumen yang sama, beban serentak dengan impor saldo awal dari CSV, pratinjau dan penyelesaian dokumen tenant lain | dijalankan pada runtime baru |
+| `k6/receipt-posting.js` | Penyelesaian penerimaan dan jurnalnya — perolehan untuk pembelian, saldo awal untuk aset lama: perlombaan menyelesaikan dokumen yang sama, beban serentak dengan impor saldo awal dari CSV, perlombaan koreksi nilai perolehan aset yang sama, pratinjau dan penyelesaian dokumen tenant lain | dijalankan pada runtime baru |
 | `verify.sql` | Oracle kebenaran modul, dibaca langsung dari database | dipakai sebagai gate |
 | `check-manifest.py` | Pemeriksa `app.yaml`; tidak ada hubungannya dengan beban | — |
 
@@ -108,6 +108,12 @@ docker run --rm -i --network core-loadtest_default `
   -e RUN_ID=gate-rcp-race-1 -e FIXTURE=g1 `
   grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js
 
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWDesults:/results" `
+  -e BASE_URL=http://lb -e PROFILE=adjust-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-adj-race-1 -e FIXTURE=ar1 `
+  grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js
+
 docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
   -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
   -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
@@ -137,6 +143,7 @@ tercatat `manual` dan penerbit tidak pernah menilai baris jurnal penyusutan.
 | `post-race` (`depreciation.js`) | Apakah dua "Post penyusutan" untuk periode yang sama dapat sama-sama menerbitkan posting — beban dua kali di aplikasi finance? | 0 `post_serentak_dua_posting`, 0 `server_errors`, dan `verify.sql`: total tiap posting penyusutan sama dengan periode yang ditandainya |
 | `race` (`posting-group.js`) | Apakah dua penyimpanan pertama untuk group dan tanggal yang sama, atau penyimpanan dan arsip yang bersamaan, dapat berakhir 500 atau baris campuran? | 0 `server_errors`, 0 `posting_group_mixed_rows` |
 | `race` (`receipt-posting.js`) | Apakah dua penyelesaian dokumen penerimaan yang sama dapat sama-sama menang — aset kembar dan jurnal perolehan atau saldo awal dua kali? | 0 `correctness_violations`, 0 `server_errors`, dan `verify.sql`: tepat satu posting berjenis benar per penerimaan selesai, akumulasi jurnal saldo awal sama dengan register |
+| `adjust-race` (`receipt-posting.js`) | Apakah koreksi nilai perolehan serentak atas aset yang sama dapat menghitung selisih dari nilai lama — buku besar dan register berpisah tanpa ada yang ditolak? | 0 `correctness_violations`, 0 `server_errors`, 0 `adjust_rejected`, dan `verify.sql`: rantai koreksi tiap aset tersambung dari jurnal perolehannya sampai register, tanpa nomor bolong |
 | `latency` | Berapa concurrency yang masih memenuhi SLO? | p95/p99 per jenis operasi |
 
 Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode. Karena itu gate latensi
@@ -152,7 +159,10 @@ Tiga sumber terpisah, tidak ada yang memakai kode yang sedang diuji sebagai haki
    Number Sequence (kecuali group aset dan buku penyusutan, yang kodenya diketik dan diperiksa
    bentuknya), posting group yang menunjuk akun tenant lain, dan jurnal perolehan: tepat satu
    posting per penerimaan selesai di tenant yang sama, tidak ada posting tanpa penerimaan selesai,
-   debit posting sama dengan nilai register ditambah PPN, dan jumlah aset sama dengan jumlah unit.
+   debit posting sama dengan nilai perolehan asal ditambah PPN, dan jumlah aset sama dengan jumlah
+   unit. Untuk koreksi nilai perolehan: rantai "sebelum" dan "sesudah" tiap aset tersambung dari
+   jurnal perolehannya, nilai asal ditambah seluruh selisihnya sama dengan register, nomor urutnya
+   tanpa lubang, dan tiap koreksi merujuk jurnal asal dengan mode yang sama.
    Untuk jurnal penyusutan: periode yang ditandai di-post menunjuk posting berjenis benar, total
    tiap posting penyusutan sama dengan periode yang ditandainya, dan pembalikan mengikuti periode
    aslinya.

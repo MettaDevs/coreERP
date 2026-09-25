@@ -70,6 +70,8 @@ Aset dibaca lengkap beserta nilai atributnya lewat `GET /api/v1/aset/{id}`, dan 
 - **Group aset**, karena buku penyusutan sudah dibentuk dari matriks group pada saat aset diterima. Menggantinya membuat buku yang berjalan tidak lagi cocok dengan groupnya.
 - **Nilai perolehan dan residu**, begitu buku aset sudah punya periode penyusutan. Balikkan periodenya lebih dahulu.
 
+Sebelum ada periode penyusutan, mengoreksi nilai perolehan menerbitkan jurnal koreksinya ke finance; lihat [Koreksi nilai perolehan](#koreksi-nilai-perolehan).
+
 Mengubah `placed_in_service_on` menghitung ulang `depreciation_start_on` tiap buku sesuai konvensinya masing-masing, tetapi hanya selama belum ada periode berjalan.
 
 Membuat dokumen **Penjualan aset** atau **Pemusnahan aset** melepas asetnya: `lifecycle_state` menjadi `disposed` dan seluruh buku asetnya ditutup (`status = closed`, `closed_on` diisi tanggal dokumen). Buku yang tertutup tidak lagi menerima proposal penyusutan. Ini murni subledger; tidak ada jurnal yang dibuat.
@@ -273,6 +275,19 @@ perolehan, kredit akumulasi dan penyeimbang saldo awal — dan buku asetnya lahi
 offset periode, sehingga penyusutan berikutnya berlanjut dari periode ke-(offset + 1). Banyak aset
 sekaligus dapat diimpor dari CSV (`Services/OpeningBalanceImport`), yang melahirkan draf saldo awal
 setelah pratinjaunya bersih.
+
+### Koreksi nilai perolehan
+
+Mengoreksi nilai perolehan aset yang belum disusutkan (area 12, `Services/AcquisitionAdjustment`)
+menerbitkan `asset.acquisition_adjustment` di transaksi yang sama dengan koreksinya: satu pasang baris
+untuk selisihnya, harga perolehan dan akun lawan jurnal perolehan asalnya — hutang atau perantara
+menurut mode yang tercatat di jurnal asal, lawan hibah, atau penyeimbang saldo awal (K-33). Nilai
+turun membalik arahnya. Jurnalnya bertanggal hari koreksi (K-34), merujuk `AST-ACQ-…` atau
+`AST-OPB-…` lewat `adjusts_posting_id`, dan bernomor `AST-ADJ-<id aset>-<nomor urut koreksi>`. Jurnal
+asal yang dicatat manual, atau aset tanpa jurnal perolehan, membuat koreksinya hanya mengubah
+register (K-35). Layar detail aset menampilkan pratinjau jurnalnya lewat
+`GET /api/v1/aset/{id}/pratinjau-koreksi`, dan alasan koreksi wajib diisi karena ikut ke keterangan
+jurnal (K-36).
 
 ### Post penyusutan
 

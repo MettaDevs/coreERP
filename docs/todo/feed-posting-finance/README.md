@@ -98,6 +98,10 @@ field kontrak lain di repo ini.
 | K-30 | **Jurnal penyusutan diringkas per group aset + dimensi, bukan per akun.** Beban per group × unit penggunaan (BU + department), akumulasi per group × business unit. | Keputusan pemilik produk, 24 September 2026, sesuai permintaan konsultan di K-14. Setiap baris menyebut satu kolom posting group satu group, sehingga posting yang tertahan karena pemetaan kosong dapat divalidasi ulang dengan akun barunya. Group yang akunnya sama tetap dua baris. |
 | K-31 | **Penyusutan dikirim hanya lewat buku yang mem-post perolehan asetnya** (buku yang di-post group, K-26). Buku lain yang lapisannya bukan `none` tetap menyusut di register, tetapi tidak dikirim. | Keputusan pemilik produk, 24 September 2026. Di F&O tiap lapisan posting (Current, Operations, Tax) dicatat terpisah di buku besar; feed ini belum membawa lapisan, jadi mengirim dua buku membuat beban aset yang sama tercatat dua kali di aplikasi finance yang hanya punya satu buku besar. |
 | K-32 | **Penyusutan yang lebih halus dari presisi mata uang menahan proses post** dengan pesan untuk mengatur pembulatan penyusutan (round-off) di matriks group × buku, bukan dibulatkan per aset. | Keputusan pemilik produk, 24 September 2026. Total jurnal harus sama persis dengan register (K-14), dan tidak ada pembulatan diam-diam (K-18, K-20). Dengan presisi bawaan 2 desimal, kasus ini tidak muncul. |
+| K-33 | **Koreksi nilai perolehan dikreditkan ke akun lawan jurnal asalnya.** Pembelian ke Hutang Usaha atau akun perantara menurut `settlement_mode` yang tercatat di jurnal perolehannya, hibah ke akun lawan hibah (K-25), dan saldo awal ke akun penyeimbang saldo awal. Selisih turun membalik arahnya. | Keputusan pemilik produk, 25 September 2026, perluasan K-10 ke hibah dan saldo awal: koreksi selalu masuk ke akun yang sama dengan jurnal perolehannya, walaupun setelan entitas legal sudah berganti. |
+| K-34 | **Jurnal koreksi bertanggal hari koreksi dilakukan**, untuk `posting_date` maupun `document_date`. Layar mengirim tanggal lokal penggunanya, dan server hanya menerima hari ini plus-minus satu hari. | Keputusan pemilik produk, 25 September 2026, mengikuti D365: *acquisition adjustment* di jurnal aset tetap F&O bertanggal baris jurnal koreksinya sendiri. Sesuai K-17, koreksi masuk ke periode yang masih terbuka dan tidak menulis ulang periode jurnal asalnya. Plus-minus satu hari menampung zona waktu mana pun tanpa membuka jalan untuk memundurkan tanggal. |
+| K-35 | **Jurnal perolehan yang dicatat manual membuat koreksinya manual juga.** Tidak ada posting; nilai di register tetap berubah, dan layar memberi tahu bahwa koreksinya dicatat manual di aplikasi finance. Aset tanpa jurnal perolehan sama sekali juga tanpa posting. | Keputusan pemilik produk, 25 September 2026. Aplikasi finance mencatat jurnal aslinya sendiri (K-16), jadi posting koreksi akan merujuk posting yang tidak pernah diterimanya. |
+| K-36 | **Koreksi nilai perolehan ditinjau sebelum disimpan, dan alasannya wajib.** Layar aset menampilkan jurnal koreksi beserta masalahnya dengan komponen pemeriksaan posting, dan alasannya ikut ke keterangan jurnal (`source_document.description`, `details.reason`). | Keputusan pemilik produk, 25 September 2026, seperti pratinjau penerimaan dan "Post penyusutan" (K-22). |
 
 ## Alur
 
@@ -265,13 +269,20 @@ kembali nol.
 ### `asset.acquisition_adjustment`: koreksi nilai perolehan
 
 Faktur ternyata 510, padahal tercatat 500. Koreksi **dimulai dari modul aset**, supaya register
-aset (dasar penyusutan), GL, dan hutang sama-sama menjadi 510. Mode mengikuti posting asal
-(`adjusts_posting_id`):
+aset (dasar penyusutan), GL, dan hutang sama-sama menjadi 510. Akun lawannya mengikuti posting
+asal (`adjusts_posting_id`), dan untuk pembelian modenya juga (K-10, K-33):
 
-| Mode asal | Debit | Kredit |
+| Jurnal asal | Debit | Kredit |
 | --- | --- | --- |
-| `direct_payable` | `1-2300` 10 | `2-1100` 10 |
-| `clearing` | `1-2300` 10 | `2-1900` 10 |
+| pembelian, `direct_payable` | `1-2300` 10 | `2-1100` 10 |
+| pembelian, `clearing` | `1-2300` 10 | `2-1900` 10 |
+| hibah | `1-2300` 10 | akun lawan hibah 10 |
+| saldo awal | `1-2300` 10 | `3-9000` 10 |
+
+Nilai turun (510 → 500) membalik kedua sisinya. Satu posting menyebut satu aset, dengan `posting_id`
+`AST-ADJ-<id aset>-<nomor urut koreksi>` dan dimensi aset itu saat dikoreksi. Tanggalnya hari
+koreksi dilakukan (K-34), alasannya wajib dan ikut ke keterangan jurnal (K-36), dan jurnal asal yang
+dicatat manual membuat koreksinya manual juga (K-35).
 
 Fase ini hanya mendukung koreksi **sebelum ada periode penyusutan**, sama seperti aturan
 `AsetController` sekarang.
