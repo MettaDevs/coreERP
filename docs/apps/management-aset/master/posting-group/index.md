@@ -31,6 +31,8 @@ Posting group tidak menyimpan akun, hanya menunjuknya. Nomor dan nama akun tetap
 | `opening_balance_offset_account_id` | bila dipakai | Penyeimbang saldo awal saat cutover (K-13) |
 | `grant_offset_account_id` | bila dipakai | Lawan hibah: kredit penerimaan dengan cara perolehan `hibah` (K-25) |
 
+Di layar, tiap kolom akun membawa ikon bantuan berisi contoh jurnalnya, diambil dari bagian "Jenis posting dan jurnalnya" di PRD feed posting finance (K-39). Akun diisi langsung di layar ini; tidak ada templat berkas terpisah.
+
 Setiap kolom akun menyimpan id `finance_reference_accounts`, tanpa foreign key. Indeks uniknya `(tenant_id, group_aset_id, effective_from) WHERE deleted_at IS NULL`.
 
 ## Endpoint

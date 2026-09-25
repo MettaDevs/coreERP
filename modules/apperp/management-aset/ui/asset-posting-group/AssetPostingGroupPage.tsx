@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ import {
     FieldDescription,
     FieldError,
     FieldGroup,
+    FieldHint,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
@@ -767,6 +769,54 @@ function DateTabs({
     );
 }
 
+/**
+ * Contoh jurnal untuk tiap kolom akun (feed posting finance TODO 0.1.3), diambil dari bagian "Jenis
+ * posting dan jurnalnya" di PRD. Pengisi akun lazimnya orang keuangan yang tahu akunnya tetapi belum
+ * tahu jurnal aset mana yang memakainya; contohnya menjawab itu tanpa membuka dokumen lain.
+ */
+const ACCOUNT_HINTS: Record<string, string> = {
+    acquisition_account_id:
+        'Akun aset tetap yang bertambah saat aset diterima, dipindahkan dari sistem lama, atau nilainya dikoreksi. Contoh penerimaan ambulans 500: Dr Aset Tetap – Kendaraan 500.',
+    accumulated_depreciation_account_id:
+        'Akun pengurang aset tetap yang menampung penyusutan. Contoh penyusutan sebulan 3,7: Cr Akumulasi Penyusutan – Kendaraan 3,7.',
+    depreciation_expense_account_id:
+        'Akun beban di laba rugi untuk penyusutan tiap periode. Contoh: Dr Beban Penyusutan Kendaraan 3,7.',
+    payable_account_id:
+        'Hutang ke pemasok bila penerimaan aset langsung menjadi hutang di aplikasi finance. Contoh ambulans 500 + PPN 55: Cr Hutang Usaha 555.',
+    clearing_account_id:
+        'Akun penampung bila faktur pemasok dibuat terpisah di aplikasi finance. Contoh: Cr Aset Diterima Belum Difakturkan 555; saat fakturnya dibuat, Dr akun ini dan Cr Hutang Usaha 555 sampai saldonya kembali nol.',
+    input_vat_account_id:
+        'PPN pembelian aset yang dapat dikreditkan. Contoh PPN ambulans: Dr PPN Masukan 55.',
+    opening_balance_offset_account_id:
+        'Lawan saat aset lama dipindahkan dari sistem sebelumnya. Contoh aset 100 dengan akumulasi 40: Dr Aset Tetap 100, Cr Akumulasi Penyusutan 40, Cr Penyeimbang Saldo Awal 60.',
+    grant_offset_account_id:
+        'Lawan untuk aset yang diterima sebagai hibah, lazimnya akun ekuitas atau pendapatan hibah. Contoh hibah 500: Dr Aset Tetap 500, Cr akun ini 500.',
+};
+
+/** Ikon bantuan kecil di sebelah kontrolnya, pola yang sama dengan `DynamicField`. */
+function withAccountHint(column: AccountColumn, control: ReactNode) {
+    const hint = ACCOUNT_HINTS[column.column];
+
+    if (!hint) {
+        return control;
+    }
+
+    return (
+        <div className="flex items-end gap-1.5">
+            <div className="min-w-0 flex-1">{control}</div>
+            <FieldHint hint={hint}>
+                <button
+                    type="button"
+                    aria-label={`Contoh jurnal ${column.label}`}
+                    className="text-muted-foreground hover:text-foreground mb-2.5 shrink-0"
+                >
+                    <CircleAlert className="size-4" />
+                </button>
+            </FieldHint>
+        </div>
+    );
+}
+
 function AccountField({
     column,
     value,
@@ -811,37 +861,43 @@ function AccountField({
     if (disabled) {
         return (
             <Field>
-                <Input
-                    label={column.label}
-                    value={
-                        current
-                            ? accountLabel(current)
-                            : value
-                              ? value
-                              : 'Tidak dipetakan'
-                    }
-                    disabled
-                />
+                {withAccountHint(
+                    column,
+                    <Input
+                        label={column.label}
+                        value={
+                            current
+                                ? accountLabel(current)
+                                : value
+                                  ? value
+                                  : 'Tidak dipetakan'
+                        }
+                        disabled
+                    />,
+                )}
             </Field>
         );
     }
 
     return (
         <Field data-invalid={Boolean(error)}>
-            <Select
-                label={column.label}
-                required={column.required}
-                items={items}
-                value={value ?? NONE}
-                placeholder="Pilih akun"
-                searchPlaceholder="Cari nomor atau nama akun"
-                emptyMessage="Akun tidak ditemukan."
-                portalContainer={portal}
-                onSearchChange={onSearch}
-                onValueChange={(next) =>
-                    onChange(next === null || next === NONE ? null : next)
-                }
-            />
+            {withAccountHint(
+                column,
+                <Select
+                    label={column.label}
+                    required={column.required}
+                    items={items}
+                    value={value ?? NONE}
+                    placeholder="Pilih akun"
+                    searchPlaceholder="Cari nomor atau nama akun"
+                    emptyMessage="Akun tidak ditemukan."
+                    portalContainer={portal}
+                    onSearchChange={onSearch}
+                    onValueChange={(next) =>
+                        onChange(next === null || next === NONE ? null : next)
+                    }
+                />,
+            )}
             {reason && (
                 <FieldDescription>
                     {reason}. Posting yang memakai akun ini tertahan sampai

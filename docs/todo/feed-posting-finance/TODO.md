@@ -29,22 +29,44 @@ bentuk dimensi BC (6.3.3), mode `push` (4.1, 6.10), tampilan masalah ala Journal
 
 ---
 
-### 0. [ ] Prasyarat non-kode
+### 0. [~] Prasyarat non-kode
 
 **Tempat:** pemilik produk, konsultan akuntansi, tim old-finance · **Setelah:** — ·
 **Selesai bila:** semua jawaban tercatat di PRD, dan uji terima punya lingkungan.
 
-- [ ] 0.1 Siapkan templat posting group aset untuk konsultan.
-  - [ ] 0.1.1 Baris = group aset yang ada di tenant (ambil dari master group aset).
-  - [ ] 0.1.2 Kolom = akun harga perolehan, akumulasi penyusutan, beban penyusutan, lawan hutang, perantara, PPN Masukan, penyeimbang saldo awal.
-  - [ ] 0.1.3 Sertakan contoh jurnal per kolom, diambil dari bagian "Jenis posting dan jurnalnya" di PRD.
-- [ ] 0.2 Konfirmasi ke konsultan: akun PPN Masukan, akun Hutang Usaha, dan akun penyeimbang saldo awal. Nomor dan `Akun_ID`-nya.
-- [ ] 0.3 Konfirmasi ke konsultan: aturan dimensi (neraca → BU, laba rugi → BU + department) dan ringkasan penyusutan per akun + dimensi.
+Diputuskan pemilik produk pada 25 September 2026 **tanpa konsultan**, mengikuti padanan Dynamics 365 BC
+dan F&O serta kode old-finance: K-37 (presisi IDR), K-38 (cutover), K-39 (pengisian akun posting group).
+Yang tersisa bergantung pada pihak aplikasi finance.
+
+- [x] 0.1 Siapkan templat posting group aset untuk konsultan.
+  Tidak ada berkas templat (K-39): akun diisi langsung di layar posting group, satu baris per group aset
+  dengan delapan kolom akun, seperti *FA Posting Groups* di BC.
+  - [x] 0.1.1 Baris = group aset yang ada di tenant (ambil dari master group aset).
+    Sudah begitu bentuk layarnya sejak area 8.
+  - [x] 0.1.2 Kolom = akun harga perolehan, akumulasi penyusutan, beban penyusutan, lawan hutang, perantara, PPN Masukan, penyeimbang saldo awal.
+    Ditambah lawan hibah (K-25).
+  - [x] 0.1.3 Sertakan contoh jurnal per kolom, diambil dari bagian "Jenis posting dan jurnalnya" di PRD.
+    Bantuan per kolom akun lewat `FieldHint`: hover sekitar satu detik, klik ikon untuk menahannya.
+- [x] 0.2 Konfirmasi ke konsultan: akun PPN Masukan, akun Hutang Usaha, dan akun penyeimbang saldo awal. Nomor dan `Akun_ID`-nya.
+  Bukan prasyarat kode (K-39): nomornya data tenant, dipilih dari daftar akun Core yang diimpor dari
+  aplikasi finance, sehingga `Akun_ID` ikut sebagai `external_id` (K-05).
+- [x] 0.3 Konfirmasi ke konsultan: aturan dimensi (neraca → BU, laba rugi → BU + department) dan ringkasan penyusutan per akun + dimensi.
+  Tetap K-09 — padanan *account structure* F&O yang membatasi dimensi per akun — dan K-30 untuk
+  ringkasan penyusutan per group aset + dimensi.
 - [ ] 0.4 Tetapkan pemilik dan jadwal pekerjaan di sisi old-finance (area 15).
-- [ ] 0.5 Tetapkan tanggal cutover per entitas legal.
+  Per 25 September 2026 belum ada: pihak aplikasi finance yang menguji lewat tenant `dio` di SaaS dev
+  masih sibuk dan belum menguji.
+- [x] 0.5 Tetapkan tanggal cutover per entitas legal.
+  Awal tahun buku berikutnya, 1 Januari 2027 untuk tahun buku kalender (K-38). Disetel per entitas legal
+  di Core.
 - [ ] 0.6 Siapkan instance dev old-finance yang bisa dijangkau server dev CoreERP, untuk area 16.
-- [ ] 0.7 Konfirmasi ke konsultan: presisi nilai IDR (0 atau 2 desimal) dan presisi harga satuan (K-20). Pastikan presisi kolom nilai di old-finance sama atau lebih halus.
-- [ ] 0.8 Minta tim old-finance menyiapkan kode group aset dan buku penyusutan versi manual bersama konsultan (misalnya `KENDARAAN`, `ALKES`, `KOMERSIAL`), untuk dipakai di 8.7.
+  Menunggu 0.4.
+- [x] 0.7 Konfirmasi ke konsultan: presisi nilai IDR (0 atau 2 desimal) dan presisi harga satuan (K-20). Pastikan presisi kolom nilai di old-finance sama atau lebih halus.
+  2 desimal untuk nilai dan 3 untuk harga satuan (K-37), sama dengan bawaan `MoneyPrecision`. Kode
+  old-finance membulatkan nilai ke 2 desimal.
+- [x] 0.8 Minta tim old-finance menyiapkan kode group aset dan buku penyusutan versi manual bersama konsultan (misalnya `KENDARAAN`, `ALKES`, `KOMERSIAL`), untuk dipakai di 8.7.
+  Tidak ada kode bawaan (K-24): admin tenant mengetik kode group dan buku sendiri, seperti kode *FA Class*
+  dan *Depreciation Book* di BC. Contoh di atas hanya contoh dokumentasi.
 
 ---
 
@@ -506,7 +528,7 @@ penyusutan), K-32 (nilai lebih halus dari presisi menahan proses).
 
 ---
 
-### 12. [ ] Modul aset: koreksi nilai perolehan
+### 12. [x] Modul aset: koreksi nilai perolehan
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 9 · **Selesai bila:** koreksi nilai
 sebelum ada penyusutan menerbitkan `asset.acquisition_adjustment` dengan mode yang diwarisi dari
