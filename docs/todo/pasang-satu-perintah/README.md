@@ -73,6 +73,8 @@ Halaman ini mengikat tiga halaman lain:
 | PS-07 | Berkas pemasang disajikan tanpa login, dibatasi laju: `GET /pasang.sh` (alamat admin.erp disisipkan), `GET /agen/{coreerp-agent,coreerp-agent.service,coreerp-agent.timer,env.template,update.sh}`, `GET /agen/kunci-rilis.pub`; disalin ke image konsol oleh `apps/control-plane/Dockerfile` | Berkas yang disajikan sama byte dengan yang di repo pada commit image; test |
 | PS-08 | Halaman **Pengaturan** untuk operator: sidik jari kunci publik rilis, keadaan kunci lisensi, dan tempat bagian Harbor (CP-06 milik PRD Harbor) | Kunci yang hilang tampil sebagai kesalahan yang jelas |
 
+PS-09 dan PS-10 lahir dari uji 16 September; keduanya ada di bagian keadaan di bawah.
+
 ### Agen
 
 | ID | Pekerjaan | Selesai bila |
@@ -81,6 +83,8 @@ Halaman ini mengikat tiga halaman lain:
 | PA-02 | Sesudah mendaftar, `pasang.sh` menjalankan putaran agen sambil mencetak progres yang dapat dibaca manusia, sampai operasi `install` selesai atau 90 menit, lalu menyalakan timer | Terminal teknisi menunjukkan kapan selesai dan apa yang harus dibuka |
 | PA-03 | Operasi `install`: ambil rilis → jalankan pembaruan pertama → `tenant:bootstrap-site` dengan hash lewat stdin dan `--app` per app → laporkan langkah | Kata sandi dan hash tidak pernah tampil di log agen; operasi diulang aman |
 | PA-04 | Subperintah manual `bootstrap-tenant` dibuang setelah PA-03 lulus uji di server kedua | Grep bersih |
+
+PA-05 sampai PA-07 juga lahir dari uji itu, dan ditulis bersama cara mengerjakannya di sana.
 
 **Titik singgung dengan PRD Harbor.** Langkah "ambil rilis" di PA-03 memakai jalur yang sama dengan
 operasi `upgrade`. Sampai AG-01 selesai, PA-03 memakai jalur yang ada di `main`; begitu AG-01 masuk,
@@ -159,13 +163,107 @@ printf '%s' "$T" | sudo docker exec -i -u www-data coreerp-saas-core-console-1 p
 
 Perintah itu menolak menyimpan token yang tidak melihat zonanya, dan tidak pernah mencetak tokennya.
 
+## Keadaan 16 September 2026 — pemasangan pertama di server klien
+
+Rilis 0.5.0 dipasang pemilik produk di server kedua dengan perintah dari panel, ditambah `--proxy-luar`
+karena port 80 dan 443 di mesin itu dipegang Dokploy, serta `COREERP_HOME=/opt/coreerp-situs` dan
+`COREERP_PROYEK=coreerp-situs` karena nama proyek compose `coreerp` sudah dipakai stack lain di sana.
+
+Yang terbukti, diperiksa satu per satu di mesinnya:
+
+- alamat aplikasi terbentuk sendiri dan record DNS-nya dibuat konsol; namanya dijawab resolver publik
+  dengan alamat server itu;
+- `.env` server klien berisi `APP_URL` milik tenant — bukan lagi nama host mesinnya, yang selama ini
+  menjadi cacatnya;
+- image ditarik lewat digest, migration keluar dengan kode 0, seluruh container sehat, dan `/up` menjawab
+  200;
+- situs melapor balik ke admin.erp: nomor rilis, waktu, dan alamat IP asal laporan.
+
+Yang **tidak** dapat dibuktikan uji itu:
+
+| Tidak terbukti | Sebab |
+| --- | --- |
+| Aplikasi terbuka dari internet lewat HTTPS | `--proxy-luar` membuat proxy agen tidak menyala, dan Traefik Dokploy di mesin itu tidak punya rute untuk nama host tenant. Yang menjawab adalah Traefik: 404 dengan sertifikat `TRAEFIK DEFAULT CERT` |
+| Pembaruan ke rilis berikutnya, dan pemunduran saat pembaruan gagal | Hanya pemasangan pertama yang dijalankan. Skenarionya E2E-01 di PRD Harbor |
+| Cadangan dan pemulihan situs klien | Belum dijalankan sama sekali |
+
+Sesudah uji itu server kedua disuspensi penyedianya dengan alasan *flooding*. Mesin itu menjalankan
+banyak layanan lain di luar CoreERP, dan penarikan image satu kali sebesar ±1 GB tidak berbentuk seperti
+sebab yang lazim untuk suspensi semacam itu — tetapi tanpa laporan lalu lintas dari penyedia hal itu
+tidak dapat dipastikan. Lanjutan ujinya menunggu VPS lain, dan sebaiknya VPS yang port 80 dan 443-nya
+kosong supaya PA-07 ikut terjawab.
+
+### Yang belum dikerjakan
+
+| ID | Pekerjaan | Selesai bila |
+| --- | --- | --- |
+| PA-05 | Penanda kemajuan saat agen menarik image | Operator dapat membedakan penarikan yang lambat dari yang macet, tanpa membuka log |
+| PA-06 | `--proxy-luar` mengurus ikatan port yang dapat dijangkau proxy lain | Proxy yang berjalan di container pada mesin yang sama dapat menjangkau aplikasi tanpa `.env` disunting tangan |
+| PA-07 | Proxy HTTPS agen dibuktikan hidup | Sertifikat yang disodorkan terbit dari Let's Encrypt untuk nama host tenant, dan bertahan melewati satu pembaruan |
+| PS-09 | Panel memberi rute siap tempel untuk pemasangan dengan proxy luar | Halaman situs menampilkan host, sasaran, dan cuplikan rute; hanya untuk situs yang dipasang dengan proxy luar |
+| PS-10 | Kredensial admin provider tidak lagi dicetak di terminal server klien | Perintah pasang selesai tanpa satu pun rahasia di layar, dan jalan masuk pertama tetap ada |
+| PS-11 | Domain milik klien sendiri | **Ditunda** atas keputusan pemilik produk 16 September 2026 |
+
+**PA-05 — penanda kemajuan.** Hari ini `coreerp-agent` hanya mencetak nama langkah, sehingga penarikan
+±1 GB terlihat persis sama dengan penarikan yang berhenti. Pemilik produk meminta persen **dan** waktu
+berjalan. Langkah pertama mengukur dulu bentuk keluaran `docker pull` tanpa TTY di mesin sasaran —
+apakah ia memuat jumlah byte per lapisan atau hanya status seperti `Download complete` — karena bentuk
+itu menentukan mana yang mungkin dihitung. Bila ukurannya tidak ada di keluaran, ukuran lapisan dapat
+diambil dari manifest yang sudah dibaca agen sebelum menarik. Waktu berjalan selalu mungkin dan tidak
+pernah menyesatkan, jadi ia penanda dasarnya; persen ditambahkan di atasnya bila datanya ada. Ujinya di
+suite agen dengan shim `docker` yang mengeluarkan bentuk keluaran pull yang sudah diukur tadi, bukan bentuk
+karangan.
+
+**PA-06 — ikatan port saat proxy luar.** Dengan `--proxy-luar`, aplikasi tetap terikat di `127.0.0.1`
+(`CORE_APP_BIND`). Proxy yang berjalan di dalam container — Traefik milik Dokploy, misalnya — tidak dapat
+menjangkau loopback host, jadi pemasangan selesai tanpa galat tetapi tidak dapat dilayani siapa pun.
+Pada 16 September hal ini hanya bisa diperbaiki dengan menyunting `.env` dan membuat ulang container.
+Dua jalan yang masuk akal: `--proxy-luar` menerima alamat ikat sebagai argumen, atau ia memakai alamat
+gerbang jembatan Docker sebagai bawaan. Apa pun yang dipilih, pesan penutup pemasang harus menyebut
+alamat dan port yang harus dituju proxy, dan bila ikatannya menjadi alamat publik hal itu harus
+dikatakan terang-terangan — port yang terbuka tanpa TLS adalah keputusan, bukan efek samping.
+
+**PA-07 — proxy HTTPS dibuktikan hidup.** Kodenya sudah ada dan lulus suite agen, tetapi belum pernah
+melayani satu permintaan pun. Ujinya butuh VPS yang port 80 dan 443-nya kosong: pasang tanpa
+`--proxy-luar`, lalu buktikan dari luar mesin bahwa sertifikatnya terbit dari Let's Encrypt untuk nama
+host tenant — bukan sertifikat darurat — dan bahwa halaman masuk dijawab 200. Sesudah itu naikkan satu
+rilis dan periksa sertifikatnya tidak terbit ulang: volume sertifikat yang tidak bertahan akan menabrak
+batas laju Let's Encrypt pada klien yang sering diperbarui.
+
+**PS-09 — rute untuk proxy luar.** Ketika situs dipasang dengan proxy luar, admin.erp sudah memegang
+semua yang dibutuhkan rutenya: nama host tenant, alamat server, dan port aplikasi. Tanpa itu ditampilkan,
+operator berakhir seperti 16 September — DNS benar, aplikasi sehat, dan pengunjung melihat 404 dari proxy
+yang tidak pernah diberi tahu. Butir ini bergantung pada agen yang melaporkan bahwa situs dipasang dengan
+proxy luar; hari ini keterangan itu tidak dikirim ke admin.erp sama sekali, jadi kerjakan pelaporannya
+lebih dulu.
+
+**PS-10 — kredensial admin provider.** Pemasang mencetak `provider@coreerp.local` beserta kata sandinya di
+layar server klien. Akun itu dibuat `ProviderAdminSeeder`, punya baris `provider_access`, dan tidak punya
+keanggotaan tenant — `ProviderIdentityMonitorTest` membuktikan keduanya. Artinya ia akun vendor, bukan
+akun klinik, padahal yang menempelkan perintah pasang bisa saja staf klinik. Pemilik produk juga menyebut
+identitas provider sudah diatur lewat SSO. Jadi urutannya: putuskan dulu apakah akun lokal ini masih perlu
+ada sebagai jalan masuk ketika SSO tidak dapat dihubungi. Bila tidak perlu, buang seluruh jalurnya,
+termasuk `COREERP_PROVIDER_PASSWORD`. Bila perlu, pindahkan penampilannya ke admin.erp seperti perintah
+pasang sekali pakai, dan server klien tidak mencetak apa pun. Kata sandi yang tercetak pada uji 16
+September harus dianggap bocor dan diganti.
+
+**PS-11 — domain milik klien.** Alamat situs selalu berbentuk `https://<tenant>.<domain dasar>`, dan
+kolom alamat mandiri sengaja tidak dibangun. Klinik yang ingin memakai domainnya sendiri karena itu belum
+terlayani. Butir ini ditulis supaya keputusan menundanya tetap terlihat, bukan hilang sebagai hal yang
+terlupa. Bila kelak dikerjakan, yang ikut berubah bukan hanya kolomnya: record DNS tidak lagi dapat dibuat
+konsol karena zonanya milik orang lain, sehingga verifikasi kepemilikan dan penerbitan sertifikat harus
+dirancang lebih dulu.
+
 ## Urutan
 
 1. PR #122 (jalur offline dibuang) dan PR #124 (fondasi Core) masuk.
 2. Lisensi yang mengunci masuk.
 3. PS-01..08 dan PA-01..04.
-4. Uji di server kedua bersama E2E-01 PRD Harbor: dari tenant baru sampai admin klien masuk dengan kata
-   sandi sementara dan diminta menggantinya.
+4. Pemasangan pertama di server klien — **selesai 16 September 2026**, lihat bagian keadaan di atas.
+5. Sisa E2E-01 PRD Harbor di VPS yang port 80 dan 443-nya kosong: pembaruan, pembaruan gagal lalu mundur,
+   dan admin klien masuk dengan kata sandi sementara lalu diminta menggantinya. PA-07 ikut terjawab di
+   mesin yang sama.
+6. PA-05, PA-06, PS-09, dan PS-10 — tidak menunggu server, kecuali pembuktian PA-06 dan PS-09.
 
 ## Kriteria terima
 
