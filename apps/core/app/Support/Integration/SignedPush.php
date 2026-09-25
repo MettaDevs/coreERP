@@ -49,17 +49,24 @@ final class SignedPush
         if ($client->delivery_mode !== IntegrationClient::PUSH || $client->push_url === null || $client->signing_secret === null) {
             throw new RuntimeException('Klien integrasi ini tidak memakai mode push.');
         }
-        $tolak = $this->tujuan->reject($client->push_url);
-        if ($tolak !== null) {
-            throw new RuntimeException($tolak);
+        $periksa = $this->tujuan->inspect($client->push_url);
+        if ($periksa['reason'] !== null) {
+            throw new RuntimeException($periksa['reason']);
         }
 
         $tanda = self::sign($client->signing_secret, $body);
 
         // Redirect tidak diikuti: tujuan yang sudah lolos PushDestination bisa mengalihkan ke
         // jaringan privat, dan pengalihan itu tidak pernah diperiksa. Jawaban 3xx dihitung gagal.
+        $opsi = ['allow_redirects' => false];
+        // Di SaaS, cURL memakai alamat yang baru saja diperiksa, bukan hasil resolusi DNS keduanya
+        // sendiri. Nama host tetap dipakai untuk SNI dan verifikasi sertifikat.
+        if ($periksa['pin'] !== []) {
+            $opsi['curl'] = [CURLOPT_RESOLVE => $periksa['pin']];
+        }
+
         return Http::acceptJson()
-            ->withOptions(['allow_redirects' => false])
+            ->withOptions($opsi)
             ->connectTimeout(3)
             ->timeout(10)
             ->withBody($body, 'application/json')
