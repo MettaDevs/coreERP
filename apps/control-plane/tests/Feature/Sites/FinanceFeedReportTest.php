@@ -28,6 +28,9 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'ringkasan lengkap' => [self::feed(['held' => 1, 'pending' => 3, 'posted' => 120, 'rejected' => 2, 'manual' => 4], '2026-09-20T03:00:00Z', '2026-09-23T07:55:00Z')];
         yield 'belum ada posting dan pull' => [self::feed([], null, null)];
         yield 'tidak terbaca dari Core' => [null];
+        // Angka push (TODO 14.6) datang berpasangan dari Core yang sudah mengenalnya.
+        yield 'dengan angka push' => [[...self::feed(['pending' => 3, 'posted' => 12], '2026-09-20T03:00:00Z', null), 'last_pushed_at' => '2026-09-23T07:40:00Z', 'failed_pushes' => 2]];
+        yield 'push belum pernah terjadi' => [[...self::feed([], null, null), 'last_pushed_at' => null, 'failed_pushes' => 0]];
     }
 
     /** @param  array<string, mixed>|null  $feed */
@@ -78,6 +81,12 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'pull terakhir tidak disebut' => [array_diff_key($sah, ['last_pulled_at' => true])];
         yield 'waktu dengan zona lain' => [[...$sah, 'oldest_pending_at' => '2026-09-20T10:00:00+07:00']];
         yield 'waktu hanya tanggal' => [[...$sah, 'last_pulled_at' => '2026-09-23']];
+        yield 'push gagal tanpa jam push' => [[...$sah, 'failed_pushes' => 1]];
+        yield 'jam push tanpa jumlah gagal' => [[...$sah, 'last_pushed_at' => '2026-09-23T07:40:00Z']];
+        yield 'push gagal negatif' => [[...$sah, 'last_pushed_at' => null, 'failed_pushes' => -1]];
+        yield 'push gagal berupa teks' => [[...$sah, 'last_pushed_at' => null, 'failed_pushes' => '2']];
+        yield 'push gagal null' => [[...$sah, 'last_pushed_at' => null, 'failed_pushes' => null]];
+        yield 'jam push dengan zona lain' => [[...$sah, 'last_pushed_at' => '2026-09-23T14:40:00+07:00', 'failed_pushes' => 0]];
         yield 'objek kosong' => [(object) []];
         yield 'larik kosong' => [[]];
         yield 'bukan objek' => ['sehat'];
@@ -142,6 +151,8 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'tertahan' => [['finance_feed' => self::feed(['held' => 2], null, null)], 'attention', ['held'], null];
         yield 'pending tepat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T08:00:00Z', $lastPull)], 'healthy', [], 86400];
         yield 'pending lewat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T07:59:59Z', $lastPull)], 'attention', ['pending_old'], 86401];
+        yield 'push gagal' => [['finance_feed' => [...self::feed(['pending' => 2, 'posted' => 40], '2026-09-23T05:00:00Z', null), 'last_pushed_at' => '2026-09-23T07:40:00Z', 'failed_pushes' => 1]], 'attention', ['push_failed'], 10800];
+        yield 'push saja tanpa posting dan pull' => [['finance_feed' => [...self::feed([], null, null), 'last_pushed_at' => '2026-09-23T07:40:00Z', 'failed_pushes' => 0]], 'healthy', [], null];
         yield 'semuanya' => [['finance_feed' => self::feed(['held' => 1, 'pending' => 5, 'rejected' => 2], '2026-09-15T00:00:00Z', null)], 'attention', ['rejected', 'held', 'pending_old'], 720000];
     }
 
@@ -193,7 +204,30 @@ class FinanceFeedReportTest extends SiteTestCase
                 ->where('site.financeFeed.counts', ['held' => 0, 'pending' => 4, 'posted' => 90, 'rejected' => 1, 'manual' => 0])
                 ->where('site.financeFeed.oldestPendingAt', '2026-09-23T06:30:00+00:00')
                 ->where('site.financeFeed.oldestPendingSeconds', 5400)
-                ->where('site.financeFeed.lastPulledAt', '2026-09-23T07:59:00+00:00'));
+                ->where('site.financeFeed.lastPulledAt', '2026-09-23T07:59:00+00:00')
+                // Core di laporan ini belum mengirim angka push: layarnya menulis "Belum dilaporkan", bukan nol.
+                ->where('site.financeFeed.pushReported', false)
+                ->where('site.financeFeed.failedPushes', null));
+    }
+
+    /** Angka push dari laporan sampai ke halaman, dan kiriman yang gagal menandai feed (TODO 14.6). */
+    public function test_failed_pushes_reach_the_site_page(): void
+    {
+        $site = $this->enrolledSite();
+
+        $this->agent('POST', '/api/agent/v1/report', $site, $this->report($site, [
+            'server_time' => self::SERVER_TIME,
+            'finance_feed' => [...self::feed(['pending' => 3, 'posted' => 90], '2026-09-23T06:30:00Z', null), 'last_pushed_at' => '2026-09-23T07:40:00Z', 'failed_pushes' => 2],
+        ]))->assertOk();
+
+        $this->actingAs($this->operator())->get("/situs/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('site.financeFeed.state', 'attention')
+                ->where('site.financeFeed.alerts', ['push_failed'])
+                ->where('site.financeFeed.pushReported', true)
+                ->where('site.financeFeed.lastPushedAt', '2026-09-23T07:40:00+00:00')
+                ->where('site.financeFeed.failedPushes', 2));
     }
 
     /**

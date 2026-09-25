@@ -399,7 +399,8 @@ Hasil studi halaman *Vendors* di F&O dan BC (TODO 2.1), dan bentuk yang dibangun
   bentuk yang sama dengan pratinjau (masalah per baris dan jalan pintas ke perbaikannya), aksi
   "tandai manual" dengan alasan, "validasi ulang", dan riwayat pull, kirim, dan ack.
 - **Laporan agent** membawa `finance_feed`: jumlah `pending`, `held`, `rejected`, umur posting
-  `pending` tertua, dan waktu pull terakhir. Control-plane menampilkannya di halaman site,
+  `pending` tertua, waktu pull terakhir, serta waktu push terakhir dan jumlah push yang gagal
+  (TODO 14.6). Control-plane menampilkannya di halaman site,
   supaya masalah terlihat sebelum klien menelepon.
 
 ## Di luar cakupan

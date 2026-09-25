@@ -85,6 +85,10 @@ type FinanceFeed = {
     oldestPendingAt: string | null;
     oldestPendingSeconds: number | null;
     lastPulledAt: string | null;
+    /** Core di server ini sudah mengirim angka push; `false` untuk rilis Core yang lebih lama dari agennya. */
+    pushReported: boolean;
+    lastPushedAt: string | null;
+    failedPushes: number | null;
     alerts: string[];
     pendingAlertHours: number;
 };
@@ -752,9 +756,9 @@ function feedStateHint(feed: FinanceFeed, reported: boolean): string | null {
         case 'unreadable':
             return 'Agen tidak mendapat ringkasan dari Core. Rilis Core di server ini mungkin belum memilikinya, atau core-app tidak menjawab.';
         case 'unused':
-            return 'Belum ada posting dan aplikasi finance belum pernah melakukan pull.';
+            return 'Belum ada posting, dan aplikasi finance belum pernah melakukan pull maupun menerima push.';
         case 'healthy':
-            return `Tidak ada yang ditolak atau tertahan, dan tidak ada yang pending lebih dari ${feed.pendingAlertHours} jam.`;
+            return `Tidak ada yang ditolak, tertahan, atau gagal di-push, dan tidak ada yang pending lebih dari ${feed.pendingAlertHours} jam.`;
         default:
             return null;
     }
@@ -768,6 +772,8 @@ function feedAlertText(alert: string, feed: FinanceFeed): string {
             return `${COUNT.format(counts.rejected ?? 0)} posting ditolak aplikasi finance.`;
         case 'held':
             return `${COUNT.format(counts.held ?? 0)} posting tertahan di CoreERP dan belum dapat sampai ke aplikasi finance.`;
+        case 'push_failed':
+            return `${COUNT.format(feed.failedPushes ?? 0)} kiriman push gagal dan tidak dicoba lagi otomatis. Postingnya masih pending; periksa alamat tujuan klien integrasinya.`;
         case 'pending_old':
             return `Posting pending tertua sudah menunggu ${durationText(feed.oldestPendingSeconds ?? 0)}, lebih lama dari ${feed.pendingAlertHours} jam.`;
         default:
@@ -792,6 +798,7 @@ function FinanceFeedSection({
     const hint = feedStateHint(feed, reported);
     const pendingOld = feed.alerts.includes('pending_old');
     const pulled = relativeTime(feed.lastPulledAt);
+    const pushed = relativeTime(feed.lastPushedAt);
 
     return (
         <Section
@@ -869,6 +876,28 @@ function FinanceFeedSection({
                             {feed.lastPulledAt
                                 ? `${dateTimeText(feed.lastPulledAt)}${pulled ? ` (${pulled})` : ''}`
                                 : 'Belum pernah di-pull'}
+                        </Row>
+                        <Row label="Push terakhir">
+                            {!feed.pushReported
+                                ? 'Belum dilaporkan'
+                                : feed.lastPushedAt
+                                  ? `${dateTimeText(feed.lastPushedAt)}${pushed ? ` (${pushed})` : ''}`
+                                  : 'Belum pernah ada push'}
+                        </Row>
+                        <Row label="Push gagal">
+                            {!feed.pushReported ? (
+                                'Belum dilaporkan'
+                            ) : (
+                                <span
+                                    className={
+                                        (feed.failedPushes ?? 0) > 0
+                                            ? 'text-red-700 dark:text-red-300'
+                                            : undefined
+                                    }
+                                >
+                                    {COUNT.format(feed.failedPushes ?? 0)}
+                                </span>
+                            )}
                         </Row>
                     </dl>
                 </>

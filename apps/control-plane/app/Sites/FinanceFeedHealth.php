@@ -11,7 +11,8 @@ use Illuminate\Support\Carbon;
  * finance area 14).
  *
  * Angkanya disusun Core di server klien (`finance-postings:summary`) dan dibawa agen: jumlah posting per status, jam
- * terbit posting `pending` tertua, dan jam pull terakhir pembaca. Konsol tidak pernah melihat isi jurnalnya (K-02);
+ * terbit posting `pending` tertua, jam pull terakhir pembaca, dan — untuk klien mode push — jam kiriman push terakhir
+ * yang berhasil serta jumlah kiriman yang berhenti gagal (TODO 14.6). Konsol tidak pernah melihat isi jurnalnya (K-02);
  * rinciannya ada di layar Posting finance › Pantau posting pada aplikasi server itu. Yang dikerjakan di sini hanya
  * menilai angka itu, supaya layar dan test membaca penilaian yang sama.
  *
@@ -19,8 +20,12 @@ use Illuminate\Support\Carbon;
  * | --- | --- |
  * | `not_reported` | Belum ada laporan, atau laporan agen lama yang belum mengenal `finance_feed`. Sah: agen di server klien diperbarui sesudah konsol |
  * | `unreadable` | Agen mengenal bidangnya tetapi tidak mendapat ringkasan dari Core — belum ada rilis sehat, Core tidak menjawab, atau rilis Core belum punya perintahnya |
- * | `unused` | Belum ada satu posting pun dan belum pernah ada pull: feed belum dipakai di server ini |
- * | `attention` | Ada posting `rejected` atau `held`, atau posting `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` |
+ * | `unused` | Belum ada satu posting pun, belum pernah ada pull, dan belum pernah ada push: feed belum dipakai di server ini |
+ * | `attention` | Ada posting `rejected` atau `held`, kiriman push yang gagal, atau posting `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` |
+ *
+ * Dua angka push hanya ada bila Core di server klien sudah mengirimnya; Core yang lebih lama dari agennya tidak
+ * menyebutnya, dan layar menulis "Belum dilaporkan" untuk keduanya (`failedPushes` dan `lastPushedAt` bernilai
+ * `null`, bukan nol).
  * | `healthy` | Selain itu |
  */
 final class FinanceFeedHealth
@@ -43,7 +48,7 @@ final class FinanceFeedHealth
 
     /**
      * @param  ?array<string, mixed>  $report  laporan agen terakhir, `sites.last_report`, yang sudah lolos `SiteReports::validate()`
-     * @return array{state: string, counts: ?array<string, int>, oldestPendingAt: ?string, oldestPendingSeconds: ?int, lastPulledAt: ?string, alerts: list<string>, pendingAlertHours: int}
+     * @return array{state: string, counts: ?array<string, int>, oldestPendingAt: ?string, oldestPendingSeconds: ?int, lastPulledAt: ?string, pushReported: bool, lastPushedAt: ?string, failedPushes: ?int, alerts: list<string>, pendingAlertHours: int}
      */
     public static function fromReport(?array $report): array
     {
@@ -52,6 +57,9 @@ final class FinanceFeedHealth
             'oldestPendingAt' => null,
             'oldestPendingSeconds' => null,
             'lastPulledAt' => null,
+            'pushReported' => false,
+            'lastPushedAt' => null,
+            'failedPushes' => null,
             'alerts' => [],
             'pendingAlertHours' => self::PENDING_ALERT_HOURS,
         ];
@@ -75,6 +83,9 @@ final class FinanceFeedHealth
 
         $oldestPendingAt = self::time($feed['oldest_pending_at'] ?? null);
         $lastPulledAt = self::time($feed['last_pulled_at'] ?? null);
+        $pushReported = array_key_exists('failed_pushes', $feed);
+        $lastPushedAt = self::time($feed['last_pushed_at'] ?? null);
+        $failedPushes = $pushReported && is_int($feed['failed_pushes']) ? $feed['failed_pushes'] : null;
 
         // Umur terhadap jam server klien di laporan yang sama, bukan jam konsol. Kedua waktunya dari jam yang sama,
         // jadi selisih jam server klien terhadap konsol tidak ikut; yang terbaca adalah umurnya saat laporan terakhir.
@@ -95,6 +106,12 @@ final class FinanceFeedHealth
             $alerts[] = 'held';
         }
 
+        // Kiriman push yang gagal berhenti dan menunggu tangan manusia; tanpa tanda ini ia hanya terlihat sebagai
+        // `pending` yang menua (TODO 14.6).
+        if ($failedPushes !== null && $failedPushes > 0) {
+            $alerts[] = 'push_failed';
+        }
+
         if ($oldestPendingSeconds !== null && $oldestPendingSeconds > self::PENDING_ALERT_HOURS * 3600) {
             $alerts[] = 'pending_old';
         }
@@ -102,13 +119,16 @@ final class FinanceFeedHealth
         return [
             'state' => match (true) {
                 $alerts !== [] => 'attention',
-                array_sum($counts) === 0 && $lastPulledAt === null => 'unused',
+                array_sum($counts) === 0 && $lastPulledAt === null && $lastPushedAt === null => 'unused',
                 default => 'healthy',
             },
             'counts' => $counts,
             'oldestPendingAt' => $oldestPendingAt?->toIso8601String(),
             'oldestPendingSeconds' => $oldestPendingSeconds,
             'lastPulledAt' => $lastPulledAt?->toIso8601String(),
+            'pushReported' => $pushReported,
+            'lastPushedAt' => $lastPushedAt?->toIso8601String(),
+            'failedPushes' => $failedPushes,
             'alerts' => $alerts,
             'pendingAlertHours' => self::PENDING_ALERT_HOURS,
         ];

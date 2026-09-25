@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Finance;
 
 use App\Models\FinancePosting;
+use App\Models\FinancePostingDelivery;
 use App\Models\IntegrationClient;
 use Illuminate\Support\Carbon;
 
@@ -12,7 +13,8 @@ use Illuminate\Support\Carbon;
  * Ringkasan kesehatan feed posting finance untuk admin.erp (TODO feed posting finance 14.1, K-02).
  *
  * Yang keluar dari sini hanya angka dan waktu: jumlah posting per status, jam terbit posting `pending`
- * tertua, dan jam pull terakhir. Tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
+ * tertua, jam pull terakhir, serta — untuk klien mode push (TODO 14.6) — jam kiriman push terakhir yang
+ * diterima pembaca dan jumlah kiriman yang berhenti gagal. Tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
  * nilai uang. Ringkasan ini dibawa agen situs ke admin.erp, sedangkan data keuangan tenant tidak boleh keluar
  * dari server tempat datanya berada (K-02). Pembacanya perintah `finance-postings:summary`.
  *
@@ -41,7 +43,7 @@ final class PostingFeedSummary
     ];
 
     /**
-     * @return array{counts: array<string, int>, oldest_pending_at: ?string, last_pulled_at: ?string}
+     * @return array{counts: array<string, int>, oldest_pending_at: ?string, last_pulled_at: ?string, last_pushed_at: ?string, failed_pushes: int}
      */
     public function read(): array
     {
@@ -61,6 +63,15 @@ final class PostingFeedSummary
             'oldest_pending_at' => $this->utc(FinancePosting::query()->where('status', FinancePosting::PENDING)->min('published_at')),
             // Klien mode pull mana pun, termasuk yang sudah dicabut: pull terakhirnya tetap pull terakhir yang terjadi.
             'last_pulled_at' => $this->utc(IntegrationClient::query()->max('last_pulled_at')),
+            // Sejajar dengan pull terakhir: klien mana pun, termasuk yang sudah dicabut.
+            'last_pushed_at' => $this->utc(FinancePostingDelivery::query()->max('delivered_at')),
+            // Hanya yang masih menunggu tangan manusia: postingnya belum sampai (`pending`) dan kliennya masih
+            // hidup. Posting yang sudah ditandai manual atau di-ack lewat pull tidak menandai feed selamanya.
+            'failed_pushes' => FinancePostingDelivery::query()
+                ->where('status', FinancePostingDelivery::FAILED)
+                ->whereHas('posting', fn ($posting) => $posting->where('status', FinancePosting::PENDING))
+                ->whereIn('integration_client_id', IntegrationClient::query()->whereNull('revoked_at')->select('id'))
+                ->count(),
         ];
     }
 

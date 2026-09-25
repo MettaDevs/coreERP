@@ -555,7 +555,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - [Number sequence](14-number-sequences.md) — nomor vendor `core.vendor`, reference milik Core.
 - [UI modul di dalam shell](27-ui-modul-dalam-shell.md) — alamat layar module untuk `source_document.url` dan `mapping.fix_url`.
 - [Pelaporan kesalahan](28-pelaporan-kesalahan.md) — ke mana `PostingTidakSah` pergi.
-- [admin.erp](31-admin-erp-control-plane.md#kesehatan-feed-posting-finance) — ringkasan jumlah per status, `pending` tertua, dan pull terakhir tiap server klien (`finance-postings:summary`).
+- [admin.erp](31-admin-erp-control-plane.md#kesehatan-feed-posting-finance) — ringkasan jumlah per status, `pending` tertua, pull terakhir, serta push terakhir dan push yang gagal tiap server klien (`finance-postings:summary`).
 - [Integrasi sistem eksternal](12-external-module-integration.md) — aturan umum sistem luar yang bertukar data dengan module.
 - [Healthcare finance subledger](17-healthcare-finance-subledger.md) — rancangan posting ke Finance/GL yang lebih luas.
 - [Penyusutan dan bridge backoffice](../todo/managementaset/03-penyusutan-dan-bridge-backoffice.md) — kontrak ekspor lama yang digantikan feed ini.

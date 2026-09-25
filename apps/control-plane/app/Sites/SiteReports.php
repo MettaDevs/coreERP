@@ -102,11 +102,15 @@ final class SiteReports
             'report.license_perpetual' => ['nullable', 'boolean:strict'],
             // Ringkasan feed posting finance dari Core di server klien: jumlah per status dan dua waktu, tanpa isi
             // jurnal. `null` berarti agen tidak mendapatkannya dari Core; kunci yang tidak ada berarti agen lama.
-            'report.finance_feed' => ['nullable', 'array:counts,oldest_pending_at,last_pulled_at'],
+            // Dua kunci push (TODO 14.6) datang berpasangan dan boleh tidak ada: Core di server klien bisa lebih
+            // lama dari agennya.
+            'report.finance_feed' => ['nullable', 'array:counts,oldest_pending_at,last_pulled_at,last_pushed_at,failed_pushes'],
             'report.finance_feed.counts' => [Rule::requiredIf($feed), 'array:'.implode(',', FinanceFeedHealth::STATUSES)],
             ...$feedCounts,
             'report.finance_feed.oldest_pending_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
             'report.finance_feed.last_pulled_at' => [Rule::when($feed, ['present']), 'nullable', self::FEED_TIME],
+            'report.finance_feed.last_pushed_at' => ['present_with:report.finance_feed.failed_pushes', 'nullable', self::FEED_TIME],
+            'report.finance_feed.failed_pushes' => ['present_with:report.finance_feed.last_pushed_at', 'integer:strict', 'min:0'],
         ]);
 
         if ($validator->fails()) {
