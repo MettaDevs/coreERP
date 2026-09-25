@@ -15,9 +15,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * memulangkannya sebagai string dan bukan float.
  *
  * `posting_layer` satu-satunya saklar posting (K-15): buku `none` tidak pernah di-post ke aplikasi
- * finance. Kolom `export_to_backoffice` masih ada di tabel hanya supaya rilis sebelumnya tetap bisa
- * berjalan di atas skema ini (aturan N-1); tidak ada kode yang membaca atau menulisnya lagi, dan
- * kolomnya dibuang satu rilis kemudian (TODO 8.4.3).
+ * finance. Saklar lama `export_to_backoffice` sudah dibuang (TODO 8.4.3).
  *
  * @property string $posting_layer
  * @property string $round_off_depreciation
