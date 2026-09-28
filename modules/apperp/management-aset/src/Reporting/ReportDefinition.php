@@ -35,7 +35,12 @@ interface ReportDefinition
      * Daftar placeholder yang boleh dipakai layout, setara "Available Fields" BC. Kolom
      * tabel diberi nama tabelnya supaya pembuat layout tahu mana yang berulang per baris.
      *
-     * @return list<array{key: string, label: string, table: ?string}>
+     * Placeholder uang, persen, tanggal, dan bulan menyatakan `type` (`money`, `percent`,
+     * `date`, `month`) dan dikirim mentah dari {@see data()}; Core yang memformatnya, sama
+     * seperti `AutoFormatType` pada kolom laporan BC. Jangan memformat rupiah atau tanggal
+     * di definisi: teks "Rp …" tidak dapat dijumlah di Excel.
+     *
+     * @return list<array{key: string, label: string, table: ?string, type?: string}>
      */
     public function fields(): array;
 

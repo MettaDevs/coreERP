@@ -3,9 +3,11 @@
 namespace App\Support\Reporting\Rendering;
 
 use App\Support\Reporting\ReportData;
+use App\Support\Reporting\ValueFormat;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
@@ -21,7 +23,9 @@ use Throwable;
  * menggeser referensinya, seperti Excel sendiri saat baris disisipkan.
  *
  * Sel yang seluruh isinya satu placeholder bernilai angka ditulis sebagai angka, supaya
- * kolom jam dan jumlah dapat dijumlahkan pengguna di Excel.
+ * kolom jam dan jumlah dapat dijumlahkan pengguna di Excel. Placeholder yang menyatakan
+ * tipenya (`money`, `date`, …) ditulis sebagai angka atau tanggal asli beserta format
+ * selnya, lihat {@see ValueFormat}; di tengah teks ia ditulis sebagai teks tampilnya.
  */
 final class XlsxTemplateRenderer
 {
@@ -77,7 +81,7 @@ final class XlsxTemplateRenderer
                 $cells[$column] = $sheet->getCell([$column, $row])->getValue();
             }
             if ($count === 0) {
-                $this->writeRow($sheet, $row, $cells, $table, []);
+                $this->writeRow($sheet, $row, $cells, $table, [], $data->formats);
 
                 continue;
             }
@@ -90,7 +94,7 @@ final class XlsxTemplateRenderer
                         $sheet->duplicateStyle($sheet->getStyle("{$from}{$row}"), "{$from}{$target}");
                     }
                 }
-                $this->writeRow($sheet, $target, $cells, $table, $values);
+                $this->writeRow($sheet, $target, $cells, $table, $values, $data->formats);
             }
             if ($count > 1) {
                 $this->extendRangesEndingAt($sheet, $row, $row + $count - 1);
@@ -135,8 +139,9 @@ final class XlsxTemplateRenderer
     /**
      * @param  array<int, mixed>  $cells
      * @param  array<string, string|int|float|null>  $values
+     * @param  array<string, ValueFormat>  $formats
      */
-    private function writeRow(Worksheet $sheet, int $row, array $cells, string $table, array $values): void
+    private function writeRow(Worksheet $sheet, int $row, array $cells, string $table, array $values, array $formats): void
     {
         foreach ($cells as $column => $template) {
             if (! is_string($template) || ! str_contains($template, '${')) {
@@ -148,7 +153,7 @@ final class XlsxTemplateRenderer
                 }
 
                 return $values[substr($macro, strlen($table) + 1)] ?? '';
-            });
+            }, $formats);
         }
     }
 
@@ -196,7 +201,7 @@ final class XlsxTemplateRenderer
                 if (! is_string($value) || ! str_contains($value, '${')) {
                     continue;
                 }
-                $this->writeCell($sheet, $cell->getCoordinate(), $value, fn (string $macro): string|int|float|null => $data->fields[$macro] ?? '');
+                $this->writeCell($sheet, $cell->getCoordinate(), $value, fn (string $macro): string|int|float|null => $data->fields[$macro] ?? '', $data->formats);
             }
         }
     }
@@ -204,8 +209,9 @@ final class XlsxTemplateRenderer
     /**
      * @param  array{int,int}|string  $coordinate
      * @param  callable(string): (string|int|float|null)  $lookup  Null berarti biarkan placeholder untuk tahap berikutnya.
+     * @param  array<string, ValueFormat>  $formats
      */
-    private function writeCell(Worksheet $sheet, array|string $coordinate, string $template, callable $lookup): void
+    private function writeCell(Worksheet $sheet, array|string $coordinate, string $template, callable $lookup, array $formats): void
     {
         $cell = $sheet->getCell($coordinate);
         if (preg_match(self::WHOLE_CELL_PATTERN, $template, $whole) === 1) {
@@ -213,7 +219,19 @@ final class XlsxTemplateRenderer
             if ($value === null) {
                 return;
             }
-            if (is_int($value) || is_float($value)) {
+            $format = $formats[$whole[1]] ?? null;
+            $typed = $format?->cell($value);
+            if ($typed !== null) {
+                $cell->setValueExplicit($typed[0], DataType::TYPE_NUMERIC);
+                // Format sel yang sudah dipilih pembuat layout dihormati; hanya sel yang masih
+                // "General" yang diberi format bawaan tipenya.
+                $numberFormat = $cell->getStyle()->getNumberFormat();
+                if ($numberFormat->getFormatCode() === NumberFormat::FORMAT_GENERAL) {
+                    $numberFormat->setFormatCode($typed[1]);
+                }
+            } elseif ($format !== null) {
+                $cell->setValueExplicit($format->text($value), DataType::TYPE_STRING);
+            } elseif (is_int($value) || is_float($value)) {
                 $cell->setValueExplicit($value, DataType::TYPE_NUMERIC);
             } else {
                 $cell->setValueExplicit($value, DataType::TYPE_STRING);
@@ -222,10 +240,14 @@ final class XlsxTemplateRenderer
             return;
         }
 
-        $replaced = preg_replace_callback(self::MACRO_PATTERN, function (array $match) use ($lookup): string {
+        $replaced = preg_replace_callback(self::MACRO_PATTERN, function (array $match) use ($lookup, $formats): string {
             $value = $lookup($match[1]);
+            if ($value === null) {
+                return $match[0];
+            }
+            $format = $formats[$match[1]] ?? null;
 
-            return $value === null ? $match[0] : (string) $value;
+            return $format !== null ? $format->text($value) : (string) $value;
         }, $template);
         $cell->setValueExplicit($replaced ?? $template, DataType::TYPE_STRING);
     }
