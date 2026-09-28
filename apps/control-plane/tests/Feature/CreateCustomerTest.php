@@ -138,6 +138,72 @@ class CreateCustomerTest extends TestCase
             && ! isset($request['first_environment_expires_at']));
     }
 
+    /**
+     * Produksi di server klien sampai ke Core sebagai `first_environment_hosting`.
+     *
+     * Tanpa field itu Core melahirkan produksi di server kita, dan operator baru tahu salah ketika
+     * alamat tenantnya melayani tempat kerja kosong yang tidak pernah dipakai klien.
+     */
+    public function test_a_production_on_the_client_server_reaches_core(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response([
+            'tenant_id' => '01hzz', 'environment_id' => '01hzy',
+            'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
+        ], 201)]);
+
+        $this->actingAs($this->operator())->post('/tenant', [
+            ...$this->input(),
+            'first_environment' => 'production',
+            'first_environment_hosting' => 'client_server',
+        ])->assertRedirect();
+
+        Http::assertSent(fn (OutboundRequest $request): bool => $request['first_environment'] === 'production'
+            && $request['first_environment_hosting'] === 'client_server');
+    }
+
+    /**
+     * Jalur lama tidak berubah satu byte pun: produksi di server kita dan demo tidak mengirim field itu.
+     *
+     * Pilihan yang tertinggal di formulir setelah operator berpindah ke demo juga dibuang, bukan
+     * diteruskan — Core akan menolaknya, dan operator melihat galat untuk pilihan yang tidak lagi tampil.
+     */
+    public function test_the_hosting_is_only_sent_for_a_production_on_the_client_server(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response([
+            'tenant_id' => '01hzz', 'environment_id' => null,
+            'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
+        ], 201)]);
+
+        $operator = $this->operator();
+
+        $this->actingAs($operator)->post('/tenant', [
+            ...$this->input(),
+            'first_environment' => 'production',
+            'first_environment_hosting' => 'provider',
+        ])->assertRedirect();
+
+        $this->actingAs($operator)->post('/tenant', [
+            ...$this->input(),
+            'first_environment' => 'demo',
+            'first_environment_expires_at' => now()->addDays(30)->toDateString(),
+            'first_environment_hosting' => 'client_server',
+        ])->assertRedirect();
+
+        Http::assertSentCount(2);
+        Http::assertNotSent(fn (OutboundRequest $request): bool => isset($request['first_environment_hosting']));
+    }
+
+    public function test_an_unknown_hosting_never_reaches_core(): void
+    {
+        Http::preventStrayRequests();
+
+        $this->actingAs($this->operator())->post('/tenant', [
+            ...$this->input(),
+            'first_environment' => 'production',
+            'first_environment_hosting' => 'rumah-klien',
+        ])->assertSessionHasErrors('first_environment_hosting');
+    }
+
     /** @return array<string, mixed> */
     private function input(): array
     {

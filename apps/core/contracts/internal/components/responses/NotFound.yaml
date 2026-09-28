@@ -1,0 +1,4 @@
+description: Resource tidak ada dalam scope tenant ini.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }

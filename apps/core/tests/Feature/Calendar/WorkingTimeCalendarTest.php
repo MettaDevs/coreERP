@@ -11,13 +11,15 @@ use App\Models\WorkingTimeCalendar;
 use App\Models\WorkingTimeTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 class WorkingTimeCalendarTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
-    private function createTenantUser(string $role = 'admin'): array
+    private function createTenantUser(): array
     {
         $slug = 'tenant-'.strtolower(Str::random(6));
 
@@ -39,9 +41,9 @@ class WorkingTimeCalendarTest extends TestCase
         $membership = TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
-            'system_role' => $role,
             'status' => 'active',
         ]);
+        $this->makeOwner($membership);
 
         $org = Organization::create([
             'tenant_id' => $tenant->id,
@@ -61,7 +63,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_working_time_calendar_page_can_be_rendered(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $response = $this
             ->actingAs($user)
@@ -72,7 +74,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_user_can_create_calendar(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $response = $this
             ->actingAs($user)
@@ -94,7 +96,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_user_can_update_calendar(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $calendar = WorkingTimeCalendar::create([
             'tenant_id' => $tenant->id,
@@ -124,7 +126,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_user_can_soft_delete_calendar(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $calendar = WorkingTimeCalendar::create([
             'tenant_id' => $tenant->id,
@@ -146,7 +148,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_user_can_copy_calendar(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $calendar = WorkingTimeCalendar::create([
             'tenant_id' => $tenant->id,
@@ -174,7 +176,7 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_compose_working_times_generates_days_and_lines_accurately(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser('admin');
+        [$user, $tenant, $org] = $this->createTenantUser();
 
         $calendar = WorkingTimeCalendar::create([
             'tenant_id' => $tenant->id,
@@ -235,8 +237,8 @@ class WorkingTimeCalendarTest extends TestCase
 
     public function test_tenant_isolation_is_strictly_enforced(): void
     {
-        [$userA, $tenantA, $orgA] = $this->createTenantUser('admin');
-        [$userB, $tenantB, $orgB] = $this->createTenantUser('admin');
+        [$userA, $tenantA, $orgA] = $this->createTenantUser();
+        [$userB, $tenantB, $orgB] = $this->createTenantUser();
 
         $calendarA = WorkingTimeCalendar::create([
             'tenant_id' => $tenantA->id,

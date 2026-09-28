@@ -15,7 +15,7 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariable;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
-use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeAssetType;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeJenisAset;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 
@@ -36,35 +36,35 @@ final class MaintenanceSetupLinkController extends Controller
     // melanggar batas modul dan tidak akan pernah cocok dengan kompetensi pekerja. Dibangun
     // ulang sebagai referensi ke Workforce Core ketika kontraknya tersedia.
 
-    public function jobTypeAssetTypes(Request $request, string $jobTypeId): JsonResponse
+    public function jobTypeAsetTypes(Request $request, string $jobTypeId): JsonResponse
     {
         $this->jobType($jobTypeId);
         $this->permission($request, 'maintenance-job-types', 'read');
 
-        return response()->json($this->assetTypeTransfer($jobTypeId, 'job_type_id'));
+        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id'));
     }
 
-    public function replaceJobTypeAssetTypes(Request $request, string $jobTypeId): JsonResponse
+    public function replaceJobTypeAsetTypes(Request $request, string $jobTypeId): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->jobType($jobTypeId);
         $this->permission($request, 'maintenance-job-types', 'update');
 
-        $data = $request->validate($this->assetTypeIdsRules($tenant));
-        $this->replaceAssetTypeLink($jobTypeId, $data['jenis_aset_ids']);
+        $data = $request->validate($this->asetTypeIdsRules($tenant));
+        $this->replaceAsetTypeLink($jobTypeId, $data['jenis_aset_ids']);
 
-        return response()->json($this->assetTypeTransfer($jobTypeId, 'job_type_id'));
+        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id'));
     }
 
-    public function jenisAsetAssetTypes(Request $request, string $jenisAsetId): JsonResponse
+    public function jenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
     {
         $this->jenisAset($jenisAsetId);
         $this->permission($request, 'jenis-aset', 'read');
 
-        return response()->json($this->assetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
+        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
     }
 
-    public function replaceJenisAsetAssetTypes(Request $request, string $jenisAsetId): JsonResponse
+    public function replaceJenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
     {
         $tenant = $this->tenant($request);
         $this->jenisAset($jenisAsetId);
@@ -74,22 +74,22 @@ final class MaintenanceSetupLinkController extends Controller
         DB::transaction(function () use ($jenisAsetId, $data): void {
             // Dikunci dari sisi job type, bukan sisi jenis aset, karena arah yang
             // satunya juga mengunci job type. Lihat lockJobTypes().
-            $current = MaintenanceJobTypeAssetType::query()
+            $current = MaintenanceJobTypeJenisAset::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->pluck('job_type_id')->all();
             $this->lockJobTypes([...$current, ...$data['jenis_aset_ids']]);
 
-            MaintenanceJobTypeAssetType::query()->where('jenis_aset_id', $jenisAsetId)->delete();
+            MaintenanceJobTypeJenisAset::query()->where('jenis_aset_id', $jenisAsetId)->delete();
             foreach ($data['jenis_aset_ids'] as $jobTypeId) {
                 $this->jobType($jobTypeId);
-                MaintenanceJobTypeAssetType::query()->create([
+                MaintenanceJobTypeJenisAset::query()->create([
                     'job_type_id' => $jobTypeId,
                     'jenis_aset_id' => $jenisAsetId,
                 ]);
             }
         });
 
-        return response()->json($this->assetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
+        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
     }
 
     public function variableValues(Request $request, string $variableId): JsonResponse
@@ -234,9 +234,9 @@ final class MaintenanceSetupLinkController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function assetTypeTransfer(string $id, string $column): array
+    private function asetTypeTransfer(string $id, string $column): array
     {
-        $selectedIds = MaintenanceJobTypeAssetType::query()->where($column, $id)
+        $selectedIds = MaintenanceJobTypeJenisAset::query()->where($column, $id)
             ->pluck($column === 'job_type_id' ? 'jenis_aset_id' : 'job_type_id')->all();
         $selectedIds = array_map('strval', $selectedIds);
         $lawan = $column === 'job_type_id' ? JenisAset::class : MaintenanceJobType::class;
@@ -249,13 +249,13 @@ final class MaintenanceSetupLinkController extends Controller
     }
 
     /** @param  list<string>  $jenisAsetIds */
-    private function replaceAssetTypeLink(string $jobTypeId, array $jenisAsetIds): void
+    private function replaceAsetTypeLink(string $jobTypeId, array $jenisAsetIds): void
     {
         DB::transaction(function () use ($jobTypeId, $jenisAsetIds): void {
             $this->lockJobTypes([$jobTypeId]);
-            MaintenanceJobTypeAssetType::query()->where('job_type_id', $jobTypeId)->delete();
+            MaintenanceJobTypeJenisAset::query()->where('job_type_id', $jobTypeId)->delete();
             foreach ($jenisAsetIds as $jenisAsetId) {
-                MaintenanceJobTypeAssetType::query()->create([
+                MaintenanceJobTypeJenisAset::query()->create([
                     'job_type_id' => $jobTypeId,
                     'jenis_aset_id' => $jenisAsetId,
                 ]);
@@ -264,7 +264,7 @@ final class MaintenanceSetupLinkController extends Controller
     }
 
     /** @return array<string, list<mixed>> */
-    private function assetTypeIdsRules(string $tenant): array
+    private function asetTypeIdsRules(string $tenant): array
     {
         return [
             'jenis_aset_ids' => ['present', 'array', 'max:200'],
@@ -302,7 +302,7 @@ final class MaintenanceSetupLinkController extends Controller
     /**
      * Mengunci baris job type yang terlibat, selalu terurut menurut id.
      *
-     * `aset_m_maintenance_job_type_asset_type` disunting dari dua arah: per job type dan
+     * `aset_m_maintenance_job_type_jenis_aset` disunting dari dua arah: per job type dan
      * per jenis aset. Mengunci baris pemilik masing-masing arah tidak menolong,
      * karena keduanya akan memegang kunci pada tabel yang berbeda dan tetap saling
      * menimpa. Karena itu kedua arah mengunci sisi yang sama, yaitu job type: dua

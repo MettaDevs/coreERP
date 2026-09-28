@@ -53,6 +53,16 @@ final class EnvironmentProvisioningController extends Controller
             return response()->json(['message' => 'Lingkungan itu tidak ada di registry.'], 404);
         }
 
+        // Sebelum status, karena produksi server klien lahir `provisioning` — status yang lolos
+        // pemeriksaan di bawah. 409, sama seperti status yang salah: barisnya ada dan permintaannya
+        // berbentuk benar, yang salah tempat lingkungan itu berjalan. Perintahnya menolak juga; yang
+        // di sini supaya jawabannya kalimat, bukan 422 berisi keluaran perintah yang gagal.
+        if ($environment->hostedOnClientServer()) {
+            return response()->json([
+                'message' => $environment->clientServerRefusal('Penyiapan database'),
+            ], 409);
+        }
+
         if (! in_array($environment->status, ['provisioning', 'degraded'], true)) {
             // 409, bukan 422. Permintaannya tidak salah bentuk — ia datang ke keadaan yang salah,
             // dan itu keadaan yang bisa berubah sendiri sebelum orangnya menekan tombol.

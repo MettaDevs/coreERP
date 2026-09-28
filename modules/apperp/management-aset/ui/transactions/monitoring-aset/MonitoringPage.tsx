@@ -7,7 +7,7 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { api, errorMessage } from '../../api';
-type Asset = {
+type Aset = {
     id: string;
     kode: string;
     lifecycle_state: string;
@@ -15,11 +15,11 @@ type Asset = {
     currency_code: string;
 };
 export default function MonitoringPage() {
-    const [assets, setAssets] = useState<Asset[]>([]);
+    const [aset, setAset] = useState<Aset[]>([]);
     const [error, setError] = useState('');
     useEffect(() => {
-        api<{ data: Asset[] }>('/aset')
-            .then((x) => setAssets(x.data))
+        api<{ data: Aset[] }>('/aset')
+            .then((x) => setAset(x.data))
             .catch((e) =>
                 setError(errorMessage(e, 'Monitoring belum dapat dimuat.')),
             );
@@ -36,7 +36,7 @@ export default function MonitoringPage() {
                         {error}
                     </p>
                 )}
-                {!assets.length ? (
+                {!aset.length ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
@@ -50,20 +50,20 @@ export default function MonitoringPage() {
                     </Empty>
                 ) : (
                     <div className="divide-y">
-                        {assets.map((asset) => (
+                        {aset.map((aset) => (
                             <div
                                 className="flex items-center justify-between px-5 py-3"
-                                key={asset.id}
+                                key={aset.id}
                             >
                                 <div>
-                                    <p className="font-medium">{asset.kode}</p>
+                                    <p className="font-medium">{aset.kode}</p>
                                     <p className="text-muted-foreground text-sm">
-                                        Status: {asset.lifecycle_state}
+                                        Status: {aset.lifecycle_state}
                                     </p>
                                 </div>
                                 <span>
-                                    {asset.currency_code}{' '}
-                                    {asset.acquisition_value}
+                                    {aset.currency_code}{' '}
+                                    {aset.acquisition_value}
                                 </span>
                             </div>
                         ))}

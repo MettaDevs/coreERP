@@ -1,0 +1,23 @@
+type: object
+required: [id, name, type, number, status, updated_at]
+properties:
+  id: { type: string, format: ulid }
+  name: { type: string }
+  type:
+    type: [string, 'null']
+    description: |
+      Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
+      `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
+      menerima nilai yang belum dikenalnya.
+  number:
+    type: [string, 'null']
+    maxLength: 30
+    pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$'
+    description: |
+      Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
+      nomor pada saat terbit.
+  status: { type: string, description: '`active` atau status nonaktif lain.' }
+  updated_at:
+    type: [string, 'null']
+    format: date-time
+    description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.

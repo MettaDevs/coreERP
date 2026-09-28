@@ -11,7 +11,7 @@ export type DetailSection = {
     fields: FieldConfig[];
     /** Seksi ini memuat matriks buku penyusutan, bukan field biasa. */
     books?: boolean;
-    /** Seksi ini memuat kotak angka bawaan (Attributes/Models/Assets/…), bukan field biasa. */
+    /** Seksi ini memuat kotak angka bawaan (Attributes/Models/Aset/…), bukan field biasa. */
     counters?: boolean;
     /** Seksi ini memuat daftar atribut jenis aset, bukan field biasa. */
     attributes?: boolean;
@@ -75,7 +75,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'bawaan',
                 title: 'Bawaan',
                 defaultOpen: true,
-                fields: pick('asset_location_id'),
+                fields: pick('lokasi_aset_id'),
             },
             { id: 'buku', title: 'Buku penyusutan', books: true, fields: [] },
             { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },

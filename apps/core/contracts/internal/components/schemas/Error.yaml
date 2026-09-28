@@ -1,0 +1,6 @@
+type: object
+required: [message]
+properties:
+  message:
+    type: string
+    description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.

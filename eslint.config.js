@@ -115,6 +115,63 @@ export default [
         },
     },
     {
+        // Sebuah `catch` tidak boleh memulangkan nilai yang juga sah.
+        //
+        // Aturan yang lebih tua — "setiap catch harus menangani, melempar ulang, atau mencatat" —
+        // meloloskan bentuk yang paling sering menipu: `catch { console.log(...); return undefined }`.
+        // Ia sudah mencatat, jadi ia lulus, dan pemanggilnya tetap menerima `undefined` yang
+        // berbunyi persis sama dengan "memang tidak ada". Yang hilang bukan lognya; yang hilang
+        // adalah kemampuan pemanggil membedakan gagal dari kosong.
+        //
+        // Log tidak menutup jarak itu. Log dibaca orang yang sudah curiga; nilai kembali dibaca
+        // kode, saat itu juga, dan kode tidak pernah curiga. Jadi yang dilarang di sini adalah
+        // nilainya, bukan kesunyiannya: pulangkan bentuk yang menyatakan "tidak tahu" — lempar
+        // ulang, atau nilai yang berbeda dari nilai sah mana pun — lalu biarkan pemanggilnya
+        // memutuskan.
+        //
+        // `return;` telanjang sengaja tidak ikut dilarang: pada fungsi `void` ia tidak
+        // menyampaikan fakta apa pun kepada siapa pun, jadi tidak ada yang bisa disalahpahami.
+        //
+        // `return false` pernah ikut dilarang di sini dan dibuang lagi setelah dijalankan. Dua
+        // temuannya benar-benar jujur: `copy()` yang memulangkan false berarti teksnya memang
+        // tidak jadi disalin, dan pembanding URL yang memulangkan false berarti alamat yang tidak
+        // dapat diurai memang bukan alamat yang sedang dibuka. Pada fungsi yang memang menjawab
+        // ya/tidak, `false` adalah jawaban — bukan ketidaktahuan yang menyamar. Aturan yang merah
+        // pada dua kasus benar dari dua temuan adalah aturan yang akan dimatikan orang, bersama
+        // tiga larangan lain yang menumpang di dalamnya.
+        //
+        // Sisi PHP dijaga terpisah oleh
+        // `apps/core/tests/Feature/Boundary/CatchTidakMemalsukanHasilTest.php`.
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: 'CatchClause ReturnStatement > Literal[raw="null"]',
+                    message:
+                        '`catch` yang memulangkan null: pemanggil tidak bisa membedakannya dari "memang tidak ada". Lempar ulang, atau pulangkan bentuk yang menyatakan kegagalan.',
+                },
+                {
+                    selector:
+                        'CatchClause ReturnStatement > Identifier[name="undefined"]',
+                    message:
+                        '`catch` yang memulangkan undefined: pemanggil tidak bisa membedakannya dari nilai yang memang belum diisi. Lempar ulang, atau pulangkan bentuk yang menyatakan kegagalan.',
+                },
+                {
+                    selector:
+                        'CatchClause ReturnStatement > ArrayExpression[elements.length=0]',
+                    message:
+                        '`catch` yang memulangkan larik kosong: pemanggil membacanya sebagai "tidak ada satu pun", padahal yang benar adalah "tidak terbaca". Lempar ulang, atau pulangkan bentuk yang menyatakan kegagalan.',
+                },
+                {
+                    selector:
+                        'CatchClause ReturnStatement > ObjectExpression[properties.length=0]',
+                    message:
+                        '`catch` yang memulangkan objek kosong: pemanggil membacanya sebagai data yang sah dan kebetulan kosong. Lempar ulang, atau pulangkan bentuk yang menyatakan kegagalan.',
+                },
+            ],
+        },
+    },
+    {
         // laravel/chisel menghapus kode di antara sepasang penanda `@chisel-*` saat sebuah
         // fitur dimatikan. Penanda itu berada di tengah blok impor, dan import/order menata
         // ulang impor melewatinya: penandanya berpindah, isinya berubah, dan penghapusan

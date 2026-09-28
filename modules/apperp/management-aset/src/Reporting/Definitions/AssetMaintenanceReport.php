@@ -7,7 +7,7 @@ namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetChecklist;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
@@ -110,8 +110,8 @@ final class AssetMaintenanceReport implements ReportDefinition
                 $join->on('wo.id', '=', 'aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id')
                     ->on('wo.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id');
             })
-            ->join('aset_tr_penerimaan_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_pemeliharaan_aset_details.asset_id')
+            ->join('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', 'aset_tr_pemeliharaan_aset_details.aset_id')
                     ->on('aset.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id');
             })
             ->leftJoin('aset_m_maintenance_job_type as job_type', function ($join): void {
@@ -152,7 +152,7 @@ final class AssetMaintenanceReport implements ReportDefinition
             $query->where('aset.jenis_aset_id', $parameters['jenis_aset_id']);
         }
         if (! empty($parameters['asset_id'])) {
-            $query->where('aset_tr_pemeliharaan_aset_details.asset_id', $parameters['asset_id']);
+            $query->where('aset_tr_pemeliharaan_aset_details.aset_id', $parameters['asset_id']);
         }
         if (! empty($parameters['dari'])) {
             $query->where('wo.created_at', '>=', $parameters['dari'].' 00:00:00');
@@ -217,7 +217,7 @@ final class AssetMaintenanceReport implements ReportDefinition
             : 'Semua jenis';
 
         $asetLabel = ! empty($parameters['asset_id'])
-            ? (Asset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
+            ? (Aset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
             : 'Semua aset';
 
         $nomor = 1;

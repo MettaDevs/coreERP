@@ -18,7 +18,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  *
  * @property ?string $kelompok_harta_fiskal_id
  * @property ?string $property_type
- * @property ?string $asset_location_id
+ * @property ?string $lokasi_aset_id
  * @property ?string $capitalization_threshold
  * @property ?string $tipe_harta
  * @property ?string $default_depreciation_profile_id
@@ -32,16 +32,17 @@ class GroupAset extends MasterData
      * dan barang ekstrakomptabel pada penatausahaan barang di Indonesia.
      *
      * Sifat harta — berwujud, tidak berwujud, hak guna — sengaja tidak disimpan di sini.
-     * Klasifikasi itu menentukan akun, dan akun ditentukan posting profile milik Finance,
-     * bukan modul ini. Aset yang perlu dibedakan sifatnya dibedakan dengan group sendiri.
+     * Klasifikasi itu menentukan akun, dan akun ditentukan posting group aset
+     * (`AssetPostingGroup`), bukan field group. Aset yang perlu dibedakan sifatnya dibedakan
+     * dengan group sendiri.
      */
-    public const PROPERTY_TYPE = ['fixed_asset', 'inventory_item', 'other'];
+    public const PROPERTY_TYPE = ['fixed_aset', 'inventory_item', 'other'];
 
     protected $table = 'aset_m_group_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
-        'kelompok_harta_fiskal_id', 'property_type', 'asset_location_id',
+        'kelompok_harta_fiskal_id', 'property_type', 'lokasi_aset_id',
         'capitalization_threshold',
     ];
 

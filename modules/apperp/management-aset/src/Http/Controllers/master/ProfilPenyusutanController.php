@@ -8,7 +8,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
 /**
@@ -88,7 +88,7 @@ class ProfilPenyusutanController extends MasterDataController
             return;
         }
 
-        $used = AssetBook::query()
+        $used = BukuAset::query()
             ->where(fn ($query) => $query
                 ->where('depreciation_profile_id', $record->getKey())
                 ->orWhere('alternative_profile_id', $record->getKey()))

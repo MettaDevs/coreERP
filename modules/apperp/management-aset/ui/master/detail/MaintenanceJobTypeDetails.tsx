@@ -55,12 +55,12 @@ export default function MaintenanceJobTypeDetails({
         // setelah panel dilepas dibuang lewat `dilepas`.
         const muat = async () => {
             try {
-                const [variantResult, assetTypeResult] = await Promise.all([
+                const [variantResult, asetTypeResult] = await Promise.all([
                     api<{ data: Variant[] }>(
                         `/maintenance-job-types/${jobTypeId}/variants`,
                     ),
                     api<{ data: { remaining: Choice[]; selected: Choice[] } }>(
-                        `/maintenance-job-types/${jobTypeId}/asset-types`,
+                        `/maintenance-job-types/${jobTypeId}/jenis-aset`,
                     ),
                 ]);
 
@@ -69,8 +69,8 @@ export default function MaintenanceJobTypeDetails({
                 }
 
                 setVariants(variantResult.data);
-                setRemaining(assetTypeResult.data.remaining.map(choiceItem));
-                setSelected(assetTypeResult.data.selected.map(choiceItem));
+                setRemaining(asetTypeResult.data.remaining.map(choiceItem));
+                setSelected(asetTypeResult.data.selected.map(choiceItem));
                 setError('');
             } catch (caught) {
                 if (dilepas) {
@@ -134,12 +134,12 @@ export default function MaintenanceJobTypeDetails({
         }
     }
 
-    async function saveAssetTypes() {
+    async function saveAsetTypes() {
         setBusy(true);
         setError('');
 
         try {
-            await api(`/maintenance-job-types/${jobTypeId}/asset-types`, {
+            await api(`/maintenance-job-types/${jobTypeId}/jenis-aset`, {
                 method: 'PUT',
                 body: JSON.stringify({
                     jenis_aset_ids: selected.map((item) => item.id),
@@ -267,7 +267,7 @@ export default function MaintenanceJobTypeDetails({
                     <Button
                         type="button"
                         disabled={busy}
-                        onClick={() => void saveAssetTypes()}
+                        onClick={() => void saveAsetTypes()}
                     >
                         {busy ? 'Menyimpan…' : 'Simpan relasi jenis aset'}
                     </Button>

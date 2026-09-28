@@ -147,7 +147,7 @@ export function setup() {
         const jenisAset = [];
 
         for (let slot = 0; slot < 4; slot++) {
-            const aset = buatMaster(tenant, 'jenis-aset', `Race jenis aset ${RUN_ID}-${slot}`, `mnt-race-asset-${RUN_ID}-${index}-${slot}`);
+            const aset = buatMaster(tenant, 'jenis-aset', `Race jenis aset ${RUN_ID}-${slot}`, `mnt-race-aset-${RUN_ID}-${index}-${slot}`);
 
             if (aset.status !== 200 && aset.status !== 201) {
                 fail(`setup jenis aset gagal: ${aset.status} ${String(aset.body).slice(0, 300)}`);
@@ -188,9 +188,9 @@ function linkRace(data) {
 
     const tulis = record(
         http.put(
-            `${ASET('maintenance-job-types')}/${arena.jobTypeId}/asset-types`,
+            `${ASET('maintenance-job-types')}/${arena.jobTypeId}/jenis-aset`,
             JSON.stringify({ jenis_aset_ids: diminta }),
-            paramsUntuk(tenant, { tags: { op: 'replace', resource: 'job-type-asset-types' } }),
+            paramsUntuk(tenant, { tags: { op: 'replace', resource: 'job-type-jenis-aset' } }),
         ),
         writeLatency,
         'replace',
@@ -198,7 +198,7 @@ function linkRace(data) {
     check(tulis, { 'replace diterima': (response) => response.status === 200 });
 
     const baca = record(
-        http.get(`${ASET('maintenance-job-types')}/${arena.jobTypeId}/asset-types`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'job-type-asset-types' } })),
+        http.get(`${ASET('maintenance-job-types')}/${arena.jobTypeId}/jenis-aset`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'job-type-jenis-aset' } })),
         readLatency,
         'read',
     );

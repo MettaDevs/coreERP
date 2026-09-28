@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\AppServiceCredential;
 use App\Models\ModuleInstallation;
+use App\Support\License\SiteLicense;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,9 +76,18 @@ class AuthenticateAppService
      * Penentu sebelumnya — artifact ditempatkan, migration berhasil, runtime dinyatakan siap —
      * milik jalur hosting container, dan ia ikut dibuang bersama jalur itu. Mempertahankannya
      * berarti menolak setiap pemanggil, karena tidak ada lagi yang menulis `app_placements`.
+     *
+     * Lisensi situs ditanyakan lebih dulu, tanpa menyentuh database. App yang tidak tercantum di
+     * lisensi — atau semua app ketika lisensinya terkunci — tidak dianggap siap walaupun hak dan
+     * pemasangannya ada di database. Tanpa ini, app yang halamannya sudah ditutup
+     * `ResolveModuleContext` masih dapat memanggil layanan Core atas nama tenant lewat `internal/v1`.
      */
     private function isReadyForTenant(string $appId, string $tenantId): bool
     {
+        if (! app(SiteLicense::class)->allowsApp($appId)) {
+            return false;
+        }
+
         return DB::table('tenant_app_entitlements as entitlements')
             ->join('core_module_installations as installations', function ($join) use ($appId): void {
                 $join->on('installations.tenant_id', '=', 'entitlements.tenant_id')

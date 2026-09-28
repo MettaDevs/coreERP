@@ -48,7 +48,6 @@ apps/core/    Laravel. Identity, tenant, entitlement, katalog app, pemasangan mo
 apps/provider-console/ Konsol vendor.
 packages/ui/           SDK UI bersama (@apperp/ui).
 modules/               Module bisnis, satu folder per module di bawah <penerbit>/. Baca modules/README.md dulu.
-editions/              Satu berkas per pelanggan: module apa yang dibeli dan rilis mana yang dipasang.
 integrations/          Bridge lintas app.
 deploy/                Manifest deployment dan contoh konfigurasi.
 docs/                  Dokumentasi ini.

@@ -60,11 +60,13 @@ ui:
         - id: profil-penyusutan
           label: Profil penyusutan
           permission: management-aset.profil-penyusutan.read
-        - id: fixed-asset-parameters
+        - id: fixed-aset-parameters
           label: Parameter aset tetap
           permission: management-aset.fixed-asset-parameters.read
-        - id: fixed-asset-posting-profiles
-          label: Profil posting aset
+        # Label memakai istilah Business Central (FA Posting Groups); kode izin tetap
+        # `fixed-asset-posting-profiles` karena kode adalah kontrak, bukan label.
+        - id: fixed-aset-posting-profiles
+          label: Posting group aset
           permission: management-aset.fixed-asset-posting-profiles.read
       maintenance:
         # Urutan ini adalah alur setup awal: dasar pekerjaan, checklist dan
@@ -167,13 +169,19 @@ workflow_types:
   - code: management-aset.dekomisioning-aset-verification
     name: Verifikasi usulan dekomisioning aset
     decision_context_schema:
-      required: [document_id, asset_id]
+      required: [document_id, aset_id]
   - code: management-aset.pemusnahan-aset-verification
     name: Verifikasi usulan pemusnahan aset
     decision_context_schema:
-      required: [document_id, asset_id]
+      required: [document_id, aset_id]
 security:
   data_policies:
+    # Ejaan `asset` pada kode di bawah disengaja, dan berlaku untuk seluruh kode kebijakan,
+    # permission, entry point, dan duty pada berkas ini. Semuanya pengenal yang tercatat di
+    # katalog Core dan pada peran serta hibah lingkup milik tenant; menggantinya membuat
+    # `app:register-manifest` menolak pembaruan selama masih ada peran yang memakainya, dan
+    # membuat hibah lingkup yang sudah ada tidak lagi cocok. Yang dibaca orang adalah label
+    # dan id menu, dan keduanya memang sudah berbahasa Indonesia.
     - code: management-aset.asset-responsibility
       name: Akses aset menurut unit penanggung jawab
       protected_permissions:
@@ -181,6 +189,14 @@ security:
         - management-aset.aset.create
         - management-aset.aset.update
         - management-aset.aset.mutate
+        - management-aset.mutasi-aset.read
+        - management-aset.mutasi-aset.create
+        - management-aset.mutasi-aset.update
+        - management-aset.mutasi-aset.archive
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+        - management-aset.penerimaan-aset.archive
         - management-aset.perencanaan-aset.read
         - management-aset.perencanaan-aset.create
         - management-aset.perencanaan-aset.update
@@ -205,6 +221,7 @@ security:
         - management-aset.penyusutan.create
         - management-aset.penyusutan.finalize
         - management-aset.penyusutan.correct
+        - management-aset.penyusutan.post
       requires_legal_entity: true
       requires_operating_unit: true
       allows_descendants: true
@@ -326,6 +343,15 @@ security:
     - code: management-aset.mutasi-aset.form
       name: Layar mutasi aset
       type: form
+    - code: management-aset.mutasi-aset.api
+      name: API mutasi aset
+      type: api
+    - code: management-aset.penerimaan-aset.form
+      name: Layar penerimaan aset
+      type: form
+    - code: management-aset.penerimaan-aset.api
+      name: API penerimaan aset
+      type: api
     - code: management-aset.perencanaan-aset.form
       name: Layar perencanaan aset
       type: form
@@ -405,8 +431,11 @@ security:
       name: Layar parameter aset tetap
       type: form
     - code: management-aset.fixed-asset-posting-profiles.form
-      name: Layar profil posting aset
+      name: Layar posting group aset
       type: form
+    - code: management-aset.fixed-asset-posting-profiles.api
+      name: API posting group aset
+      type: api
   permissions:
     - code: management-aset.model-aset.read
       name: Lihat model aset
@@ -692,8 +721,10 @@ security:
       name: Lihat register aset
       entry_point: management-aset.aset.form
       access: read
+    # Sejak 18 September 2026 izin ini menjaga penyelesaian dokumen penerimaan, bukan
+    # sebuah endpoint pembuatan aset — endpoint itu sudah tidak ada.
     - code: management-aset.aset.create
-      name: Terima aset
+      name: Daftarkan aset ke register
       entry_point: management-aset.aset.api
       access: create
     - code: management-aset.aset.update
@@ -708,6 +739,34 @@ security:
       name: Lihat mutasi aset
       entry_point: management-aset.mutasi-aset.form
       access: read
+    - code: management-aset.mutasi-aset.create
+      name: Buat mutasi aset
+      entry_point: management-aset.mutasi-aset.api
+      access: create
+    - code: management-aset.mutasi-aset.update
+      name: Ubah mutasi aset
+      entry_point: management-aset.mutasi-aset.api
+      access: update
+    - code: management-aset.mutasi-aset.archive
+      name: Arsipkan mutasi aset
+      entry_point: management-aset.mutasi-aset.api
+      access: delete
+    - code: management-aset.penerimaan-aset.read
+      name: Lihat penerimaan aset
+      entry_point: management-aset.penerimaan-aset.form
+      access: read
+    - code: management-aset.penerimaan-aset.create
+      name: Buat penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: create
+    - code: management-aset.penerimaan-aset.update
+      name: Ubah penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: update
+    - code: management-aset.penerimaan-aset.archive
+      name: Arsipkan penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: delete
     - code: management-aset.perencanaan-aset.read
       name: Lihat perencanaan aset
       entry_point: management-aset.perencanaan-aset.form
@@ -808,6 +867,10 @@ security:
       name: Koreksi penyusutan
       entry_point: management-aset.penyusutan.api
       access: correct
+    - code: management-aset.penyusutan.post
+      name: Post penyusutan ke aplikasi finance
+      entry_point: management-aset.penyusutan.api
+      access: invoke
     - code: management-aset.tipe-lokasi-aset.read
       name: Lihat tipe lokasi aset
       entry_point: management-aset.tipe-lokasi-aset.form
@@ -893,9 +956,21 @@ security:
       entry_point: management-aset.fixed-asset-parameters.form
       access: read
     - code: management-aset.fixed-asset-posting-profiles.read
-      name: Lihat profil posting aset
+      name: Lihat posting group aset
       entry_point: management-aset.fixed-asset-posting-profiles.form
       access: read
+    - code: management-aset.fixed-asset-posting-profiles.create
+      name: Tambah baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: create
+    - code: management-aset.fixed-asset-posting-profiles.update
+      name: Ubah akun posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: update
+    - code: management-aset.fixed-asset-posting-profiles.archive
+      name: Arsipkan baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: delete
   privileges:
     - code: management-aset.model-aset.maintain
       name: Pelihara model aset
@@ -1073,17 +1148,51 @@ security:
       permissions:
         - management-aset.validasi-status-work-order.read
         - management-aset.validasi-status-work-order.update
+    # Menerima aset dari ujung ke ujung: menyusun berkasnya sekaligus menyelesaikannya.
+    #
+    # Izin dokumen ikut di sini sejak `POST /aset` dipensiunkan 18 September 2026. Tanpa
+    # itu privilege bernama "Terima aset" tidak cukup untuk menerima aset apa pun, karena
+    # tidak ada lagi jalan masuk ke register selain lewat dokumen penerimaan.
     - code: management-aset.aset.receive
       name: Terima aset
       permissions:
         - management-aset.aset.read
         - management-aset.aset.create
         - management-aset.aset.update
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+    # Menyelesaikan serah terima: yang benar-benar memindahkan penempatan aset.
     - code: management-aset.aset.transfer
       name: Mutasi aset
       permissions:
         - management-aset.aset.mutate
         - management-aset.mutasi-aset.read
+    # Menyusun berita acaranya. Sengaja terpisah dari privilege di atas: juru tulis boleh
+    # menyiapkan dokumennya tanpa berwenang memindahkan barangnya.
+    - code: management-aset.mutasi-aset.maintain
+      name: Kelola dokumen mutasi aset
+      permissions:
+        - management-aset.mutasi-aset.read
+        - management-aset.mutasi-aset.create
+        - management-aset.mutasi-aset.update
+    - code: management-aset.mutasi-aset.retire
+      name: Arsipkan dokumen mutasi aset
+      permissions:
+        - management-aset.mutasi-aset.archive
+    # Menyusun berkas penerimaannya. Terpisah dari `management-aset.aset.receive` dengan
+    # alasan yang sama seperti pada mutasi: juru tulis boleh menyiapkan dokumennya, yang
+    # berwenang menambah aset ke register yang menyelesaikannya.
+    - code: management-aset.penerimaan-aset.maintain
+      name: Kelola dokumen penerimaan aset
+      permissions:
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+    - code: management-aset.penerimaan-aset.retire
+      name: Arsipkan dokumen penerimaan aset
+      permissions:
+        - management-aset.penerimaan-aset.archive
     - code: management-aset.perencanaan-aset.maintain
       name: Kelola perencanaan aset
       permissions: [management-aset.perencanaan-aset.read, management-aset.perencanaan-aset.create, management-aset.perencanaan-aset.update]
@@ -1132,6 +1241,9 @@ security:
     - code: management-aset.penyusutan.correct-period
       name: Koreksi penyusutan aset
       permissions: [management-aset.penyusutan.correct]
+    - code: management-aset.penyusutan.post-to-finance
+      name: Post jurnal penyusutan
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.post]
     - code: management-aset.tipe-lokasi-aset.maintain
       name: Pelihara tipe lokasi aset
       permissions:
@@ -1187,9 +1299,19 @@ security:
       permissions:
         - management-aset.fixed-asset-parameters.read
     - code: management-aset.fixed-asset-posting-profiles.view
-      name: Lihat profil posting aset
+      name: Lihat posting group aset
       permissions:
         - management-aset.fixed-asset-posting-profiles.read
+    - code: management-aset.fixed-asset-posting-profiles.maintain
+      name: Pelihara posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.read
+        - management-aset.fixed-asset-posting-profiles.create
+        - management-aset.fixed-asset-posting-profiles.update
+    - code: management-aset.fixed-asset-posting-profiles.retire
+      name: Arsipkan posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.archive
   duties:
     - code: management-aset.model-aset.manage
       name: Kelola model aset
@@ -1285,6 +1407,10 @@ security:
       privileges:
         - management-aset.aset.receive
         - management-aset.aset.transfer
+        - management-aset.mutasi-aset.maintain
+        - management-aset.mutasi-aset.retire
+        - management-aset.penerimaan-aset.maintain
+        - management-aset.penerimaan-aset.retire
     - code: management-aset.perencanaan-aset.manage
       name: Kelola perencanaan aset
       privileges: [management-aset.perencanaan-aset.maintain, management-aset.perencanaan-aset.retire]
@@ -1318,6 +1444,11 @@ security:
     - code: management-aset.penyusutan.manage
       name: Kelola penyusutan aset
       privileges: [management-aset.penyusutan.maintain, management-aset.penyusutan.correct-period]
+    # Duty tersendiri: role yang sudah memegang "Kelola penyusutan aset" tidak boleh diam-diam dapat
+    # mengirim jurnal ke aplikasi finance (keputusan pemilik produk, 22 September 2026).
+    - code: management-aset.penyusutan.finance-posting
+      name: Post penyusutan ke aplikasi finance
+      privileges: [management-aset.penyusutan.post-to-finance]
     - code: management-aset.tipe-lokasi-aset.manage
       name: Kelola tipe lokasi aset
       privileges:
@@ -1348,6 +1479,14 @@ security:
       privileges:
         - management-aset.fixed-asset-parameters.view
         - management-aset.fixed-asset-posting-profiles.view
+    # Duty tersendiri, bukan tambahan pada duty yang sudah ada: role yang sudah memegang duty
+    # lama tidak boleh diam-diam dapat mengubah akun jurnal (keputusan pemilik produk,
+    # 22 September 2026).
+    - code: management-aset.fixed-asset-posting-profiles.manage
+      name: Kelola posting group aset
+      privileges:
+        - management-aset.fixed-asset-posting-profiles.maintain
+        - management-aset.fixed-asset-posting-profiles.retire
 number_sequences:
   references:
     - code: management-aset.model-aset
@@ -1355,6 +1494,8 @@ number_sequences:
       default_prefix: MDLA
       allowed_scopes:
         - tenant
+    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
+    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
     - code: management-aset.group-aset
       name: Kode group aset
       default_prefix: GRPA
@@ -1410,6 +1551,16 @@ number_sequences:
       default_prefix: TCMA
       allowed_scopes:
         - tenant
+    - code: management-aset.mutasi-aset
+      name: Nomor berita acara serah terima aset
+      default_prefix: MUTA
+      allowed_scopes:
+        - legal_entity
+    - code: management-aset.penerimaan-aset
+      name: Nomor penerimaan aset
+      default_prefix: PNRA
+      allowed_scopes:
+        - legal_entity
     - code: management-aset.tipe-work-order
       name: Kode tipe work order
       default_prefix: TPWO
@@ -1455,6 +1606,8 @@ number_sequences:
       default_prefix: TATR
       allowed_scopes:
         - tenant
+    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
+    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
     - code: management-aset.buku-penyusutan
       name: Kode buku penyusutan
       default_prefix: BKPY
@@ -1514,6 +1667,26 @@ reports:
       - key: standar
         name: Daftar work order standar (Excel)
         description: Satu lembar dengan kolom identitas, jadwal, dan ringkasan jam.
+        format: xlsx
+  - code: management-aset.berita-acara-serah-terima
+    name: Berita acara serah terima aset
+    description: Satu berita acara serah terima beserta seluruh aset yang berpindah di dalamnya.
+    permission: management-aset.mutasi-aset.read
+    parameters: [id]
+    builtin_layouts:
+      - key: standar
+        name: Berita acara standar (Word)
+        description: Kop, identitas kedua pihak, tabel aset, dan blok tanda tangan.
+        format: docx
+  - code: management-aset.daftar-mutasi-aset
+    name: Daftar mutasi aset
+    description: Seluruh perpindahan aset dalam jangkauan Anda, satu baris per aset, untuk diolah di Excel.
+    permission: management-aset.mutasi-aset.read
+    parameters: [status, dari, sampai]
+    builtin_layouts:
+      - key: standar
+        name: Daftar mutasi standar (Excel)
+        description: Satu lembar dengan kolom bukti, aset, asal, tujuan, dan kondisi.
         format: xlsx
   - code: management-aset.laporan-pemeliharaan-aset
     name: Laporan pemeliharaan aset

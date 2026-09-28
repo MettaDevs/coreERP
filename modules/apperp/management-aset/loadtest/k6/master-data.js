@@ -184,7 +184,7 @@ export function setup() {
         ]),
     );
 
-    const assetIds = tahap(
+    const asetIds = tahap(
         'aset',
         semua((tenant, index) => [
             'POST',
@@ -214,7 +214,7 @@ export function setup() {
         profilPenyusutanId: profilIds[index],
         bukuPenyusutanId: bukuIds[index],
         tipeAtributId: tipeAtributIds[index],
-        assetId: assetIds[index],
+        asetId: asetIds[index],
     }));
 
     console.log(`setup: ${lengkap.length} tenant siap + 1 tenant berhak sempit`);
@@ -488,9 +488,9 @@ function planningIdempotencyRace(tenant) {
     }
 }
 
-function mutateAsset(tenant) {
+function mutateAset(tenant) {
     const response = http.post(
-        `${ASET('aset')}/${tenant.assetId}/penempatan`,
+        `${ASET('aset')}/${tenant.asetId}/penempatan`,
         JSON.stringify({ effective_on: '2026-01-02', reason: 'load test mutasi', usage_org_unit_id: tenant.orgUnitId }),
         paramsUntuk(tenant, { tags: { op: 'mutate', resource: 'aset' } }),
     );
@@ -504,27 +504,27 @@ function mutateAsset(tenant) {
  */
 function attributeConstraintRace(tenant) {
     const valuesBody = JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }] });
-    const assetBody = JSON.stringify({ atribut: [{ tipe_atribut_id: tenant.tipeAtributId, nilai: 'B' }] });
-    const [values, asset] = http.batch([
+    const asetBody = JSON.stringify({ atribut: [{ tipe_atribut_id: tenant.tipeAtributId, nilai: 'B' }] });
+    const [values, aset] = http.batch([
         ['PUT', `${ASET('tipe-atribut')}/${tenant.tipeAtributId}/nilai`, valuesBody, paramsUntuk(tenant, {
             tags: { op: 'attribute_race_values', resource: 'tipe-atribut' },
             responseCallback: http.expectedStatuses(200, 409),
         })],
-        ['PATCH', `${ASET('aset')}/${tenant.assetId}`, assetBody, paramsUntuk(tenant, {
-            tags: { op: 'attribute_race_asset', resource: 'aset' },
+        ['PATCH', `${ASET('aset')}/${tenant.asetId}`, asetBody, paramsUntuk(tenant, {
+            tags: { op: 'attribute_race_aset', resource: 'aset' },
             responseCallback: http.expectedStatuses(200, 422),
         })],
     ]);
 
-    [values, asset].forEach((response) => {
+    [values, aset].forEach((response) => {
         writeLatency.add(response.timings.duration);
         recordFailure(response, 'attribute-race');
     });
-    const tidakTersedia = [values, asset].some((response) => response.status === 0 || response.status === 502 || response.status === 504);
-    const sah = (values.status === 200 && asset.status === 422) || (values.status === 409 && asset.status === 200);
+    const tidakTersedia = [values, aset].some((response) => response.status === 0 || response.status === 502 || response.status === 504);
+    const sah = (values.status === 200 && aset.status === 422) || (values.status === 409 && aset.status === 200);
 
     if (!tidakTersedia && !sah) {
-        violation('attribute_values_race', { values: values.status, asset: asset.status });
+        violation('attribute_values_race', { values: values.status, aset: aset.status });
     }
 }
 
@@ -556,7 +556,7 @@ export default function (data) {
     } else if (roll < 0.84) {
         lifecycleTransaction(tenant);
     } else if (roll < 0.89) {
-        mutateAsset(tenant);
+        mutateAset(tenant);
     } else if (roll < 0.92) {
         idempotencyRace(tenant);
     } else if (roll < 0.94) {

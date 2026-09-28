@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 #
-# Membuktikan bahwa modul yang tidak dibeli tidak ada di dalam image edisi.
+# Membuktikan bahwa yang tidak boleh dikirim tidak ada di dalam image yang dibagikan ke klien.
 #
-# Ini pemeriksaan yang membuat seluruh model lisensi berdiri. Klaimnya bukan "modul yang tidak
-# dibeli dimatikan", melainkan "modul yang tidak dibeli **tidak ada** di server pelanggan" — dan
-# klaim sekuat itu harus dibuktikan mesin pada image yang benar-benar dikirim, bukan dijanjikan
-# di dokumen.
+# **Yang dijaganya berubah pada 18 September 2026, dan bukan kekuatannya.** Sampai hari itu image
+# dipangkas per pelanggan, dan pemeriksa ini menuntut "modul yang tidak dibeli tidak ada di server
+# pelanggan". Edisi per pelanggan dicabut — satu image berisi seluruh modul dibagikan ke semua
+# klien, dan yang mengunci modul adalah lisensi dari admin.erp — sehingga daftar terlarangnya
+# sekarang berisi apa yang tidak boleh sampai ke klien mana pun: **modul bahan uji**.
+#
+# Ia tidak menjadi pemeriksa basa-basi karena itu: sebuah menu bernama "Contoh A" di layar klien
+# tetap kegagalan yang tidak boleh mungkin terjadi, dan klaim sekuat itu harus dibuktikan mesin
+# pada image yang benar-benar dikirim, bukan dijanjikan di dokumen.
 #
 # Empat jalur diperiksa. Tiga di antaranya menelusuri jejak satu modul, yang meninggalkan bekas
 # di tiga tempat berbeda dan bisa bocor sendiri-sendiri; yang pertama tidak berurusan dengan
@@ -20,39 +25,39 @@
 # melainkan bentuk image. Repo ini berisi lebih dari satu aplikasi — `provider-console`,
 # `web-shell`, dan pusat admin — dan tidak satu pun dari mereka dijual, dipasang, atau boleh
 # berjalan di server pelanggan; pusat admin bahkan memegang data seluruh pelanggan sekaligus.
-# Karena tidak bergantung pada `$tidak_dibeli`, ia tetap berarti pada edisi yang membeli semua
-# modul, ketika ketiga jalur di bawahnya tidak punya apa pun untuk dicari.
+# Karena tidak bergantung pada `$terlarang`, ia tetap berarti pada hari repo ini tidak lagi punya
+# satu pun modul bahan uji dan ketiga jalur di bawahnya tidak punya apa pun untuk dicari.
 #
 # Ia ditulis sebagai daftar-boleh, bukan daftar-larang atas nama `control-plane`: aplikasi kelima
 # yang ditambahkan seseorang tahun depan tertangkap tanpa ada yang perlu ingat mendaftarkannya.
 #
 # Pemakaian:
-#   scripts/verify-edition.sh <edisi> <image> [--anggap-tidak-dibeli <id modul>]
+#   scripts/verify-edition.sh <image> [--anggap-terlarang <id modul>]
 #   scripts/verify-edition.sh --buktikan-aplikasi-bisa-merah
 #
 # Dua bentuk itu ada untuk satu tujuan yang sama: membuktikan pemeriksa ini bisa merah. Sebuah
 # pemeriksa kebocoran yang belum pernah gagal tidak dapat dibedakan dari pemeriksa yang tidak
 # memeriksa apa pun, dan yang kedua jauh lebih berbahaya karena ia mengakhiri pencarian.
 #
-# `--anggap-tidak-dibeli` memperlakukan sebuah modul yang **memang dibeli** seolah tidak dibeli,
+# `--anggap-terlarang` memperlakukan sebuah modul yang **memang dikirim** seolah terlarang,
 # sehingga ketiga jalur modul harus merah. `--buktikan-aplikasi-bisa-merah` membangun dua image
 # sekali pakai berisi dua baris — satu hanya berisi `apps/core`, satu lagi ditambah
 # `apps/control-plane` — lalu menuntut jalur pertama hijau pada yang pertama dan merah pada yang
-# kedua. Image edisi tidak dibangun ulang untuk itu.
+# kedua. Image yang sesungguhnya tidak dibangun ulang untuk itu.
 
 set -euo pipefail
 
 akar_repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 pakai() {
-    echo "Pemakaian: scripts/verify-edition.sh <edisi> <image> [--anggap-tidak-dibeli <id modul>]" >&2
+    echo "Pemakaian: scripts/verify-edition.sh <image> [--anggap-terlarang <id modul>]" >&2
     echo "           scripts/verify-edition.sh --buktikan-aplikasi-bisa-merah" >&2
     exit 2
 }
 
 gagal() {
     echo >&2
-    echo "KEBOCORAN EDISI: $*" >&2
+    echo "KEBOCORAN IMAGE: $*" >&2
     exit 1
 }
 
@@ -127,11 +132,11 @@ periksa_aplikasi() {
         echo >&2
         echo "Folder aplikasi di dalam image:" >&2
         printf '%s\n' "$terbaca" >&2
-        gagal "folder aplikasi \"${terlarang[*]}\" ikut ke dalam image edisi \"$label\"; hanya \"${APLIKASI_BOLEH[*]}\" yang dikirim ke pelanggan"
+        gagal "folder aplikasi \"${terlarang[*]}\" ikut ke dalam image \"$label\"; hanya \"${APLIKASI_BOLEH[*]}\" yang dikirim ke klien"
     fi
 }
 
-# Membuktikan bahwa `periksa_aplikasi` bisa merah — tanpa membangun ulang image edisi.
+# Membuktikan bahwa `periksa_aplikasi` bisa merah — tanpa membangun ulang image yang sesungguhnya.
 #
 # Jalur merahnya dibuat dengan image sekali pakai berisi dua baris, pola yang sama dipakai
 # `scripts/periksa-sisa-mesin.sh buktikan-merah`. Dua sasaran dibangun dari satu berkas, dan yang
@@ -190,19 +195,18 @@ if [ "${1:-}" = '--buktikan-aplikasi-bisa-merah' ]; then
     exit 0
 fi
 
-[ "$#" -ge 2 ] || pakai
+[ "$#" -ge 1 ] || pakai
 
-edisi="$1"
-image="$2"
-shift 2
+image="$1"
+shift
 
-anggap_tidak_dibeli=""
+anggap_terlarang=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --anggap-tidak-dibeli)
+        --anggap-terlarang)
             [ "$#" -ge 2 ] || pakai
-            anggap_tidak_dibeli="$2"
+            anggap_terlarang="$2"
             shift 2
             ;;
         *)
@@ -213,46 +217,62 @@ while [ "$#" -gt 0 ]; do
 done
 
 # ---------------------------------------------------------------------------
-# Daftar modul: yang dibeli, dan yang tidak.
+# Daftar modul: yang dikirim, dan yang terlarang.
 # ---------------------------------------------------------------------------
 #
 # Dihitung di sini, di luar image, dan sengaja begitu: kalau daftarnya dibaca dari dalam image,
 # image yang bocor akan menghitung dirinya sendiri sebagai benar.
+#
+# Yang terlarang tidak ditulis tangan melainkan disimpulkan: seluruh modul di repo dikurangi
+# yang dikirim. Daftar-larang yang ditulis tangan akan melewatkan bahan uji yang ditambahkan
+# seseorang bulan depan, dan yang terlewat itu tidak berbunyi.
+#
+# **Dua akar dipindai, bukan satu.** Bahan uji penjaga batas pindah ke
+# `apps/core/tests/Fixtures/modules` pada 18 September 2026, dan `modules/` sejak itu hanya berisi
+# modul yang dijual. Memindai `modules/` saja membuat daftar terlarang kosong — dan pemeriksa yang
+# tidak punya apa pun untuk dicari melaporkan hijau persis seperti pemeriksa yang tidak menemukan
+# pelanggaran. Justru bahan uji itulah yang paling tidak boleh ada di dalam image.
 
-dibeli="$(cd "$akar_repo/apps/core" && php artisan edition:resolve "$edisi" --daftar)"
+AKAR_MODUL=(
+    "$akar_repo/modules"
+    "$akar_repo/apps/core/tests/Fixtures/modules"
+)
+
+dikirim="$(cd "$akar_repo/apps/core" && php artisan edition:modules --daftar)"
 
 semua_modul=""
-for folder in "$akar_repo"/modules/*/*/; do
-    [ -f "$folder/app.yaml" ] || continue
-    semua_modul="$semua_modul $(basename "$folder")"
+for akar in "${AKAR_MODUL[@]}"; do
+    for folder in "$akar"/*/*/; do
+        [ -f "$folder/app.yaml" ] || continue
+        semua_modul="$semua_modul $(basename "$folder")"
+    done
 done
 
-[ -n "${semua_modul// /}" ] || gagal "tidak satu pun modul terbaca di $akar_repo/modules; pemindaiannya salah alamat dan hasil hijaunya tidak berarti apa-apa"
+[ -n "${semua_modul// /}" ] || gagal "tidak satu pun modul terbaca di ${AKAR_MODUL[*]}; pemindaiannya salah alamat dan hasil hijaunya tidak berarti apa-apa"
 
-if [ -n "$anggap_tidak_dibeli" ]; then
-    echo "Catatan: \"$anggap_tidak_dibeli\" diperlakukan seolah tidak dibeli, untuk membuktikan pemeriksa ini bisa merah."
-    dibeli="$(printf '%s\n' "$dibeli" | grep -vx "$anggap_tidak_dibeli" || true)"
+if [ -n "$anggap_terlarang" ]; then
+    echo "Catatan: \"$anggap_terlarang\" diperlakukan seolah terlarang, untuk membuktikan pemeriksa ini bisa merah."
+    dikirim="$(printf '%s\n' "$dikirim" | grep -vx "$anggap_terlarang" || true)"
 fi
 
-tidak_dibeli=""
+terlarang=""
 for modul in $semua_modul; do
-    if printf '%s\n' "$dibeli" | grep -qx "$modul"; then
+    if printf '%s\n' "$dikirim" | grep -qx "$modul"; then
         continue
     fi
-    tidak_dibeli="$tidak_dibeli $modul"
+    terlarang="$terlarang $modul"
 done
 
-echo "Edisi   : $edisi"
-echo "Image   : $image"
-echo "Dibeli  :$(printf '%s' " $(printf '%s' "$dibeli" | tr '\n' ' ')")"
-echo "Terlarang:$tidak_dibeli"
+echo "Image    : $image"
+echo "Dikirim  :$(printf '%s' " $(printf '%s' "$dikirim" | tr '\n' ' ')")"
+echo "Terlarang:$terlarang"
 
-periksa_aplikasi "$image" "$edisi"
+periksa_aplikasi "$image" "$image"
 
 echo "1/4 aplikasi: bersih, tidak ada folder aplikasi di /repo/apps selain \"${APLIKASI_BOLEH[*]}\"."
 
-if [ -z "${tidak_dibeli// /}" ]; then
-    gagal "tidak ada satu pun modul yang terlarang untuk edisi ini, jadi ketiga pemeriksaan di bawah tidak dapat membuktikan apa pun. Tambahkan modul kedua ke repo, atau periksa edisi lain."
+if [ -z "${terlarang// /}" ]; then
+    gagal "tidak ada satu pun modul yang terlarang, jadi ketiga pemeriksaan di bawah tidak dapat membuktikan apa pun. Repo ini memuat modul bahan uji, jadi daftar terlarang yang kosong berarti penghitungnya yang salah — bukan bahwa tidak ada yang perlu dijaga."
 fi
 
 # ---------------------------------------------------------------------------
@@ -264,10 +284,18 @@ fi
 # sebuah pemetaan PSR-4 yang tertinggal adalah bukti bahwa pemangkasannya terjadi setelah
 # pemasangan, bukan sebelum.
 
-for modul in $tidak_dibeli; do
+for modul in $terlarang; do
     if docker run --rm --entrypoint sh "$image" -c "[ -e /repo/modules/*/$modul ] 2>/dev/null" 2>/dev/null; then
-        gagal "folder modul \"$modul\" ada di dalam image edisi \"$edisi\""
+        gagal "folder modul \"$modul\" ada di dalam image \"$image\""
     fi
+
+    folder_modul=''
+    for akar in "${AKAR_MODUL[@]}"; do
+        if [ -f "$akar/apperp/$modul/app.yaml" ]; then
+            folder_modul="$akar/apperp/$modul"
+            break
+        fi
+    done
 
     namespace="$(php -r '
         $berkas = $argv[1];
@@ -277,7 +305,7 @@ for modul in $tidak_dibeli; do
             echo rtrim($awalan, "\\\\"), "\n";
             break;
         }
-    ' "$akar_repo/modules/apperp/$modul/composer.json")"
+    ' "$folder_modul/composer.json")"
 
     if [ -n "$namespace" ]; then
         # `grep -r` dijalankan di dalam container: mengekspor seluruh image ke runner lalu
@@ -286,7 +314,7 @@ for modul in $tidak_dibeli; do
             echo >&2
             echo "Berkas yang menyebutnya:" >&2
             docker run --rm --entrypoint sh "$image" -c "grep -rlF '$namespace' /repo 2>/dev/null | head -20" >&2 || true
-            gagal "namespace \"$namespace\" milik modul \"$modul\" masih disebut di dalam image edisi \"$edisi\""
+            gagal "namespace \"$namespace\" milik modul \"$modul\" masih disebut di dalam image \"$image\""
         fi
     fi
 done
@@ -321,7 +349,7 @@ else
 
     jalankan_artisan migrate --force >/dev/null
 
-    for modul in $(printf '%s\n' "$dibeli"); do
+    for modul in $(printf '%s\n' "$dikirim"); do
         [ -n "$modul" ] || continue
         jalankan_artisan module:migrate "$modul" >/dev/null
     done
@@ -329,19 +357,27 @@ else
     tabel="$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USERNAME" -d "$DB_DATABASE" -At \
         -c "select tablename from pg_tables where schemaname = 'public'")"
 
-    for modul in $tidak_dibeli; do
+    for modul in $terlarang; do
+        folder_modul=''
+        for akar in "${AKAR_MODUL[@]}"; do
+            if [ -f "$akar/apperp/$modul/app.yaml" ]; then
+                folder_modul="$akar/apperp/$modul"
+                break
+            fi
+        done
+
         awalan="$(php -r '
             $isi = @file_get_contents($argv[1]);
             if ($isi === false) { exit(0); }
             if (preg_match("/^table_prefix:\s*(\S+)/m", $isi, $cocok) === 1) { echo trim($cocok[1], "\"'"'"'"); }
-        ' "$akar_repo/modules/apperp/$modul/app.yaml")"
+        ' "$folder_modul/app.yaml")"
 
         [ -n "$awalan" ] || continue
 
         if printf '%s\n' "$tabel" | grep -q "^$awalan"; then
             echo >&2
             printf '%s\n' "$tabel" | grep "^$awalan" >&2
-            gagal "migration di dalam image edisi \"$edisi\" membuat tabel berawalan \"$awalan\", milik modul \"$modul\" yang tidak dibeli"
+            gagal "migration di dalam image \"$image\" membuat tabel berawalan \"$awalan\", milik modul \"$modul\" yang tidak dikirim"
         fi
     done
 
@@ -354,13 +390,13 @@ fi
 #
 # Halaman modul masuk ke bundel lewat pola glob atas folder `modules/*/*/ui`, jadi yang
 # menentukan adalah folder apa yang ada saat build berjalan. Pemeriksaan ini yang menagihnya:
-# rute modul yang tidak dibeli di dalam bundel berarti foldernya masih ada waktu aset dibangun,
+# rute modul yang tidak dikirim di dalam bundel berarti foldernya masih ada waktu aset dibangun,
 # walau ia sudah tidak ada di image akhir.
 #
 # **Yang dicari bentuk rute dan nama halamannya, bukan id modul telanjang, dan itu keputusan.**
 # Id telanjang juga muncul di kode Core yang sah — `product-launcher.tsx` memetakan ikon per
-# produk dengan id yang ditulis tangan — sehingga edisi Core-saja akan dinyatakan bocor karena
-# berkas milik Core. Dua bentuk di bawah hanya bisa lahir dari kode modul: `"<id>::"` adalah
+# produk dengan id yang ditulis tangan — sehingga sebuah modul akan dinyatakan bocor karena
+# berkas milik Core menyebut namanya. Dua bentuk di bawah hanya bisa lahir dari kode modul: `"<id>::"` adalah
 # awalan nama halaman Inertia milik modul, dan `"/<id>/"` adalah awalan rute layar maupun
 # API-nya. Keduanya yang benar-benar dituntut task ini.
 #
@@ -368,16 +404,16 @@ fi
 # pada modul kedua; ia dicatat sebagai pekerjaan tersendiri, bukan ditutup dengan melonggarkan
 # pemeriksa ini.
 
-for modul in $tidak_dibeli; do
+for modul in $terlarang; do
     for bentuk in "$modul::" "/$modul/"; do
         if docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/core/public/build 2>/dev/null | head -5" | grep -q .; then
             echo >&2
             docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/core/public/build 2>/dev/null | head -20" >&2 || true
-            gagal "bundel JavaScript pada image edisi \"$edisi\" memuat \"$bentuk\", milik modul \"$modul\" yang tidak dibeli"
+            gagal "bundel JavaScript pada image \"$image\" memuat \"$bentuk\", milik modul \"$modul\" yang tidak dikirim"
         fi
     done
 done
 
 echo "4/4 bundel: bersih."
 echo
-echo "Edisi \"$edisi\" bersih: hanya \"${APLIKASI_BOLEH[*]}\" yang ada di /repo/apps, dan tidak satu pun modul terlarang ditemukan pada ketiga jalur modul."
+echo "Image \"$image\" bersih: hanya \"${APLIKASI_BOLEH[*]}\" yang ada di /repo/apps, dan tidak satu pun modul terlarang ditemukan pada ketiga jalur modul."
