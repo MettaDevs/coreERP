@@ -5,6 +5,7 @@ import {
     BookOpen,
     Briefcase,
     Building2,
+    CalendarCheck,
     CalendarDays,
     Clock,
     Coins,
@@ -180,6 +181,26 @@ export function AppSidebar() {
                         icon: Clock,
                         href: '/settings/working-time-templates',
                         permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Kalender kerja',
+                        icon: CalendarDays,
+                        href: '/settings/working-time-calendars',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Jadwal kerja',
+                        icon: Clock,
+                        href: '/settings/working-time-calendar-times',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Jadwal dari pola',
+                        icon: CalendarCheck,
+                        href: '/settings/compose-working-times',
+                        // Halaman ini hanya berisi formulir penyusunan jadwal, jadi ia untuk
+                        // yang boleh mengubah data referensi saja.
+                        permission: 'core.reference-data.update',
                     },
                 ],
             },

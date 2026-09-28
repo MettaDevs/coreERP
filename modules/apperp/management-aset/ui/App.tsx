@@ -1,4 +1,5 @@
 import { lazy, useMemo } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import { Card, CardContent } from '@apperp/ui/card';
 import {
     Empty,
@@ -78,6 +79,44 @@ const PengaturanAsetTetapPlaceholderPage = lazy(
 const AssetPostingGroupPage = lazy(
     () => import('./asset-posting-group/AssetPostingGroupPage'),
 );
+
+/**
+ * Halaman laporan, berkunci id entri menunya.
+ *
+ * Keenamnya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
+ * membedakannya hanya data, dan data itu ditulis di satu peta, bukan satu cabang `if`
+ * per laporan. Izinnya sama dengan izin entri menu di `app.yaml` dan izin definisi
+ * laporannya; laporan baru cukup menambah satu entri di sini.
+ */
+const REPORT_PAGES: Record<
+    string,
+    { permission: string; Page: LazyExoticComponent<ComponentType> }
+> = {
+    'laporan-penyusutan-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanPenyusutanAsetPage')),
+    },
+    'laporan-mutasi-aset': {
+        permission: 'management-aset.mutasi-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMutasiAsetPage')),
+    },
+    'laporan-monitoring-aset': {
+        permission: 'management-aset.monitoring-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMonitoringAsetPage')),
+    },
+    'laporan-pemeliharaan-aset': {
+        permission: 'management-aset.pemeliharaan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemeliharaanAsetPage')),
+    },
+    'laporan-penjualan-aset': {
+        permission: 'management-aset.penjualan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPenjualanAsetPage')),
+    },
+    'laporan-pemusnahan-aset': {
+        permission: 'management-aset.pemusnahan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemusnahanAsetPage')),
+    },
+};
 
 /**
  * Dokumen siklus hidup aset, berkunci id entri menunya.
@@ -266,6 +305,16 @@ export default function App({
                     context={konteks}
                     config={LIFECYCLE[view]}
                 />
+            </main>
+        );
+    }
+
+    const report = REPORT_PAGES[view];
+
+    if (report && permissions.includes(report.permission)) {
+        return (
+            <main>
+                <report.Page />
             </main>
         );
     }
