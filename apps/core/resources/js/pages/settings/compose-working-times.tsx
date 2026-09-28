@@ -1,6 +1,9 @@
+import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
+import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
     Table,
     TableBody,
@@ -10,15 +13,7 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    CalendarCheck,
-    CalendarDays,
-    Clock,
-    Info,
-    Play,
-    Sparkles,
-} from 'lucide-react';
+import { AlertCircle, ArrowLeft, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -54,7 +49,6 @@ type Props = {
     initialTemplateId?: string | null;
     initialFromDate: string;
     initialToDate: string;
-    canManage: boolean;
 };
 
 const DAY_NAMES = [
@@ -67,6 +61,20 @@ const DAY_NAMES = [
     'Minggu',
 ];
 
+/**
+ * Tanggal kalender lokal sebagai `YYYY-MM-DD`.
+ *
+ * Bukan `toISOString()`: fungsi itu mengubah tanggal ke UTC lebih dulu, jadi tengah malam di
+ * WIB/WITA/WIT menjadi hari sebelumnya — "Bulan ini" di bulan September berubah menjadi
+ * 31 Agustus sampai 29 September.
+ */
+function localDate(date: Date): string {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export default function ComposeWorkingTimesPage({
     calendars,
     templates,
@@ -74,7 +82,6 @@ export default function ComposeWorkingTimesPage({
     initialTemplateId,
     initialFromDate,
     initialToDate,
-    canManage,
 }: Props) {
     const [calendarId, setCalendarId] = useState<string>(
         initialCalendarId && calendars.some((c) => c.id === initialCalendarId)
@@ -103,7 +110,7 @@ export default function ComposeWorkingTimesPage({
         [templates, templateId],
     );
 
-    // Group lines of the selected template by day of week (0 = Senin .. 6 = Minggu)
+    // Baris pola dikelompokkan per hari (0 = Senin .. 6 = Minggu)
     const templatePreviewByDay = useMemo(() => {
         if (!selectedTemplate) {
             return [];
@@ -129,23 +136,27 @@ export default function ComposeWorkingTimesPage({
         });
     }, [selectedTemplate]);
 
-    // Quick range presets
+    const setRange = (start: Date, end: Date) => {
+        setFromDate(localDate(start));
+        setToDate(localDate(end));
+    };
+
     const handleSetRangeCurrentMonth = () => {
         const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        setFromDate(start.toISOString().slice(0, 10));
-        setToDate(end.toISOString().slice(0, 10));
+        setRange(
+            new Date(now.getFullYear(), now.getMonth(), 1),
+            new Date(now.getFullYear(), now.getMonth() + 1, 0),
+        );
     };
 
     const handleSetRangeNextMonth = () => {
         const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
-        setFromDate(start.toISOString().slice(0, 10));
-        setToDate(end.toISOString().slice(0, 10));
+        setRange(
+            new Date(now.getFullYear(), now.getMonth() + 1, 1),
+            new Date(now.getFullYear(), now.getMonth() + 2, 0),
+        );
     };
 
     const handleSetRangeCurrentYear = () => {
@@ -223,7 +234,6 @@ export default function ComposeWorkingTimesPage({
             <Head title="Jadwal dari pola" />
 
             <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background">
-                {/* Header Ribbon */}
                 <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-6 py-3 text-xs">
                     <div className="flex items-center gap-3">
                         <Link
@@ -234,12 +244,9 @@ export default function ComposeWorkingTimesPage({
                             <span>Jadwal kerja</span>
                         </Link>
                         <span className="text-border">|</span>
-                        <div className="flex items-center gap-2">
-                            <CalendarCheck className="size-4 text-primary" />
-                            <span className="text-sm font-semibold text-foreground">
-                                Jadwal dari pola (Compose working times)
-                            </span>
-                        </div>
+                        <span className="text-sm font-semibold text-foreground">
+                            Jadwal dari pola
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -247,275 +254,236 @@ export default function ComposeWorkingTimesPage({
                             href="/settings/working-time-calendars"
                             className="rounded border border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
-                            Daftar Kalender
+                            Daftar kalender
                         </Link>
                         <Link
                             href="/settings/working-time-templates"
                             className="rounded border border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
-                            Daftar Pola
+                            Daftar pola
                         </Link>
                     </div>
                 </div>
 
-                {/* Page Content */}
                 <div className="flex-1 p-6">
                     <div className="mx-auto max-w-6xl space-y-6">
-                        {/* Info Banner */}
-                        <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-xs text-foreground">
-                            <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
-                            <div className="space-y-1">
-                                <p className="font-semibold text-foreground">
-                                    Penyusunan Jadwal Kerja Otomatis
-                                </p>
-                                <p className="text-muted-foreground">
-                                    Fitur ini menerapkan pola jam kerja mingguan
-                                    (working time template) ke dalam kalender
-                                    kerja untuk rentang tanggal yang Anda
-                                    tentukan. Hari kerja, jam kerja per shift,
-                                    efisiensi, dan kapasitas akan dihitung
-                                    secara otomatis.
-                                </p>
-                            </div>
-                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Terapkan pola jam kerja mingguan ke satu kalender
+                            kerja untuk rentang tanggal tertentu. Hari kerja dan
+                            jam kerjanya diambil dari pola yang dipilih.
+                        </p>
 
-                        {/* General Form Error */}
                         {errors.general && (
-                            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                                <Info className="size-4 shrink-0" />
-                                <span>{errors.general}</span>
-                            </div>
+                            <Alert variant="destructive">
+                                <AlertCircle />
+                                <AlertDescription>
+                                    {errors.general}
+                                </AlertDescription>
+                            </Alert>
                         )}
 
                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                            {/* Left Column: Form Setup (7 cols) */}
                             <form
                                 onSubmit={handleSubmit}
                                 className="space-y-6 rounded-lg border border-border bg-card p-6 lg:col-span-7"
                             >
-                                <div className="border-b border-border pb-3">
-                                    <h2 className="text-sm font-semibold text-foreground">
-                                        Parameter Penyusunan Jadwal
-                                    </h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        Pilih kalender sasaran, pola acuan,
-                                        serta rentang tanggal pelaksanaan.
-                                    </p>
-                                </div>
+                                <h2 className="border-b border-border pb-3 text-sm font-semibold text-foreground">
+                                    Susun jadwal
+                                </h2>
 
-                                {/* Field 1: Target Calendar */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-foreground">
-                                        Kalender Kerja Sasaran{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </label>
-                                    {calendars.length === 0 ? (
-                                        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
-                                            Belum ada kalender kerja yang
-                                            dibuat.{' '}
-                                            <Link
-                                                href="/settings/working-time-calendars"
-                                                className="font-semibold underline hover:no-underline"
-                                            >
-                                                Buat kalender kerja sekarang
-                                            </Link>
-                                        </div>
-                                    ) : (
-                                        <select
+                                {calendars.length === 0 ? (
+                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+                                        Belum ada kalender kerja yang dibuat.{' '}
+                                        <Link
+                                            href="/settings/working-time-calendars"
+                                            className="font-semibold underline hover:no-underline"
+                                        >
+                                            Buat kalender kerja sekarang
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <Field
+                                        data-invalid={Boolean(
+                                            errors.calendar_id,
+                                        )}
+                                    >
+                                        <NativeSelect
+                                            label="Kalender kerja sasaran"
                                             value={calendarId}
                                             onChange={(e) =>
                                                 setCalendarId(e.target.value)
                                             }
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                         >
                                             {calendars.map((c) => (
-                                                <option key={c.id} value={c.id}>
+                                                <NativeSelectOption
+                                                    key={c.id}
+                                                    value={c.id}
+                                                >
                                                     {c.code} — {c.name} (
                                                     {c.standard_work_hours}{' '}
                                                     jam/hari)
-                                                </option>
+                                                </NativeSelectOption>
                                             ))}
-                                        </select>
-                                    )}
-                                    {errors.calendar_id && (
-                                        <p className="text-xs text-destructive">
-                                            {errors.calendar_id}
-                                        </p>
-                                    )}
-                                </div>
+                                        </NativeSelect>
+                                        {errors.calendar_id && (
+                                            <FieldError>
+                                                {errors.calendar_id}
+                                            </FieldError>
+                                        )}
+                                    </Field>
+                                )}
 
-                                {/* Field 2: Working Time Template */}
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold text-foreground">
-                                        Pola Jam Kerja Acuan{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </label>
-                                    {templates.length === 0 ? (
-                                        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
-                                            Belum ada pola jam kerja aktif.{' '}
-                                            <Link
-                                                href="/settings/working-time-templates"
-                                                className="font-semibold underline hover:no-underline"
-                                            >
-                                                Buat pola jam kerja sekarang
-                                            </Link>
-                                        </div>
-                                    ) : (
-                                        <select
+                                {templates.length === 0 ? (
+                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+                                        Belum ada pola jam kerja aktif.{' '}
+                                        <Link
+                                            href="/settings/working-time-templates"
+                                            className="font-semibold underline hover:no-underline"
+                                        >
+                                            Buat pola jam kerja sekarang
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <Field
+                                        data-invalid={Boolean(
+                                            errors.template_id,
+                                        )}
+                                    >
+                                        <NativeSelect
+                                            label="Pola jam kerja acuan"
                                             value={templateId}
                                             onChange={(e) =>
                                                 setTemplateId(e.target.value)
                                             }
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                         >
                                             {templates.map((t) => (
-                                                <option key={t.id} value={t.id}>
+                                                <NativeSelectOption
+                                                    key={t.id}
+                                                    value={t.id}
+                                                >
                                                     {t.code} — {t.name}
-                                                </option>
+                                                </NativeSelectOption>
                                             ))}
-                                        </select>
-                                    )}
-                                    {errors.template_id && (
-                                        <p className="text-xs text-destructive">
-                                            {errors.template_id}
-                                        </p>
-                                    )}
-                                </div>
+                                        </NativeSelect>
+                                        {errors.template_id && (
+                                            <FieldError>
+                                                {errors.template_id}
+                                            </FieldError>
+                                        )}
+                                    </Field>
+                                )}
 
-                                {/* Field 3: Date Range */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-semibold text-foreground">
-                                            Rentang Tanggal{' '}
-                                            <span className="text-destructive">
-                                                *
-                                            </span>
-                                        </label>
-                                        {/* Presets */}
-                                        <div className="flex items-center gap-1.5 text-[11px]">
-                                            <span className="text-muted-foreground">
-                                                Pilihan cepat:
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={
-                                                    handleSetRangeCurrentMonth
-                                                }
-                                                className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                            >
-                                                Bulan Ini
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={
-                                                    handleSetRangeNextMonth
-                                                }
-                                                className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                            >
-                                                Bulan Depan
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={
-                                                    handleSetRangeCurrentYear
-                                                }
-                                                className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                                            >
-                                                Tahun Ini
-                                            </button>
-                                        </div>
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                        <span className="text-muted-foreground">
+                                            Pilihan cepat:
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSetRangeCurrentMonth}
+                                        >
+                                            Bulan ini
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSetRangeNextMonth}
+                                        >
+                                            Bulan depan
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSetRangeCurrentYear}
+                                        >
+                                            Tahun ini
+                                        </Button>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        <div className="space-y-1">
-                                            <span className="text-[11px] text-muted-foreground">
-                                                Dari Tanggal:
-                                            </span>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                errors.from_date,
+                                            )}
+                                        >
                                             <Input
+                                                label="Dari tanggal"
                                                 type="date"
+                                                required
                                                 value={fromDate}
                                                 onChange={(e) =>
                                                     setFromDate(e.target.value)
                                                 }
-                                                className="h-8 text-xs"
                                             />
                                             {errors.from_date && (
-                                                <p className="text-xs text-destructive">
+                                                <FieldError>
                                                     {errors.from_date}
-                                                </p>
+                                                </FieldError>
                                             )}
-                                        </div>
+                                        </Field>
 
-                                        <div className="space-y-1">
-                                            <span className="text-[11px] text-muted-foreground">
-                                                Sampai Tanggal:
-                                            </span>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                errors.to_date,
+                                            )}
+                                        >
                                             <Input
+                                                label="Sampai tanggal"
                                                 type="date"
+                                                required
                                                 value={toDate}
                                                 onChange={(e) =>
                                                     setToDate(e.target.value)
                                                 }
-                                                className="h-8 text-xs"
                                             />
                                             {errors.to_date && (
-                                                <p className="text-xs text-destructive">
+                                                <FieldError>
                                                     {errors.to_date}
-                                                </p>
+                                                </FieldError>
                                             )}
-                                        </div>
+                                        </Field>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">
                                         Setiap hari dalam rentang ini yang telah
-                                        memiliki jadwal akan ditimpa dengan
-                                        konfigurasi pola terbaru.
+                                        memiliki jadwal akan ditimpa dengan pola
+                                        yang dipilih. Rentang paling panjang 3
+                                        tahun.
                                     </p>
                                 </div>
 
-                                {/* Form Submit Actions */}
                                 <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-                                    <Link
-                                        href="/settings/working-time-calendar-times"
-                                        className="rounded-md border border-input px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
-                                    >
-                                        Batal
-                                    </Link>
+                                    <Button variant="outline" asChild>
+                                        <Link href="/settings/working-time-calendar-times">
+                                            Batal
+                                        </Link>
+                                    </Button>
                                     <Button
                                         type="submit"
                                         disabled={
-                                            !canManage ||
                                             calendars.length === 0 ||
                                             templates.length === 0 ||
                                             isSubmitting
                                         }
-                                        className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                                     >
-                                        <Play className="size-3.5 fill-current" />
-                                        <span>
-                                            {isSubmitting
-                                                ? 'Memproses Jadwal…'
-                                                : 'Terapkan Jadwal dari Pola'}
-                                        </span>
+                                        <Play className="fill-current" />
+                                        {isSubmitting
+                                            ? 'Menyusun jadwal…'
+                                            : 'Susun jadwal'}
                                     </Button>
                                 </div>
                             </form>
 
-                            {/* Right Column: Template Preview & Calendar Info (5 cols) */}
                             <div className="space-y-6 lg:col-span-5">
-                                {/* Calendar Summary Card */}
                                 {selectedCalendar && (
                                     <div className="rounded-lg border border-border bg-card p-4 text-xs">
-                                        <div className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
-                                            <CalendarDays className="size-4 text-primary" />
-                                            <span>
-                                                Kalender Sasaran:{' '}
-                                                {selectedCalendar.code}
-                                            </span>
-                                        </div>
+                                        <p className="border-b border-border pb-2 font-semibold text-foreground">
+                                            Kalender sasaran:{' '}
+                                            {selectedCalendar.code}
+                                        </p>
                                         <div className="mt-3 space-y-1 text-muted-foreground">
                                             <p className="font-medium text-foreground">
                                                 {selectedCalendar.name}
@@ -533,24 +501,20 @@ export default function ComposeWorkingTimesPage({
                                     </div>
                                 )}
 
-                                {/* Template Schedule Preview */}
                                 <div className="rounded-lg border border-border bg-card p-4">
                                     <div className="flex items-center justify-between border-b border-border pb-2">
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                                            <Clock className="size-4 text-primary" />
-                                            <span>
-                                                Pratinjau Pola:{' '}
-                                                {selectedTemplate?.code ??
-                                                    'Belum ada pola'}
-                                            </span>
-                                        </div>
+                                        <p className="text-xs font-semibold text-foreground">
+                                            Pratinjau pola:{' '}
+                                            {selectedTemplate?.code ??
+                                                'Belum ada pola'}
+                                        </p>
                                         {selectedTemplate && (
                                             <Badge
                                                 variant="outline"
                                                 className="text-[10px]"
                                             >
                                                 {selectedTemplate.lines.length}{' '}
-                                                Baris Shift
+                                                baris jam kerja
                                             </Badge>
                                         )}
                                     </div>
@@ -567,7 +531,7 @@ export default function ComposeWorkingTimesPage({
                                                             Status
                                                         </TableHead>
                                                         <TableHead className="text-xs">
-                                                            Jam Kerja
+                                                            Jam kerja
                                                         </TableHead>
                                                         <TableHead className="w-16 text-right text-xs">
                                                             Total
@@ -589,8 +553,8 @@ export default function ComposeWorkingTimesPage({
                                                                 </TableCell>
                                                                 <TableCell className="text-center text-xs">
                                                                     {item.isOpen ? (
-                                                                        <Badge className="bg-emerald-500/10 text-[10px] text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400">
-                                                                            Buka
+                                                                        <Badge className="bg-success/10 text-[10px] text-success">
+                                                                            Kerja
                                                                         </Badge>
                                                                     ) : (
                                                                         <Badge

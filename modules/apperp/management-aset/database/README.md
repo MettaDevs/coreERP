@@ -91,9 +91,9 @@ tanggal yang barisnya diarsipkan boleh dipakai lagi. Delapan kolom akunnya (`acq
 `finance_reference_accounts` milik Core tanpa foreign key; keberadaan dan statusnya diperiksa lewat
 kontrak `DaftarAkun`.
 
-`m_buku_penyusutan.export_to_backoffice` tidak lagi dibaca maupun ditulis sejak saklarnya dilebur ke
-`posting_layer` (K-15). Kolomnya dibiarkan satu rilis supaya rilis sebelumnya tetap berjalan di atas
-skema ini (aturan N-1), lalu dibuang.
+`m_buku_penyusutan.export_to_backoffice` sudah dibuang (TODO 8.4.3): saklarnya dilebur ke
+`posting_layer` (K-15) di rilis 0.9.0, dan kolomnya dibiarkan satu rilis supaya 0.8.0 tetap berjalan di
+atas skema 0.9.0 (aturan N-1). API tetap menolak field itu dengan 422.
 
 `tr_penerimaan_aset.vendor_id` menunjuk vendor milik Core (K-06), juga tanpa foreign key; keberadaan
 dan entitas legalnya diperiksa lewat kontrak `DaftarVendor`. `cara_perolehan` bernilai `pembelian`,
