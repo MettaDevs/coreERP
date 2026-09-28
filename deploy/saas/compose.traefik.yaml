@@ -20,7 +20,7 @@ services:
   # pintu depan yang selamat tidak menyelamatkan apa pun. Menaruhnya di tempat lain hanya menambah
   # satu titik yang bisa rusak tanpa menambah satu pun yang bertahan.
   traefik:
-    image: traefik:v3.3
+    image: ${TRAEFIK_IMAGE:-traefik:v3.3}
     restart: unless-stopped
     environment:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN wajib}

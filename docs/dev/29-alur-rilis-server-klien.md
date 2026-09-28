@@ -80,6 +80,12 @@ dibangun: rilis itu ditarik lagi dari Harbor, dengan compose dan migrasi dari co
 sesudah menyunting `/etc/coreerp/saas.env`, atau untuk kembali ke rilis sebelumnya bila rilis baru bermasalah di
 SaaS dev — ingat aturan migration di bawah.
 
+**Object storage SaaS dev adalah RustFS sejak rilis 0.9.1**, menggantikan MinIO yang distribusi gratisnya
+dihentikan (image-nya tidak lagi dapat ditarik). Rilis 0.9.1 ke atas membaca `RUSTFS_ACCESS_KEY` dan
+`RUSTFS_SECRET_KEY` dari `saas.env`. Mundur ke 0.9.0 atau sebelumnya menyalakan MinIO lagi dan membaca
+`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` — keduanya dibiarkan di `saas.env` untuk itu — tetapi berkas yang diunggah
+sesudah pindah hanya ada di RustFS.
+
 ## Satu pembaruan di server klien, langkah demi langkah
 
 ```mermaid

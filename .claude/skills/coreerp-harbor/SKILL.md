@@ -64,7 +64,8 @@ Nothing mechanical catches a drift between these. Change them in the same pull r
    - both jobs green;
    - `/var/log/coreerp-rilis/<release>.log` ends with the release registered;
    - the running SaaS containers' image ids resolve (`RepoDigests`) to the digests in
-     `/var/lib/coreerp-perakit/rilis/<release>/saas.json`;
+     `/var/lib/coreerp-perakit/rilis/<release>/saas.json` — including every third-party image under `pihak_ketiga`,
+     which must come from `coreerp/saas/`, never from Docker Hub;
    - core `/up` answers 200 from inside the console container, and the admin console login page answers 200;
    - the release appears in `site_releases`.
 

@@ -1,4 +1,5 @@
 import { ActionButton } from '@apperp/ui/action-button';
+import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
@@ -12,7 +13,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
+import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
     Table,
     TableBody,
@@ -22,7 +25,7 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarCheck, Clock, Copy } from 'lucide-react';
+import { AlertCircle, CalendarCheck, Clock, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -129,7 +132,7 @@ export default function WorkingTimeCalendars({
                 name: formName.trim(),
                 description: formDesc.trim() || null,
                 base_calendar_id: formBaseId || null,
-                standard_work_hours: Number(formHours) || 8,
+                standard_work_hours: formHours,
             },
             {
                 preserveScroll: true,
@@ -158,7 +161,7 @@ export default function WorkingTimeCalendars({
                 name: formName.trim(),
                 description: formDesc.trim() || null,
                 base_calendar_id: formBaseId || null,
-                standard_work_hours: Number(formHours) || 8,
+                standard_work_hours: formHours,
             },
             {
                 preserveScroll: true,
@@ -290,7 +293,7 @@ export default function WorkingTimeCalendars({
                         className="border-primary/40 text-primary hover:bg-primary/10"
                     >
                         <Clock className="size-4" />
-                        <span>Jadwal kerja (Working times)</span>
+                        <span>Jadwal kerja</span>
                     </Button>
 
                     {canManage && (
@@ -323,17 +326,16 @@ export default function WorkingTimeCalendars({
 
                 {/* Notice if no legal entity selected */}
                 {!currentLegalEntity && (
-                    <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+                    <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
                         <span>
-                            <strong>Pemberitahuan:</strong> Belum ada entitas
-                            legal yang aktif pada sesi ini. Kalender kerja
-                            memerlukan entitas legal aktif.
+                            Belum ada entitas legal yang aktif pada sesi ini.
+                            Kalender kerja selalu milik satu entitas legal.
                         </span>
                         <a
                             href="/settings/organization"
-                            className="font-semibold underline hover:text-amber-900 dark:hover:text-amber-100"
+                            className="font-semibold underline"
                         >
-                            Atur Organisasi &rarr;
+                            Atur organisasi &rarr;
                         </a>
                     </div>
                 )}
@@ -366,9 +368,16 @@ export default function WorkingTimeCalendars({
                                             colSpan={5}
                                             className="py-8 text-center text-muted-foreground"
                                         >
-                                            Belum ada kalender kerja. Klik{' '}
-                                            <strong>+ Baru</strong> untuk
-                                            menambahkan.
+                                            Belum ada kalender kerja.
+                                            {canManage && (
+                                                <>
+                                                    {' '}
+                                                    Klik <strong>
+                                                        + Baru
+                                                    </strong>{' '}
+                                                    untuk menambahkan.
+                                                </>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -435,120 +444,31 @@ export default function WorkingTimeCalendars({
                 </div>
             </div>
 
-            {/* Dialog Create Calendar */}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Tambah Kalender Kerja Baru</DialogTitle>
+                        <DialogTitle>Tambah kalender kerja</DialogTitle>
                         <DialogDescription>
-                            Definisikan master kalender kerja untuk entitas
-                            legal aktif.
+                            Kalender kerja baru untuk entitas legal{' '}
+                            {currentLegalEntity?.name ?? 'yang aktif'}.
                         </DialogDescription>
                     </DialogHeader>
 
                     <DialogBody className="space-y-4 py-2">
-                        {formErrors.general && (
-                            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                                {formErrors.general}
-                            </div>
-                        )}
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
-                            <Input
-                                value={formCode}
-                                onChange={(e) =>
-                                    setFormCode(e.target.value.toUpperCase())
-                                }
-                                placeholder="Contoh: 24HR, PROD, PAYROLL"
-                                className="mt-1"
-                                autoFocus
-                            />
-                            {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.code}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
-                            <Input
-                                value={formName}
-                                onChange={(e) => setFormName(e.target.value)}
-                                placeholder="Contoh: Production 24 Hours"
-                                className="mt-1"
-                            />
-                            {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.name}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kalender Dasar (Opsional)
-                            </label>
-                            <select
-                                value={formBaseId}
-                                onChange={(e) => setFormBaseId(e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
-                            >
-                                <option value="">
-                                    -- Tanpa Kalender Dasar --
-                                </option>
-                                {calendars.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.code} - {c.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {formErrors.base_calendar_id && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.base_calendar_id}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Jam Kerja Standar per Hari
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="24"
-                                value={formHours}
-                                onChange={(e) =>
-                                    setFormHours(Number(e.target.value))
-                                }
-                                className="mt-1"
-                            />
-                            {formErrors.standard_work_hours && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.standard_work_hours}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Keterangan (Opsional)
-                            </label>
-                            <Input
-                                value={formDesc}
-                                onChange={(e) => setFormDesc(e.target.value)}
-                                placeholder="Catatan atau tujuan kalender..."
-                                className="mt-1"
-                            />
-                        </div>
+                        <CalendarFormFields
+                            code={formCode}
+                            onCodeChange={setFormCode}
+                            name={formName}
+                            onNameChange={setFormName}
+                            baseId={formBaseId}
+                            onBaseIdChange={setFormBaseId}
+                            hours={formHours}
+                            onHoursChange={setFormHours}
+                            description={formDesc}
+                            onDescriptionChange={setFormDesc}
+                            baseOptions={calendars}
+                            errors={formErrors}
+                        />
                     </DialogBody>
 
                     <DialogFooter>
@@ -563,114 +483,33 @@ export default function WorkingTimeCalendars({
                 </DialogContent>
             </Dialog>
 
-            {/* Dialog Edit Calendar */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Ubah Kalender Kerja</DialogTitle>
+                        <DialogTitle>Ubah kalender kerja</DialogTitle>
                         <DialogDescription>
-                            Perbarui rincian master kalender kerja.
+                            Perbarui kode, nama, dan jam kerja standar kalender
+                            ini.
                         </DialogDescription>
                     </DialogHeader>
 
                     <DialogBody className="space-y-4 py-2">
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
-                            <Input
-                                value={formCode}
-                                onChange={(e) =>
-                                    setFormCode(e.target.value.toUpperCase())
-                                }
-                                className="mt-1"
-                            />
-                            {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.code}
-                                </p>
+                        <CalendarFormFields
+                            code={formCode}
+                            onCodeChange={setFormCode}
+                            name={formName}
+                            onNameChange={setFormName}
+                            baseId={formBaseId}
+                            onBaseIdChange={setFormBaseId}
+                            hours={formHours}
+                            onHoursChange={setFormHours}
+                            description={formDesc}
+                            onDescriptionChange={setFormDesc}
+                            baseOptions={calendars.filter(
+                                (c) => c.id !== selectedCalendar?.id,
                             )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
-                            <Input
-                                value={formName}
-                                onChange={(e) => setFormName(e.target.value)}
-                                className="mt-1"
-                            />
-                            {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.name}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kalender Dasar (Opsional)
-                            </label>
-                            <select
-                                value={formBaseId}
-                                onChange={(e) => setFormBaseId(e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
-                            >
-                                <option value="">
-                                    -- Tanpa Kalender Dasar --
-                                </option>
-                                {calendars
-                                    .filter(
-                                        (c) => c.id !== selectedCalendar?.id,
-                                    )
-                                    .map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.code} - {c.name}
-                                        </option>
-                                    ))}
-                            </select>
-                            {formErrors.base_calendar_id && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.base_calendar_id}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Jam Kerja Standar per Hari
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="24"
-                                value={formHours}
-                                onChange={(e) =>
-                                    setFormHours(Number(e.target.value))
-                                }
-                                className="mt-1"
-                            />
-                            {formErrors.standard_work_hours && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.standard_work_hours}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Keterangan (Opsional)
-                            </label>
-                            <Input
-                                value={formDesc}
-                                onChange={(e) => setFormDesc(e.target.value)}
-                                className="mt-1"
-                            />
-                        </div>
+                            errors={formErrors}
+                        />
                     </DialogBody>
 
                     <DialogFooter>
@@ -678,67 +517,56 @@ export default function WorkingTimeCalendars({
                             onClick={handleUpdate}
                             disabled={isSubmitting || !formCode || !formName}
                         >
-                            {isSubmitting ? 'Menyimpan…' : 'Simpan Perubahan'}
+                            {isSubmitting ? 'Menyimpan…' : 'Simpan perubahan'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsEditOpen(false)} />
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Dialog Copy Calendar */}
             <Dialog open={isCopyOpen} onOpenChange={setIsCopyOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Salin Kalender Kerja</DialogTitle>
+                        <DialogTitle>Salin kalender kerja</DialogTitle>
                         <DialogDescription>
                             Salin kalender{' '}
                             <strong>{selectedCalendar?.code}</strong> beserta
-                            seluruh rincian hari kerja dan jam kerjanya ke
-                            kalender baru.
+                            seluruh hari kerja dan jam kerjanya ke kalender
+                            baru.
                         </DialogDescription>
                     </DialogHeader>
 
                     <DialogBody className="space-y-4 py-2">
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender Baru{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
+                        <Field data-invalid={Boolean(formErrors.code)}>
                             <Input
+                                label="Kode kalender baru"
+                                required
                                 value={copyTargetCode}
                                 onChange={(e) =>
                                     setCopyTargetCode(
                                         e.target.value.toUpperCase(),
                                     )
                                 }
-                                className="mt-1"
                                 autoFocus
                             />
                             {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.code}
-                                </p>
+                                <FieldError>{formErrors.code}</FieldError>
                             )}
-                        </div>
+                        </Field>
 
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender Baru{' '}
-                                <span className="text-destructive">*</span>
-                            </label>
+                        <Field data-invalid={Boolean(formErrors.name)}>
                             <Input
+                                label="Nama kalender baru"
+                                required
                                 value={copyTargetName}
                                 onChange={(e) =>
                                     setCopyTargetName(e.target.value)
                                 }
-                                className="mt-1"
                             />
                             {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {formErrors.name}
-                                </p>
+                                <FieldError>{formErrors.name}</FieldError>
                             )}
-                        </div>
+                        </Field>
                     </DialogBody>
 
                     <DialogFooter>
@@ -750,12 +578,123 @@ export default function WorkingTimeCalendars({
                                 !copyTargetName
                             }
                         >
-                            {isSubmitting ? 'Menyalin…' : 'Salin Kalender'}
+                            {isSubmitting ? 'Menyalin…' : 'Salin kalender'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsCopyOpen(false)} />
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+        </>
+    );
+}
+
+type CalendarFormFieldsProps = {
+    code: string;
+    onCodeChange: (value: string) => void;
+    name: string;
+    onNameChange: (value: string) => void;
+    baseId: string;
+    onBaseIdChange: (value: string) => void;
+    hours: number;
+    onHoursChange: (value: number) => void;
+    description: string;
+    onDescriptionChange: (value: string) => void;
+    baseOptions: CalendarItem[];
+    errors: Record<string, string>;
+};
+
+/** Isian kalender yang sama untuk dialog tambah dan ubah. */
+function CalendarFormFields({
+    code,
+    onCodeChange,
+    name,
+    onNameChange,
+    baseId,
+    onBaseIdChange,
+    hours,
+    onHoursChange,
+    description,
+    onDescriptionChange,
+    baseOptions,
+    errors,
+}: CalendarFormFieldsProps) {
+    return (
+        <>
+            {errors.general && (
+                <Alert variant="destructive">
+                    <AlertCircle />
+                    <AlertDescription>{errors.general}</AlertDescription>
+                </Alert>
+            )}
+
+            <Field data-invalid={Boolean(errors.code)}>
+                <Input
+                    label="Kode kalender"
+                    required
+                    value={code}
+                    onChange={(e) => onCodeChange(e.target.value.toUpperCase())}
+                    autoFocus
+                />
+                {errors.code ? (
+                    <FieldError>{errors.code}</FieldError>
+                ) : (
+                    <FieldDescription>
+                        Huruf, angka, garis bawah, atau tanda hubung, misalnya
+                        STD atau PROD-24.
+                    </FieldDescription>
+                )}
+            </Field>
+
+            <Field data-invalid={Boolean(errors.name)}>
+                <Input
+                    label="Nama kalender"
+                    required
+                    value={name}
+                    onChange={(e) => onNameChange(e.target.value)}
+                />
+                {errors.name && <FieldError>{errors.name}</FieldError>}
+            </Field>
+
+            <Field data-invalid={Boolean(errors.base_calendar_id)}>
+                <NativeSelect
+                    label="Kalender dasar"
+                    value={baseId}
+                    onChange={(e) => onBaseIdChange(e.target.value)}
+                >
+                    <NativeSelectOption value="">
+                        Tanpa kalender dasar
+                    </NativeSelectOption>
+                    {baseOptions.map((c) => (
+                        <NativeSelectOption key={c.id} value={c.id}>
+                            {c.code} - {c.name}
+                        </NativeSelectOption>
+                    ))}
+                </NativeSelect>
+                {errors.base_calendar_id && (
+                    <FieldError>{errors.base_calendar_id}</FieldError>
+                )}
+            </Field>
+
+            <Field data-invalid={Boolean(errors.standard_work_hours)}>
+                <Input
+                    label="Jam kerja standar per hari"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    value={hours}
+                    onChange={(e) => onHoursChange(Number(e.target.value))}
+                />
+                {errors.standard_work_hours && (
+                    <FieldError>{errors.standard_work_hours}</FieldError>
+                )}
+            </Field>
+
+            <Input
+                label="Keterangan"
+                value={description}
+                onChange={(e) => onDescriptionChange(e.target.value)}
+            />
         </>
     );
 }
