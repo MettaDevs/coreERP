@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -22,6 +23,7 @@ use Tests\TestCase;
  */
 class VendorTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $owner;
@@ -69,10 +71,11 @@ class VendorTest extends TestCase
 
     public function test_referensi_nomor_core_dipasang_ulang_bila_barisnya_hilang(): void
     {
-        // Baris app `core` dan referensinya ditulis migration, jadi ikut hilang bila tabel `apps`
-        // dikosongkan — test ber-DatabaseTruncation melakukannya dengan TRUNCATE apps CASCADE,
-        // dan kelas test sesudahnya di proses yang sama pernah gagal membuat vendor karenanya.
-        DB::table('apps')->where('id', 'core')->delete();
+        // Referensi nomor vendor ditulis migration, jadi ikut hilang bila tabel `apps` dikosongkan —
+        // test ber-DatabaseTruncation melakukannya dengan TRUNCATE apps CASCADE, dan kelas test
+        // sesudahnya di proses yang sama pernah gagal membuat vendor karenanya. Baris app `core`
+        // sendiri kini dipegang juga oleh katalog layar Core, jadi yang dihapus di sini referensinya.
+        DB::table('app_number_sequence_references')->where('app_id', 'core')->where('code', 'core.vendor')->delete();
 
         $this->buat(['party_name' => 'PT Sarana Medika'])->assertCreated()->assertJsonPath('data.number', 'VND-000001');
 
@@ -169,14 +172,18 @@ class VendorTest extends TestCase
         $this->assertDatabaseHas('parties', ['id' => $vendor['party_id'], 'name' => 'PT Sarana Medika Utama']);
     }
 
-    public function test_anggota_biasa_dapat_melihat_tetapi_tidak_dapat_membuat_atau_mengubah(): void
+    public function test_the_inquire_duty_views_vendors_but_cannot_create_or_change_them(): void
     {
         $vendor = (string) $this->buat(['party_name' => 'PT Sarana Medika'])->json('data.id');
         $anggota = User::factory()->create();
-        TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'system_role' => 'member', 'status' => 'active',
+        $membership = TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'status' => 'active',
         ]);
 
+        // Tanpa role, layar vendor pun tertutup.
+        $this->actingAs($anggota)->get('/settings/vendors')->assertForbidden();
+
+        $this->grantDuties($membership, ['core.vendor.inquire']);
         $this->actingAs($anggota)->get('/settings/vendors')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', false)->where('vendors.total', 1));
         $this->actingAs($anggota)->postJson('/api/v1/vendors', [

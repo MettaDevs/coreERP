@@ -10,6 +10,7 @@ use App\Models\Party;
 use App\Models\PartyRoleRegistration;
 use App\Models\TenantMembership;
 use App\Models\Vendor;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -168,7 +169,7 @@ final class SaveVendor
 
     private function pastikanAdmin(TenantMembership $actor): void
     {
-        if (! $actor->canManageAccess()) {
+        if (! $actor->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE)) {
             throw new AuthorizationException;
         }
     }

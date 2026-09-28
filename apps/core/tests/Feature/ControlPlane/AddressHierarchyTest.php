@@ -9,10 +9,12 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 class AddressHierarchyTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $user;
@@ -36,12 +38,11 @@ class AddressHierarchyTest extends TestCase
             'slug' => 'demo-enterprise',
             'status' => 'active',
         ]);
-        TenantMembership::create([
+        $this->makeOwner(TenantMembership::create([
             'tenant_id' => $this->tenant->id,
             'user_id' => $this->user->id,
-            'system_role' => 'owner',
             'status' => 'active',
-        ]);
+        ]));
     }
 
     public function test_indonesia_address_hierarchy_is_seeded(): void

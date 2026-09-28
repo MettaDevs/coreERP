@@ -52,6 +52,9 @@ class NumberSequenceConcurrencyTest extends TestCase
     protected function tearDown(): void
     {
         DB::statement('TRUNCATE TABLE clients, apps RESTART IDENTITY CASCADE');
+        // Katalog layar Core ditulis migration dan ikut terhapus bersama `apps`; tanpa ini role Owner di kelas test
+        // sesudahnya tidak memegang satu pun duty Core. Migration-nya idempoten.
+        (require database_path('migrations/2026_09_25_120100_register_core_security_catalog.php'))->up();
 
         parent::tearDown();
     }

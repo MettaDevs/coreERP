@@ -35,7 +35,7 @@ Target yang dikunci:
 | [06-worktree-target.md](06-worktree-target.md) | Kondisi repo sekarang dan target pemisahan repository |
 | [07-reporting-and-replicas.md](07-reporting-and-replicas.md) | Read replica per app, reporting projection lintas app, dan consistency policy |
 | [08-query-scopes-and-schema.md](08-query-scopes-and-schema.md) | Schema organization/hierarchy target dan query tenant/legal-entity/organization scope |
-| [09-identity-and-access.md](09-identity-and-access.md) | Role platform, security role/duty/privilege/permission, workforce, SoD, organization scope, kapan tenant memakai SSO, dan dua jenis undangan |
+| [09-identity-and-access.md](09-identity-and-access.md) | Role Owner, katalog layar Core, security role/duty/privilege/permission, workforce, SoD, organization scope, kapan tenant memakai SSO, dan dua jenis undangan |
 | [10-core-foundation-gates.md](10-core-foundation-gates.md) | Fondasi Core yang belum tersedia, pemilik kebenaran, dan kondisi kapan implementasinya boleh dimulai |
 | [11-local-docker-development.md](11-local-docker-development.md) | Stack Docker lokal, akses database, dan checklist menambah app |
 | [12-external-module-integration.md](12-external-module-integration.md) | Panduan integrasi sistem eksternal ke modul CoreERP |

@@ -386,7 +386,8 @@ final class ClientServerSetup
     }
 
     /**
-     * Owner aktif tertua tenant ini — admin pertama yang dilahirkan di server klien.
+     * Owner aktif tertua tenant ini — admin pertama yang dilahirkan di server klien. Owner adalah
+     * pemegang role Owner (`roles.is_owner`); keanggotaan tidak lagi membawa penanda owner (SEC-22).
      *
      * @return array{name: string, email: string}|null
      */
@@ -395,8 +396,13 @@ final class ClientServerSetup
         $row = DB::table('tenant_memberships')
             ->join('users', 'users.id', '=', 'tenant_memberships.user_id')
             ->where('tenant_memberships.tenant_id', $tenantId)
-            ->where('tenant_memberships.system_role', 'owner')
             ->where('tenant_memberships.status', 'active')
+            ->whereExists(fn ($query) => $query->selectRaw('1')
+                ->from('role_assignments')
+                ->join('roles', 'roles.id', '=', 'role_assignments.role_id')
+                ->whereColumn('role_assignments.membership_id', 'tenant_memberships.id')
+                ->where('role_assignments.status', 'active')
+                ->where('roles.is_owner', true))
             ->orderBy('tenant_memberships.created_at')
             ->orderBy('tenant_memberships.id')
             ->first(['users.name', 'users.email']);

@@ -13,6 +13,7 @@ use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\StatusPostingBerubah;
 use App\Support\Modules\Contracts\PostingTidakSah;
@@ -45,7 +46,7 @@ final class FinancePostingMonitorController extends Controller
 
     public function index(Request $request): Response
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_READ);
         $tenant = $membership->tenant_id;
         $filter = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
@@ -77,7 +78,7 @@ final class FinancePostingMonitorController extends Controller
             ->through(fn (FinancePosting $posting): array => $this->present($posting, $entitas));
 
         return Inertia::render('settings/finance-postings', [
-            'canManage' => $membership->canManageAccess(),
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::FINANCE_POSTING_PROCESS),
             'filters' => [
                 'q' => $kata === '' ? null : $kata,
                 'status' => $filter['status'] ?? null,
@@ -103,7 +104,7 @@ final class FinancePostingMonitorController extends Controller
 
     public function show(Request $request, FinancePosting $financePosting): JsonResponse
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_READ);
         $posting = $this->milik($membership, $financePosting);
         $events = $posting->events()->orderBy('created_at')->orderBy('id')->get();
         $deliveries = FinancePostingDelivery::query()->where('finance_posting_id', $posting->id)->orderBy('first_attempt_at')->get();
@@ -173,7 +174,7 @@ final class FinancePostingMonitorController extends Controller
 
     public function revalidate(Request $request, FinancePosting $financePosting, PostingPublisher $penerbit): JsonResponse
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_PROCESS);
         $posting = $this->milik($membership, $financePosting);
         if ($posting->status !== FinancePosting::HELD) {
             throw ValidationException::withMessages(['status' => 'Hanya posting yang tertahan yang dapat divalidasi ulang.']);
@@ -194,7 +195,7 @@ final class FinancePostingMonitorController extends Controller
 
     public function markManual(Request $request, FinancePosting $financePosting, PostingPublisher $penerbit): JsonResponse
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_PROCESS);
         $posting = $this->milik($membership, $financePosting);
         $data = $request->validate(
             ['reason' => ['required', 'string', 'max:500']],
@@ -215,10 +216,11 @@ final class FinancePostingMonitorController extends Controller
         return response()->json(['data' => $this->present($hasil, $this->entitasLegal($membership->tenant_id))]);
     }
 
-    private function admin(Request $request): TenantMembership
+    /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
+    private function authorizedMembership(Request $request, string $permission): TenantMembership
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->canManageAccess(), 403);
+        abort_unless($membership->hasCorePermission($permission), 403);
 
         return $membership;
     }
