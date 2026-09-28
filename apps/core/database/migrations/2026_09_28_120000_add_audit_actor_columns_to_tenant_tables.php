@@ -1,6 +1,5 @@
 <?php
 
-use App\Support\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Kolom jejak pembuat dan pengubah terakhir di setiap tabel tenant milik Core (K-01, area 1 TODO
  * analisa gap BC fase 1), beserta fungsi trigger yang mengisinya dari `coreerp.user_id`.
+ *
+ * Migration ini tidak memakai `AuditColumns`: admin.erp ikut menjalankan migration Core, dan kelas
+ * Core tidak ada di sana. Nama kolom, trigger, dan fungsinya harus sama dengan konstanta di kelas itu.
  *
  * Tabel sisi pusat (model ber-`OwnedByControlPlane`) tidak ikut: pemiliknya admin.erp, dan sebagian
  * sudah punya `created_by` sendiri. Tabel module ditangani migration module masing-masing, karena
@@ -73,29 +75,29 @@ return new class extends Migration
         }
 
         foreach (self::TABLES as $table) {
-            $hasCreator = Schema::hasColumn($table, AuditColumns::CREATED_BY);
+            $hasCreator = Schema::hasColumn($table, 'created_by_user_id');
 
             Schema::table($table, function (Blueprint $blueprint) use ($hasCreator): void {
                 if (! $hasCreator) {
-                    $blueprint->unsignedBigInteger(AuditColumns::CREATED_BY)->nullable();
+                    $blueprint->unsignedBigInteger('created_by_user_id')->nullable();
                 }
-                $blueprint->unsignedBigInteger(AuditColumns::UPDATED_BY)->nullable();
+                $blueprint->unsignedBigInteger('updated_by_user_id')->nullable();
             });
 
-            AuditColumns::attach($table);
+            DB::statement("CREATE OR REPLACE TRIGGER stamp_audit_actor BEFORE INSERT OR UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_stamp_audit_actor()");
         }
     }
 
     public function down(): void
     {
         foreach (self::TABLES as $table) {
-            AuditColumns::detach($table);
+            DB::statement("DROP TRIGGER IF EXISTS stamp_audit_actor ON {$table}");
 
             $keepCreator = $table === 'report_layouts' || in_array($table, self::TEXT_CREATOR_COLUMNS, true);
             Schema::table($table, function (Blueprint $blueprint) use ($keepCreator): void {
                 $blueprint->dropColumn($keepCreator
-                    ? [AuditColumns::UPDATED_BY]
-                    : [AuditColumns::CREATED_BY, AuditColumns::UPDATED_BY]);
+                    ? ['updated_by_user_id']
+                    : ['created_by_user_id', 'updated_by_user_id']);
             });
         }
 
