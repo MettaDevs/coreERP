@@ -306,9 +306,9 @@ Silo menjawab **di mana resource berjalan**. Customisasi menjawab **perilaku apa
 
 | Kombinasi | Contoh |
 | --- | --- |
-| Pooled + standard config | SaaS biasa dengan custom field dan approval workflow. |
+| Pooled + standard config | SaaS biasa dengan setelan tenant dan workflow persetujuan. |
 | Isolated + standard product | Customer regulated dengan database dedicated, tetapi versi product tetap standar. |
-| On-prem perpetual + private addon | Customer menjalankan POS, Booking, dan addon policy khusus pada Compose mereka sendiri, sesuai contract dan compatibility matrix. |
+| On-prem perpetual + module khusus | Server klien menerima image yang sama dengan klien lain; module yang terbuka, termasuk module khusus, ditentukan lisensi dari admin.erp. |
 | Core fork | Tidak didukung sebagai pola SaaS; hanya proyek bespoke dengan konsekuensi support terpisah. |
 
 Detail customisasi ada pada [05-customization-and-addons.md](05-customization-and-addons.md).

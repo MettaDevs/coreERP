@@ -22,7 +22,7 @@ Berlaku di `CoreERP` — termasuk seluruh isi `modules/` — maupun di setiap re
 
 **Jangan query database lintas app.** Pakai REST/OpenAPI atau event/AsyncAPI. Lihat [API dan integration bridge](/dev/04-api-and-integration).
 
-**Jangan fork Core untuk kebutuhan customer.** Pakai konfigurasi, integration connector, atau addon app. Lihat [Kustomisasi dan addon](/dev/05-customization-and-addons).
+**Jangan fork Core untuk kebutuhan customer.** Pakai setelan, fitur produk, integrasi lewat API, atau module khusus, sesuai urutannya. Lihat [Kebutuhan khusus pelanggan](/dev/05-customization-and-addons).
 
 **Pertahankan perubahan user yang tidak terkait.** Verifikasi hanya scope yang kamu ubah.
 
