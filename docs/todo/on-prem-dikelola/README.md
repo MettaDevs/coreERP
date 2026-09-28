@@ -48,7 +48,7 @@ Bukan pekerjaan dari nol. Yang di bawah ini sudah berdiri dan tinggal dipakai:
 | Image edisi diterbitkan ke registry, ditandai SHA commit, tanpa tag bergerak | Ada | `.github/workflows/release.yml` → `ghcr.io/.../edisi-<edisi>:<sha>` |
 | Bundle berisi seluruh image, compose, manifest, checksum, dan tanda tangan | Ada | `scripts/build-bundle.sh` |
 | Pemasangan dan pembaruan dari bundle, dengan mundur yang memulihkan image **dan** database | Ada, dijalankan di Docker lokal | `scripts/update.sh` |
-| Compose satu server tanpa konsol dan tanpa MinIO | Ada | `deploy/compose.edition.yaml` |
+| Compose satu server tanpa konsol dan tanpa object storage (RustFS hanya di SaaS) | Ada | `deploy/compose.edition.yaml` |
 | Pola operasi yang dicatat per langkah, beralasan bila gagal, satu berjalan per sasaran | Ada, untuk lingkungan | tabel `environment_operations` |
 | Masuk ke admin.erp lewat SSO, pintu kata sandi berbatas percobaan | Ada | `apps/control-plane/app/Http/Controllers/Sso/`, `apps/control-plane/app/Http/Controllers/Login.php` |
 

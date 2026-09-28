@@ -44,7 +44,7 @@ Hasilnya di `/var/lib/coreerp-perakit/rilis/<rilis>/`:
 | `compose.yaml` | `deploy/compose.edition.yaml` pada commit itu, dengan setiap image pendamping diganti nama lokalnya `coreerp.local/pendamping/<nama>:<20 heksa pertama digest>` |
 | `update.sh` | Salinan `scripts/update.sh` pada commit itu |
 | `SHA256SUMS`, `SHA256SUMS.sig` | Sidik ketiga berkas di atas, ditandatangani RSA SHA-256 dengan kunci rilis |
-| `saas.json` | Commit dan digest image core serta konsol untuk `deploy/saas/pasang-rilis.sh`. Di luar SHA256SUMS: tidak pernah dikirim ke server klien |
+| `saas.json` | Commit, digest image core serta konsol, dan `pihak_ketiga` (`NAMA_IMAGE` → rujukan digest di `coreerp/saas/`) untuk `deploy/saas/pasang-rilis.sh`. Di luar SHA256SUMS: tidak pernah dikirim ke server klien |
 
 Manifest v2 tidak menyebut host registry dan tidak menyebut edisi. `digest` adalah digest manifest di
 registry — yang dicocokkan agen lewat `RepoDigests` — dan `config_digest` dicatat terpisah karena
@@ -61,6 +61,8 @@ containerd.
 - **Pendamping disalin lewat digest, `linux/amd64` saja**, ke `coreerp/pendamping/<nama>:<rilis>`, supaya
   server klien tidak pernah menarik dari Docker Hub. Daftarnya dibaca dari baris `image:` harfiah di
   `deploy/compose.edition.yaml`.
+- **Image pihak ketiga SaaS dev disalin dengan cara yang sama** ke `coreerp/saas/<nama>:<rilis>`. Di compose SaaS
+  setiap image pihak ketiga wajib `${NAMA_IMAGE:-sumber}`; yang ditulis harfiah ditolak sebelum manifest ditulis.
 - **Perakit tidak push di sekitar GC Harbor**, Sabtu 19.00–21.59 UTC.
 - **Commit yang compose-nya belum menolak menarik ditolak sebelum push.** Setiap service di
   `deploy/compose.edition.yaml` harus `pull_policy: never`; tag rilis immutable, jadi rilis dari commit yang
