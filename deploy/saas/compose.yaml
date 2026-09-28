@@ -163,9 +163,14 @@ services:
       - core-minio-data:/data
 
   # Sekali jalan, dan aman diulang: `mb --ignore-existing` tidak mengeluh pada bucket yang sudah ada.
+  #
+  # Memakai image server MinIO yang sama, bukan `quay.io/minio/mc`: image server sudah membawa `mc` (healthcheck
+  # di atas memakainya), dan sejak 28 September 2026 quay.io menjawab 401 untuk `minio/mc` — pemasangan rilis
+  # 0.9.0 di SaaS dev gagal di sini. Satu image juga berarti satu tarikan lebih sedikit. `MINIO_MC_IMAGE` tetap
+  # dapat menimpanya.
   core-minio-init:
     profiles: [data]
-    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:latest}
+    image: ${MINIO_MC_IMAGE:-${MINIO_IMAGE:-quay.io/minio/minio:latest}}
     restart: 'no'
     depends_on:
       core-minio:
