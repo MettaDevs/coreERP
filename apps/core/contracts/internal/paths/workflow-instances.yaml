@@ -1,0 +1,97 @@
+post:
+  tags: [Workflow]
+  operationId: internal.workflow-instances.store
+  summary: Ajukan dokumen ke workflow Core
+  description: |
+    App mengajukan dokumennya; Core menjalankan konfigurasi workflow milik tenant.
+
+    Keputusannya **tidak** dikembalikan pada response ini. Ia tiba kemudian sebagai
+    event `core.workflow.decision.v2` ke endpoint webhook app — lihat
+    `contracts/asyncapi.yaml`. Response ini hanya menyatakan pengajuan diterima.
+
+    `workflow_type` harus terdaftar untuk app pemanggil; jenis milik app lain
+    menghasilkan 404, bukan 403, agar keberadaan workflow app lain tidak bocor.
+  parameters:
+    - name: Idempotency-Key
+      in: header
+      required: true
+      schema: { $ref: '#/components/schemas/IdempotencyKey' }
+      description: |
+        Wajib. Pengulangan dengan kunci yang sama mengembalikan instance yang sama
+        dengan status 200 dan header `Idempotent-Replayed: true`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            [workflow_type, source_document_type, source_document_id, initiator_membership_id, decision_context]
+          properties:
+            workflow_type:
+              type: string
+              maxLength: 120
+              description: Kode `workflow_types` milik app pemanggil.
+            source_document_type:
+              type: string
+              maxLength: 120
+              description: Jenis dokumen milik app, mis. `dekomisioning-aset`.
+            source_document_id: { type: string, format: ulid }
+            legal_entity_id:
+              type: [string, 'null']
+              format: ulid
+              description: |
+                Wajib bila jenis workflow ber-scope `legal_entity`; dikosongkan bila
+                ber-scope `tenant`.
+            initiator_membership_id:
+              type: string
+              format: ulid
+              description: Harus anggota aktif pada tenant yang sama.
+            decision_context:
+              type: object
+              description: |
+                Konteks keputusan. Field wajibnya ditentukan
+                `decision_context_schema` pada jenis workflow, bukan oleh file ini.
+                Nilainya dikembalikan apa adanya pada event keputusan.
+  responses:
+    '201':
+      description: Workflow instance dibuat.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/WorkflowInstance' }
+    '200':
+      description: Pemutaran ulang idempotency key yang sama.
+      headers:
+        Idempotent-Replayed:
+          schema: { type: string, const: 'true' }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/WorkflowInstance' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '404':
+      description: Jenis workflow tidak terdaftar untuk app ini.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '409':
+      description: |
+        Belum ada konfigurasi workflow aktif dan terbit untuk dokumen ini, atau
+        permintaan dengan kunci yang sama sedang diproses.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '422':
+      description: Pengaju tidak valid, atau `decision_context` kurang field wajib.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

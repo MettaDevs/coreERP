@@ -1,0 +1,76 @@
+# Rute registry CoreERP untuk Traefik milik Dokploy.
+#
+# Templat. `pasang.sh` mengisi daftar alamat yang boleh membuka UI dari /etc/coreerp/registry/setelan.env,
+# lalu menulis hasilnya ke /etc/dokploy/traefik/dynamic/coreerp-registry.yml. Traefik membacanya ulang
+# sendiri; tidak ada yang perlu di-restart.
+#
+# Berkas tersendiri, bukan bagian dari coreerp.yml: stack registry dan stack SaaS dipasang dan diperbarui
+# oleh jalur yang berbeda, dan deploy-dev tidak boleh pernah menulis rute ini.
+#
+# Tiga router untuk satu host, dibedakan jalur dan prioritas — semuanya di atas router tenant (10) dan
+# konsol (100), supaya `registry.erp.grenery.xyz` tidak pernah dicari Core sebagai tenant bernama registry.
+#
+# | Router            | Jalur                  | Terbuka untuk      | Kenapa                                   |
+# | ----------------- | ---------------------- | ------------------ | ---------------------------------------- |
+# | ...-token         | /service/token         | internet, dibatasi | docker login di server klien; brute force |
+# | ...-docker        | /v2, /v2/...           | internet           | push dan pull docker                     |
+# | ...-admin         | selainnya (UI, /api/)  | daftar IP saja     | UI dan API admin tidak perlu dari luar   |
+#
+# Sengaja TANPA healthCheck. Satu-satunya backend, dan jalur yang wajar untuk diperiksa (`/v2/`) dijawab
+# 401 — Traefik akan menganggapnya mati dan menjawab 503 ke setiap docker pull.
+
+http:
+  routers:
+    coreerp-registry-token:
+      rule: 'Host(`registry.erp.grenery.xyz`) && Path(`/service/token`)'
+      priority: 230
+      entryPoints: [websecure]
+      middlewares: [coreerp-registry-batas-token]
+      service: coreerp-registry
+      tls: &tls
+        certResolver: cloudflare
+        # Sertifikat wildcard yang sama dengan coreerp.yml. Nama yang sama berarti Traefik memakai
+        # sertifikat yang sudah ada di acme-cloudflare.json, bukan menerbitkan yang baru.
+        domains:
+          - main: 'erp.grenery.xyz'
+            sans:
+              - '*.erp.grenery.xyz'
+              - '*.demo.erp.grenery.xyz'
+              - '*.sandbox.erp.grenery.xyz'
+
+    coreerp-registry-docker:
+      rule: 'Host(`registry.erp.grenery.xyz`) && (Path(`/v2`) || PathPrefix(`/v2/`))'
+      priority: 220
+      entryPoints: [websecure]
+      service: coreerp-registry
+      tls: *tls
+
+    coreerp-registry-admin:
+      rule: 'Host(`registry.erp.grenery.xyz`)'
+      priority: 210
+      entryPoints: [websecure]
+      middlewares: [coreerp-registry-izin-ui]
+      service: coreerp-registry
+      tls: *tls
+
+  middlewares:
+    coreerp-registry-izin-ui:
+      ipAllowList:
+        sourceRange:
+${DAFTAR_IZIN_UI}
+
+    # Per alamat asal. Satu docker pull meminta token sekali per repositori, jadi 30 per menit dengan
+    # ledakan 20 tidak pernah dirasakan agen maupun perakit, tetapi menahan tebakan kata sandi robot.
+    coreerp-registry-batas-token:
+      rateLimit:
+        average: 30
+        period: 1m
+        burst: 20
+
+  services:
+    coreerp-registry:
+      loadBalancer:
+        servers:
+          # Alias proxy Harbor di dokploy-network, dari compose.dokploy.yml.
+          - url: 'http://harbor-registry-proxy:8080'
+        passHostHeader: true

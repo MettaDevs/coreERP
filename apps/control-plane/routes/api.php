@@ -25,6 +25,7 @@ Route::prefix('agent/v1')->group(function (): void {
         Route::post('operations/{operation}/steps', [AgentApi::class, 'step']);
         Route::get('releases/{edition}/{release}/files/{file}', [AgentApi::class, 'releaseFile'])
             ->where('file', '[A-Za-z0-9.]+');
+        Route::post('registry-credential', [AgentApi::class, 'registryCredential']);
         Route::post('key', [AgentApi::class, 'rotateKey']);
     });
 });

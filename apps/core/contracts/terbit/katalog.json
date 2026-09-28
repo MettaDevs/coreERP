@@ -1,0 +1,20 @@
+[
+  {
+    "id": "integrasi-finance",
+    "judul": "Integrasi · Finance",
+    "publik": true,
+    "berkas": "integrasi-finance.yaml"
+  },
+  {
+    "id": "app",
+    "judul": "App module (internal)",
+    "publik": false,
+    "berkas": "app.yaml"
+  },
+  {
+    "id": "pusat-admin",
+    "judul": "Pusat admin (internal)",
+    "publik": false,
+    "berkas": "pusat-admin.yaml"
+  }
+]

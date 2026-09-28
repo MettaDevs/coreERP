@@ -127,7 +127,7 @@ class WorkflowConfigurationTest extends TestCase
     {
         $membership = $this->owner->activeMembership();
         $secondUser = User::factory()->create(['name' => 'Second approver', 'email' => 'second@workflow.test']);
-        $secondMembership = TenantMembership::create(['tenant_id' => $membership->tenant_id, 'user_id' => $secondUser->id, 'system_role' => 'member', 'status' => 'active']);
+        $secondMembership = TenantMembership::create(['tenant_id' => $membership->tenant_id, 'user_id' => $secondUser->id, 'status' => 'active']);
         $workflow = $this->createWorkflow();
         $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
@@ -405,7 +405,7 @@ class WorkflowConfigurationTest extends TestCase
         $lain = TenantMembership::create([
             'tenant_id' => $membership->tenant_id,
             'user_id' => User::factory()->create(['name' => 'Pemeriksa lain', 'email' => 'lain@workflow.test'])->id,
-            'system_role' => 'member', 'status' => 'active',
+            'status' => 'active',
         ]);
 
         $instance = $this->submitOwnDocument($membership, [$membership->id, $lain->id]);

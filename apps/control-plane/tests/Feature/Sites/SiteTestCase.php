@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use ControlPlane\Dns\CloudflareSettings;
+use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteEnrollmentToken;
+use ControlPlane\Models\SiteRelease;
 use ControlPlane\Models\User;
 use ControlPlane\Sites\SignedAgentRequest;
 use ControlPlane\Tests\CoreSchema;
 use ControlPlane\Tests\TestCase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,8 +31,87 @@ abstract class SiteTestCase extends TestCase
 {
     use CoreSchema;
 
+    protected const CORE_URL = 'http://core.uji:8000';
+
     /** @var array<int, array{private: string, public: string}> */
     private static array $keys = [];
+
+    /** @var list<string> */
+    private array $temporaryFiles = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['core.base_url' => self::CORE_URL, 'core.token' => 'kunci-uji']);
+
+        // Laporan agen kini dapat memanggil Core untuk menerbitkan lisensi. Panggilan yang lolos dari
+        // palsuan harus menjadi kegagalan yang berisik, bukan permintaan sungguhan ke luar mesin ini.
+        Http::preventStrayRequests();
+    }
+
+    protected function tearDown(): void
+    {
+        try {
+            foreach ($this->temporaryFiles as $file) {
+                @unlink($file);
+            }
+        } finally {
+            parent::tearDown();
+        }
+    }
+
+    /**
+     * Menyetel kunci privat lisensi dari slot kunci uji, dan memulangkan kunci publiknya.
+     */
+    protected function useLicenseKey(int $slot = 7): string
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'kunci-lisensi-');
+        file_put_contents($path, $this->rsaKey($slot)['private']);
+        $this->temporaryFiles[] = $path;
+
+        config(['sites.license_private_key_path' => $path]);
+
+        return $this->rsaKey($slot)['public'];
+    }
+
+    /**
+     * Jawaban palsu API entitlements Core, dalam bentuk kontraknya.
+     *
+     * @param  list<string>  $apps
+     */
+    protected function fakeEntitlements(Site $site, array $apps = ['management-aset', 'human-resources']): void
+    {
+        Http::fake([
+            $this->entitlementsUrl($site) => Http::response(['tenant_id' => $site->tenant_id, 'apps' => $apps]),
+        ]);
+    }
+
+    /**
+     * Konsol dengan domain dasar `erp.contoh.test`, token Cloudflare tersimpan, dan Cloudflare tiruan yang menyimpan
+     * keadaan. Skema dan port disebut tegas: `.env` pengembang lazim berisi `http` dan port 8000, dan alamat server
+     * klien yang sah hanya `https://<host>`.
+     */
+    protected function useCloudflare(?string $storedToken = 'token-uji'): FakeCloudflare
+    {
+        config([
+            'core.base_domain' => 'erp.contoh.test',
+            'core.address_scheme' => 'https',
+            'core.address_port' => null,
+            'sites.cloudflare_api_url' => FakeCloudflare::API,
+        ]);
+
+        if ($storedToken !== null) {
+            app(CloudflareSettings::class)->storeToken($storedToken, null);
+        }
+
+        return new FakeCloudflare('contoh.test');
+    }
+
+    protected function entitlementsUrl(Site $site): string
+    {
+        return self::CORE_URL.'/api/internal/v1/tenants/'.$site->tenant_id.'/entitlements';
+    }
 
     protected function operator(string $email = 'operator@contoh.test'): User
     {
@@ -75,6 +158,99 @@ abstract class SiteTestCase extends TestCase
         return $tenantId;
     }
 
+    /**
+     * Lingkungan produksi tenant ini yang berjalan di server klien — bentuk yang dilahirkan Core untuk
+     * `first_environment_hosting=client_server`.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    protected function clientServerEnvironment(string $tenantId, array $overrides = []): Environment
+    {
+        $id = (string) Str::ulid();
+
+        DB::table('environments')->insert([
+            'id' => $id,
+            'tenant_id' => $tenantId,
+            'kind' => 'production',
+            'name' => 'Produksi',
+            'slug' => 'produksi-'.Str::lower(Str::random(6)),
+            'database_name' => null,
+            'hosting' => 'client_server',
+            'status' => 'provisioning',
+            'outbound_allowed' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+            ...$overrides,
+        ]);
+
+        return Environment::query()->findOrFail($id);
+    }
+
+    /** Owner aktif tenant — admin pertama yang dilahirkan di server klien. */
+    protected function owner(string $tenantId, string $name = 'Dewi Pemilik', string $email = 'dewi@klinik.test', string $status = 'active'): int
+    {
+        $userId = DB::table('users')->insertGetId([
+            'name' => $name,
+            'email' => $email,
+            'password' => bcrypt('rahasia-owner'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $membershipId = (string) Str::ulid();
+        DB::table('tenant_memberships')->insert([
+            'id' => $membershipId,
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'status' => $status,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Owner adalah pemegang role Owner tenant (`roles.is_owner`), bukan penanda di keanggotaan.
+        $roleId = DB::table('roles')->where('tenant_id', $tenantId)->where('is_owner', true)->value('id');
+        if ($roleId === null) {
+            $roleId = (string) Str::ulid();
+            DB::table('roles')->insert([
+                'id' => $roleId,
+                'tenant_id' => $tenantId,
+                'name' => 'Owner',
+                'is_active' => true,
+                'is_owner' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        DB::table('role_assignments')->insert([
+            'id' => (string) Str::ulid(),
+            'membership_id' => $membershipId,
+            'role_id' => $roleId,
+            'source' => 'automatic',
+            'status' => 'active',
+            'valid_from' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $userId;
+    }
+
+    /** Rilis terdaftar dengan isi berkas tiruan. */
+    protected function release(string $release, string $edition = Site::SINGLE_IMAGE_EDITION): SiteRelease
+    {
+        return SiteRelease::query()->create([
+            'edition' => $edition,
+            'release' => $release,
+            'image' => 'ghcr.io/x@sha256:'.str_repeat('a', 64),
+            'digest' => 'sha256:'.str_repeat('b', 64),
+            'manifest' => '{}',
+            'compose' => '',
+            'update_script' => '',
+            'checksums' => '',
+            'signature' => base64_encode('x'),
+        ]);
+    }
+
     /** @param  array<string, mixed>  $attributes */
     protected function site(array $attributes = []): Site
     {
@@ -83,7 +259,6 @@ abstract class SiteTestCase extends TestCase
             'name' => 'Situs Uji',
             'profile' => 'managed_on_prem',
             'edition' => 'apotek-sejahtera',
-            'connectivity' => 'online',
             'timezone' => 'Asia/Jakarta',
             ...$attributes,
         ]);
@@ -126,14 +301,13 @@ abstract class SiteTestCase extends TestCase
         ]);
     }
 
-    protected function enrollmentToken(Site $site, string $channel = 'online', ?\DateTimeInterface $expiresAt = null): string
+    protected function enrollmentToken(Site $site, ?\DateTimeInterface $expiresAt = null): string
     {
         $token = Str::random(48);
 
         SiteEnrollmentToken::query()->create([
             'site_id' => $site->id,
             'token_hash' => hash('sha256', $token),
-            'channel' => $channel,
             'expires_at' => $expiresAt ?? now()->addHour(),
         ]);
 
@@ -194,7 +368,10 @@ abstract class SiteTestCase extends TestCase
             'last_backup' => null,
             'last_operation' => null,
             'certificate_expires_at' => null,
-            'license_expires_at' => '2027-01-01',
+            // Relatif, bukan tanggal tetap: tanggal tetap suatu hari masuk jendela perpanjangan, dan
+            // setiap test laporan diam-diam berubah menjadi test perpanjangan lisensi.
+            'license_expires_at' => now()->addYear()->toDateString(),
+            'license_required' => true,
             ...$overrides,
         ];
     }

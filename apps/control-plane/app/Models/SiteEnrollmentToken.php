@@ -14,7 +14,6 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $site_id
  * @property string $token_hash
- * @property string $channel
  * @property Carbon $expires_at
  * @property ?Carbon $used_at
  */
@@ -24,7 +23,7 @@ class SiteEnrollmentToken extends Model
 
     protected $table = 'site_enrollment_tokens';
 
-    protected $fillable = ['site_id', 'token_hash', 'channel', 'expires_at', 'used_at', 'created_by'];
+    protected $fillable = ['site_id', 'token_hash', 'expires_at', 'used_at', 'created_by'];
 
     protected function casts(): array
     {

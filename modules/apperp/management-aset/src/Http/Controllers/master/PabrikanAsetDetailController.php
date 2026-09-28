@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\PabrikanAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Angka turunan untuk panel detail pabrikan. Angka ini sengaja dipisahkan dari
@@ -25,7 +26,7 @@ class PabrikanAsetDetailController extends Controller
         abort_unless(PabrikanAset::query()->whereKey($pabrikanAsetId)->exists(), 404);
 
         $mayReadModels = in_array('management-aset.model-aset.read', $permissions, true);
-        $mayReadAssets = in_array('management-aset.aset.read', $permissions, true);
+        $mayReadAset = in_array('management-aset.aset.read', $permissions, true);
 
         return response()->json(['data' => [
             'model_count' => $mayReadModels
@@ -33,11 +34,11 @@ class PabrikanAsetDetailController extends Controller
                     ->where('pabrikan_aset_id', $pabrikanAsetId)
                     ->count()
                 : null,
-            'asset_count' => $mayReadAssets
-                ? $scope->assetQuery(
-                    Asset::query()
+            'aset_count' => $mayReadAset
+                ? $scope->asetQuery(
+                    Aset::query()
                         ->where('pabrikan_aset_id', $pabrikanAsetId)
-                        ->whereNotIn('lifecycle_state', ['decommissioned', 'disposed']),
+                        ->whereNotIn('lifecycle_state', StatusAset::tidakLagiBeredar()),
                     $request,
                 )->count()
                 : null,

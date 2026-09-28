@@ -23,6 +23,12 @@ class GroupAsetController extends MasterDataController
         return GroupAset::class;
     }
 
+    /** Kode diketik, misalnya `KENDARAAN`; lihat MasterDataController::manualCode(). */
+    protected function manualCode(): bool
+    {
+        return true;
+    }
+
     protected function childMasters(): array
     {
         // Setelah rantai klasifikasi diratakan, yang menggantung pada group bukan lagi
@@ -30,7 +36,7 @@ class GroupAsetController extends MasterDataController
         // yang dipakai aset, jadi mengarsipkannya selagi ada aset aktif akan memutus
         // dasar penyusutan aset tersebut.
         return [
-            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'group_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_tr_aset', column: 'group_aset_id', label: 'aset'),
         ];
     }
 
@@ -50,7 +56,7 @@ class GroupAsetController extends MasterDataController
             // kehilangan klasifikasi ketika beralih ke reference ID.
             'tipe_harta' => ['prohibited'],
             // Sifat harta dibuang dari group: ia tidak menggerakkan apa pun di sini, dan
-            // akun ditentukan posting profile milik Finance. Menolaknya lebih baik
+            // akun ditentukan posting group aset. Menolaknya lebih baik
             // daripada menerima diam-diam, karena client lama yang mengirim `low_value`
             // sebenarnya bermaksud menandai barang non-kapitalisasi — maksud yang
             // sekarang hanya terekam benar lewat `property_type`.
@@ -63,7 +69,7 @@ class GroupAsetController extends MasterDataController
             'posting_layers' => ['prohibited'],
             'property_type' => ['sometimes', 'nullable', Rule::in(GroupAset::PROPERTY_TYPE)],
             // Lokasi bawaan; hanya nilai awal saat aset diterima, bukan lokasi yang berlaku.
-            'asset_location_id' => [
+            'lokasi_aset_id' => [
                 'sometimes', 'nullable', 'ulid',
                 Rule::exists('aset_m_lokasi_aset', 'id')
                     ->where('tenant_id', $tenantId)
@@ -76,7 +82,7 @@ class GroupAsetController extends MasterDataController
     protected function extraPayload(array $data): array
     {
         $payload = [];
-        foreach (['kelompok_harta_fiskal_id', 'property_type', 'asset_location_id', 'capitalization_threshold'] as $column) {
+        foreach (['kelompok_harta_fiskal_id', 'property_type', 'lokasi_aset_id', 'capitalization_threshold'] as $column) {
             if (array_key_exists($column, $data)) {
                 $payload[$column] = $data[$column];
             }
@@ -90,7 +96,7 @@ class GroupAsetController extends MasterDataController
         return [
             'kelompok_harta_fiskal_id' => $record->kelompok_harta_fiskal_id,
             'property_type' => $record->property_type,
-            'asset_location_id' => $record->asset_location_id,
+            'lokasi_aset_id' => $record->lokasi_aset_id,
             'capitalization_threshold' => $record->capitalization_threshold,
         ];
     }

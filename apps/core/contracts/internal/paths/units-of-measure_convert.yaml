@@ -1,0 +1,48 @@
+post:
+  tags: [Directory]
+  operationId: internal.units-of-measure.convert
+  summary: Konversi nilai antar satuan
+  description: |
+    Kedua satuan harus aktif dan berada dalam kelas yang sama. Konversi khusus
+    produk (misalnya box-ke-pcs) bukan milik endpoint ini; itu milik PIM/Inventory
+    ketika module tersebut memiliki produk.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [from_unit_id, to_unit_id, value]
+          properties:
+            from_unit_id: { type: string, format: ulid }
+            to_unit_id:
+              type: string
+              format: ulid
+              description: Harus berbeda dari `from_unit_id`.
+            value:
+              type: string
+              description: Dikirim sebagai string agar presisi desimal tidak hilang.
+  responses:
+    '200':
+      description: Hasil konversi.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: object
+                required: [value, unit_id]
+                properties:
+                  value: { type: string }
+                  unit_id: { type: string, format: ulid }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422':
+      description: |
+        Satuan tidak aktif, beda kelas, atau aturan konversi belum dikonfigurasi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

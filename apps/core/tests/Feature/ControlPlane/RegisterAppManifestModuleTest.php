@@ -35,13 +35,34 @@ class RegisterAppManifestModuleTest extends TestCase
      * adalah `app.yaml` module — dan perubahan itu harus disengaja, bukan efek samping.
      */
     private const JUMLAH_SEBELUM_PEMINDAHAN = [
-        'entry_points' => 65,
-        'permissions' => 122,
-        'privileges' => 64,
-        'duties' => 36,
-        'number_sequence_references' => 29,
+        // 17 September 2026, mutasi aset: +1 entry point (`mutasi-aset.api`), +3 permission
+        // (create/update/archive), +2 privilege (maintain/retire), +1 reference nomor
+        // (`MUTA`), dan +2 laporan (berita acara serah terima dan daftar mutasi).
+        //
+        // 18 September 2026, penerimaan aset: +2 entry point (`penerimaan-aset.form` dan
+        // `.api`), +4 permission (read/create/update/archive), +2 privilege
+        // (maintain/retire), dan +1 reference nomor (`PNRA`). Duty tidak bertambah:
+        // keduanya menempel pada `management-aset.aset.manage` yang sudah ada.
+        //
+        // 23 September 2026, posting group aset (feed posting finance area 8): +1 entry point
+        // (`fixed-asset-posting-profiles.api`), +3 permission (create/update/archive), +2
+        // privilege (maintain/retire), dan +1 duty (`fixed-asset-posting-profiles.manage`),
+        // tersendiri supaya role lama tidak diam-diam dapat mengubah akun jurnal.
+        //
+        // 24 September 2026, "Post penyusutan" (feed posting finance area 11): +1 permission
+        // (`penyusutan.post`, invoke), +1 privilege (`penyusutan.post-to-finance`), dan +1 duty
+        // (`penyusutan.finance-posting`), tersendiri supaya role yang mengelola penyusutan tidak
+        // diam-diam dapat mengirim jurnalnya ke aplikasi finance.
+        //
+        // Menu laporan aset (PR laporan per jenis): +1 laporan tiap PR, di sini
+        // `laporan-penjualan-aset`.
+        'entry_points' => 69,
+        'permissions' => 133,
+        'privileges' => 71,
+        'duties' => 38,
+        'number_sequence_references' => 31,
         'workflow_types' => 2,
-        'reports' => 3,
+        'reports' => 5,
     ];
 
     private string $akarSementara;

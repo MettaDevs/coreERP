@@ -23,7 +23,7 @@ class AgentApiTest extends SiteTestCase
 {
     // ------------------------------------------------------------------ pendaftaran
 
-    public function test_a_valid_online_token_enrolls_the_site_once(): void
+    public function test_a_valid_token_enrolls_the_site_once(): void
     {
         $site = $this->site();
         $token = $this->enrollmentToken($site);
@@ -43,17 +43,15 @@ class AgentApiTest extends SiteTestCase
         $this->postJson('/api/agent/v1/enroll', $body)->assertUnauthorized()->assertJsonPath('error', 'enrollment_rejected');
     }
 
-    public function test_expired_offline_and_revoked_tokens_are_refused_with_the_same_answer(): void
+    public function test_expired_and_revoked_tokens_are_refused_with_the_same_answer(): void
     {
         $key = $this->rsaKey()['public'];
 
         $expired = $this->site(['name' => 'Kedaluwarsa']);
-        $offline = $this->site(['name' => 'Offline', 'connectivity' => 'offline']);
         $revoked = $this->site(['name' => 'Dicabut', 'revoked_at' => now()]);
 
         foreach ([
-            $this->enrollmentToken($expired, 'online', now()->subMinute()),
-            $this->enrollmentToken($offline, 'offline'),
+            $this->enrollmentToken($expired, now()->subMinute()),
             $this->enrollmentToken($revoked),
             str_repeat('x', 48),
         ] as $token) {
@@ -90,7 +88,7 @@ class AgentApiTest extends SiteTestCase
             ->assertExactJson(['interval_seconds' => 60]);
 
         $site->refresh();
-        $this->assertSame('heartbeat', $site->last_seen_via);
+        $this->assertNotNull($site->last_seen_at);
         $this->assertSame('0.1.0', $site->reported_release);
         $this->assertSame(1, SiteReport::query()->count());
     }
@@ -174,6 +172,52 @@ class AgentApiTest extends SiteTestCase
 
         $this->assertNull($site->refresh()->last_report);
         $this->assertSame(0, SiteReport::query()->count());
+    }
+
+    /** @return iterable<string, array{?bool}> */
+    public static function licenseRequirements(): iterable
+    {
+        yield 'wajib' => [true];
+        yield 'tidak wajib' => [false];
+        yield 'tidak terbaca' => [null];
+    }
+
+    #[DataProvider('licenseRequirements')]
+    public function test_license_required_is_accepted_as_a_json_boolean_and_kept(?bool $required): void
+    {
+        $site = $this->enrolledSite();
+
+        $this->agent('POST', '/api/agent/v1/report', $site, $this->report($site, ['license_required' => $required]))
+            ->assertOk();
+
+        $site->refresh();
+        $this->assertIsArray($site->last_report);
+        $this->assertArrayHasKey('license_required', $site->last_report);
+        $this->assertSame($required, $site->last_report['license_required']);
+        $this->assertSame($required, SiteReport::query()->sole()->payload['license_required']);
+    }
+
+    /** @return iterable<string, array{mixed}> */
+    public static function nonBooleanLicenseRequirements(): iterable
+    {
+        yield 'teks true' => ['true'];
+        yield 'teks false' => ['false'];
+        yield 'angka 1' => [1];
+        yield 'angka 0' => [0];
+        yield 'teks 1' => ['1'];
+        yield 'daftar' => [[true]];
+    }
+
+    #[DataProvider('nonBooleanLicenseRequirements')]
+    public function test_license_required_that_is_not_a_boolean_refuses_the_report(mixed $value): void
+    {
+        $site = $this->enrolledSite();
+
+        $this->agent('POST', '/api/agent/v1/report', $site, $this->report($site, ['license_required' => $value]))
+            ->assertStatus(422)
+            ->assertExactJson(['error' => 'report_invalid']);
+
+        $this->assertNull($site->refresh()->last_report);
     }
 
     public function test_a_report_naming_another_site_is_refused(): void

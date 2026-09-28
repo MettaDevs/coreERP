@@ -204,18 +204,34 @@ const nodeTypes: NodeTypes = {
     parallel: FlowNode,
 };
 
+/**
+ * Daftar field konteks, beserta keterangan apakah skemanya benar-benar terbaca.
+ *
+ * Dulu kegagalan membaca skema dipulangkan sebagai larik kosong, dan itu berakhir di tempat
+ * yang sama dengan skema yang memang tidak mendeklarasikan field apa pun: dropdown berisi
+ * "Pilih field" saja. Orang yang menyusun workflow lalu menyimpulkan jenis ini tidak punya
+ * konteks yang bisa diperiksa — kesimpulan yang tidak pernah dibaca dari skema mana pun.
+ */
+type ContextFields =
+    { readable: true; fields: string[] } | { readable: false; fields: [] };
+
 function contextFields(
     schema: Props['workflowType']['decision_context_schema'],
-): string[] {
+): ContextFields {
     try {
         const parsed = typeof schema === 'string' ? JSON.parse(schema) : schema;
         const properties = (parsed as { properties?: Record<string, unknown> })
             .properties;
         const required = (parsed as { required?: string[] }).required ?? [];
 
-        return [...new Set([...required, ...Object.keys(properties ?? {})])];
+        return {
+            readable: true,
+            fields: [
+                ...new Set([...required, ...Object.keys(properties ?? {})]),
+            ],
+        };
     } catch {
-        return [];
+        return { readable: false, fields: [] };
     }
 }
 
@@ -259,7 +275,7 @@ export default function WorkflowEditor({
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const readOnly = !canManage || version.status !== 'draft';
     const selected = nodes.find((node) => node.id === selectedId) ?? null;
-    const fields = useMemo(
+    const context = useMemo(
         () => contextFields(workflowType.decision_context_schema),
         [workflowType.decision_context_schema],
     );
@@ -909,16 +925,22 @@ export default function WorkflowEditor({
                                                         }
                                                     >
                                                         <option value="">
-                                                            Pilih field
+                                                            {context.readable
+                                                                ? 'Pilih field'
+                                                                : 'Skema konteks tidak terbaca'}
                                                         </option>
-                                                        {fields.map((field) => (
-                                                            <option
-                                                                key={field}
-                                                                value={field}
-                                                            >
-                                                                {field}
-                                                            </option>
-                                                        ))}
+                                                        {context.fields.map(
+                                                            (field) => (
+                                                                <option
+                                                                    key={field}
+                                                                    value={
+                                                                        field
+                                                                    }
+                                                                >
+                                                                    {field}
+                                                                </option>
+                                                            ),
+                                                        )}
                                                     </NativeSelect>
                                                 </Field>
                                                 <Field>

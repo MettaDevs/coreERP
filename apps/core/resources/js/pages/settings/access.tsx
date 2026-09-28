@@ -52,7 +52,6 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
-import { NativeSelect } from '@apperp/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { Select } from '@apperp/ui/select';
 import {
@@ -86,7 +85,6 @@ import { useInitials } from '@/hooks/use-initials';
 type Permission = {
     code: string;
     name: string;
-    entry_point_code: string;
     access_level: string;
 };
 type Privilege = { code: string; name: string; permissions: Permission[] };
@@ -145,7 +143,6 @@ type Member = {
     id: string;
     name: string;
     email: string;
-    system_role: string;
     platform_role?: string;
     security_role?: string;
     avatar_url?: string | null;
@@ -155,25 +152,40 @@ type Member = {
 };
 type Invitation = {
     id: string;
-    system_role: string;
     label: string | null;
     roles: string[];
     assignments: Assignment[];
     redeemed_count: number;
     code: string | null;
     revoked_at: string | null;
+    /** Terisi untuk undangan yang terikat ke satu akun SSO; null untuk kode anonim. */
+    sso: {
+        email: string;
+        name: string | null;
+        notified_at: string | null;
+        redeemed_at: string | null;
+    } | null;
 };
 type Props = {
     tenant: { id: string; name: string };
     canManage: boolean;
     members: Member[];
-    apps: App[];
     roles: Role[];
     dataPolicies: DataPolicy[];
     organizations: Organization[];
-    hierarchies: Hierarchy[];
     invitations: Invitation[];
     newInvitationCodes: string[];
+    /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
+    ssoAvailable: boolean;
+    /*
+     * Dua prop berikut dikirim `Inertia::defer()`: ia **tidak ada** pada respons pertama dan
+     * tiba pada permintaan susulan yang dikirim Inertia sendiri sesudah halaman tercat.
+     * Karena itu tipenya opsional — bukan karena backend kadang tidak punya, melainkan karena
+     * memang ada satu jendela waktu ketika halaman hidup tanpa keduanya. Keduanya hanya dibaca
+     * di dalam dialog, jadi jendela itu tidak terlihat siapa pun.
+     */
+    apps?: App[];
+    hierarchies?: Hierarchy[];
 };
 
 const unrestrictedScope = (policyCode: string): PolicyScope => ({
@@ -915,7 +927,11 @@ function AssignmentPicker({
 type CodeDraft = {
     key: string;
     label: string;
-    system_role: string;
+    /**
+     * Email orang yang diundang. Kosong berarti kode anonim yang dapat dipakai siapa pun yang
+     * memegangnya — perilaku yang sudah ada sebelum undangan SSO, dan yang sengaja dipertahankan.
+     */
+    sso_email: string;
     assignments: Assignment[];
     /**
      * Terisi untuk kode yang sudah diterbitkan. Baris itu tetap dapat diubah —
@@ -923,18 +939,24 @@ type CodeDraft = {
      * berikutnya. `redeemed` dipakai untuk memperingatkan bahwa kode sudah
      * beredar sebelum perubahan disimpan.
      */
-    issued?: { id: string; revoked: boolean; redeemed: number };
+    issued?: {
+        id: string;
+        revoked: boolean;
+        redeemed: number;
+        sso: Invitation['sso'];
+    };
 };
 
 const issuedDraft = (invitation: Invitation): CodeDraft => ({
     key: `issued-${invitation.id}`,
     label: invitation.label ?? '',
-    system_role: invitation.system_role,
+    sso_email: invitation.sso?.email ?? '',
     assignments: invitation.assignments,
     issued: {
         id: invitation.id,
         revoked: Boolean(invitation.revoked_at),
         redeemed: invitation.redeemed_count,
+        sso: invitation.sso,
     },
 });
 
@@ -946,7 +968,6 @@ const issuedDraft = (invitation: Invitation): CodeDraft => ({
 const codeFingerprint = (code: CodeDraft): string =>
     JSON.stringify({
         label: code.label,
-        system_role: code.system_role,
         assignments: [...code.assignments]
             .sort((first, second) =>
                 first.role_id.localeCompare(second.role_id),
@@ -989,7 +1010,7 @@ const codeScopeSummary = (roles: Role[], assignments: Assignment[]): string => {
 const blankCode = (): CodeDraft => ({
     key: crypto.randomUUID(),
     label: '',
-    system_role: 'user',
+    sso_email: '',
     assignments: [],
 });
 
@@ -1120,12 +1141,15 @@ function InviteForm({
     roles,
     dataPolicies,
     organizations,
-    hierarchies,
+    // Ditunda di server, jadi ia kosong sampai permintaan susulan tiba. Pemilih batas data
+    // yang membacanya berada di dalam dialog; ketika dialog itu dapat dibuka, ia sudah ada.
+    hierarchies = [],
     invitations,
+    ssoAvailable,
 }: Pick<
     Props,
     'roles' | 'dataPolicies' | 'organizations' | 'hierarchies' | 'invitations'
->) {
+> & { ssoAvailable: boolean }) {
     const [open, setOpen] = useState(false);
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -1160,7 +1184,8 @@ function InviteForm({
             .filter((role): role is Role => Boolean(role));
     // Baris terbit yang sudah dicabut tidak dapat ditukar siapa pun lagi,
     // sehingga mengubahnya tidak mengubah akses siapa pun.
-    const locked = (code: CodeDraft) => Boolean(code.issued?.revoked);
+    const locked = (code: CodeDraft) =>
+        Boolean(code.issued?.revoked) || Boolean(code.issued?.sso?.redeemed_at);
     const dirty = (code: CodeDraft) =>
         Boolean(code.issued) &&
         pristine.get(code.key) !== codeFingerprint(code);
@@ -1174,7 +1199,6 @@ function InviteForm({
             `/settings/access/invitations/${code.issued.id}`,
             {
                 label: code.label,
-                system_role: code.system_role,
                 assignments: code.assignments.map((assignment) => ({
                     role_id: assignment.role_id,
                     policy_scopes: assignment.policy_scopes,
@@ -1197,7 +1221,83 @@ function InviteForm({
         );
     };
 
+    /**
+     * Meminta penyedia mengirim ulang email undangan.
+     *
+     * Ada karena pengiriman pertama boleh gagal tanpa menghanguskan undangannya — penyedia yang
+     * sedang mati meninggalkan baris yang sah dengan surat yang tidak pernah keluar.
+     */
+    const resend = (code: CodeDraft) => {
+        if (!code.issued) {
+            return;
+        }
+
+        setSaving(code.key);
+        router.post(
+            `/settings/access/invitations/${code.issued.id}/kirim-ulang`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    setIssuedRows(
+                        (page.props.invitations as Invitation[]).map(
+                            issuedDraft,
+                        ),
+                    );
+                    toast('Penyedia SSO diminta mengirim ulang undangannya.');
+                },
+                onFinish: () => setSaving(null),
+            },
+        );
+    };
+
     const columns: DataTableColumn<CodeDraft>[] = [
+        // Hanya ada bila tenant ini memakai SSO. Tanpa itu, yang muncul adalah kotak email yang
+        // setiap isinya pasti ditolak pembuatan undangannya.
+        ...(ssoAvailable
+            ? [
+                  {
+                      id: 'sso_email',
+                      header: 'Diundang',
+                      width: 240,
+                      cell: (code: CodeDraft) =>
+                          code.issued ? (
+                              code.issued.sso ? (
+                                  <div className="min-w-0">
+                                      <p className="truncate text-sm">
+                                          {code.issued.sso.name ??
+                                              code.issued.sso.email}
+                                      </p>
+                                      <p className="truncate text-xs text-muted-foreground">
+                                          {code.issued.sso.email}
+                                      </p>
+                                  </div>
+                              ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                      Kode anonim
+                                  </span>
+                              )
+                          ) : (
+                              <div>
+                                  <Input
+                                      type="email"
+                                      value={code.sso_email}
+                                      placeholder="nama@rumahsakit.co.id"
+                                      onChange={(event) =>
+                                          update(code.key, {
+                                              sso_email: event.target.value,
+                                          })
+                                      }
+                                  />
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                      Kosongkan untuk kode anonim yang dapat
+                                      dipakai siapa pun yang memegangnya.
+                                  </p>
+                              </div>
+                          ),
+                  } satisfies DataTableColumn<CodeDraft>,
+              ]
+            : []),
         {
             id: 'label',
             header: 'Keterangan',
@@ -1236,37 +1336,37 @@ function InviteForm({
                     ) : (
                         <Badge variant="outline">Baru</Badge>
                     )}
-                    {code.issued && code.issued.redeemed > 0 && (
-                        <Badge variant="outline">
-                            {code.issued.redeemed} terpakai
-                        </Badge>
+                    {code.issued?.sso ? (
+                        <>
+                            {/*
+                                Undangan pribadi hanya punya dua keadaan yang berarti: sudah dipakai
+                                orangnya, atau masih menunggu. Penghitung "n terpakai" milik kode
+                                anonim tidak pernah lebih dari satu di sini, dan membacanya sebagai
+                                angka justru menyesatkan.
+                            */}
+                            <Badge variant="outline">
+                                {code.issued.sso.redeemed_at
+                                    ? 'Dipakai'
+                                    : 'Menunggu'}
+                            </Badge>
+                            {!code.issued.sso.notified_at &&
+                                !code.issued.sso.redeemed_at && (
+                                    <Badge variant="secondary">
+                                        Email belum terkirim
+                                    </Badge>
+                                )}
+                        </>
+                    ) : (
+                        code.issued &&
+                        code.issued.redeemed > 0 && (
+                            <Badge variant="outline">
+                                {code.issued.redeemed} terpakai
+                            </Badge>
+                        )
                     )}
                     {dirty(code) && <Badge variant="outline">Diubah</Badge>}
                 </div>
             ),
-        },
-        {
-            id: 'system_role',
-            header: 'User Platform',
-            width: 150,
-            cell: (code) =>
-                locked(code) ? (
-                    <span className="text-muted-foreground">
-                        {code.system_role}
-                    </span>
-                ) : (
-                    <NativeSelect
-                        value={code.system_role}
-                        onChange={(event) =>
-                            update(code.key, {
-                                system_role: event.target.value,
-                            })
-                        }
-                    >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                    </NativeSelect>
-                ),
         },
         {
             id: 'roles',
@@ -1369,6 +1469,24 @@ function InviteForm({
                 }
 
                 if (!dirty(code)) {
+                    // Undangan terikat yang suratnya belum sampai: satu-satunya tindakan yang
+                    // berarti di baris ini adalah mengirimnya lagi.
+                    if (code.issued.sso && !code.issued.sso.redeemed_at) {
+                        return (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={saving === code.key}
+                                onClick={() => resend(code)}
+                            >
+                                {code.issued.sso.notified_at
+                                    ? 'Kirim ulang email'
+                                    : 'Kirim email'}
+                            </Button>
+                        );
+                    }
+
                     return (
                         <span className="text-muted-foreground">Tersimpan</span>
                     );
@@ -1473,7 +1591,10 @@ function InviteForm({
                         form.transform((data) => ({
                             codes: data.codes.map((code) => ({
                                 label: code.label,
-                                system_role: code.system_role,
+                                // Dikirim huruf kecil: aturannya `lowercase`, dan menolak
+                                // "Dewi@Klinik.test" karena huruf besarnya adalah penolakan yang
+                                // tidak dapat dijelaskan kepada siapa pun yang mengetiknya.
+                                sso_email: code.sso_email.trim().toLowerCase(),
                                 assignments: code.assignments,
                             })),
                         }));
@@ -1599,7 +1720,6 @@ function MemberAccessDialog({
     const contentRef = useRef<HTMLDivElement>(null);
     const getInitials = useInitials();
     const form = useForm({
-        system_role: member?.system_role ?? 'user',
         assignments: (member?.assignments ?? [])
             .filter((assignment) => assignment.source !== 'automatic')
             .map((assignment) => ({
@@ -1630,8 +1750,7 @@ function MemberAccessDialog({
                                 Atur Akses Anggota
                             </DialogTitle>
                             <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Atur role platform, tanggung jawab security
-                                role, dan batas data anggota.
+                                Atur role dan batas data anggota.
                             </DialogDescription>
                         </div>
                     </div>
@@ -1659,12 +1778,6 @@ function MemberAccessDialog({
                                     </p>
                                 </div>
                             </div>
-                            <Badge
-                                variant="outline"
-                                className="border-primary/30 bg-primary/5 text-[11px] font-medium text-primary"
-                            >
-                                {member.system_role}
-                            </Badge>
                         </div>
                     )}
                 </DialogHeader>
@@ -1684,25 +1797,6 @@ function MemberAccessDialog({
                 >
                     <DialogBody>
                         <FieldGroup>
-                            <Field>
-                                <NativeSelect
-                                    label="Role platform"
-                                    value={form.data.system_role}
-                                    disabled={member?.system_role === 'owner'}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'system_role',
-                                            event.target.value,
-                                        )
-                                    }
-                                >
-                                    {member?.system_role === 'owner' && (
-                                        <option value="owner">Pemilik</option>
-                                    )}
-                                    <option value="user">Anggota</option>
-                                    <option value="admin">Admin</option>
-                                </NativeSelect>
-                            </Field>
                             <AssignmentPicker
                                 assignments={form.data.assignments}
                                 roles={roles}
@@ -1859,13 +1953,14 @@ export default function Access({
     tenant,
     canManage,
     members,
-    apps,
+    apps = [],
     roles,
     dataPolicies,
     organizations,
-    hierarchies,
+    hierarchies = [],
     invitations = [],
     newInvitationCodes = [],
+    ssoAvailable = false,
 }: Props) {
     const url = usePage().url;
     const queryString = url.includes('?') ? url.split('?')[1] : '';
@@ -1876,12 +1971,6 @@ export default function Access({
     const copy = (code: string) => {
         void navigator.clipboard.writeText(code);
         toast('Kode disalin');
-    };
-
-    const platformRoleLabel: Record<string, string> = {
-        owner: 'Pemilik',
-        admin: 'Admin',
-        user: 'Anggota',
     };
 
     const memberColumns: DataTableColumn<Member>[] = [
@@ -1912,16 +2001,6 @@ export default function Access({
                 </div>
             ),
             sortValue: (member) => member.name,
-        },
-        {
-            id: 'platform-role',
-            header: 'Role platform',
-            cell: (member) => (
-                <Badge>
-                    {platformRoleLabel[member.system_role] ??
-                        member.system_role}
-                </Badge>
-            ),
         },
         {
             id: 'security-role',
@@ -1970,12 +2049,6 @@ export default function Access({
                     {invitation.revoked_at ? 'Dicabut' : 'Aktif'}
                 </Badge>
             ),
-        },
-        {
-            id: 'access',
-            header: 'Akses',
-            cell: (invitation) =>
-                `${platformRoleLabel[invitation.system_role] ?? invitation.system_role} · sesuai batas data role`,
         },
         {
             id: 'roles',
@@ -2122,6 +2195,7 @@ export default function Access({
                                         organizations={organizations}
                                         hierarchies={hierarchies}
                                         invitations={invitations}
+                                        ssoAvailable={ssoAvailable}
                                     />
                                 </CardAction>
                             )}

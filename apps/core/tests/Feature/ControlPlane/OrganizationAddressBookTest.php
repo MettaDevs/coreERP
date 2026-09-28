@@ -162,7 +162,7 @@ class OrganizationAddressBookTest extends TestCase
     {
         $user = User::factory()->create();
         TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $user->id, 'system_role' => 'member', 'status' => 'active',
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $user->id, 'status' => 'active',
         ]);
 
         return $user;

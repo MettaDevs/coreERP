@@ -8,7 +8,7 @@ use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -104,12 +104,12 @@ final class AssetDisposalSaleReport implements ReportDefinition
         // Tabel utama tidak beralias
         $query = DokumenSiklusAset::query()
             ->where('aset_tr_dokumen_siklus_aset.jenis_dokumen', 'penjualan-aset')
-            ->leftJoin('aset_tr_penerimaan_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_dokumen_siklus_aset.asset_id')
+            ->leftJoin('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', 'aset_tr_dokumen_siklus_aset.aset_id')
                     ->on('aset.tenant_id', '=', 'aset_tr_dokumen_siklus_aset.tenant_id');
             })
             ->leftJoin('aset_tr_buku_aset as buku', function ($join): void {
-                $join->on('buku.asset_id', '=', 'aset.id')
+                $join->on('buku.aset_id', '=', 'aset.id')
                     ->on('buku.tenant_id', '=', 'aset.tenant_id');
             });
 
@@ -130,7 +130,7 @@ final class AssetDisposalSaleReport implements ReportDefinition
             $query->where('aset.jenis_aset_id', $parameters['jenis_aset_id']);
         }
         if (! empty($parameters['asset_id'])) {
-            $query->where('aset_tr_dokumen_siklus_aset.asset_id', $parameters['asset_id']);
+            $query->where('aset_tr_dokumen_siklus_aset.aset_id', $parameters['asset_id']);
         }
         if (! empty($parameters['dari'])) {
             $query->where('aset_tr_dokumen_siklus_aset.tanggal', '>=', $parameters['dari']);
@@ -172,7 +172,7 @@ final class AssetDisposalSaleReport implements ReportDefinition
             : 'Semua jenis';
 
         $asetLabel = ! empty($parameters['asset_id'])
-            ? (Asset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
+            ? (Aset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
             : 'Semua aset';
 
         $nomor = 1;

@@ -2,7 +2,7 @@
 Ulid:
   type: string
   pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
-AssetPlanningDetailWrite:
+AsetPlanningDetailWrite:
   type: object
   required:
   - jenis_aset_id
@@ -26,7 +26,7 @@ AssetPlanningDetailWrite:
     estimated_unit_price:
       type: number
       minimum: 0
-AssetPlanningWrite:
+AsetPlanningWrite:
   type: object
   required:
   - legal_entity_id
@@ -64,7 +64,72 @@ AssetPlanningWrite:
       type: array
       minItems: 1
       items:
-        $ref: '#/components/schemas/AssetPlanningDetailWrite'
+        $ref: '#/components/schemas/AsetPlanningDetailWrite'
+AsetTransferWrite:
+  type: object
+  description: |
+    Tujuan berada di header dan aset di baris: satu serah terima adalah satu perpindahan
+    antara dua pihak. Keadaan asal tidak dikirim klien — server membacanya dari aset saat
+    dokumen diselesaikan.
+  required:
+  - legal_entity_id
+  - responsible_org_unit_id
+  - tanggal
+  - tujuan_org_unit_id
+  - alasan
+  - details
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      description: Unit kerja pemilik dokumen, yaitu pihak yang menyerahkan.
+      $ref: '#/components/schemas/Ulid'
+    tanggal:
+      type: string
+      format: date
+    tujuan_lokasi_id:
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    tujuan_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    diserahkan_oleh_user_id:
+      type: string
+      maxLength: 64
+      nullable: true
+    diterima_oleh_user_id:
+      description: Menjadi penanggung jawab aset pada riwayat penempatan setelah diselesaikan.
+      type: string
+      maxLength: 64
+      nullable: true
+    alasan:
+      type: string
+      maxLength: 250
+    keterangan:
+      type: string
+      maxLength: 2000
+      nullable: true
+    details:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/AsetTransferDetailWrite'
+AsetTransferDetailWrite:
+  type: object
+  required:
+  - aset_id
+  properties:
+    aset_id:
+      $ref: '#/components/schemas/Ulid'
+    kondisi_aset_id:
+      description: Kondisi yang disaksikan saat serah terima; ikut memperbarui kondisi aset.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    catatan:
+      type: string
+      maxLength: 2000
+      nullable: true
 WorkOrderWrite:
   type: object
   description: >-
@@ -121,10 +186,10 @@ WorkOrderJobWrite:
   type: object
   description: Satu baris pekerjaan; lokasi aset disalin server sebagai snapshot saat baris dibuat.
   required:
-  - asset_id
+  - aset_id
   - maintenance_job_type_id
   properties:
-    asset_id:
+    aset_id:
       $ref: '#/components/schemas/Ulid'
     maintenance_job_type_id:
       $ref: '#/components/schemas/Ulid'
@@ -393,7 +458,7 @@ ModelAset:
     required:
     - pabrikan_aset_id
     - pabrikan_aset
-    - asset_count
+    - aset_count
     properties:
       pabrikan_aset_id:
         $ref: '#/components/schemas/Ulid'
@@ -414,7 +479,7 @@ ModelAset:
         - string
         - 'null'
         maxLength: 150
-      asset_count:
+      aset_count:
         description: Aset yang memakai model ini, dibatasi tanggung jawab organisasi pemanggil.
         type:
         - integer
@@ -431,7 +496,7 @@ ModelAset:
       kode: PBRA-000001
       nama: Pabrikan contoh
     model_number: PK-100
-    asset_count: 3
+    aset_count: 3
     aktif: true
     created_at: '2026-07-26T02:00:00.000000Z'
     updated_at: '2026-07-26T02:00:00.000000Z'
@@ -517,11 +582,11 @@ GroupAsetFields:
       - string
       - 'null'
       enum:
-      - fixed_asset
+      - fixed_aset
       - inventory_item
       - other
       - null
-    asset_location_id:
+    lokasi_aset_id:
       description: |
         Lokasi bawaan saat aset diterima. Hanya nilai awal; lokasi yang berlaku tetap
         hidup pada aset dan penempatannya, dan tidak pernah dibaca ulang dari group.
@@ -665,14 +730,14 @@ PabrikanAsetDetail:
   properties:
     data:
       type: object
-      required: [model_count, asset_count]
+      required: [model_count, aset_count]
       properties:
         model_count:
           description: Model yang belum diarsipkan pada pabrikan ini.
           type: integer
           minimum: 0
           nullable: true
-        asset_count:
+        aset_count:
           description: Aset yang memakai pabrikan ini, dibatasi tanggung jawab organisasi pemanggil.
           type: integer
           minimum: 0
@@ -1212,17 +1277,14 @@ BukuPenyusutanFields:
   type: object
   properties:
     posting_layer:
-      description: Lapisan posting buku ini. `tax` lazim dipakai buku fiskal.
+      description: |
+        Lapisan posting buku ini, dan satu-satunya saklar posting (K-15): buku `none`
+        (memorandum) dihitung dan dilaporkan tetapi tidak pernah di-post ke aplikasi finance;
+        lapisan lain di-post. Buku fiskal lazimnya `none`, supaya penyusutan aset yang sama tidak
+        dijurnal dua kali. Field `export_to_backoffice` yang dulu ada ditolak dengan 422.
       type: string
       enum: [current, operations, tax, none]
       default: current
-    export_to_backoffice:
-      description: |
-        App ini belum menjurnal. Saat aktif, field ini hanya menyiapkan bridge internal;
-        pengiriman ke Finance baru boleh dilakukan setelah kontrak posting dan ownership
-        COA tersedia.
-      type: boolean
-      default: false
     round_off_depreciation:
       description: Kelipatan nominal pembulatan penyusutan. Nol berarti tanpa pembulatan.
       type:
@@ -1348,6 +1410,177 @@ GroupBukuPenyusutanList:
             id:
               $ref: '#/components/schemas/Ulid'
         - $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+PostingGroupAsetAccounts:
+  type: object
+  description: |
+    Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
+    bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
+  additionalProperties: false
+  properties:
+    acquisition_account_id:
+      description: Harga perolehan. Wajib.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    accumulated_depreciation_account_id:
+      description: Akumulasi penyusutan. Wajib.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    depreciation_expense_account_id:
+      description: Beban penyusutan. Wajib.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    payable_account_id:
+      description: Lawan hutang untuk mode `direct_payable`, bawaan setiap entitas legal. Wajib.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    clearing_account_id:
+      description: Perantara, hanya untuk entitas legal bermode `clearing`.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    input_vat_account_id:
+      description: PPN Masukan, hanya untuk penerimaan yang membawa PPN.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    opening_balance_offset_account_id:
+      description: Penyeimbang saldo awal, hanya untuk saldo awal saat cutover.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    grant_offset_account_id:
+      description: Lawan hibah, hanya untuk penerimaan dengan cara perolehan `hibah`; hibah tidak dikreditkan ke hutang.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+PostingGroupAsetRow:
+  allOf:
+  - type: object
+    required: [group_aset_id, effective_from, missing]
+    properties:
+      group_aset_id:
+        $ref: '#/components/schemas/Ulid'
+      effective_from:
+        type: string
+        format: date
+      missing:
+        description: Akun wajib yang masih kosong di baris ini, urut seperti kolom matriks.
+        type: array
+        items:
+          type: string
+  - $ref: '#/components/schemas/PostingGroupAsetAccounts'
+PostingGroupAsetRowResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      $ref: '#/components/schemas/PostingGroupAsetRow'
+PostingGroupAsetMatrix:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [today, accounts, groups, groups_needing_attention, account_details]
+      properties:
+        today:
+          type: string
+          format: date
+        accounts:
+          description: Kolom matriks, urut, dengan label dan apakah akunnya wajib.
+          type: array
+          items:
+            type: object
+            required: [column, label, required]
+            properties:
+              column:
+                type: string
+              label:
+                type: string
+              required:
+                type: boolean
+        groups:
+          type: array
+          items:
+            type: object
+            required: [id, kode, nama, aktif, current, rows, missing, unusable_accounts]
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              kode:
+                type: string
+              nama:
+                type: string
+              aktif:
+                type: boolean
+              current:
+                description: Baris yang berlaku hari ini, atau `null`.
+                oneOf:
+                - $ref: '#/components/schemas/PostingGroupAsetRow'
+                - type: 'null'
+              rows:
+                description: Seluruh baris yang belum diarsipkan, tanggal berlaku terbaru lebih dulu.
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostingGroupAsetRow'
+              missing:
+                description: Akun wajib yang kosong pada baris yang berlaku; seluruh akun wajib bila belum ada baris.
+                type: array
+                items:
+                  type: string
+              unusable_accounts:
+                description: >-
+                  Kolom baris yang berlaku yang menunjuk akun yang tidak bisa dipakai posting: tidak ada
+                  lagi di daftar akun, nonaktif, atau kini khusus satu entitas legal. Hanya terjadi bila
+                  daftar akun berubah sesudah dipetakan; posting yang memakainya tertahan di Core.
+                type: array
+                items:
+                  type: string
+        groups_needing_attention:
+          description: >-
+            Jumlah group yang posting-nya akan tertahan dengan baris yang berlaku hari ini: `missing`
+            atau `unusable_accounts`-nya tidak kosong.
+          type: integer
+        account_details:
+          description: Akun yang dipakai matriks, berkunci id.
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ReferenceAccount'
+ReferenceAccount:
+  type: object
+  description: Satu akun dari daftar akun referensi Core (K-05).
+  required: [id, external_id, code, name, type, active, legal_entity_id]
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    external_id:
+      type: string
+    code:
+      type: string
+    name:
+      type: string
+    type:
+      type: string
+      enum: [balance_sheet, profit_loss]
+    active:
+      type: boolean
+    legal_entity_id:
+      description: '`null` berarti berlaku untuk semua entitas legal tenant.'
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+ReferenceAccountList:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/ReferenceAccount'
 TipeAtributFields:
   type: object
   properties:
@@ -1385,7 +1618,7 @@ TipeAtributFields:
       readOnly: true
       type: integer
       minimum: 0
-    asset_types_count:
+    jenis_aset_count:
       description: Jumlah jenis aset yang masih memasang atribut ini. Hanya keluaran.
       readOnly: true
       type: integer
@@ -1403,7 +1636,7 @@ TipeAtribut:
   - $ref: '#/components/schemas/MasterRecord'
   - $ref: '#/components/schemas/TipeAtributFields'
   - type: object
-    required: [data_type, satuan_id, satuan, min_value, max_value, values_count, asset_types_count, data_type_locked]
+    required: [data_type, satuan_id, satuan, min_value, max_value, values_count, jenis_aset_count, data_type_locked]
 TipeAtributCreate:
   allOf:
   - $ref: '#/components/schemas/MasterCreate'
@@ -1512,7 +1745,7 @@ JenisAsetDetail:
   properties:
     data:
       type: object
-      required: [atribut_count, model_count, asset_count]
+      required: [atribut_count, model_count, aset_count]
       properties:
         atribut_count:
           description: Tipe atribut yang terpasang pada jenis aset ini.
@@ -1525,7 +1758,7 @@ JenisAsetDetail:
           type: integer
           minimum: 0
           nullable: true
-        asset_count:
+        aset_count:
           description: |
             Aset yang memakai jenis ini, dibatasi tanggung jawab organisasi pemanggil.
             `null` bila pemanggil tidak memegang `management-aset.aset.read`.

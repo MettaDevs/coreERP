@@ -1,0 +1,62 @@
+# Akar pembaca: app module yang memanggil Core lewat kredensial app. Dirakit ke
+# `contracts/terbit/app.yaml` oleh `contracts/bundle.py`. Tidak terbit di portal publik.
+x-portal:
+  judul: App module (internal)
+  publik: false
+  urutan: 80
+openapi: 3.1.0
+info:
+  title: CoreERP — API untuk app module
+  version: 1.0.0
+  description: |
+    Endpoint `internal/v1` yang dipanggil app bisnis memakai kredensial app (`appId` +
+    `serviceToken` + `tenantHeader`), diverifikasi `AuthenticateAppService`.
+
+    Module yang berjalan di dalam runtime Core memanggil Core lewat kontrak in-process di
+    `App\Support\Modules\Contracts`, bukan lewat endpoint ini. Yang tersisa di sini adalah pintu
+    untuk app yang masih berjalan sebagai proses tersendiri dan addon pihak ketiga.
+
+    - `tenant_id` **tidak pernah** diterima dari URL, query, atau body; ia berasal dari header
+      kredensial yang diverifikasi.
+    - App hanya menerima referensi opaque milik Core.
+    - Seluruh response sukses memakai envelope `data`.
+
+servers:
+  - url: /api/internal/v1
+    description: Relatif terhadap host Core; path lengkapnya `/api/internal/v1/...`.
+
+security:
+  - appId: []
+    serviceToken: []
+    tenantHeader: []
+
+tags:
+  - name: Directory
+    description: Data referensi Core yang boleh dibaca app. Hanya baca.
+  - name: Human Resources
+    description: Sinkronisasi workforce. Terbatas pada app `human-resources`.
+  - name: Number sequence
+    description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
+  - name: Workflow
+    description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
+
+paths:
+  /members: { $ref: 'paths/members.yaml' }
+  /members/{membership}: { $ref: 'paths/members_membership.yaml' }
+  /operating-units: { $ref: 'paths/operating-units.yaml' }
+  /fiscal-periods: { $ref: 'paths/fiscal-periods.yaml' }
+  /units-of-measure: { $ref: 'paths/units-of-measure.yaml' }
+  /units-of-measure/resolve: { $ref: 'paths/units-of-measure_resolve.yaml' }
+  /units-of-measure/convert: { $ref: 'paths/units-of-measure_convert.yaml' }
+  /human-resources/position-assignments: { $ref: 'paths/human-resources_position-assignments.yaml' }
+  /number-sequences/{reference}/issue: { $ref: 'paths/number-sequences_reference_issue.yaml' }
+  /number-sequences/{reference}/reserve: { $ref: 'paths/number-sequences_reference_reserve.yaml' }
+  /number-sequence-reservations/{reservation}/confirm: { $ref: 'paths/number-sequence-reservations_reservation_confirm.yaml' }
+  /number-sequence-reservations/{reservation}/cancel: { $ref: 'paths/number-sequence-reservations_reservation_cancel.yaml' }
+  /workflow-instances: { $ref: 'paths/workflow-instances.yaml' }
+
+components:
+  securitySchemes:
+    appId: { $ref: 'components/securitySchemes/appId.yaml' }
+    serviceToken: { $ref: 'components/securitySchemes/serviceToken.yaml' }
+    tenantHeader: { $ref: 'components/securitySchemes/tenantHeader.yaml' }

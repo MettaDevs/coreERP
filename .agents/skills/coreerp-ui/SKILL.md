@@ -75,7 +75,7 @@ Two mistakes shipped a page with a doubled header and no way to reach it. Both a
   ```
 
   Follow `pages/workflow-inbox.tsx` or `pages/settings/number-sequences.tsx`; do not follow older pages that still import `AppLayout` directly.
-- **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to (admin-only groups are already gated on `system_role`), and add it to the settings sub-nav too only if the page uses that layout.
+- **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to and give it the Core screen permission that guards its route (`permission: 'core.<group>.read'`; the sidebar hides it from members who lack it, while the route enforces it), and add it to the settings sub-nav too only if the page uses that layout.
 - **Verify by walking the rail**, not by opening the URL directly: open the Shell, click through the rail to the new page, and confirm one header and one sidebar. A page reached by typing its URL proves nothing about either rule.
 
 ## Theme bridge
@@ -97,8 +97,8 @@ The Shell sends `theme: { appearance: 'light' | 'dark', font: 'poppins' | 'geist
 
   The two must be equal. Never verify a binary artifact by redirecting `git show HEAD:<path>` to a file in PowerShell — its redirection applies text encoding and corrupts the bytes, so the hash you compute matches nothing and points at a problem that does not exist, or hides one that does.
 - The ignored tarball is a development adapter. Release CI must publish the same version to the artifact registry.
-- Generated output is not source. `graphify-out/` and similar directories belong in `.gitignore` at the repository root (`/graphify-out`, anchored so a same-named directory deeper in the tree is not swept up by accident), not in git. Committing them makes every regeneration surface as a thousand-line diff nobody can review, and the bytes stay in history after the files are removed.
+- Generated output is not source. Generated directories belong in `.gitignore` at the repository root (anchored, e.g. `/dist`, so a same-named directory deeper in the tree is not swept up by accident), not in git. Committing them makes every regeneration surface as a thousand-line diff nobody can review, and the bytes stay in history after the files are removed.
 
 ## Checks
 
-Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint. Run `graphify update .` after repository changes.
+Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.
