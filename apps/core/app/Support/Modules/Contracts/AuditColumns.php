@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Support\Modules\Contracts;
+
+use App\Support\Database\AuditActor;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Kolom jejak pembuat dan pengubah terakhir di setiap tabel tenant, padanan `SystemCreatedBy` dan
+ * `SystemModifiedBy` di Business Central (keputusan K-01, `docs/todo/AnalisaGapCoreErpkeBCPhase1`).
+ *
+ * Isinya ID `users.id`, diisi trigger PostgreSQL `coreerp_stamp_audit_actor` dari variabel sesi yang
+ * dipasang {@see AuditActor}. Trigger, bukan event Eloquent, karena update lewat query builder tidak
+ * melewati event model; jejak yang bolong diam-diam lebih buruk daripada tidak ada jejak.
+ *
+ * Kolom ini hanya ringkasan per baris: siapa yang membuat dan siapa yang terakhir mengubah. Riwayat
+ * lengkap setiap perubahan milik log perubahan (gap 6), satu tabel untuk semua record.
+ *
+ * Tabel tenant baru, di Core maupun module, memanggil {@see self::add()} di `Schema::create` lalu
+ * {@see self::attach()} sesudahnya. `AuditColumnsBoundaryTest` dan `ModuleTableBoundaryTest` menolak
+ * tabel ber-`tenant_id` yang lupa.
+ */
+final class AuditColumns
+{
+    public const CREATED_BY = 'created_by_user_id';
+
+    public const UPDATED_BY = 'updated_by_user_id';
+
+    public const FUNCTION = 'coreerp_stamp_audit_actor';
+
+    public const TRIGGER = 'stamp_audit_actor';
+
+    /**
+     * Tanpa foreign key ke `users`: pada database tenant sendiri tabel `users` tinggal di database
+     * pusat, dan foreign key lintas batas itu dibatasi `FkMenyeberangBatasTest`.
+     */
+    public static function add(Blueprint $table): void
+    {
+        $table->unsignedBigInteger(self::CREATED_BY)->nullable();
+        $table->unsignedBigInteger(self::UPDATED_BY)->nullable();
+    }
+
+    public static function attach(string $table): void
+    {
+        $wrapped = DB::getQueryGrammar()->wrapTable($table);
+
+        DB::statement('CREATE OR REPLACE TRIGGER '.self::TRIGGER.' BEFORE INSERT OR UPDATE ON '.$wrapped
+            .' FOR EACH ROW EXECUTE FUNCTION '.self::FUNCTION.'()');
+    }
+
+    public static function detach(string $table): void
+    {
+        DB::statement('DROP TRIGGER IF EXISTS '.self::TRIGGER.' ON '.DB::getQueryGrammar()->wrapTable($table));
+    }
+}

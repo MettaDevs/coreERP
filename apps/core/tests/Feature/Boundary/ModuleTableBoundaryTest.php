@@ -74,6 +74,7 @@ class ModuleTableBoundaryTest extends TestCase
                 '--realpath' => true,
                 '--force' => true,
             ]);
+            $keluaranMigrate = Artisan::output();
 
             $sesudah = $inspector->tabelSaatIni($connection);
             $pelanggaran = $inspector->pelanggaran($sebelum, $sesudah, $module['awalan'], self::PENGECUALIAN);
@@ -90,6 +91,18 @@ class ModuleTableBoundaryTest extends TestCase
                 $sesudah,
                 sprintf('Migration module "%s" tidak membuat tabel apa pun, jadi penjaga ini tidak menguji apa pun.', $module['id']),
             );
+
+            // Tabel tenant module membawa kolom jejak dan triggernya, sama seperti tabel Core (K-01).
+            $jejak = new AuditColumnInspector($connection);
+            $tabelTenantBaru = array_values(array_intersect(array_diff($sesudah, $sebelum), $jejak->tenantTables()));
+            $this->assertNotSame([], $tabelTenantBaru, sprintf('Module "%s" tidak membuat tabel ber-tenant_id; pemeriksaan kolom jejak tidak menguji apa pun.', $module['id']));
+            $this->assertSame([], $jejak->missing($tabelTenantBaru), sprintf(
+                'Tabel module "%s" belum membawa kolom jejak. Panggil AuditColumns::add() dan AuditColumns::attach() di migration pembuatnya.
+Keluaran migrate:
+%s',
+                $module['id'],
+                $keluaranMigrate,
+            ));
         }
     }
 
