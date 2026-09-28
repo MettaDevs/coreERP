@@ -20,7 +20,7 @@ class IdentityMonitorController extends Controller
             ->when($search, fn ($query) => $query->where(fn ($nested) => $nested
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")))
-            ->with(['memberships.tenant:id,name', 'memberships.roleAssignments' => fn ($query) => $query->where('status', 'active'), 'memberships.roleAssignments.role:id,name'])
+            ->with(['memberships.tenant:id,name'])
             ->latest()
             ->paginate(20)
             ->withQueryString()
@@ -31,10 +31,8 @@ class IdentityMonitorController extends Controller
                 'created_at' => $user->created_at,
                 'last_login_at' => $user->last_login_at,
                 'memberships' => $user->memberships->map(fn (TenantMembership $membership) => [
-                    'id' => $membership->id,
                     'tenant' => $membership->tenant->name,
-                    // Owner dan admin bukan lagi penanda keanggotaan (SEC-22); yang menjelaskan hak seseorang adalah role-nya.
-                    'roles' => $membership->roleAssignments->map(fn ($assignment) => $assignment->role->name)->filter()->unique()->values()->all(),
+                    'system_role' => $membership->system_role,
                     'status' => $membership->status,
                 ])->values()->all(),
             ]);

@@ -6,8 +6,6 @@ use App\Models\ExternalIdentity;
 use App\Models\InvitationCode;
 use App\Models\Role;
 use App\Models\TenantMembership;
-use App\Support\Access\AccessGuards;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\OutboundRefused;
 use App\Support\DataPolicyScopeResolver;
 use App\Support\Sso\SharedIdentityProvider;
@@ -36,14 +34,18 @@ class CreateInvitation
     private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     /**
-     * @param  array{label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data
+     * @param  array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data
      * @return array{invitation:InvitationCode,code:string}
      */
     public function handle(TenantMembership $actor, array $data): array
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE)) {
+        if (! $actor->canManageAccess()) {
             throw new AuthorizationException;
         }
+        if ($data['system_role'] === 'owner') {
+            throw ValidationException::withMessages(['system_role' => 'Invitations cannot grant owner access.']);
+        }
+
         $roleIds = Role::query()
             ->where('tenant_id', $actor->tenant_id)
             ->where('is_active', true)
@@ -52,7 +54,6 @@ class CreateInvitation
         if ($roleIds->count() !== count(array_unique(array_column($data['assignments'], 'role_id')))) {
             throw ValidationException::withMessages(['role_ids' => 'Role harus berasal dari tenant aktif.']);
         }
-        AccessGuards::assertMayGrantRoles($actor, array_values($roleIds->map(strval(...))->all()));
         $roles = Role::query()->whereIn('id', $roleIds)->get()->keyBy('id');
         $scopes = collect($data['assignments'])->flatMap(function (array $assignment) use ($roles, $actor): array {
             $role = $roles->get($assignment['role_id']);
@@ -80,6 +81,7 @@ class CreateInvitation
                     'tenant_id' => $actor->tenant_id,
                     'code_hash' => self::hash($plain),
                     'code_ciphertext' => Crypt::encryptString($plain),
+                    'system_role' => $data['system_role'],
                     'label' => $data['label'] ?? null,
                     'created_by' => $actor->user_id,
                     // Kode anonim tidak pernah kedaluwarsa, seperti sebelumnya. Undangan terikat
@@ -107,6 +109,7 @@ class CreateInvitation
                         'invitation_id' => $invitation->id,
                         'subject' => $invited->subject,
                         'email' => $invited->email,
+                        'system_role' => $data['system_role'],
                         'expires_at' => $expiresAt?->toIso8601String(),
                     ]);
                 }

@@ -5,8 +5,6 @@ namespace App\Actions\Access;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
-use App\Support\Access\AccessGuards;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;
 use App\Support\SodConflictEvaluator;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -21,18 +19,19 @@ class UpdateMembership
         private readonly SodConflictEvaluator $sod,
     ) {}
 
-    /**
-     * Owner dan admin tidak lagi berupa penanda di keanggotaan (SEC-22). Siapa pun yang memegang *Kelola akses*
-     * dapat mengubah penugasan manual anggota mana pun, dengan dua penjaga dari `AccessGuards`: role Owner hanya
-     * diberikan atau dicabut pemegang Owner, dan sesudah perubahan harus tetap ada anggota yang dapat mengelola
-     * akses.
-     *
-     * @param  array{assignments:list<array{role_id:string,policy_scopes:list<array<string,mixed>>}>}  $data
-     */
+    /** @param array{system_role:string,assignments:list<array{role_id:string,policy_scopes:list<array<string,mixed>>}>} $data */
     public function handle(TenantMembership $actor, TenantMembership $target, array $data): TenantMembership
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || $actor->tenant_id !== $target->tenant_id) {
+        $targetIsOwner = $target->system_role === 'owner';
+        if (! $actor->canManageAccess()
+            || $actor->tenant_id !== $target->tenant_id
+            || ($targetIsOwner && $actor->id !== $target->id)) {
             throw new AuthorizationException;
+        }
+        if (($targetIsOwner && $data['system_role'] !== 'owner') || (! $targetIsOwner && $data['system_role'] === 'owner')) {
+            throw ValidationException::withMessages([
+                'system_role' => 'Role pemilik tidak dapat dipindahkan lewat layar ini.',
+            ]);
         }
 
         $roleIds = collect($data['assignments'])->pluck('role_id')->unique()->values()->all();
@@ -40,14 +39,15 @@ class UpdateMembership
         if ($roles->count() !== count($roleIds)) {
             throw ValidationException::withMessages(['role_ids' => 'Pilih tanggung jawab bisnis yang tersedia untuk bisnis ini.']);
         }
-        $previousRoleIds = $target->roleAssignments()->where('source', 'manual')->pluck('role_id')->map(strval(...))->all();
-        AccessGuards::assertMayGrantRoles($actor, array_values(array_merge(array_diff($roleIds, $previousRoleIds), array_diff($previousRoleIds, $roleIds))));
         $this->sod->assertManualAssignmentAllowed($target, $roleIds);
         foreach ($data['assignments'] as $assignment) {
             $this->scopeResolver->assertNoRedundantGrants($assignment['policy_scopes']);
         }
 
-        return DB::transaction(function () use ($actor, $target, $data, $roles): TenantMembership {
+        return DB::transaction(function () use ($actor, $target, $targetIsOwner, $data, $roles): TenantMembership {
+            if (! $targetIsOwner) {
+                $target->update(['system_role' => $data['system_role']]);
+            }
             $target->roleAssignments()->where('source', 'manual')->delete();
             foreach ($data['assignments'] as $input) {
                 $assignment = RoleAssignment::create([
@@ -76,8 +76,6 @@ class UpdateMembership
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
-            AccessGuards::assertNotLockedOut($actor->tenant_id);
 
             return $target->load('roleAssignments.role', 'roleAssignments.dataPolicyScopes');
         });

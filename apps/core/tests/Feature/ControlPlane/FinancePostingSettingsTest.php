@@ -18,7 +18,6 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use RuntimeException;
-use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -26,7 +25,6 @@ use Tests\TestCase;
  */
 class FinancePostingSettingsTest extends TestCase
 {
-    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $owner;
@@ -135,17 +133,14 @@ class FinancePostingSettingsTest extends TestCase
         DB::table('finance_posting_settings')->where('legal_entity_id', $le)->update(['cutover_date' => null]);
     }
 
-    public function test_reading_needs_the_inquire_duty_and_changing_needs_the_manage_duty(): void
+    public function test_hanya_owner_atau_admin_yang_mengubah_dan_anggota_tetap_dapat_membaca(): void
     {
         $le = $this->legalEntity('PT Metta Sehat', 'META');
         $anggota = User::factory()->create();
-        $membership = TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'status' => 'active',
+        TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'system_role' => 'member', 'status' => 'active',
         ]);
 
-        $this->actingAs($anggota)->getJson("/api/v1/organizations/{$le}/finance-posting")->assertForbidden();
-
-        $this->grantDuties($membership, ['core.finance-setup.inquire']);
         $this->actingAs($anggota)->getJson("/api/v1/organizations/{$le}/finance-posting")->assertOk();
         $this->actingAs($anggota)->putJson("/api/v1/organizations/{$le}/finance-posting", [
             'enabled' => true, 'cutover_date' => '2026-10-01',
@@ -280,7 +275,7 @@ class FinancePostingSettingsTest extends TestCase
     {
         $anggota = User::factory()->create();
         TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'status' => 'active',
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'system_role' => 'member', 'status' => 'active',
         ]);
 
         $this->actingAs($anggota)->put('/settings/currencies/IDR', [

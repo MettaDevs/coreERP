@@ -6,7 +6,6 @@ use App\Models\LegalEntity;
 use App\Models\OperatingUnit;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +16,7 @@ class CreateOrganization
     /** @param array{classification:string,name:string,company_code:?string,country_code:?string,operating_unit_type:?string,operating_unit_number?:?string} $data */
     public function handle(TenantMembership $actor, array $data): Organization
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE)) {
+        if (! $actor->canManageAccess()) {
             throw new AuthorizationException;
         }
         if ($data['classification'] === 'legal_entity'

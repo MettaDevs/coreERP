@@ -36,8 +36,6 @@ type NavigationItem = {
     label: string;
     icon?: typeof LayoutDashboard;
     href: string;
-    /** Permission layar Core yang membuat entri ini tampil; kosong berarti selalu tampil. */
-    permission?: string;
 };
 type PrimaryNavigationItem = NavigationItem & {
     icon: typeof LayoutDashboard;
@@ -112,28 +110,6 @@ export function AppSidebar() {
         };
     }, []);
 
-    // Menu pengaturan disaring dengan permission layar Core anggota ini (SEC-22). Hanya penyaring tampilan: setiap
-    // rute dan aksinya memeriksa permission-nya sendiri di server. Kelompok yang semua entrinya tersaring ikut hilang.
-    const grantedPermissions = new Set(
-        props.auth.membership?.permissions ?? [],
-    );
-    const isAllowed = (permission?: string) =>
-        permission === undefined || grantedPermissions.has(permission);
-    const filterByPermission = (
-        items: PrimaryNavigationItem[],
-    ): PrimaryNavigationItem[] =>
-        items
-            .map((item) => ({
-                ...item,
-                children: item.children.filter((child) =>
-                    isAllowed(child.permission),
-                ),
-            }))
-            .filter(
-                (item) =>
-                    isAllowed(item.permission) && item.children.length > 0,
-            );
-
     const coreItems: PrimaryNavigationItem[] = [
         {
             label: 'Dashboard',
@@ -156,190 +132,197 @@ export function AppSidebar() {
                     : []),
             ],
         },
-        ...filterByPermission([
-            {
-                label: 'Setup Address',
-                icon: Map,
-                href: '/settings/address-setup',
-                children: [
-                    {
-                        label: 'Pengaturan',
-                        icon: Map,
-                        href: '/settings/address-setup',
-                        permission: 'core.reference-data.read',
-                    },
-                ],
-            },
-            {
-                label: 'Kalender',
-                icon: CalendarDays,
-                href: '/settings/working-time-templates',
-                children: [
-                    {
-                        label: 'Pola jam kerja',
-                        icon: Clock,
-                        href: '/settings/working-time-templates',
-                        permission: 'core.reference-data.read',
-                    },
-                ],
-            },
-            {
-                label: 'Organization',
-                icon: Building2,
-                href: '/settings/organization',
-                children: [
-                    {
-                        label: 'Organisasi',
-                        icon: Building2,
-                        href: '/settings/organization',
-                        permission: 'core.organization.read',
-                    },
-                ],
-            },
-            {
-                label: 'Buku alamat',
-                icon: Contact,
-                href: '/settings/global-address-book',
-                children: [
-                    {
-                        label: 'General',
-                        icon: UserRound,
-                        href: '/settings/global-address-book?section=general',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Addresses',
-                        icon: MapPin,
-                        href: '/settings/global-address-book?section=addresses',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Relationships',
-                        icon: Users,
-                        href: '/settings/global-address-book?section=relationships',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Contact Information',
-                        icon: PhoneCall,
-                        href: '/settings/global-address-book?section=contacts',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Roles',
-                        icon: Briefcase,
-                        href: '/settings/global-address-book?section=roles',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Vendor',
-                        icon: Truck,
-                        href: '/settings/vendors',
-                        permission: 'core.vendor.read',
-                    },
-                ],
-            },
-            {
-                label: 'Identity & access',
-                icon: KeyRound,
-                href: '/settings/access?section=members',
-                children: [
-                    {
-                        label: 'Anggota',
-                        icon: Users,
-                        href: '/settings/access?section=members',
-                        permission: 'core.access.read',
-                    },
-                    {
-                        label: 'Undangan',
-                        icon: Users,
-                        href: '/settings/access?section=invitations',
-                        permission: 'core.access.read',
-                    },
-                    {
-                        label: 'Konfigurasi keamanan',
-                        icon: ShieldCheck,
-                        href: '/settings/security-configuration',
-                        permission: 'core.access.read',
-                    },
-                    {
-                        label: 'Workflow',
-                        icon: ShieldCheck,
-                        href: '/settings/workflows',
-                        permission: 'core.workflow.read',
-                    },
-                    {
-                        label: 'Klien integrasi',
-                        icon: Plug,
-                        href: '/settings/integration-clients',
-                        permission: 'core.finance-setup.read',
-                    },
-                ],
-            },
-            {
-                label: 'Data referensi',
-                icon: Ruler,
-                href: '/settings/units-of-measure',
-                children: [
-                    {
-                        label: 'Satuan',
-                        icon: Ruler,
-                        href: '/settings/units-of-measure',
-                        permission: 'core.reference-data.read',
-                    },
-                    {
-                        label: 'Mata uang',
-                        icon: Coins,
-                        href: '/settings/currencies',
-                        permission: 'core.reference-data.read',
-                    },
-                    {
-                        label: 'Daftar akun',
-                        icon: BookOpen,
-                        href: '/settings/finance-accounts',
-                        permission: 'core.finance-setup.read',
-                    },
-                    {
-                        label: 'Setup Address',
-                        icon: Map,
-                        href: '/settings/address-setup',
-                        permission: 'core.reference-data.read',
-                    },
-                    {
-                        label: 'Layout laporan',
-                        icon: FileText,
-                        href: '/settings/report-layouts',
-                        permission: 'core.report-layout.read',
-                    },
-                ],
-            },
-            {
-                label: 'Nomor dokumen',
-                icon: Hash,
-                href: '/settings/number-sequences',
-                children: [
-                    {
-                        label: 'Atur nomor',
-                        icon: Hash,
-                        href: '/settings/number-sequences',
-                        permission: 'core.number-sequence.read',
-                    },
-                ],
-            },
-            {
-                label: 'Posting finance',
-                icon: ListChecks,
-                href: '/settings/finance-postings',
-                children: [
-                    {
-                        label: 'Pantau posting',
-                        icon: ListChecks,
-                        href: '/settings/finance-postings',
-                        permission: 'core.finance-posting.read',
-                    },
-                ],
-            },
-        ]),
+        {
+            label: 'Setup Address',
+            icon: Map,
+            href: '/settings/address-setup',
+            children: [
+                {
+                    label: 'Pengaturan',
+                    icon: Map,
+                    href: '/settings/address-setup',
+                },
+            ],
+        },
+        ...(props.auth.membership
+            ? [
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Kalender',
+                                icon: CalendarDays,
+                                href: '/settings/working-time-templates',
+                                children: [
+                                    {
+                                        label: 'Pola jam kerja',
+                                        icon: Clock,
+                                        href: '/settings/working-time-templates',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+                  {
+                      label: 'Organization',
+                      icon: Building2,
+                      href: '/settings/organization',
+                      children: [
+                          {
+                              label: 'Organisasi',
+                              icon: Building2,
+                              href: '/settings/organization',
+                          },
+                      ],
+                  },
+                  {
+                      label: 'Buku alamat',
+                      icon: Contact,
+                      href: '/settings/global-address-book',
+                      children: [
+                          {
+                              label: 'General',
+                              icon: UserRound,
+                              href: '/settings/global-address-book?section=general',
+                          },
+                          {
+                              label: 'Addresses',
+                              icon: MapPin,
+                              href: '/settings/global-address-book?section=addresses',
+                          },
+                          {
+                              label: 'Relationships',
+                              icon: Users,
+                              href: '/settings/global-address-book?section=relationships',
+                          },
+                          {
+                              label: 'Contact Information',
+                              icon: PhoneCall,
+                              href: '/settings/global-address-book?section=contacts',
+                          },
+                          {
+                              label: 'Roles',
+                              icon: Briefcase,
+                              href: '/settings/global-address-book?section=roles',
+                          },
+                          {
+                              label: 'Vendor',
+                              icon: Truck,
+                              href: '/settings/vendors',
+                          },
+                      ],
+                  },
+                  {
+                      label: 'Identity & access',
+                      icon: KeyRound,
+                      href: '/settings/access?section=members',
+                      children: [
+                          {
+                              label: 'Anggota',
+                              icon: Users,
+                              href: '/settings/access?section=members',
+                          },
+                          {
+                              label: 'Undangan',
+                              icon: Users,
+                              href: '/settings/access?section=invitations',
+                          },
+                          {
+                              label: 'Konfigurasi keamanan',
+                              icon: ShieldCheck,
+                              href: '/settings/security-configuration',
+                          },
+                          {
+                              label: 'Workflow',
+                              icon: ShieldCheck,
+                              href: '/settings/workflows',
+                          },
+                          ...(['owner', 'admin'].includes(
+                              props.auth.membership.system_role,
+                          )
+                              ? [
+                                    {
+                                        label: 'Klien integrasi',
+                                        icon: Plug,
+                                        href: '/settings/integration-clients',
+                                    },
+                                ]
+                              : []),
+                      ],
+                  },
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Data referensi',
+                                icon: Ruler,
+                                href: '/settings/units-of-measure',
+                                children: [
+                                    {
+                                        label: 'Satuan',
+                                        icon: Ruler,
+                                        href: '/settings/units-of-measure',
+                                    },
+                                    {
+                                        label: 'Mata uang',
+                                        icon: Coins,
+                                        href: '/settings/currencies',
+                                    },
+                                    {
+                                        label: 'Daftar akun',
+                                        icon: BookOpen,
+                                        href: '/settings/finance-accounts',
+                                    },
+                                    {
+                                        label: 'Setup Address',
+                                        icon: Map,
+                                        href: '/settings/address-setup',
+                                    },
+                                    {
+                                        label: 'Layout laporan',
+                                        icon: FileText,
+                                        href: '/settings/report-layouts',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Nomor dokumen',
+                                icon: Hash,
+                                href: '/settings/number-sequences',
+                                children: [
+                                    {
+                                        label: 'Atur nomor',
+                                        icon: Hash,
+                                        href: '/settings/number-sequences',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Posting finance',
+                                icon: ListChecks,
+                                href: '/settings/finance-postings',
+                                children: [
+                                    {
+                                        label: 'Pantau posting',
+                                        icon: ListChecks,
+                                        href: '/settings/finance-postings',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+              ]
+            : []),
         {
             label: 'Profile',
             icon: UserRound,

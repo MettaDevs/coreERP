@@ -12,7 +12,7 @@ class InvitationRequest extends FormRequest
     }
 
     /**
-     * Menerima dua bentuk. Bentuk tunggal (`label` + `assignments`)
+     * Menerima dua bentuk. Bentuk tunggal (`system_role` + `assignments`)
      * dipertahankan untuk API. Grid pada UI mengirim `codes`: satu baris satu
      * kode undangan, sehingga admin tidak perlu membuatnya satu per satu.
      *
@@ -23,6 +23,7 @@ class InvitationRequest extends FormRequest
         $prefix = $this->has('codes') ? 'codes.*.' : '';
 
         return array_merge($this->has('codes') ? ['codes' => ['required', 'array', 'min:1']] : [], [
+            $prefix.'system_role' => ['required', 'in:user,admin'],
             $prefix.'label' => ['nullable', 'string', 'max:120'],
             // Kosong berarti kode anonim seperti sebelum undangan SSO ada. Terisi berarti
             // undangan untuk satu orang, dan `CreateInvitation` yang memastikan orangnya memang
@@ -46,7 +47,7 @@ class InvitationRequest extends FormRequest
         return is_string($value) && trim($value) !== '' ? $value : null;
     }
 
-    /** @return array{label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>} */
+    /** @return array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>} */
     public function payload(): array
     {
         return $this->payloads()[0];
@@ -55,7 +56,7 @@ class InvitationRequest extends FormRequest
     /**
      * Seluruh kode yang diminta. Bentuk tunggal menghasilkan satu elemen.
      *
-     * @return list<array{label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}>
+     * @return list<array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}>
      */
     public function payloads(): array
     {
@@ -65,6 +66,7 @@ class InvitationRequest extends FormRequest
         // yang sama, tetapi hanya yang pertama terbaca sebagai daftar berindeks rapat oleh analisis
         // tipe — dan bentuk itulah yang dijanjikan kepada pemanggilnya.
         return array_values(collect($rows)->map(fn (mixed $row): array => [
+            'system_role' => (string) data_get($row, 'system_role'),
             'label' => self::text(data_get($row, 'label')),
             'sso_email' => self::text(data_get($row, 'sso_email')),
             'assignments' => array_values(collect(data_get($row, 'assignments', []))->map(fn (mixed $assignment): array => [

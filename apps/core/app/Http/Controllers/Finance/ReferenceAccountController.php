@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\FinanceReferenceAccount;
 use App\Models\FinanceReferenceAccountImport;
 use App\Models\Organization;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\ReferenceAccountImporter;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +31,6 @@ final class ReferenceAccountController extends Controller
     public function index(Request $request): Response
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_READ), 403);
         $tenant = $membership->tenant_id;
         $filter = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -66,7 +64,7 @@ final class ReferenceAccountController extends Controller
             ->pluck('name', 'id');
 
         return Inertia::render('settings/finance-accounts', [
-            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE),
+            'canManage' => $membership->canManageAccess(),
             'filters' => ['q' => $kata, 'scope' => $scope, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'accounts' => $accounts,
@@ -97,7 +95,7 @@ final class ReferenceAccountController extends Controller
     public function import(Request $request, ReferenceAccountImporter $importer): JsonResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $data = $request->validate([
             'file' => ['required', 'file', 'max:2048', 'extensions:csv,txt'],
             'scope' => ['required', 'string', 'max:26'],
@@ -123,7 +121,7 @@ final class ReferenceAccountController extends Controller
     {
         $membership = $this->currentMembership($request);
         abort_unless($account->tenant_id === $membership->tenant_id, 404);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $data = $request->validate(['active' => ['required', 'boolean']]);
 
         $account->update(['active' => (bool) $data['active']]);

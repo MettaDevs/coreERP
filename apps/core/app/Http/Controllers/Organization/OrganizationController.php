@@ -18,7 +18,6 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +58,7 @@ class OrganizationController extends Controller
             ->get();
 
         return Inertia::render('settings/organization', [
-            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
+            'canManage' => $membership->canManageAccess(),
             'section' => $section,
             'tenant' => $membership->tenant->only(['id', 'name']),
             'organizations' => $organizations,

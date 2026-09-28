@@ -10,7 +10,6 @@ use App\Models\Party;
 use App\Models\TenantMembership;
 use App\Models\TenantNumberSequence;
 use App\Models\Vendor;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +28,7 @@ final class VendorController extends Controller
 
     public function index(Request $request): Response
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_READ);
+        $membership = $this->currentMembership($request);
         $tenant = $membership->tenant_id;
         $filter = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -54,7 +53,7 @@ final class VendorController extends Controller
             ->through(fn (Vendor $vendor): array => $this->present($vendor));
 
         return Inertia::render('settings/vendors', [
-            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
+            'canManage' => $membership->canManageAccess(),
             'filters' => ['q' => $kata, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'vendors' => $vendors,
@@ -65,7 +64,7 @@ final class VendorController extends Controller
     /** Pihak di buku alamat tenant untuk dipilih sebagai vendor. */
     public function partyOptions(Request $request): JsonResponse
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $membership = $this->admin($request);
         $kata = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
 
         return response()->json(['data' => Party::query()
@@ -81,7 +80,7 @@ final class VendorController extends Controller
 
     public function store(Request $request, SaveVendor $simpan): JsonResponse
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $membership = $this->admin($request);
         $data = $request->validate([
             'legal_entity_id' => ['required', 'string', 'size:26'],
             'party_id' => ['nullable', 'required_without:party_name', 'string', 'size:26'],
@@ -113,7 +112,7 @@ final class VendorController extends Controller
 
     public function update(Request $request, Vendor $vendor, SaveVendor $simpan): JsonResponse
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $membership = $this->admin($request);
         abort_unless($vendor->tenant_id === $membership->tenant_id, 404);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:200'],
@@ -157,11 +156,10 @@ final class VendorController extends Controller
         return $urutan === null || $urutan->allow_manual;
     }
 
-    /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
-    private function authorizedMembership(Request $request, string $permission): TenantMembership
+    private function admin(Request $request): TenantMembership
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission($permission), 403);
+        abort_unless($membership->canManageAccess(), 403);
 
         return $membership;
     }

@@ -75,7 +75,7 @@ Two mistakes shipped a page with a doubled header and no way to reach it. Both a
   ```
 
   Follow `pages/workflow-inbox.tsx` or `pages/settings/number-sequences.tsx`; do not follow older pages that still import `AppLayout` directly.
-- **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to and give it the Core screen permission that guards its route (`permission: 'core.<group>.read'`; the sidebar hides it from members who lack it, while the route enforces it), and add it to the settings sub-nav too only if the page uses that layout.
+- **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to (admin-only groups are already gated on `system_role`), and add it to the settings sub-nav too only if the page uses that layout.
 - **Verify by walking the rail**, not by opening the URL directly: open the Shell, click through the rail to the new page, and confirm one header and one sidebar. A page reached by typing its URL proves nothing about either rule.
 
 ## Theme bridge

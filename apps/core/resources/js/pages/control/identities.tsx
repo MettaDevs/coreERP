@@ -23,9 +23,8 @@ type Identity = {
     created_at: string;
     last_login_at: string | null;
     memberships: {
-        id: string;
         tenant: string;
-        roles: string[];
+        system_role: string;
         status: string;
     }[];
 };
@@ -60,9 +59,11 @@ export default function Identities({ identities, filters }: Props) {
             cell: (identity) => (
                 <div className="flex flex-wrap gap-2">
                     {identity.memberships.map((membership) => (
-                        <Badge key={membership.id} variant="outline">
-                            {membership.tenant} ·{' '}
-                            {membership.roles.join(', ') || 'tanpa role'}
+                        <Badge
+                            key={`${membership.tenant}-${membership.system_role}`}
+                            variant="outline"
+                        >
+                            {membership.tenant} · {membership.system_role}
                         </Badge>
                     ))}
                     {!identity.memberships.length && (

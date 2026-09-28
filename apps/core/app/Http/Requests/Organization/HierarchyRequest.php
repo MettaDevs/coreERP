@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Organization;
 
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\CurrentWorkspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -11,7 +10,7 @@ class HierarchyRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('core', CoreSecurityCatalog::ORGANIZATION_UPDATE) ?? false;
+        return $this->user()?->can('manage-access') ?? false;
     }
 
     /** @return array<string, mixed> */

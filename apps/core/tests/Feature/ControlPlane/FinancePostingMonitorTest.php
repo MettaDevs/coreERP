@@ -100,7 +100,7 @@ class FinancePostingMonitorTest extends TestCase
         $anggota = User::factory()->create();
         TenantMembership::query()->create([
             'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id,
-            'status' => 'active',
+            'system_role' => 'member', 'status' => 'active',
         ]);
         // Jurnal keuangan tenant, jadi anggota biasa bahkan tidak boleh melihatnya.
         $this->actingAs($anggota)->get('/settings/finance-postings')->assertForbidden();

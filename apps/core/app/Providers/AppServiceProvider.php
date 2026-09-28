@@ -4,8 +4,6 @@ namespace App\Providers;
 
 use App\Models\Passkey;
 use App\Models\User;
-use App\Support\Access\CorePermissions;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
@@ -50,7 +48,6 @@ class AppServiceProvider extends ServiceProvider
          * salah.
          */
         $this->app->scoped(CurrentWorkspace::class);
-        $this->app->scoped(CorePermissions::class);
         $this->app->scoped(DataPolicyAccessResolver::class);
 
         // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
@@ -126,19 +123,22 @@ class AppServiceProvider extends ServiceProvider
         // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
         OutboundGuard::install();
 
-        // Gate lama tetap bernama sama, tetapi kini membaca permission ubah kelompok layarnya masing-masing
-        // lewat rantai security role (SEC-22), bukan penanda owner/admin.
-        foreach ([
-            'manage-access' => CoreSecurityCatalog::ACCESS_UPDATE,
-            'manage-number-sequences' => CoreSecurityCatalog::NUMBER_SEQUENCE_UPDATE,
-            'manage-report-layouts' => CoreSecurityCatalog::REPORT_LAYOUT_UPDATE,
-            'manage-reference-data' => CoreSecurityCatalog::REFERENCE_DATA_UPDATE,
-        ] as $gate => $permission) {
-            Gate::define($gate, fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
-        }
-        // Gate umum untuk rute layar Core: `->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::VENDOR_READ))`.
-        // Kode permission-nya dari `CoreSecurityCatalog`, jadi penjaga sebuah rute terbaca di berkas rutenya sendiri.
-        Gate::define('core', fn (User $user, string $permission): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
+        Gate::define(
+            'manage-access',
+            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
+        );
+        Gate::define(
+            'manage-number-sequences',
+            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
+        );
+        Gate::define(
+            'manage-report-layouts',
+            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
+        );
+        Gate::define(
+            'manage-reference-data',
+            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
+        );
         Gate::define('monitor-identities', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
         Gate::define('manage-app-catalog', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
         // Dokumen API internal di portal `/docs`: referensi Scramble untuk layar CoreERP dan

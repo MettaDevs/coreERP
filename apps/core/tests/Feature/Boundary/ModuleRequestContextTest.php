@@ -95,6 +95,7 @@ class ModuleRequestContextTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $membership->tenant_id,
             'user_id' => $this->tanpaIzin->id,
+            'system_role' => 'user',
             'status' => 'active',
         ]);
     }

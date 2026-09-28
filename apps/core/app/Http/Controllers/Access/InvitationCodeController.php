@@ -7,7 +7,6 @@ use App\Actions\Access\UpdateInvitation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\InvitationRequest;
 use App\Models\InvitationCode;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Sso\SsoInvitationMailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -61,6 +60,7 @@ class InvitationCodeController extends Controller
         if ($request->is('api/*')) {
             return response()->json(['data' => [
                 'id' => $invitation->id,
+                'system_role' => $invitation->system_role,
                 'label' => $invitation->label,
                 'roles' => $invitation->roles->pluck('name')->values(),
             ]]);
@@ -79,7 +79,7 @@ class InvitationCodeController extends Controller
     public function resend(Request $request, InvitationCode $invitationCode, SsoInvitationMailer $mailer): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) && $invitationCode->tenant_id === $membership->tenant_id, 403);
+        abort_unless($membership->canManageAccess() && $invitationCode->tenant_id === $membership->tenant_id, 403);
 
         if (! $invitationCode->isSsoBound() || ! $invitationCode->isOpen()) {
             throw ValidationException::withMessages(['invitation' => 'Undangan ini tidak dapat dikirim ulang.']);
@@ -101,7 +101,7 @@ class InvitationCodeController extends Controller
     public function destroy(Request $request, InvitationCode $invitationCode): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) && $invitationCode->tenant_id === $membership->tenant_id, 403);
+        abort_unless($membership->canManageAccess() && $invitationCode->tenant_id === $membership->tenant_id, 403);
         $invitationCode->update(['revoked_at' => now()]);
 
         return $request->is('api/*') ? response()->json(null, 204) : back();

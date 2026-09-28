@@ -96,7 +96,7 @@ final class BootstrapSiteTenantTest extends TestCase
             TenantMembership::query()
                 ->where('tenant_id', self::TENANT_ID)
                 ->where('user_id', $owner->id)
-                ->whereHas('roleAssignments.role', fn ($query) => $query->where('is_owner', true))
+                ->where('system_role', 'owner')
                 ->where('status', 'active')
                 ->exists(),
         );

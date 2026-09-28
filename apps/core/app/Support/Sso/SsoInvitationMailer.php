@@ -63,9 +63,9 @@ class SsoInvitationMailer
                 'recipient_email' => $invitation->sso_email_at_invite,
                 'recipient_name' => $invitation->sso_name_at_invite,
                 'app_name' => (string) config('coreerp.sso.invitation_app_name', 'CoreERP'),
-                // Penyedia mencetaknya apa adanya di suratnya. Cukup "Owner" atau "Pengguna": nama role
-                // internal tenant bukan urusan penyedia.
-                'role_name' => $invitation->roles()->where('is_owner', true)->exists() ? 'Owner' : 'Pengguna',
+                // Penyedia mencetaknya apa adanya di suratnya. Peran sistem sudah cukup menjelaskan,
+                // dan nama peran internal tenant bukan urusan penyedia.
+                'role_name' => $invitation->system_role === 'admin' ? 'Admin' : 'Pengguna',
                 'accept_url' => $acceptUrl,
                 'expires_in_days' => $this->days($invitation),
             ]);

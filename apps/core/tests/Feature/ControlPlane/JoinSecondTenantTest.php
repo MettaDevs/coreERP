@@ -189,7 +189,7 @@ class JoinSecondTenantTest extends TestCase
     private function invitationFrom(User $owner): string
     {
         return $this->actingAs($owner)
-            ->postJson('/api/v1/invitation-codes', ['assignments' => []])
+            ->postJson('/api/v1/invitation-codes', ['system_role' => 'user', 'assignments' => []])
             ->assertCreated()
             ->json('data.code');
     }

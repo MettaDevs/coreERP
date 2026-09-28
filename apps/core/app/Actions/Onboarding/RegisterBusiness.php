@@ -10,10 +10,10 @@ use App\Models\Client;
 use App\Models\Environment;
 use App\Models\Role;
 use App\Models\RoleAssignment;
+use App\Models\SecurityDuty;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Access\OwnerRoleDuties;
 use App\Support\AppDependencyGraph;
 use App\Support\ControlPlane\EnvironmentAddress;
 use App\Support\Modules\Contracts\TenantDisiapkan;
@@ -177,6 +177,7 @@ class RegisterBusiness
             $membership = TenantMembership::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
+                'system_role' => 'owner',
                 'status' => 'active',
             ]);
             // Indeks navigasi: ia menentukan environment mana yang muncul di pengalih, bukan apa
@@ -203,16 +204,14 @@ class RegisterBusiness
                 ]);
             }
 
-            // Owner memegang semua duty yang sah untuk tenant ini — duty Core dan duty app yang dibeli — dan
-            // disamakan lagi setiap kali katalog berubah (`OwnerRoleDuties`). Tidak ada lagi owner/admin di
-            // keanggotaan: hak mengelola tenant datang dari role ini (SEC-22).
             $ownerRole = Role::create([
                 'tenant_id' => $tenant->id,
                 'name' => 'Owner',
                 'is_active' => true,
-                'is_owner' => true,
             ]);
-            app(OwnerRoleDuties::class)->sync($ownerRole);
+            $ownerRole->duties()->sync(
+                SecurityDuty::query()->whereIn('app_id', $appIds)->pluck('code'),
+            );
             $ownerAssignment = RoleAssignment::create([
                 'membership_id' => $membership->id,
                 'role_id' => $ownerRole->id,

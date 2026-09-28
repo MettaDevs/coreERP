@@ -12,17 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $tenant_id
  * @property string $name
  * @property bool $is_active
- * @property bool $is_owner Role Owner bawaan tenant: selalu memegang semua duty yang sah (`OwnerRoleDuties`).
  */
 class Role extends Model
 {
     use HasUlids;
 
-    protected $fillable = ['tenant_id', 'name', 'is_active', 'is_owner'];
+    protected $fillable = ['tenant_id', 'name', 'is_active'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'is_owner' => 'boolean'];
+        return ['is_active' => 'boolean'];
     }
 
     /** @return BelongsTo<Tenant, $this> */

@@ -34,7 +34,7 @@ Aturan yang ditegakkan kode, dan alasannya:
 - **Menghapus yang utama menaikkan yang tertua tersisa.** Dokumen tidak boleh kehilangan alamat hanya karena alamat utama dihapus.
 - **Bentuk tercetak disusun saat disimpan, ke kolom `formatted`.** Aturannya di `PostalAddressFormatter`: jalan dan gedung, PO Box, kelurahan atau kecamatan, lalu kota, provinsi, dan kode pos. Nama negara hanya ditulis untuk alamat di luar Indonesia. Dokumen resmi menyalin bentuk ini, sehingga perubahan alamat kemudian tidak menulis ulang dokumen lama.
 - **Kode negara dinormalkan lalu diperiksa ke tabel.** `id` dan `ID` sama; `ZZ` ditolak 422, bukan disimpan sebagai teks bebas.
-- **Layar Buku alamat butuh duty *Lihat organisasi*; mengubah kontak, lokasi, dan identitas cetak butuh *Kelola organisasi* (`core.organization.update`).** API baca kontak dan lokasi tetap terbuka bagi semua anggota tenant karena dipakai pemilih di layar lain. Organisasi tenant lain dijawab 404, bukan 403, supaya keberadaannya tidak bocor.
+- **Semua anggota tenant boleh membaca; hanya admin tenant (`canManageAccess`) boleh mengubah.** Organisasi tenant lain dijawab 404, bukan 403, supaya keberadaannya tidak bocor.
 
 ## Yang membaca buku alamat
 

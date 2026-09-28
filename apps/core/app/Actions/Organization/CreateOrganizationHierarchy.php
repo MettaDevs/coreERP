@@ -6,7 +6,6 @@ use App\Models\HierarchyPurpose;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +16,7 @@ class CreateOrganizationHierarchy
     /** @param array{name:string,purpose_codes:list<string>,root_organization_id:string,effective_from:string} $data */
     public function handle(TenantMembership $actor, array $data): OrganizationHierarchy
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE)) {
+        if (! $actor->canManageAccess()) {
             throw new AuthorizationException;
         }
 

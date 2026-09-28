@@ -16,8 +16,7 @@ export type Auth = {
     user: User;
     membership?: {
         id: string;
-        /** Permission layar Core (`core.<kelompok>.read|update`); hanya untuk menyusun menu. */
-        permissions: string[];
+        system_role: string;
         tenant_id: string;
         tenant_name: string;
     } | null;
@@ -28,6 +27,7 @@ export type WorkspaceMembership = {
     id: string;
     tenant_id: string;
     tenant_name: string;
+    system_role: string;
 };
 
 export type WorkspaceOrganization = {

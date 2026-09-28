@@ -10,15 +10,13 @@ use App\Models\User;
 use App\Models\WorkingTimeTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 class WorkingTimeTemplateTest extends TestCase
 {
-    use GrantsCoreRoles;
     use RefreshDatabase;
 
-    private function createTenantUser(bool $owner = true): array
+    private function createTenantUser(string $role = 'admin'): array
     {
         $slug = 'tenant-'.strtolower(Str::random(6));
 
@@ -40,11 +38,9 @@ class WorkingTimeTemplateTest extends TestCase
         $membership = TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'system_role' => $role,
             'status' => 'active',
         ]);
-        if ($owner) {
-            $this->makeOwner($membership);
-        }
 
         $org = Organization::create([
             'tenant_id' => $tenant->id,
@@ -64,7 +60,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_working_time_template_page_can_be_rendered(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $response = $this
             ->actingAs($user)
@@ -75,7 +71,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_working_time_templates_empty_by_default(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $response = $this
             ->actingAs($user)
@@ -88,7 +84,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_unauthorized_user_cannot_manage_working_time_templates(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser(owner: false);
+        [$user, $tenant, $org] = $this->createTenantUser('member');
 
         $response = $this
             ->actingAs($user)
@@ -103,7 +99,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_user_can_create_new_template_with_empty_inputs(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $response = $this
             ->actingAs($user)
@@ -125,7 +121,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_user_can_update_day_lines_and_calculate_hours(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $template = WorkingTimeTemplate::create([
             'tenant_id' => $tenant->id,
@@ -167,7 +163,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_user_can_copy_template(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $source = WorkingTimeTemplate::create([
             'tenant_id' => $tenant->id,
@@ -210,7 +206,7 @@ class WorkingTimeTemplateTest extends TestCase
 
     public function test_user_can_delete_template(): void
     {
-        [$user, $tenant, $org] = $this->createTenantUser();
+        [$user, $tenant, $org] = $this->createTenantUser('admin');
 
         $template = WorkingTimeTemplate::create([
             'tenant_id' => $tenant->id,

@@ -9,9 +9,6 @@ use App\Models\OrganizationHierarchyVersion;
 use App\Models\Role;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Access\AccessGuards;
-use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Access\TenantProducts;
 use App\Support\DataPolicyAccessResolver;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +42,7 @@ class InvitationAccessTest extends TestCase
         $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
 
         $response = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'admin',
             'assignments' => [[
                 'role_id' => $role->id,
                 'policy_scopes' => [[
@@ -91,6 +89,7 @@ class InvitationAccessTest extends TestCase
         $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         foreach (['expired', 'revoked'] as $state) {
             $response = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+                'system_role' => 'user',
                 'assignments' => [[
                     'role_id' => $role->id,
                     'policy_scopes' => [[
@@ -143,6 +142,7 @@ class InvitationAccessTest extends TestCase
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish")->assertRedirect();
 
         $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
             'assignments' => [[
                 'role_id' => $role->id,
                 'policy_scopes' => [
@@ -175,14 +175,14 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [[
                 'policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null,
                 'hierarchy_id' => null, 'include_descendants' => false,
             ]]]],
         ])->assertOk();
 
-        // Penugasan manual tidak menyentuh role Owner yang diberikan saat bisnis didaftarkan.
-        $this->assertTrue(AccessGuards::holdsOwnerRole($membership->fresh()));
+        $this->assertDatabaseHas('tenant_memberships', ['id' => $membership->id, 'system_role' => 'owner']);
         $this->assertDatabaseHas('role_assignments', [
             'membership_id' => $membership->id,
             'role_id' => $role->id,
@@ -197,6 +197,7 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [
                 ['policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null, 'hierarchy_id' => null, 'include_descendants' => false],
                 ['policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null, 'hierarchy_id' => null, 'include_descendants' => false],
@@ -216,6 +217,7 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
             'assignments' => [[
                 'role_id' => $role->id,
                 'policy_scopes' => [[
@@ -243,6 +245,7 @@ class InvitationAccessTest extends TestCase
         ];
 
         $created = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
             'label' => 'Batch Agustus',
             'assignments' => [['role_id' => $first->id, 'policy_scopes' => [$scope]]],
         ])->assertCreated();
@@ -262,12 +265,14 @@ class InvitationAccessTest extends TestCase
         $this->assertSame([$first->id], $joined->roleAssignments()->pluck('role_id')->all());
 
         $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
             'label' => 'Batch Agustus (revisi)',
             'assignments' => [['role_id' => $second->id, 'policy_scopes' => [$scope]]],
         ])->assertOk();
 
         $invitation = InvitationCode::findOrFail($invitationId);
         $this->assertSame($code, $invitation->accessibleCode());
+        $this->assertSame('admin', $invitation->system_role);
         $this->assertSame([$second->id], $invitation->roles()->pluck('roles.id')->all());
         $this->assertSame(1, DB::table('invitation_data_policy_scopes')
             ->where('invitation_id', $invitationId)->where('role_id', $second->id)->count());
@@ -290,6 +295,7 @@ class InvitationAccessTest extends TestCase
         ])->assertCreated();
         $later = User::query()->where('email', 'later@metta.test')->firstOrFail()->activeMembership();
         $this->assertSame([$second->id], $later->roleAssignments()->pluck('role_id')->all());
+        $this->assertSame('admin', $later->system_role);
     }
 
     public function test_revoked_invitation_cannot_be_edited(): void
@@ -304,11 +310,13 @@ class InvitationAccessTest extends TestCase
             'include_descendants' => false,
         ];
         $invitationId = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertCreated()->json('data.id');
         InvitationCode::findOrFail($invitationId)->update(['revoked_at' => now()]);
 
         $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertUnprocessable();
     }
@@ -325,6 +333,7 @@ class InvitationAccessTest extends TestCase
             'include_descendants' => false,
         ];
         $invitationId = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertCreated()->json('data.id');
 
@@ -332,10 +341,12 @@ class InvitationAccessTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->owner->activeMembership()->tenant_id,
             'user_id' => $plain->id,
+            'system_role' => 'user',
             'status' => 'active',
         ]);
 
         $this->actingAs($plain)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertForbidden();
     }
@@ -358,10 +369,12 @@ class InvitationAccessTest extends TestCase
         ];
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertUnprocessable()->assertJsonValidationErrors('organization_id');
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [[...$scope, 'unrestricted' => true]]]],
         ])->assertOk();
 
@@ -382,114 +395,21 @@ class InvitationAccessTest extends TestCase
         );
     }
 
-    public function test_access_manager_without_the_owner_role_cannot_grant_or_revoke_it(): void
+    public function test_admin_cannot_change_the_owner_access(): void
     {
         $ownerMembership = $this->owner->activeMembership();
-        $ownerRole = $this->ownerRole();
-        [$manager] = $this->accessManager();
+        $admin = User::factory()->create();
+        TenantMembership::create([
+            'tenant_id' => $ownerMembership->tenant_id,
+            'user_id' => $admin->id,
+            'system_role' => 'admin',
+            'status' => 'active',
+        ]);
 
-        // Memberi dirinya sendiri role Owner.
-        $managerMembership = $manager->activeMembership();
-        $this->actingAs($manager)->patchJson("/api/v1/memberships/{$managerMembership->id}", [
-            'assignments' => [
-                ['role_id' => $managerMembership->roleAssignments()->value('role_id'), 'policy_scopes' => []],
-                ['role_id' => $ownerRole->id, 'policy_scopes' => []],
-            ],
-        ])->assertUnprocessable()->assertJsonValidationErrors('role_ids');
-
-        // Membuat undangan yang membawa role Owner.
-        $this->actingAs($manager)->postJson('/api/v1/invitation-codes', [
-            'assignments' => [['role_id' => $ownerRole->id, 'policy_scopes' => []]],
-        ])->assertUnprocessable()->assertJsonValidationErrors('role_ids');
-
-        // Owner boleh memberikannya; pemegang Kelola akses tetap tidak boleh mencabutnya.
-        $colleague = User::factory()->create();
-        $colleagueMembership = TenantMembership::create(['tenant_id' => $ownerMembership->tenant_id, 'user_id' => $colleague->id, 'status' => 'active']);
-        $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$colleagueMembership->id}", [
-            'assignments' => [['role_id' => $ownerRole->id, 'policy_scopes' => []]],
-        ])->assertOk();
-        $this->assertTrue(AccessGuards::holdsOwnerRole($colleagueMembership->fresh()));
-
-        $this->actingAs($manager)->patchJson("/api/v1/memberships/{$colleagueMembership->id}", [
+        $this->actingAs($admin)->patchJson("/api/v1/memberships/{$ownerMembership->id}", [
+            'system_role' => 'owner',
             'assignments' => [],
-        ])->assertUnprocessable()->assertJsonValidationErrors('role_ids');
-        $this->assertTrue(AccessGuards::holdsOwnerRole($colleagueMembership->fresh()));
-    }
-
-    public function test_access_manager_can_manage_members_without_touching_the_owner_role(): void
-    {
-        [$manager] = $this->accessManager();
-        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
-        $member = User::factory()->create();
-        $memberMembership = TenantMembership::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'user_id' => $member->id, 'status' => 'active']);
-
-        $this->actingAs($manager)->patchJson("/api/v1/memberships/{$memberMembership->id}", [
-            'assignments' => [['role_id' => $role->id, 'policy_scopes' => []]],
-        ])->assertOk();
-
-        $this->assertSame([$role->id], $memberMembership->roleAssignments()->pluck('role_id')->all());
-    }
-
-    public function test_a_change_that_leaves_nobody_able_to_manage_access_is_rejected(): void
-    {
-        [$manager, $managerRole] = $this->accessManager();
-        // Owner yang tersisa sudah tidak aktif, jadi pemegang Kelola akses ini satu-satunya.
-        $this->owner->activeMembership()->roleAssignments()->update(['status' => 'inactive']);
-        $membership = $manager->activeMembership();
-
-        $this->actingAs($manager)->patchJson("/api/v1/memberships/{$membership->id}", [
-            'assignments' => [],
-        ])->assertUnprocessable()->assertJsonValidationErrors('access');
-        $this->actingAs($manager)->deleteJson("/api/v1/roles/{$managerRole->id}")
-            ->assertUnprocessable()->assertJsonValidationErrors('access');
-
-        $this->assertSame([$managerRole->id], $membership->roleAssignments()->pluck('role_id')->all());
-        $this->assertDatabaseHas('roles', ['id' => $managerRole->id]);
-    }
-
-    public function test_the_owner_role_cannot_be_edited_deleted_or_nested(): void
-    {
-        $ownerRole = $this->ownerRole();
-
-        $this->actingAs($this->owner)->putJson("/api/v1/roles/{$ownerRole->id}", [
-            'name' => 'Owner',
-            'duty_codes' => ['app-uji.entitas.manage'],
-        ])->assertUnprocessable()->assertJsonValidationErrors('name');
-        $this->actingAs($this->owner)->deleteJson("/api/v1/roles/{$ownerRole->id}")
-            ->assertUnprocessable()->assertJsonValidationErrors('role');
-        $this->actingAs($this->owner)->postJson('/api/v1/roles', [
-            'name' => 'Super',
-            'duty_codes' => ['app-uji.entitas.manage'],
-            'child_role_ids' => [$ownerRole->id],
-        ])->assertUnprocessable()->assertJsonValidationErrors('child_role_ids');
-
-        $this->assertDatabaseHas('roles', ['id' => $ownerRole->id, 'is_owner' => true]);
-        $this->assertSame(
-            TenantProducts::duties($ownerRole->tenant_id)->count(),
-            DB::table('security_role_duties')->where('role_id', $ownerRole->id)->count(),
-        );
-    }
-
-    private function ownerRole(): Role
-    {
-        return Role::query()->where('tenant_id', $this->owner->activeMembership()->tenant_id)->where('is_owner', true)->sole();
-    }
-
-    /**
-     * Anggota yang memegang *Kelola akses* lewat role biasa, tanpa role Owner.
-     *
-     * @return array{0: User, 1: Role}
-     */
-    private function accessManager(): array
-    {
-        $role = $this->createRole('Pengelola akses', [CoreSecurityCatalog::ACCESS_MANAGE_DUTY]);
-        $user = User::factory()->create();
-        $membership = TenantMembership::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'user_id' => $user->id, 'status' => 'active']);
-        $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
-            'assignments' => [['role_id' => $role->id, 'policy_scopes' => []]],
-        ])->assertOk();
-
-        return [$user, $role];
+        ])->assertForbidden();
     }
 
     private function createRole(string $name, array $duties): Role

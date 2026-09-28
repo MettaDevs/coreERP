@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use App\Models\CoreApp;
 use App\Models\Environment;
 use App\Models\TenantMembership;
-use App\Support\Access\CorePermissions;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use App\Support\License\SiteLicense;
@@ -80,10 +79,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
                 'membership' => $membership ? [
                     'id' => $membership->id,
-                    // Permission layar Core anggota ini, untuk menyusun menu pengaturan. Hanya penyaring tampilan:
-                    // setiap rute dan aksi memeriksa permission-nya sendiri di server (SEC-22). Closure, supaya
-                    // permintaan yang bukan halaman Inertia — API module, misalnya — tidak ikut membayar query-nya.
-                    'permissions' => fn (): array => app(CorePermissions::class)->of($membership),
+                    'system_role' => $membership->system_role,
                     'tenant_id' => $membership->tenant_id,
                     'tenant_name' => $membership->tenant->name,
                 ] : null,
@@ -94,6 +90,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $item->id,
                     'tenant_id' => $item->tenant_id,
                     'tenant_name' => $item->tenant->name,
+                    'system_role' => $item->system_role,
                 ])->values(),
                 'active_legal_entity' => $legalEntity ? [
                     'id' => $legalEntity->id,

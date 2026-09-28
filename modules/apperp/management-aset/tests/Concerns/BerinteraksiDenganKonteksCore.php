@@ -578,6 +578,7 @@ trait BerinteraksiDenganKonteksCore
             $membership = TenantMembership::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $pengguna->id,
+                'system_role' => 'user',
                 'status' => 'active',
             ]);
 

@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Tests\Concerns\GrantsCoreRoles;
 
 /**
  * Panggung jurnal penerimaan aset (feed posting finance, area 9 dan 10): owner, entitas legal dengan
@@ -26,8 +25,6 @@ use Tests\Concerns\GrantsCoreRoles;
  */
 trait MenerbitkanJurnalPenerimaan
 {
-    use GrantsCoreRoles;
-
     private const API = '/api/modules/management-aset/v1/';
 
     private string $tenantId;
@@ -50,7 +47,7 @@ trait MenerbitkanJurnalPenerimaan
         Http::preventStrayRequests();
         $this->tenantId = $this->buatTenantUji();
         $this->owner = User::factory()->create();
-        $this->makeOwner(TenantMembership::create(['tenant_id' => $this->tenantId, 'user_id' => $this->owner->id, 'status' => 'active']));
+        TenantMembership::create(['tenant_id' => $this->tenantId, 'user_id' => $this->owner->id, 'system_role' => 'owner', 'status' => 'active']);
 
         $this->le = $this->organisasi(['classification' => 'legal_entity', 'name' => 'PT Metta Sehat', 'company_code' => 'META', 'country_code' => 'ID']);
         $this->klinik = $this->organisasi(['classification' => 'operating_unit', 'name' => 'Klinik A', 'operating_unit_type' => 'business_unit', 'operating_unit_number' => 'KLN-A']);

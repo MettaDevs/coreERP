@@ -9,11 +9,9 @@ use App\Models\Role;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Access\OwnerRoleDuties;
-use App\Support\Access\TenantProducts;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -25,7 +23,7 @@ class SecurityConfigurationController extends Controller
     public function index(Request $request): Response
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $appIds = $this->entitledAppIds($membership);
         $tenantId = $membership->tenant_id;
 
@@ -34,7 +32,7 @@ class SecurityConfigurationController extends Controller
         // yang sama, sehingga tidak ada query tambahan dan tidak ada state
         // seleksi yang disimpan di server.
         return Inertia::render('settings/security-configuration', [
-            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE),
+            'canManage' => $membership->canManageAccess(),
             'apps' => CoreApp::query()->whereIn('id', $appIds)
                 ->orderBy('name')->get(['id', 'name']),
             'roles' => Role::query()
@@ -45,7 +43,6 @@ class SecurityConfigurationController extends Controller
                 ->map(fn (Role $role) => [
                     'id' => $role->id,
                     'name' => $role->name,
-                    'is_owner' => $role->is_owner,
                     'duty_codes' => $role->duties->pluck('code')->values(),
                     'child_roles' => $role->children->map(fn (Role $child) => $child->only(['id', 'name']))->values(),
                     'parent_roles' => $role->parents->map(fn (Role $parent) => $parent->only(['id', 'name']))->values(),
@@ -192,8 +189,6 @@ class SecurityConfigurationController extends Controller
         $draftPrivilege = $item->privileges()->where('source', 'custom')->where('status', '!=', 'active')->exists();
         abort_if($draftPrivilege, 422, 'Terbitkan seluruh tugas akses di dalam tanggung jawab ini terlebih dahulu.');
         $item->update(['status' => 'active', 'published_at' => now()]);
-        // Owner memegang semua duty yang sah, termasuk duty buatan tenant yang baru terbit.
-        app(OwnerRoleDuties::class)->syncTenant($membership->tenant_id);
 
         return back()->with('status', 'Tanggung jawab diterbitkan dan siap dipakai pada role.');
     }
@@ -238,7 +233,7 @@ class SecurityConfigurationController extends Controller
     private function manager(Request $request): TenantMembership
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
 
         return $membership;
     }
@@ -281,14 +276,12 @@ class SecurityConfigurationController extends Controller
         return $codes;
     }
 
-    /**
-     * App yang katalognya boleh dilihat dan dipakai tenant ini, termasuk Core sendiri (`TenantProducts`).
-     *
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function entitledAppIds(TenantMembership $membership): array
     {
-        return TenantProducts::appIds($membership->tenant_id);
+        return DB::table('tenant_app_entitlements')->where('tenant_id', $membership->tenant_id)
+            ->where('status', 'active')->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->pluck('app_id')->all();
     }
 
     private function customPrivilege(string $code, TenantMembership $membership): SecurityPrivilege

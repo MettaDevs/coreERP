@@ -5,7 +5,6 @@ namespace App\Actions\Organization;
 use App\Models\OperatingUnit;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +21,7 @@ class UpdateOrganization
      */
     public function handle(TenantMembership $actor, Organization $organization, array $data): Organization
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $organization->tenant_id !== $actor->tenant_id) {
+        if (! $actor->canManageAccess() || $organization->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
         $gantiNomor = $organization->classification === 'operating_unit' && array_key_exists('operating_unit_number', $data);

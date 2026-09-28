@@ -13,7 +13,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
-use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -25,7 +24,6 @@ use Tests\TestCase;
  */
 class AccessPageMuatanTest extends TestCase
 {
-    use GrantsCoreRoles;
     use RefreshDatabase;
 
     /** @return array{0: User, 1: Tenant} */
@@ -48,11 +46,12 @@ class AccessPageMuatanTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->makeOwner(TenantMembership::create([
+        TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'system_role' => 'owner',
             'status' => 'active',
-        ]));
+        ]);
 
         Organization::create([
             'tenant_id' => $tenant->id,
@@ -184,12 +183,11 @@ class AccessPageMuatanTest extends TestCase
         /** @var array<int, array<string, mixed>> $apps */
         $apps = $respons->json('props.apps');
 
-        // Duty layar Core ikut ditawarkan, supaya role dapat disusun dari keduanya (SEC-22).
-        $this->assertSame(['app-uji', 'core'], collect($apps)->pluck('id')->sort()->values()->all());
-        $app = collect($apps)->firstWhere('id', 'app-uji');
-        $this->assertSame(['id', 'name', 'duties'], array_keys($app));
+        $this->assertCount(1, $apps);
+        $this->assertSame(['id', 'name', 'duties'], array_keys($apps[0]));
+        $this->assertSame('app-uji', $apps[0]['id']);
 
-        $duty = $app['duties'][0];
+        $duty = $apps[0]['duties'][0];
         $this->assertSame(['code', 'app_id', 'name', 'privileges'], array_keys($duty));
         $this->assertSame('app-uji.barang.manage', $duty['code']);
 

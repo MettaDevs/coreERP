@@ -248,6 +248,7 @@ class OrganizationHierarchyTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->owner->activeMembership()->tenant_id,
             'user_id' => $member->id,
+            'system_role' => 'user',
             'status' => 'active',
         ]);
 

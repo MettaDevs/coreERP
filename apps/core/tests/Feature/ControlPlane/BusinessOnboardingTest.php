@@ -5,9 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
 use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\EnvironmentAddress;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,7 +51,7 @@ class BusinessOnboardingTest extends TestCase
         $pcs = DB::table('units_of_measure')->where(['tenant_id' => $tenantId, 'code' => 'PCS'])->value('id');
         $this->assertDatabaseHas('uom_conversions', ['tenant_id' => $tenantId, 'from_unit_id' => $lusin, 'to_unit_id' => $pcs, 'factor' => 12]);
         $this->assertDatabaseCount('organizations', 0);
-        $this->assertTrue(TenantMembership::query()->where('status', 'active')->whereHas('roleAssignments.role', fn ($query) => $query->where('is_owner', true))->exists());
+        $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner', 'status' => 'active']);
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
         $this->assertDatabaseCount('environments', 1);
         $this->assertDatabaseHas('environments', [
@@ -71,8 +69,7 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseCount('role_assignments', 1);
         // Role owner menerima seluruh duty app yang menjadi haknya; fixture katalog
         // mendeklarasikan dua master, jadi dua duty.
-        // Owner memegang dua duty app yang dibeli ditambah semua duty layar Core.
-        $this->assertDatabaseCount('security_role_duties', 2 + DB::table('security_duties')->where('app_id', CoreSecurityCatalog::APP_ID)->count());
+        $this->assertDatabaseCount('security_role_duties', 2);
     }
 
     public function test_registration_includes_transitive_app_dependencies(): void

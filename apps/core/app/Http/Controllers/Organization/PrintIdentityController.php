@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Reporting\PrintIdentityStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,7 +95,7 @@ class PrintIdentityController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($organization->tenant_id === $membership->tenant_id, 404);
         if ($manage) {
-            abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE), 403);
+            abort_unless($membership->canManageAccess(), 403);
         }
     }
 }

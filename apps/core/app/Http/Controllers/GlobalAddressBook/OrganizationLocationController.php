@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\CountryRegion;
 use App\Models\Organization;
 use App\Models\PartyLocation;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\AddressBook\OrganizationAddressBook;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -83,7 +82,7 @@ class OrganizationLocationController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($organization->tenant_id === $membership->tenant_id, 404);
         if ($manage) {
-            abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE), 403);
+            abort_unless($membership->canManageAccess(), 403);
         }
     }
 }

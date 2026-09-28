@@ -58,6 +58,7 @@ class LayarManagementAsetTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->pemilik->activeMembership()->tenant_id,
             'user_id' => $this->tanpaIzin->id,
+            'system_role' => 'user',
             'status' => 'active',
         ]);
     }

@@ -91,7 +91,7 @@ class WorkspaceContextTest extends TestCase
     }
 
     /** @return array{TenantMembership, Organization, Organization} */
-    private function createWorkspace(User $user, string $slug, string $unitName): array
+    private function createWorkspace(User $user, string $slug, string $unitName, string $systemRole = 'owner'): array
     {
         $client = Client::create(['legal_name' => ucfirst($slug), 'slug' => $slug, 'status' => 'active']);
         $tenant = Tenant::create([
@@ -121,6 +121,7 @@ class WorkspaceContextTest extends TestCase
         $membership = TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'system_role' => $systemRole,
             'status' => 'active',
         ]);
 

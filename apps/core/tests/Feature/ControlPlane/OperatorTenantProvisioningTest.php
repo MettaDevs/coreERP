@@ -141,6 +141,7 @@ final class OperatorTenantProvisioningTest extends TestCase
         $this->assertDatabaseHas('tenant_memberships', [
             'tenant_id' => $tenantId,
             'user_id' => $owner->id,
+            'system_role' => 'owner',
             'status' => 'active',
         ]);
         $this->assertDatabaseHas('tenant_app_entitlements', [
@@ -148,7 +149,7 @@ final class OperatorTenantProvisioningTest extends TestCase
             'app_id' => 'app-uji',
             'status' => 'active',
         ]);
-        $this->assertDatabaseHas('roles', ['tenant_id' => $tenantId, 'name' => 'Owner', 'is_active' => true, 'is_owner' => true]);
+        $this->assertDatabaseHas('roles', ['tenant_id' => $tenantId, 'name' => 'Owner', 'is_active' => true]);
         $this->assertSame(1, DB::table('role_assignments')->count());
 
         $production = Environment::query()->where('tenant_id', $tenantId)->sole();

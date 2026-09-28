@@ -6,7 +6,6 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -15,7 +14,7 @@ class PlaceOrganizationInHierarchy
 {
     public function handle(TenantMembership $actor, OrganizationHierarchyVersion $version, string $organizationId, string $parentOrganizationId): void
     {
-        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $version->hierarchy->tenant_id !== $actor->tenant_id) {
+        if (! $actor->canManageAccess() || $version->hierarchy->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
         if ($version->status !== 'draft') {

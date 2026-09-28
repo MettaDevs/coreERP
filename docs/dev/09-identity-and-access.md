@@ -8,7 +8,7 @@ Model target mengikuti Microsoft Dynamics 365 untuk workforce dan role-based sec
 
 Dokumen ini panjang dan memuat empat jenis isi yang berbeda. Kalau kamu mencari sesuatu yang spesifik, masuk lewat sini:
 
-**Model keamanan** — [Role Owner](#role-owner-bukan-role-platform) · [Security mengikuti tanggung jawab bisnis](#security-mengikuti-tanggung-jawab-bisnis) · [Hierarchy security role](#hierarchy-security-role) · [Permission dan operasi sensitif](#permission-dan-operasi-sensitif) · [Granularitas permission dan duty](#granularitas-permission-dan-duty) · [Data-policy-scoped role assignment](#data-policy-scoped-role-assignment)
+**Model keamanan** — [Role platform](#role-platform) · [Security mengikuti tanggung jawab bisnis](#security-mengikuti-tanggung-jawab-bisnis) · [Hierarchy security role](#hierarchy-security-role) · [Permission dan operasi sensitif](#permission-dan-operasi-sensitif) · [Granularitas permission dan duty](#granularitas-permission-dan-duty) · [Data-policy-scoped role assignment](#data-policy-scoped-role-assignment)
 
 **Orang dan penugasan** — [Workforce dan rangkap position](#workforce-dan-rangkap-position) · [Temporary access dan segregation of duties](#temporary-access-dan-segregation-of-duties) · [Model data target](#model-data-target)
 
@@ -20,29 +20,17 @@ Dokumen ini panjang dan memuat empat jenis isi yang berbeda. Kalau kamu mencari 
 Mulai dari [Glosarium](../onboarding/glosarium.md) untuk istilah role, duty, privilege, dan permission, lalu [Alur end-to-end](../onboarding/alur-end-to-end.md) yang menunjukkan model ini bekerja pada satu kasus nyata.
 :::
 
-## Role Owner, bukan role platform
+## Role platform
 
-Keanggotaan tenant tidak membawa penanda owner, admin, atau user. Kolom `system_role` dibuang pada 25 September 2026
-(SEC-22, keputusan pemilik produk): semua hak di dalam tenant, termasuk hak mengelola tenant itu sendiri, datang
-dari rantai security role di bawah.
+Setiap membership tenant mempunyai satu role platform yang dilindungi:
 
-Setiap tenant punya satu **role Owner** (`roles.is_owner`, satu per tenant). Padanannya di Dynamics 365 adalah
-*System administrator*:
+| Role | Hak dasar | Batas |
+| --- | --- | --- |
+| `owner` | Kendali akhir tenant, admin, entitlement, dan delegasi akses. | Hanya owner dapat memindahkan ownership. |
+| `admin` | Mengelola anggota, security role, assignment, dan konfigurasi tenant. | Tidak dapat menghapus atau menurunkan owner. |
+| `user` | Anggota tenant. | Tidak memperoleh akses bisnis sampai menerima security role. |
 
-- **Memegang semua duty yang sah untuk tenant itu**: duty Core, duty setiap app yang dibeli, dan duty khusus tenant
-  yang sudah diterbitkan. `OwnerRoleDuties` menyamakannya setiap kali katalog berubah — saat manifest app
-  didaftarkan, saat katalog Core didaftarkan, dan saat duty khusus diterbitkan — jadi duty baru sampai ke Owner
-  tanpa disunting siapa pun.
-- **Tidak dapat diubah, diarsipkan, atau dijadikan turunan role lain.** Turunan diwarisi induknya; Owner sebagai
-  turunan membuat role mana pun setara Owner tanpa melewati penjaga berikutnya.
-- **Hanya pemegang Owner yang dapat memberikan atau mencabut role Owner**, lewat layar anggota maupun undangan.
-  Pemegang *Kelola akses* tanpa Owner dapat mengatur role lain, tetapi tidak role ini.
-- **Tenant tidak boleh terkunci.** Perubahan anggota atau role yang membuat tidak ada lagi anggota aktif pemegang
-  permission `core.access.update` ditolak (`AccessGuards`).
-
-Pendaftar tenant menerima role Owner saat tenant lahir. Saat kolomnya dibuang, setiap anggota aktif yang dulu
-`owner` atau `admin` dipindahkan menjadi pemegang role Owner beserta cakupan data semua kebijakan app yang dibeli,
-sehingga tidak ada yang kehilangan akses yang dulu dipegangnya.
+Role platform mengatur administrasi SaaS. Ia terpisah dari security role bisnis dan tidak dipakai sebagai template duty/permission.
 
 ## Security mengikuti tanggung jawab bisnis
 
@@ -67,35 +55,6 @@ User
 | Module entry point | Form, menu item, API/service, report, atau action yang dilindungi. |
 
 Role tidak mempunyai `module_id` dan tidak dimiliki department. App mendaftarkan entry point dan permission kanonik melalui contract/manifest. Administrator tenant menyusun role dari duty yang diperlukan, termasuk duty lintas app.
-
-### Katalog layar Core
-
-Layar setup Core ikut rantai yang sama sebagai app `core`. Katalognya ditulis migration, bukan manifest —
-migration Core juga dijalankan admin.erp tanpa kelas aplikasi, jadi isinya berdiri di migration itu sendiri, sedangkan
-kode permission yang dipakai kode aplikasi ada di `CoreSecurityCatalog`. Delapan kelompok layar punya satu entry point `form` dan dua duty,
-padanan duty *Inquire* dan *Maintain* di Dynamics 365:
-
-| Kelompok | Duty Lihat (`read`) | Duty Kelola (`read` + `update`) |
-| --- | --- | --- |
-| Akses dan keamanan | `core.access.inquire` | `core.access.manage` |
-| Organisasi dan buku alamat | `core.organization.inquire` | `core.organization.manage` |
-| Number sequence dan kalender fiskal | `core.number-sequence.inquire` | `core.number-sequence.manage` |
-| Data referensi | `core.reference-data.inquire` | `core.reference-data.manage` |
-| Tata letak laporan | `core.report-layout.inquire` | `core.report-layout.manage` |
-| Workflow | `core.workflow.inquire` | `core.workflow.manage` |
-| Setup finance | `core.finance-setup.inquire` | `core.finance-setup.manage` |
-| Vendor | `core.vendor.inquire` | `core.vendor.manage` |
-
-Pantau posting finance memisahkan tindak lanjutnya: `core.finance-posting.inquire` hanya melihat, sedangkan
-`core.finance-posting.follow-up` menambah Validasi ulang dan Tandai manual (permission `core.finance-posting.process`,
-tingkat `invoke`). Pada layar setup Core, tingkat `update` mencakup membuat dan mengarsipkan, karena belum ada
-layar yang perlu memberi "boleh membuat tetapi tidak boleh mengubah".
-
-Rute layar memakai `->middleware(CoreSecurityCatalog::gate(...))` untuk permission lihat, dan setiap aksi
-mengubah memeriksa permission ubahnya sendiri. Menu pengaturan di sidebar disaring dengan permission yang sama
-(`auth.membership.permissions`), tetapi penyaring itu hanya tampilan. Beberapa API baca yang dipakai pemilih di
-layar lain — daftar organisasi, satuan, kalender fiskal, tata letak laporan, dan pencarian alamat — sengaja tetap
-terbuka bagi semua anggota tenant.
 
 ## Security Configuration
 
@@ -262,7 +221,7 @@ HR menyediakan workforce dasar dan mengirim perubahan penugasan posisi ke Core. 
 identity user
   -> client
   -> tenant
-  -> membership pendaftar dengan role Owner
+  -> owner membership
   -> entitlement untuk produk yang dipilih
 ```
 
@@ -272,7 +231,7 @@ Pemilihan produk hanya menghasilkan entitlement. Artifact deployment diproses da
 
 ## Invitation dan role provisioning
 
-Pemegang *Kelola akses* membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar pemegang yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa security-role assignment serta grant data policy; undangan yang membawa role Owner hanya dapat dibuat atau diubah pemegang Owner. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
+Owner/Admin membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar admin yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa role platform selain `owner`, security-role assignment, serta grant data policy. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
 
 ### Kapan sebuah tenant memakai SSO
 
@@ -318,7 +277,7 @@ Penukarannya memakai upacara tiga kaki yang sama dengan masuk lewat SSO — `sso
 
 Emailnya dikirim penyedia, bukan Core: repo ini tidak punya jalur email sama sekali. Tautannya mendarat di `/undangan` pada **domain dasar** lalu dialihkan ke alamat tenant, karena penyedia menolak `accept_url` yang host-nya di luar alamat balik client — dan alamat balik itu satu per penempatan, di domain dasar.
 
-Yang perlu disadari: endpoint pencarian penyedia tidak mengenal scope, sehingga setiap pemegang *Kelola akses* (`core.access.update`) dapat memakainya untuk memeriksa apakah sebuah email terdaftar di direktori. Yang menahannya hanya throttle dan jejak audit `access.invitation.sso.ditolak`.
+Yang perlu disadari: endpoint pencarian penyedia tidak mengenal scope, sehingga setiap operator ber-`manage-access` dapat memakainya untuk memeriksa apakah sebuah email terdaftar di direktori. Yang menahannya hanya throttle dan jejak audit `access.invitation.sso.ditolak`.
 
 Role dapat diberikan melalui:
 
@@ -367,7 +326,7 @@ mengubah pasangan grant ini.
 
 ## Number sequence administration
 
-Pemegang duty *Kelola number sequence* (`core.number-sequence.manage`) dapat mengatur Number Sequence. Permission ini memberi akses ke konfigurasi nomor tenant aktif saja; ia tidak memberi provider admin akses ke nomor tenant dan tidak memberi app akses ke layar konfigurasi. App memakai credential service serta context tenant yang Core verifikasi terhadap entitlement dan installation readiness.
+Owner dan admin tenant dapat mengatur Number Sequence melalui permission platform `manage-number-sequences`. Permission ini memberi akses ke konfigurasi nomor tenant aktif saja; ia tidak memberi provider admin akses ke nomor tenant dan tidak memberi app akses ke layar konfigurasi. App memakai credential service serta context tenant yang Core verifikasi terhadap entitlement dan installation readiness.
 
 ## Product launcher
 

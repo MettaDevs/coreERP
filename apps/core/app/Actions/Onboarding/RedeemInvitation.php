@@ -157,11 +157,15 @@ class RedeemInvitation
             // Pernah menjadi anggota lalu dicabut. Menghidupkannya kembali persis yang dimaksud
             // orang yang mengundangnya lagi — dan barisnya tetap satu, seperti yang dituntut
             // kunci unik (tenant, user).
-            $membership->update(['status' => 'active']);
+            $membership->update([
+                'system_role' => $invitation->system_role,
+                'status' => 'active',
+            ]);
         } else {
             $membership = TenantMembership::create([
                 'tenant_id' => $invitation->tenant_id,
                 'user_id' => $user->id,
+                'system_role' => $invitation->system_role,
                 'status' => 'active',
             ]);
         }

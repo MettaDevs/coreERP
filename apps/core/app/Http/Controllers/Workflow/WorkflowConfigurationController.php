@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Workflow;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DefinisiParameterWorkflow;
 use App\Support\ParameterWorkflow;
 use App\Support\WorkflowGraph;
@@ -24,7 +23,7 @@ class WorkflowConfigurationController extends Controller
     public function index(Request $request, ParameterWorkflow $parameter): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_READ), 403);
+        abort_unless($membership->canManageAccess(), 403);
 
         $types = DB::table('workflow_types as types')
             ->join('apps', 'apps.id', '=', 'types.app_id')
@@ -79,7 +78,7 @@ class WorkflowConfigurationController extends Controller
     public function updateParameters(Request $request, ParameterWorkflow $parameter): RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
 
         // Kodenya divalidasi terhadap registry, bukan terhadap daftar yang ditulis ulang di
         // sini. Daftar kedua akan menyimpang pada hari seseorang menambah parameter, dan yang
@@ -120,7 +119,7 @@ class WorkflowConfigurationController extends Controller
     public function edit(Request $request, string $workflow): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_READ), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         $type = DB::table('workflow_types as types')->join('apps', 'apps.id', '=', 'types.app_id')->where('types.id', $configuration->workflow_type_id)->first(['types.id', 'types.name', 'types.code', 'types.scope', 'types.decision_context_schema', 'apps.name as app_name']);
         $version = $this->latestVersion($configuration->id);
@@ -140,7 +139,7 @@ class WorkflowConfigurationController extends Controller
     public function graph(Request $request, string $workflow): JsonResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_READ), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         $version = $this->latestVersion($configuration->id);
 
@@ -155,7 +154,7 @@ class WorkflowConfigurationController extends Controller
     public function store(Request $request): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $data = $request->validate([
             'workflow_type_id' => ['required', 'ulid'],
             'name' => ['required', 'string', 'max:160'],
@@ -207,7 +206,7 @@ class WorkflowConfigurationController extends Controller
     public function createDraft(Request $request, string $workflow): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         $draft = DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'draft')->first();
         if (! $draft) {
@@ -226,7 +225,7 @@ class WorkflowConfigurationController extends Controller
     public function updateGraph(Request $request, string $workflow): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'draft')->orderByDesc('version')->first();
         abort_unless($version, 409, 'Versi aktif tidak dapat diubah. Buat draf baru terlebih dahulu.');
@@ -254,7 +253,7 @@ class WorkflowConfigurationController extends Controller
     public function publish(Request $request, string $workflow): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         DB::transaction(function () use ($configuration, $membership): void {
             $version = DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'draft')->orderByDesc('version')->lockForUpdate()->first();
@@ -314,7 +313,7 @@ class WorkflowConfigurationController extends Controller
     public function activate(Request $request, string $workflow): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         DB::transaction(function () use ($configuration, $membership): void {
             DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'published')->exists() || abort(422, 'Workflow belum memiliki versi aktif.');
@@ -328,7 +327,7 @@ class WorkflowConfigurationController extends Controller
     public function deactivate(Request $request, string $workflow): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
+        abort_unless($membership->canManageAccess(), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
         DB::table('workflow_configurations')->where('id', $configuration->id)->update(['enabled' => false, 'updated_at' => now()]);
 

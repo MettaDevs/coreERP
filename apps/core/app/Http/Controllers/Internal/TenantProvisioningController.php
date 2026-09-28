@@ -45,7 +45,7 @@ final class TenantProvisioningController extends Controller
 
         $membership = TenantMembership::query()
             ->where('user_id', $owner->id)
-            ->whereHas('roleAssignments.role', fn ($query) => $query->where('is_owner', true))
+            ->where('system_role', 'owner')
             ->latest('created_at')
             ->firstOrFail();
 

@@ -124,7 +124,7 @@ sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan dibaca pem
 - [x] 2.4 Layar Core (Buku alamat › Vendor).
   - [x] 2.4.1 Daftar vendor dengan filter entitas legal dan status.
   - [x] 2.4.2 Form buat/ubah. Party bisa dipilih dari yang ada atau dibuat baru.
-  - [x] 2.4.3 Akses: semua anggota melihat, owner/admin membuat dan mengubah (keputusan pemilik produk, 22 September 2026). Sejak 25 September 2026 (7.4) melihat butuh duty *Lihat vendor* (`core.vendor.inquire`) dan mengubah butuh *Kelola vendor* (`core.vendor.manage`).
+  - [x] 2.4.3 Akses: semua anggota melihat, owner/admin membuat dan mengubah (keputusan pemilik produk, 22 September 2026). Permission, privilege, dan duty tersendiri menyusul bila layar ini perlu dibuka untuk peran lain.
   - [x] 2.4.4 Verifikasi di browser: buat vendor baru, pilih party yang sudah ada, nomor manual, ubah nama, nonaktifkan.
     Diverifikasi 23 September 2026. Mengganti nama mengganti nama party, jadi vendor lain yang memakai party yang sama
     ikut berganti nama. Itu memang bentuk buku alamat, bukan cacat.
@@ -325,10 +325,7 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
   - [ ] 7.3.4 Kirim ulang kiriman push yang `failed`. Hari ini posting itu tetap `pending` tetapi tidak dikirim lagi ke
     klien tersebut. Jalan keluar yang ada hanya Tandai manual, atau pembaca melakukan pull lewat API.
   - [x] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
-- [x] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut. Selesai 25 September 2026 bersama katalog izin
-  Core (SEC-22): duty `core.finance-posting.inquire` (Pantau posting, lihat) dan `core.finance-posting.follow-up`
-  (Pantau posting, tindak lanjut: Validasi ulang dan Tandai manual). Owner dan admin dihapus; role Owner bawaan
-  memegang semua duty. Rinciannya di `docs/dev/09-identity-and-access.md`.
+- [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut. **Menunggu katalog izin Core.** Sampai katalog itu ada, layar dan aksinya dijaga `canManageAccess()` = owner/admin, termasuk untuk melihat (keputusan pemilik produk, 23 September 2026).
 - [x] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
 - [~] 7.6 Komponen "pemeriksaan posting" bersama, gaya *Journal Check* BC (K-22). Dipakai di layar pantau, pratinjau penerimaan (9.3), dan pratinjau "Post penyusutan" (11.2.7).
   - Letaknya `apps/core/resources/js/components/finance/posting-check.tsx`, bukan paket `@apperp/ui`: UI module ikut dikompilasi dan dicek tipe oleh Core dengan alias `@/`, sedangkan mengubah SDK menuntut alur vendoring tarball. Layar module memakainya lewat `import { PostingCheck } from '@/components/finance/posting-check'`.

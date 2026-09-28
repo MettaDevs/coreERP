@@ -11,7 +11,6 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -35,7 +34,6 @@ use Tests\TestCase;
  */
 class TenantAddressMembershipTest extends TestCase
 {
-    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private Tenant $tenantA;
@@ -79,6 +77,7 @@ class TenantAddressMembershipTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->tenantA->id,
             'user_id' => $user->id,
+            'system_role' => 'member',
             'status' => 'revoked',
         ]);
 
@@ -111,6 +110,7 @@ class TenantAddressMembershipTest extends TestCase
         $membershipB = TenantMembership::create([
             'tenant_id' => $this->tenantB->id,
             'user_id' => $user->id,
+            'system_role' => 'member',
             'status' => 'active',
         ]);
 
@@ -187,11 +187,12 @@ class TenantAddressMembershipTest extends TestCase
     private function memberOf(Tenant $tenant): User
     {
         $user = User::factory()->create();
-        $this->makeOwner(TenantMembership::create([
+        TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
+            'system_role' => 'owner',
             'status' => 'active',
-        ]));
+        ]);
 
         return $user;
     }
