@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
+use LogicException;
+use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
+use Modules\Apperp\ManagementAset\Reporting\ReportContext;
+use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
+use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Tests\TestCase;
 
 /**
@@ -49,7 +55,7 @@ class PerkakasModuleTest extends TestCase
     {
         $terdaftar = array_keys(Artisan::all());
 
-        foreach (['laporan:bangun-layout-bawaan', 'management-aset:seed-maintenance'] as $perintah) {
+        foreach (['management-aset:build-builtin-layouts', 'management-aset:seed-maintenance'] as $perintah) {
             $this->assertContains($perintah, $terdaftar, sprintf(
                 'Perintah `%s` tidak terdaftar. Perintah yang tidak terdaftar tidak ada bedanya '.
                 'dengan perintah yang tidak ada: ia tidak melempar apa pun, ia cuma tidak muncul.',
@@ -60,22 +66,21 @@ class PerkakasModuleTest extends TestCase
 
     public function test_perintah_layout_menulis_ke_folder_module_bukan_folder_core(): void
     {
-        $akarModule = dirname(__DIR__, 2);
-        $berkas = [
-            $akarModule.'/resources/laporan/work-order/standar.docx',
-            $akarModule.'/resources/laporan/daftar-work-order/standar.xlsx',
-        ];
-
         // Layout bawaan ikut di-commit, jadi isinya dikembalikan apa adanya setelah perintah
         // menimpanya. Yang diuji adalah ke mana ia menulis, bukan apa yang ditulisnya.
+        //
+        // Yang dicadangkan seluruh layout bawaan, bukan hanya dua yang diperiksa: perintah
+        // menimpa semuanya, dan yang tidak dikembalikan tertinggal sebagai berkas berubah di
+        // working tree setiap kali suite ini berjalan.
+        $berkas = glob(dirname(__DIR__, 2).'/resources/laporan/*/*.*') ?: [];
+        $this->assertNotSame([], $berkas);
         $cadangan = [];
         foreach ($berkas as $jalur) {
-            $this->assertFileExists($jalur);
             $cadangan[$jalur] = (string) file_get_contents($jalur);
         }
 
         try {
-            $this->assertSame(0, Artisan::call('laporan:bangun-layout-bawaan'));
+            $this->assertSame(0, Artisan::call('management-aset:build-builtin-layouts'), Artisan::output());
 
             foreach ($berkas as $jalur) {
                 $this->assertNotSame('', (string) file_get_contents($jalur));
@@ -97,6 +102,59 @@ class PerkakasModuleTest extends TestCase
             // bukan berubah menjadi berkas tak bertuan yang ikut ter-commit.
             $this->hapusFolder(resource_path('laporan'));
         }
+    }
+
+    public function test_layout_command_rejects_report_without_layout_builder(): void
+    {
+        // Menambah laporan tidak lagi berarti menyunting perintah pembangunnya; pembangunnya
+        // ditemukan dari folder. Yang menggantikan langkah itu adalah penolakan ini: laporan
+        // yang menyatakan layout bawaan tanpa pembangun tidak boleh lolos diam-diam, karena
+        // berkasnya tidak akan pernah dibangun dan tombol Cetak-nya gagal di tangan pengguna.
+        app(ReportRegistry::class)->register(new class implements ReportDefinition
+        {
+            public function code(): string
+            {
+                return 'laporan-tanpa-pembangun';
+            }
+
+            public function name(): string
+            {
+                return 'Laporan tanpa pembangun';
+            }
+
+            public function description(): string
+            {
+                return '';
+            }
+
+            public function permission(): string
+            {
+                return 'management-aset.aset.read';
+            }
+
+            public function builtinLayouts(): array
+            {
+                return [new BuiltinLayout('standar', 'Standar', '', 'xlsx')];
+            }
+
+            public function parameterRules(): array
+            {
+                return [];
+            }
+
+            public function fields(): array
+            {
+                return [];
+            }
+
+            public function data(ReportContext $context, array $parameters): ReportData
+            {
+                throw new LogicException('Tidak dipanggil oleh perintah pembangun layout.');
+            }
+        });
+
+        $this->assertSame(1, Artisan::call('management-aset:build-builtin-layouts'));
+        $this->assertStringContainsString('laporan-tanpa-pembangun', Artisan::output());
     }
 
     private function hapusFolder(string $folder): void
