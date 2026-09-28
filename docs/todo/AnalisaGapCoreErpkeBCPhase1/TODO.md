@@ -54,18 +54,18 @@ Semua keputusan diambil pemilik pada 28 September 2026; isinya di tabel Keputusa
 - [x] 0.10 K-10 nilai bawaan zona waktu pengguna: setelan zona waktu entitas legal.
       [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
 
-### 1. [ ] Kolom jejak pembuat dan pengubah (gap 1)
+### 1. [x] Kolom jejak pembuat dan pengubah (gap 1)
 
 **Tempat:** Core, lalu setiap module · **Setelah:** 0.1 · **Selesai bila:** setiap tabel tenant punya
 kolom pelaku buat dan ubah yang terisi otomatis, dan test B-1 lulus.
 
 Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 
-- [ ] 1.1 Helper migration untuk kolom jejak, dipakai tabel baru.
-- [ ] 1.2 Pengisian otomatis dari pengguna yang sedang login, dan dari pengguna pemicu untuk job latar.
-- [ ] 1.3 Migration yang menambahkan kolom jejak ke tabel tenant Core yang sudah ada.
-- [ ] 1.4 Migration yang sama untuk tabel module (`management-aset`, `human-resources`).
-- [ ] 1.5 Test boundary yang menolak tabel tenant baru tanpa kolom jejak.
+- [x] 1.1 Helper migration untuk kolom jejak, dipakai tabel baru. `AuditColumns` di `App\Support\Modules\Contracts`.
+- [x] 1.2 Pengisian otomatis dari pengguna yang sedang login, dan dari pengguna pemicu untuk job latar.
+- [x] 1.3 Migration yang menambahkan kolom jejak ke tabel tenant Core yang sudah ada.
+- [x] 1.4 Migration yang sama untuk tabel module (`management-aset`, `human-resources`).
+- [x] 1.5 Test boundary yang menolak tabel tenant baru tanpa kolom jejak.
 
 ### 2. [ ] Log perubahan dan riwayat per record (gap 6)
 
@@ -201,7 +201,7 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
 ## Bagian B: test
 
-- [ ] **B-1** (area 1) Tabel tenant tanpa kolom jejak ditolak test boundary. Membuat dan mengubah
+- [x] **B-1** (area 1) Tabel tenant tanpa kolom jejak ditolak test boundary. Membuat dan mengubah
       record lewat request mengisi pelaku yang benar; job latar mengisi pengguna pemicunya.
 - [ ] **B-2** (area 2) Update lewat query builder tercatat. Field di luar setup tidak tercatat. Entri
       tidak bisa diubah. Riwayat per record urut waktu dan tidak bocor antar tenant.
