@@ -15,7 +15,7 @@ modules/
 └─ apperp/                        # publisher
    └─ management-aset/            # module
       ├─ app.yaml                 # manifest: identitas dan menu module
-      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow, laporan
+      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow
       ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
       ├─ src/                     # PHP: Http/, Models/, Services/, Actions/, Providers/
       ├─ database/migrations/     # migration module saja

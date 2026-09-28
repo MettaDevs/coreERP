@@ -47,6 +47,23 @@ interface PenyediaLaporanModul
     public function punya(string $kodeLaporan): bool;
 
     /**
+     * Katalog laporan module, dibaca `app:register-manifest`: kode lengkap berawalan id module,
+     * nama, keterangan, permission data, nama parameter, dan layout bawaannya.
+     *
+     * Ini satu-satunya sumber katalog laporan module. Sampai 28 September 2026 isi yang sama
+     * juga ditulis di blok `reports` manifest, dan keduanya menyimpang: laporan yang terlewat
+     * di manifest tampil di pratinjau, lalu tombol Cetak-nya menjawab 404. Di Business Central
+     * objek report adalah satu-satunya sumbernya, dan di sini definisi laporan module yang
+     * mengambil peran itu.
+     *
+     * Tanpa konteks pengguna: katalog berlaku untuk semua tenant, dan izin ditegakkan saat
+     * laporan dijalankan, bukan saat didaftarkan.
+     *
+     * @return list<array{code: string, name: string, description: ?string, permission: string, parameters: list<string>, builtin_layouts: list<array{key: string, name: string, description: ?string, format: string}>}>
+     */
+    public function catalog(): array;
+
+    /**
      * Placeholder dan nama parameter satu laporan.
      *
      * Placeholder boleh menyatakan `type` — `money`, `number`, `percent`, `date`, atau

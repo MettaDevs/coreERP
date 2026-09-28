@@ -5,7 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Modules\ModuleManifestFiles;
+use App\Support\Reporting\DaftarLaporanModul;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -108,34 +108,34 @@ class ReportingTest extends TestCase
 
     public function test_katalog_menyebut_laporan_manifest_beserta_hak_menjalankannya(): void
     {
-        $manifest = $this->laporanDiManifest();
+        $definisi = $this->reportFromModuleCatalog();
 
         $data = $this->actingAs($this->owner)->getJson('/api/v1/reports')->assertOk()->json('data');
         $laporan = collect($data)->firstWhere('code', self::KODE_LAPORAN);
 
         $this->assertNotNull($laporan, sprintf(
-            'Katalog laporan tidak memuat `%s`. Barisnya berasal dari blok `reports` manifest module; '
+            'Katalog laporan tidak memuat `%s`. Barisnya berasal dari definisi laporan module; '
             .'kalau ia hilang, yang hilang bukan sekadar satu entri daftar melainkan tombol Cetak pada '
             .'layar work order, dan tidak ada pesan kesalahan di mana pun yang menyebutkannya.',
             self::KODE_LAPORAN,
         ));
         $this->assertSame('Management Aset', $laporan['app_name']);
-        $this->assertSame($manifest['permission'], $laporan['permission'], sprintf(
-            'Permission laporan di katalog (%s) berbeda dari yang dideklarasikan manifest (%s). Katalog '
+        $this->assertSame($definisi['permission'], $laporan['permission'], sprintf(
+            'Permission laporan di katalog (%s) berbeda dari yang dinyatakan definisi laporan module (%s). Katalog '
             .'menentukan siapa yang melihat tombol Cetak, sedangkan module menegakkan permission-nya '
             .'sendiri saat dataset dibaca; ketika keduanya berbeda, penggunanya melihat tombol yang '
             .'selalu berujung ekspor gagal.',
             $laporan['permission'],
-            $manifest['permission'],
+            $definisi['permission'],
         ));
-        $this->assertSame($manifest['parameters'], $laporan['parameters']);
-        $this->assertSame('bawaan:'.$manifest['builtin_layouts'][0]['key'], $laporan['builtin_layouts'][0]['ref']);
+        $this->assertSame($definisi['parameters'], $laporan['parameters']);
+        $this->assertSame('bawaan:'.$definisi['builtin_layouts'][0]['key'], $laporan['builtin_layouts'][0]['ref']);
         $this->assertTrue($laporan['can_run'], sprintf(
             'Pemilik bisnis tidak dianggap berhak menjalankan laporannya sendiri. Ia menerima seluruh '
             .'duty app yang di-entitle, jadi `%s` mestinya sampai kepadanya lewat rantai '
             .'role -> duty -> privilege -> permission; kalau tidak, rantai itu putus di suatu tempat dan '
             .'seluruh module ikut tertutup untuknya, bukan hanya laporan ini.',
-            $manifest['permission'],
+            $definisi['permission'],
         ));
 
         // Anggota tanpa role tidak dapat membuka app-nya sama sekali, jadi laporannya pun
@@ -442,24 +442,23 @@ class ReportingTest extends TestCase
     }
 
     /**
-     * Blok `reports` manifest untuk laporan yang diuji.
+     * Laporan yang diuji, dari katalog definisi laporan module aset.
      *
-     * Dibaca dari berkas, bukan disalin ke dalam test, supaya assertion tentang katalog
-     * membuktikan katalog sama dengan manifest — bukan sama dengan angan-angan test ini.
+     * Dibaca dari definisinya, bukan disalin ke dalam test, supaya assertion tentang katalog
+     * membuktikan katalog sama dengan definisi module — satu-satunya sumbernya sejak blok
+     * `reports` manifest dibuang — bukan sama dengan angan-angan test ini.
      *
      * @return array<string, mixed>
      */
-    private function laporanDiManifest(): array
+    private function reportFromModuleCatalog(): array
     {
-        $manifest = ModuleManifestFiles::read(dirname(base_path(), 2).'/modules/apperp/management-aset');
-
-        foreach ($manifest['reports'] ?? [] as $laporan) {
-            if (($laporan['code'] ?? null) === self::KODE_LAPORAN) {
+        foreach (app(DaftarLaporanModul::class)->untuk('management-aset')?->catalog() ?? [] as $laporan) {
+            if ($laporan['code'] === self::KODE_LAPORAN) {
                 return $laporan;
             }
         }
 
-        $this->fail(sprintf('Manifest module aset tidak lagi mendeklarasikan laporan `%s`.', self::KODE_LAPORAN));
+        $this->fail(sprintf('Module aset tidak lagi mendefinisikan laporan `%s`.', self::KODE_LAPORAN));
     }
 
     private function memberWithoutRoles(): User

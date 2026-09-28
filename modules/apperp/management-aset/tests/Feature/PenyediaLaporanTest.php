@@ -3,8 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
-use App\Support\Modules\ModuleManifestFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
@@ -500,22 +500,31 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('12000000.00', $laporan['fields']['total_nilai_penjualan']);
     }
 
-    public function test_every_registered_report_is_declared_for_printing(): void
+    public function test_every_registered_report_reaches_the_print_catalog(): void
     {
-        // Dialog cetak mencari laporan di katalog Core, yang dibaca dari berkas laporan di
-        // `manifest/reports/`. Laporan yang terdaftar di module tetapi terlewat di manifest tampil
-        // di pratinjau, lalu tombol Cetak-nya menjawab 404.
-        $manifest = ModuleManifestFiles::read(dirname(__DIR__, 2));
-        $this->assertIsArray($manifest['reports']);
-        $declared = array_column($manifest['reports'], null, 'code');
+        // Dialog cetak mencari laporan di katalog Core. Katalog itu diisi `app:register-manifest`
+        // dari definisi laporan module lewat `catalog()`, bukan dari manifest, jadi laporan yang
+        // terdaftar di `ReportRegistry` tidak bisa lagi terlewat seperti saat blok `reports` masih
+        // ditulis tangan dan tombol Cetak-nya menjawab 404. Yang dijaga di sini jalurnya sampai ke
+        // tabel katalog.
+        $this->assertSame(0, Artisan::call('app:register-manifest', ['module' => 'management-aset']), Artisan::output());
 
-        foreach (app(ReportRegistry::class)->all() as $definition) {
+        $catalog = DB::table('app_reports')->where('app_id', 'management-aset')->get()->keyBy('code');
+        $definitions = app(ReportRegistry::class)->all();
+        $this->assertCount(count($definitions), $catalog);
+
+        foreach ($definitions as $definition) {
             $code = 'management-aset.'.$definition->code();
-            $this->assertArrayHasKey($code, $declared, "Laporan `{$code}` belum didaftarkan di `manifest/reports/`.");
-            $this->assertSame($definition->permission(), $declared[$code]['permission'], $code);
+            /** @var object{permission: string, parameters: string, builtin_layouts: string}|null $row */
+            $row = $catalog->get($code);
+            $this->assertNotNull($row, "Laporan `{$code}` tidak sampai ke katalog Core.");
+            $this->assertSame($definition->permission(), $row->permission, $code);
+            $this->assertSame(array_keys($definition->parameterRules()), json_decode($row->parameters, true), $code);
+            $layouts = json_decode($row->builtin_layouts, true);
+            $this->assertIsArray($layouts);
             $this->assertSame(
                 array_map(static fn ($layout): array => [$layout->key, $layout->format], $definition->builtinLayouts()),
-                array_map(static fn (array $layout): array => [$layout['key'], $layout['format']], $declared[$code]['builtin_layouts']),
+                array_map(static fn (array $layout): array => [$layout['key'], $layout['format']], $layouts),
                 $code,
             );
         }

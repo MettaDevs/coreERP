@@ -93,10 +93,10 @@ class ModuleManifestFilesTest extends TestCase
             '      entry_point: modul-uji.barang.form',
             '      access: read',
         ]);
-        $this->write('manifest/reports/daftar-barang.yaml', [
-            'reports:',
-            '  - code: modul-uji.daftar-barang',
-            '    name: Daftar barang',
+        $this->write('manifest/workflows/barang.yaml', [
+            'workflow_types:',
+            '  - code: modul-uji.barang-verification',
+            '    name: Verifikasi barang',
         ]);
 
         $manifest = ModuleManifestFiles::read($this->folder);
@@ -106,9 +106,9 @@ class ModuleManifestFilesTest extends TestCase
         $this->assertSame(['modul-uji.barang.form', 'modul-uji.barang.api'], array_column($manifest['security']['entry_points'], 'code'));
         $this->assertSame(['modul-uji.gudang.read', 'modul-uji.barang.read'], array_column($manifest['security']['permissions'], 'code'));
         $this->assertSame(['modul-uji.barang'], array_column($manifest['number_sequences']['references'], 'code'));
-        $this->assertSame(['modul-uji.daftar-barang'], array_column($manifest['reports'], 'code'));
+        $this->assertSame(['modul-uji.barang-verification'], array_column($manifest['workflow_types'], 'code'));
         // Selain daftar berkode, isinya tetap milik `app.yaml`.
-        $this->assertSame(['id', 'name', 'ui', 'security', 'number_sequences', 'reports'], array_keys($manifest));
+        $this->assertSame(['id', 'name', 'ui', 'security', 'number_sequences', 'workflow_types'], array_keys($manifest));
         $this->assertSame('Master data', $manifest['ui']['navigation']['rail'][0]['label']);
     }
 
@@ -145,23 +145,37 @@ class ModuleManifestFilesTest extends TestCase
         ModuleManifestFiles::read($this->folder);
     }
 
-    public function test_list_written_as_a_map_is_rejected(): void
+    public function test_reports_are_rejected_because_they_come_from_report_definitions(): void
     {
-        $this->write('manifest/barang.yaml', [
+        $this->write('manifest/reports/daftar-barang.yaml', [
             'reports:',
-            '  code: modul-uji.daftar-barang',
-            '  name: Daftar barang',
+            '  - code: modul-uji.daftar-barang',
+            '    name: Daftar barang',
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('`manifest/barang.yaml`: `reports` harus berupa daftar.');
+        $this->expectExceptionMessage('`manifest/reports/daftar-barang.yaml` memuat `reports`, yang tidak dibaca dari berkas di `manifest/`.');
+
+        ModuleManifestFiles::read($this->folder);
+    }
+
+    public function test_list_written_as_a_map_is_rejected(): void
+    {
+        $this->write('manifest/barang.yaml', [
+            'workflow_types:',
+            '  code: modul-uji.barang-verification',
+            '  name: Verifikasi barang',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('`manifest/barang.yaml`: `workflow_types` harus berupa daftar.');
 
         ModuleManifestFiles::read($this->folder);
     }
 
     public function test_yml_file_is_rejected_instead_of_skipped(): void
     {
-        $this->write('manifest/barang.yml', ['reports: []']);
+        $this->write('manifest/barang.yml', ['workflow_types: []']);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('`manifest/barang.yml` tidak dibaca; berkas manifest memakai akhiran `.yaml`.');

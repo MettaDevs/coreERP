@@ -166,10 +166,10 @@ database:
 events:
   asyncapi: contracts/asyncapi.yaml
 
-# Entry point, permission, privilege, duty, kebijakan data, referensi nomor, jenis workflow, dan
-# laporan module ini tidak ditulis di sini, melainkan di `manifest/`: satu berkas per fitur,
+# Entry point, permission, privilege, duty, kebijakan data, referensi nomor, dan jenis workflow
+# module ini tidak ditulis di sini, melainkan di `manifest/`: satu berkas per fitur,
 # dikelompokkan per area seperti folder Fixed Assets di Business Central (`setup`, `fixed-asset`,
-# `depreciation`, `maintenance`, `reports`). Core menggabungkannya dengan berkas ini saat
+# `depreciation`, `maintenance`). Core menggabungkannya dengan berkas ini saat
 # `app:register-manifest`, dan kode yang dinyatakan dua kali ditolak. Tujuannya sama dengan
 # `routes/api/<fitur>.php`: orang yang mengerjakan fitur berbeda tidak menyunting berkas yang sama.
 #
@@ -177,7 +177,7 @@ events:
 # memasangkan entry point dengan access level, privilege adalah satu tugas, dan duty adalah bagian
 # proses bisnis yang disusun tenant menjadi security role.
 #
-# Laporan cetak/ekspor gaya Business Central: dataset tetap milik module ini (kelas di
-# `src/Reporting/Definitions`); layout unggahan tenant, antrean ekspor, render, dan halamannya
-# milik Core. Kode diawali ID module; `permission` adalah hak membaca datanya. Lihat
-# docs/dev/23-document-rendering.md.
+# Laporan cetak/ekspor gaya Business Central tidak ditulis di manifest sama sekali. Katalognya
+# dibaca dari kelas di `src/Reporting/Definitions` lewat `PenyediaLaporan::catalog()`, seperti
+# objek report BC yang menjadi satu-satunya sumber; layout unggahan tenant, antrean ekspor, render,
+# dan halamannya milik Core. Lihat docs/dev/23-document-rendering.md.

@@ -21,7 +21,7 @@ Karena itu mesinnya milik Core, seperti Number Sequence, Workflow, dan Fiscal Ca
 | Lapis | Padanan BC | Pemilik | Di mana |
 | --- | --- | --- | --- |
 | Dataset | Report dataset | Developer module | Kelas definisi laporan di module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses |
-| Katalog laporan | Report object | Manifest app | Blok `reports` di manifest module (`app.yaml` atau satu berkas per laporan di `manifest/`), disalin ke tabel `app_reports` Core saat registrasi |
+| Katalog laporan | Report object | Developer module | Dibaca dari kelas dataset lewat `PenyediaLaporanModul::catalog()` saat `app:register-manifest`, disalin ke tabel `app_reports` Core |
 | Layout bawaan | Extension layout | Release app | Berkas `.docx`/`.xlsx` di app, dibaca Core lewat kontrak yang sama dan disimpan per versi release |
 | Layout unggahan | User-defined layout | Tenant | Tabel `report_layouts` Core, ber-`tenant_id`, opsional `legal_entity_id` |
 | Layout default | Report Selections + Document Layouts | Tenant per legal entity | Tabel `report_layout_defaults` Core; legal entity mengalahkan tenant |
@@ -46,36 +46,29 @@ Pemeriksaan izin tetap terjadi dua kali pada kedua bentuk, dan itu bukan pemerik
 
 Tidak ada framework yang dibangun ulang. Untuk satu laporan:
 
-1. Satu kelas dataset: kode, nama, permission datanya, aturan parameter, daftar placeholder, dan query yang memakai scope organisasi yang sama dengan endpoint detailnya.
+1. Satu kelas dataset: kode, nama, keterangan, permission datanya, aturan parameter, layout bawaannya, daftar placeholder, dan query yang memakai scope organisasi yang sama dengan endpoint detailnya.
 2. Satu layout bawaan `.docx` atau `.xlsx`, dibangkitkan dari kode lewat command supaya perubahannya terbaca di review.
-3. Blok `reports` di manifest module. Module aset menulisnya satu berkas per laporan di `manifest/reports/`, supaya dua orang yang membuat laporan berbeda tidak menyunting berkas yang sama.
-4. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya.
-5. Tombol Cetak pada halaman record yang meminta Shell mencetak.
+3. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya.
+4. Tombol Cetak pada halaman record yang meminta Shell mencetak.
 
-Blok manifestnya:
+**Tidak ada blok manifest.** Sampai 28 September 2026 laporan juga ditulis di blok `reports` manifest,
+dan dua sumber itu menyimpang: laporan yang terlewat di manifest tampil di pratinjau, lalu menjawab
+404 saat dicetak. Sekarang `app:register-manifest` membaca katalognya dari kelas dataset lewat
+`PenyediaLaporanModul::catalog()`: kode berawalan id module, nama, keterangan, permission, nama
+parameter (kunci aturan parameternya), dan layout bawaan. Kelas dataset menjadi satu-satunya
+sumber, sama seperti objek report di Business Central. Manifest module yang masih memuat blok
+`reports` ditolak.
 
-```yaml
-reports:
-  - code: procurement.purchase-order        # berawalan ID app; kode di sisi app: purchase-order
-    name: Purchase order
-    description: Satu purchase order beserta barisnya.
-    permission: procurement.purchase-order.read   # permission app ini; wajib dipegang pengguna
-    parameters: [id]                              # nama parameter; validasinya di app
-    builtin_layouts:
-      - key: standar
-        name: Purchase order standar (Word)
-        format: docx
-```
-
-Tiga hal yang diminta Core:
+Empat hal yang diminta Core:
 
 | Yang diminta | Guna |
 | --- | --- |
+| Katalog | Kode, nama, permission, parameter, dan layout bawaan setiap laporan, dibaca saat registrasi |
 | Definisi | Placeholder, parameter, layout bawaan |
 | Berkas layout bawaan | Isi `.docx`/`.xlsx` yang ikut rilis |
 | Dataset | Data yang sudah disaring; kegagalan disampaikan sebagai pesan siap-baca bila record tidak ada atau di luar scope |
 
-Ketiganya adalah tiga method pada `PenyediaLaporanModul`. Sampai 10 September 2026 ada bentuk kedua
+Keempatnya adalah method pada `PenyediaLaporanModul`. Sampai 10 September 2026 ada bentuk kedua
 — `GET internal/v1/laporan/{kode}`, `GET internal/v1/laporan/{kode}/layouts/{key}`, dan
 `POST internal/v1/laporan/{kode}/dataset` — untuk app yang berjalan sebagai container tersendiri. Ia
 dibuang bersama app berkontainer terakhir.

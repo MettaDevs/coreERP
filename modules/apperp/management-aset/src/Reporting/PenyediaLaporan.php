@@ -40,6 +40,24 @@ final class PenyediaLaporan implements PenyediaLaporanModul
         return $this->registry->has($kodeLaporan);
     }
 
+    public function catalog(): array
+    {
+        return array_map(fn (ReportDefinition $definition): array => [
+            'code' => $this->idModule().'.'.$definition->code(),
+            'name' => $definition->name(),
+            'description' => $definition->description(),
+            'permission' => $definition->permission(),
+            // Sama dengan yang dipulangkan `definisi()`: nama parameter adalah kunci aturannya.
+            'parameters' => array_map('strval', array_keys($definition->parameterRules())),
+            'builtin_layouts' => array_map(static fn (BuiltinLayout $layout): array => [
+                'key' => $layout->key,
+                'name' => $layout->name,
+                'description' => $layout->description,
+                'format' => $layout->format,
+            ], $definition->builtinLayouts()),
+        ], $this->registry->all());
+    }
+
     /**
      * @param  array<string, mixed>  $konteks
      * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
