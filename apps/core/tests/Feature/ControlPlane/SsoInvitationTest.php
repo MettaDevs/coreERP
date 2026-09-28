@@ -20,6 +20,7 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,7 @@ use Tests\TestCase;
  */
 class SsoInvitationTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private const ISSUER = 'https://sso.uji';
@@ -89,7 +91,7 @@ class SsoInvitationTest extends TestCase
             'aktif' => true,
         ]);
 
-        $this->operator = $this->member('operator@klinik.test', 'owner');
+        $this->operator = $this->member('operator@klinik.test', owner: true);
         $this->fakeProvider();
     }
 
@@ -249,7 +251,7 @@ class SsoInvitationTest extends TestCase
 
         // Akun, tautan identitas, dan keanggotaan lahir bersama.
         $this->assertDatabaseHas('external_identities', ['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => '4242']);
-        $this->assertDatabaseHas('tenant_memberships', ['tenant_id' => $this->tenant->id, 'user_id' => $user->id, 'status' => 'active', 'system_role' => 'user']);
+        $this->assertDatabaseHas('tenant_memberships', ['tenant_id' => $this->tenant->id, 'user_id' => $user->id, 'status' => 'active']);
 
         $invitation->refresh();
         $this->assertNotNull($invitation->sso_redeemed_at);
@@ -348,7 +350,7 @@ class SsoInvitationTest extends TestCase
         auth()->logout();
         $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
-        $this->assertSame(1, TenantMembership::query()->where('tenant_id', $this->tenant->id)->where('system_role', 'user')->count());
+        $this->assertSame(1, TenantMembership::query()->where('tenant_id', $this->tenant->id)->where('user_id', '!=', $this->operator->id)->count());
     }
 
     public function test_an_invitation_revoked_while_the_ceremony_is_away_changes_nothing(): void
@@ -473,7 +475,6 @@ class SsoInvitationTest extends TestCase
     private function createInvitation(?string $email = 'dewi@klinik.test'): TestResponse
     {
         return $this->actingAs($this->operator)->post('http://tenanta.contoh.co.id/settings/access/invitations', [
-            'system_role' => 'user',
             'label' => 'Perawat baru',
             'assignments' => [],
             'sso_email' => $email,
@@ -601,15 +602,17 @@ class SsoInvitationTest extends TestCase
         ]]]];
     }
 
-    private function member(string $email, string $role = 'user'): User
+    private function member(string $email, bool $owner = false): User
     {
         $user = User::factory()->create(['email' => $email]);
-        TenantMembership::create([
+        $membership = TenantMembership::create([
             'tenant_id' => $this->tenant->id,
             'user_id' => $user->id,
-            'system_role' => $role,
             'status' => 'active',
         ]);
+        if ($owner) {
+            $this->makeOwner($membership);
+        }
 
         return $user;
     }

@@ -45,7 +45,6 @@ class RoleHierarchyTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->owner->activeMembership()->tenant_id,
             'user_id' => $this->subject->id,
-            'system_role' => 'user',
             'status' => 'active',
         ]);
     }
@@ -67,7 +66,6 @@ class RoleHierarchyTest extends TestCase
         $membership = $this->subject->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
-            'system_role' => 'user',
             'assignments' => [['role_id' => $role->id]],
         ])->assertOk();
     }

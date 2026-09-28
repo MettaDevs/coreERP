@@ -197,12 +197,37 @@ abstract class SiteTestCase extends TestCase
             'updated_at' => now(),
         ]);
 
+        $membershipId = (string) Str::ulid();
         DB::table('tenant_memberships')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $membershipId,
             'tenant_id' => $tenantId,
             'user_id' => $userId,
-            'system_role' => 'owner',
             'status' => $status,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Owner adalah pemegang role Owner tenant (`roles.is_owner`), bukan penanda di keanggotaan.
+        $roleId = DB::table('roles')->where('tenant_id', $tenantId)->where('is_owner', true)->value('id');
+        if ($roleId === null) {
+            $roleId = (string) Str::ulid();
+            DB::table('roles')->insert([
+                'id' => $roleId,
+                'tenant_id' => $tenantId,
+                'name' => 'Owner',
+                'is_active' => true,
+                'is_owner' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        DB::table('role_assignments')->insert([
+            'id' => (string) Str::ulid(),
+            'membership_id' => $membershipId,
+            'role_id' => $roleId,
+            'source' => 'automatic',
+            'status' => 'active',
+            'valid_from' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

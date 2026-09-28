@@ -10,6 +10,8 @@ use App\Models\OrganizationHierarchy;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
+use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Access\TenantProducts;
 use App\Support\Sso\TenantSso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,27 +25,24 @@ class AccessController extends Controller
     {
         $membership = $this->currentMembership($request);
         $tenantId = $membership->tenant_id;
-        $entitledAppIds = $membership->tenant->entitlements()
-            ->where('status', 'active')
-            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
-            ->pluck('app_id');
+        $entitledAppIds = TenantProducts::appIds($tenantId);
+        $mayManage = $membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE);
 
         return Inertia::render('settings/access', [
-            'canManage' => $membership->canManageAccess(),
+            'canManage' => $mayManage,
             'tenant' => $membership->tenant->only(['id', 'name']),
             'members' => TenantMembership::query()
                 ->where('tenant_id', $tenantId)
                 ->with(['user:id,name,email,last_login_at', 'roleAssignments.role:id,name', 'roleAssignments.dataPolicyScopes.policy'])
                 ->orderBy('created_at')
                 ->get()
-                ->map(function (TenantMembership $member) use ($membership): array {
+                ->map(function (TenantMembership $member) use ($mayManage): array {
                     $assignments = $member->roleAssignments->where('status', 'active');
 
                     return [
                         'id' => $member->id,
                         'name' => $member->user->name,
                         'email' => $member->user->email,
-                        'system_role' => $member->system_role,
                         'status' => $member->status,
                         'last_login_at' => $member->user->last_login_at,
                         'roles' => $assignments->map(fn (RoleAssignment $assignment) => $assignment->role->name)->values(),
@@ -64,7 +63,7 @@ class AccessController extends Controller
                                 'valid_until' => $scope->valid_until?->toDateTimeString(),
                             ])->values(),
                         ])->values(),
-                        'can_edit_access' => $member->system_role !== 'owner' || $member->id === $membership->id,
+                        'can_edit_access' => $mayManage,
                     ];
                 }),
             /*
@@ -81,7 +80,7 @@ class AccessController extends Controller
              * mengikuti jumlah module, bukan jumlah data tenant, jadi ia memburuk pada setiap
              * module baru yang dijual.
              */
-            'apps' => Inertia::defer(fn (): array => $this->katalogIzin(self::daftarString($entitledAppIds))),
+            'apps' => Inertia::defer(fn (): array => $this->katalogIzin($entitledAppIds)),
             'roles' => $this->roles($tenantId),
             'dataPolicies' => AppDataPolicy::query()
                 ->whereIn('app_id', $entitledAppIds)
@@ -106,7 +105,7 @@ class AccessController extends Controller
              * data di dalam dialog. Ditunda, bukan dihapus — yang membukanya tetap mendapatkannya.
              */
             'hierarchies' => Inertia::defer(fn (): array => $this->hierarchies($tenantId)),
-            'invitations' => $this->invitations($tenantId, $membership->canManageAccess()),
+            'invitations' => $this->invitations($tenantId, $mayManage),
             'newInvitationCodes' => $request->session()->pull('new_invitation_codes', []),
             // Kolom "Diundang" hanya berarti bila tenant ini memang memakai SSO; tanpa itu, yang
             // muncul adalah kotak email yang setiap isinya pasti ditolak.
@@ -235,9 +234,9 @@ class AccessController extends Controller
      * undangan yang sudah ada dengan kolom yang sama seperti baris baru —
      * tanggung jawab dan batas datanya terbaca, bukan sekadar nama role.
      *
-     * @return Collection<int, array<string, mixed>>
+     * @return list<array<string, mixed>>
      */
-    private function invitations(string $tenantId, bool $canManage): Collection
+    private function invitations(string $tenantId, bool $canManage): array
     {
         $scopes = DB::table('invitation_data_policy_scopes as scope')
             ->join('invitation_codes as invitation', 'invitation.id', '=', 'scope.invitation_id')
@@ -261,7 +260,7 @@ class AccessController extends Controller
             ->groupBy('source_reference')
             ->map(fn (Collection $rows): int => $rows->pluck('membership_id')->unique()->count());
 
-        return InvitationCode::query()
+        return array_values(InvitationCode::query()
             ->where('tenant_id', $tenantId)
             ->with(['roles:id,name'])
             ->latest()
@@ -272,7 +271,6 @@ class AccessController extends Controller
                 return [
                     'id' => $invitation->id,
                     'redeemed_count' => $redeemed->get('invitation:'.$invitation->id, 0),
-                    'system_role' => $invitation->system_role,
                     'label' => $invitation->label,
                     'roles' => $invitation->roles->pluck('name')->values(),
                     'assignments' => $invitation->roles->map(fn (Role $role): array => [
@@ -301,7 +299,7 @@ class AccessController extends Controller
                         'redeemed_at' => $invitation->sso_redeemed_at,
                     ] : null,
                 ];
-            });
+            })->all());
     }
 
     /**
@@ -355,7 +353,7 @@ class AccessController extends Controller
     }
 
     /**
-     * @return Collection<int, array{id:string,name:string,duties:Collection<int, mixed>,data_policy_codes:list<string>}>
+     * @return list<array{id:string,name:string,is_owner:bool,duties:Collection<int, mixed>,data_policy_codes:list<string>}>
      *
      * Dua query tetap, bukan dua query **per role**.
      *
@@ -366,7 +364,7 @@ class AccessController extends Controller
      * kode ketika itu terjadi. Yang tumbuh adalah datanya, dan itulah bentuk kegagalan yang
      * tidak pernah muncul di lingkungan tempat ia ditulis.
      */
-    private function roles(string $tenantId): Collection
+    private function roles(string $tenantId): array
     {
         $policies = AppDataPolicy::query()->get(['code', 'protected_permissions']);
 
@@ -378,13 +376,13 @@ class AccessController extends Controller
             ->get();
 
         if ($roles->isEmpty()) {
-            return collect();
+            return [];
         }
 
         $turunan = $this->turunanRole($tenantId, self::daftarString($roles->pluck('id')));
         $permissionPerRole = $this->permissionPerRole(array_values(array_unique(array_merge(...array_values($turunan)))));
 
-        return $roles->map(function (Role $role) use ($policies, $turunan, $permissionPerRole): array {
+        return array_values($roles->map(function (Role $role) use ($policies, $turunan, $permissionPerRole): array {
             $permissionCodes = array_values(array_unique(array_merge(
                 ...array_map(
                     static fn (string $id): array => $permissionPerRole[$id] ?? [],
@@ -395,14 +393,15 @@ class AccessController extends Controller
             return [
                 'id' => $role->id,
                 'name' => $role->name,
+                // Owner selalu memegang semua duty yang sah (`OwnerRoleDuties`); layar tidak menawarkan mengubahnya.
+                'is_owner' => $role->is_owner,
                 'duties' => $role->duties->map(fn ($duty) => $duty->only(['code', 'app_id', 'name']))->values(),
-                'data_policy_codes' => $policies
+                'data_policy_codes' => array_values(array_map(strval(...), $policies
                     ->filter(fn (AppDataPolicy $policy): bool => array_intersect($policy->protected_permissions, $permissionCodes) !== [])
                     ->pluck('code')
-                    ->values()
-                    ->all(),
+                    ->all())),
             ];
-        });
+        })->all());
     }
 
     /**

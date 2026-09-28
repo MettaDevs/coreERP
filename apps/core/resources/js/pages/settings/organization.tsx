@@ -57,7 +57,7 @@ import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import type {
     Edge,
     Node as FlowNode,
@@ -408,10 +408,12 @@ function OrganizationExtraSectionContent({
     section,
     organization,
     canManage,
+    canManageFinancePosting,
 }: {
     section: OrganizationExtraSection;
     organization: Organization;
     canManage: boolean;
+    canManageFinancePosting: boolean;
 }) {
     if (section.value === 'addresses') {
         return (
@@ -446,7 +448,7 @@ function OrganizationExtraSectionContent({
         return (
             <FinancePostingSection
                 organizationId={organization.id}
-                canManage={canManage}
+                canManage={canManageFinancePosting}
             />
         );
     }
@@ -496,7 +498,15 @@ function OrganizationDetailPage({
     const unitType =
         operatingUnitTypes[organization.operating_unit?.type ?? ''] ??
         organization.operating_unit?.type;
-    const extraSections: (OrganizationExtraSection & {
+    // Setelan posting ke aplikasi finance termasuk setup finance, bukan organisasi: bagiannya hanya tampil bagi
+    // pemegang duty Lihat setup finance, dan mengubahnya butuh Kelola setup finance.
+    const permissions = new Set(
+        usePage().props.auth.membership?.permissions ?? [],
+    );
+    const canManageFinancePosting = permissions.has(
+        'core.finance-setup.update',
+    );
+    const allExtraSections: (OrganizationExtraSection & {
         icon: React.ComponentType<{ className?: string }>;
     })[] = legalEntity
         ? [
@@ -590,6 +600,11 @@ function OrganizationDetailPage({
                   icon: Image,
               },
           ];
+    const extraSections = allExtraSections.filter(
+        (section) =>
+            section.value !== 'finance-posting' ||
+            permissions.has('core.finance-setup.read'),
+    );
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground">
@@ -921,6 +936,9 @@ function OrganizationDetailPage({
                                             section={section}
                                             organization={organization}
                                             canManage={canManage}
+                                            canManageFinancePosting={
+                                                canManageFinancePosting
+                                            }
                                         />
                                     </AccordionContent>
                                 </AccordionItem>

@@ -270,15 +270,16 @@ final class BootstrapSiteTenant extends Command
      * Jawaban untuk tenant yang sudah ada: "sudah ada" bila owner-nya sama, tolak bila berbeda.
      *
      * Owner dicocokkan lewat email, karena email-lah yang dicatat admin.erp dan dikirim agen — id user
-     * di server ini tidak pernah dikenal di sana. Satu tenant boleh punya lebih dari satu owner;
-     * cukup salah satunya yang cocok.
+     * di server ini tidak pernah dikenal di sana. Owner adalah pemegang role Owner tenant itu; satu
+     * tenant boleh punya lebih dari satu, dan cukup salah satunya yang cocok.
      */
     private function answerExisting(Tenant $existing, string $email): int
     {
         $owners = User::query()
             ->whereIn('id', TenantMembership::query()
                 ->where('tenant_id', $existing->id)
-                ->where('system_role', 'owner')
+                ->whereHas('roleAssignments', fn ($query) => $query->where('status', 'active')
+                    ->whereHas('role', fn ($query) => $query->where('is_owner', true)))
                 ->select('user_id'))
             ->orderBy('email')
             ->pluck('email')

@@ -52,7 +52,6 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
-import { NativeSelect } from '@apperp/ui/native-select';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { Select } from '@apperp/ui/select';
 import {
@@ -144,7 +143,6 @@ type Member = {
     id: string;
     name: string;
     email: string;
-    system_role: string;
     platform_role?: string;
     security_role?: string;
     avatar_url?: string | null;
@@ -154,7 +152,6 @@ type Member = {
 };
 type Invitation = {
     id: string;
-    system_role: string;
     label: string | null;
     roles: string[];
     assignments: Assignment[];
@@ -930,7 +927,6 @@ function AssignmentPicker({
 type CodeDraft = {
     key: string;
     label: string;
-    system_role: string;
     /**
      * Email orang yang diundang. Kosong berarti kode anonim yang dapat dipakai siapa pun yang
      * memegangnya — perilaku yang sudah ada sebelum undangan SSO, dan yang sengaja dipertahankan.
@@ -954,7 +950,6 @@ type CodeDraft = {
 const issuedDraft = (invitation: Invitation): CodeDraft => ({
     key: `issued-${invitation.id}`,
     label: invitation.label ?? '',
-    system_role: invitation.system_role,
     sso_email: invitation.sso?.email ?? '',
     assignments: invitation.assignments,
     issued: {
@@ -973,7 +968,6 @@ const issuedDraft = (invitation: Invitation): CodeDraft => ({
 const codeFingerprint = (code: CodeDraft): string =>
     JSON.stringify({
         label: code.label,
-        system_role: code.system_role,
         assignments: [...code.assignments]
             .sort((first, second) =>
                 first.role_id.localeCompare(second.role_id),
@@ -1016,7 +1010,6 @@ const codeScopeSummary = (roles: Role[], assignments: Assignment[]): string => {
 const blankCode = (): CodeDraft => ({
     key: crypto.randomUUID(),
     label: '',
-    system_role: 'user',
     sso_email: '',
     assignments: [],
 });
@@ -1206,7 +1199,6 @@ function InviteForm({
             `/settings/access/invitations/${code.issued.id}`,
             {
                 label: code.label,
-                system_role: code.system_role,
                 assignments: code.assignments.map((assignment) => ({
                     role_id: assignment.role_id,
                     policy_scopes: assignment.policy_scopes,
@@ -1375,29 +1367,6 @@ function InviteForm({
                     {dirty(code) && <Badge variant="outline">Diubah</Badge>}
                 </div>
             ),
-        },
-        {
-            id: 'system_role',
-            header: 'User Platform',
-            width: 150,
-            cell: (code) =>
-                locked(code) ? (
-                    <span className="text-muted-foreground">
-                        {code.system_role}
-                    </span>
-                ) : (
-                    <NativeSelect
-                        value={code.system_role}
-                        onChange={(event) =>
-                            update(code.key, {
-                                system_role: event.target.value,
-                            })
-                        }
-                    >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                    </NativeSelect>
-                ),
         },
         {
             id: 'roles',
@@ -1622,7 +1591,6 @@ function InviteForm({
                         form.transform((data) => ({
                             codes: data.codes.map((code) => ({
                                 label: code.label,
-                                system_role: code.system_role,
                                 // Dikirim huruf kecil: aturannya `lowercase`, dan menolak
                                 // "Dewi@Klinik.test" karena huruf besarnya adalah penolakan yang
                                 // tidak dapat dijelaskan kepada siapa pun yang mengetiknya.
@@ -1752,7 +1720,6 @@ function MemberAccessDialog({
     const contentRef = useRef<HTMLDivElement>(null);
     const getInitials = useInitials();
     const form = useForm({
-        system_role: member?.system_role ?? 'user',
         assignments: (member?.assignments ?? [])
             .filter((assignment) => assignment.source !== 'automatic')
             .map((assignment) => ({
@@ -1783,8 +1750,7 @@ function MemberAccessDialog({
                                 Atur Akses Anggota
                             </DialogTitle>
                             <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Atur role platform, tanggung jawab security
-                                role, dan batas data anggota.
+                                Atur role dan batas data anggota.
                             </DialogDescription>
                         </div>
                     </div>
@@ -1812,12 +1778,6 @@ function MemberAccessDialog({
                                     </p>
                                 </div>
                             </div>
-                            <Badge
-                                variant="outline"
-                                className="border-primary/30 bg-primary/5 text-[11px] font-medium text-primary"
-                            >
-                                {member.system_role}
-                            </Badge>
                         </div>
                     )}
                 </DialogHeader>
@@ -1837,25 +1797,6 @@ function MemberAccessDialog({
                 >
                     <DialogBody>
                         <FieldGroup>
-                            <Field>
-                                <NativeSelect
-                                    label="Role platform"
-                                    value={form.data.system_role}
-                                    disabled={member?.system_role === 'owner'}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'system_role',
-                                            event.target.value,
-                                        )
-                                    }
-                                >
-                                    {member?.system_role === 'owner' && (
-                                        <option value="owner">Pemilik</option>
-                                    )}
-                                    <option value="user">Anggota</option>
-                                    <option value="admin">Admin</option>
-                                </NativeSelect>
-                            </Field>
                             <AssignmentPicker
                                 assignments={form.data.assignments}
                                 roles={roles}
@@ -2032,12 +1973,6 @@ export default function Access({
         toast('Kode disalin');
     };
 
-    const platformRoleLabel: Record<string, string> = {
-        owner: 'Pemilik',
-        admin: 'Admin',
-        user: 'Anggota',
-    };
-
     const memberColumns: DataTableColumn<Member>[] = [
         {
             id: 'identity',
@@ -2066,16 +2001,6 @@ export default function Access({
                 </div>
             ),
             sortValue: (member) => member.name,
-        },
-        {
-            id: 'platform-role',
-            header: 'Role platform',
-            cell: (member) => (
-                <Badge>
-                    {platformRoleLabel[member.system_role] ??
-                        member.system_role}
-                </Badge>
-            ),
         },
         {
             id: 'security-role',
@@ -2124,12 +2049,6 @@ export default function Access({
                     {invitation.revoked_at ? 'Dicabut' : 'Aktif'}
                 </Badge>
             ),
-        },
-        {
-            id: 'access',
-            header: 'Akses',
-            cell: (invitation) =>
-                `${platformRoleLabel[invitation.system_role] ?? invitation.system_role} · sesuai batas data role`,
         },
         {
             id: 'roles',

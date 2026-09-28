@@ -320,7 +320,7 @@ class IntegrationClientTest extends TestCase
         $id = (string) $this->buat()->json('data.id');
         $anggota = User::factory()->create();
         TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'system_role' => 'member', 'status' => 'active',
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'status' => 'active',
         ]);
 
         $this->actingAs($anggota)->get('/settings/integration-clients')->assertForbidden();

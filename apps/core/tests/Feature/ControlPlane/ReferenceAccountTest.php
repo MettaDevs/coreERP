@@ -14,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,7 @@ use Tests\TestCase;
  */
 class ReferenceAccountTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private const COA = "external_id,code,name,type,active\n"
@@ -198,15 +200,18 @@ class ReferenceAccountTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('accounts.total', 3));
     }
 
-    public function test_anggota_biasa_dapat_melihat_tetapi_tidak_dapat_mengimpor_atau_mengubah(): void
+    public function test_the_inquire_duty_views_accounts_but_cannot_import_or_change_them(): void
     {
         $this->impor(self::COA);
         $anggota = User::factory()->create();
-        TenantMembership::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'system_role' => 'member', 'status' => 'active',
+        $membership = TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $anggota->id, 'status' => 'active',
         ]);
         $id = (string) FinanceReferenceAccount::query()->value('id');
 
+        $this->actingAs($anggota)->get('/settings/finance-accounts')->assertForbidden();
+
+        $this->grantDuties($membership, ['core.finance-setup.inquire']);
         $this->actingAs($anggota)->get('/settings/finance-accounts')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', false));
         $this->actingAs($anggota)->post('/api/v1/finance-reference-accounts/imports', [
