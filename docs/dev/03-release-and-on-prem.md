@@ -1,61 +1,77 @@
 # Release, provisioning, dan on-prem perpetual
 
+> **Sejak 15 September 2026 yang di-deploy selalu rilis, bukan `main`:** satu image untuk semua klien, dirakit
+> sekali di server pertama, disimpan di Harbor, dipasang ke SaaS dev lewat digest, lalu dipilih operator di
+> admin.erp untuk server klien dan dipasang agen dengan digest yang sama. Alurnya, beserta diagramnya, di
+> [Dari branch sampai server klien](29-alur-rilis-server-klien.md).
+>
+> Bagian halaman ini tentang bundle dan admin pelanggan yang menjalankan pembaruan sendiri menggambarkan
+> jalur yang lebih dulu ada dan tidak berlaku untuk server klien yang dikelola. Aturan tentang migration yang
+> kompatibel mundur dan pembaruan yang aman diulang tetap berlaku untuk keduanya.
+
 ## Dua bentuk rilis
 
-Module yang berjalan di runtime Core **ikut image edisi Core**; ia tidak punya image sendiri. Satu
-edisi adalah satu berkas manifest di `editions/`, berisi nama pelanggan, profil penempatan, nomor
-rilis, dan id modul yang dibeli. Modul yang tidak disebut di sana **tidak ada di dalam image** —
-bukan disembunyikan lisensi, melainkan berkasnya memang tidak ikut.
+Module yang berjalan di runtime Core **ikut image Core**; ia tidak punya image sendiri. Yang
+dibagikan ke klien **satu image per rilis, berisi seluruh modul** — bukan satu image per pelanggan.
+Modul mana yang boleh dibuka sebuah tenant ditentukan lisensi yang diterbitkan admin.erp, bukan isi
+image, dan nomor rilisnya diberikan operator kepada perakit lewat `--rilis`.
 
 ```bash
-php artisan edition:resolve <nama berkas edisi>
+php artisan edition:modules
 ```
 
-Perintah itu yang menghitung daftar akhirnya: dependency ditutup transitif, modul penghubung ikut
-hanya bila kedua sisinya ada, dan modul bahan uji ditolak. Bentuk dan aturannya ada di
-`editions/README.md`.
+Perintah itu yang menghitung isinya: seluruh modul di repo, dikurangi modul ber-`kind:
+internal-fixture` yang tidak boleh sampai ke klien mana pun.
 
-Alur terbitnya dijaga CI, dan pembuktiannya dua arah: satu edisi dengan modul bisnis dan satu edisi
-tanpa modul bisnis sama-sama dibangun, lalu pemeriksa kebocoran dijalankan pada keduanya — dan
-sesudahnya pemeriksa itu sengaja dibuat merah untuk membuktikan ia masih memeriksa. Lihat
+> **Sampai 18 September 2026 bentuknya berbeda**, dan bekasnya masih terbaca di beberapa nama.
+> Dulu ada folder `editions/` berisi satu manifest per pelanggan — nama pelanggan, profil
+> penempatan, nomor rilis sendiri, dan daftar modul yang dibeli — dan image dipangkas mengikuti
+> daftar itu. Folder itu dihapus. Alasannya di
+> [Registry image sendiri dengan Harbor](/todo/registry-harbor/): satu image ramping, lisensi yang
+> mengunci, dan registry milik sendiri.
+
+Alur terbitnya dijaga CI: image dibangun, pemeriksa kebocoran dijalankan padanya, dan sesudahnya
+pemeriksa itu sengaja dibuat merah untuk membuktikan ia masih memeriksa. Lihat
 [CI/CD](22-ci-cd.md#yang-benar-benar-ada-hari-ini).
 
 App yang masih berupa container tetap memakai jalur di bawah: image API dan UI sendiri, database
 sendiri, dan bundle yang menyusunnya. Jalur itu tidak dihapus selama masih ada app yang
 menjalankannya.
 
-### Satu repo, satu `main`, rilis lewat edisi
+### Satu repo, satu `main`, satu nomor rilis
 
 Seluruh Core dan seluruh module hidup di satu repo dengan satu cabang utama. Yang membedakan satu
-pelanggan dari pelanggan lain bukan cabang, melainkan **manifest edisi**.
+klien dari klien lain bukan cabang dan bukan isi image, melainkan **lisensi** yang diterbitkan
+admin.erp.
 
-Pemeliharaan versi lama memakai cabang tersendiri per edisi, dan **paling banyak dua edisi ke
-belakang**. Hotfix untuk pelanggan yang belum naik versi dibuat dari cabang pemeliharaannya, bukan
-dari `main` — mengambilnya dari `main` berarti mengirim perubahan yang belum pernah diuji bersama
-versi yang sedang berjalan di sana. Batas dua edisi bukan angka teknis; ia batas berapa banyak versi
-yang benar-benar sanggup dijaga tim sebesar ini.
+Pemeliharaan versi lama memakai cabang tersendiri per rilis, dan **paling banyak dua rilis ke
+belakang**. Hotfix untuk klien yang belum naik versi dibuat dari cabang pemeliharaannya, bukan dari
+`main` — mengambilnya dari `main` berarti mengirim perubahan yang belum pernah diuji bersama versi
+yang sedang berjalan di sana. Batas dua rilis bukan angka teknis; ia batas berapa banyak versi yang
+benar-benar sanggup dijaga tim sebesar ini.
 
-### Apa yang ditulis manifest, dan apa yang dihitung mesin
+### Apa yang ditulis tangan, dan apa yang dihitung mesin
 
-Manifest edisi menyebut pelanggan, profil penempatan, nomor rilis, dan **daftar module yang dibeli**.
-Yang sengaja **tidak** ditulis di sana: dependency, module penghubung, dan penolakan module bahan
-uji. Ketiganya dihitung `edition:resolve`, karena daftar yang ditulis tangan akan ketinggalan pada
-hari sebuah module menambah dependency baru — dan ketinggalannya baru terasa sebagai layar yang
-kosong di tempat pelanggan.
+Yang ditulis tangan hanya satu angka, dan ia tidak tinggal di repo: nomor rilis yang diberikan
+operator kepada perakit. Daftar module tidak ditulis di mana pun. Ia dihitung `edition:modules` dari
+folder module yang ada, karena daftar yang ditulis tangan akan ketinggalan pada hari sebuah module
+mendarat — dan ketinggalannya baru terasa sebagai layar yang kosong di tempat klien.
 
-Sumber kebenaran dependency adalah `depends_on` pada `app.yaml` tiap module, bukan tabel di database.
-Alasannya sederhana dan mengikat: image edisi dibangun di CI, tempat tidak ada database mana pun.
+Satu bentuk ditolak, bukan disaring diam-diam: module bertanda `kind: internal-fixture` tidak pernah
+ikut. Sebuah menu bernama "Contoh A" di layar klien adalah kegagalan yang tidak boleh mungkin
+terjadi, jadi jejaknya dicari pada image yang sudah jadi — bukan dipercayakan pada disiplin orang.
 
-Dua bentuk masukan ditolak, bukan disaring diam-diam: id module yang tidak ada di repo, dan module
-bertanda `kind: internal-fixture`. Yang kedua penting — sebuah menu bernama "Contoh A" di layar
-pelanggan adalah kegagalan yang tidak boleh mungkin terjadi, jadi ia harus gagal saat membangun,
-bukan hilang tanpa suara.
+Sejak 18 September 2026 penolakan itu bukan lagi satu-satunya yang menahannya. Bahan uji penjaga
+batas tidak tinggal di `modules/` sama sekali; ia pindah ke `apps/core/tests/Fixtures/modules`, yang
+tidak disebut `config('modules.akar')` di luar lingkungan test, tidak dimuat `autoload-dev` pada
+pemasangan produksi, dan dibuang utuh oleh tahap akhir Dockerfile. Pemangkasan menjadi lapis
+keempat, bukan satu-satunya. Alasannya ditulis lengkap di `modules/README.md`.
 
-Module penghubung dikenali dari `kind: link`. Ia ikut **hanya** bila seluruh sisinya terpilih, dan ia
-**tidak pernah** menarik sisinya ikut masuk. Aturan itu berlaku juga untuk penghubung berlapis:
-penghubung yang menarik sisinya akan diam-diam mengirim module yang tidak dibeli.
+Folder module yang tidak terbaca sama sekali juga ditolak. Daftar kosong yang dipulangkan diam-diam
+menghasilkan image berisi Core saja, dan image itu lulus setiap pemeriksaan kebocoran karena memang
+tidak ada yang bocor.
 
-### Bagaimana image edisi dibangun
+### Bagaimana image dibangun
 
 Pembangunannya menerima daftar module dan mengenal tiga bentuk nilai: semua module, kosong yang
 berarti Core saja, dan daftar eksplisit. Pemangkasan `composer.json` beserta lockfile-nya terjadi
@@ -72,7 +88,7 @@ Isi `storage/` juga tidak ikut. Yang dikirim hanya rangka foldernya; berkas di d
 pembangun, dan Docker menyalin isi image ke named volume yang masih kosong — sehingga berkas mesin
 pengembang berakhir di storage pelanggan pada boot pertama.
 
-### Apa yang diperiksa sebelum sebuah edisi boleh terbit
+### Apa yang diperiksa sebelum sebuah rilis boleh terbit
 
 Pemeriksaan kebocoran dijalankan pada image yang benar-benar dikirim, dan daftar module yang
 dipakainya dihitung **di luar** image — image yang bocor tidak boleh menilai dirinya sendiri. Yang
@@ -312,6 +328,53 @@ Jika customer secara eksplisit membeli managed support, Compose dapat menambahka
 5. Aktifkan traffic setelah health check sukses; catat installation registry dan audit event lokal.
 
 Rollback image hanya boleh dilakukan bila migration kompatibel mundur. Jika tidak, gunakan forward fix dari release baru dan restore backup dengan prosedur recovery yang jelas.
+
+### Perubahan skema dan mundur
+
+**Yang dimundurkan saat rilis bermasalah adalah image, bukan database.** Migration tidak ikut mundur,
+dan `down()` tidak pernah dipakai di produksi: memulihkan database dari cadangan membuang setiap
+transaksi yang ditulis sesudah pembaruan, dan `down()` yang menghapus kolom membuang isinya. Di server
+klinik, yang hilang adalah rekam medis dan kuitansi.
+
+Karena itu setiap rilis wajib **kompatibel N-1**: skema sesudah migration rilis N harus tetap dapat
+dipakai kode rilis N-1.
+
+| Perubahan di migration | Kode rilis sebelumnya | Boleh dalam satu rilis |
+| --- | --- | --- |
+| Tabel baru | tidak mengenalnya | ya |
+| Kolom baru yang boleh kosong atau punya nilai bawaan | tidak menyebutnya | ya |
+| Index, constraint yang melonggarkan | tetap menulis nilai yang sah | ya |
+| Kolom wajib diisi tanpa nilai bawaan pada tabel yang sudah ada | gagal saat menyisipkan baris | tidak |
+| Menghapus atau mengganti nama kolom atau tabel | gagal saat membaca atau menulis | tidak |
+| Mengubah tipe kolom, `SET NOT NULL`, constraint yang mengetatkan | gagal pada nilai yang dulu sah | tidak |
+
+Perubahan yang memang harus merusak dikerjakan bertahap (**expand/contract**):
+
+1. **Expand** — tambah kolom atau tabel baru yang boleh kosong. Kode lama tetap jalan.
+2. Kode baru menulis ke yang lama dan yang baru, dan data lama diisikan ke yang baru.
+3. Kode baru membaca dari yang baru.
+4. **Contract** — yang lama dihapus, paling cepat satu rilis sesudah tidak ada kode yang membacanya.
+   Migration-nya membawa penanda `@kontrak` beserta alasannya.
+
+Mundur otomatis yang **memulihkan database** hanya terjadi di dalam pembaruan itu sendiri: `update.sh`
+mencadangkan database tepat sebelum migration, dan memulihkannya bila migration gagal atau aplikasi
+tidak menjadi sehat. Pada saat itu belum ada transaksi yang lahir di rilis baru selain yang ditulis
+selama jendela pembaruan — alasan pembaruan hanya dijalankan di jendela yang disepakati.
+
+Masalah yang ketahuan jam atau hari sesudahnya diselesaikan dengan salah satu dari tiga cara ini,
+berurutan dari yang dipilih lebih dulu:
+
+1. **Matikan fiturnya** tanpa mundur apa pun, bila fitur itu punya sakelar.
+2. **Maju ke rilis perbaikan** (1.2.1), bukan mundur ke 1.1.0.
+3. **Jalankan image rilis sebelumnya** di atas database yang ada. Ini aman karena aturan N-1.
+
+Pemulihan database dari cadangan hanya untuk bencana, dan ia keputusan manusia di lokasi — bukan tombol.
+
+**Penjaganya** `apps/core/tests/Feature/Boundary/MigrasiKompatibelMundurTest.php`. Ia membaca `up()`
+setiap migration Core dan modul, dan menolak pola yang merusak kode lama kecuali migration itu
+membawa `@kontrak <alasan>` (langkah contract) atau `@kompatibel-mundur <alasan>` (pola yang terbaca
+merusak tetapi aman, misalnya melebarkan tipe kolom). Migration yang lahir sebelum aturan ini berlaku
+dicatat di daftar beku di test itu, dan daftar itu hanya boleh berkurang.
 
 ## Disable dan uninstall
 

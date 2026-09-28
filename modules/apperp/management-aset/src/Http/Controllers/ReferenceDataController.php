@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
 use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
+use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use RuntimeException;
 
 final class ReferenceDataController extends Controller
@@ -35,6 +36,58 @@ final class ReferenceDataController extends Controller
         } catch (RuntimeException $exception) {
             return response()->json(['error' => ['code' => 'units_of_measure_unavailable', 'message' => $exception->getMessage()]], 503);
         }
+    }
+
+    /**
+     * Unit kerja dan orang milik Core, untuk dropdown yang menampilkan **nama**.
+     *
+     * Sebelum ini layar mutasi meminta pengguna mengetik ULID unit kerja dan ULID pengguna
+     * ke dalam kotak teks. Itu bukan sekadar tidak nyaman: tidak ada orang yang hafal ULID,
+     * jadi satu-satunya cara mengisinya benar adalah menyalinnya dari tempat lain, dan
+     * salah satu digit yang tertukar tersimpan tanpa keluhan.
+     *
+     * Izinnya menumpang izin layar yang memakainya, sama seperti satuan: siapa pun yang
+     * boleh membuka salah satu layar itu memang sudah harus dapat melihat pilihannya.
+     */
+    private const DIREKTORI_READERS = [
+        'management-aset.mutasi-aset.read',
+        'management-aset.aset.read',
+        'management-aset.pemeliharaan-aset.read',
+    ];
+
+    public function operatingUnits(Request $request, DirektoriAset $direktori): JsonResponse
+    {
+        $this->guardDirektori($request);
+
+        return response()->json(['data' => array_map(
+            // `kode` sengaja disamakan dengan nama: kontrak Core tidak memulangkan kode
+            // unit, dan label dropdown modul ini berbentuk `kode — nama`. Tanpa penyamaan
+            // itu, pilihannya terbaca sebagai "— Divisi Engineering".
+            static fn (array $unit): array => ['id' => $unit['id'], 'kode' => $unit['nama'], 'nama' => $unit['nama'], 'display_label' => $unit['nama']],
+            $direktori->unitKerja((string) $request->attributes->get('coreerp.tenant_id')),
+        )]);
+    }
+
+    public function members(Request $request, DirektoriAset $direktori): JsonResponse
+    {
+        $this->guardDirektori($request);
+
+        return response()->json(['data' => array_map(
+            static fn (array $anggota): array => [
+                'id' => $anggota['id'],
+                'kode' => $anggota['nama'],
+                'nama' => $anggota['nama'],
+                'display_label' => $anggota['nama'],
+                'email' => $anggota['email'],
+            ],
+            $direktori->anggota((string) $request->attributes->get('coreerp.tenant_id')),
+        )]);
+    }
+
+    private function guardDirektori(Request $request): void
+    {
+        $held = $request->attributes->get('coreerp.permissions', []);
+        abort_if(array_intersect(self::DIREKTORI_READERS, $held) === [], 403);
     }
 
     public function fiscalClassifications(Request $request): JsonResponse

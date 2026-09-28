@@ -1,0 +1,7 @@
+type: apiKey
+in: header
+name: X-CoreERP-Tenant-Id
+description: |
+  Tenant yang menjadi konteks request. Credential yang terikat tenant hanya sah
+  untuk tenant itu. Nilai ini adalah **satu-satunya** sumber `tenant_id`; body dan
+  query tidak pernah dipercaya.

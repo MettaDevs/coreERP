@@ -4,11 +4,6 @@
 #
 #   coreerp-agent enroll --admin-url https://admin.erp.contoh --token <token>
 #   coreerp-agent run [--now]
-#   coreerp-agent write-report [folder]
-#   coreerp-agent import-package <folder paket>
-#   coreerp-agent confirm-enrollment
-#   coreerp-agent install-bundle <folder bundle>
-#   coreerp-agent install-license <berkas lisensi>
 #   coreerp-agent bootstrap-tenant --admin-name <nama> --admin-email <email>
 #
 # Agen ini **menarik**, bukan didorong. Server klinik hampir selalu di belakang router tanpa port masuk,
@@ -22,9 +17,11 @@
 #    Daftar tertutup menjaga server klien dari admin.erp yang dibobol — bukan dari orang yang sudah
 #    memegang root di server ini.
 #
-# 2. **Kunci publik rilis tidak pernah diambil dari admin.erp.** Ia dipasang sekali lewat jalur lain
-#    (`pasang.sh`). admin.erp yang dibobol hanya dapat meminta rilis yang memang kami tanda tangani,
-#    bukan membuat rilis baru.
+# 2. **Kunci publik rilis tidak pernah diganti lewat agen.** `pasang.sh` mengambilnya sekali saat
+#    pemasangan pertama dan menolak kunci yang berbeda dari yang sudah terpasang; sesudah itu agen hanya
+#    membacanya dari disk, dan tidak ada operasi maupun jawaban admin.erp yang menyentuhnya. admin.erp
+#    yang dibobol sesudah pemasangan hanya dapat meminta rilis yang memang kami tanda tangani, bukan
+#    membuat rilis baru.
 #
 # 3. **Rilis wajib naik.** Satu celah yang tersisa bila admin.erp dibobol adalah meminta server mundur
 #    ke rilis lama yang sah tetapi bercacat keamanan. Agen menolak rilis yang tidak lebih baru dari yang
@@ -48,18 +45,108 @@ shopt -s inherit_errexit
 
 AGEN_VERSI='0.1.0'
 
+# Didefinisikan sebelum setelan: pembacaan agent.env di bawah sudah dapat menolak.
+gagal() {
+    printf '\n' >&2
+    printf 'GAGAL: %s\n' "$1" >&2
+    shift
+    [ "$#" -eq 0 ] || printf '%s\n' "$@" >&2
+    exit 1
+}
+
 RUMAH="${COREERP_HOME:-/opt/coreerp}"
 FOLDER_AGEN="$RUMAH/agent"
+BERKAS_SETELAN="$FOLDER_AGEN/agent.env"
 BERKAS_SITUS="$FOLDER_AGEN/site.json"
 KUNCI_SITUS="$FOLDER_AGEN/site-key.pem"
 KUNCI_SITUS_PUBLIK="$FOLDER_AGEN/site-public.pem"
 KUNCI_TERTUNDA="$FOLDER_AGEN/site-key.pem.tertunda"
 FOLDER_LISENSI="$FOLDER_AGEN/license"
 FOLDER_RILIS="$FOLDER_AGEN/releases"
-FOLDER_KOTAK_KELUAR="$FOLDER_AGEN/outbox"
 FOLDER_LOG="$FOLDER_AGEN/log"
 BERKAS_KEADAAN="$FOLDER_AGEN/state.json"
 BERKAS_KUNCI_PUTARAN="$FOLDER_AGEN/run.lock"
+
+# --- Setelan server: lingkungan proses, lalu agent.env, lalu bawaan ------------------------------------
+#
+# agent.env dulu hanya dibaca unit systemd lewat `EnvironmentFile=`. Perintah yang dijalankan tangan lewat
+# /usr/local/bin/coreerp-agent — bootstrap-tenant, run --now — tidak pernah melihatnya dan diam-diam
+# memakai bawaan: bootstrap-tenant masuk ke proyek compose `coreerp` walaupun situs ini berjalan di proyek
+# lain, dan pembaruan yang dijalankan run dari terminal memberi update.sh folder cadangan bawaan, bukan disk
+# kedua yang disebut agent.env. Agen karena itu membacanya sendiri, supaya timer dan terminal memakai
+# setelan yang sama.
+#
+# Berkasnya TIDAK di-`source`. Ia ditulis tangan di server klien dan dibaca proses root; baris `$(...)` di
+# sana tidak boleh menjadi perintah. Hanya `KUNCI=nilai` yang diterima, dan hanya kunci di daftar di bawah —
+# yang benar-benar dibaca agen atau update.sh. Nilainya dibatasi pada huruf yang dibaca sama persis oleh
+# systemd dan oleh pembacaan ini: kutip, spasi, `$`, dan garis miring terbalik masing-masing diurai systemd
+# dengan aturannya sendiri, dan nilai yang dibaca berbeda di dua tempat adalah cacat yang sama dengan yang
+# diperbaiki di sini.
+#
+# Yang sengaja tidak ada di daftar: COREERP_HOME (berkas ini tinggal di bawahnya), COREERP_UPDATE_SCRIPT dan
+# COREERP_AGENT_BATAS_RINGKASAN_DETIK (seam pengujian, bukan setelan), dan COREERP_LEWATI_PERIKSA_CADANGAN
+# (melewati pemeriksaan adalah keputusan satu kali jalan; di berkas ia diam-diam berlaku untuk setiap pembaruan
+# sesudahnya).
+SETELAN_DIIZINKAN=(
+    COREERP_PROYEK
+    COREERP_FOLDER_CADANGAN
+    COREERP_ENV
+    COREERP_KUNCI_PUBLIK
+    COREERP_TITIK_DATA_DB
+    COREERP_BATAS_SEHAT_DETIK
+    COREERP_AGENT_DETAK_DETIK
+)
+
+muat_setelan() {
+    local berkas="$1" baris sisa nomor=0 kunci nilai satu diizinkan
+    local -A dari_berkas=()
+
+    [ -f "$berkas" ] || return 0
+
+    while IFS= read -r baris || [ -n "$baris" ]; do
+        nomor=$((nomor + 1))
+        sisa="${baris#"${baris%%[![:space:]]*}"}"
+
+        case "$sisa" in
+            '' | '#'* | ';'*) continue ;;
+        esac
+
+        # Baris yang ditolak disebut nomornya saja, bukan isinya: keluaran agen masuk journald, dan
+        # rahasia yang keliru ditaruh di sini tidak boleh ikut tercetak.
+        [[ "$baris" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || gagal \
+            "$berkas baris $nomor bukan KUNCI=nilai." \
+            'Berkas ini tidak dijalankan sebagai skrip. Yang diterima hanya baris KUNCI=nilai, komentar' \
+            'yang diawali # atau ;, dan baris kosong.'
+
+        kunci="${BASH_REMATCH[1]}"
+        nilai="${BASH_REMATCH[2]}"
+        diizinkan=0
+
+        for satu in "${SETELAN_DIIZINKAN[@]}"; do
+            [ "$satu" != "$kunci" ] || diizinkan=1
+        done
+
+        [ "$diizinkan" -eq 1 ] || gagal \
+            "$berkas baris $nomor: $kunci bukan setelan yang dibaca agen." \
+            "Yang diterima: ${SETELAN_DIIZINKAN[*]}"
+
+        [[ "$nilai" =~ ^[A-Za-z0-9_./:@+-]*$ ]] || gagal \
+            "$berkas baris $nomor: nilai $kunci memuat huruf yang tidak diterima." \
+            'Hanya huruf, angka, dan . _ / : @ + - — tanpa kutip, spasi, $, atau garis miring terbalik.'
+
+        # Kunci yang disebut dua kali: yang terakhir berlaku, sama dengan systemd.
+        dari_berkas["$kunci"]="$nilai"
+    done < "$berkas"
+
+    # Nilai yang disebut di lingkungan proses menang: itu keputusan orang yang menjalankan perintah saat
+    # itu. Di bawah systemd nilainya datang dari berkas yang sama, jadi keduanya tidak berbeda. Diekspor,
+    # bukan hanya disetel, karena update.sh yang dijalankan agen membaca variabel yang sama.
+    for kunci in "${!dari_berkas[@]}"; do
+        [ -n "${!kunci:-}" ] || export "$kunci=${dari_berkas[$kunci]}"
+    done
+}
+
+muat_setelan "$BERKAS_SETELAN"
 
 # Nama variabel dan jalur bawaannya sama dengan `update.sh`, supaya keduanya tidak pernah memeriksa
 # dengan kunci yang berbeda.
@@ -75,16 +162,14 @@ FOLDER_KEADAAN_UPDATE="$RUMAH/keadaan"
 DETAK_DETIK="${COREERP_AGENT_DETAK_DETIK:-300}"
 [[ "$DETAK_DETIK" =~ ^[1-9][0-9]*$ ]] || DETAK_DETIK=300
 
+# Batas menunggu ringkasan feed posting finance dari Core pada setiap laporan. Core yang macet — database terkunci
+# migrasi, container yang menggantung — tidak boleh menahan laporan: laporan yang tidak pernah terkirim membuat
+# seluruh server terlihat "Tidak melapor" di admin.erp, bukan hanya feed-nya.
+BATAS_RINGKASAN_DETIK="${COREERP_AGENT_BATAS_RINGKASAN_DETIK:-20}"
+[[ "$BATAS_RINGKASAN_DETIK" =~ ^[1-9][0-9]*$ ]] || BATAS_RINGKASAN_DETIK=20
+
 SEMENTARA=''
 ALASAN=''
-
-gagal() {
-    printf '\n' >&2
-    printf 'GAGAL: %s\n' "$1" >&2
-    shift
-    [ "$#" -eq 0 ] || printf '%s\n' "$@" >&2
-    exit 1
-}
 
 langkah() {
     printf '\n==> %s\n' "$*"
@@ -111,25 +196,21 @@ bantuan() {
     cat <<'TEKS'
 Agen situs CoreERP.
 
-  coreerp-agent enroll --admin-url URL --token TOKEN   mendaftarkan situs online
+  coreerp-agent enroll --admin-url URL --token TOKEN   mendaftarkan situs ke admin.erp
   coreerp-agent run [--now]                             satu putaran: lapor, ambil operasi, kerjakan
-  coreerp-agent write-report [FOLDER]                   menulis file laporan bertanda tangan
-  coreerp-agent import-package FOLDER                   mendaftarkan situs offline dari paket pendaftaran
-  coreerp-agent confirm-enrollment                      menghapus token pendaftaran sesudah situs terikat
-  coreerp-agent install-bundle FOLDER                   memasang bundle rilis yang dibawa dengan flashdisk
-  coreerp-agent install-license BERKAS                  memasang lisensi yang dibawa dengan flashdisk
   coreerp-agent bootstrap-tenant --admin-name NAMA --admin-email EMAIL
                                                         melahirkan tenant dan admin pertamanya (sekali,
                                                         dari terminal, sesudah rilis pertama terpasang)
 
-Seluruh jalur berada di bawah COREERP_HOME (bawaan /opt/coreerp).
+Seluruh jalur berada di bawah COREERP_HOME (bawaan /opt/coreerp). Setelan server dibaca dari
+COREERP_HOME/agent/agent.env; variabel yang disebut di lingkungan perintah menang atas berkas itu.
 TEKS
 }
 
 periksa_perintah() {
     local kurang=() satu
 
-    for satu in curl jq openssl sha256sum flock docker base64 df; do
+    for satu in curl jq openssl sha256sum flock docker base64 df timeout; do
         command -v "$satu" >/dev/null 2>&1 || kurang+=("$satu")
     done
 
@@ -142,9 +223,9 @@ periksa_perintah() {
 
 # --- Validasi nilai yang ikut masuk ke jalur berkas, URL, dan header ----------------------------------
 #
-# Nilai-nilai ini datang dari admin.erp atau dari paket di flashdisk. Mereka dipakai menyusun jalur
-# berkas dan URL, jadi bentuknya dibatasi sebelum dipakai: id berisi `../` akan menulis di luar folder
-# agen, dan id berisi tanda kutip akan merusak header tanda tangan.
+# Nilai-nilai ini datang dari admin.erp. Mereka dipakai menyusun jalur berkas dan URL, jadi bentuknya
+# dibatasi sebelum dipakai: id berisi `../` akan menulis di luar folder agen, dan id berisi tanda kutip
+# akan merusak header tanda tangan.
 
 cocok() {
     [[ "$1" =~ $2 ]]
@@ -193,6 +274,13 @@ rilis_lebih_baru() {
 periksa_alamat_admin() {
     local alamat="$1" sisa host
 
+    # Bagian pengguna (`orang@host`) tidak pernah sah untuk admin.erp, dan ia menipu pemotong host di
+    # bawah: `http://127.0.0.1:1@admin.erp.contoh` terbaca localhost, padahal curl mengirim permintaannya
+    # ke admin.erp.contoh tanpa TLS.
+    case "$alamat" in
+        *@*) gagal "Alamat admin.erp tidak boleh memuat bagian pengguna (@): $alamat" 'Contoh yang benar: https://admin.erp.contoh' ;;
+    esac
+
     case "$alamat" in
         https://*) ;;
         http://*)
@@ -221,7 +309,7 @@ periksa_alamat_admin() {
 # --- Berkas situs dan keadaan ---------------------------------------------------------------------------
 
 siapkan_folder() {
-    mkdir -p "$FOLDER_AGEN" "$FOLDER_RILIS" "$FOLDER_KOTAK_KELUAR" "$FOLDER_LOG"
+    mkdir -p "$FOLDER_AGEN" "$FOLDER_RILIS" "$FOLDER_LOG"
     chmod 0700 "$FOLDER_AGEN"
 
     # Folder lisensi dibaca Core dari dalam container lewat bind mount hanya-baca, oleh pengguna yang
@@ -232,19 +320,17 @@ siapkan_folder() {
 
 SITUS_ID=''
 SITUS_ADMIN=''
-SITUS_KANAL=''
 
 muat_situs() {
     [ -f "$BERKAS_SITUS" ] || gagal \
         "Situs ini belum terdaftar: $BERKAS_SITUS tidak ada." \
-        "Daftarkan dengan \`coreerp-agent enroll\` (online) atau \`coreerp-agent import-package\` (offline)."
+        "Daftarkan dengan \`coreerp-agent enroll\`."
 
     jq -e 'type == "object"' "$BERKAS_SITUS" >/dev/null 2>&1 \
         || gagal "$BERKAS_SITUS bukan JSON yang dapat dibaca."
 
     SITUS_ID="$(jq -r '.site_id // "" | tostring' "$BERKAS_SITUS")"
     SITUS_ADMIN="$(jq -r '.admin_url // "" | tostring' "$BERKAS_SITUS")"
-    SITUS_KANAL="$(jq -r '.channel // "" | tostring' "$BERKAS_SITUS")"
 
     id_sah "$SITUS_ID" || gagal "Id situs di $BERKAS_SITUS tidak sah."
     [ -f "$KUNCI_SITUS" ] || gagal "Kunci situs tidak ditemukan: $KUNCI_SITUS"
@@ -279,6 +365,50 @@ catat_operasi_terakhir() {
     # shellcheck disable=SC2016 # $id, $hasil, $langkah adalah variabel jq, bukan ekspansi shell
     ubah_keadaan --arg id "$id" --arg hasil "$hasil" --arg langkah "$langkah_teks" \
         '.last_operation = {id: $id, result: $hasil, step: (if $langkah == "" then null else $langkah[0:120] end)}'
+}
+
+# Jenis operasi yang sedang dikerjakan putaran ini. Diisi `kerjakan_operasi`, dibaca `tutup_operasi`.
+OPERASI_JENIS=''
+
+# Operasi yang sedang berjalan, beserta langkahnya, dicatat di state.json selama ia berjalan.
+#
+# Pembacanya `pasang.sh`, yang menunggu operasi `install` di terminal teknisi. `run --now` baru pulang
+# sesudah operasinya selesai — bisa puluhan menit menarik image lewat sambungan klinik — jadi langkah yang
+# sedang berjalan hanya dapat dibaca dari sini. Laporan ke admin.erp tidak ikut membawanya: `susun_laporan`
+# menyebut kuncinya satu per satu.
+catat_operasi_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg id "$1" --arg jenis "$2" '.current_operation = {id: $id, operation: $jenis, release: null, step: null}'
+}
+
+catat_langkah_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg langkah "$1" \
+        'if (.current_operation | type) == "object" then .current_operation.step = $langkah[0:120] else . end'
+}
+
+catat_rilis_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg rilis "$1" \
+        'if (.current_operation | type) == "object" then .current_operation.release = $rilis else . end'
+}
+
+# Hasil operasi `install` terakhir, terpisah dari last_operation yang ditimpa operasi apa pun sesudahnya.
+# `pasang.sh` yang dijalankan ulang di server yang sudah terpasang membacanya untuk tidak menunggu
+# pemasangan yang sudah lama selesai. Sebab kegagalan ikut dicatat karena teknisi di depan terminal itulah
+# yang paling mungkin memperbaikinya; isinya kalimat agen atau ekor keluaran update.sh dan Core, yang
+# keduanya tidak pernah mencetak rahasia — dan hash kata sandi tidak pernah masuk ke sana (operasi_pasang).
+catat_pemasangan_terakhir() {
+    local id="$1" hasil="$2" langkah_teks="$3" pesan="$4"
+
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg id "$id" --arg hasil "$hasil" --arg langkah "$langkah_teks" --arg pesan "$pesan" \
+        '.last_install = {
+            id: $id,
+            result: $hasil,
+            step: (if $langkah == "" then null else $langkah[0:120] end),
+            message: (if $hasil == "failed" then $pesan[0:4000] else null end)
+        }'
 }
 
 buat_kunci() {
@@ -433,18 +563,127 @@ tanggal_habis_lisensi() {
     fi
 }
 
+# Mencetak `true` atau `false` — nilai JSON `license_perpetual` di laporan.
+#
+# Lisensi tanpa tanggal berakhir tidak punya tanggal yang dapat dibaca admin.erp. Tanpa penanda ini ia
+# terbaca persis seperti lisensi yang hilang, dan admin.erp akan menerbitkan lisensi baru setiap kali jeda
+# perpanjangannya lewat. `has` memisahkan null yang disengaja dari berkas yang tidak menyebutnya sama sekali.
+lisensi_permanen() {
+    local berkas="$FOLDER_LISENSI/license.json"
+
+    if [ -f "$berkas" ] \
+        && jq -e 'type == "object" and has("valid_until") and .valid_until == null' "$berkas" >/dev/null 2>&1; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+# Mencetak `true`, `false`, atau `null` — nilai JSON `license_required` di laporan.
+#
+# Root di server klien dapat mematikan kunci lisensi dengan satu baris `.env`, dan agen tidak dapat
+# mencegahnya. Yang dapat dilakukan agen: melaporkan apa yang akan dilihat Core, supaya admin.erp tahu.
+#
+# Yang dibaca `.env` yang sama dengan yang diberikan update.sh ke Compose. Compose memakai baris terakhir
+# untuk kunci yang disebut dua kali, jadi baris terakhir yang menentukan — `=false` yang ditambahkan di
+# bawah `=true` tetap berarti mati. `true` hanya untuk bentuk yang persis; kutip, spasi, komentar di ujung,
+# atau `export` dilaporkan `false`. Keliru ke arah itu hanya menyalakan peringatan yang lalu diperiksa
+# orang; keliru ke arah sebaliknya menyembunyikan kunci yang dimatikan.
+lisensi_diwajibkan() {
+    local baris status=0
+
+    baris="$(grep -E '^[[:space:]]*(export[[:space:]]+)?COREERP_LICENSE_REQUIRED[[:space:]]*=' "$BERKAS_ENV" 2>/dev/null \
+        | tail -n 1)" || status=$?
+
+    case "$status" in
+        0) ;;
+        # Kuncinya tidak disebut: Compose memakai bawaan false.
+        1) printf 'false'; return 0 ;;
+        # Berkasnya tidak ada atau tidak terbaca. Yang tidak diketahui tidak dilaporkan sebagai false.
+        *) printf 'null'; return 0 ;;
+    esac
+
+    if [ "$baris" = 'COREERP_LICENSE_REQUIRED=true' ]; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
+# baca_ringkasan_feed TUJUAN — menulis `finance_feed` untuk laporan: objek ringkasan, atau `null`.
+#
+# Ringkasan feed posting finance datang dari Core lewat `php artisan finance-postings:summary` — jalan yang sama
+# dengan `tenant:bootstrap-site`: container `core-app`, compose dan image yang dicatat update.sh sesudah terbukti
+# sehat. Tanpa endpoint HTTP dan tanpa kredensial baru di server ini.
+#
+# Keluarannya tidak diteruskan apa adanya. Objeknya disusun ulang kunci demi kunci di sini, dengan bentuk yang
+# diperiksa: jumlah bilangan bulat tidak negatif, waktu UTC berakhiran Z. Kunci yang kelak ditambahkan Core —
+# nomor posting, nama akun, nilai uang — tidak ikut keluar dari server ini sebelum agen dan kontraknya sendiri
+# menyebutnya. `last_pushed_at` dan `failed_pushes` hanya ikut bila Core mengirim keduanya: rilis Core yang lebih
+# lama dari agen ini belum punya angka push, dan laporannya tetap sah tanpa keduanya.
+#
+# `null`, bukan objek kosong atau angka nol, bila ringkasannya tidak didapat: belum ada rilis yang terbukti sehat,
+# .env tidak ada, Core tidak menjawab dalam BATAS_RINGKASAN_DETIK, rilis Core belum punya perintahnya, atau
+# keluarannya tidak berbentuk. Nol berarti "tidak ada posting", dan itu klaim yang tidak diketahui kebenarannya.
+# Laporannya sendiri tetap dikirim.
+baca_ringkasan_feed() {
+    local tujuan="$1" mentah="$SEMENTARA/ringkasan-feed.json" compose_sehat versi_sehat image_sehat=''
+
+    compose_sehat="$FOLDER_KEADAAN_UPDATE/compose-sehat.yaml"
+    versi_sehat="$FOLDER_KEADAAN_UPDATE/versi-sehat"
+    [ ! -f "$versi_sehat" ] || image_sehat="$(cat "$versi_sehat" 2>/dev/null || true)"
+
+    # stdin dari /dev/null: `compose exec` meneruskan stdin, dan `run --now` dari terminal tidak boleh
+    # menunggunya. `9>&-`: Core yang tertinggal sesudah batas waktunya tidak ikut memegang kunci putaran.
+    if [ -n "$image_sehat" ] && [ -f "$compose_sehat" ] && [ -f "$BERKAS_ENV" ] \
+        && EDITION_IMAGE="$image_sehat" timeout --kill-after=5 "$BATAS_RINGKASAN_DETIK" \
+            docker compose --project-name "$PROYEK" --env-file "$BERKAS_ENV" -f "$compose_sehat" \
+            exec -T core-app php artisan finance-postings:summary < /dev/null > "$mentah" 2>/dev/null 9>&- \
+        && jq -cs '
+            def jumlah: if type == "number" and . >= 0 and . == floor then . else error("jumlah") end;
+            def waktu:
+                if . == null then null
+                elif type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") then .
+                else error("waktu") end;
+            if length == 1 and (.[0] | type) == "object" and (.[0].counts | type) == "object"
+                and (.[0] | has("oldest_pending_at") and has("last_pulled_at"))
+            then .[0] else error("bentuk") end
+            | {
+                counts: {
+                    held: (.counts.held | jumlah),
+                    pending: (.counts.pending | jumlah),
+                    posted: (.counts.posted | jumlah),
+                    rejected: (.counts.rejected | jumlah),
+                    manual: (.counts.manual | jumlah)
+                },
+                oldest_pending_at: (.oldest_pending_at | waktu),
+                last_pulled_at: (.last_pulled_at | waktu)
+              }
+              + (if has("last_pushed_at") and has("failed_pushes")
+                 then {last_pushed_at: (.last_pushed_at | waktu), failed_pushes: (.failed_pushes | jumlah)}
+                 else {} end)' "$mentah" > "$tujuan" 2>/dev/null; then
+        return 0
+    fi
+
+    printf 'null' > "$tujuan"
+}
+
 # Setiap kunci laporan disebut satu per satu. Tidak ada `+ $keadaan` atau salinan utuh dari berkas
 # lain: kunci baru di state.json tidak boleh ikut keluar hanya karena seseorang menambahkannya di sana.
 susun_laporan() {
-    local tujuan="$1" sekarang kontainer data cadangan lisensi
+    local tujuan="$1" sekarang kontainer feed data cadangan lisensi wajib
 
     sekarang="$(sekarang_utc)"
     kontainer="$SEMENTARA/kontainer.json"
     baca_kontainer "$kontainer"
+    feed="$SEMENTARA/finance-feed.json"
+    baca_ringkasan_feed "$feed"
 
     data="$(ruang_bebas "$(folder_data)")"
     cadangan="$(ruang_bebas "$FOLDER_CADANGAN")"
     lisensi="$(tanggal_habis_lisensi)"
+    permanen="$(lisensi_permanen)"
+    wajib="$(lisensi_diwajibkan)"
 
     jq -c -n \
         --arg site_id "$SITUS_ID" \
@@ -453,8 +692,11 @@ susun_laporan() {
         --arg data "$data" \
         --arg cadangan "$cadangan" \
         --arg lisensi "$lisensi" \
+        --argjson permanen "$permanen" \
+        --argjson wajib "$wajib" \
         --slurpfile keadaan "$BERKAS_KEADAAN" \
-        --slurpfile kontainer "$kontainer" '
+        --slurpfile kontainer "$kontainer" \
+        --slurpfile feed "$feed" '
         def angka($s): if ($s | test("^[0-9]+$")) then ($s | tonumber) else null end;
         def teks($s): if ($s | type) == "string" and $s != "" then $s else null end;
         ($keadaan[0] // {}) as $k
@@ -480,12 +722,38 @@ susun_laporan() {
                 else null end
             ),
             certificate_expires_at: null,
-            license_expires_at: teks($lisensi)
+            license_expires_at: teks($lisensi),
+            license_perpetual: $permanen,
+            license_required: $wajib,
+            finance_feed: $feed[0]
           }
         | if .containers == null then del(.containers) else . end' > "$tujuan"
 }
 
-# Mencetak kode HTTP. Interval dari admin.erp disimpan di site.json dan dipakai sebagai jeda putaran.
+# Perpanjangan lisensi datang di jawaban laporan saat jatuh tempo — tanpa penjadwal di server ini dan tanpa
+# operator yang harus mengingatnya. Keluarannya hanya ke stderr: stdout kirim_laporan adalah kode HTTP.
+#
+# Gagal memasang tidak menggagalkan laporan maupun putaran. Lisensi yang terpasang tetap berlaku sampai
+# tanggalnya, laporan berikutnya masih menyebut tanggal lama, dan admin.erp menyertakan lisensi lagi sesudah
+# jedanya. Putaran yang berhenti di sini justru tidak lagi mengambil operasi yang dapat memperbaikinya.
+pasang_lisensi_dari_laporan() {
+    local jawaban="$1"
+
+    jq -e 'type == "object" and has("license")' "$jawaban" >/dev/null 2>&1 || return 0
+
+    if pasang_lisensi "$jawaban" '.license'; then
+        if [ "$(lisensi_permanen)" = true ]; then
+            catat 'Lisensi dari admin.erp terpasang, tanpa tanggal berakhir.'
+        else
+            catat "Lisensi dari admin.erp terpasang, berlaku sampai $(tanggal_habis_lisensi)."
+        fi
+    else
+        catat "Lisensi dari admin.erp DITOLAK dan tidak dipasang: $ALASAN. Lisensi yang terpasang tidak diubah."
+    fi
+}
+
+# Mencetak kode HTTP. Interval dari admin.erp disimpan di site.json dan dipakai sebagai jeda putaran;
+# lisensi yang disertakan admin.erp dipasang.
 kirim_laporan() {
     local isi="$SEMENTARA/laporan.json" jawaban="$SEMENTARA/laporan-jawaban.json" kode interval
 
@@ -502,6 +770,8 @@ kirim_laporan() {
 
         # shellcheck disable=SC2016 # variabel jq
         ubah_keadaan --argjson t "$(date +%s)" '.last_report_epoch = $t'
+
+        pasang_lisensi_dari_laporan "$jawaban"
     fi
 
     printf '%s' "$kode"
@@ -509,11 +779,18 @@ kirim_laporan() {
 
 # --- Laporan langkah operasi ----------------------------------------------------------------------------
 
+# Detik Unix laporan langkah terakhir yang diterima admin.erp, dari shell ini. Dibaca detak_bila_perlu.
+LAPOR_TERAKHIR=0
+
 # lapor_langkah ID STATUS LANGKAH [PESAN_GAGAL]
 # Pulang 0 bila dicatat, 3 bila admin.erp menjawab 409 (operasi bukan milik agen ini lagi), 1 selain itu.
 lapor_langkah() {
     local id="$1" status="$2" langkah_teks="$3" pesan="${4:-}"
     local isi="$SEMENTARA/langkah.json" jawaban="$SEMENTARA/langkah-jawaban.json" kode
+
+    # Dicatat sebelum dikirim: terminal pemasang tetap melihat langkahnya walaupun admin.erp sedang tidak
+    # terjangkau.
+    [ "$status" != running ] || catat_langkah_berjalan "$langkah_teks"
 
     jq -c -n --arg status "$status" --arg step "$langkah_teks" --arg pesan "$pesan" '
         {status: $status, step: $step[0:120]}
@@ -524,7 +801,10 @@ lapor_langkah() {
     kode="$(panggil POST "/api/agent/v1/operations/$id/steps" "$isi" "$jawaban")"
 
     case "$kode" in
-        200) return 0 ;;
+        200)
+            LAPOR_TERAKHIR="$(date +%s)"
+            return 0
+            ;;
         409)
             catat "admin.erp menjawab 409 untuk operasi $id: operasi ini tidak lagi dipegang agen ini."
             return 3
@@ -542,6 +822,7 @@ tutup_operasi() {
     local id="$1" status="$2" langkah_teks="$3" pesan="${4:-}" percobaan hasil
 
     catat_operasi_terakhir "$id" "$status" "$langkah_teks"
+    [ "$OPERASI_JENIS" != install ] || catat_pemasangan_terakhir "$id" "$status" "$langkah_teks" "$pesan"
 
     for percobaan in 1 2 3; do
         hasil=0
@@ -559,10 +840,15 @@ tutup_operasi() {
 
 # --- Rilis: unduh, periksa, jaga ------------------------------------------------------------------------
 
+MANIFEST_VERSI=''
 MANIFEST_EDISI=''
 MANIFEST_RILIS=''
 MANIFEST_IMAGE=''
 MANIFEST_DIGEST=''
+MANIFEST_CONFIG_DIGEST=''
+PENDAMPING_NAMA=()
+PENDAMPING_IMAGE=()
+PENDAMPING_DIGEST=()
 
 berkas_tercantum() {
     awk -v nama="$2" '{ n = $2; sub(/^\*/, "", n); if (n == nama) ada = 1 } END { exit !ada }' "$1"
@@ -588,9 +874,8 @@ periksa_berkas_rilis() {
     fi
 
     # `sha256sum --check` hanya memeriksa berkas yang tercantum. Berkas yang tidak tercantum lolos tanpa
-    # diperiksa sama sekali — termasuk arsip image yang diselipkan ke samping berkas rilis online.
+    # diperiksa sama sekali.
     wajib=(manifest.json compose.yaml update.sh)
-    [ ! -e "$folder/images.tar.gz" ] || wajib+=(images.tar.gz)
 
     for satu in "${wajib[@]}"; do
         berkas_tercantum "$folder/SHA256SUMS" "$satu" \
@@ -605,6 +890,16 @@ periksa_berkas_rilis() {
     jq -e 'type == "object"' "$folder/manifest.json" >/dev/null 2>&1 \
         || { tolak 'manifest.json bukan objek JSON'; return 1; }
 
+    # Manifest v1 tidak pernah menyebut `versi`. Versi yang disebut tetapi tidak dikenal ditolak, bukan dibaca
+    # sebagai v1: bentuk yang lebih baru boleh saja kebetulan memuat `edisi` dan `image`.
+    if jq -e 'has("versi")' "$folder/manifest.json" >/dev/null 2>&1; then
+        jq -e '.versi == 2' "$folder/manifest.json" >/dev/null 2>&1 \
+            || { tolak 'manifest menyebut versi yang tidak dikenal agen ini'; return 1; }
+        periksa_manifest_v2 "$folder/manifest.json" || return 1
+        return 0
+    fi
+
+    MANIFEST_VERSI=1
     MANIFEST_EDISI="$(jq -r '.edisi // "" | tostring' "$folder/manifest.json")"
     MANIFEST_RILIS="$(jq -r '.rilis // "" | tostring' "$folder/manifest.json")"
     MANIFEST_IMAGE="$(jq -r '.image // "" | tostring' "$folder/manifest.json")"
@@ -613,6 +908,90 @@ periksa_berkas_rilis() {
     edisi_sah "$MANIFEST_EDISI" || { tolak 'manifest menyebut edisi yang tidak sah'; return 1; }
     rilis_sah "$MANIFEST_RILIS" || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
     [ -n "$MANIFEST_IMAGE" ] || { tolak 'manifest tidak menyebut image'; return 1; }
+}
+
+# Bentuk nilai manifest v2, dalam jq. Pola memakai `\A` dan `\z` dengan alasan yang sama dengan
+# periksa_parameter_pasang: `$` Oniguruma juga cocok sebelum baris baru di ujung.
+#
+# `repositori` tanpa host dan tanpa tag. Host datang dari admin.erp bersama kredensialnya, pada setiap operasi;
+# image yang menyebut host sendiri akan ditarik dari registry yang tidak pernah dipilih siapa pun di sini. Docker
+# membaca komponen pertama sebagai host bila ia memuat titik atau berbunyi `localhost` — dan pola huruf di bawah
+# sendiri tidak menolak titik — jadi komponen pertama diperiksa tersendiri.
+# shellcheck disable=SC2016 # $b adalah variabel jq
+JQ_BENTUK_V2='
+    def repositori: type == "string"
+        and test("\\A[a-z0-9]+([._/-][a-z0-9]+)*\\z")
+        and (split("/") as $b | ($b | length) == 1 or (($b[0] | contains(".") | not) and $b[0] != "localhost"));
+    def digest: type == "string" and test("\\Asha256:[a-f0-9]{64}\\z");
+'
+
+# periksa_manifest_v2 BERKAS — manifest rilis v2 dari perakit; pulang 1 dengan ALASAN, mengisi MANIFEST_* dan
+# PENDAMPING_* bila lulus.
+#
+# Setiap nilainya menjadi rujukan `docker pull` atau nama tag, jadi bentuknya dibatasi sebelum satu permintaan
+# pun sampai ke registry. Digest wajib lengkap: rujukan lewat digest itulah yang mengikat isi image pada tanda
+# tangan, sedangkan tag dapat dipindahkan. Nama pendamping wajib unik, karena nama itu menjadi tag lokal dan dua
+# pendamping bernama sama menimpa satu tag.
+#
+# Manifest v2 tidak menyebut edisi; pemanggil yang mengisi MANIFEST_EDISI dari operasi.
+periksa_manifest_v2() {
+    local berkas="$1" nama image digest
+
+    MANIFEST_VERSI=2
+    MANIFEST_EDISI=''
+
+    jq -e '(.rilis | type) == "string" and (.rilis | test("\\A(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,5}\\z"))' \
+        "$berkas" >/dev/null 2>&1 || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
+    MANIFEST_RILIS="$(jq -r '.rilis' "$berkas")"
+    rilis_sah "$MANIFEST_RILIS" || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
+
+    jq -e '(.commit | type) == "string" and (.commit | test("\\A[0-9a-f]{40}\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'commit di manifest v2 bukan SHA commit 40 huruf heksadesimal'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' .image | repositori' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'image di manifest v2 bukan jalur repositori tanpa host dan tanpa tag'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' (.digest | digest) and (.config_digest | digest)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'digest atau config_digest di manifest v2 bukan sha256: dengan 64 huruf heksadesimal kecil'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' (.pendamping | type) == "array"
+        and all(.pendamping[]; type == "object"
+            and (.nama | type == "string" and test("\\A[a-z0-9][a-z0-9._-]*\\z"))
+            and (.image | repositori) and (.digest | digest))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'pendamping di manifest v2 bukan larik {nama, image tanpa host, digest sha256}'; return 1; }
+
+    jq -e '[.pendamping[].nama] | length == (unique | length)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'pendamping di manifest v2 menyebut nama yang sama lebih dari sekali'; return 1; }
+
+    MANIFEST_IMAGE="$(jq -r '.image' "$berkas")"
+    MANIFEST_DIGEST="$(jq -r '.digest' "$berkas")"
+    MANIFEST_CONFIG_DIGEST="$(jq -r '.config_digest' "$berkas")"
+    PENDAMPING_NAMA=()
+    PENDAMPING_IMAGE=()
+    PENDAMPING_DIGEST=()
+
+    # Pola di atas tidak mengizinkan tab maupun baris baru, jadi @tsv aman dipecah di sini.
+    while IFS=$'\t' read -r nama image digest; do
+        PENDAMPING_NAMA+=("$nama")
+        PENDAMPING_IMAGE+=("$image")
+        PENDAMPING_DIGEST+=("$digest")
+    done < <(jq -r '.pendamping[] | [.nama, .image, .digest] | @tsv' "$berkas")
+}
+
+# Nama lokal image rilis v2. Aturan yang sama ditulis di `update.sh`, yang memeriksa tag ini sebelum compose
+# menyala, dan di `compose.yaml` rilis yang dirakit perakit. Ketiganya harus sama persis.
+#
+# Core bernomor rilis: satu image per rilis. Pendamping memakai 20 huruf pertama digestnya, bukan nomor rilis:
+# PostgreSQL yang digest-nya tidak berubah tetap bertag sama, sehingga Compose tidak membuat ulang container
+# database pada setiap pembaruan. `coreerp.local` tidak pernah di-resolve ke Docker Hub.
+tag_lokal_core() {
+    printf 'coreerp.local/core:%s' "$1"
+}
+
+tag_lokal_pendamping() {
+    local digest="${2#sha256:}"
+
+    printf 'coreerp.local/pendamping/%s:%s' "$1" "${digest:0:20}"
 }
 
 # izinkan_rilis EDISI RILIS — pulang 1 dengan ALASAN bila rilis ini tidak boleh dipasang di sini.
@@ -634,18 +1013,28 @@ izinkan_rilis() {
 }
 
 catat_rilis_terpasang() {
+    local image="$MANIFEST_IMAGE"
+
+    # Image v2 yang berjalan adalah tag lokalnya — nama yang dijalankan compose. `coreerp/core` tanpa host
+    # bukan nama yang dapat ditemukan siapa pun di server ini.
+    [ "$MANIFEST_VERSI" != 2 ] || image="$(tag_lokal_core "$MANIFEST_RILIS")"
+
     # shellcheck disable=SC2016 # variabel jq
     ubah_keadaan \
-        --arg e "$MANIFEST_EDISI" --arg r "$MANIFEST_RILIS" --arg i "$MANIFEST_IMAGE" --arg d "$MANIFEST_DIGEST" \
+        --arg e "$MANIFEST_EDISI" --arg r "$MANIFEST_RILIS" --arg i "$image" --arg d "$MANIFEST_DIGEST" \
         '.edition = $e | .release = $r
          | .image = (if $i == "" then null else $i end)
          | .digest = (if $d == "" then null else $d end)'
 }
 
-# ikuti_keluaran ID_OPERASI BERKAS_LOG BERKAS_PENANDA_LEPAS
+# ikuti_keluaran ID_OPERASI BERKAS_LOG BERKAS_PENANDA_LEPAS [LANGKAH_BERJALAN]
 #
 # Membaca keluaran update.sh baris demi baris: menyalinnya ke log dan ke keluaran agen, dan melaporkan
 # setiap baris `==> ` sebagai langkah. Berjalan di ujung pipa, jadi keadaannya dititipkan ke berkas.
+#
+# LANGKAH_BERJALAN adalah langkah yang sudah dilaporkan pemanggil sebelum keluarannya dimulai. Detak hanya
+# berlaku untuk langkah yang sedang berjalan; tanpanya perintah yang diam sampai selesai — `docker pull --quiet`
+# yang menarik ratusan megabyte — tidak pernah memperpanjang lease.
 #
 # Sesudah admin.erp menjawab 409, pelaporan berhenti tetapi **pembacaan tidak**, dan update.sh tidak
 # dibunuh. Berhenti membaca membuat update.sh mati kena SIGPIPE pada tulisan berikutnya — sama saja
@@ -653,7 +1042,7 @@ catat_rilis_terpasang() {
 # ada yang menjalankan jalur mundurnya. update.sh sendiri yang tahu cara mundur dengan selamat; operasi
 # yang sudah bukan milik kita lebih baik dibiarkan selesai daripada dihentikan di titik paling berbahaya.
 ikuti_keluaran() {
-    local id="$1" log="$2" penanda="$3" baris sisa='' kode_baca langkah_kini='' terakhir_lapor hasil batas_baca=30
+    local id="$1" log="$2" penanda="$3" baris sisa='' kode_baca langkah_kini="${4:-}" terakhir_lapor hasil batas_baca=30
 
     terakhir_lapor="$(date +%s)"
     [ "$DETAK_DETIK" -ge "$batas_baca" ] || batas_baca="$DETAK_DETIK"
@@ -750,27 +1139,348 @@ pesan_dari_log() {
     tail -n 20 "$1" 2>/dev/null | tr -d '\r' || true
 }
 
-operasi_upgrade() {
-    local id="$1" berkas="$2" edisi rilis sementara tujuan satu kode hasil log hasil_lokal
+PARAMETER_EDISI=''
+PARAMETER_RILIS=''
 
-    edisi="$(jq -r 'if (.parameters.edition | type) == "string" then .parameters.edition else "" end' "$berkas")"
-    rilis="$(jq -r 'if (.parameters.release | type) == "string" then .parameters.release else "" end' "$berkas")"
+# baca_parameter_rilis BERKAS_OPERASI — mengisi PARAMETER_EDISI dan PARAMETER_RILIS; pulang 1 dengan ALASAN.
+#
+# `upgrade` dan `install` menyebut rilisnya dengan cara yang sama, karena keduanya mengambil rilis lewat
+# jalur yang sama (`pasang_rilis`). `release` yang null atau kosong ditolak di sini: admin.erp tidak pernah
+# memberikan install tanpa rilis, dan agen tidak bergantung pada janji itu.
+baca_parameter_rilis() {
+    local berkas="$1"
 
-    if ! edisi_sah "$edisi" || ! rilis_sah "$rilis"; then
-        tutup_operasi "$id" failed 'Menolak pembaruan' 'parameter upgrade tidak sah: edition dan release wajib ada dan berbentuk benar'
+    PARAMETER_EDISI="$(jq -r 'if (.parameters.edition | type) == "string" then .parameters.edition else "" end' "$berkas")"
+    PARAMETER_RILIS="$(jq -r 'if (.parameters.release | type) == "string" then .parameters.release else "" end' "$berkas")"
+
+    if ! edisi_sah "$PARAMETER_EDISI" || ! rilis_sah "$PARAMETER_RILIS"; then
+        tolak 'edition dan release wajib ada dan berbentuk benar'
+        return 1
+    fi
+}
+
+# --- Rilis v2: image dari registry lewat digest (AG-01 di docs/todo/registry-harbor) ---------------------
+#
+# Server klien tidak menyimpan alamat registry maupun kredensialnya. Keduanya datang dari admin.erp pada setiap
+# operasi `install` atau `upgrade`, untuk robot pull-only yang lahir dan mati bersama operasi itu, dan hanya hidup
+# di variabel shell ini dan di DOCKER_CONFIG sementara milik putaran ini. Yang dijalankan compose hanya tag lokal
+# `coreerp.local/*`, diberikan sesudah RepoDigests image yang ditarik terbukti sama dengan digest yang
+# ditandatangani.
+
+REGISTRY_HOST=''
+REGISTRY_PENGGUNA=''
+REGISTRY_SANDI=''
+FOLDER_DOCKER=''
+HASIL_TARIK=''
+
+# minta_kredensial ID_OPERASI — mengisi REGISTRY_*; pulang 1 dengan ALASAN.
+#
+# Jawabannya memuat kata sandi robot. Berkas jawabannya ada di folder sementara agen (0700, umask 077) hanya
+# selama dibaca, dan dihapus sebelum fungsi ini pulang, apa pun hasilnya. Nilainya dibaca jq langsung dari berkas,
+# tidak pernah lewat argumen proses, dan tidak ada ALASAN yang menyebutnya.
+#
+# Bentuknya diperiksa di jq, bukan sesudah dibaca shell: substitusi perintah membuang baris baru di ujung, dan
+# host "registry.contoh\n" lalu terbaca sah. Host wajib memuat titik atau port — tanpa keduanya Docker membaca
+# komponen pertama rujukan sebagai namespace Docker Hub, dan `coreerp/coreerp/core` ditarik dari docker.io.
+minta_kredensial() {
+    local id="$1" isi="$SEMENTARA/kredensial.json" jawaban="$SEMENTARA/kredensial-jawaban.json" kode
+
+    REGISTRY_PENGGUNA=''
+    REGISTRY_SANDI=''
+
+    jq -c -n --arg id "$id" '{operation_id: $id}' > "$isi"
+    kode="$(panggil POST /api/agent/v1/registry-credential "$isi" "$jawaban")"
+
+    if [ "$kode" != 200 ]; then
+        rm -f "$jawaban"
+        case "$kode" in
+            409) tolak 'admin.erp tidak memberi kredensial registry (HTTP 409): situs ini tidak lagi memegang operasi ini' ;;
+            503) tolak 'admin.erp tidak dapat memberi kredensial registry (HTTP 503): registry belum disetel di admin.erp atau tidak menjawab' ;;
+            000) tolak 'admin.erp tidak dapat dihubungi untuk meminta kredensial registry' ;;
+            *) tolak "admin.erp tidak memberi kredensial registry (HTTP $kode)" ;;
+        esac
+        return 1
+    fi
+
+    if ! jq -e '.registry | type == "string" and length <= 261
+        and test("\\A[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:[0-9]{1,5})?\\z")
+        and test("[.:]")' "$jawaban" >/dev/null 2>&1; then
+        rm -f "$jawaban"
+        tolak 'admin.erp menjawab registry yang bukan host polos (host atau host:port, tanpa skema, path, atau pengguna)'
+        return 1
+    fi
+
+    if ! jq -e '(.username | type == "string" and length > 0 and length <= 255
+            and (test("[[:cntrl:][:space:]]") | not) and (startswith("-") | not))
+        and (.password | type == "string" and length > 0 and (test("[[:cntrl:]]") | not))' "$jawaban" >/dev/null 2>&1; then
+        rm -f "$jawaban"
+        tolak 'admin.erp menjawab kredensial registry yang tidak berbentuk: nama pengguna atau kata sandi kosong atau memuat huruf kendali (isinya tidak dicetak)'
+        return 1
+    fi
+
+    REGISTRY_HOST="$(jq -r '.registry' "$jawaban")"
+    REGISTRY_PENGGUNA="$(jq -r '.username' "$jawaban")"
+    REGISTRY_SANDI="$(jq -r '.password' "$jawaban")"
+    rm -f "$jawaban"
+}
+
+# masuk_registry — docker login ke DOCKER_CONFIG sementara, kata sandi lewat stdin; pulang 1 dengan ALASAN.
+#
+# Kata sandi dikosongkan sesudahnya, berhasil atau tidak. Kredensial berikutnya selalu diminta ulang ke admin.erp,
+# jadi tidak ada alasan menyimpannya lebih lama dari satu login.
+masuk_registry() {
+    local keluaran="$SEMENTARA/login-keluaran" status=0
+
+    # `printf` bawaan bash, bukan program: kata sandi tidak muncul di argumen proses mana pun.
+    printf '%s' "$REGISTRY_SANDI" \
+        | DOCKER_CONFIG="$FOLDER_DOCKER" docker login "$REGISTRY_HOST" --username "$REGISTRY_PENGGUNA" --password-stdin \
+            > "$keluaran" 2>&1 9>&- || status=$?
+    REGISTRY_SANDI=''
+
+    if [ "$status" -ne 0 ]; then
+        tolak "login ke registry $REGISTRY_HOST gagal: $(tail -n 3 "$keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+        return 1
+    fi
+}
+
+# lepas_registry — docker logout, lalu DOCKER_CONFIG sementara dihapus. Dipanggil pada setiap jalan keluar
+# tarik_image_rilis. Jalan keluar yang terputus di tengah — sinyal, atau agen yang mati — ditangani trap EXIT agen,
+# karena foldernya di dalam SEMENTARA.
+lepas_registry() {
+    REGISTRY_SANDI=''
+
+    if [ -n "$FOLDER_DOCKER" ]; then
+        if [ -n "$REGISTRY_HOST" ]; then
+            DOCKER_CONFIG="$FOLDER_DOCKER" docker logout "$REGISTRY_HOST" >/dev/null 2>&1 9>&- || true
+        fi
+        rm -rf "$FOLDER_DOCKER"
+    fi
+
+    FOLDER_DOCKER=''
+    REGISTRY_HOST=''
+    REGISTRY_PENGGUNA=''
+}
+
+# detak_bila_perlu ID_OPERASI LANGKAH — melaporkan LANGKAH ulang bila laporan terakhir sudah DETAK_DETIK lalu;
+# pulang 3 bila admin.erp melepas operasinya.
+#
+# Detak ikuti_keluaran hanya berjalan selama satu perintah ditunggu, dan jamnya mulai dari nol di setiap
+# perintah. Beberapa pull yang masing-masing sedikit lebih pendek dari DETAK_DETIK akan melewati lease tanpa satu
+# laporan pun, jadi di antara pull jamnya dibaca dari laporan terakhir.
+detak_bila_perlu() {
+    local hasil=0
+
+    [ "$(( $(date +%s) - LAPOR_TERAKHIR ))" -ge "$DETAK_DETIK" ] || return 0
+    lapor_langkah "$1" running "$2" || hasil=$?
+    [ "$hasil" -ne 3 ] || return 3
+}
+
+# tarik_satu ID_OPERASI LANGKAH RUJUKAN — docker pull lewat digest sambil memperpanjang lease. Keluarannya di
+# $SEMENTARA/tarik-keluaran. Pulang 0 bila ditarik, 1 bila gagal, 3 bila admin.erp melepas operasinya.
+#
+# ikuti_keluaran berjalan di shell ini, bukan di ujung pipa, supaya laporan detaknya ikut menggeser
+# LAPOR_TERAKHIR. Kode keluar pull dititipkan ke berkas: substitusi proses tidak membawanya. Pull yang operasinya
+# dilepas di tengah tidak dibunuh, tetapi hasilnya tidak dipakai; robotnya dihapus admin.erp bersama operasinya.
+tarik_satu() {
+    local id="$1" langkah_teks="$2" rujukan="$3" keluaran="$SEMENTARA/tarik-keluaran" status_berkas="$SEMENTARA/tarik-status"
+    local penanda="$SEMENTARA/tarik-lepas"
+
+    rm -f "$penanda" "$status_berkas"
+    : > "$keluaran"
+
+    ikuti_keluaran "$id" "$LOG_OPERASI" "$penanda" "$langkah_teks" < <(
+        kode=0
+        DOCKER_CONFIG="$FOLDER_DOCKER" docker pull --quiet "$rujukan" > "$keluaran" 2>&1 </dev/null 9>&- || kode=$?
+        cat "$keluaran"
+        printf '%s' "$kode" > "$status_berkas"
+    )
+
+    [ ! -e "$penanda" ] || return 3
+    [ "$(cat "$status_berkas" 2>/dev/null || true)" = 0 ]
+}
+
+# periksa_image_ditarik RUJUKAN [inti] — pulang 1 dengan ALASAN bila image yang ditarik bukan yang ditandatangani.
+#
+# Yang dicocokkan RepoDigests, bukan `.Id`: `.Id` adalah digest config pada store image klasik dan digest manifest
+# pada store containerd, jadi `.Id` saja tidak pernah cukup. Image inti tetap diperiksa `.Id`-nya terhadap
+# keduanya — manifest v2 mencatat keduanya supaya pemeriksaan ini tidak bergantung pada store yang dipakai.
+periksa_image_ditarik() {
+    local rujukan="$1" jenis="${2:-}" daftar id_image
+
+    if ! daftar="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$rujukan" 2>/dev/null)"; then
+        tolak "image $rujukan tidak ada sesudah ditarik"
+        return 1
+    fi
+
+    if ! grep -qxF -- "$rujukan" <<< "$daftar"; then
+        tolak "image yang ditarik bukan yang ditandatangani: RepoDigests-nya tidak memuat $rujukan"
+        return 1
+    fi
+
+    [ "$jenis" = inti ] || return 0
+
+    id_image="$(docker image inspect --format '{{.Id}}' "$rujukan" 2>/dev/null || true)"
+
+    if [ "$id_image" != "$MANIFEST_CONFIG_DIGEST" ] && [ "$id_image" != "$MANIFEST_DIGEST" ]; then
+        tolak "id image $rujukan (${id_image:0:80}) bukan config_digest maupun digest di manifest yang ditandatangani"
+        return 1
+    fi
+}
+
+# tarik_image_rilis ID_OPERASI — kredensial → login → pull lewat digest → RepoDigests → tag lokal → logout, untuk
+# manifest v2. Hasilnya di HASIL_TARIK, dengan alasan yang sama dengan HASIL_RILIS tidak memakai kode keluar:
+#
+#   ditarik   seluruh image ditarik, cocok, dan bertag lokal
+#   gagal     ALASAN diisi; operasinya BELUM ditutup
+#   dilepas   admin.erp melepas operasinya; tidak ada yang dilaporkan lagi
+#
+# Tidak ada image yang diberi tag lokal sebelum seluruhnya lolos pemeriksaan: tag lokal yang sudah menunjuk image
+# benar dari rilis sebelumnya tidak boleh ditimpa oleh penarikan yang lalu ditolak.
+tarik_image_rilis() {
+    local id="$1" langkah_teks="Menarik image rilis $MANIFEST_RILIS" hasil i satu host_lama keterangan
+    local -a rujukan=() lokal=()
+
+    HASIL_TARIK=gagal
+
+    hasil=0
+    lapor_langkah "$id" running "$langkah_teks" || hasil=$?
+
+    if [ "$hasil" -eq 3 ]; then
+        HASIL_TARIK=dilepas
         return
     fi
+
+    # Di dalam SEMENTARA, bukan di /root/.docker: kredensial robot tidak boleh terbaca `docker` lain di server ini,
+    # dan trap EXIT agen menghapusnya pada jalan keluar yang tidak sampai ke lepas_registry.
+    FOLDER_DOCKER="$(mktemp -d "$SEMENTARA/docker-config.XXXXXX")"
+
+    if ! minta_kredensial "$id" || ! masuk_registry; then
+        lepas_registry
+        return
+    fi
+
+    rujukan=("$REGISTRY_HOST/$MANIFEST_IMAGE@$MANIFEST_DIGEST")
+    lokal=("$(tag_lokal_core "$MANIFEST_RILIS")")
+
+    for i in "${!PENDAMPING_NAMA[@]}"; do
+        rujukan+=("$REGISTRY_HOST/${PENDAMPING_IMAGE[$i]}@${PENDAMPING_DIGEST[$i]}")
+        lokal+=("$(tag_lokal_pendamping "${PENDAMPING_NAMA[$i]}" "${PENDAMPING_DIGEST[$i]}")")
+    done
+
+    for satu in "${rujukan[@]}"; do
+        hasil=0
+        detak_bila_perlu "$id" "$langkah_teks" || hasil=$?
+        [ "$hasil" -ne 3 ] || { HASIL_TARIK=dilepas; lepas_registry; return; }
+
+        keterangan=''
+        hasil=0
+        tarik_satu "$id" "$langkah_teks" "$satu" || hasil=$?
+
+        # Robot yang dihapus atau tokennya habis di tengah pull besar dijawab 401. Kredensial diminta sekali lagi —
+        # admin.erp menghapus robot operasi ini lalu membuat robot baru, jadi nama penggunanya ikut berganti — dan
+        # pull itu diulang sekali. Kegagalan kedua bukan lagi kredensial yang basi.
+        if [ "$hasil" -eq 1 ] \
+            && grep -qiE 'unauthorized|authentication required|(^|[^0-9a-z])401([^0-9a-z]|$)' "$SEMENTARA/tarik-keluaran"; then
+            catat "Registry menolak kredensial saat menarik $satu; kredensial baru diminta sekali."
+            host_lama="$REGISTRY_HOST"
+
+            if ! minta_kredensial "$id"; then
+                lepas_registry
+                return
+            fi
+
+            if [ "$REGISTRY_HOST" != "$host_lama" ]; then
+                ALASAN="admin.erp menjawab registry $REGISTRY_HOST di tengah operasi yang menarik dari $host_lama"
+                REGISTRY_HOST="$host_lama"
+                lepas_registry
+                return
+            fi
+
+            if ! masuk_registry; then
+                lepas_registry
+                return
+            fi
+
+            keterangan=' sesudah kredensial baru'
+            hasil=0
+            tarik_satu "$id" "$langkah_teks" "$satu" || hasil=$?
+        fi
+
+        case "$hasil" in
+            0) ;;
+            3)
+                HASIL_TARIK=dilepas
+                lepas_registry
+                return
+                ;;
+            *)
+                ALASAN="menarik $satu gagal$keterangan: $(tail -n 5 "$SEMENTARA/tarik-keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+                lepas_registry
+                return
+                ;;
+        esac
+    done
+
+    if ! periksa_image_ditarik "${rujukan[0]}" inti; then
+        lepas_registry
+        return
+    fi
+
+    for satu in "${rujukan[@]:1}"; do
+        if ! periksa_image_ditarik "$satu"; then
+            lepas_registry
+            return
+        fi
+    done
+
+    for i in "${!rujukan[@]}"; do
+        if ! docker tag "${rujukan[$i]}" "${lokal[$i]}" > "$SEMENTARA/tag-keluaran" 2>&1 9>&-; then
+            ALASAN="memberi tag ${lokal[$i]} gagal: $(tail -n 3 "$SEMENTARA/tag-keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+            lepas_registry
+            return
+        fi
+    done
+
+    lepas_registry
+    HASIL_TARIK=ditarik
+}
+
+HASIL_RILIS=''
+LOG_OPERASI=''
+
+# pasang_rilis ID EDISI RILIS LANGKAH_TOLAK — mengunduh, memeriksa, lalu menjalankan update.sh atas satu
+# rilis. Satu-satunya jalur rilis masuk ke server ini, dipakai `upgrade` dan `install`. Untuk manifest v2,
+# image ditarik dari registry kita di sini (tarik_image_rilis), untuk keduanya sekaligus, sebelum update.sh.
+#
+# Hasilnya di HASIL_RILIS, bukan di kode keluar:
+#
+#   terpasang   update.sh selesai; operasinya BELUM ditutup, pemanggil yang menutupnya
+#   ditutup     gagal, dan kegagalannya sudah dilaporkan
+#   dilepas     admin.erp melepas operasinya; tidak ada yang dilaporkan lagi
+#
+# Kode keluar tidak dipakai karena pemanggil yang menangkapnya dengan `||` diam-diam mematikan `set -e` untuk
+# seluruh isi fungsi ini. LOG_OPERASI menyebut log operasi yang ditulis update.sh.
+pasang_rilis() {
+    local id="$1" edisi="$2" rilis="$3" langkah_tolak="$4" sementara tujuan satu kode hasil log hasil_lokal
+
+    HASIL_RILIS=ditutup
+    log="$FOLDER_LOG/operasi-$id.log"
+    LOG_OPERASI="$log"
 
     # Pemeriksaan pertama memakai nomor yang diminta, supaya penolakan yang jelas tidak perlu mengunduh
     # apa pun. Pemeriksaan yang menentukan ada di bawah, pada manifest yang ditandatangani.
     if ! izinkan_rilis "$edisi" "$rilis"; then
-        tutup_operasi "$id" failed 'Menolak pembaruan' "$ALASAN"
+        tutup_operasi "$id" failed "$langkah_tolak" "$ALASAN"
         return
     fi
 
     hasil=0
     lapor_langkah "$id" running "Mengunduh dan memeriksa rilis $rilis" || hasil=$?
-    [ "$hasil" -ne 3 ] || return 3
+
+    if [ "$hasil" -eq 3 ]; then
+        HASIL_RILIS=dilepas
+        return
+    fi
 
     sementara="$(mktemp -d "$FOLDER_RILIS/.unduh.XXXXXX")"
 
@@ -790,6 +1500,11 @@ operasi_upgrade() {
         return
     fi
 
+    # Manifest v2 tidak menyebut edisi: satu image untuk semua klien, dan admin.erp menyimpan rilisnya di bawah
+    # edisi tetap `coreerp`. Tidak ada edisi bertanda tangan untuk dicocokkan, jadi yang dicatat edisi yang diminta.
+    # Nomor rilisnya tetap ditandatangani dan tetap dicocokkan di bawah.
+    [ "$MANIFEST_VERSI" != 2 ] || MANIFEST_EDISI="$edisi"
+
     # Nomor yang diminta dan nomor yang ditandatangani harus sama. Tanpa ini, admin.erp yang dibobol dapat
     # meminta "9.9.9" lalu menyajikan berkas rilis lama yang sah di bawah nama itu.
     if [ "$MANIFEST_EDISI" != "$edisi" ] \
@@ -802,7 +1517,7 @@ operasi_upgrade() {
 
     if ! izinkan_rilis "$MANIFEST_EDISI" "$MANIFEST_RILIS"; then
         rm -rf "$sementara"
-        tutup_operasi "$id" failed 'Menolak pembaruan' "$ALASAN"
+        tutup_operasi "$id" failed "$langkah_tolak" "$ALASAN"
         return
     fi
 
@@ -810,8 +1525,25 @@ operasi_upgrade() {
     rm -rf "$tujuan"
     mv "$sementara" "$tujuan"
 
-    log="$FOLDER_LOG/operasi-$id.log"
     : > "$log"
+
+    # update.sh rilis v2 tidak menarik apa pun; image-nya harus sudah ada di sini dengan tag lokal.
+    if [ "$MANIFEST_VERSI" = 2 ]; then
+        tarik_image_rilis "$id"
+
+        case "$HASIL_TARIK" in
+            ditarik) ;;
+            dilepas)
+                catat 'Operasi dilepas admin.erp saat menarik image; update.sh tidak dijalankan.'
+                HASIL_RILIS=dilepas
+                return
+                ;;
+            *)
+                tutup_operasi "$id" failed "Menarik image rilis $MANIFEST_RILIS" "$ALASAN"
+                return
+                ;;
+        esac
+    fi
 
     jalankan_pembaruan "$tujuan" "$id" "$log"
 
@@ -820,14 +1552,302 @@ operasi_upgrade() {
         [ "$STATUS_PEMBARUAN" -ne 0 ] || hasil_lokal=succeeded
         catat_operasi_terakhir "$id" "$hasil_lokal" "$(langkah_terakhir)"
         catat 'Operasi dilepas admin.erp di tengah pembaruan; update.sh dibiarkan selesai dan hasilnya tidak dilaporkan.'
-        return 3
+        HASIL_RILIS=dilepas
+        return
     fi
 
-    if [ "$STATUS_PEMBARUAN" -eq 0 ]; then
-        tutup_operasi "$id" succeeded "Rilis $MANIFEST_RILIS terpasang"
-    else
+    if [ "$STATUS_PEMBARUAN" -ne 0 ]; then
         tutup_operasi "$id" failed "$(langkah_terakhir)" "$(pesan_dari_log "$log")"
+        return
     fi
+
+    HASIL_RILIS=terpasang
+}
+
+operasi_upgrade() {
+    local id="$1" berkas="$2"
+
+    if ! baca_parameter_rilis "$berkas"; then
+        tutup_operasi "$id" failed 'Menolak pembaruan' "parameter upgrade tidak sah: $ALASAN"
+        return
+    fi
+
+    catat_rilis_berjalan "$PARAMETER_RILIS"
+    pasang_rilis "$id" "$PARAMETER_EDISI" "$PARAMETER_RILIS" 'Menolak pembaruan'
+
+    case "$HASIL_RILIS" in
+        terpasang) tutup_operasi "$id" succeeded "Rilis $MANIFEST_RILIS terpasang" ;;
+        dilepas) return 3 ;;
+    esac
+}
+
+# --- Pemasangan pertama ---------------------------------------------------------------------------------
+
+# periksa_parameter_pasang BERKAS_OPERASI — pulang 1 dengan ALASAN bila satu parameter `install` tidak sah.
+#
+# Semuanya diperiksa sebelum satu berkas pun diunduh: parameter yang baru ditolak Core sesudah rilisnya
+# terpasang meninggalkan server yang menyala tanpa tenant, dan operasi yang gagal di langkah terakhir.
+#
+# Nilainya dibaca jq langsung dari berkas operasi, tidak pernah lewat `--arg`: argumen jq terbaca siapa pun
+# dari daftar proses, dan salah satu nilainya hash kata sandi. Karena alasan yang sama tidak ada ALASAN yang
+# menyebut nilai yang ditolak.
+#
+# Pola memakai `\A` dan `\z`, bukan `^` dan `$`: jq memakai Oniguruma, dan di sana `$` juga cocok sebelum baris
+# baru di ujung.
+periksa_parameter_pasang() {
+    local berkas="$1" bidang
+
+    baca_parameter_rilis "$berkas" || return 1
+
+    # Aturan ULID yang sama dengan validasi `ulid` Laravel di Core: 26 huruf Crockford base32, huruf pertama
+    # 0-7. Huruf kecil diterima; admin.erp menulis ULID dengan huruf kecil, dan Core menyamakannya.
+    jq -e '(.parameters.tenant_id | type) == "string"
+        and (.parameters.tenant_id | test("\\A[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'tenant_id bukan ULID (26 huruf Crockford base32)'; return 1; }
+
+    # Nama sampai ke terminal dan log lewat keluaran Core; huruf kendali di sana dapat menyamarkan isi layar.
+    # Batas 255 sama dengan batas Core, supaya yang ditolak Core ditolak di sini lebih dulu.
+    for bidang in tenant_name admin_name; do
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '(.parameters[$b] | type) == "string" and (.parameters[$b] | test("[^[:space:]]"))' \
+            "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang wajib berupa teks yang tidak kosong"; return 1; }
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '.parameters[$b] | length <= 255' "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang lebih dari 255 huruf"; return 1; }
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '.parameters[$b] | test("[[:cntrl:]]") | not' "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang memuat huruf kendali"; return 1; }
+    done
+
+    jq -e '(.parameters.admin_email | type) == "string"
+        and (.parameters.admin_email | test("\\A[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_email bukan alamat email'; return 1; }
+    jq -e '.parameters.admin_email | length <= 255' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_email lebih dari 255 huruf'; return 1; }
+
+    # Larik kosong sah: tenant yang hanya memakai Core. Setiap id menjadi satu `--app=<id>`; tanpa pola ini id
+    # berawalan minus atau berisi baris baru ikut masuk ke argumen perintah Core.
+    jq -e '(.parameters.app_ids | type) == "array"
+        and all(.parameters.app_ids[]; type == "string" and test("\\A[a-z0-9][a-z0-9-]*\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'app_ids bukan larik id app (huruf kecil, angka, dan tanda minus)'; return 1; }
+
+    # admin.erp mengirim id yang unik. Core menolak id ganda — tetapi baru sesudah rilisnya terpasang.
+    jq -e '(.parameters.app_ids | length) == (.parameters.app_ids | unique | length)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'app_ids menyebut app yang sama lebih dari sekali'; return 1; }
+
+    # Bentuk yang sama persis dengan yang diterima Core. `$2a$` dan `$2b$` tidak dikenali Laravel sebagai hash,
+    # dan di-hash ulang sebagai teks polos: admin pertama tidak pernah dapat masuk.
+    jq -e '(.parameters.admin_password_hash | type) == "string"
+        and (.parameters.admin_password_hash | test("\\A\\$2y\\$(0[4-9]|[12][0-9]|3[01])\\$[./A-Za-z0-9]{53}\\z"))' \
+        "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_password_hash bukan hash bcrypt berawalan 2y (isinya tidak dicetak)'; return 1; }
+
+    # `app_url` hanya dikirim admin.erp yang memberi alamat otomatis. Tanpanya operasi berjalan seperti sebelum
+    # kunci itu ada, dan .env dibiarkan seperti yang ditulis pasang.sh. Yang disebut — termasuk null — wajib sah.
+    #
+    # Nilainya menjadi baris .env dan argumen `--from` Caddy di compose, jadi bentuknya dibatasi pada asal HTTPS
+    # polos: tanpa port (proxy mendengar 443), tanpa jalur (Core dilayani di akar), tanpa pengguna, dan host
+    # huruf kecil yang label-labelnya sah menurut DNS — Caddy meminta sertifikat untuk host itu apa adanya.
+    # Paling sedikit dua label, dan paling panjang 253 huruf untuk host-nya.
+    if jq -e '.parameters | has("app_url")' "$berkas" >/dev/null 2>&1; then
+        jq -e '(.parameters.app_url | type) == "string"
+            and (.parameters.app_url | length) <= 261
+            and (.parameters.app_url
+                | test("\\Ahttps://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+\\z"))' \
+            "$berkas" >/dev/null 2>&1 \
+            || { tolak 'app_url bukan alamat https://<host> tanpa port, jalur, atau garis miring di ujung, dengan host huruf kecil paling sedikit dua label'; return 1; }
+    fi
+}
+
+# tulis_alamat_aplikasi APP_URL — mengganti APP_URL dan COREERP_APP_HOST di .env; pulang 1 dengan ALASAN.
+#
+# .env memuat rahasia yang lahir di server ini — APP_KEY, kata sandi database — dan tidak pernah ditulis ulang
+# dari templat. Hanya baris yang mendefinisikan kedua kunci itu yang diganti, di tempatnya; kunci yang belum
+# disebut ditambahkan di ujung. Setiap baris definisinya diganti, bukan hanya yang pertama: Compose memakai
+# yang terakhir.
+#
+# Ditulis ke berkas sementara di folder yang sama, dengan pemilik yang sama dan 0600, lalu diganti namanya:
+# .env yang terpotong karena disk penuh atau listrik padam kehilangan APP_KEY, dan tanpa APP_KEY seluruh data
+# terenkripsi tidak terbaca lagi. Isi yang tidak berubah tidak ditulis sama sekali.
+#
+# Seluruh berkas dibaca lebih dulu, dalam satu perintah yang kegagalannya terlihat. Membacanya baris demi baris
+# sambil menulis menyembunyikan .env yang tidak terbaca: salinannya lalu hanya berisi dua baris baru, dan salinan
+# itu yang menggantikan .env. Jumlah baris salinan diperiksa sebelum menggantikan aslinya, untuk tulisan yang
+# terpotong. Fungsi ini dipanggil dari dalam `if`, tempat `set -e` tidak menghentikan apa pun, jadi setiap
+# langkahnya diperiksa sendiri.
+tulis_alamat_aplikasi() {
+    local alamat="$1" host baru satu ada_url=0 ada_host=0
+    local -a lama=() isi=()
+
+    host="${alamat#https://}"
+    baru="$BERKAS_ENV.baru.$BASHPID"
+
+    if [ ! -f "$BERKAS_ENV" ] || ! mapfile -t lama < "$BERKAS_ENV"; then
+        tolak "$BERKAS_ENV tidak ada atau tidak terbaca; alamat aplikasi tidak dapat ditulis"
+        return 1
+    fi
+
+    for satu in "${lama[@]}"; do
+        # Bentuk yang dibaca Compose sebagai definisi kunci: spasi di depan dan `export` diterimanya.
+        if [[ "$satu" =~ ^[[:space:]]*(export[[:space:]]+)?(APP_URL|COREERP_APP_HOST)[[:space:]]*= ]]; then
+            case "${BASH_REMATCH[2]}" in
+                APP_URL) satu="APP_URL=$alamat"; ada_url=1 ;;
+                *) satu="COREERP_APP_HOST=$host"; ada_host=1 ;;
+            esac
+        fi
+        isi+=("$satu")
+    done
+
+    [ "$ada_url" -eq 1 ] || isi+=("APP_URL=$alamat")
+    [ "$ada_host" -eq 1 ] || isi+=("COREERP_APP_HOST=$host")
+
+    if ! printf '%s\n' "${isi[@]}" > "$baru" \
+        || [ "$(wc -l < "$baru" 2>/dev/null || true)" != "${#isi[@]}" ]; then
+        rm -f "$baru"
+        tolak "salinan $BERKAS_ENV tidak dapat ditulis utuh; .env tidak diubah"
+        return 1
+    fi
+
+    if cmp -s "$baru" "$BERKAS_ENV"; then
+        rm -f "$baru"
+        return 0
+    fi
+
+    if ! chown --reference="$BERKAS_ENV" "$baru" || ! chmod 0600 "$baru" || ! mv -f "$baru" "$BERKAS_ENV"; then
+        rm -f "$baru"
+        tolak "alamat aplikasi tidak dapat ditulis ke $BERKAS_ENV"
+        return 1
+    fi
+}
+
+# Operasi `install`: rilis pertama, lalu tenant dengan id yang sama dengan admin.erp beserta admin pertamanya.
+#
+# **Hash kata sandi hanya lewat stdin.** Kata sandi sementara dibuat admin.erp dan ditunjukkan sekali kepada
+# operator; yang sampai ke sini hanya hash bcrypt-nya. Hash itu tidak pernah menjadi argumen proses — terbaca
+# dari daftar proses — dan tidak pernah ditulis ke log agen, log operasi, atau state.json. Keluaran Core
+# disaring sebelum ditulis ke mana pun: Core tidak mencetaknya, tetapi log yang memuat hash tidak dapat
+# ditarik kembali dari journald dan pengumpul log.
+#
+# **Aman diulang.** Rilis yang sama yang sudah terpasang tidak diunduh dan dijalankan ulang — penolakan rilis
+# yang tidak lebih baru akan menggagalkan ulangan itu — dan Core menjawab tenant dengan owner yang sama
+# "sudah ada" dengan kode keluar nol. "Coba lagi" sesudah langkah tenant gagal karena itu langsung mengulang
+# langkah tenant.
+#
+# Jendela pembaruan tidak diperiksa di sini: admin.erp yang memutuskan kapan `install` boleh diklaim.
+operasi_pasang() {
+    local id="$1" berkas="$2" edisi rilis tenant_id tenant_nama nama_admin email_admin hash alamat_aplikasi
+    local compose_sehat versi_sehat image_sehat log baris_awal hasil satu
+    local -a app=() perintah_core=() status_pipa=()
+
+    if ! periksa_parameter_pasang "$berkas"; then
+        tutup_operasi "$id" failed 'Menolak pemasangan' "parameter install tidak sah: $ALASAN"
+        return
+    fi
+
+    edisi="$PARAMETER_EDISI"
+    rilis="$PARAMETER_RILIS"
+    tenant_id="$(jq -r '.parameters.tenant_id' "$berkas")"
+    tenant_nama="$(jq -r '.parameters.tenant_name' "$berkas")"
+    nama_admin="$(jq -r '.parameters.admin_name' "$berkas")"
+    email_admin="$(jq -r '.parameters.admin_email' "$berkas")"
+    mapfile -t app < <(jq -r '.parameters.app_ids[]' "$berkas")
+    hash="$(jq -r '.parameters.admin_password_hash' "$berkas")"
+    alamat_aplikasi="$(jq -r 'if (.parameters.app_url | type) == "string" then .parameters.app_url else "" end' "$berkas")"
+
+    catat_rilis_berjalan "$rilis"
+
+    # Sebelum rilis dipasang: update.sh menyalakan compose — dan proxy HTTPS yang meminta sertifikat untuk
+    # COREERP_APP_HOST — dengan .env ini. Alamat yang baru ditulis sesudah stack menyala tidak dipakai siapa pun
+    # sampai pembaruan berikutnya, sementara Core sudah menerbitkan tautan dengan alamat sementara dari pasang.sh.
+    if [ -n "$alamat_aplikasi" ]; then
+        hasil=0
+        lapor_langkah "$id" running "Menyetel alamat aplikasi $alamat_aplikasi" || hasil=$?
+        [ "$hasil" -ne 3 ] || return 3
+
+        if ! tulis_alamat_aplikasi "$alamat_aplikasi"; then
+            tutup_operasi "$id" failed 'Menyetel alamat aplikasi' "$ALASAN"
+            return
+        fi
+    fi
+
+    if [ "$(jq -r '.edition // "" | tostring' "$BERKAS_KEADAAN")" = "$edisi" ] \
+        && [ "$(normalkan_rilis "$(jq -r '.release // "" | tostring' "$BERKAS_KEADAAN")")" = "$(normalkan_rilis "$rilis")" ]; then
+        log="$FOLDER_LOG/operasi-$id.log"
+        : > "$log"
+
+        hasil=0
+        lapor_langkah "$id" running "Rilis $rilis sudah terpasang; pembaruan dilewati" || hasil=$?
+        [ "$hasil" -ne 3 ] || return 3
+    else
+        pasang_rilis "$id" "$edisi" "$rilis" 'Menolak pemasangan'
+
+        case "$HASIL_RILIS" in
+            terpasang) ;;
+            dilepas) return 3 ;;
+            *) return ;;
+        esac
+
+        log="$LOG_OPERASI"
+    fi
+
+    hasil=0
+    lapor_langkah "$id" running 'Melahirkan tenant dan admin pertama' || hasil=$?
+    [ "$hasil" -ne 3 ] || return 3
+
+    # Compose dan image yang dicatat update.sh sesudah terbukti sehat — yang sama dengan yang dipakai
+    # bootstrap-tenant dan cadangan.
+    compose_sehat="$FOLDER_KEADAAN_UPDATE/compose-sehat.yaml"
+    versi_sehat="$FOLDER_KEADAAN_UPDATE/versi-sehat"
+    image_sehat=''
+    [ ! -f "$versi_sehat" ] || image_sehat="$(cat "$versi_sehat")"
+
+    if [ -z "$image_sehat" ] || [ ! -f "$compose_sehat" ] || [ ! -f "$BERKAS_ENV" ]; then
+        tutup_operasi "$id" failed 'Melahirkan tenant dan admin pertama' \
+            'belum ada versi yang terbukti sehat di server ini, atau .env tidak ada; tenant dilahirkan di dalam aplikasi yang sedang berjalan'
+        return
+    fi
+
+    # Opsi ditulis `--opsi=nilai`, bukan `--opsi nilai`: nama yang kebetulan diawali tanda minus akan dibaca
+    # Symfony Console sebagai opsi lain pada bentuk kedua.
+    perintah_core=(
+        docker compose --project-name "$PROYEK" --env-file "$BERKAS_ENV" -f "$compose_sehat"
+        exec -T core-app php artisan tenant:bootstrap-site
+        "--tenant-id=$tenant_id"
+        "--name=$tenant_nama"
+        "--admin-name=$nama_admin"
+        "--admin-email=$email_admin"
+        --admin-password-hash-stdin
+    )
+
+    for satu in "${app[@]}"; do
+        perintah_core+=("--app=$satu")
+    done
+
+    baris_awal="$(wc -l < "$log")"
+
+    # `printf` bawaan bash, bukan program: hash tidak muncul di argumen proses mana pun. Kode keluar yang
+    # dipakai milik docker, bukan pipa: printf yang terlambat menulis ke Core yang sudah keluar mati kena
+    # SIGPIPE walaupun Core-nya berhasil.
+    set +e
+    printf '%s' "$hash" \
+        | EDITION_IMAGE="$image_sehat" "${perintah_core[@]}" 2>&1 9>&- \
+        | while IFS= read -r satu || [ -n "$satu" ]; do
+            satu="${satu%$'\r'}"
+            satu="${satu//"$hash"/[hash disembunyikan]}"
+            printf '%s\n' "$satu" >> "$log"
+            printf '%s\n' "$satu"
+        done
+    status_pipa=("${PIPESTATUS[@]}")
+    set -e
+
+    if [ "${status_pipa[1]}" -ne 0 ]; then
+        tutup_operasi "$id" failed 'Melahirkan tenant dan admin pertama' \
+            "$(tail -n "+$((baris_awal + 1))" "$log" | tail -n 20 || true)"
+        return
+    fi
+
+    tutup_operasi "$id" succeeded "Pemasangan selesai: rilis $rilis"
 }
 
 # --- Cadangan -------------------------------------------------------------------------------------------
@@ -914,15 +1934,23 @@ ambil_lisensi() {
 
 # pasang_lisensi BERKAS_JSON FILTER — pulang 1 dengan ALASAN bila ditolak.
 #
-# Satu-satunya jalan lisensi masuk ke server ini: operasi `install_license`, subcommand
-# `install-license`, dan paket pendaftaran offline semuanya lewat sini.
+# Satu-satunya jalan lisensi masuk ke folder lisensi. Operasi `install_license` dan jawaban laporan
+# sama-sama memanggilnya, supaya perpanjangan otomatis — yang tidak dilihat siapa pun — tidak pernah
+# diperiksa lebih longgar daripada pemasangan yang diminta operator.
 #
-# Kunci pemeriksanya kunci lisensi yang datang dari admin.erp, bukan kunci rilis. Lisensi hanya
-# menyalakan atau memadamkan peringatan di Core — tidak mengunci dan tidak membuka apa pun — jadi lisensi
-# palsu dari admin.erp yang dibobol hanya menyembunyikan peringatan.
+# Lisensi versi 2 **mengunci**. Core yang mewajibkan lisensi hanya membuka app yang disebut `apps`, dan
+# lisensi yang tidak dapat dibacanya mengunci seluruh tenant. Karena itu semua pemeriksaan selesai sebelum
+# lisensi yang terpasang disentuh: lisensi yang akan ditolak Core tidak boleh menggantikan lisensi yang
+# masih diterimanya. Yang ditolak di sini, lisensi lama tetap berlaku sampai tanggalnya sendiri.
+#
+# Kunci pemeriksanya kunci lisensi yang diantar admin.erp saat pendaftaran, bukan kunci rilis. admin.erp
+# memang sumber kebenaran app yang dibeli; lisensi menentukan app yang boleh dibuka, tetapi tidak dapat
+# mengganti kode yang berjalan. Yang dijaga di sini lisensi yang rusak di jalan, lisensi milik situs lain,
+# dan bentuk yang tidak dibaca Core.
 pasang_lisensi() {
-    local sumber="$1" filter="$2" kunci="$FOLDER_LISENSI/license-public.pem" situs_lisensi
+    local sumber="$1" filter="$2" kunci="$FOLDER_LISENSI/license-public.pem" situs_lisensi berlaku
     local lisensi="$SEMENTARA/lisensi.json" tanda="$SEMENTARA/lisensi.sig"
+    local baru="$FOLDER_LISENSI/.license.json.baru" baru_tanda="$FOLDER_LISENSI/.license.json.sig.baru"
 
     ambil_lisensi "$sumber" "$filter" || return 1
 
@@ -935,20 +1963,65 @@ pasang_lisensi() {
 
     jq -e 'type == "object"' "$lisensi" >/dev/null 2>&1 || { tolak 'lisensi bukan objek JSON'; return 1; }
 
-    situs_lisensi="$(jq -r '.site_id // "" | tostring' "$lisensi")"
+    # Situs yang tidak disebut ditolak seperti situs lain. Kunci publik lisensi sama untuk semua situs, jadi
+    # lisensi tanpa situs dapat dipasang di server mana pun — termasuk lisensi tenant lain dengan app lebih
+    # banyak.
+    # shellcheck disable=SC2016 # $s adalah variabel jq
+    if ! jq -e --arg s "$SITUS_ID" '.site_id == $s' "$lisensi" >/dev/null 2>&1; then
+        situs_lisensi="$(jq -r 'if (.site_id | type) == "string" then .site_id[0:100] else "" end' "$lisensi")"
 
-    if [ -n "$situs_lisensi" ] && [ "$situs_lisensi" != "$SITUS_ID" ]; then
-        tolak "lisensi ini untuk situs $situs_lisensi, bukan situs ini"
+        if [ -z "$situs_lisensi" ]; then
+            tolak 'lisensi tidak menyebut situs; lisensi tanpa situs tidak dipasang'
+        else
+            tolak "lisensi ini untuk situs $situs_lisensi, bukan situs ini"
+        fi
         return 1
     fi
 
-    # Byte lisensi disalin persis — tanda tangannya atas byte itu, dan Core dapat memeriksanya lagi.
-    install -m 0644 "$lisensi" "$FOLDER_LISENSI/.license.json.baru"
-    base64 -w0 "$tanda" > "$FOLDER_LISENSI/.license.json.sig.baru"
-    chmod 0644 "$FOLDER_LISENSI/.license.json.sig.baru"
+    # Core membaca tepat satu versi. Versi lain yang terpasang terbaca tidak sah, dan itu mengunci.
+    jq -e '.version == 2' "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'lisensi bukan format versi 2; agen hanya memasang versi yang dibaca Core'; return 1; }
 
-    mv -f "$FOLDER_LISENSI/.license.json.sig.baru" "$FOLDER_LISENSI/license.json.sig"
-    mv -f "$FOLDER_LISENSI/.license.json.baru" "$FOLDER_LISENSI/license.json"
+    # `\A` dan `\z`, bukan `^` dan `$`: jq memakai Oniguruma, dan di sana `$` juga cocok sebelum baris baru —
+    # "human-resources\n" akan lolos sebagai id app.
+    jq -e '(.apps | type) == "array"
+        and all(.apps[]; type == "string" and test("\\A[a-z0-9][a-z0-9-]*\\z"))' "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'apps di lisensi bukan larik id app (huruf kecil, angka, dan tanda minus)'; return 1; }
+
+    # Bidangnya wajib disebut, walau boleh bernilai null. Berkas yang terpotong saat ditulis kehilangan
+    # bidang terakhirnya lebih dulu; kalau ketiadaan `valid_until` terbaca sebagai "tanpa tanggal berakhir",
+    # berkas rusak justru menjadi lisensi terkuat di sistem ini. Core memisahkan keduanya dengan cara yang sama.
+    jq -e 'has("valid_until")' "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'lisensi tidak menyebut valid_until'; return 1; }
+
+    # null berarti lisensi tanpa tanggal berakhir, dipilih operator per situs di admin.erp. Yang membatasi
+    # app tetap daftar `apps`, jadi lisensi ini bukan jalan pintas menuju seluruh modul.
+    if ! jq -e '.valid_until == null' "$lisensi" >/dev/null 2>&1; then
+        jq -e '(.valid_until | type) == "string" and (.valid_until | test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}\\z"))' \
+            "$lisensi" >/dev/null 2>&1 \
+            || { tolak 'valid_until di lisensi bukan tanggal berbentuk YYYY-MM-DD atau null'; return 1; }
+
+        # Bentuk yang benar belum tentu tanggal yang ada. Core menolak 2027-02-30, jadi agen juga.
+        berlaku="$(jq -r '.valid_until' "$lisensi")"
+        if [ "$(date -u -d "$berlaku" +%Y-%m-%d 2>/dev/null || true)" != "$berlaku" ]; then
+            tolak "valid_until di lisensi bukan tanggal kalender: $berlaku"
+            return 1
+        fi
+    fi
+
+    # Byte lisensi disalin persis — tanda tangannya atas byte itu, dan Core memeriksanya lagi. Setiap tulisan
+    # diperiksa sendiri: fungsi ini dipanggil dari dalam `if`, tempat `set -e` tidak menghentikan apa pun,
+    # dan tanda tangan yang terpotong karena disk penuh lalu diganti namanya akan mengunci situs ini.
+    if ! install -m 0644 "$lisensi" "$baru" \
+        || ! base64 -w0 "$tanda" > "$baru_tanda" \
+        || ! chmod 0644 "$baru_tanda"; then
+        rm -f "$baru" "$baru_tanda"
+        tolak "lisensi tidak dapat ditulis ke $FOLDER_LISENSI"
+        return 1
+    fi
+
+    mv -f "$baru_tanda" "$FOLDER_LISENSI/license.json.sig"
+    mv -f "$baru" "$FOLDER_LISENSI/license.json"
 }
 
 operasi_lisensi() {
@@ -1033,8 +2106,12 @@ kerjakan_operasi() {
 
     catat "Mengerjakan operasi $id: ${operasi:0:40}"
 
+    OPERASI_JENIS="${operasi:0:40}"
+    catat_operasi_berjalan "$id" "$OPERASI_JENIS"
+
     case "$operasi" in
         upgrade) operasi_upgrade "$id" "$berkas" ;;
+        install) operasi_pasang "$id" "$berkas" ;;
         backup) operasi_backup "$id" ;;
         install_license) operasi_lisensi "$id" "$berkas" ;;
         rotate_key) operasi_putar_kunci "$id" ;;
@@ -1120,10 +2197,8 @@ perintah_enroll() {
             tenant_id: $d.tenant_id,
             tenant_name: $d.tenant_name,
             admin_url: $alamat,
-            channel: "online",
             interval_seconds: $d.interval_seconds,
-            update_window: $d.update_window,
-            enrolled: true
+            update_window: $d.update_window
           }' > "$BERKAS_SITUS.baru"
 
     mv -f "$SEMENTARA/site-key.pem" "$KUNCI_SITUS"
@@ -1132,7 +2207,7 @@ perintah_enroll() {
     pastikan_keadaan
 
     printf '    terdaftar sebagai situs %s\n' "$SITUS_ID"
-    printf '\nRilis pertama diminta dari halaman situs di admin.erp, bukan dari server ini.\n'
+    printf '\nRilis pertama dipasang lewat operasi install dari admin.erp, bukan dari server ini.\n'
 }
 
 perintah_run() {
@@ -1154,15 +2229,6 @@ perintah_run() {
         catat 'Putaran agen lain masih berjalan; putaran ini dilewati.'
         exit 0
     fi
-
-    case "$SITUS_KANAL" in
-        online) ;;
-        offline)
-            catat "Situs ini berkanal offline: tidak ada yang dikirim. Tulis laporan dengan \`coreerp-agent write-report\`."
-            exit 0
-            ;;
-        *) gagal "Kanal situs tidak dikenal di $BERKAS_SITUS: $SITUS_KANAL" ;;
-    esac
 
     periksa_alamat_admin "$SITUS_ADMIN"
 
@@ -1211,195 +2277,15 @@ perintah_run() {
     hasil=$?
     set -e
 
+    # Operasi yang pulang tanpa ditutup — dilepas admin.erp, atau jawaban ganti kunci yang hilang — tidak
+    # boleh tampil sebagai sedang berjalan di terminal pemasang sampai operasi berikutnya datang.
+    ubah_keadaan 'del(.current_operation)'
+
     # Laporan sesudah operasi supaya admin.erp melihat rilis atau cadangan baru tanpa menunggu putaran
     # berikutnya. Gagalnya tidak menggagalkan putaran: operasinya sendiri sudah dilaporkan.
     kode="$(kirim_laporan)" || true
 
     exit "$hasil"
-}
-
-perintah_write_report() {
-    local keluar="${1:-$FOLDER_KOTAK_KELUAR}" laporan isi token nama tujuan belum_terikat konten tanda
-
-    muat_situs
-    mkdir -p "$keluar"
-
-    laporan="$SEMENTARA/laporan.json"
-    isi="$SEMENTARA/isi-laporan.json"
-    susun_laporan "$laporan"
-
-    belum_terikat="$(jq -r 'if .enrolled == false then "ya" else "tidak" end' "$BERKAS_SITUS")"
-
-    # Selama situs offline belum diikat, file laporan juga yang mengantar kunci publik situs ke admin.erp,
-    # beserta token pendaftaran sebagai buktinya. Sesudah terikat, keduanya tidak ikut lagi.
-    if [ "$belum_terikat" = ya ]; then
-        token="$(jq -r '.enrollment_token // "" | tostring' "$BERKAS_SITUS")"
-        [ -n "$token" ] || gagal "Situs belum terikat, tetapi $BERKAS_SITUS tidak memuat token pendaftaran."
-
-        jq -c -j -n --slurpfile r "$laporan" --arg token "$token" --rawfile kunci "$KUNCI_SITUS_PUBLIK" \
-            '{report: $r[0], enrollment: {token: $token, public_key: $kunci}}' > "$isi"
-    else
-        jq -c -j -n --slurpfile r "$laporan" '{report: $r[0], enrollment: null}' > "$isi"
-    fi
-
-    # Tanda tangan atas byte isi yang persis sama dengan yang di-base64-kan. Membungkus isi dalam base64
-    # alih-alih menaruh objeknya langsung menghindari pertanyaan "JSON yang mana yang ditandatangani"
-    # sesudah seseorang membuka file itu di editor yang merapikan spasinya.
-    konten="$(base64 -w0 "$isi")"
-    tanda="$(openssl dgst -sha256 -sign "$KUNCI_SITUS" "$isi" | base64 -w0)"
-
-    nama="laporan-$SITUS_ID-$(cap_waktu).json"
-    tujuan="$keluar/$nama"
-
-    jq -n --arg konten "$konten" --arg tanda "$tanda" \
-        '{format: "coreerp-site-report-v1", content: $konten, signature: $tanda}' > "$keluar/.$nama.baru"
-
-    mv -f "$keluar/.$nama.baru" "$tujuan"
-
-    printf '%s\n' "$tujuan"
-    printf '\nBawa berkas ini ke admin.erp dan unggah di halaman situs.\n' >&2
-
-    if [ "$belum_terikat" = ya ]; then
-        printf "Sesudah admin.erp menerimanya, jalankan \`coreerp-agent confirm-enrollment\` supaya token\\n" >&2
-        printf 'pendaftaran dihapus dari server ini.\n' >&2
-    fi
-}
-
-perintah_import_package() {
-    local paket="${1:-}" berkas
-
-    [ -n "$paket" ] || gagal 'Pemakaian: coreerp-agent import-package FOLDER'
-    berkas="$paket/site.json"
-    [ -f "$berkas" ] || gagal "Paket pendaftaran tidak lengkap: $berkas tidak ada."
-
-    # Diperiksa terpisah dari site.json: kunci situs yang mungkin sudah terikat ke admin.erp tidak boleh
-    # tertimpa diam-diam, termasuk ketika site.json-nya hilang atau terhapus.
-    [ ! -e "$KUNCI_SITUS" ] || gagal \
-        "Server ini sudah punya kunci situs: $KUNCI_SITUS" \
-        '' \
-        'Paket pendaftaran tidak dipasang di atasnya. Kunci itu mungkin sudah dikenal admin.erp, dan' \
-        'menimpanya memutus situs ini dari pengelolaan tanpa jalan kembali.'
-
-    [ ! -e "$BERKAS_SITUS" ] || gagal "Situs ini sudah terdaftar: $BERKAS_SITUS sudah ada."
-
-    jq -e '
-        type == "object"
-        and (.site_id | type) == "string"
-        and (.tenant_id | type) == "string"
-        and (.tenant_name | type) == "string"
-        and .channel == "offline"
-        and (.enrollment_token | type) == "string" and (.enrollment_token | length) > 0
-        and ((.license_public_key == null) or ((.license_public_key | type) == "string"))
-        and ((.license == null) or ((.license | type) == "object"))' "$berkas" >/dev/null 2>&1 \
-        || gagal "$berkas bukan paket pendaftaran offline yang sah."
-
-    SITUS_ID="$(jq -r '.site_id' "$berkas")"
-    id_sah "$SITUS_ID" || gagal 'Paket menyebut id situs yang tidak sah.'
-
-    if jq -e '.license != null and .license_public_key == null' "$berkas" >/dev/null; then
-        gagal 'Paket membawa lisensi tanpa kunci publik lisensi; lisensinya tidak dapat diperiksa.'
-    fi
-
-    siapkan_folder
-
-    if jq -e '.license_public_key != null' "$berkas" >/dev/null; then
-        jq -j '.license_public_key' "$berkas" > "$FOLDER_LISENSI/license-public.pem"
-        chmod 0644 "$FOLDER_LISENSI/license-public.pem"
-    fi
-
-    # Lisensi diperiksa sebelum kunci situs dibuat dan site.json ditulis, supaya paket yang ditolak tidak
-    # meninggalkan situs setengah terdaftar.
-    if jq -e '.license != null' "$berkas" >/dev/null; then
-        pasang_lisensi "$berkas" '.license' || gagal "Lisensi di paket ditolak: $ALASAN"
-        printf '    lisensi terpasang\n'
-    fi
-
-    buat_kunci "$SEMENTARA/site-key.pem" "$SEMENTARA/site-public.pem"
-
-    jq '{
-          site_id: .site_id,
-          tenant_id: .tenant_id,
-          tenant_name: .tenant_name,
-          admin_url: (.admin_url // null),
-          channel: "offline",
-          interval_seconds: null,
-          update_window: (.update_window // null),
-          enrolled: false,
-          enrollment_token: .enrollment_token
-        }' "$berkas" > "$BERKAS_SITUS.baru"
-
-    mv -f "$SEMENTARA/site-key.pem" "$KUNCI_SITUS"
-    mv -f "$SEMENTARA/site-public.pem" "$KUNCI_SITUS_PUBLIK"
-    mv -f "$BERKAS_SITUS.baru" "$BERKAS_SITUS"
-    pastikan_keadaan
-
-    printf '    situs %s terdaftar di server ini (belum terikat di admin.erp)\n' "$SITUS_ID"
-    printf '\nLangkah berikutnya:\n'
-    printf '  1. coreerp-agent install-bundle <folder bundle>   bila rilis pertama belum terpasang\n'
-    printf '  2. coreerp-agent bootstrap-tenant --admin-name NAMA --admin-email EMAIL\n'
-    printf '  3. coreerp-agent write-report                     menulis laporan pertama ke %s\n' "$FOLDER_KOTAK_KELUAR"
-    printf '  4. Bawa berkas laporan itu ke admin.erp; laporan pertama yang mengikat kunci situs ini.\n'
-}
-
-perintah_confirm_enrollment() {
-    muat_situs
-
-    if jq -e '.enrolled == false' "$BERKAS_SITUS" >/dev/null; then
-        ubah_json "$BERKAS_SITUS" '.enrolled = true | del(.enrollment_token)'
-        printf 'Situs %s ditandai terikat; token pendaftaran dihapus dari server ini.\n' "$SITUS_ID"
-    else
-        printf 'Situs %s sudah terikat.\n' "$SITUS_ID"
-    fi
-}
-
-perintah_install_bundle() {
-    local bundle="${1:-}" id log skrip status_pipa langkah_akhir
-
-    [ -n "$bundle" ] || gagal 'Pemakaian: coreerp-agent install-bundle FOLDER'
-    [ -d "$bundle" ] || gagal "Folder bundle tidak ditemukan: $bundle"
-    bundle="$(cd "$bundle" && pwd)"
-
-    muat_situs
-
-    exec 9>>"$BERKAS_KUNCI_PUTARAN"
-    flock -w 120 9 || gagal 'Putaran agen lain masih berjalan lebih dari dua menit; coba lagi nanti.'
-
-    langkah 'Memeriksa bundle'
-
-    periksa_berkas_rilis "$bundle" || gagal "Bundle ditolak: $ALASAN"
-
-    [ -f "$bundle/images.tar.gz" ] || gagal \
-        'Bundle ini tidak membawa images.tar.gz.' \
-        'Server tanpa internet tidak dapat menarik image dari registry; mintalah bundle lengkap dari build-bundle.sh.'
-
-    izinkan_rilis "$MANIFEST_EDISI" "$MANIFEST_RILIS" || gagal "Bundle ditolak: $ALASAN"
-
-    printf '    edisi %s, rilis %s: tanda tangan dan checksum sah\n' "$MANIFEST_EDISI" "$MANIFEST_RILIS"
-
-    id="offline-$(cap_waktu)"
-    log="$FOLDER_LOG/operasi-$id.log"
-    : > "$log"
-    skrip="${COREERP_UPDATE_SCRIPT:-$bundle/update.sh}"
-
-    set +e
-    bash "$skrip" "$bundle" </dev/null 9>&- 2>&1 | tee -a "$log"
-    status_pipa=("${PIPESTATUS[@]}")
-    set -e
-
-    langkah_akhir="$(sed -n 's/^==> //p' "$log" | tail -n 1)"
-
-    if [ "${status_pipa[0]}" -ne 0 ]; then
-        catat_operasi_terakhir "$id" failed "$langkah_akhir"
-        gagal "Pemasangan bundle gagal pada langkah: ${langkah_akhir:-(sebelum langkah pertama)}" \
-            "Log lengkap: $log" \
-            "Hasil ini ikut di laporan berikutnya: jalankan \`coreerp-agent write-report\`."
-    fi
-
-    catat_rilis_terpasang
-    catat_operasi_terakhir "$id" succeeded "Rilis $MANIFEST_RILIS terpasang"
-
-    printf "\\nRilis %s terpasang. Tulis laporan dengan \`coreerp-agent write-report\` dan bawa ke admin.erp.\\n" \
-        "$MANIFEST_RILIS"
 }
 
 # Melahirkan tenant di Core dengan id yang sama dengan catatan di admin.erp, beserta admin pertamanya.
@@ -1447,9 +2333,8 @@ perintah_bootstrap_tenant() {
         gagal \
             'Belum ada rilis yang terpasang dan terbukti sehat di server ini.' \
             '' \
-            'Tenant dilahirkan di dalam aplikasi yang sedang berjalan. Pasang rilis pertama lebih dulu:' \
-            '  online : minta "Perbarui" dari halaman situs di admin.erp' \
-            '  offline: coreerp-agent install-bundle <folder bundle>'
+            'Tenant dilahirkan di dalam aplikasi yang sedang berjalan. Pasang rilis pertama lebih dulu dengan' \
+            'meminta "Perbarui" dari halaman situs di admin.erp.'
     fi
 
     [ -f "$BERKAS_ENV" ] || gagal "Berkas setelan tidak ditemukan: $BERKAS_ENV"
@@ -1468,19 +2353,6 @@ perintah_bootstrap_tenant() {
         "--name=$tenant_nama" \
         "--admin-name=$nama_admin" \
         "--admin-email=$email_admin" 9>&-
-}
-
-perintah_install_license() {
-    local berkas="${1:-}"
-
-    [ -n "$berkas" ] || gagal 'Pemakaian: coreerp-agent install-license BERKAS'
-    [ -f "$berkas" ] || gagal "Berkas lisensi tidak ditemukan: $berkas"
-
-    muat_situs
-
-    pasang_lisensi "$berkas" '.' || gagal "Lisensi ditolak: $ALASAN"
-
-    printf 'Lisensi terpasang di %s\n' "$FOLDER_LISENSI/license.json"
 }
 
 utama() {
@@ -1508,11 +2380,6 @@ utama() {
     case "$perintah" in
         enroll) perintah_enroll "$@" ;;
         run) perintah_run "$@" ;;
-        write-report) perintah_write_report "$@" ;;
-        import-package) perintah_import_package "$@" ;;
-        confirm-enrollment) perintah_confirm_enrollment "$@" ;;
-        install-bundle) perintah_install_bundle "$@" ;;
-        install-license) perintah_install_license "$@" ;;
         bootstrap-tenant) perintah_bootstrap_tenant "$@" ;;
         *) gagal "Perintah tidak dikenal: $perintah" "$(bantuan)" ;;
     esac

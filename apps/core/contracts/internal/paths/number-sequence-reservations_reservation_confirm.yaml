@@ -1,0 +1,32 @@
+post:
+  tags: [Number sequence]
+  operationId: internal.number-sequence-reservations.confirm
+  summary: Konfirmasi nomor yang dipesan
+  description: |
+    Dipanggil setelah dokumen app benar-benar tersimpan. Reservation yang sudah
+    `confirmed` mengembalikan hasil yang sama tanpa efek tambahan.
+  parameters:
+    - $ref: '#/components/parameters/ReservationId'
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/NumberSequenceContext' }
+  responses:
+    '200':
+      description: Reservation dikonfirmasi.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Reservation' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422':
+      description: Reservation sudah dibatalkan atau tidak dalam status yang dapat dikonfirmasi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

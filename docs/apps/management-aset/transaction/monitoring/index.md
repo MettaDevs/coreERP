@@ -1,6 +1,6 @@
 # Monitoring dan layar yang belum berisi
 
-Halaman ini untuk developer. Isinya tiga layar yang **sudah dideklarasikan di manifest** tetapi isinya belum selesai — dan kenapa keduanya bukan hal yang sama.
+Halaman ini untuk developer. Isinya dua layar yang **sudah dideklarasikan di manifest** tetapi isinya belum selesai — dan kenapa keduanya bukan hal yang sama.
 
 Ini penting karena layar yang terdaftar di manifest **sudah muncul di navigasi Shell** begitu tenant diberi permission-nya. Kalau isinya kosong tanpa penjelasan, pengguna mengira aplikasinya rusak.
 
@@ -12,16 +12,11 @@ Ia **berfungsi**, hanya masih sederhana: belum ada penyaringan, pengelompokan, m
 
 Kodenya di `ui/transactions/monitoring-aset/MonitoringPage.tsx`.
 
-## Dua layar setup yang sengaja kosong
+## Layar setup yang sengaja kosong
 
-`fixed-asset-parameters` dan `fixed-asset-posting-profiles` menampilkan `Empty` dengan penjelasan, bukan form.
+`fixed-asset-parameters` menampilkan `Empty` dengan penjelasan, bukan form: pengaturan pembulatan saat ini disimpan pada Buku penyusutan, dan pengaturan lain menunggu kebutuhannya dipastikan. Komponennya `ui/pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage.tsx`.
 
-| Layar | Kenapa kosong |
-| --- | --- |
-| **Parameter aset tetap** | Pengaturan pembulatan saat ini disimpan pada Buku penyusutan. Pengaturan lain menunggu kebutuhannya dipastikan |
-| **Profil posting aset** | Pemetaan akun menunggu modul Finance. App aset tidak menyimpan akun atau posting apa pun |
-
-Keduanya memakai satu komponen, `ui/fixed-assets-setup/FixedAssetSetupPlaceholderPage.tsx`.
+Layar kosong kedua yang dulu ada di sini, profil posting aset, sudah berisi sejak 23 September 2026 sebagai [Posting group aset](/apps/management-aset/master/posting-group/). Akunnya ternyata tidak menunggu modul Finance: daftar akun referensi di Core menjadi sumbernya (K-05 feed posting finance).
 
 ### Kenapa layarnya sudah ada padahal isinya belum
 
@@ -33,7 +28,7 @@ Yang penting: **teks kosongnya menyebut alasan dan penggantinya.** Layar kosong 
 
 1. Endpoint barunya masuk kontrak dalam perubahan yang sama.
 2. Permission-nya sudah ada di manifest — periksa dulu sebelum menambah yang baru.
-3. Profil posting menyentuh akun, yang **bukan milik modul ini**. Kalau Finance sudah ada, pemetaannya jadi rujukan ke modul itu, bukan tabel akun di sini.
+3. Pengaturan yang menyentuh akun menunjuk daftar akun referensi Core lewat kontrak `DaftarAkun`, seperti posting group, bukan tabel akun sendiri di modul ini.
 
 ## Halaman terkait
 

@@ -57,7 +57,7 @@ import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import type {
     Edge,
     Node as FlowNode,
@@ -87,6 +87,7 @@ import {
     Network,
     Pencil,
     Plus,
+    Receipt,
     Search,
     Trash2,
 } from 'lucide-react';
@@ -96,15 +97,17 @@ import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
 } from '@/components/organization/address-book-section';
+import { FinancePostingSection } from '@/components/organization/finance-posting-section';
 import { PrintIdentitySection } from '@/components/organization/print-identity-section';
 
+type OperatingUnit = { type: string; number: string | null };
 type Organization = {
     id: string;
     name: string;
     classification: 'legal_entity' | 'operating_unit';
     status: string;
     legal_entity: { company_code: string; country_code: string } | null;
-    operating_unit: { type: string } | null;
+    operating_unit: OperatingUnit | null;
 };
 type Purpose = {
     code: string;
@@ -115,7 +118,7 @@ type Purpose = {
 type HierarchyNode = {
     id: string;
     organization: Pick<Organization, 'id' | 'name' | 'classification'> & {
-        operating_unit?: { type: string } | null;
+        operating_unit?: OperatingUnit | null;
     };
     parent_node: {
         id: string;
@@ -146,6 +149,35 @@ type Props = {
     operatingUnitTypes: Record<string, string>;
 };
 
+/**
+ * Tipe yang nomornya dipakai sebagai nilai dimensi keuangan: business unit untuk dimensi
+ * klinik, department untuk dimensi poli. Unit bertipe ini yang belum bernomor membuat posting
+ * finance-nya tertahan, jadi kekosongannya ditandai sebelum ada transaksi.
+ */
+const TIPE_BERDIMENSI = ['business_unit', 'department'];
+
+function perluNomor(unit: OperatingUnit | null | undefined): boolean {
+    return (
+        unit !== null &&
+        unit !== undefined &&
+        TIPE_BERDIMENSI.includes(unit.type) &&
+        !unit.number
+    );
+}
+
+function NomorBelumAda() {
+    return (
+        <Badge
+            variant="outline"
+            className="border-warning/40 text-warning"
+            title="Posting finance untuk unit ini akan tertahan sampai nomornya diisi."
+        >
+            <CircleAlert />
+            Belum bernomor
+        </Badge>
+    );
+}
+
 function CreateOrganizationDialog({
     classification,
     operatingUnitTypes,
@@ -162,6 +194,7 @@ function CreateOrganizationDialog({
         company_code: '',
         country_code: 'ID',
         operating_unit_type: 'department',
+        operating_unit_number: '',
     });
     const legalEntity = classification === 'legal_entity';
 
@@ -280,39 +313,75 @@ function CreateOrganizationDialog({
                                     </Field>
                                 </div>
                             ) : (
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.operating_unit_type,
-                                    )}
-                                >
-                                    <NativeSelect
-                                        label="Tipe Operating Unit"
-                                        value={form.data.operating_unit_type}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'operating_unit_type',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field
+                                        data-invalid={Boolean(
                                             form.errors.operating_unit_type,
                                         )}
                                     >
-                                        {Object.entries(operatingUnitTypes).map(
-                                            ([value, label]) => (
+                                        <NativeSelect
+                                            label="Tipe Operating Unit"
+                                            value={
+                                                form.data.operating_unit_type
+                                            }
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'operating_unit_type',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            aria-invalid={Boolean(
+                                                form.errors.operating_unit_type,
+                                            )}
+                                        >
+                                            {Object.entries(
+                                                operatingUnitTypes,
+                                            ).map(([value, label]) => (
                                                 <option
                                                     key={value}
                                                     value={value}
                                                 >
                                                     {label}
                                                 </option>
-                                            ),
+                                            ))}
+                                        </NativeSelect>
+                                        <FieldError>
+                                            {form.errors.operating_unit_type}
+                                        </FieldError>
+                                    </Field>
+                                    <Field
+                                        data-invalid={Boolean(
+                                            form.errors.operating_unit_number,
                                         )}
-                                    </NativeSelect>
-                                    <FieldError>
-                                        {form.errors.operating_unit_type}
-                                    </FieldError>
-                                </Field>
+                                    >
+                                        <Input
+                                            label="Nomor Unit"
+                                            value={
+                                                form.data.operating_unit_number
+                                            }
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'operating_unit_number',
+                                                    event.target.value.toUpperCase(),
+                                                )
+                                            }
+                                            maxLength={30}
+                                            placeholder="Contoh: KLN-A"
+                                            aria-invalid={Boolean(
+                                                form.errors
+                                                    .operating_unit_number,
+                                            )}
+                                        />
+                                        <FieldDescription>
+                                            Kode tetap yang dikirim ke aplikasi
+                                            finance. Huruf besar, angka, dan
+                                            tanda hubung.
+                                        </FieldDescription>
+                                        <FieldError>
+                                            {form.errors.operating_unit_number}
+                                        </FieldError>
+                                    </Field>
+                                </div>
                             )}
                         </FieldGroup>
                     </DialogBody>
@@ -339,10 +408,12 @@ function OrganizationExtraSectionContent({
     section,
     organization,
     canManage,
+    canManageFinancePosting,
 }: {
     section: OrganizationExtraSection;
     organization: Organization;
     canManage: boolean;
+    canManageFinancePosting: boolean;
 }) {
     if (section.value === 'addresses') {
         return (
@@ -369,6 +440,15 @@ function OrganizationExtraSectionContent({
                 organizationId={organization.id}
                 organizationName={organization.name}
                 canManage={canManage}
+            />
+        );
+    }
+
+    if (section.value === 'finance-posting') {
+        return (
+            <FinancePostingSection
+                organizationId={organization.id}
+                canManage={canManageFinancePosting}
             />
         );
     }
@@ -413,11 +493,20 @@ function OrganizationDetailPage({
         company_code: organization.legal_entity?.company_code ?? '',
         country_code: organization.legal_entity?.country_code ?? 'ID',
         operating_unit_type: organization.operating_unit?.type ?? 'department',
+        operating_unit_number: organization.operating_unit?.number ?? '',
     });
     const unitType =
         operatingUnitTypes[organization.operating_unit?.type ?? ''] ??
         organization.operating_unit?.type;
-    const extraSections: (OrganizationExtraSection & {
+    // Setelan posting ke aplikasi finance termasuk setup finance, bukan organisasi: bagiannya hanya tampil bagi
+    // pemegang duty Lihat setup finance, dan mengubahnya butuh Kelola setup finance.
+    const permissions = new Set(
+        usePage().props.auth.membership?.permissions ?? [],
+    );
+    const canManageFinancePosting = permissions.has(
+        'core.finance-setup.update',
+    );
+    const allExtraSections: (OrganizationExtraSection & {
         icon: React.ComponentType<{ className?: string }>;
     })[] = legalEntity
         ? [
@@ -474,6 +563,13 @@ function OrganizationDetailPage({
                       'Nama pada kop, baris induk, NPWP/NIB, footer, dan logo pada semua dokumen yang dicetak.',
                   icon: Image,
               },
+              {
+                  value: 'finance-posting',
+                  title: 'Posting ke Aplikasi Finance',
+                  description:
+                      'Aktif atau tidaknya pengiriman jurnal, tanggal cutover, dan kebijakan jurnal perolehan.',
+                  icon: Receipt,
+              },
           ]
         : [
               {
@@ -504,6 +600,11 @@ function OrganizationDetailPage({
                   icon: Image,
               },
           ];
+    const extraSections = allExtraSections.filter(
+        (section) =>
+            section.value !== 'finance-posting' ||
+            permissions.has('core.finance-setup.read'),
+    );
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground">
@@ -550,8 +651,16 @@ function OrganizationDetailPage({
                             <span>
                                 {legalEntity
                                     ? `${organization.legal_entity?.company_code ?? 'Belum ada kode'} · ${organization.legal_entity?.country_code ?? 'Belum ada negara'}`
-                                    : unitType}
+                                    : [
+                                          unitType,
+                                          organization.operating_unit?.number,
+                                      ]
+                                          .filter(Boolean)
+                                          .join(' · ')}
                             </span>
+                            {perluNomor(organization.operating_unit) && (
+                                <NomorBelumAda />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -705,57 +814,104 @@ function OrganizationDetailPage({
                                             </Field>
                                         </>
                                     ) : (
-                                        <Field
-                                            data-invalid={Boolean(
-                                                form.errors.operating_unit_type,
-                                            )}
-                                        >
-                                            <NativeSelect
-                                                label="Tipe Operating Unit"
-                                                value={
-                                                    form.data
-                                                        .operating_unit_type
-                                                }
-                                                aria-readonly={!editing}
-                                                onMouseDown={(event) => {
-                                                    if (!editing) {
-                                                        event.preventDefault();
-                                                    }
-                                                }}
-                                                onKeyDown={(event) => {
-                                                    if (!editing) {
-                                                        event.preventDefault();
-                                                    }
-                                                }}
-                                                onChange={(event) =>
-                                                    form.setData(
-                                                        'operating_unit_type',
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                aria-invalid={Boolean(
+                                        <>
+                                            <Field
+                                                data-invalid={Boolean(
                                                     form.errors
                                                         .operating_unit_type,
                                                 )}
                                             >
-                                                {Object.entries(
-                                                    operatingUnitTypes,
-                                                ).map(([value, label]) => (
-                                                    <option
-                                                        key={value}
-                                                        value={value}
-                                                    >
-                                                        {label}
-                                                    </option>
-                                                ))}
-                                            </NativeSelect>
-                                            <FieldError>
-                                                {
+                                                <NativeSelect
+                                                    label="Tipe Operating Unit"
+                                                    value={
+                                                        form.data
+                                                            .operating_unit_type
+                                                    }
+                                                    aria-readonly={!editing}
+                                                    onMouseDown={(event) => {
+                                                        if (!editing) {
+                                                            event.preventDefault();
+                                                        }
+                                                    }}
+                                                    onKeyDown={(event) => {
+                                                        if (!editing) {
+                                                            event.preventDefault();
+                                                        }
+                                                    }}
+                                                    onChange={(event) =>
+                                                        form.setData(
+                                                            'operating_unit_type',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    aria-invalid={Boolean(
+                                                        form.errors
+                                                            .operating_unit_type,
+                                                    )}
+                                                >
+                                                    {Object.entries(
+                                                        operatingUnitTypes,
+                                                    ).map(([value, label]) => (
+                                                        <option
+                                                            key={value}
+                                                            value={value}
+                                                        >
+                                                            {label}
+                                                        </option>
+                                                    ))}
+                                                </NativeSelect>
+                                                <FieldError>
+                                                    {
+                                                        form.errors
+                                                            .operating_unit_type
+                                                    }
+                                                </FieldError>
+                                            </Field>
+                                            <Field
+                                                data-invalid={Boolean(
                                                     form.errors
-                                                        .operating_unit_type
-                                                }
-                                            </FieldError>
-                                        </Field>
+                                                        .operating_unit_number,
+                                                )}
+                                            >
+                                                <Input
+                                                    label="Nomor Unit"
+                                                    value={
+                                                        form.data
+                                                            .operating_unit_number
+                                                    }
+                                                    readOnly={!editing}
+                                                    onChange={(event) =>
+                                                        form.setData(
+                                                            'operating_unit_number',
+                                                            event.target.value.toUpperCase(),
+                                                        )
+                                                    }
+                                                    maxLength={30}
+                                                    placeholder={
+                                                        editing
+                                                            ? 'Contoh: KLN-A'
+                                                            : 'Belum diisi'
+                                                    }
+                                                    aria-invalid={Boolean(
+                                                        form.errors
+                                                            .operating_unit_number,
+                                                    )}
+                                                />
+                                                <FieldDescription>
+                                                    Kode tetap yang dikirim ke
+                                                    aplikasi finance sebagai
+                                                    dimensi. Mengganti nomor
+                                                    tidak mengubah jurnal yang
+                                                    sudah terkirim.
+                                                </FieldDescription>
+                                                <FieldError>
+                                                    {
+                                                        form.errors
+                                                            .operating_unit_number
+                                                    }
+                                                </FieldError>
+                                            </Field>
+                                        </>
                                     )}
                                 </FieldGroup>
                             </AccordionContent>
@@ -780,6 +936,9 @@ function OrganizationDetailPage({
                                             section={section}
                                             organization={organization}
                                             canManage={canManage}
+                                            canManageFinancePosting={
+                                                canManageFinancePosting
+                                            }
                                         />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -1072,6 +1231,8 @@ type OrganizationHierarchyFlowData = {
     label: string;
     classification: Organization['classification'];
     operatingUnitType: string | null;
+    operatingUnitNumber: string | null;
+    needsNumber: boolean;
 };
 type OrganizationHierarchyFlowNode = FlowNode<
     OrganizationHierarchyFlowData,
@@ -1099,8 +1260,18 @@ function OrganizationHierarchyFlowNode({
             <p className="mt-1 text-[11px] text-muted-foreground">
                 {data.classification === 'legal_entity'
                     ? 'Legal Entity (Badan Hukum)'
-                    : (data.operatingUnitType ?? 'Operating Unit')}
+                    : [
+                          data.operatingUnitType ?? 'Operating Unit',
+                          data.operatingUnitNumber,
+                      ]
+                          .filter(Boolean)
+                          .join(' · ')}
             </p>
+            {data.needsNumber && (
+                <div className="mt-1.5">
+                    <NomorBelumAda />
+                </div>
+            )}
             <Handle
                 type="source"
                 position={Position.Bottom}
@@ -1114,7 +1285,10 @@ const organizationHierarchyNodeTypes: NodeTypes = {
     organization: OrganizationHierarchyFlowNode,
 };
 
-function buildHierarchyGraph(version: Version): {
+function buildHierarchyGraph(
+    version: Version,
+    operatingUnitTypes: Props['operatingUnitTypes'],
+): {
     nodes: OrganizationHierarchyFlowNode[];
     edges: Edge[];
 } {
@@ -1215,7 +1389,14 @@ function buildHierarchyGraph(version: Version): {
         data: {
             label: node.organization.name,
             classification: node.organization.classification,
-            operatingUnitType: node.organization.operating_unit?.type ?? null,
+            // Label tipe, bukan kodenya: daftar operating unit memakai label yang sama.
+            operatingUnitType: node.organization.operating_unit
+                ? (operatingUnitTypes[node.organization.operating_unit.type] ??
+                  node.organization.operating_unit.type)
+                : null,
+            operatingUnitNumber:
+                node.organization.operating_unit?.number ?? null,
+            needsNumber: perluNomor(node.organization.operating_unit),
         },
     }));
     const edges = version.nodes.flatMap((node) =>
@@ -1234,8 +1415,14 @@ function buildHierarchyGraph(version: Version): {
     return { nodes, edges };
 }
 
-function HierarchyCanvas({ version }: { version: Version }) {
-    const graph = buildHierarchyGraph(version);
+function HierarchyCanvas({
+    version,
+    operatingUnitTypes,
+}: {
+    version: Version;
+    operatingUnitTypes: Props['operatingUnitTypes'];
+}) {
+    const graph = buildHierarchyGraph(version, operatingUnitTypes);
 
     return (
         <div className="overflow-hidden rounded-xl border border-border bg-background shadow-xs">
@@ -1434,6 +1621,7 @@ export default function OrganizationPage({
                 organization.name,
                 organization.legal_entity?.company_code,
                 organization.legal_entity?.country_code,
+                organization.operating_unit?.number ?? undefined,
                 organization.operating_unit?.type,
                 organization.operating_unit?.type
                     ? operatingUnitTypes[organization.operating_unit.type]
@@ -1579,15 +1767,26 @@ export default function OrganizationPage({
                                                         const subtitle =
                                                             organization.legal_entity
                                                                 ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
-                                                                : (operatingUnitTypes[
+                                                                : [
+                                                                      operatingUnitTypes[
+                                                                          organization
+                                                                              .operating_unit
+                                                                              ?.type ??
+                                                                              ''
+                                                                      ] ??
+                                                                          organization
+                                                                              .operating_unit
+                                                                              ?.type,
                                                                       organization
                                                                           .operating_unit
-                                                                          ?.type ??
-                                                                          ''
-                                                                  ] ??
-                                                                  organization
-                                                                      .operating_unit
-                                                                      ?.type);
+                                                                          ?.number,
+                                                                  ]
+                                                                      .filter(
+                                                                          Boolean,
+                                                                      )
+                                                                      .join(
+                                                                          ' · ',
+                                                                      );
 
                                                         return (
                                                             <button
@@ -1626,6 +1825,13 @@ export default function OrganizationPage({
                                                                                 subtitle
                                                                             }
                                                                         </span>
+                                                                        {perluNomor(
+                                                                            organization.operating_unit,
+                                                                        ) && (
+                                                                            <span className="mt-1 block">
+                                                                                <NomorBelumAda />
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -1749,6 +1955,9 @@ export default function OrganizationPage({
 
                                             <HierarchyCanvas
                                                 version={version}
+                                                operatingUnitTypes={
+                                                    operatingUnitTypes
+                                                }
                                             />
 
                                             <div className="space-y-3 pt-2">
@@ -1776,6 +1985,19 @@ export default function OrganizationPage({
                                                                                 .organization
                                                                                 .name
                                                                         }
+                                                                        {node
+                                                                            .organization
+                                                                            .operating_unit
+                                                                            ?.number && (
+                                                                            <span className="ml-1.5 font-mono font-normal text-muted-foreground">
+                                                                                {
+                                                                                    node
+                                                                                        .organization
+                                                                                        .operating_unit
+                                                                                        .number
+                                                                                }
+                                                                            </span>
+                                                                        )}
                                                                     </span>
                                                                     <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                                                                         {node.parent_node

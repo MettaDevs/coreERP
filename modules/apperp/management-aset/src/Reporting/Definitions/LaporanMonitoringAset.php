@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -96,46 +96,46 @@ final class LaporanMonitoringAset implements ReportDefinition
 
     public function data(ReportContext $context, array $parameters): ReportData
     {
-        $query = Asset::query()
-            ->leftJoin('aset_m_group_aset as group_aset', fn ($j) => $j->on('group_aset.id', '=', 'aset_tr_penerimaan_aset.group_aset_id')->on('group_aset.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'))
-            ->leftJoin('aset_m_kelompok_harta_fiskal as fiskal', fn ($j) => $j->on('fiskal.id', '=', 'aset_tr_penerimaan_aset.kelompok_harta_fiskal_id')->on('fiskal.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'))
-            ->leftJoin('aset_m_jenis_aset as jenis', fn ($j) => $j->on('jenis.id', '=', 'aset_tr_penerimaan_aset.jenis_aset_id')->on('jenis.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'))
-            ->leftJoin('aset_m_model_aset as model', fn ($j) => $j->on('model.id', '=', 'aset_tr_penerimaan_aset.model_aset_id')->on('model.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'))
-            ->leftJoin('aset_m_kondisi_aset as kondisi', fn ($j) => $j->on('kondisi.id', '=', 'aset_tr_penerimaan_aset.kondisi_aset_id')->on('kondisi.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'))
-            ->leftJoin('aset_tr_buku_aset as buku', fn ($j) => $j->on('buku.asset_id', '=', 'aset_tr_penerimaan_aset.id')->on('buku.tenant_id', '=', 'aset_tr_penerimaan_aset.tenant_id'));
+        $query = Aset::query()
+            ->leftJoin('aset_m_group_aset as group_aset', fn ($j) => $j->on('group_aset.id', '=', 'aset_tr_aset.group_aset_id')->on('group_aset.tenant_id', '=', 'aset_tr_aset.tenant_id'))
+            ->leftJoin('aset_m_kelompok_harta_fiskal as fiskal', fn ($j) => $j->on('fiskal.id', '=', 'aset_tr_aset.kelompok_harta_fiskal_id')->on('fiskal.tenant_id', '=', 'aset_tr_aset.tenant_id'))
+            ->leftJoin('aset_m_jenis_aset as jenis', fn ($j) => $j->on('jenis.id', '=', 'aset_tr_aset.jenis_aset_id')->on('jenis.tenant_id', '=', 'aset_tr_aset.tenant_id'))
+            ->leftJoin('aset_m_model_aset as model', fn ($j) => $j->on('model.id', '=', 'aset_tr_aset.model_aset_id')->on('model.tenant_id', '=', 'aset_tr_aset.tenant_id'))
+            ->leftJoin('aset_m_kondisi_aset as kondisi', fn ($j) => $j->on('kondisi.id', '=', 'aset_tr_aset.kondisi_aset_id')->on('kondisi.tenant_id', '=', 'aset_tr_aset.tenant_id'))
+            ->leftJoin('aset_tr_buku_aset as buku', fn ($j) => $j->on('buku.aset_id', '=', 'aset_tr_aset.id')->on('buku.tenant_id', '=', 'aset_tr_aset.tenant_id'));
 
-        app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_penerimaan_aset.legal_entity_id', 'aset_tr_penerimaan_aset.responsible_org_unit_id');
+        app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_aset.legal_entity_id', 'aset_tr_aset.responsible_org_unit_id');
 
         if (! empty($parameters['group_aset_id'])) {
-            $query->where('aset_tr_penerimaan_aset.group_aset_id', $parameters['group_aset_id']);
+            $query->where('aset_tr_aset.group_aset_id', $parameters['group_aset_id']);
         }
         if (! empty($parameters['kelompok_harta_fiskal_id'])) {
-            $query->where('aset_tr_penerimaan_aset.kelompok_harta_fiskal_id', $parameters['kelompok_harta_fiskal_id']);
+            $query->where('aset_tr_aset.kelompok_harta_fiskal_id', $parameters['kelompok_harta_fiskal_id']);
         }
         if (! empty($parameters['jenis_aset_id'])) {
-            $query->where('aset_tr_penerimaan_aset.jenis_aset_id', $parameters['jenis_aset_id']);
+            $query->where('aset_tr_aset.jenis_aset_id', $parameters['jenis_aset_id']);
         }
         if (! empty($parameters['asset_id'])) {
-            $query->where('aset_tr_penerimaan_aset.id', $parameters['asset_id']);
+            $query->where('aset_tr_aset.id', $parameters['asset_id']);
         }
 
         $rows = $query
             ->addSelect([
-                'aset_tr_penerimaan_aset.id',
-                'aset_tr_penerimaan_aset.kode',
-                'aset_tr_penerimaan_aset.nama',
-                'aset_tr_penerimaan_aset.model_number',
-                'aset_tr_penerimaan_aset.serial_number',
-                'aset_tr_penerimaan_aset.acquisition_value',
-                'aset_tr_penerimaan_aset.lifecycle_state',
-                'aset_tr_penerimaan_aset.keterangan',
-                'aset_tr_penerimaan_aset.responsible_org_unit_id',
+                'aset_tr_aset.id',
+                'aset_tr_aset.kode',
+                'aset_tr_aset.nama',
+                'aset_tr_aset.model_number',
+                'aset_tr_aset.serial_number',
+                'aset_tr_aset.acquisition_value',
+                'aset_tr_aset.lifecycle_state',
+                'aset_tr_aset.keterangan',
+                'aset_tr_aset.responsible_org_unit_id',
                 'model.nama as model_nama',
                 'kondisi.nama as kondisi_nama',
                 'buku.accumulated_depreciation as buku_akumulasi',
                 'buku.net_book_value as buku_nilai_buku',
             ])
-            ->orderBy('aset_tr_penerimaan_aset.kode')
+            ->orderBy('aset_tr_aset.kode')
             ->toBase()
             ->get();
 

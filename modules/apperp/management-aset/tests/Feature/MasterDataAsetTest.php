@@ -41,12 +41,14 @@ class MasterDataAsetTest extends TestCase
      * Seluruh master klasifikasi kini datar. `jenis-aset` ikut di sini karena setelah
      * rantai diratakan ia tidak lagi punya induk.
      *
+     * Group aset tidak ada di sini: kodenya diketik, tidak diterbitkan urutan nomor (K-24), dan
+     * CRUD-nya diuji `KodeKetikMasterSetupTest`.
+     *
      * @return array<string, array{0:string,1:string}>
      */
     public static function standaloneMasters(): array
     {
         return [
-            'group aset' => ['group-aset', 'aset_m_group_aset'],
             'jenis aset' => ['jenis-aset', 'aset_m_jenis_aset'],
             'kondisi aset' => ['kondisi-aset', 'aset_m_kondisi_aset'],
             'pabrikan aset' => ['pabrikan-aset', 'aset_m_pabrikan_aset'],
@@ -342,7 +344,8 @@ class MasterDataAsetTest extends TestCase
         // benar tetap bisa menghasilkan nomor dari urutan yang salah.
         $terbit = DB::table('number_sequence_issues')->pluck('formatted_value')->all();
 
-        foreach (['group-aset', 'jenis-aset', 'pabrikan-aset', 'model-aset'] as $resource) {
+        // Group aset tidak ikut: kodenya diketik (K-24), jadi ia tidak menerbitkan nomor sama sekali.
+        foreach (['jenis-aset', 'pabrikan-aset', 'model-aset'] as $resource) {
             $awalan = $this->awalanNomor('management-aset.'.$resource).'-';
 
             $this->assertTrue(
@@ -351,7 +354,7 @@ class MasterDataAsetTest extends TestCase
             );
         }
 
-        $this->assertSame(4, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
+        $this->assertSame(3, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_reference_fiskal_hanya_menampilkan_data_tenant_aktif(): void
@@ -387,12 +390,12 @@ class MasterDataAsetTest extends TestCase
         $created = $this->createRecord('group-aset', [
             'nama' => 'Bangunan',
             'kelompok_harta_fiskal_id' => $reference,
-            'property_type' => 'fixed_asset',
+            'property_type' => 'fixed_aset',
             'capitalization_threshold' => 1000,
         ])->assertCreated();
 
         $created->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
-        $created->assertJsonPath('data.property_type', 'fixed_asset');
+        $created->assertJsonPath('data.property_type', 'fixed_aset');
         $created->assertJsonPath('data.capitalization_threshold', '1000.00');
 
         $this->request('group-aset', 'patch', '/api/modules/management-aset/v1/group-aset/'.$created->json('data.id'), ['capitalization_threshold' => 2500])
@@ -439,9 +442,9 @@ class MasterDataAsetTest extends TestCase
     /** Lokasi bawaan harus milik tenant yang sama; ULID asing tidak boleh lolos. */
     public function test_lokasi_bawaan_group_tidak_boleh_lintas_tenant(): void
     {
-        $this->createRecord('group-aset', ['nama' => 'Salah', 'asset_location_id' => (string) Str::ulid()])
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'lokasi_aset_id' => (string) Str::ulid()])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('asset_location_id');
+            ->assertJsonValidationErrors('lokasi_aset_id');
     }
 
     /**
@@ -465,7 +468,7 @@ class MasterDataAsetTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'idempotency_conflict');
 
-        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
+        $this->assertSame(1, DB::table('aset_m_group_aset')->where('tenant_id', $this->tenantId)->count(), 'Kiriman ulang tidak boleh membuat record kedua.');
     }
 
     public function test_kode_dari_klien_diabaikan_dan_selalu_berasal_dari_core(): void
@@ -687,7 +690,7 @@ class MasterDataAsetTest extends TestCase
     {
         return $this->sebagaiPengguna($tenantId ?? $this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $this->creationKeyFor($resource))
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload));
     }
 
     /**
@@ -698,7 +701,7 @@ class MasterDataAsetTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $key)
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload));
     }
 
     /**

@@ -114,6 +114,17 @@ Core tidak men-seed reference bisnis dari app yang belum terpasang.
 
 `default_prefix` adalah singkatan uppercase yang disetujui pemilik domain. Saat app sudah siap untuk tenant, konfigurasi awal langsung aktif dengan rentang `0`–`19999` dan preview prefix + lima digit. Prefix tidak diturunkan otomatis dari nama karena singkatan bisnis tidak selalu sama dengan huruf awal.
 
+## Reference milik Core sendiri
+
+Sebagian kecil identitas dimiliki Core, bukan module. Saat ini hanya satu: nomor vendor (`core.vendor`, lihat [feed posting finance](../todo/feed-posting-finance/README.md)). Reference seperti ini tidak datang dari manifest, jadi aturannya berbeda:
+
+- Ia milik baris app `core` berstatus `internal` di tabel `apps`. Status itu bukan `available`, jadi baris ini tidak pernah tampil di peluncur, pendaftaran, atau katalog produk, dan tidak butuh entitlement.
+- Reference dan baris `apps`-nya ditulis migration, bukan registrasi katalog, jadi aturan manifest di atas tidak diperiksa untuknya. Kodenya tetap diawali ID pemiliknya (`core.`).
+- Setelan awal per reference (profile, scope, segment) ditulis di `App\Support\Finance\CoreNumberSequences`, bukan diturunkan dari `default_prefix` seperti reference module.
+- Urutan tenant lahir saat pertama kali dipakai atau saat layar Nomor dokumen dibuka, mana yang lebih dulu. Yang kedua penting: format terkunci begitu nomor pertama terbit, jadi admin harus bisa menyesuaikannya lebih dulu, misalnya dengan nomor pemasok lama yang akan diketik manual.
+
+Menambah reference Core berarti menambah baris di migration dan di `CoreNumberSequences`. Keputusannya tetap melewati gate yang sama dengan reference module: pemilik, scope, mode, periode reset, dan format.
+
 ## Konfigurasi owner/admin
 
 Owner atau admin tenant mengatur tiap reference melalui **Nomor dokumen** (butuh permission `manage-number-sequences`):

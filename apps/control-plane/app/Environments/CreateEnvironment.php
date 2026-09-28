@@ -24,6 +24,13 @@ use Illuminate\Support\Str;
  * Operasinya sendiri dicatat `succeeded`, dan itu bukan kelonggaran: yang dikerjakannya memang
  * selesai seluruhnya. Langkah membuat database adalah operasi tersendiri yang lahir di irisan
  * berikutnya, bukan bagian dari operasi ini yang menggantung.
+ *
+ * ## Produksi di server klien
+ *
+ * `hosting = client_server` hanya sah untuk produksi. Constraint `environments_server_klien_hanya_produksi`
+ * menolak selainnya; pemanggil yang sampai ke sini dengan kombinasi itu ditolak lebih dulu dengan
+ * kalimat, bukan dengan pelanggaran constraint. Lingkungannya tetap lahir `provisioning` dan tidak pernah
+ * disiapkan di server kita: isinya dipasang agen di server klien, lewat panel di halaman rinciannya.
  */
 final class CreateEnvironment
 {
@@ -33,9 +40,14 @@ final class CreateEnvironment
         string $name,
         ?Carbon $expiresAt,
         int $requestedBy,
+        string $hosting = 'provider',
     ): Environment {
-        return DB::transaction(function () use ($tenant, $kind, $name, $expiresAt, $requestedBy): Environment {
-            $environment = $this->insert($tenant, $kind, $name, $expiresAt, $requestedBy);
+        if ($hosting === 'client_server' && $kind !== 'production') {
+            throw new EnvironmentRejected('Server klien hanya untuk lingkungan produksi. Demo dan sandbox selalu berjalan di server kita.');
+        }
+
+        return DB::transaction(function () use ($tenant, $kind, $name, $expiresAt, $requestedBy, $hosting): Environment {
+            $environment = $this->insert($tenant, $kind, $name, $expiresAt, $requestedBy, $hosting);
 
             $now = Carbon::now();
 
@@ -47,6 +59,7 @@ final class CreateEnvironment
                 'step' => 'tercatat-di-registry',
                 'detail' => [
                     'kind' => $kind,
+                    'hosting' => $hosting,
                     'database' => $environment->database(),
                 ],
                 'started_at' => $now,
@@ -83,6 +96,7 @@ final class CreateEnvironment
         string $name,
         ?Carbon $expiresAt,
         int $requestedBy,
+        string $hosting,
     ): Environment {
         $base = Str::slug($name) !== '' ? Str::slug($name) : $kind;
 
@@ -97,6 +111,7 @@ final class CreateEnvironment
                     'slug' => Str::limit($slug, 120, ''),
                     'status' => 'provisioning',
                     'expires_at' => $expiresAt,
+                    'hosting' => $hosting,
                     // Ditegakkan juga oleh CHECK `environments_keluar_ikut_jenis`. Ditulis di sini
                     // supaya nilainya tidak pernah datang dari formulir — "beri sandbox ini email
                     // sehari saja" harus menjadi percakapan, bukan satu kotak centang.

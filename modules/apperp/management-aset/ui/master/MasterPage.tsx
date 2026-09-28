@@ -332,9 +332,9 @@ export default function MasterPage({
                       width: 90,
                   },
                   {
-                      id: 'asset-types',
+                      id: 'jenis-aset',
                       header: 'Jenis aset',
-                      cell: (item) => Number(item.asset_types_count ?? 0),
+                      cell: (item) => Number(item.jenis_aset_count ?? 0),
                       width: 110,
                   },
               ]

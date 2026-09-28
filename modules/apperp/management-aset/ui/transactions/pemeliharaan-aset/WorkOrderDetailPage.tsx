@@ -53,11 +53,11 @@ function JobRow({
     canRemove,
     readOnly,
     onRequestEdit,
-    assets,
-    assetItems,
+    aset,
+    asetItems,
     jobTypes,
     trades,
-    onAssetSearch,
+    onAsetSearch,
     onChange,
     onRemove,
 }: {
@@ -69,12 +69,12 @@ function JobRow({
     /** Dipanggil saat pengguna menyentuh baris ini selagi mode baca. */
     onRequestEdit: () => void;
     /** Daftar penuh; dipakai untuk menampilkan aset yang sedang terpilih walau tersaring keluar. */
-    assets: Option[];
+    aset: Option[];
     /** Daftar yang lolos pencarian; hanya mengisi pilihan dropdown. */
-    assetItems: Option[];
+    asetItems: Option[];
     jobTypes: Option[];
     trades: Option[];
-    onAssetSearch: (query: string) => void;
+    onAsetSearch: (query: string) => void;
     onChange: (change: Partial<JobLine>) => void;
     onRemove: () => void;
 }) {
@@ -147,17 +147,17 @@ function JobRow({
                         <Select
                             label="Aset"
                             required
-                            items={assetItems.map(
-                                (asset) => labelDari(asset) ?? '',
+                            items={asetItems.map(
+                                (aset) => labelDari(aset) ?? '',
                             )}
-                            value={labelDari(pilih(assets, job.asset_id))}
+                            value={labelDari(pilih(aset, job.aset_id))}
                             placeholder="Pilih aset"
                             searchPlaceholder="Cari kode atau nama aset"
                             ariaLabel={`Aset baris ${index + 1}`}
-                            onSearchChange={onAssetSearch}
+                            onSearchChange={onAsetSearch}
                             onValueChange={(value) =>
                                 onChange({
-                                    asset_id: idDari(assets, value),
+                                    aset_id: idDari(aset, value),
                                     maintenance_job_type_id: '',
                                     variant_id: '',
                                 })
@@ -552,14 +552,14 @@ export default function WorkOrderDetailPage({
     );
     const [tipe, setTipe] = useState<Option[]>([]);
     const [layanan, setLayanan] = useState<Option[]>([]);
-    const [assets, setAssets] = useState<Option[]>([]);
-    const [jobTypesByAsset, setJobTypesByAsset] = useState<
+    const [aset, setAset] = useState<Option[]>([]);
+    const [jobTypesByAset, setJobTypesByAset] = useState<
         Record<string, Option[]>
     >({});
     const [trades, setTrades] = useState<Option[]>([]);
     const [faultCauses, setFaultCauses] = useState<Option[]>([]);
     const [repairActions, setRepairActions] = useState<Option[]>([]);
-    const [assetSearch, setAssetSearch] = useState('');
+    const [asetSearch, setAsetSearch] = useState('');
     // Checklist dicatat bersama job yang alamatnya membukanya. Menutup checklist berarti
     // `checklistJobId` hilang dari alamat, dan isinya ikut hilang saat render itu juga —
     // tanpa effect yang perlu mengosongkannya lebih dulu.
@@ -569,18 +569,18 @@ export default function WorkOrderDetailPage({
     } | null>(null);
     const [saving, setSaving] = useState(false);
 
-    const loadJobTypesForAsset = useCallback(async (assetId: string) => {
-        if (!assetId) {
+    const loadJobTypesForAset = useCallback(async (asetId: string) => {
+        if (!asetId) {
             return;
         }
 
         try {
             const result = await api<{ data: Option[] }>(
-                `/pemeliharaan-aset/referensi/job-types?asset_id=${encodeURIComponent(assetId)}`,
+                `/pemeliharaan-aset/referensi/job-types?aset_id=${encodeURIComponent(asetId)}`,
             );
-            setJobTypesByAsset((current) => ({
+            setJobTypesByAset((current) => ({
                 ...current,
-                [assetId]: result.data,
+                [asetId]: result.data,
             }));
         } catch {
             toast.error('Jenis pekerjaan untuk aset belum dapat dimuat.');
@@ -636,7 +636,7 @@ export default function WorkOrderDetailPage({
                     }),
                 );
                 await Promise.all(
-                    details.map((job) => loadJobTypesForAsset(job.asset_id)),
+                    details.map((job) => loadJobTypesForAset(job.aset_id)),
                 );
 
                 if (dibatalkan) {
@@ -666,7 +666,7 @@ export default function WorkOrderDetailPage({
         return () => {
             dibatalkan = true;
         };
-    }, [loadJobTypesForAsset, mode, versiMuat, workOrderId]);
+    }, [loadJobTypesForAset, mode, versiMuat, workOrderId]);
 
     useEffect(() => {
         if (!bolehSusun) {
@@ -709,7 +709,7 @@ export default function WorkOrderDetailPage({
         // Register aset dikembalikan utuh oleh `/aset` tanpa parameter pencarian, jadi
         // penyaringan dilakukan di sini. Mengirim `q` ke server hanya akan diabaikan diam-diam
         // dan membuat kotak pencarian terlihat bekerja padahal tidak.
-        void muat('/aset', setAssets, 'Aset belum dapat dimuat.');
+        void muat('/aset', setAset, 'Aset belum dapat dimuat.');
     }, [bolehSusun]);
 
     // Checklist yang terbuka ikut alamat: menutupnya berarti kembali ke alamat rincian,
@@ -747,14 +747,14 @@ export default function WorkOrderDetailPage({
             ? checklistMuatan.rows
             : undefined;
 
-    const assetQuery = assetSearch.trim().toLowerCase();
-    const assetTersaring =
-        assetQuery === ''
-            ? assets
-            : assets.filter((asset) =>
-                  `${asset.kode} ${asset.nama ?? ''}`
+    const asetQuery = asetSearch.trim().toLowerCase();
+    const asetTersaring =
+        asetQuery === ''
+            ? aset
+            : aset.filter((aset) =>
+                  `${aset.kode} ${aset.nama ?? ''}`
                       .toLowerCase()
-                      .includes(assetQuery),
+                      .includes(asetQuery),
               );
 
     const pindahStatus = async (ke: string, label: string) => {
@@ -877,7 +877,7 @@ export default function WorkOrderDetailPage({
 
         if (
             !record.details.every(
-                (job) => job.asset_id && job.maintenance_job_type_id,
+                (job) => job.aset_id && job.maintenance_job_type_id,
             )
         ) {
             toast.error('Pilih aset dan jenis pekerjaan pada setiap baris.');
@@ -897,7 +897,7 @@ export default function WorkOrderDetailPage({
             dijadwalkan_mulai: record.dijadwalkan_mulai || null,
             dijadwalkan_selesai: record.dijadwalkan_selesai || null,
             details: record.details.map((job) => ({
-                asset_id: job.asset_id,
+                aset_id: job.aset_id,
                 maintenance_job_type_id: job.maintenance_job_type_id,
                 variant_id: job.variant_id || null,
                 trade_id: job.trade_id || null,
@@ -995,10 +995,10 @@ export default function WorkOrderDetailPage({
             header: 'Aset',
             cell: (job) => (
                 <span className="text-primary font-medium">
-                    {job.asset_kode ?? '—'}
+                    {job.aset_kode ?? '—'}
                 </span>
             ),
-            sortValue: (job) => job.asset_kode ?? '',
+            sortValue: (job) => job.aset_kode ?? '',
             width: 150,
         },
         {
@@ -1035,7 +1035,7 @@ export default function WorkOrderDetailPage({
             cell: (job) =>
                 canEditExecution ? (
                     <Input
-                        aria-label={`Jam aktual ${job.asset_kode ?? ''}`}
+                        aria-label={`Jam aktual ${job.aset_kode ?? ''}`}
                         type="number"
                         min="0"
                         step="0.25"
@@ -1072,7 +1072,7 @@ export default function WorkOrderDetailPage({
                             value={labelDari(selected)}
                             placeholder="Pilih bila ada"
                             searchPlaceholder="Cari sebab kerusakan"
-                            ariaLabel={`Sebab kerusakan ${job.asset_kode ?? ''}`}
+                            ariaLabel={`Sebab kerusakan ${job.aset_kode ?? ''}`}
                             onValueChange={(value) => {
                                 const id = idDari(faultCauses, value) || null;
                                 const mintaKeterangan = faultCauses.find(
@@ -1088,7 +1088,7 @@ export default function WorkOrderDetailPage({
                         />
                         {selected?.minta_keterangan && (
                             <Input
-                                aria-label={`Keterangan sebab kerusakan ${job.asset_kode ?? ''}`}
+                                aria-label={`Keterangan sebab kerusakan ${job.aset_kode ?? ''}`}
                                 placeholder="Tulis sebab kerusakan"
                                 value={job.sebab_kerusakan_keterangan ?? ''}
                                 onChange={(event) =>
@@ -1130,7 +1130,7 @@ export default function WorkOrderDetailPage({
                             value={labelDari(selected)}
                             placeholder="Pilih bila ada"
                             searchPlaceholder="Cari tindakan perbaikan"
-                            ariaLabel={`Tindakan perbaikan ${job.asset_kode ?? ''}`}
+                            ariaLabel={`Tindakan perbaikan ${job.aset_kode ?? ''}`}
                             onValueChange={(value) => {
                                 const id = idDari(repairActions, value) || null;
                                 const mintaKeterangan = repairActions.find(
@@ -1146,7 +1146,7 @@ export default function WorkOrderDetailPage({
                         />
                         {selected?.minta_keterangan && (
                             <Input
-                                aria-label={`Keterangan tindakan perbaikan ${job.asset_kode ?? ''}`}
+                                aria-label={`Keterangan tindakan perbaikan ${job.aset_kode ?? ''}`}
                                 placeholder="Tulis tindakan perbaikan"
                                 value={job.tindakan_perbaikan_keterangan ?? ''}
                                 onChange={(event) =>
@@ -1496,7 +1496,7 @@ export default function WorkOrderDetailPage({
                                 data={record.details}
                                 getRowKey={(job) => String(job.id)}
                                 getRowLabel={(job) =>
-                                    job.asset_kode ?? 'baris pekerjaan'
+                                    job.aset_kode ?? 'baris pekerjaan'
                                 }
                                 actions={[
                                     {
@@ -1522,20 +1522,18 @@ export default function WorkOrderDetailPage({
                                     canRemove={record.details.length > 1}
                                     readOnly={readOnly}
                                     onRequestEdit={mintaSunting}
-                                    assets={assets}
-                                    assetItems={assetTersaring}
-                                    jobTypes={
-                                        jobTypesByAsset[job.asset_id] ?? []
-                                    }
+                                    aset={aset}
+                                    asetItems={asetTersaring}
+                                    jobTypes={jobTypesByAset[job.aset_id] ?? []}
                                     trades={trades}
-                                    onAssetSearch={setAssetSearch}
+                                    onAsetSearch={setAsetSearch}
                                     onChange={(change) => {
                                         if (
-                                            'asset_id' in change &&
-                                            change.asset_id
+                                            'aset_id' in change &&
+                                            change.aset_id
                                         ) {
-                                            void loadJobTypesForAsset(
-                                                change.asset_id,
+                                            void loadJobTypesForAset(
+                                                change.aset_id,
                                             );
                                         }
 

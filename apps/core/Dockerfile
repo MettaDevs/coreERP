@@ -10,22 +10,27 @@
 # Bangun dari akar repo:
 #   docker build -f apps/core/Dockerfile .
 #
-# ## Image per edisi
+# ## Module apa yang ikut
 #
-# `MODUL` adalah daftar id module yang dibeli satu edisi, dipisah spasi. Isinya dihitung
-# `php artisan edition:resolve <edisi> --daftar` — yang sudah menutup dependency transitif dan
-# modul penghubung — dan diteruskan `scripts/build-edition.sh`:
+# `MODUL` adalah daftar id module yang ikut, dipisah spasi. Isinya dihitung
+# `php artisan edition:modules --daftar` dan diteruskan `scripts/build-edition.sh`:
 #
 #   docker build -f apps/core/Dockerfile --build-arg MODUL="management-aset" .
 #   docker build -f apps/core/Dockerfile --build-arg MODUL="" .
 #
-# Daftar kosong berarti **Core saja**, dan itu edisi yang sah: `editions/praktek-dr-budi.yaml`
-# memang tidak membeli satu module pun.
+# **Argumen ini bukan lagi pilihan produk.** Sampai 18 September 2026 isinya datang dari manifest
+# edisi per pelanggan di `editions/`, dan image dipangkas mengikuti apa yang dibeli pelanggan itu.
+# Bentuk itu dicabut: yang dibagikan satu image berisi seluruh module yang dijual, dan yang
+# mengunci module untuk sebuah tenant adalah lisensi dari admin.erp. Yang tersisa dari pemangkasan
+# hanya penolakan module bahan uji — dan itu yang dihitung `edition:modules`.
 #
-# Nilai bawaannya `semua`, dan itu sengaja bukan sinonim dari daftar kosong. Tanpa argumen,
-# image memuat seluruh module di repo persis seperti sebelum edisi ada — bentuk yang dipakai
-# `compose.yaml` di repo erp-dev, dan yang harus tetap bekerja. Membuat "tanpa argumen" berarti
-# Core saja akan membuat pemanggilan lama diam-diam menghasilkan image yang berbeda isinya.
+# Daftar kosong berarti **Core saja**. Ia tetap bentuk yang sah, dan dipakai untuk membuktikan
+# pemangkasannya benar-benar bekerja; ia bukan lagi sebuah edisi pelanggan.
+#
+# Nilai bawaannya `semua`, dan itu sengaja bukan sinonim dari daftar kosong. Tanpa argumen, image
+# memuat seluruh module di repo **termasuk bahan uji** — bentuk yang dipakai `compose.yaml` di repo
+# erp-dev, tempat module contoh justru dibutuhkan. Karena itu image yang dikirim ke klien tidak
+# pernah dibangun tanpa argumen: `scripts/build-edition.sh` selalu menyebutnya.
 ARG MODUL=semua
 
 FROM composer:2 AS vendor
@@ -37,7 +42,7 @@ WORKDIR /repo
 COPY scripts/edisi-pangkas.php ./scripts/
 COPY apps/core/composer.json apps/core/composer.lock ./apps/core/
 COPY modules ./modules
-# Module yang tidak dibeli dibuang di sini, yaitu SEBELUM pemasangan. Urutannya tidak bisa
+# Module yang tidak ikut dibuang di sini, yaitu SEBELUM pemasangan. Urutannya tidak bisa
 # dibalik ke sisi mana pun:
 #
 # - membuang foldernya lebih dulu tanpa memangkas `composer.json` membuat pemasangan gagal,
@@ -46,8 +51,8 @@ COPY modules ./modules
 #   `vendor/composer/installed.json` dan `vendor/composer/autoload_psr4.php`.
 #
 # Yang kedua adalah kebocoran, bukan sisa yang bisa diabaikan: klaim produknya berbunyi "modul
-# yang tidak dibeli tidak ada di server pelanggan", bukan "kodenya tidak ada". Alasan lengkap
-# beserta cara `composer.lock` disegarkan ada di `scripts/edisi-pangkas.php`.
+# bahan uji tidak ada di server klien", bukan "kodenya tidak ada". Alasan lengkap beserta cara
+# `composer.lock` disegarkan ada di `scripts/edisi-pangkas.php`.
 RUN php scripts/edisi-pangkas.php pasang --modul="$MODUL"
 WORKDIR /repo/apps/core
 # ext-gd dan ext-opentelemetry hanya ada pada image runtime di bawah; image composer tidak
@@ -100,10 +105,10 @@ COPY packages/ui ./packages/ui
 # percobaan ulang menutup kasus yang memang cuma unduhan meleset.
 RUN npm ci && node --input-type=module -e 'await import("rolldown")' || (rm -rf node_modules && npm ci && node --input-type=module -e 'await import("rolldown")')
 # UI module ikut dibangun dari folder module, jadi folder itu harus ada di tahap ini — dan
-# hanya berisi module yang dibeli. Yang menentukan isi bundel adalah folder apa yang ada saat
+# hanya berisi module yang ikut. Yang menentukan isi bundel adalah folder apa yang ada saat
 # build berjalan, bukan sebuah daftar kedua: `resources/js/app.tsx` menyapu
 # `../../../../modules/*/*/ui/Pages/**/*.tsx` dan `resources/css/app.css` memindai
-# `@source '../../../../modules/*/*/ui'`. Keduanya pola glob, jadi UI module yang tidak dibeli
+# `@source '../../../../modules/*/*/ui'`. Keduanya pola glob, jadi UI module yang tidak ikut
 # hilang dari bundel karena foldernya memang tidak ada. Salinannya diambil dari tahap `vendor`
 # yang sudah dipangkas, bukan dari konteks yang masih utuh.
 COPY --from=vendor /repo/modules ./modules
@@ -184,15 +189,24 @@ COPY --from=assets /repo/apps/core/public/build ./apps/core/public/build
 # Berkas yang hanya dipakai saat membangun tidak ikut ke server pelanggan. Ada dua kelompok, dan
 # keduanya dibuang karena alasan yang sama sekaligus berbeda tingkatnya.
 #
-# **Suite test.** Ia bukan bagian dari runtime, dan sesudah metadata Composer dipangkas ia
-# satu-satunya tempat tersisa di Core yang menyebut namespace module secara harfiah: penjaga batas
-# menguji dirinya dengan kode palsu bernama seperti module contoh, dan beberapa test Core mengimpor
-# namespace test module aset. Nama itu terbaca sebagai jejak module yang tidak dibeli, dan
-# pemeriksaan kebocoran memang mencarinya. `tests/` milik module ikut dibuang dengan alasan yang
-# sama, sebelum ada module yang menulis test batas yang menyebut nama tetangganya.
+# **Suite test.** Ia bukan bagian dari runtime, dan sejak 18 September 2026 baris ini memikul
+# beban yang lebih berat daripada sekadar kerapian: **module bahan uji tinggal di dalamnya.**
+# `contoh-a` dan `contoh-b` pindah dari `modules/` ke `apps/core/tests/Fixtures/modules`, jadi
+# baris inilah yang membuat berkasnya tidak pernah sampai ke server klien.
+#
+# Ia bukan satu-satunya yang menahannya, dan itu disengaja. `config/modules.php` hanya menyebut
+# akar bahan uji ketika `APP_ENV=testing`, sehingga runtime produksi tidak punya jalan untuk
+# memuatnya walaupun berkasnya entah bagaimana ikut; dan `composer.json` memasang autoload-nya di
+# `autoload-dev`, yang tidak pernah dimuat pemasangan produksi. Tiga lapis, karena yang paling
+# rapuh selalu yang bergantung pada seseorang ingat.
+#
+# Selebihnya alasan lamanya tetap berlaku: suite test menyebut namespace module secara harfiah —
+# penjaga batas menguji dirinya dengan kode palsu, dan beberapa test Core mengimpor namespace test
+# module aset. Nama itu terbaca sebagai jejak module yang tidak ikut, dan pemeriksaan kebocoran
+# memang mencarinya. `tests/` milik module ikut dibuang dengan alasan yang sama.
 #
 # **Resep pembangunannya sendiri.** `Dockerfile` ikut tersalin bersama pohon app, dan komentarnya
-# menyebut nama module — termasuk yang tidak dibeli. Itu ditemukan alur `edition` pada percobaan
+# menyebut nama module — termasuk yang tidak ikut. Itu ditemukan alur `edition` pada percobaan
 # pertama, dan yang salah bukan komentarnya: sebuah image runtime tidak punya keperluan apa pun
 # dengan resep yang membangunnya, dan selama berkas itu ikut, setiap kalimat yang ditulis di sini
 # menjadi calon kebocoran berikutnya. Komentar di atas karena itu tidak lagi mengeja namespace-nya,

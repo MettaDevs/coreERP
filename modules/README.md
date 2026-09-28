@@ -43,7 +43,7 @@ Halaman React module berada di `ui/Pages/` dan ikut build shell Core. Tidak ada 
 aplikasi React kedua, dan tidak ada token yang dipertukarkan lebih dulu.
 
 ```text
-modules/apperp/contoh-a/ui/Pages/Daftar.tsx
+apps/core/tests/Fixtures/modules/apperp/contoh-a/ui/Pages/Daftar.tsx
 ```
 
 Controller module merendernya seperti halaman Inertia biasa, dengan nama berbentuk
@@ -79,8 +79,6 @@ Setiap module memakai satu namespace dan satu awalan tabel, dan keduanya diturun
 
 | Folder | Namespace PHP | Awalan tabel |
 | --- | --- | --- |
-| `apperp/contoh-a` | `Modules\Apperp\ContohA\` | `contoh_a_` |
-| `apperp/contoh-b` | `Modules\Apperp\ContohB\` | `contoh_b_` |
 | `apperp/human-resources` | `Modules\Apperp\HumanResources\` | `hr_` |
 | `apperp/management-aset` | `Modules\Apperp\ManagementAset\` | `aset_` |
 
@@ -88,6 +86,12 @@ Namespace mengikuti `StudlyCase` dari nama folder. Awalan tabel **tidak** selalu
 ia dipilih pendek dan tidak berubah setelah module pertama kali dipasang, karena mengubahnya berarti
 mengganti nama tabel di setiap instalasi pelanggan. Awalan baru dicatat di tabel ini pada pull request
 yang membuat module-nya, supaya tabrakan ketahuan saat peninjauan, bukan saat migrasi jalan.
+
+Dua awalan lagi terpakai tanpa muncul di tabel itu: `contoh_a_` dan `contoh_b_`, milik bahan uji
+penjaga batas di `apps/core/tests/Fixtures/modules`. Keduanya tidak dicatat di sini karena tabel ini
+diperiksa dua arah terhadap isi `modules/` — baris yang menyebut folder yang tidak ada di sana justru
+membuat pemeriksanya merah. Jangan pakai kedua awalan itu untuk module sungguhan: tabelnya benar-benar
+dibuat saat suite test berjalan.
 
 Tabel ini memuat module yang **ada hari ini**, tidak lebih dan tidak kurang, dan itu dijaga
 `SusunanManifestModulTest` di `apps/core/tests/Feature/Boundary/`. Baris yang kurang membuat
@@ -115,14 +119,34 @@ berlaku; awalan module ditulis di depannya, misalnya `aset_m_group` dan `aset_tr
   baru; jangan mengambil jalan pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module
   akan ikut pecah tanpa peringatan.
 
-## Module contoh tidak pernah sampai ke pelanggan
+## Module contoh tidak tinggal di sini lagi
 
-`contoh-a` dan `contoh-b` ada sebagai bahan uji penjaga batas dan hidup sampai fase 7. Keduanya menandai
-dirinya `kind: internal-fixture` pada `app.yaml`.
+`contoh-a` dan `contoh-b` adalah bahan uji penjaga batas, bukan produk. Sampai 18 September 2026
+keduanya tinggal di folder ini bersama module yang dijual, ditandai `kind: internal-fixture` pada
+`app.yaml`, dan satu-satunya hal yang memisahkan menu "Contoh A" dari layar klien adalah sebuah
+pemangkasan saat membangun image.
 
-Module ber-`kind: internal-fixture` **tidak boleh** masuk ke edisi pelanggan mana pun. Pembangun bundle
-menolaknya, dan penolakan itu diuji — bukan sekadar diingat. Sebuah menu bernama "Contoh A" yang muncul
-di layar pelanggan adalah kegagalan yang tidak boleh mungkin terjadi.
+Pemangkasan itu ternyata tidak berlaku di semua jalur: image ramping `deploy/perakit/Dockerfile` —
+yang membangun image yang benar-benar dikirim — sengaja tidak memangkas apa pun, karena module dikunci
+lisensi dan bukan dibuang dari image. Bahan uji ikut terbawa oleh keputusan yang tidak pernah
+dimaksudkan untuknya.
+
+Keduanya karena itu pindah ke **`apps/core/tests/Fixtures/modules`**, dan perpindahannya mengubah sifat
+jaminannya:
+
+- `ModuleRegistry` hanya memindai folder yang disebut `config/modules.akar`, dan akar bahan uji hanya
+  disebut ketika `APP_ENV=testing`. Runtime produksi tidak punya jalan untuk memuatnya walaupun
+  berkasnya ada;
+- tahap akhir Dockerfile membuang seluruh `apps/core/tests`, jadi berkasnya memang tidak ikut;
+- keduanya tidak lagi di-`require` `apps/core/composer.json`. Autoload-nya hidup di `autoload-dev`, yang
+  tidak pernah dimuat pemasangan produksi.
+
+Tiga lapis, dan tidak satu pun bergantung pada seseorang ingat memangkas.
+
+Module ber-`kind: internal-fixture` tetap **tidak boleh** masuk ke image yang dibagikan ke klien, dan
+`scripts/verify-edition.sh` tetap menagihnya pada image yang sudah jadi — sekarang dengan membaca kedua
+akar sekaligus. Sebuah menu bernama "Contoh A" di layar klien adalah kegagalan yang tidak boleh mungkin
+terjadi.
 
 ## Rujukan
 

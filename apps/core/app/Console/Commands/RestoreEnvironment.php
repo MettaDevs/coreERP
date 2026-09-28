@@ -137,6 +137,16 @@ final class RestoreEnvironment extends Command
             return self::FAILURE;
         }
 
+        // Pemulihan menaikkan status sebuah baris menjadi sesuatu yang dapat dirutekan. Untuk
+        // lingkungan server klien tidak ada yang dapat dikembalikan di sini — databasenya tidak
+        // pernah di server ini — jadi yang dipulihkan hanya ilusi, dan ilusi itu dilayani dari
+        // database bersama. Penghapusan lunaknya pun milik admin.erp dan agennya, bukan perintah ini.
+        if ($environment->hostedOnClientServer()) {
+            $this->error($environment->clientServerRefusal('Pemulihan'));
+
+            return self::FAILURE;
+        }
+
         // Aman dijalankan ulang, dan tanpa meninggalkan jejak. Riwayat yang penuh operasi yang
         // tidak mengerjakan apa-apa adalah riwayat yang berhenti dibaca orang — alasan yang sama
         // dengan yang sudah dipakai `environment:convert`.
@@ -179,6 +189,9 @@ final class RestoreEnvironment extends Command
         // Demo baru yang lahir selama yang lama dalam masa tenggang sudah memegang alamat itu.
         // Diperiksa di sini supaya penolakannya terbaca; yang benar-benar menegakkannya tetap
         // `environments_satu_per_jenis` dan `environments_satu_produksi`.
+        //
+        // Penghuni di server klien tidak disaring: indeksnya menghitungnya, jadi pemeriksaan yang
+        // menyaringnya menjadi lebih longgar daripada indeksnya dan menukar kalimat ini dengan 23505.
         $occupant = Environment::query()
             ->where('tenant_id', $environment->tenant_id)
             ->where('kind', $environment->kind)

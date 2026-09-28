@@ -25,13 +25,36 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $started_at
  * @property ?Carbon $lease_until
  * @property ?Carbon $finished_at
+ * @property ?int $registry_robot_id
+ * @property ?string $registry_robot_name
  */
 class SiteOperation extends Model
 {
     use HasUlids;
 
     /** Daftar tertutup. Sama persis dengan CHECK `site_operations_jenis_dikenal` dan kontrak agen. */
-    public const OPERATIONS = ['upgrade', 'backup', 'install_license', 'rotate_key', 'send_diagnostics'];
+    public const OPERATIONS = ['install', 'upgrade', 'backup', 'install_license', 'rotate_key', 'send_diagnostics'];
+
+    /**
+     * Operasi yang boleh diminta operator dari formulir "Minta operasi".
+     *
+     * `install` tidak ada di sini. Ia membawa hash kata sandi sementara owner dan lahir bersama token
+     * pendaftarannya dari "Buat perintah pasang" di halaman lingkungan; permintaan tangan tanpa keduanya
+     * adalah pemasangan yang tidak dapat melahirkan admin yang dapat masuk.
+     */
+    public const MANUAL_OPERATIONS = ['upgrade', 'backup', 'install_license', 'rotate_key', 'send_diagnostics'];
+
+    /** Status akhir. Sama dengan pasangan `finished_at` di CHECK `site_operations_selesai_sejalan`. */
+    public const FINAL_STATUSES = ['succeeded', 'failed', 'cancelled', 'expired'];
+
+    /**
+     * Parameter yang dihapus begitu operasinya ditutup.
+     *
+     * Hash kata sandi sementara hanya dibutuhkan agen selama pemasangan. Sesudah itu ia hanya menunggu
+     * dibocorkan — lewat cadangan database, salinan, atau pembaca yang tidak seharusnya. Constraint
+     * `site_operations_hash_sandi_hanya_saat_terbuka` menolak baris tertutup yang masih membawanya.
+     */
+    public const PASSWORD_HASH_PARAMETER = 'admin_password_hash';
 
     protected $table = 'site_operations';
 
@@ -59,6 +82,7 @@ class SiteOperation extends Model
             'started_at' => 'datetime',
             'lease_until' => 'datetime',
             'finished_at' => 'datetime',
+            'registry_robot_id' => 'integer',
         ];
     }
 

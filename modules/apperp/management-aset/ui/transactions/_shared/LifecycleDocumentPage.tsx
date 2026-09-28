@@ -36,7 +36,7 @@ export type LifecycleConfig = {
     resource: string;
     title: string;
     action: string;
-    needsAsset: boolean;
+    needsAset: boolean;
     financial: boolean;
 };
 
@@ -84,7 +84,7 @@ export default function LifecycleDocumentPage({
                     legal_entity_id: context.legal_entity_id,
                     responsible_org_unit_id: context.org_unit_id,
                     tanggal: values.get('tanggal'),
-                    asset_id: values.get('asset_id') || null,
+                    aset_id: values.get('aset_id') || null,
                     nilai: values.get('nilai') || null,
                     keterangan: values.get('keterangan') || null,
                 }),
@@ -168,10 +168,10 @@ export default function LifecycleDocumentPage({
                                 required
                             />
                         </Field>
-                        {config.needsAsset && (
+                        {config.needsAset && (
                             <Field>
                                 <Input
-                                    name="asset_id"
+                                    name="aset_id"
                                     label="ID aset"
                                     required
                                 />

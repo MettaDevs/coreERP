@@ -1,0 +1,26 @@
+type: object
+additionalProperties: false
+required: [id, number, name, party_type, tax_number, status, legal_entity, updated_at]
+properties:
+  id: { type: string, format: ulid }
+  number:
+    type: string
+    maxLength: 40
+    description: |
+      Nomor vendor, unik per entitas legal dan tidak pernah berubah. Diterbitkan urutan
+      nomor Core (bawaan `VND-000001`) atau diketik manual saat memindahkan pemasok lama.
+  name: { type: string, maxLength: 200, description: Nama party saat ini. }
+  party_type: { type: string, enum: [organization, person] }
+  tax_number: { type: [string, 'null'], maxLength: 32, description: 'NPWP, bila diisi.' }
+  status: { type: string, enum: [active, inactive] }
+  legal_entity:
+    type: object
+    additionalProperties: false
+    required: [id, code]
+    properties:
+      id: { type: string, format: ulid }
+      code: { type: [string, 'null'], description: Kode perusahaan entitas legal. }
+  updated_at:
+    type: string
+    format: date-time
+    description: Waktu perubahan terakhir, dari vendor maupun nama party-nya.

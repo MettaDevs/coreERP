@@ -7,7 +7,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetAttribute;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AtributAset;
 
 /**
  * Pilihan nilai untuk atribut bertipe daftar tetap, disunting di dalam form atributnya.
@@ -72,7 +72,7 @@ class TipeAtributNilaiController extends MasterLinkController
         }
 
         $allowed = collect($rows)->pluck('nilai')->map(fn (mixed $value): string => trim((string) $value))->unique()->values();
-        $conflicts = AssetAttribute::query()
+        $conflicts = AtributAset::query()
             ->where('tipe_atribut_id', $ownerId)
             ->whereNotNull('nilai_text')
             ->whereNotIn('nilai_text', $allowed->all());

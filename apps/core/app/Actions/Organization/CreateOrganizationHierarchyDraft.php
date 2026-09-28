@@ -4,6 +4,7 @@ namespace App\Actions\Organization;
 
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
+use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,7 +15,7 @@ class CreateOrganizationHierarchyDraft
     {
         $source->loadMissing(['hierarchy', 'nodes']);
 
-        if (! $actor->canManageAccess() || $source->hierarchy->tenant_id !== $actor->tenant_id) {
+        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $source->hierarchy->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
         if ($source->status !== 'published') {

@@ -4,75 +4,11 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "01975d7beab1793b6a0515a68959063e",
+    "content-hash": "f3988a250123ce08b0fab5643c147523",
     "packages": [
         {
-            "name": "apperp/contoh-a",
-            "version": "dev-feat/sso-oidc",
-            "dist": {
-                "type": "path",
-                "url": "../../modules/apperp/contoh-a",
-                "reference": "e03680f204bbaf27fc56ab203bdec2af2941bf32"
-            },
-            "require": {
-                "php": "^8.4"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Apperp\\ContohA\\": "src/",
-                    "Modules\\Apperp\\ContohA\\Database\\Seeders\\": "database/seeders/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "Modules\\Apperp\\ContohA\\Tests\\": "tests/"
-                }
-            },
-            "license": [
-                "proprietary"
-            ],
-            "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
-        },
-        {
-            "name": "apperp/contoh-b",
-            "version": "dev-feat/sso-oidc",
-            "dist": {
-                "type": "path",
-                "url": "../../modules/apperp/contoh-b",
-                "reference": "eabcbc85af1042ce652179fc0e8ceb702b750624"
-            },
-            "require": {
-                "php": "^8.4"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Apperp\\ContohB\\": "src/",
-                    "Modules\\Apperp\\ContohB\\Database\\Seeders\\": "database/seeders/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "Modules\\Apperp\\ContohB\\Tests\\": "tests/"
-                }
-            },
-            "license": [
-                "proprietary"
-            ],
-            "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
-        },
-        {
             "name": "apperp/human-resources",
-            "version": "dev-feat/sso-oidc",
+            "version": "dev-chore/cabut-edisi-dan-bahan-uji",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/human-resources",
@@ -103,7 +39,7 @@
         },
         {
             "name": "apperp/management-aset",
-            "version": "dev-feat/sso-oidc",
+            "version": "dev-chore/cabut-edisi-dan-bahan-uji",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/management-aset",
@@ -12387,8 +12323,6 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "apperp/contoh-a": 20,
-        "apperp/contoh-b": 20,
         "apperp/human-resources": 20,
         "apperp/management-aset": 20
     },

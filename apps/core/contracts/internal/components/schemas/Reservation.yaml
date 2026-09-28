@@ -1,0 +1,8 @@
+type: object
+required: [id, number, status, expires_at]
+properties:
+  id: { type: string, format: ulid }
+  number: { type: string }
+  status:
+    enum: [reserved, reconciliation_pending, confirmed, cancelled]
+  expires_at: { type: [string, 'null'], format: date-time }
