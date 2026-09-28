@@ -1688,3 +1688,13 @@ reports:
         name: Daftar mutasi standar (Excel)
         description: Satu lembar dengan kolom bukti, aset, asal, tujuan, dan kondisi.
         format: xlsx
+  - code: management-aset.laporan-penyusutan-aset
+    name: Laporan penyusutan aset
+    description: Penyusutan bulan ini, tahun berjalan, akumulasi, dan nilai buku per aset, dari catatan buku aset.
+    permission: management-aset.penyusutan.read
+    parameters: [group_aset_id, kelompok_harta_fiskal_id, jenis_aset_id, asset_id, buku_id, periode]
+    builtin_layouts:
+      - key: standar
+        name: Laporan penyusutan aset standar (Excel)
+        description: 'Satu baris per buku aset: umur ekonomis, penyusutan, akumulasi, dan nilai buku.'
+        format: xlsx

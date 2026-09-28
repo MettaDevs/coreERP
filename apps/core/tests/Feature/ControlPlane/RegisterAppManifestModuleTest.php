@@ -53,13 +53,17 @@ class RegisterAppManifestModuleTest extends TestCase
         // (`penyusutan.post`, invoke), +1 privilege (`penyusutan.post-to-finance`), dan +1 duty
         // (`penyusutan.finance-posting`), tersendiri supaya role yang mengelola penyusutan tidak
         // diam-diam dapat mengirim jurnalnya ke aplikasi finance.
+        //
+        // 28 September 2026, laporan penyusutan aset (#153): +1 laporan
+        // (`laporan-penyusutan-aset`). Tanpa baris manifest ini tombol Cetak menjawab 404
+        // walau pratinjaunya tampil, karena dialog cetak mencari laporan di katalog Core.
         'entry_points' => 69,
         'permissions' => 133,
         'privileges' => 71,
         'duties' => 38,
         'number_sequence_references' => 31,
         'workflow_types' => 2,
-        'reports' => 4,
+        'reports' => 5,
     ];
 
     private string $akarSementara;
