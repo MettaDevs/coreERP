@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    DateFilter,
+    FiscalClassificationFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -24,7 +31,8 @@ export type MaintenanceReportRow = {
 export default function LaporanPemeliharaanAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -36,7 +44,7 @@ export default function LaporanPemeliharaanAsetPage() {
         () => [
             {
                 id: 'no_bukti',
-                header: 'No. Bukti',
+                header: 'No. bukti',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? row.kode ?? '-')}
@@ -45,12 +53,12 @@ export default function LaporanPemeliharaanAsetPage() {
             },
             {
                 id: 'tanggal',
-                header: 'Tgl Work Order',
+                header: 'Tgl work order',
                 cell: (row) => String(row.tanggal ?? row.dibuat_pada ?? '-'),
             },
             {
                 id: 'asset_kode',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
                         {String(row.asset_kode ?? '-')}
@@ -59,7 +67,7 @@ export default function LaporanPemeliharaanAsetPage() {
             },
             {
                 id: 'asset_nama',
-                header: 'Item Aset',
+                header: 'Item aset',
                 cell: (row) => String(row.asset_nama ?? '-'),
             },
             {
@@ -83,7 +91,7 @@ export default function LaporanPemeliharaanAsetPage() {
             },
             {
                 id: 'checklist',
-                header: 'Item Checklist',
+                header: 'Item checklist',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
                         {String(row.checklist ?? '-')}
@@ -92,12 +100,12 @@ export default function LaporanPemeliharaanAsetPage() {
             },
             {
                 id: 'analisa_perbaikan',
-                header: 'Analisa Perbaikan',
+                header: 'Analisa perbaikan',
                 cell: (row) => String(row.analisa_perbaikan ?? '-'),
             },
             {
                 id: 'jenis_pemeliharaan',
-                header: 'Jenis Pemeliharaan',
+                header: 'Jenis pemeliharaan',
                 cell: (row) =>
                     String(
                         row.jenis_pemeliharaan ?? row.tipe_work_order ?? '-',
@@ -105,7 +113,7 @@ export default function LaporanPemeliharaanAsetPage() {
             },
             {
                 id: 'unit_organisasi',
-                header: 'Unit Organisasi',
+                header: 'Unit organisasi',
                 cell: (row) => String(row.unit_organisasi ?? '-'),
             },
             {
@@ -129,18 +137,27 @@ export default function LaporanPemeliharaanAsetPage() {
 
     return (
         <ReportPageLayout<MaintenanceReportRow>
-            title="Laporan Pemeliharaan Aset"
+            title="Laporan pemeliharaan aset"
             description="Daftar pelaksanaan perawatan berkala dan perbaikan aset beserta riwayat checklist dan teknisi."
             reportCode="laporan-pemeliharaan-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}

@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    DateFilter,
+    FiscalClassificationFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -21,7 +28,8 @@ export type SaleReportRow = {
 export default function LaporanPenjualanAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -33,7 +41,7 @@ export default function LaporanPenjualanAsetPage() {
         () => [
             {
                 id: 'no_bukti',
-                header: 'No. Bukti',
+                header: 'No. bukti',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? '-')}
@@ -42,12 +50,12 @@ export default function LaporanPenjualanAsetPage() {
             },
             {
                 id: 'tanggal_penjualan',
-                header: 'Tgl Penjualan',
+                header: 'Tgl penjualan',
                 cell: (row) => String(row.tanggal_penjualan ?? '-'),
             },
             {
                 id: 'asset_kode',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
                         {String(row.asset_kode ?? '-')}
@@ -56,7 +64,7 @@ export default function LaporanPenjualanAsetPage() {
             },
             {
                 id: 'asset_nama',
-                header: 'Item Aset',
+                header: 'Item aset',
                 cell: (row) => String(row.asset_nama ?? '-'),
             },
             {
@@ -66,7 +74,7 @@ export default function LaporanPenjualanAsetPage() {
             },
             {
                 id: 'nilai_penjualan',
-                header: 'Nilai Penjualan',
+                header: 'Nilai penjualan',
                 cell: (row) => (
                     <span className="font-medium">
                         {String(row.nilai_penjualan ?? '-')}
@@ -76,13 +84,13 @@ export default function LaporanPenjualanAsetPage() {
             },
             {
                 id: 'nilai_buku',
-                header: 'Nilai Buku',
+                header: 'Nilai buku',
                 cell: (row) => String(row.nilai_buku ?? '-'),
                 align: 'right',
             },
             {
                 id: 'laba_rugi',
-                header: 'Laba / (Rugi)',
+                header: 'Laba / (rugi)',
                 cell: (row) => (
                     <span className="text-primary font-medium">
                         {String(row.laba_rugi ?? '-')}
@@ -101,7 +109,7 @@ export default function LaporanPenjualanAsetPage() {
             },
             {
                 id: 'status_dokumen',
-                header: 'Status Dokumen',
+                header: 'Status dokumen',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
                         {String(row.status_dokumen ?? '-')}
@@ -137,18 +145,27 @@ export default function LaporanPenjualanAsetPage() {
 
     return (
         <ReportPageLayout<SaleReportRow>
-            title="Laporan Penjualan Aset"
+            title="Laporan penjualan aset"
             description="Rekapitulasi transaksi pelepasan aset secara komersial beserta nilai realisasi dan laba/rugi pelepasan."
             reportCode="laporan-penjualan-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}

@@ -1,4 +1,5 @@
 import { lazy, useMemo } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import { Card, CardContent } from '@apperp/ui/card';
 import {
     Empty,
@@ -78,24 +79,44 @@ const PengaturanAsetTetapPlaceholderPage = lazy(
 const AssetPostingGroupPage = lazy(
     () => import('./asset-posting-group/AssetPostingGroupPage'),
 );
-const LaporanPenyusutanAsetPage = lazy(
-    () => import('./laporan/LaporanPenyusutanAsetPage'),
-);
-const LaporanMutasiAsetPage = lazy(
-    () => import('./laporan/LaporanMutasiAsetPage'),
-);
-const LaporanMonitoringAsetPage = lazy(
-    () => import('./laporan/LaporanMonitoringAsetPage'),
-);
-const LaporanPemeliharaanAsetPage = lazy(
-    () => import('./laporan/LaporanPemeliharaanAsetPage'),
-);
-const LaporanPenjualanAsetPage = lazy(
-    () => import('./laporan/LaporanPenjualanAsetPage'),
-);
-const LaporanPemusnahanAsetPage = lazy(
-    () => import('./laporan/LaporanPemusnahanAsetPage'),
-);
+
+/**
+ * Halaman laporan, berkunci id entri menunya.
+ *
+ * Keenamnya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
+ * membedakannya hanya data, dan data itu ditulis di satu peta, bukan satu cabang `if`
+ * per laporan. Izinnya sama dengan izin entri menu di `app.yaml` dan izin definisi
+ * laporannya; laporan baru cukup menambah satu entri di sini.
+ */
+const REPORT_PAGES: Record<
+    string,
+    { permission: string; Page: LazyExoticComponent<ComponentType> }
+> = {
+    'laporan-penyusutan-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanPenyusutanAsetPage')),
+    },
+    'laporan-mutasi-aset': {
+        permission: 'management-aset.mutasi-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMutasiAsetPage')),
+    },
+    'laporan-monitoring-aset': {
+        permission: 'management-aset.monitoring-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMonitoringAsetPage')),
+    },
+    'laporan-pemeliharaan-aset': {
+        permission: 'management-aset.pemeliharaan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemeliharaanAsetPage')),
+    },
+    'laporan-penjualan-aset': {
+        permission: 'management-aset.penjualan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPenjualanAsetPage')),
+    },
+    'laporan-pemusnahan-aset': {
+        permission: 'management-aset.pemusnahan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemusnahanAsetPage')),
+    },
+};
 
 /**
  * Dokumen siklus hidup aset, berkunci id entri menunya.
@@ -288,68 +309,12 @@ export default function App({
         );
     }
 
-    if (
-        view === 'laporan-penyusutan-aset' &&
-        permissions.includes('management-aset.penyusutan.read')
-    ) {
-        return (
-            <main>
-                <LaporanPenyusutanAsetPage />
-            </main>
-        );
-    }
+    const report = REPORT_PAGES[view];
 
-    if (
-        view === 'laporan-mutasi-aset' &&
-        permissions.includes('management-aset.mutasi-aset.read')
-    ) {
+    if (report && permissions.includes(report.permission)) {
         return (
             <main>
-                <LaporanMutasiAsetPage />
-            </main>
-        );
-    }
-
-    if (
-        view === 'laporan-monitoring-aset' &&
-        permissions.includes('management-aset.monitoring-aset.read')
-    ) {
-        return (
-            <main>
-                <LaporanMonitoringAsetPage />
-            </main>
-        );
-    }
-
-    if (
-        view === 'laporan-pemeliharaan-aset' &&
-        permissions.includes('management-aset.pemeliharaan-aset.read')
-    ) {
-        return (
-            <main>
-                <LaporanPemeliharaanAsetPage />
-            </main>
-        );
-    }
-
-    if (
-        view === 'laporan-penjualan-aset' &&
-        permissions.includes('management-aset.penjualan-aset.read')
-    ) {
-        return (
-            <main>
-                <LaporanPenjualanAsetPage />
-            </main>
-        );
-    }
-
-    if (
-        view === 'laporan-pemusnahan-aset' &&
-        permissions.includes('management-aset.pemusnahan-aset.read')
-    ) {
-        return (
-            <main>
-                <LaporanPemusnahanAsetPage />
+                <report.Page />
             </main>
         );
     }

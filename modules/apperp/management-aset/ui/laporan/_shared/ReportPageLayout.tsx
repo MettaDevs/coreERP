@@ -1,5 +1,7 @@
-import { Printer, RefreshCw } from 'lucide-react';
-import type { Key, ReactNode } from 'react';
+import { AlertCircle, Printer, RefreshCw } from 'lucide-react';
+import { useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
@@ -32,8 +34,7 @@ export type ReportPageLayoutProps<T> = {
     loading?: boolean;
     error?: string;
     totalSummary?: ReactNode;
-    getRowKey?: (row: T) => Key;
-    onRefresh?: () => void;
+    onRefresh: () => void;
 };
 
 export function ReportPageLayout<T extends Record<string, unknown>>({
@@ -47,14 +48,16 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
     loading = false,
     error,
     totalSummary,
-    getRowKey = (row) =>
-        (row.id as Key) ??
-        (row.kode as Key) ??
-        (row.no_bukti as Key) ??
-        (row.nomor as Key) ??
-        JSON.stringify(row),
     onRefresh,
 }: ReportPageLayoutProps<T>) {
+    // Baris laporan tidak punya kunci alami: satu aset muncul sekali per buku, satu dokumen
+    // sekali per aset. Daftarnya diganti utuh setiap kali dimuat dan tidak diurutkan ulang
+    // di layar, jadi posisi baris cukup sebagai kunci.
+    const keys = useMemo(
+        () => new Map(rows.map((row, index) => [row, index])),
+        [rows],
+    );
+
     const handlePrint = () => {
         // Bersihkan parameter filter kosong sebelum dikirim ke Core
         const cleanParams: Record<string, unknown> = {};
@@ -67,7 +70,7 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
 
         requestPrint({
             report: reportCode,
-            title: `Cetak ${title}`,
+            title: `Cetak ${title.toLowerCase()}`,
             parameters: cleanParams,
         });
     };
@@ -75,28 +78,26 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
             <CardHeader className="min-h-0 border-b px-5 py-3">
-                <CardTitle className="text-base">{title}</CardTitle>
+                <CardTitle>{title}</CardTitle>
                 {description && (
                     <CardDescription>{description}</CardDescription>
                 )}
                 <CardAction className="flex items-center gap-2">
-                    {onRefresh && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={onRefresh}
-                            disabled={loading}
-                            title="Segarkan data terbaru"
-                            aria-label="Segarkan data terbaru"
-                            className="gap-1.5"
-                        >
-                            <RefreshCw
-                                className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
-                            />
-                            <span className="hidden sm:inline">Segarkan</span>
-                        </Button>
-                    )}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRefresh}
+                        disabled={loading}
+                        title="Segarkan data terbaru"
+                        aria-label="Segarkan data terbaru"
+                        className="gap-1.5"
+                    >
+                        <RefreshCw
+                            className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
+                        />
+                        <span className="hidden sm:inline">Segarkan</span>
+                    </Button>
                     <Button
                         type="button"
                         variant="outline"
@@ -116,9 +117,11 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
 
                 <div className="space-y-4 px-5 py-4">
                     {error && (
-                        <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border p-3 text-sm">
-                            {error}
-                        </div>
+                        <Alert variant="destructive">
+                            <AlertCircle />
+                            <AlertTitle>Laporan tidak dapat dimuat</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
                     )}
 
                     {loading ? (
@@ -126,7 +129,9 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                             <Spinner className="text-primary size-6 animate-spin" />
                             <p className="text-sm">Memuat data laporan...</p>
                         </div>
-                    ) : rows.length === 0 ? (
+                    ) : error ? null : rows.length === 0 ? (
+                        // Tanpa syarat `error` di atas, kegagalan memuat tampil bersama
+                        // "tidak ada yang sesuai dengan filter" — seolah filternya yang salah.
                         <Empty className="py-12">
                             <EmptyHeader>
                                 <EmptyTitle>Tidak ada data laporan</EmptyTitle>
@@ -142,7 +147,7 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                             <DataTable
                                 columns={columns}
                                 data={rows}
-                                getRowKey={getRowKey}
+                                getRowKey={(row) => keys.get(row) ?? -1}
                                 showRowNumbers={true}
                                 emptyMessage="Tidak ada data ditemukan."
                             />

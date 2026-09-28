@@ -115,7 +115,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
         $izin = is_array($konteks['permissions'] ?? null) ? $konteks['permissions'] : [];
 
         if (! in_array($definition->permission(), $izin, true)) {
-            throw new RuntimeException('Anda tidak berhak membaca data laporan ini.');
+            throw new ReportAccessDeniedException('Anda tidak berhak membaca data laporan ini.');
         }
 
         return $definition;
