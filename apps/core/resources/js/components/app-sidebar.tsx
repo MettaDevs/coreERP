@@ -198,7 +198,9 @@ export function AppSidebar() {
                         label: 'Jadwal dari pola',
                         icon: CalendarCheck,
                         href: '/settings/compose-working-times',
-                        permission: 'core.reference-data.read',
+                        // Halaman ini hanya berisi formulir penyusunan jadwal, jadi ia untuk
+                        // yang boleh mengubah data referensi saja.
+                        permission: 'core.reference-data.update',
                     },
                 ],
             },
