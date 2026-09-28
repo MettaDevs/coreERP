@@ -7,6 +7,7 @@ namespace App\Support\Reporting;
 use App\Support\Finance\MoneyPrecision;
 use Carbon\CarbonImmutable;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
 /**
  * Cara menampilkan satu nilai dataset laporan yang menyatakan tipenya.
@@ -30,13 +31,15 @@ final class ValueFormat
 {
     public const MONEY = 'money';
 
+    public const NUMBER = 'number';
+
     public const PERCENT = 'percent';
 
     public const DATE = 'date';
 
     public const MONTH = 'month';
 
-    public const TYPES = [self::MONEY, self::PERCENT, self::DATE, self::MONTH];
+    public const TYPES = [self::MONEY, self::NUMBER, self::PERCENT, self::DATE, self::MONTH];
 
     /** Bahasa nama bulan; seluruh layar dan dokumen CoreERP berbahasa Indonesia. */
     private const LOCALE = 'id';
@@ -62,7 +65,8 @@ final class ValueFormat
 
         return match ($this->type) {
             self::MONEY => is_numeric($value) ? $this->money($value) : (string) $value,
-            self::PERCENT => is_numeric($value) ? $this->percent($value) : (string) $value,
+            self::NUMBER => is_numeric($value) ? $this->number($value) : (string) $value,
+            self::PERCENT => is_numeric($value) ? $this->number($value).'%' : (string) $value,
             self::DATE => $this->date($value)?->format('d/m/Y') ?? (string) $value,
             self::MONTH => $this->date($value)?->settings(['locale' => self::LOCALE])->translatedFormat('F Y') ?? (string) $value,
             default => (string) $value,
@@ -83,14 +87,18 @@ final class ValueFormat
             return null;
         }
 
-        if ($this->type === self::MONEY || $this->type === self::PERCENT) {
+        if (in_array($this->type, [self::MONEY, self::NUMBER, self::PERCENT], true)) {
             if (! is_numeric($value)) {
                 return null;
             }
 
-            return $this->type === self::MONEY
-                ? [(float) $value, $this->moneyFormatCode()]
-                : [(float) $value / 100, '0.00%'];
+            // Angka biasa tidak diberi format: Excel menampilkannya dengan pemisah menurut
+            // bahasa komputer pembacanya, dan format sel pilihan pembuat layout tetap berlaku.
+            return match ($this->type) {
+                self::MONEY => [(float) $value, $this->moneyFormatCode()],
+                self::NUMBER => [(float) $value, NumberFormat::FORMAT_GENERAL],
+                default => [(float) $value / 100, '0.00%'],
+            };
         }
 
         $date = $this->date($value);
@@ -107,22 +115,25 @@ final class ValueFormat
 
     private function money(string|int|float $value): string
     {
-        $rounded = MoneyPrecision::round($value, $this->decimals);
-        $negative = str_starts_with($rounded, '-');
-        [$whole, $fraction] = array_pad(explode('.', ltrim($rounded, '-')), 2, '');
-        $grouped = ltrim(strrev(chunk_split(strrev($whole), 3, '.')), '.');
         $prefix = $this->symbol === '' ? '' : $this->symbol.' ';
 
-        return ($negative ? '-' : '').$prefix.$grouped.($fraction === '' ? '' : ','.$fraction);
+        return $this->grouped(MoneyPrecision::round($value, $this->decimals), $prefix);
     }
 
-    /** Persen sampai dua desimal, tanpa nol di belakang koma: 25%, 12,5%. */
-    private function percent(string|int|float $value): string
+    /** Angka dan persen sampai dua desimal, tanpa nol di belakang koma: 4, 2,5, 1.234,75. */
+    private function number(string|int|float $value): string
     {
-        $rounded = MoneyPrecision::round($value, 2);
-        $trimmed = str_contains($rounded, '.') ? rtrim(rtrim($rounded, '0'), '.') : $rounded;
+        return $this->grouped(rtrim(rtrim(MoneyPrecision::round($value, 2), '0'), '.'));
+    }
 
-        return str_replace('.', ',', $trimmed).'%';
+    /** Desimal bertitik (`-1234567.50`) menjadi tulisan Indonesia (`-Rp 1.234.567,50`). */
+    private function grouped(string $decimal, string $prefix = ''): string
+    {
+        $negative = str_starts_with($decimal, '-');
+        [$whole, $fraction] = array_pad(explode('.', ltrim($decimal, '-')), 2, '');
+        $whole = ltrim(strrev(chunk_split(strrev($whole), 3, '.')), '.');
+
+        return ($negative ? '-' : '').$prefix.$whole.($fraction === '' ? '' : ','.$fraction);
     }
 
     /** Tanggal `Y-m-d` (jam di belakangnya diabaikan) atau bulan `Y-m`. */

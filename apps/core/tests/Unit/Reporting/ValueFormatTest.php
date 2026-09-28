@@ -32,6 +32,10 @@ class ValueFormatTest extends TestCase
         yield 'uang tanpa simbol' => [new ValueFormat(ValueFormat::MONEY, 2), 1000, '1.000,00'];
         yield 'uang bukan angka ditampilkan apa adanya' => [$idr, 'belum dinilai', 'belum dinilai'];
         yield 'uang kosong' => [$idr, null, ''];
+        yield 'angka bulat' => [new ValueFormat(ValueFormat::NUMBER), 4, '4'];
+        yield 'angka pecahan' => [new ValueFormat(ValueFormat::NUMBER), 2.5, '2,5'];
+        yield 'angka ribuan' => [new ValueFormat(ValueFormat::NUMBER), '1234.756', '1.234,76'];
+        yield 'angka negatif' => [new ValueFormat(ValueFormat::NUMBER), -0.5, '-0,5'];
         yield 'persen bulat' => [new ValueFormat(ValueFormat::PERCENT), 25, '25%'];
         yield 'persen pecahan' => [new ValueFormat(ValueFormat::PERCENT), 12.5, '12,5%'];
         yield 'persen dua desimal' => [new ValueFormat(ValueFormat::PERCENT), '33.3333', '33,33%'];
@@ -60,6 +64,7 @@ class ValueFormatTest extends TestCase
     public function test_excel_cell_keeps_percent_dates_and_months_as_values(): void
     {
         $this->assertSame([0.125, '0.00%'], (new ValueFormat(ValueFormat::PERCENT))->cell(12.5));
+        $this->assertSame([2.5, 'General'], (new ValueFormat(ValueFormat::NUMBER))->cell('2.5'));
         $this->assertSame(
             [(float) ExcelDate::dateTimeToExcel(new DateTimeImmutable('2026-07-23')), 'dd/mm/yyyy'],
             (new ValueFormat(ValueFormat::DATE))->cell('2026-07-23 10:15:00'),

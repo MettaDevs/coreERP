@@ -49,10 +49,10 @@ interface PenyediaLaporanModul
     /**
      * Placeholder dan nama parameter satu laporan.
      *
-     * Placeholder boleh menyatakan `type` — `money`, `percent`, `date`, atau `month` — dan
-     * nilainya di dataset lalu dikirim mentah: uang sebagai angka, persen sebagai angka
-     * (`12.5` untuk 12,5%), tanggal `Y-m-d`, bulan `Y-m`. Core yang memformatnya per keluaran.
-     * Placeholder tanpa `type` dianggap sudah siap tampil.
+     * Placeholder boleh menyatakan `type` — `money`, `number`, `percent`, `date`, atau
+     * `month` — dan nilainya di dataset lalu dikirim mentah: uang dan angka sebagai angka,
+     * persen sebagai angka (`12.5` untuk 12,5%), tanggal `Y-m-d`, bulan `Y-m`. Core yang
+     * memformatnya per keluaran. Placeholder tanpa `type` dianggap sudah siap tampil.
      *
      * @param  array<string, mixed>  $konteks
      * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
