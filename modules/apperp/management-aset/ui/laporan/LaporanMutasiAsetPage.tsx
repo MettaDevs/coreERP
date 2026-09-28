@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    DateFilter,
+    FiscalClassificationFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -22,7 +29,8 @@ export type MutationReportRow = {
 export default function LaporanMutasiAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -34,12 +42,12 @@ export default function LaporanMutasiAsetPage() {
         () => [
             {
                 id: 'tanggal_mutasi',
-                header: 'Tgl Mutasi',
+                header: 'Tgl mutasi',
                 cell: (row) => String(row.tanggal_mutasi ?? '-'),
             },
             {
                 id: 'nomor_bukti',
-                header: 'No. Bukti Mutasi',
+                header: 'No. bukti mutasi',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {String(row.nomor_bukti ?? row.no_bukti ?? '-')}
@@ -48,7 +56,7 @@ export default function LaporanMutasiAsetPage() {
             },
             {
                 id: 'kode_aset',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
                         {String(row.kode_aset ?? row.asset_kode ?? '-')}
@@ -57,7 +65,7 @@ export default function LaporanMutasiAsetPage() {
             },
             {
                 id: 'nama_aset',
-                header: 'Nama Aset',
+                header: 'Nama aset',
                 cell: (row) => String(row.nama_aset ?? row.asset_nama ?? '-'),
             },
             {
@@ -67,27 +75,27 @@ export default function LaporanMutasiAsetPage() {
             },
             {
                 id: 'lokasi_asal',
-                header: 'Lokasi Asal',
+                header: 'Lokasi asal',
                 cell: (row) => String(row.lokasi_asal ?? '-'),
             },
             {
                 id: 'lokasi_tujuan',
-                header: 'Lokasi Tujuan',
+                header: 'Lokasi tujuan',
                 cell: (row) => String(row.lokasi_tujuan ?? '-'),
             },
             {
                 id: 'penanggung_jawab',
-                header: 'Penanggung Jawab',
+                header: 'Penanggung jawab',
                 cell: (row) => String(row.penanggung_jawab ?? '-'),
             },
             {
                 id: 'pic_penerima',
-                header: 'PIC Penerima',
+                header: 'PIC penerima',
                 cell: (row) => String(row.pic_penerima ?? '-'),
             },
             {
                 id: 'kondisi_aset',
-                header: 'Kondisi Aset',
+                header: 'Kondisi aset',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
                         {String(row.kondisi_aset ?? '-')}
@@ -110,18 +118,27 @@ export default function LaporanMutasiAsetPage() {
 
     return (
         <ReportPageLayout<MutationReportRow>
-            title="Laporan Mutasi Aset"
+            title="Laporan mutasi aset"
             description="Histori perpindahan lokasi, penanggung jawab, dan serah terima aset antar unit organisasi."
             reportCode="laporan-mutasi-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}
