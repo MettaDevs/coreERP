@@ -51,6 +51,8 @@ export default withMermaid({
       'todo/environment-dan-pusat-admin/index.md',
     'todo/produksi-database-sendiri/README.md':
       'todo/produksi-database-sendiri/index.md',
+    'todo/AnalisaGapCoreErpkeBCPhase1/README.md':
+      'todo/AnalisaGapCoreErpkeBCPhase1/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -331,6 +333,20 @@ export default withMermaid({
                 {
                   text: 'TODO production database sendiri',
                   link: '/todo/produksi-database-sendiri/TODO',
+                },
+              ],
+            },
+            {
+              text: 'Analisa gap ke Business Central',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Analisa gap fase 1',
+                  link: '/todo/AnalisaGapCoreErpkeBCPhase1/',
+                },
+                {
+                  text: 'TODO analisa gap fase 1',
+                  link: '/todo/AnalisaGapCoreErpkeBCPhase1/TODO',
                 },
               ],
             },
