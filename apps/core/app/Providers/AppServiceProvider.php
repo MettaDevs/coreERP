@@ -10,6 +10,7 @@ use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
 use App\Support\Database\AuditActor;
+use App\Support\Database\ChangeLogSwitch;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\License\SiteLicense;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -19,6 +20,8 @@ use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
@@ -157,6 +160,11 @@ class AppServiceProvider extends ServiceProvider
         // sesi dipulihkan di tiap permintaan, dan dilepas saat keluar.
         Event::listen(Authenticated::class, fn (Authenticated $event) => AuditActor::set($event->user->getAuthIdentifier()));
         Event::listen(Logout::class, fn () => AuditActor::clear());
+
+        // Log perubahan tidak mencatat migration dan upgrade versi. `migrate --database` menjalankan
+        // migration dengan koneksi itu sebagai bawaan, jadi koneksi bawaan saat event ini yang dimatikan.
+        Event::listen(MigrationsStarted::class, fn () => ChangeLogSwitch::pause());
+        Event::listen(MigrationsEnded::class, fn () => ChangeLogSwitch::resume());
 
         // Keyed per app and tenant so one noisy app cannot starve another, and so a stolen token cannot burn a
         // tenant's number range as fast as the network allows. Credential checks are bcrypt, so this also bounds

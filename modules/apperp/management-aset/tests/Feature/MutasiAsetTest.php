@@ -88,6 +88,44 @@ class MutasiAsetTest extends TestCase
         }
     }
 
+    public function test_riwayat_perubahan_aset_mencatat_pemindahan_dengan_nama_lokasi_dan_pelakunya(): void
+    {
+        $asal = $this->master('lokasi-aset', ['nama' => 'Gudang lama']);
+        $aset = $this->receive();
+        DB::table('aset_tr_aset')->where('id', $aset)->update(['lokasi_aset_id' => $asal]);
+        $tujuan = $this->master('lokasi-aset', ['nama' => 'Ruang Implementor']);
+        $mutasi = $this->draft([$aset], $tujuan);
+        $versi = (int) DB::table('aset_tr_mutasi_aset')->where('id', $mutasi)->value('version');
+
+        $this->sebagaiPenggunaBernama('Petugas Mutasi', $this->tenantId, ['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasi.'/selesaikan', ['version' => $versi])
+            ->assertOk();
+
+        $riwayat = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])
+            ->getJson('/api/modules/management-aset/v1/aset/'.$aset.'/riwayat-perubahan')
+            ->assertOk()
+            ->json('data');
+
+        $pindah = collect($riwayat)->firstWhere('field_name', 'lokasi_aset_id');
+        $this->assertNotNull($pindah, 'Pemindahan lokasi tidak tercatat di riwayat.');
+        $petugas = User::query()->findOrFail($this->idPengguna('Petugas Mutasi'));
+        $this->assertSame(
+            ['modification', 'Lokasi', 'Gudang lama', 'Ruang Implementor', (int) $petugas->id, $petugas->name],
+            [$pindah['change_type'], $pindah['field_caption'], $pindah['old_display'], $pindah['new_display'], $pindah['user_id'], $pindah['user_name']],
+        );
+        // Aset lahir dari penerimaan, dan kelahirannya ikut tercatat.
+        $this->assertContains('insertion', array_column($riwayat, 'change_type'));
+    }
+
+    public function test_riwayat_perubahan_aset_tertutup_tanpa_hak_baca_aset(): void
+    {
+        $aset = $this->receive();
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/aset/'.$aset.'/riwayat-perubahan')
+            ->assertForbidden();
+    }
+
     public function test_keadaan_asal_dibekukan_saat_diselesaikan_bukan_saat_diketik(): void
     {
         $asal = $this->master('lokasi-aset', ['nama' => 'Gudang lama']);

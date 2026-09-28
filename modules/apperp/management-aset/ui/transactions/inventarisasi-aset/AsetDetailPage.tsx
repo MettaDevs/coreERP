@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { ChangeHistory } from '@/components/change-history';
+import type { ChangeHistoryPage } from '@/components/change-history';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -184,6 +186,15 @@ export default function AsetDetailPage({
             dibatalkan = true;
         };
     }, [asetId, context]);
+
+    // Riwayat perubahan dibaca lewat rute module, yang memeriksa hak dan cakupan atas aset ini.
+    const loadChangeHistory = useCallback(
+        (page: number) =>
+            api<ChangeHistoryPage>(
+                `/aset/${asetId}/riwayat-perubahan?page=${page}`,
+            ),
+        [asetId],
+    );
 
     // Riwayat penempatan hanya dibaca pada mode baca; ia bukan isian dan tidak pernah
     // ikut disimpan.
@@ -741,6 +752,15 @@ export default function AsetDetailPage({
                                         ))}
                                     </div>
                                 )}
+                            </CollapsibleSection>
+                        )}
+
+                        {readOnly && asetId && (
+                            <CollapsibleSection
+                                value="riwayat-perubahan"
+                                title="Riwayat perubahan"
+                            >
+                                <ChangeHistory load={loadChangeHistory} />
                             </CollapsibleSection>
                         )}
 

@@ -3252,6 +3252,36 @@ paths:
           description: Aset dan histori penempatan
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/aset/{id}/riwayat-perubahan:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: asetChangeHistory
+      summary: Membaca riwayat perubahan per field aset dari log perubahan Core, terbaru lebih dulu
+      description: |
+        Hanya field yang dicatat setelan log perubahan tenant (bawaannya status, nama, lokasi, unit penanggung
+        jawab, kondisi, dan arsip). Hak baca dan cakupan unit penanggung jawab sama dengan membuka asetnya.
+        `user_name` kosong berarti perubahan oleh sistem. `*_display` berisi nama lokasi, kondisi, unit kerja,
+        atau label status; kosong berarti nilai mentahnya yang ditampilkan.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Satu halaman riwayat perubahan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeHistoryPage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/perencanaan-aset:
     get:
       tags:
@@ -7051,6 +7081,74 @@ components:
         file_name:
           type: string
           description: Nama berkas hasil tanpa ekstensi.
+    ChangeHistoryPage:
+      type: object
+      required:
+      - data
+      - next_page
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - changed_at
+            - user_id
+            - user_name
+            - field_name
+            - field_caption
+            - change_type
+            - old_value
+            - new_value
+            - old_display
+            - new_display
+            properties:
+              id:
+                type: integer
+              changed_at:
+                type: string
+                description: Waktu perubahan dalam UTC.
+              user_id:
+                type:
+                - integer
+                - 'null'
+              user_name:
+                type:
+                - string
+                - 'null'
+              field_name:
+                type: string
+              field_caption:
+                type:
+                - string
+                - 'null'
+              change_type:
+                type: string
+                enum:
+                - insertion
+                - modification
+                - deletion
+              old_value:
+                type:
+                - string
+                - 'null'
+              new_value:
+                type:
+                - string
+                - 'null'
+              old_display:
+                type:
+                - string
+                - 'null'
+              new_display:
+                type:
+                - string
+                - 'null'
+        next_page:
+          type:
+          - integer
+          - 'null'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

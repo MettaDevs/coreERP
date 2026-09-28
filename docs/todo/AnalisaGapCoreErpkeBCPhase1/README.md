@@ -130,7 +130,7 @@ vendor. Bagian itu butuh notifikasi, jadi menunggu [gap 8](#di-luar-fase-1).
 3. **Penangkap di lapisan database**, bukan di event Eloquent. Update lewat query builder
    (`DB::table()->update()`, `Model::query()->update()`) tidak melewati event model, jadi penangkap di
    level model akan bolong diam-diam. Trigger PostgreSQL menangkap semua penulisan seperti global
-   trigger BC. Pelakunya dikirim per transaksi lewat `set_config(..., true)` yang dibaca trigger.
+   trigger BC. Pelakunya dikirim lewat variabel sesi `coreerp.user_id` (`set_config(..., false)`) yang dibaca trigger: tingkat sesi, bukan per transaksi, karena kebanyakan penulisan tidak dibungkus transaksi. Job antrean memasang dan melepasnya per job (`AuditActor::runAs`).
    Karena trigger ikut migration, ia terpasang di setiap database tenant. BC sendiri menangkap di
    lapisan platform, bukan SQL: platform bertanya ke Change Log tabel mana yang perlu dicatat
    (`GetDatabaseTableTriggerSetup`), lalu memanggil `OnDatabaseModify` untuk setiap penulisan. Itu cukup
@@ -551,7 +551,7 @@ yang jelas. Laporan tetap di server.
 | Kode | Keputusan | Usulan |
 | --- | --- | --- |
 | K-01 | Nama kolom jejak dan apa yang dirujuk | **Diputuskan 28 Sep 2026:** `created_by_user_id` dan `updated_by_user_id`, merujuk `users.id`. Riwayat lengkapnya tetap di satu tabel log perubahan (gap 6); kolom jejak hanya ringkasan per baris |
-| K-02 | Penangkap log perubahan | **Diputuskan 28 Sep 2026:** trigger PostgreSQL, pelaku lewat `set_config` per transaksi |
+| K-02 | Penangkap log perubahan | **Diputuskan 28 Sep 2026:** trigger PostgreSQL, pelaku lewat variabel sesi `coreerp.user_id` |
 | K-03 | Versi baris | **Diputuskan 28 Sep 2026:** kolom versi eksplisit seperti `version` di dokumen aset, bukan kolom sistem `xmin` |
 | K-04 | Tanggal kerja per pengguna | **Diputuskan 28 Sep 2026:** masuk fase 1, diisi di My Profile, perilaku seperti BC |
 | K-05 | Daftar awal tabel yang boleh diretensi | **Diputuskan 28 Sep 2026:** log number sequence, hasil ekspor laporan, dan entri log perubahan |

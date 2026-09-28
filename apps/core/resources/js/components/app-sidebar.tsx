@@ -17,6 +17,7 @@ import {
     LayoutDashboard,
     ListChecks,
     Hash,
+    History,
     Map,
     MapPin,
     PhoneCall,
@@ -282,6 +283,12 @@ export function AppSidebar() {
                         icon: ShieldCheck,
                         href: '/settings/security-configuration',
                         permission: 'core.access.read',
+                    },
+                    {
+                        label: 'Riwayat perubahan',
+                        icon: History,
+                        href: '/settings/change-log',
+                        permission: 'core.change-log.read',
                     },
                     {
                         label: 'Workflow',

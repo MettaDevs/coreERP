@@ -365,7 +365,11 @@ yang menulis data atas nama pengguna membungkus pekerjaannya dengan `AuditActor:
 `RunReportExport`.
 
 Kolom ini hanya ringkasan per baris. Riwayat setiap perubahan, field demi field, milik log perubahan
-([analisa gap BC, gap 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)).
+([analisa gap BC, gap 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)): `AuditColumns::attach` juga
+memasang trigger `log_change`, yang mencatat ke `change_log_entries` hanya untuk tabel dan field yang
+dinyalakan tenant di `change_log_setup_tables` dan `change_log_setup_fields`. Riwayat satu record dibaca
+lewat `GET /api/v1/change-log/{tabel}/{id}` dengan izin `core.change-log.read`. Log mati selama migration,
+termasuk migration module.
 
 ### Penghapusan lunak
 

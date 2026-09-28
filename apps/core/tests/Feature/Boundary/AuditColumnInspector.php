@@ -49,12 +49,14 @@ final class AuditColumnInspector
                 }
             }
 
-            $hasTrigger = $this->connection->selectOne(
-                'select 1 as ada from pg_trigger where tgname = ? and tgrelid = to_regclass(?) and not tgisinternal',
-                [AuditColumns::TRIGGER, $table],
-            ) !== null;
-            if (! $hasTrigger) {
-                $problems[] = 'trigger '.AuditColumns::TRIGGER.' tidak terpasang';
+            foreach ([AuditColumns::TRIGGER, AuditColumns::LOG_TRIGGER] as $trigger) {
+                $hasTrigger = $this->connection->selectOne(
+                    'select 1 as ada from pg_trigger where tgname = ? and tgrelid = to_regclass(?) and not tgisinternal',
+                    [$trigger, $table],
+                ) !== null;
+                if (! $hasTrigger) {
+                    $problems[] = "trigger {$trigger} tidak terpasang";
+                }
             }
 
             if ($problems !== []) {

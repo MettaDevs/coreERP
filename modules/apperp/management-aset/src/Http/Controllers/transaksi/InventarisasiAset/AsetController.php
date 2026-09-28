@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
+use App\Support\Modules\Contracts\ChangeHistory;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -255,6 +256,19 @@ class AsetController extends Controller
             ->orderBy('effective_on')->orderBy('created_at')->toBase()->get();
 
         return response()->json(['data' => ['aset' => $this->present($aset), 'placements' => $placements]]);
+    }
+
+    /**
+     * Riwayat perubahan aset dari log perubahan Core. Hak baca dan cakupan unit penanggung jawab diperiksa di
+     * sini, sama seperti membuka asetnya, jadi riwayat tidak pernah lebih terbuka daripada record-nya.
+     */
+    public function changeHistory(Request $request, ChangeHistory $history, string $id): JsonResponse
+    {
+        $this->requirePermission($request, 'read');
+        $aset = app(OrganizationScope::class)->asetQuery(Aset::query(), $request)->findOrFail($id);
+        $page = (int) ($request->validate(['page' => ['nullable', 'integer', 'min:1']])['page'] ?? 1);
+
+        return response()->json($history->forRecord($this->tenantId($request), $aset->getTable(), (string) $aset->getKey(), $page));
     }
 
     /** @return array<string, array<int, mixed>> */

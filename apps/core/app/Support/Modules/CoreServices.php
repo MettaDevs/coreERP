@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Services\Modules\ChangeHistoryCore;
 use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DaftarSatuanCore;
 use App\Services\Modules\DaftarVendorCore;
@@ -16,7 +17,10 @@ use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\ReportFormatterCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\ChangeLog\ChangeLogValueResolverRegistry;
 use App\Support\Finance\PostingAccountResolverRegistry;
+use App\Support\Modules\Contracts\ChangeHistory;
+use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\DaftarAkun;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
@@ -85,6 +89,8 @@ final class CoreServices
         // Laporan: layar pratinjau module memformat nilai bertipe (`money`, `date`, …) dengan
         // aturan yang sama dengan renderer Core, supaya layar dan hasil cetak tidak berbeda.
         ReportFormatter::class => ReportFormatterCore::class,
+        // Log perubahan: module membuka riwayat record miliknya sesudah memeriksa haknya sendiri.
+        ChangeHistory::class => ChangeHistoryCore::class,
     ];
 
     /**
@@ -107,6 +113,8 @@ final class CoreServices
         // yang berlaku sekarang, supaya Validasi ulang dapat melepas posting yang tertahan karena
         // pemetaannya dulu kosong.
         PostingAccountResolvers::class => PostingAccountResolverRegistry::class,
+        // Log perubahan: nilai mentah (ULID, kode status) diterjemahkan pemilik tabelnya menjadi nama.
+        ChangeLogValueResolvers::class => ChangeLogValueResolverRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void

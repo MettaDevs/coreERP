@@ -9,6 +9,7 @@ use App\Support\Database\AuditActor;
 use App\Support\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -94,6 +95,32 @@ final class AuditActorTest extends TestCase
         }
 
         $this->assertSame('', DB::selectOne("select current_setting('".AuditActor::SETTING."', true) as nilai")->nilai);
+    }
+
+    public function test_pengguna_yang_dipulihkan_dari_sesi_pada_permintaan_nyata_menjadi_pelaku(): void
+    {
+        $pengguna = User::factory()->create();
+        AuditActor::clear();
+
+        // Bukan `actingAs`: sesi berisi tanda login, dan guard memulihkan penggunanya sendiri di dalam
+        // permintaan — jalur yang dilewati setiap permintaan sungguhan.
+        $this->withSession([Auth::guard('web')->getName() => $pengguna->id])->get('/settings/profile');
+
+        $this->assertSame((string) $pengguna->id, $this->setting());
+    }
+
+    public function test_id_yang_bukan_angka_tidak_dipasang_supaya_penulisan_tidak_gagal(): void
+    {
+        AuditActor::set('01JABCDEFGHJKMNPQRSTVWXYZ0');
+        $this->assertSame('', $this->setting());
+
+        $id = $this->insert('tetap tersimpan');
+        $this->assertSame([null, null], $this->actors($id));
+    }
+
+    private function setting(): string
+    {
+        return (string) DB::selectOne("select coalesce(current_setting('".AuditActor::SETTING."', true), '') as nilai")->nilai;
     }
 
     private function insert(string $nama): string
