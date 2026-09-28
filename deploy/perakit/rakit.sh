@@ -16,7 +16,8 @@
 #
 #   1. sumber diambil pada commit yang disebut, di salinan yang dibersihkan dari sisa putaran sebelumnya;
 #   2. image dibangun dengan cache Docker mesin ini dan diuji uji-image.sh;
-#   3. image dan pendamping didorong lewat robot perakit; pendamping disalin lewat digest, linux/amd64;
+#   3. image dan pendamping didorong lewat robot perakit; pendamping disalin lewat digest, linux/amd64, begitu
+#      pula image pihak ketiga SaaS dev, sehingga tidak ada server milik kita yang menarik dari Docker Hub;
 #   4. manifest ditulis SESUDAH push, karena digest manifest baru diketahui setelah registry menerimanya;
 #   5. manifest ditandatangani kunci rilis dan tanda tangannya diperiksa dengan kunci publik yang dipasang.
 #
@@ -36,6 +37,7 @@ shopt -s inherit_errexit
 HOST_REGISTRY='registry.erp.grenery.xyz'
 REPO_IMAGE='coreerp/core'
 REPO_PENDAMPING='coreerp/pendamping'
+REPO_SAAS='coreerp/saas'
 REPO_KONSOL='coreerp/konsol'
 PLATFORM='linux/amd64'
 CRANE='gcr.io/go-containerregistry/crane:v0.22.1'
@@ -190,6 +192,28 @@ keadaan_tag() {
         gagal "Tidak dapat memeriksa tag $1 di Harbor:" "$keluaran"
     fi
 }
+
+# Menyalin satu image pihak ketiga ke Harbor lewat digest, linux/amd64 saja, lalu mencetak digest yang tersimpan.
+# Bila tagnya sudah ada — putaran sebelumnya untuk rilis ini sudah menyalinnya — digest yang ada itulah yang
+# menjadi bagian rilis, walaupun tag sumbernya di Docker Hub sudah bergerak sejak itu: tagnya immutable.
+salin_ke_harbor() {
+    local sumber="$1" tujuan="$2" digest_sumber repo_sumber digest_tujuan
+    if [ "$(keadaan_tag "$tujuan")" = 'ada' ]; then
+        crane digest "$tujuan"
+        return
+    fi
+    # Tag sumber dapat bergerak; yang dicatat dan ditarik adalah digest yang dikunci saat ini juga.
+    digest_sumber="$(crane digest --platform "$PLATFORM" "$sumber")"
+    # Rujukan `repo:tag@digest` tidak diterima semua alat; tag dibuang dan digest yang menentukan isinya.
+    repo_sumber="${sumber%@*}"
+    case "${repo_sumber##*/}" in *:*) repo_sumber="${repo_sumber%:*}" ;; esac
+    crane copy --platform "$PLATFORM" "$repo_sumber@$digest_sumber" "$tujuan" >/dev/null 2>&1 \
+        || gagal "Menyalin $sumber ke $tujuan gagal."
+    digest_tujuan="$(crane digest "$tujuan")"
+    [ "$digest_tujuan" = "$digest_sumber" ] \
+        || gagal "Digest $tujuan di Harbor ($digest_tujuan) tidak sama dengan sumbernya ($digest_sumber)."
+    printf '%s\n' "$digest_tujuan"
+}
 printf '    rilis %s, ref %s\n' "$rilis" "$ref"
 
 langkah 'Sumber'
@@ -296,30 +320,38 @@ for sumber in "${sumber_pendamping[@]}"; do
     nama="${sumber%%[:@]*}"
     nama="${nama##*/}"
     [[ $nama =~ ^[a-z0-9][a-z0-9._-]*$ ]] || gagal "Nama pendamping tidak sah dari $sumber."
-    tujuan_pendamping="$HOST_REGISTRY/$REPO_PENDAMPING/$nama:$rilis"
-    if [ "$(keadaan_tag "$tujuan_pendamping")" = 'ada' ]; then
-        # Putaran sebelumnya untuk rilis ini sudah menyalinnya. Tagnya immutable, jadi digest yang sudah ada
-        # itulah yang menjadi bagian rilis — walaupun tag sumbernya di Docker Hub sudah bergerak sejak itu.
-        digest_pendamping="$(crane digest "$tujuan_pendamping")"
-    else
-        # Salinan platform linux/amd64 saja, lewat digest yang dikunci saat ini juga. Tag sumber dapat
-        # bergerak di Docker Hub; yang dicatat dan ditarik klien adalah digest yang disalin di sini.
-        digest_sumber="$(crane digest --platform "$PLATFORM" "$sumber")"
-        # Rujukan `repo:tag@digest` tidak diterima semua alat; tag dibuang dan digest yang menentukan isinya.
-        repo_sumber="${sumber%@*}"
-        case "${repo_sumber##*/}" in *:*) repo_sumber="${repo_sumber%:*}" ;; esac
-        crane copy --platform "$PLATFORM" "$repo_sumber@$digest_sumber" "$tujuan_pendamping" >/dev/null 2>&1 \
-            || gagal "Menyalin $sumber ke $tujuan_pendamping gagal."
-        digest_pendamping="$(crane digest "$tujuan_pendamping")"
-        [ "$digest_pendamping" = "$digest_sumber" ] \
-            || gagal "Digest $nama di Harbor ($digest_pendamping) tidak sama dengan sumbernya ($digest_sumber)."
-    fi
+    digest_pendamping="$(salin_ke_harbor "$sumber" "$HOST_REGISTRY/$REPO_PENDAMPING/$nama:$rilis")"
     pendamping_json="$(jq -c --arg nama "$nama" --arg image "$REPO_PENDAMPING/$nama" --arg digest "$digest_pendamping" \
         '. + [{nama: $nama, image: $image, digest: $digest}]' <<< "$pendamping_json")"
     # Nama lokal di server klien, aturan yang sama dengan agen: diturunkan dari digest, bukan dari nomor rilis,
     # supaya postgres tidak dibuat ulang di setiap pembaruan yang tidak mengubah digestnya.
     tag_lokal_pendamping["$sumber"]="coreerp.local/pendamping/$nama:${digest_pendamping:7:20}"
     printf '    %s ← %s (%s)\n' "$REPO_PENDAMPING/$nama" "$sumber" "$digest_pendamping"
+done
+
+langkah 'Image pihak ketiga SaaS dev'
+# Setiap image pihak ketiga di compose SaaS ditulis `${NAMA_IMAGE:-sumber}`. Ia disalin ke Harbor di sini, dan
+# pasang-rilis.sh menariknya dari Harbor lalu menimpa variabelnya dengan rujukan digest itu — SaaS dev tidak
+# menarik dari Docker Hub, sama seperti server klien. Pelajarannya MinIO, 28 September 2026: image-nya hilang dari
+# Docker Hub dan quay.io, dan pemasangan rilis berhenti. Repo-nya terpisah dari pendamping on-prem, supaya image
+# bernama sama dengan tag berbeda di kedua compose tidak berebut satu tag.
+compose_saas=("$FOLDER_SUMBER/deploy/saas/compose.yaml" "$FOLDER_SUMBER/deploy/saas/compose.traefik.yaml")
+image_harfiah="$(grep -hE '^[[:space:]]*image:' "${compose_saas[@]}" | grep -vE 'image:[[:space:]]*\$\{' || true)"
+[ -z "$image_harfiah" ] || gagal 'Compose SaaS menyebut image tanpa variabel; tulis ${NAMA_IMAGE:-sumber} supaya ia ikut disalin ke Harbor:' \
+    "$image_harfiah"
+mapfile -t image_saas < <(sed -nE 's/^[[:space:]]*image:[[:space:]]*\$\{([A-Z][A-Z0-9_]*_IMAGE):-([^}[:space:]]+)\}[[:space:]]*$/\1 \2/p' \
+    "${compose_saas[@]}" | sort -u)
+[ "${#image_saas[@]}" -gt 0 ] || gagal 'Tidak ada image pihak ketiga terbaca dari compose SaaS.'
+pihak_ketiga_json='{}'
+for baris in "${image_saas[@]}"; do
+    variabel="${baris%% *}"
+    sumber="${baris#* }"
+    nama="${sumber%%[:@]*}"
+    nama="${nama##*/}"
+    [[ $nama =~ ^[a-z0-9][a-z0-9._-]*$ ]] || gagal "Nama image SaaS tidak sah dari $sumber."
+    digest_saas="$(salin_ke_harbor "$sumber" "$HOST_REGISTRY/$REPO_SAAS/$nama:$rilis")"
+    pihak_ketiga_json="$(jq -c --arg v "$variabel" --arg r "$REPO_SAAS/$nama@$digest_saas" '. + {($v): $r}' <<< "$pihak_ketiga_json")"
+    printf '    %s ← %s (%s)\n' "$REPO_SAAS/$nama" "$sumber" "$digest_saas"
 done
 
 langkah 'Manifest v2 dan tanda tangan'
@@ -356,8 +388,9 @@ openssl dgst -sha256 -verify "$KUNCI_PUBLIK" -signature "$folder_baru/SHA256SUMS
 # Untuk deploy SaaS dev (deploy/saas/pasang-rilis.sh), bukan untuk server klien, dan karena itu di luar
 # SHA256SUMS: agen tidak pernah mengunduhnya, dan admin.erp tidak menyimpannya.
 jq -n --arg rilis "$rilis" --arg commit "$commit" --arg registry "$HOST_REGISTRY" \
-    --arg core "$REPO_IMAGE@$digest" --arg konsol "$REPO_KONSOL@$digest_konsol" \
-    '{rilis: $rilis, commit: $commit, registry: $registry, core: $core, konsol: $konsol}' > "$folder_baru/saas.json"
+    --arg core "$REPO_IMAGE@$digest" --arg konsol "$REPO_KONSOL@$digest_konsol" --argjson pihak_ketiga "$pihak_ketiga_json" \
+    '{rilis: $rilis, commit: $commit, registry: $registry, core: $core, konsol: $konsol, pihak_ketiga: $pihak_ketiga}' \
+    > "$folder_baru/saas.json"
 
 mkdir -p "$FOLDER_RILIS"
 chmod 0755 "$RUMAH" "$FOLDER_RILIS"
