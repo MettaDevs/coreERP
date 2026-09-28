@@ -197,7 +197,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/working-time-calendar-times/{calendar?}', [WorkingTimeCalendarController::class, 'times'])->name('working-time-calendar-times.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::put('settings/working-time-calendars/{calendar}/days/{day}', [WorkingTimeCalendarController::class, 'updateDay'])->name('working-time-calendars.days.update');
     Route::post('settings/working-time-calendars/{calendar}/compose', [WorkingTimeCalendarController::class, 'compose'])->name('working-time-calendars.compose');
-    Route::get('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composePage'])->name('working-time-calendars.compose-page')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
+    Route::get('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composePage'])->name('working-time-calendars.compose-page')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     Route::post('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composeFromPage'])->name('working-time-calendars.compose-from-page');
     Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
