@@ -23,7 +23,7 @@ Nomor di bawah mengikuti daftar gap yang dibahas bersama pemilik produk, supaya 
 | --- | --- | --- | --- |
 | 1 | Jejak siapa yang membuat dan mengubah setiap baris | Ya | [Gap 1 dan 6](#gap-1-6) |
 | 2 | Pengaman edit bersamaan | Ya | [Gap 2](#gap-2) |
-| 3 | Tanggal kerja, serta tautan pengguna ke pekerja HR | Ya | [Gap 3](#gap-3) |
+| 3 | Zona waktu dan tanggal kerja pengguna, serta tautan pengguna ke pekerja HR | Ya | [Gap 3](#gap-3) |
 | 4 | Retensi data log yang bisa diatur | Ya | [Gap 4](#gap-4) |
 | 5 | Klasifikasi data pribadi per kolom | Ya | [Gap 5](#gap-5) |
 | 6 | Log perubahan per field dan riwayat per record | Ya | [Gap 1 dan 6](#gap-1-6) |
@@ -145,8 +145,19 @@ penulisan ke tabel yang dicatat, dan biaya itu hanya terlihat pada beban serenta
 
 ### Keadaan hari ini
 
-Tidak ada. Dua orang yang membuka record yang sama lalu menyimpan bergantian: penyimpanan terakhir yang
-menang, dan perubahan orang pertama hilang tanpa pesan.
+Baru ada di dokumen transaksi module aset: perencanaan, permintaan pengadaan, work order, mutasi, dan
+penerimaan. Tabelnya membawa kolom `version`, form mengirimnya kembali saat menyimpan, update-nya
+bersyarat pada versi itu, dan versi basi dijawab 409, misalnya "Rencana telah berubah. Muat ulang lalu
+coba lagi."
+
+Yang belum:
+
+- Register aset (`aset_tr_aset`), master aset, tabel tenant Core, dan module HR tidak punya versi baris.
+  Di sana, dua orang yang membuka record yang sama lalu menyimpan bergantian: penyimpanan terakhir yang
+  menang, dan perubahan orang pertama hilang tanpa pesan.
+- Setiap controller aset menulis penolakannya sendiri. Sebagian memulangkan kode `stale_version`,
+  sebagian hanya `abort` 409 dengan pesan bebas.
+- API belum memakai ETag atau `If-Match`.
 
 ### Di BC
 
@@ -167,19 +178,91 @@ menang, dan perubahan orang pertama hilang tanpa pesan.
 4. Proses berlangkah banyak di dalam satu transaksi tetap memakai kunci baris (`SELECT ... FOR UPDATE`);
    versi baris tidak menggantikannya.
 
-## Gap 3: tanggal kerja, dan pengguna ke pekerja HR {#gap-3}
+## Gap 3: zona waktu, tanggal kerja, dan pengguna ke pekerja HR {#gap-3}
 
-Dua hal berbeda yang sempat tertukar dalam pembahasan: **tanggal kerja** bukan **jadwal kerja**.
+Dua hal berbeda yang sempat tertukar dalam pembahasan: **tanggal kerja** bukan **jadwal kerja**. Zona
+waktu dibahas lebih dulu, karena "hari ini" pada tanggal kerja baru benar bila dihitung menurut zona
+pengguna.
+
+### Zona waktu pengguna
+
+**Keadaan hari ini tidak konsisten.** Tiga lapis memakai zona yang berbeda:
+
+| Lapis | Zona | Contoh |
+| --- | --- | --- |
+| Server | UTC | `'timezone' => 'UTC'` di `apps/core/config/app.php` |
+| Layar | Umumnya zona peramban | `toLocaleString` dan `Intl.DateTimeFormat` tanpa `timeZone` di `apps/core/resources/js/lib/reports.ts` dan `apps/core/resources/js/pages/settings/finance-postings.tsx` |
+| Cetakan module | UTC | Waktu cetak (`dicetak_pada`), nama berkas, dan periode bawaan ditulis dengan `now()->format(...)` di `modules/apperp/management-aset/src/Reporting/Definitions/` |
+
+Akibatnya laporan yang dicetak pukul 09.00 WIB tertulis 02.00. Form yang mengisi "hari ini" sendiri
+memakai `new Date().toISOString().slice(0, 10)`, yaitu tanggal UTC, sehingga antara pukul 00.00 dan
+07.00 WIB form terisi tanggal kemarin. Pola itu ada di layar Core maupun module; cari
+`toISOString().slice(0, 10)` di `apps/core/resources/js` dan `modules/*/*/ui`.
+
+**Di BC**, *Time Zone* ada di **My Settings**, satu halaman dengan *Work Date*, dan keduanya diterapkan
+ke sesi oleh codeunit yang sama. Dari `UserSettingsImpl.Codeunit.al`:
+
+```al
+if OldUserSettings."Time Zone" <> NewUserSettings."Time Zone" then begin
+    ShouldRefreshSession := true;
+    sessionSetting.TimeZone := NewUserSettings."Time Zone";
+end;
+...
+if OldUserSettings."Work Date" <> NewUserSettings."Work Date" then
+    WorkDate(NewUserSettings."Work Date");
+```
+
+Menurut halaman *Change basic settings*, zona waktu diisi dari alamat perusahaan saat pengguna pertama
+kali masuk, dan pengguna menggantinya bila tidak cocok dengan lokasinya.
+
+**Di F&O**, tanggal-waktu gabungan (`utcdatetime`) disimpan dalam UTC, sedangkan field tanggal saja
+tidak punya zona. Zona pilihan pengguna diatur di **User options** dan dipakai untuk menampilkan
+tanggal-waktu gabungan; nilai awalnya dari locale Windows di komputer pengguna. Entitas legal juga punya
+zona sendiri, yang dibaca lewat `DateTimeUtil::getCompanyTimeZone()`.
+
+**CoreERP.** Pemilik menyetujui bentuknya pada 28 September 2026:
+
+1. Jam tidak pernah diambil dari perangkat pengguna. Waktu selalu dari server, dalam UTC.
+2. Setiap pengguna punya setelan **Zona waktu** di **My Profile**, seperti My Settings di BC dan User
+   options di F&O.
+3. Layar dan cetakan memakai setelan yang sama. Cetakan menuliskan zonanya, misalnya
+   "28/09/2026 14:05 WITA".
+4. Module mengirim waktu UTC bertipe `datetime`, dan Core yang memformatnya, melanjutkan format bertipe
+   yang sudah ada di `App\Support\Reporting\ValueFormat` dan `ValueFormats`.
+5. Konteks laporan dan konteks permintaan membawa zona pengguna, sehingga "hari ini" di module, misalnya
+   periode bawaan dan nama berkas, mengikuti zona itu.
+
+Nilai bawaan zona pengguna masih terbuka (K-10):
+
+- **Pilihan 1, usulan:** zona waktu menjadi setelan entitas legal, seperti `getCompanyTimeZone` di F&O.
+  Pengguna yang belum mengisi setelannya mengikuti entitas legal yang sedang aktif.
+- **Pilihan 2:** alamat entitas legal diubah menjadi pilihan wilayah, lalu zonanya dihitung otomatis,
+  mendekati BC yang mengisi zona dari alamat perusahaan. Hari ini alamat entitas legal berupa teks bebas
+  (`province` dan `city` di `postal_addresses`, ditulis
+  `apps/core/app/Support/AddressBook/OrganizationAddressBook.php`), sedangkan
+  `apps/core/app/Services/AddressHierarchy/TimezoneResolverService.php` butuh ID wilayah dan sengaja
+  tidak mencocokkan nama. Pilihan ini ikut mengubah buku alamat semua pihak.
+
+Bentuk kolomnya sudah punya preseden di Core: `sites.timezone`, string 40 karakter dengan bawaan
+`Asia/Jakarta`.
 
 ### Tanggal kerja (WorkDate)
 
 **Di BC**, setiap pengguna punya *Work Date* di **My Settings**. Tanggal itu menjadi tanggal posting
 bawaan, dan di field tanggal mana pun pengguna cukup mengetik `w` untuk mengisinya. Gunanya untuk
 mengerjakan transaksi tanggal lain (misalnya tutup bulan) tanpa mengetik ulang tanggal di setiap baris.
-Contoh dari source:
+Contoh dari `SetUpNewLine` di `GenJournalLine.Table.al`: baris baru pada batch jurnal yang masih kosong
+memakai tanggal kerja, sedangkan bila batch sudah berisi, baris baru menyalin tanggal posting baris
+terakhir.
 
 ```al
-GenJournalLine."Posting Date" := WorkDate();
+if GenJnlLine.FindFirst() then begin
+    "Posting Date" := LastGenJnlLine."Posting Date";
+    "Document Date" := LastGenJnlLine."Posting Date";
+    ...
+end else begin
+    "Posting Date" := WorkDate();
+    "Document Date" := WorkDate();
 ```
 
 BC juga punya *Allow Posting From/To* per pengguna di `User Setup`. Itu batas periode posting, dan
@@ -194,14 +277,17 @@ Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
   kerja tetap tampil di judul halaman.
 
 **CoreERP** belum punya. Pemilik memutuskan (K-04) tanggal kerja masuk fase 1 dan diisi di halaman
-**My Profile**. Bentuknya:
+**My Profile** (`/settings/profile`). Bentuknya:
 
-1. Tanggal kerja per pengguna per sesi, bawaannya hari ini. Nilainya kembali ke hari ini saat pengguna
-   login ulang, atau pindah tenant atau legal entity (padanan pindah company di BC).
+1. Tanggal kerja per pengguna per sesi, bawaannya hari ini menurut zona waktu pengguna, dihitung dari jam
+   server. Nilainya kembali ke hari ini saat pengguna login ulang, atau pindah tenant atau legal entity
+   (padanan pindah company di BC).
 2. Diisi di **My Profile**.
-3. Menjadi tanggal bawaan di form transaksi, menggantikan "hari ini" yang sekarang ditulis di tiap form.
+3. Menjadi tanggal bawaan di form transaksi, menggantikan "hari ini" yang sekarang dihitung sendiri di
+   tiap form dalam UTC.
 4. Selama tanggal kerja bukan hari ini, Shell menampilkan pengingat yang mengarah ke **My Profile** dan
-   bisa ditutup untuk sisa sesi.
+   bisa ditutup untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat, seperti di judul halaman
+   BC.
 
 ### Pengguna, pekerja HR, dan jadwal kerja
 
@@ -339,8 +425,9 @@ Tampilan lampiran seperti BC dibuat di PRD lain. Fase ini hanya layanan dan data
 
 ### Keadaan hari ini
 
-Tidak ada layanan lampiran (`PLAT-02`). `aset_tr_dokumen_siklus_aset` berisi dokumen bisnis (mutasi,
-pemusnahan, penjualan), bukan berkas. Disk `s3` sudah tersedia di `apps/core/config/filesystems.php`.
+Tidak ada layanan lampiran (`PLAT-02`). `aset_tr_dokumen_siklus_aset` berisi dokumen bisnis
+(dekomisioning, penjualan, dan pemusnahan aset), bukan berkas. Disk `s3` sudah tersedia di
+`apps/core/config/filesystems.php`.
 
 ### Di BC
 
@@ -349,13 +436,17 @@ pemusnahan, penjualan), bukan berkas. Disk `s3` sudah tersedia di `apps/core/con
 - Kuncinya `Table ID`, `No.`, `Document Type`, `Line No.`, dan `ID`, jadi lampiran bisa menempel ke
   header maupun baris dokumen.
 - Isinya nama berkas, jenis, ekstensi, isi berkas (`Media`), siapa dan kapan melampirkan.
-- *Document Flow* menentukan apakah lampiran ikut ke transaksi berikutnya, misalnya dari pesanan ke
-  faktur.
+- Penanda *Document Flow* (`Flow to Sales Trx`, `Flow to Purch. Trx`, dan seterusnya) menentukan apakah
+  lampiran record dari tabel lain, misalnya customer atau item, ikut disalin ke dokumen penjualan atau
+  pembelian yang memakainya. Penyalinan antar record dari tabel yang sama tidak memeriksa penanda itu.
 - App *External Storage* menambahkan penyimpanan di luar database (`Stored Externally`, `External File Path`).
 
-**Lampiran hanya dipasang pada master data dan dokumen**, misalnya Customer, Vendor, Item, Fixed Asset,
-Employee, Resource, dokumen penjualan dan pembelian beserta versi terpostingnya, order produksi, dan
-proyek. Tidak ada lampiran pada entry buku besar, jurnal, tabel setup, atau data referensi.
+**`Document Attachment` hanya dipasang pada master data dan dokumen**, misalnya Customer, Vendor, Item,
+Fixed Asset, Employee, Resource, dokumen penjualan dan pembelian beserta versi terpostingnya, order
+produksi, dan proyek. Tabel setup dan data referensi tidak diberi lampiran. Jurnal dan entry buku besar
+juga tidak memakai `Document Attachment`: buktinya dilampirkan lewat *Incoming Document*, tabel
+terpisah (`Incoming Document Attachment`) yang dibuat dari baris jurnal, atau dari nomor dokumen dan
+tanggal posting sebuah entry.
 
 ### Bagaimana di CoreERP
 
@@ -377,19 +468,20 @@ Record yang diberi lampiran pada fase 1, mengikuti pola BC:
 | `aset_tr_penerimaan_aset` | Ya | Dokumen: surat jalan, faktur, berita acara serah terima |
 | `aset_tr_mutasi_aset` | Ya | Dokumen: berita acara mutasi |
 | `aset_tr_pemeliharaan_aset` | Ya | Dokumen work order: foto kerusakan, laporan teknisi |
-| `aset_tr_dokumen_siklus_aset` | Ya | Dokumen pemusnahan dan penjualan: berita acara, bukti |
+| `aset_tr_dokumen_siklus_aset` | Ya | Dokumen dekomisioning, pemusnahan, dan penjualan: berita acara, bukti |
 | `aset_tr_permintaan_pengadaan_aset` | Ya | Dokumen permintaan: penawaran, justifikasi |
 | `aset_tr_perencanaan_aset` | Ya | Dokumen perencanaan: kajian, anggaran |
 | `hr_workers` | Ya | Master pekerja: kontrak, identitas. Klasifikasi data pribadi |
 | `vendors` (Core) | Ya | Master vendor: kontrak, dokumen pajak |
 | `aset_m_model_aset` | Opsional | Buku manual dan spesifikasi per model, bila dibutuhkan |
+| Baris dokumen (`*_details`) | Lewat dokumennya | Lampiran baris menempel ke dokumen induk dengan nomor baris, seperti `Line No.` di BC |
 | `aset_tr_penyusutan_aset` | Tidak | Entry hasil hitungan; buktinya ada di dokumen sumber |
 | `aset_tr_buku_aset` | Tidak | Setelan per aset, bukan dokumen |
 | `aset_m_*` lainnya, `aset_m_posting_group` | Tidak | Data referensi dan setup |
 | `finance_postings` dan tabel feed finance | Tidak | Setara entry; lampiran tinggal di dokumen sumber |
 | Tabel number sequence, workflow, environment, referensi wilayah | Tidak | Data teknis dan referensi |
 
-Apakah lampiran penerimaan ikut ke aset yang lahir dari penerimaan itu (padanan *Document Flow*)
+Apakah lampiran penerimaan ikut ke aset yang lahir dari penerimaan itu, mirip *Document Flow* di BC,
 diputuskan di K-07.
 
 ## Gap 10: job latar dan ekspor laporan {#gap-10}
@@ -455,13 +547,14 @@ yang jelas. Laporan tetap di server.
 | --- | --- | --- |
 | K-01 | Nama kolom jejak dan apa yang dirujuk | `created_by_user_id` dan `updated_by_user_id`, merujuk `users.id`, sejalan dengan `integration_clients` |
 | K-02 | Penangkap log perubahan | Trigger PostgreSQL, pelaku lewat `set_config` per transaksi |
-| K-03 | Versi baris | Kolom versi eksplisit, bukan kolom sistem `xmin` |
+| K-03 | Versi baris | Kolom versi eksplisit seperti `version` di dokumen aset, bukan kolom sistem `xmin` |
 | K-04 | Tanggal kerja per pengguna | **Diputuskan 28 Sep 2026:** masuk fase 1, diisi di My Profile, perilaku seperti BC |
 | K-05 | Daftar awal tabel yang boleh diretensi | Log number sequence, hasil ekspor laporan, dan entri log perubahan |
 | K-06 | Bentuk deklarasi klasifikasi di kode | Atribut kelas untuk bawaan tabel, konstanta untuk kolom |
 | K-07 | Lampiran ikut berpindah antar dokumen | Ditunda; fase 1 hanya melampirkan ke satu record |
 | K-08 | Job latar per tenant | Fase 2, bersama notifikasi |
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
+| K-10 | Nilai bawaan zona waktu pengguna | Setelan zona waktu entitas legal; pengguna yang belum mengisi ikut entitas legal aktif |
 
 ## Sumber {#sumber}
 
@@ -470,8 +563,9 @@ Microsoft Learn:
 - [System fields](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-table-system-fields)
 - [Log changes](https://learn.microsoft.com/en-us/dynamics365/business-central/across-log-changes) dan [Set up auditing](https://learn.microsoft.com/en-us/dynamics365/business-central/across-setup-auditing)
 - [Update customer (If-Match)](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/api-reference/v2.0/api/dynamics_customer_update)
-- [Change basic settings: work date](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-change-basic-settings#work-date)
+- [Change basic settings: work date](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-change-basic-settings#work-date) dan [time zone](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-change-basic-settings#time-zone)
 - [Create new users (F&O)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/sysadmin/tasks/create-new-users)
+- [Date/time data and time zones (F&O)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/organization-administration/date-time-zones) dan [DateTimeUtil.getCompanyTimeZone](https://learn.microsoft.com/en-us/dotnet/api/dynamics.ax.application.datetimeutil.getcompanytimezone?view=dyn-finops-dotnet)
 - [Data retention policies](https://learn.microsoft.com/en-us/dynamics365/business-central/admin-data-retention-policies)
 - [AppSourceCop AS0016](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/analyzers/appsourcecop-as0016) dan [Classifying data sensitivity](https://learn.microsoft.com/en-us/dynamics365/business-central/admin-classifying-data-sensitivity)
 - [Telemetry dan DataClassification](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-instrument-application-for-telemetry-app-insights)
@@ -485,7 +579,9 @@ Source BCApps, commit `777e102e90`:
 - [`ChangeLogEntry.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/System/ChangeLog/ChangeLogEntry.Table.al) dan [`ChangeLogSetupField.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/System/ChangeLog/ChangeLogSetupField.Table.al)
 - [`RetenPolAllowedTables.Codeunit.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/System%20Application/App/Retention%20Policy/src/Retention%20Policy%20Allowed%20Tables/RetenPolAllowedTables.Codeunit.al) dan [`RetenPolInstallBaseApp.Codeunit.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/OtherCapabilities/RetentionPolicy/RetenPolInstallBaseApp.Codeunit.al)
 - [`Employee.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/HumanResources/Employee/Employee.Table.al)
-- [`DocumentAttachment.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Foundation/Attachment/DocumentAttachment.Table.al)
+- [`GenJournalLine.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Finance/GeneralLedger/Journal/GenJournalLine.Table.al) dan [`GeneralJournal.Page.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Finance/GeneralLedger/Journal/GeneralJournal.Page.al)
+- [`UserSettingsImpl.Codeunit.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/System%20Application/App/User%20Settings/src/UserSettingsImpl.Codeunit.al)
+- [`DocumentAttachment.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Foundation/Attachment/DocumentAttachment.Table.al) dan [`DocumentAttachmentMgmt.Codeunit.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Foundation/Attachment/DocumentAttachmentMgmt.Codeunit.al)
 - [`ReportInbox.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/eServices/EDocument/ReportInbox.Table.al) dan [`JobQueueEntry.Table.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Layers/W1/BaseApp/Modules/System/JobQueue/JobQueueEntry.Table.al)
 
 Kode CoreERP yang diperiksa:
@@ -497,4 +593,13 @@ Kode CoreERP yang diperiksa:
 - `apps/core/app/Console/Commands/CopyEnvironment.php`, `apps/core/app/Support/Finance/PostingPusher.php`
 - `modules/apperp/human-resources/src/Models/Worker.php`,
   `modules/apperp/human-resources/src/Http/Controllers/HumanResourcesController.php`
-- `modules/apperp/management-aset/src/Models/transaksi/DokumenSiklusAset/DokumenSiklusAset.php`
+- `modules/apperp/management-aset/src/Models/transaksi/DokumenSiklusAset/DokumenSiklusAset.php`,
+  `modules/apperp/management-aset/routes/api/lifecycle-documents.php`
+- `modules/apperp/management-aset/src/Http/Controllers/transaksi/` (penolakan versi basi),
+  `modules/apperp/management-aset/src/Reporting/Definitions/`
+- `apps/core/config/app.php`, `apps/core/resources/js/lib/reports.ts`,
+  `apps/core/resources/js/pages/settings/finance-postings.tsx`,
+  `apps/core/app/Support/Reporting/ValueFormat.php`, `apps/core/app/Support/Reporting/ValueFormats.php`
+- `apps/core/app/Support/AddressBook/OrganizationAddressBook.php`,
+  `apps/core/app/Services/AddressHierarchy/TimezoneResolverService.php`,
+  `apps/core/database/migrations/2026_09_14_120000_create_site_registry_tables.php`

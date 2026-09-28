@@ -18,9 +18,12 @@ Urutan kerja yang disarankan:
    ├─▶ 3
    ├─▶ 5 ─▶ 6
    └─▶ 7
+
+9 (tanpa prasyarat)
 ```
 
-Area 3, 5, dan 7 tidak saling bergantung dan boleh dikerjakan paralel sejak keputusannya diambil.
+Area 3, 5, dan 7 tidak saling bergantung dan boleh dikerjakan paralel sejak keputusannya diambil. Area 9
+tidak menunggu keputusan apa pun dan boleh dikerjakan kapan saja.
 
 ---
 
@@ -28,8 +31,11 @@ Area 3, 5, dan 7 tidak saling bergantung dan boleh dikerjakan paralel sejak kepu
 
 ### 0. [ ] Keputusan yang masih terbuka
 
-**Tempat:** pemilik produk · **Setelah:** — · **Selesai bila:** K-01 sampai K-09 dijawab dan dicatat di
+**Tempat:** pemilik produk · **Setelah:** — · **Selesai bila:** K-01 sampai K-10 dijawab dan dicatat di
 tabel keputusan README.
+
+Butir area ini keputusan, bukan kode. `[x]` di sini berarti sudah diputuskan pemilik dan dicatat di
+README; syarat test pada legenda status berlaku mulai area 1.
 
 - [ ] 0.1 K-01 nama kolom jejak dan rujukannya. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
 - [ ] 0.2 K-02 penangkap log perubahan: trigger PostgreSQL atau event Eloquent. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
@@ -42,6 +48,8 @@ tabel keputusan README.
 - [ ] 0.8 K-08 job latar per tenant di fase 2 bersama notifikasi. [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10)
 - [x] 0.9 K-09 lampiran memakai satu tabel untuk semua record, seperti `Document Attachment` BC
       (diputuskan pemilik 28 September 2026). [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
+- [ ] 0.10 K-10 nilai bawaan zona waktu pengguna: setelan entitas legal, atau dihitung dari alamat.
+      [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
 
 ### 1. [ ] Kolom jejak pembuat dan pengubah (gap 1)
 
@@ -82,9 +90,11 @@ basi ditolak dengan pesan yang jelas, baik dari layar maupun API, dan test B-3 l
 
 Rujukan: [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2).
 
-- [ ] 3.1 Kolom versi baris di tabel tenant, naik setiap kali baris berubah.
+- [ ] 3.1 Kolom versi baris di tabel tenant yang belum punya, naik setiap kali baris berubah. Kolom
+      `version` di dokumen aset menjadi acuannya, bukan diganti.
 - [ ] 3.2 Endpoint baca memulangkan versi; API memulangkannya sebagai ETag.
-- [ ] 3.3 Endpoint tulis mewajibkan versi (form) atau `If-Match` (API), lalu update bersyarat.
+- [ ] 3.3 Endpoint tulis mewajibkan versi (form) atau `If-Match` (API), lalu update bersyarat lewat satu
+      helper Core. Controller aset yang sekarang menulis penolakannya sendiri beralih ke helper itu.
 - [ ] 3.4 Jawaban 409 dengan pesan yang menjelaskan dampaknya bagi pengguna.
 - [ ] 3.5 Form di Shell membawa versi dan menampilkan pesan muat ulang saat ditolak.
 
@@ -119,36 +129,45 @@ Rujukan: [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5).
 
 ### 6. [ ] Layanan lampiran dokumen (gap 7)
 
-**Tempat:** Core, dipakai module · **Setelah:** 5, 0.7 · **Selesai bila:** record di daftar fase 1
+**Tempat:** Core, dipakai module · **Setelah:** 5, 0.1, 0.7 · **Selesai bila:** record di daftar fase 1
 dapat diberi lampiran lewat layanan Core, haknya mengikuti record induk, dan test B-6 lulus. Tampilan
 lampiran dibuat di PRD lain.
 
 Rujukan: [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 
-- [ ] 6.1 Tabel lampiran: tenant, jenis record, ID record, baris dokumen (opsional), metadata berkas,
-      lokasi di disk, hash isi, pelaku, waktu, `deleted_at`.
+- [ ] 6.1 Satu tabel lampiran untuk semua record (K-09): tenant, jenis record, ID record, baris dokumen
+      (opsional), metadata berkas, lokasi di disk, hash isi, pelaku (nama kolom sesuai K-01), waktu,
+      `deleted_at`.
 - [ ] 6.2 Penyimpanan di disk `s3`.
 - [ ] 6.3 Pemeriksaan hak berdasarkan record induk.
 - [ ] 6.4 Klasifikasi lampiran mengikuti induknya.
 - [ ] 6.5 Endpoint unggah, daftar, unduh, dan arsip.
 - [ ] 6.6 Pendaftaran record fase 1 sesuai tabel di README.
 
-### 7. [ ] Tanggal kerja dan tautan pengguna ke pekerja (gap 3)
+### 7. [ ] Zona waktu dan tanggal kerja pengguna (gap 3)
 
-**Tempat:** Core (My Profile, Shell) dan module HR · **Setelah:** 0.4 · **Selesai bila:** tanggal kerja
-bisa diisi di My Profile dan dipakai form transaksi, dan test B-7 lulus.
+**Tempat:** Core (My Profile, Shell, reporting) dan module yang mencetak atau mengisi tanggal ·
+**Setelah:** 0.4, 0.10 · **Selesai bila:** zona waktu dan tanggal kerja bisa diisi di My Profile, layar
+dan cetakan memakai zona pengguna, form transaksi memakai tanggal kerja, dan test B-7 lulus.
 
 Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
-- [ ] 7.1 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
-- [ ] 7.1a Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
-- [ ] 7.1b Form transaksi memakai tanggal kerja sebagai tanggal bawaan.
-- [ ] 7.1c Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
-      untuk sisa sesi.
-- [ ] 7.2 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
-- [ ] 7.3 Pekerja yang tertaut tampil di layar pengguna.
-- [ ] 7.4 Catatan di backlog HR: tautan pekerja ke template jam kerja dibuat saat absensi atau
-      timesheet dibangun.
+Zona waktu dikerjakan lebih dulu: "hari ini" pada tanggal kerja baru benar bila dihitung menurut zona
+pengguna.
+
+- [ ] 7.1 Setelan zona waktu per pengguna di My Profile, dengan nilai bawaan sesuai K-10.
+- [ ] 7.2 "Hari ini" dihitung dari jam server menurut zona pengguna, tidak pernah dari jam perangkat.
+      Form yang sekarang mengisi tanggal dengan `toISOString()` beralih ke nilai ini.
+- [ ] 7.3 Layar dan cetakan memformat waktu dengan zona pengguna; cetakan menuliskan zonanya, misalnya
+      "28/09/2026 14:05 WITA".
+- [ ] 7.4 Module mengirim waktu UTC bertipe `datetime`, dan Core yang memformatnya lewat `ValueFormat`.
+      Konteks laporan dan permintaan membawa zona pengguna untuk "hari ini" di module, misalnya periode
+      bawaan dan nama berkas.
+- [ ] 7.5 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
+- [ ] 7.6 Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
+- [ ] 7.7 Form transaksi memakai tanggal kerja sebagai tanggal bawaan.
+- [ ] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
+      untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat.
 
 ### 8. [ ] Penyempurnaan ekspor laporan (gap 10)
 
@@ -162,6 +181,18 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 - [ ] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4).
 - [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum.
 - [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris.
+
+### 9. [ ] Tautan pengguna ke pekerja HR (gap 3)
+
+**Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** form pekerja HR
+mengusulkan keanggotaan yang cocok, pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
+
+Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
+
+- [ ] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
+- [ ] 9.2 Pekerja yang tertaut tampil di layar pengguna.
+- [ ] 9.3 Catatan di backlog HR: tautan pekerja ke template jam kerja dibuat saat absensi atau
+      timesheet dibangun.
 
 ---
 
@@ -179,8 +210,12 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
       sampai ke exporter telemetri.
 - [ ] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
       lampirannya. Lampiran tidak bocor antar tenant. Hash yang tidak cocok terdeteksi.
-- [ ] **B-7** (area 7) Tanggal kerja yang diisi dipakai form, dan kembali ke hari ini setelah login ulang
-      atau pindah tenant/legal entity. Usulan tautan hanya menawarkan keanggotaan tenant yang sama.
-      Satu keanggotaan tidak bisa tertaut ke dua pekerja.
+- [ ] **B-7** (area 7) Pukul 00.30 WIB (17.30 UTC hari sebelumnya), "hari ini" bagi pengguna berzona
+      `Asia/Jakarta` adalah tanggal WIB, bukan tanggal UTC. Waktu di layar dan cetakan mengikuti zona
+      pengguna, dan cetakan menuliskan zonanya. Tanggal kerja yang diisi dipakai form, dan kembali ke hari
+      ini setelah login ulang atau pindah tenant/legal entity. Pengingat muncul selama tanggal kerja bukan
+      hari ini; setelah ditutup, ia tidak muncul lagi di sesi itu dan tanggal kerja tetap terlihat.
 - [ ] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
       terlalu besar tetap tidak diulang.
+- [ ] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
+      tidak bisa tertaut ke dua pekerja.
