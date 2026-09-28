@@ -11,7 +11,7 @@ use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Modules\Apperp\ManagementAset\Console\Commands\BangunLayoutLaporanBawaan;
+use Modules\Apperp\ManagementAset\Console\Commands\BuildBuiltinLayouts;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
@@ -73,12 +73,12 @@ final class ModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Perintah artisan module. Tanpa pendaftaran ini `laporan:bangun-layout-bawaan` tidak
-        // ada sama sekali: kerangka lama menemukannya lewat pemindaian `app/Console/Commands`
-        // miliknya sendiri, dan kerangka itu sudah dibuang. `routes/console.php` memuat
+        // Perintah artisan module. Tanpa pendaftaran ini `management-aset:build-builtin-layouts`
+        // tidak ada sama sekali: kerangka lama menemukannya lewat pemindaian
+        // `app/Console/Commands` miliknya sendiri, dan kerangka itu sudah dibuang. `routes/console.php` memuat
         // `management-aset:seed-maintenance`, yang alamatnya juga hilang bersama kerangka itu.
         if ($this->app->runningInConsole()) {
-            $this->commands([BangunLayoutLaporanBawaan::class]);
+            $this->commands([BuildBuiltinLayouts::class]);
 
             // `require`, bukan `loadRoutesFrom`: yang terakhir diam ketika rute HTTP sedang
             // di-cache, dan perintah artisan tidak ada hubungannya dengan cache itu — di image

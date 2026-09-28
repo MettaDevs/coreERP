@@ -60,7 +60,9 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 
 **Kop dan footer datang dari Core, bukan dari dataset.** Kedua layout bawaan memakai blok kop tiga kolom dengan placeholder `${kop.*}` yang diisi Core dari Identitas cetak legal entity (atau operating unit) yang mencetak, dengan alamat dan kontak dari buku alamat organisasi. Dataset app tidak memuat nama perusahaan, alamat, atau logo; menambahkannya akan menggandakan sumber kebenaran.
 
-**Layout bawaan dibangkitkan dari kode.** `php artisan laporan:bangun-layout-bawaan` menulis ulang berkas di `resources/laporan/` dari `src/Console/Commands/BangunLayoutLaporanBawaan.php`. Perintah itu didaftarkan penyedia layanan modul; tanpa pendaftaran itu ia tidak ada sama sekali, karena kerangka lama yang menemukannya dengan memindai foldernya sendiri sudah dibuang. Perubahan template terbaca di review sebagai perubahan kode, dan hasilnya sama di mesin siapa pun; berkas hasilnya tetap di-commit karena runtime membaca berkas.
+**Layout bawaan dibangkitkan dari kode.** `php artisan management-aset:build-builtin-layouts` menulis ulang berkas di `resources/laporan/` dari pembangunnya di `src/Reporting/Layouts/Builtin/`, satu berkas per laporan. Perintah itu didaftarkan penyedia layanan modul; tanpa pendaftaran itu ia tidak ada sama sekali, karena kerangka lama yang menemukannya dengan memindai foldernya sendiri sudah dibuang. Perubahan template terbaca di review sebagai perubahan kode, dan hasilnya sama di mesin siapa pun; berkas hasilnya tetap di-commit karena runtime membaca berkas.
+
+**Satu laporan, satu berkas pembangun.** Pembangun ditemukan perintah dari foldernya, seperti rute di `routes/api/`, jadi dua orang yang mengerjakan dua laporan berbeda tidak menyunting berkas yang sama. Sebelumnya semua layout ditulis di satu kelas perintah, dan enam PR laporan aset pertama saling konflik di sana. Kop, kepala tabel, dan cara menyimpan dipakai bersama lewat `BuiltinLayoutBuilder`. Sebelum menulis apa pun, perintah mencocokkan pembangun dengan definisi laporan dan menolak keduanya bila tidak berpasangan: layout yang dinyatakan definisi tanpa pembangun tidak pernah dibangun, dan pembangun tanpa definisi menulis berkas yang tidak pernah dibaca.
 
 ## Yang datang dari Core dan Shell
 
@@ -79,7 +81,9 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 | `src/Reporting/ReportData.php` | Hasil dataset: `fields` sekali tampil, `tables` diulang per baris |
 | `src/Reporting/ReportDataException.php` | Pesan untuk pengguna saat dataset tidak dapat disusun |
 | `src/Reporting/Definitions/` | Dataset tiap laporan |
-| `src/Console/Commands/BangunLayoutLaporanBawaan.php` | Pembangkit layout bawaan |
+| `src/Reporting/Layouts/Builtin/` | Pembangun layout bawaan, satu berkas per laporan |
+| `src/Reporting/Layouts/BuiltinLayoutBuilder.php` | Induk pembangun: kop, kepala tabel, penyimpanan |
+| `src/Console/Commands/BuildBuiltinLayouts.php` | Perintah yang menjalankan semua pembangun |
 | `resources/laporan/` | Layout bawaan per kode laporan |
 | `tests/Feature/PenyediaLaporanTest.php` | Definisi, layout bawaan, dataset dengan permission dan scope, filter daftar |
 | `ui/print.ts` | `requestPrint()` mengirim `CustomEvent('coreerp:print')` ke shell |
@@ -91,7 +95,7 @@ Tombol **Cetak** ada di halaman rincian work order dan **Ekspor daftar** di daft
 ## Menambah laporan baru
 
 1. Tulis kelas yang mengimplementasikan `ReportDefinition` di `src/Reporting/Definitions/`. Dataset memakai `OrganizationScope` seperti endpoint detailnya.
-2. Tambahkan layout bawaan ke `BangunLayoutLaporanBawaan`, jalankan command-nya, commit berkasnya.
+2. Tulis pembangun layout bawaannya sebagai satu kelas baru di `src/Reporting/Layouts/Builtin/` (turunan `BuiltinLayoutBuilder`), jalankan `php artisan management-aset:build-builtin-layouts`, commit berkasnya. Tidak ada daftar yang perlu disunting.
 3. Daftarkan di `ModuleServiceProvider` pada `ReportRegistry`, dan di blok `reports` pada `app.yaml`.
 4. Tambahkan tombol cetak pada halaman record-nya dengan `requestPrint()`.
 5. Tambahkan test di `PenyediaLaporanTest` untuk placeholder utama dan penolakan di luar scope, lalu perbarui halaman ini.
