@@ -8,12 +8,9 @@ use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
-use Modules\Apperp\ManagementAset\Models\master\GroupAset;
-use Modules\Apperp\ManagementAset\Models\master\JenisAset;
-use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
+use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
@@ -82,11 +79,7 @@ final class AssetDepreciationReport implements ReportDefinition
     public function parameterRules(): array
     {
         return [
-            'group_aset_id' => ['nullable', 'ulid'],
-            'kelompok_harta_fiskal_id' => ['nullable', 'ulid'],
-            'jenis_aset_id' => ['nullable', 'ulid'],
-            'asset_id' => ['nullable', 'ulid'],
-            'buku_id' => ['nullable', 'ulid'],
+            ...AssetReportFilters::rules(),
             'periode' => ['nullable', 'date_format:Y-m'],
         ];
     }
@@ -94,11 +87,7 @@ final class AssetDepreciationReport implements ReportDefinition
     public function fields(): array
     {
         return [
-            $this->field('filter_group', 'Filter group aset'),
-            $this->field('filter_golongan', 'Filter kelompok harta fiskal'),
-            $this->field('filter_jenis', 'Filter jenis aset'),
-            $this->field('filter_aset', 'Filter aset'),
-            $this->field('filter_buku', 'Buku penyusutan'),
+            ...AssetReportFilters::fields(),
             $this->field('filter_periode', 'Periode laporan', type: 'month'),
             $this->field('total_nilai_perolehan', 'Total nilai perolehan', type: 'money'),
             $this->field('total_penyusutan_bulan_ini', 'Total penyusutan bulan ini', type: 'money'),
@@ -202,7 +191,7 @@ final class AssetDepreciationReport implements ReportDefinition
 
         return new ReportData(
             fields: [
-                ...$this->filterNames($parameters),
+                ...AssetReportFilters::names($parameters),
                 'filter_periode' => $month->format('Y-m'),
                 ...array_combine(
                     array_map(static fn (string $key): string => 'total_'.$key, array_keys($totals)),
@@ -237,16 +226,7 @@ final class AssetDepreciationReport implements ReportDefinition
 
         app(OrganizationScope::class)->asetQuery($query, $context->request());
 
-        foreach ([
-            'group_aset_id' => 'aset_tr_aset.group_aset_id',
-            'kelompok_harta_fiskal_id' => 'aset_tr_aset.kelompok_harta_fiskal_id',
-            'jenis_aset_id' => 'aset_tr_aset.jenis_aset_id',
-            'asset_id' => 'aset_tr_aset.id',
-        ] as $parameter => $column) {
-            if (! empty($parameters[$parameter])) {
-                $query->where($column, $parameters[$parameter]);
-            }
-        }
+        AssetReportFilters::apply($query, $parameters, 'aset_tr_aset');
 
         if (! empty($parameters['buku_id'])) {
             $query->where('buku.buku_id', $parameters['buku_id']);
@@ -334,41 +314,6 @@ final class AssetDepreciationReport implements ReportDefinition
         return in_array($row->method, self::STRAIGHT_LINE, true) && $usefulLifeMonths > 0
             ? 1200 / $usefulLifeMonths
             : null;
-    }
-
-    /**
-     * Nama filter untuk kepala laporan, bukan id-nya.
-     *
-     * @param  array<string, mixed>  $parameters
-     * @return array<string, string>
-     */
-    private function filterNames(array $parameters): array
-    {
-        $lookups = [
-            'filter_group' => ['group_aset_id', static fn (string $id): mixed => GroupAset::query()->whereKey($id)->value('nama')],
-            'filter_golongan' => ['kelompok_harta_fiskal_id', static fn (string $id): mixed => KelompokHartaFiskal::query()->whereKey($id)->value('label')],
-            'filter_jenis' => ['jenis_aset_id', static fn (string $id): mixed => JenisAset::query()->whereKey($id)->value('nama')],
-            'filter_aset' => ['asset_id', static function (string $id): ?string {
-                $aset = Aset::query()->whereKey($id)->first(['kode', 'nama']);
-
-                return $aset === null ? null : "{$aset->kode} — {$aset->nama}";
-            }],
-            'filter_buku' => ['buku_id', static fn (string $id): mixed => BukuPenyusutan::query()->whereKey($id)->value('nama')],
-        ];
-
-        $names = [];
-        foreach ($lookups as $field => [$parameter, $lookup]) {
-            $id = $parameters[$parameter] ?? null;
-            if (! is_string($id) || $id === '') {
-                $names[$field] = $field === 'filter_buku' ? 'Semua buku komersial' : 'Semua';
-
-                continue;
-            }
-            $name = $lookup($id);
-            $names[$field] = is_string($name) && $name !== '' ? $name : 'Tidak ditemukan';
-        }
-
-        return $names;
     }
 
     /** @return array{key: string, label: string, table: ?string, type?: string} */
