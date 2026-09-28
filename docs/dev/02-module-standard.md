@@ -14,7 +14,7 @@ modules/
 └─ apperp/                        # penerbit
    └─ management-aset/            # module
       ├─ app.yaml                 # manifest: identitas dan menu module
-      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow, laporan
+      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow
       ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
       ├─ src/                     # PHP: Http/, Models/, Services/, Listeners/, Reporting/
       ├─ database/migrations/     # migration module saja
@@ -147,7 +147,7 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Hanya bila module punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Datasetnya tetap milik module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses. Lihat [dokumen cetak](23-document-rendering.md) |
+| `reports` | Tidak ditulis di manifest module | Laporan module masuk katalog Core dari kelas datasetnya lewat `PenyediaLaporanModul::catalog()` saat registrasi; manifest module yang masih memuat blok ini ditolak. Admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Lihat [dokumen cetak](23-document-rendering.md) |
 
 Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
@@ -155,14 +155,14 @@ Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin
 
 Semua blok berkode di atas boleh ditulis di `app.yaml`. Module yang dikerjakan banyak orang
 menaruhnya di folder `manifest/`: kebijakan data, entry point, permission, privilege, duty,
-reference nomor, jenis workflow, dan laporan, satu berkas per fitur yang dikelompokkan per area.
-`app.yaml` tinggal memuat identitas module dan menunya.
+reference nomor, dan jenis workflow, satu berkas per fitur yang dikelompokkan per area. `app.yaml`
+tinggal memuat identitas module dan menunya. Laporan tidak ditulis di keduanya; katalognya dibaca
+dari kelas dataset module (lihat baris `reports` di tabel atas).
 
 Bentuk ini meniru Business Central. Di sana `app.json` hanya memuat identitas, dan setiap objek
 adalah berkas sendiri di folder areanya; lihat [folder Fixed Assets di BCApps](https://github.com/microsoft/BCApps/tree/main/src/Layers/W1/BaseApp/FixedAssets).
 Alasannya sama dengan `routes/api/<fitur>.php`: dua orang yang mengerjakan fitur berbeda tidak
-menyunting berkas yang sama, jadi merge mereka tidak bentrok. Blok `reports` di satu berkas dulu
-membuat setiap PR laporan bentrok dengan PR laporan lain.
+menyunting berkas yang sama, jadi merge mereka tidak bentrok.
 
 `app:register-manifest` menggabungkan keduanya lewat `App\Support\Modules\ModuleManifestFiles`:
 
@@ -176,8 +176,8 @@ membuat setiap PR laporan bentrok dengan PR laporan lain.
 Empat lapis keamanan tidak berubah karena dipecah: setiap berkas fitur tetap menulis entry
 point, permission, privilege, dan duty-nya sendiri, dan penjaga rantai di
 `apps/core/tests/Feature/Boundary/SusunanManifestModulTest.php` membaca manifest gabungan. Module aset
-memakai area `setup`, `fixed-asset`, `depreciation`, `maintenance`, dan `reports`, mengikuti
-folder Fixed Assets di Business Central.
+memakai area `setup`, `fixed-asset`, `depreciation`, dan `maintenance`, mengikuti folder Fixed
+Assets di Business Central.
 
 ### Dependency app
 

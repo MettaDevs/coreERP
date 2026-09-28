@@ -199,7 +199,7 @@ Pola kode keamanan mengikuti `<module>.<resource>.<aksi>` — Control Plane meno
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat role diberikan ke anggota |
 | `number_sequences.references` | Hanya bila module menerbitkan nomor | Reference muncul di layar **Nomor dokumen** (`settings/number-sequences`) untuk diaktifkan admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Hanya bila module punya dokumen cetak atau ekspor | Laporan masuk katalog Core; layout, antrean, dan render milik Core, module hanya menyediakan dataset lewat kontrak `PenyediaLaporanModul`. Lihat [dokumen cetak](/dev/23-document-rendering) |
+| `reports` | Tidak ditulis di manifest module | Laporan masuk katalog Core dari kelas dataset module lewat `PenyediaLaporanModul::catalog()`; layout, antrean, dan render milik Core. Lihat [dokumen cetak](/dev/23-document-rendering) |
 | `dependsOn` | Hanya bila module butuh module lain | Dependency disimpan dengan rentang versi; Core menolak target yang belum ada, versi yang tidak cocok, dan cycle. Module tanpa dependency memakai `{}` |
 
 Contoh reference nomor:
@@ -341,7 +341,7 @@ layout, mengantrekan ekspor, serta memberi tahu hasilnya lewat tray dan lonceng 
 sebuah `CustomEvent` pada `window` yang didengarkan shell — bukan impor langsung ke dialog cetak
 Core, karena impor semacam itu memutus batas module.
 
-Yang harus ada di module: blok `reports` di manifest, kelas dataset, dan pendaftaran
+Yang harus ada di module: kelas dataset (sekaligus sumber katalog laporannya) dan pendaftaran
 `PenyediaLaporanModul` dari penyedia layanannya. Semuanya dijelaskan di
 [dokumen cetak, layout, dan ekspor](/dev/23-document-rendering).
 

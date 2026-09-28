@@ -7,6 +7,7 @@ use App\Http\Requests\Provider\AppCatalogRequest;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleManifestFiles;
 use App\Support\Modules\ModuleRegistry;
+use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -17,7 +18,8 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Mendaftarkan katalog app dari manifest module yang ada di dalam repo: `app.yaml` ditambah berkas
- * fitur di folder `manifest/`-nya, digabung `ModuleManifestFiles`.
+ * fitur di folder `manifest/`-nya, digabung `ModuleManifestFiles`. Laporannya dibaca dari definisi
+ * laporan module sendiri lewat `PenyediaLaporanModul::catalog()`, bukan dari manifest.
  *
  * Manifest adalah sumber kebenaran katalog. Command ini memakai aturan validasi,
  * normalisasi payload, dan action yang sama dengan endpoint provider
@@ -49,7 +51,7 @@ class RegisterAppManifestCommand extends Command
 
     protected $description = 'Daftarkan module yang ada di repo ke katalog Core dari manifest-nya (app.yaml dan folder manifest/)';
 
-    public function handle(ModuleRegistry $registry, RegisterAppCatalog $registrar): int
+    public function handle(ModuleRegistry $registry, RegisterAppCatalog $registrar, DaftarLaporanModul $reports): int
     {
         // Bila argumen terlihat seperti path file (mengandung pemisah direktori
         // atau berakhiran .yaml/.yml), daftar langsung dari file tersebut.
@@ -73,7 +75,7 @@ class RegisterAppManifestCommand extends Command
         }
 
         foreach ($module as $satu) {
-            if ($this->daftarkan($satu, $registrar) === self::FAILURE) {
+            if ($this->daftarkan($satu, $registrar, $reports) === self::FAILURE) {
                 return self::FAILURE;
             }
         }
@@ -201,7 +203,7 @@ class RegisterAppManifestCommand extends Command
         return $dipilih;
     }
 
-    private function daftarkan(ModuleManifest $module, RegisterAppCatalog $registrar): int
+    private function daftarkan(ModuleManifest $module, RegisterAppCatalog $registrar, DaftarLaporanModul $reports): int
     {
         // `app.yaml` ditambah berkas fitur di `manifest/`; lihat `ModuleManifestFiles`.
         try {
@@ -223,6 +225,21 @@ class RegisterAppManifestCommand extends Command
 
             return self::FAILURE;
         }
+
+        // Laporan module tidak ditulis di manifest. Katalognya dibaca dari definisi laporan
+        // module lewat `PenyediaLaporanModul::catalog()`, satu sumber seperti objek report di
+        // Business Central. Selama isinya juga ditulis di manifest, keduanya menyimpang, dan
+        // laporan yang terlewat di manifest menjawab 404 saat dicetak.
+        if (array_key_exists('reports', $manifest)) {
+            $this->components->error(
+                "Manifest module {$module->id} masih memuat blok `reports`. Laporan module didaftarkan dari "
+                .'definisi laporannya lewat `PenyediaLaporanModul::catalog()`; hapus blok itu dari manifest.'
+            );
+
+            return self::FAILURE;
+        }
+
+        $manifest['reports'] = $reports->untuk($module->id)?->catalog() ?? [];
 
         $request = $this->requestFor($this->toPayload($manifest));
         $validator = $this->validatorFor($request);

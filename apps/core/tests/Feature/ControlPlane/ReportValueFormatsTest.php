@@ -114,6 +114,11 @@ class ReportValueFormatsTest extends TestCase
                 return $kodeLaporan === 'rekap';
             }
 
+            public function catalog(): array
+            {
+                return [];
+            }
+
             public function definisi(string $kodeLaporan, array $konteks): array
             {
                 return ['fields' => $this->fields, 'parameters' => []];

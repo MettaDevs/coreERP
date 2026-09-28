@@ -6,6 +6,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModulSedangDipindah;
+use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RecursiveDirectoryIterator;
@@ -31,7 +32,7 @@ use Tests\TestCase;
  * 10 September. Pemindahan itu sudah lama selesai, sedangkan angkanya menjadi satu tempat yang wajib
  * disunting setiap PR yang menambah izin atau laporan, dan setiap dua PR seperti itu bentrok di
  * sini. Yang tetap dijaga adalah hal pertama di atas: jumlahnya dihitung dari berkas manifest
- * module itu sendiri, lalu harus sama dengan isi katalog.
+ * module itu sendiri dan dari definisi laporannya, lalu harus sama dengan isi katalog.
  */
 class RegisterAppManifestModuleTest extends TestCase
 {
@@ -59,7 +60,11 @@ class RegisterAppManifestModuleTest extends TestCase
 
         $this->artisan('app:register-manifest')->assertSuccessful();
 
-        $diManifest = $this->countEntriesInManifestFiles();
+        // Laporan tidak ditulis di manifest: katalognya dibaca dari definisi laporan module.
+        $diManifest = [
+            ...$this->countEntriesInManifestFiles(),
+            'reports' => count(app(DaftarLaporanModul::class)->untuk('management-aset')?->catalog() ?? []),
+        ];
 
         foreach ($diManifest as $kelompok => $jumlah) {
             $this->assertGreaterThan(0, $jumlah, "Tidak ada {$kelompok} yang terbaca dari berkas manifest; hitungannya salah alamat.");
@@ -92,6 +97,27 @@ class RegisterAppManifestModuleTest extends TestCase
             .'pernah jalan; kalau menjalankannya ulang menggandakan atau menggeser baris, '
             .'satu-satunya cara pulih adalah membereskan database pelanggan dengan tangan.',
         );
+    }
+
+    /**
+     * Laporan module punya satu sumber: definisinya, dibaca lewat `PenyediaLaporanModul::catalog()`.
+     * Blok `reports` yang masih ditulis di manifest ditolak, bukan diabaikan atau digabung,
+     * karena dua sumber untuk satu katalog pasti menyimpang.
+     */
+    public function test_reports_block_in_module_manifest_is_rejected(): void
+    {
+        $this->salinModulAset('aset');
+        file_put_contents(
+            $this->akarSementara.'/apperp/aset/app.yaml',
+            "reports:\n  - code: management-aset.laporan-tulisan-tangan\n",
+            FILE_APPEND,
+        );
+
+        $this->artisan('app:register-manifest')
+            ->expectsOutputToContain('masih memuat blok `reports`')
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('apps', ['id' => 'management-aset']);
     }
 
     public function test_module_yang_sedang_dipindah_masuk_tidak_didaftarkan_ke_katalog(): void
@@ -198,7 +224,7 @@ class RegisterAppManifestModuleTest extends TestCase
             }
         }
 
-        $counts = array_fill_keys(['data_policies', 'entry_points', 'permissions', 'privileges', 'duties', 'number_sequence_references', 'workflow_types', 'reports'], 0);
+        $counts = array_fill_keys(['data_policies', 'entry_points', 'permissions', 'privileges', 'duties', 'number_sequence_references', 'workflow_types'], 0);
 
         foreach ($files as $path) {
             /** @var array<string, mixed> $content */
@@ -210,7 +236,6 @@ class RegisterAppManifestModuleTest extends TestCase
             $counts['duties'] += count($content['security']['duties'] ?? []);
             $counts['number_sequence_references'] += count($content['number_sequences']['references'] ?? []);
             $counts['workflow_types'] += count($content['workflow_types'] ?? []);
-            $counts['reports'] += count($content['reports'] ?? []);
         }
 
         return $counts;

@@ -35,7 +35,6 @@ LISTS = [
     ("security", "duties"),
     ("number_sequences", "references"),
     ("workflow_types",),
-    ("reports",),
 ]
 
 
