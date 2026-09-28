@@ -131,7 +131,12 @@ vendor. Bagian itu butuh notifikasi, jadi menunggu [gap 8](#di-luar-fase-1).
    (`DB::table()->update()`, `Model::query()->update()`) tidak melewati event model, jadi penangkap di
    level model akan bolong diam-diam. Trigger PostgreSQL menangkap semua penulisan seperti global
    trigger BC. Pelakunya dikirim per transaksi lewat `set_config(..., true)` yang dibaca trigger.
-   Karena trigger ikut migration, ia terpasang di setiap database tenant.
+   Karena trigger ikut migration, ia terpasang di setiap database tenant. BC sendiri menangkap di
+   lapisan platform, bukan SQL: platform bertanya ke Change Log tabel mana yang perlu dicatat
+   (`GetDatabaseTableTriggerSetup`), lalu memanggil `OnDatabaseModify` untuk setiap penulisan. Itu cukup
+   di BC karena tidak ada jalan menulis data selain lewat server BC. Di Laravel jalan pintasnya ada
+   (query builder, SQL mentah, job), sehingga padanan yang setara adalah trigger database. Trigger juga
+   hanya mencatat tabel dan field yang dipilih di setup, seperti BC.
 4. **Endpoint riwayat per record, dan komponen riwayat di Shell** yang menampilkan entri itu seperti
    gambar yang dicontohkan pemilik: siapa, melakukan apa, dari nilai apa ke nilai apa, kapan. Nama
    pengguna dan unit kerja ditampilkan sebagai nama, bukan ID.
@@ -232,11 +237,11 @@ zona sendiri, yang dibaca lewat `DateTimeUtil::getCompanyTimeZone()`.
 5. Konteks laporan dan konteks permintaan membawa zona pengguna, sehingga "hari ini" di module, misalnya
    periode bawaan dan nama berkas, mengikuti zona itu.
 
-Nilai bawaan zona pengguna masih terbuka (K-10):
+Nilai bawaan zona pengguna diputuskan di K-10 pada 28 September 2026: pilihan 1.
 
-- **Pilihan 1, usulan:** zona waktu menjadi setelan entitas legal, seperti `getCompanyTimeZone` di F&O.
+- **Pilihan 1, dipilih:** zona waktu menjadi setelan entitas legal, seperti `getCompanyTimeZone` di F&O.
   Pengguna yang belum mengisi setelannya mengikuti entitas legal yang sedang aktif.
-- **Pilihan 2:** alamat entitas legal diubah menjadi pilihan wilayah, lalu zonanya dihitung otomatis,
+- **Pilihan 2, tidak dipilih:** alamat entitas legal diubah menjadi pilihan wilayah, lalu zonanya dihitung otomatis,
   mendekati BC yang mengisi zona dari alamat perusahaan. Hari ini alamat entitas legal berupa teks bebas
   (`province` dan `city` di `postal_addresses`, ditulis
   `apps/core/app/Support/AddressBook/OrganizationAddressBook.php`), sedangkan
@@ -545,16 +550,16 @@ yang jelas. Laporan tetap di server.
 
 | Kode | Keputusan | Usulan |
 | --- | --- | --- |
-| K-01 | Nama kolom jejak dan apa yang dirujuk | `created_by_user_id` dan `updated_by_user_id`, merujuk `users.id`, sejalan dengan `integration_clients` |
-| K-02 | Penangkap log perubahan | Trigger PostgreSQL, pelaku lewat `set_config` per transaksi |
-| K-03 | Versi baris | Kolom versi eksplisit seperti `version` di dokumen aset, bukan kolom sistem `xmin` |
+| K-01 | Nama kolom jejak dan apa yang dirujuk | **Diputuskan 28 Sep 2026:** `created_by_user_id` dan `updated_by_user_id`, merujuk `users.id`. Riwayat lengkapnya tetap di satu tabel log perubahan (gap 6); kolom jejak hanya ringkasan per baris |
+| K-02 | Penangkap log perubahan | **Diputuskan 28 Sep 2026:** trigger PostgreSQL, pelaku lewat `set_config` per transaksi |
+| K-03 | Versi baris | **Diputuskan 28 Sep 2026:** kolom versi eksplisit seperti `version` di dokumen aset, bukan kolom sistem `xmin` |
 | K-04 | Tanggal kerja per pengguna | **Diputuskan 28 Sep 2026:** masuk fase 1, diisi di My Profile, perilaku seperti BC |
-| K-05 | Daftar awal tabel yang boleh diretensi | Log number sequence, hasil ekspor laporan, dan entri log perubahan |
-| K-06 | Bentuk deklarasi klasifikasi di kode | Atribut kelas untuk bawaan tabel, konstanta untuk kolom |
-| K-07 | Lampiran ikut berpindah antar dokumen | Ditunda; fase 1 hanya melampirkan ke satu record |
-| K-08 | Job latar per tenant | Fase 2, bersama notifikasi |
+| K-05 | Daftar awal tabel yang boleh diretensi | **Diputuskan 28 Sep 2026:** log number sequence, hasil ekspor laporan, dan entri log perubahan |
+| K-06 | Bentuk deklarasi klasifikasi di kode | **Diputuskan 28 Sep 2026:** atribut kelas untuk bawaan tabel, konstanta untuk kolom |
+| K-07 | Lampiran ikut berpindah antar dokumen | **Diputuskan 28 Sep 2026:** ditunda; fase 1 hanya melampirkan ke satu record |
+| K-08 | Job latar per tenant | **Diputuskan 28 Sep 2026:** fase 2, bersama notifikasi |
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
-| K-10 | Nilai bawaan zona waktu pengguna | Setelan zona waktu entitas legal; pengguna yang belum mengisi ikut entitas legal aktif |
+| K-10 | Nilai bawaan zona waktu pengguna | **Diputuskan 28 Sep 2026:** setelan zona waktu entitas legal (nama zona IANA); pengguna yang belum mengisi ikut entitas legal aktif |
 
 ## Sumber {#sumber}
 
