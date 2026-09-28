@@ -9,6 +9,7 @@ use App\Models\NumberSequenceReference;
 use App\Models\Permission;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
+use App\Support\Access\OwnerRoleDuties;
 use App\Support\AppDependencyGraph;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -152,6 +153,8 @@ class RegisterAppCatalog
         });
 
         app(EnsureNumberSequenceDrafts::class)->forReadyApp($app->id);
+        // Role Owner setiap tenant memegang semua duty yang sah, termasuk duty yang baru didaftarkan manifest ini.
+        app(OwnerRoleDuties::class)->syncAll();
 
         return $app;
     }

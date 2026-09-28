@@ -1,0 +1,99 @@
+get:
+  tags: [Pusat admin]
+  operationId: internal.fleet.index
+  summary: Keadaan seluruh armada dalam satu jawaban
+  description: |
+    Versi tiap lingkungan dibandingkan terhadap versi image yang sedang berjalan, beserta
+    operasi terakhirnya. **Pemanggilnya pusat admin**, dan penjaganya token bersama yang sama
+    dengan endpoint pusat admin lainnya.
+
+    Satu panggilan, bukan satu per lingkungan, karena yang dibaca layar adalah
+    **perbandingannya** — dan versi image adalah pengetahuan Core, diturunkan dari isi folder
+    migration yang tidak ada di container konsol.
+
+    **Ia tidak membuka satu pun database lingkungan.** Seluruh isinya dibaca dari tabel sisi
+    pusat: `environments` menyimpan sidik skema tiap lingkungan, `environment_operations`
+    menyimpan riwayatnya. Daftar module per lingkungan memang menuntut database lingkungannya,
+    dan karena itu ia tinggal di layar rincian satu lingkungan — bukan di sini.
+
+    **Lingkungan yang berjalan di server klien tidak ikut.** Armada ini adalah yang dijalankan
+    server ini; server klien diperbarui agennya dengan paket edisinya sendiri, dan sidiknya
+    tidak dapat dibandingkan dengan image di sini.
+  security:
+    - controlPlaneToken: []
+  responses:
+    '200':
+      description: Keadaan armada.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [platform_fingerprint, counts, environments]
+            properties:
+              platform_fingerprint:
+                type: string
+                description: |
+                  Nama berkas migration terakhir di dalam image yang sedang berjalan. Inilah
+                  "boleh naik ke mana", dan ia dikirim sekali di kepala jawaban karena
+                  jawabannya cuma satu untuk seluruh armada.
+              counts:
+                type: object
+                description: Hitungan per keadaan, untuk kepala halaman.
+                properties:
+                  current: { type: integer }
+                  behind: { type: integer }
+                  failed: { type: integer }
+                  unknown: { type: integer }
+              environments:
+                type: array
+                items:
+                  type: object
+                  required: [id, tenant, name, slug, kind, status, database, fingerprint, state, last_operation]
+                  properties:
+                    id: { type: string, format: ulid }
+                    tenant: { type: string }
+                    name: { type: string }
+                    slug: { type: string }
+                    kind:
+                      type: string
+                      enum: [production, sandbox, demo]
+                    status: { type: string }
+                    database:
+                      type: string
+                      nullable: true
+                      description: Kosong berarti lingkungan ini tinggal di database pusat.
+                    fingerprint:
+                      type: string
+                      nullable: true
+                      description: |
+                        Sidik skema lingkungan itu. Untuk lingkungan tanpa database sendiri,
+                        yang dikirim sidik database pusat — karena di sanalah ia tinggal.
+                    state:
+                      type: string
+                      enum: [current, behind, failed, unknown]
+                      description: |
+                        Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
+                        yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
+                        punya skema sama sekali.
+                    last_operation:
+                      type: object
+                      nullable: true
+                      properties:
+                        kind: { type: string }
+                        status:
+                          type: string
+                          enum: [running, succeeded, failed]
+                        step: { type: string, nullable: true }
+                        reason: { type: string, nullable: true }
+                        started_at: { type: string, nullable: true }
+                        finished_at: { type: string, nullable: true }
+                        requested_by:
+                          type: string
+                          nullable: true
+                          description: Kosong berarti penjadwal, bukan manusia.
+    '401':
+      description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '429': { $ref: '#/components/responses/RateLimited' }

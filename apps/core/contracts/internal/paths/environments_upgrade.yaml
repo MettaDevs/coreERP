@@ -1,0 +1,55 @@
+post:
+  tags: [Pusat admin]
+  operationId: internal.fleet.upgrade
+  summary: Antrekan pembaruan untuk setiap lingkungan yang tertinggal
+  description: |
+    Mengantrekan satu job per lingkungan yang **perlu** diperbarui, lalu memulangkan 202
+    seketika. Yang sudah mutakhir dilewati: mengantrekan semuanya tiap kali tombolnya ditekan
+    berarti dua ratus job yang tidak melakukan apa pun, dan "berapa yang sedang berjalan"
+    berhenti terbaca karena angkanya selalu penuh.
+
+    **Kemajuannya dipantau dari daftar operasi, bukan dari balasan ini.** Balasan ini sudah
+    ditutup jauh sebelum job pertama selesai. Business Central menyatakan aturan yang sama
+    sebagai aturan, dan `GET /fleet` yang menjawabnya.
+
+    Sasarannya dihitung **saat eksekusi**, jadi lingkungan yang lahir semenit sesudah ini
+    dipanggil ikut pada panggilan berikutnya tanpa didaftarkan ke mana pun.
+  security:
+    - controlPlaneToken: []
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            force:
+              type: boolean
+              description: |
+                Antrekan juga yang sidiknya sudah sama dengan image. Ada untuk satu keadaan
+                nyata: migration yang isinya diubah tanpa mengubah nama berkasnya — sidiknya
+                tidak bergerak, databasenya tertinggal.
+            requested_by:
+              type: integer
+              description: |
+                Id user yang menekan tombolnya, dicatat pada `environment_operations`.
+                Dihilangkan bila id-nya tidak ada sebagai user di sini.
+  responses:
+    '202':
+      description: Job sudah diantrekan. Kosong berarti tidak ada yang perlu diperbarui.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [queued, queued_count]
+            properties:
+              queued:
+                type: array
+                items: { type: string, format: ulid }
+              queued_count: { type: integer }
+    '401':
+      description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '429': { $ref: '#/components/responses/RateLimited' }

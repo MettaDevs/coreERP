@@ -131,8 +131,17 @@ jobs:
         working-directory: .
         run: python3 .github/scripts/check-skill-copies.py
 
+      # The internal contract is written split under contracts/internal/ and assembled into
+      # contracts/openapi-internal.yaml and contracts/terbit/. A bundle that differs from its
+      # sources means someone edited the output by hand, or forgot to re-run the bundler.
+      - name: Check internal API contract bundles
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 contracts/bundle.py --check
+
       # A route under internal/v1 is called by another application. No test fails when
-      # one is missing from the contract, so this is the only step that notices.
+      # one is missing from the contract, so this is the only step that notices. Routes come
+      # from `php artisan route:list`, so PHP and the copied .env above are required here.
       - name: Check internal API contract coverage
         run: |
           python3 -m pip install --quiet pyyaml

@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAppService;
+use App\Http\Middleware\AuthenticateIntegrationClient;
+use App\Http\Middleware\AuthenticateInternalCaller;
 use App\Http\Middleware\ControlPlaneOnly;
+use App\Http\Middleware\EnforceSiteLicense;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LampirkanKonteksJejak;
@@ -36,6 +39,11 @@ return Application::configure(basePath: dirname(__DIR__))
             // yang boleh dibuka token bersama, dan menyebarkannya lebih luas berarti menaruh satu
             // token yang sama di depan permukaan yang jauh lebih besar daripada yang dibutuhkan.
             'control-plane' => ControlPlaneOnly::class,
+            // Sistem di luar CoreERP yang membaca feed posting finance: token klien integrasi
+            // bercakupan sempit, bukan kredensial app. Lihat AuthenticateIntegrationClient.
+            'integration-client' => AuthenticateIntegrationClient::class,
+            // Rute yang dibaca module dan sistem luar sekaligus; lihat AuthenticateInternalCaller.
+            'internal-caller' => AuthenticateInternalCaller::class,
         ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
@@ -82,6 +90,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // dilihat orang lain membuat **seluruh** sesi itu meragukan, bukan sebagian. Akun
             // tanpa penandanya tidak tersentuh — kolomnya berbawaan `false`.
             WajibGantiSandi::class,
+            // Paling akhir. Sesudah Inertia, karena yang dikembalikannya halaman Inertia yang
+            // membutuhkan prop bersama. Sesudah `WajibGantiSandi`, dan keduanya tidak dapat saling
+            // melempar: pengalihan ke layar ganti kata sandi tetap terjadi, lalu layar itu sendiri
+            // dijawab halaman kunci yang dirender di tempat — tidak ada pengalihan balik, jadi tidak
+            // ada putaran. Pemasangan yang tidak mewajibkan lisensi tidak pernah tertahan di sini.
+            EnforceSiteLicense::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

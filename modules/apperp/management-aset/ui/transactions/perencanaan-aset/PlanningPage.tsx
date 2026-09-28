@@ -31,7 +31,7 @@ import { api, errorMessage, newIdempotencyKey } from '../../api';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
-type AssetType = { id: string; kode: string; nama: string };
+type AsetType = { id: string; kode: string; nama: string };
 type Detail = {
     jenis_aset_id: string;
     satuan_id: string;
@@ -73,7 +73,7 @@ const emptyPlan = (): Omit<Plan, 'id' | 'kode' | 'version' | 'status'> & {
     details: [emptyDetail()],
 });
 
-function AssetDetailRow({
+function AsetDetailRow({
     detail,
     index,
     canRemove,
@@ -87,8 +87,8 @@ function AssetDetailRow({
     detail: Detail;
     index: number;
     canRemove: boolean;
-    types: AssetType[];
-    units: AssetType[];
+    types: AsetType[];
+    units: AsetType[];
     portalContainer: RefObject<HTMLDivElement | null>;
     onTypeSearch: (query: string) => void;
     onChange: (change: Partial<Detail>) => void;
@@ -203,8 +203,8 @@ export default function PlanningPage({
     const can = (action: string) =>
         permissions.includes(`management-aset.perencanaan-aset.${action}`);
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [types, setTypes] = useState<AssetType[]>([]);
-    const [units, setUnits] = useState<AssetType[]>([]);
+    const [types, setTypes] = useState<AsetType[]>([]);
+    const [units, setUnits] = useState<AsetType[]>([]);
     const [typeSearch, setTypeSearch] = useState('');
     const [editing, setEditing] = useState<
         (Plan & { details: Detail[] }) | null | undefined
@@ -266,7 +266,7 @@ export default function PlanningPage({
             return;
         }
 
-        api<{ data: AssetType[] }>('/reference-data/units-of-measure')
+        api<{ data: AsetType[] }>('/reference-data/units-of-measure')
             .then((result) => setUnits(result.data))
             .catch(() => toast.error('Satuan belum dapat dimuat.'));
     }, [bolehSunting]);
@@ -276,7 +276,7 @@ export default function PlanningPage({
         }
 
         const timer = window.setTimeout(() => {
-            api<{ data: AssetType[] }>(
+            api<{ data: AsetType[] }>(
                 `/jenis-aset?per_page=20&aktif=true&q=${encodeURIComponent(typeSearch)}`,
             )
                 .then((result) => setTypes(result.data))
@@ -617,7 +617,7 @@ export default function PlanningPage({
                                     </Button>
                                 </div>
                                 {editing.details.map((detail, index) => (
-                                    <AssetDetailRow
+                                    <AsetDetailRow
                                         key={index}
                                         detail={detail}
                                         index={index}

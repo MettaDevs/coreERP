@@ -10,7 +10,7 @@
 # ## Ini BUKAN `compose.edition.yaml`
 #
 # Yang itu bundle on-prem: satu mesin milik pelanggan, seluruh layanan di dalamnya, image dimuat
-# dari `images.tar.gz` tanpa internet. Bentuk itu benar untuk on-prem dan sengaja tidak diubah.
+# dari `images.tar.gz` atau ditarik lewat digest. Bentuk itu benar untuk on-prem dan sengaja tidak diubah.
 #
 # Yang ini penyebaran SaaS milik kita sendiri: beberapa node, database terpisah dari aplikasi, dan
 # Traefik sebagai pintu depan sekaligus pembagi beban.
@@ -361,7 +361,6 @@ services:
       CONSOLE_RELEASE_TOKEN: ${CONSOLE_RELEASE_TOKEN:-}
       CONSOLE_LICENSE_PRIVATE_KEY_PATH: ${CONSOLE_LICENSE_PRIVATE_KEY_PATH:-/run/coreerp-kunci/lisensi-privat.pem}
       CONSOLE_LICENSE_PUBLIC_KEY_PATH: ${CONSOLE_LICENSE_PUBLIC_KEY_PATH:-/run/coreerp-kunci/lisensi-publik.pem}
-      CONSOLE_AGENT_SOURCE_REF: ${CONSOLE_AGENT_SOURCE_REF:-main}
     volumes:
       - ${COREERP_KUNCI_DIR:-/etc/coreerp/kunci}:/run/coreerp-kunci:ro
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang

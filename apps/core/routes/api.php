@@ -1,13 +1,16 @@
 <?php
 
 use App\Http\Controllers\Internal\EnvironmentProvisioningController;
+use App\Http\Controllers\Internal\FinancePostingFeedController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
 use App\Http\Controllers\Internal\FleetController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
+use App\Http\Controllers\Internal\TenantEntitlementController;
 use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
+use App\Http\Controllers\Internal\VendorDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
 use Illuminate\Support\Facades\Route;
@@ -15,7 +18,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app'])->group(function (): void {
     Route::get('members', [MemberDirectoryController::class, 'index']);
     Route::get('members/{membership}', [MemberDirectoryController::class, 'show']);
-    Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
     Route::get('fiscal-periods', [FiscalCalendarDirectoryController::class, 'resolve']);
     Route::get('units-of-measure', [UnitOfMeasureDirectoryController::class, 'index']);
     Route::post('units-of-measure/resolve', [UnitOfMeasureDirectoryController::class, 'resolve']);
@@ -26,6 +28,37 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
     Route::post('number-sequence-reservations/{reservation}/confirm', [InternalNumberSequenceController::class, 'confirm']);
     Route::post('number-sequence-reservations/{reservation}/cancel', [InternalNumberSequenceController::class, 'cancel']);
     Route::post('workflow-instances', [InternalWorkflowInstanceController::class, 'store']);
+});
+
+/*
+ * Dibaca module dan sistem di luar CoreERP sekaligus.
+ *
+ * Module human-resources memakai kredensial app seperti rute lain di atas. Pembaca feed posting
+ * finance memakai token klien integrasi dengan scope yang disebut di parameter middleware, dan
+ * menyinkronkan tabel penerjemahnya dari rute yang sama. Lihat AuthenticateInternalCaller.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-caller:operating-units.read'])->group(function (): void {
+    Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
+});
+
+/*
+ * Hanya untuk sistem di luar CoreERP. Module di runtime ini membaca vendor lewat kontrak DaftarVendor,
+ * bukan lewat HTTP, jadi rute ini tidak menerima kredensial app.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:vendors.read'])->group(function (): void {
+    Route::get('vendors', [VendorDirectoryController::class, 'index']);
+});
+
+/*
+ * Feed posting finance untuk pembaca mode `pull`. Membaca dan mengirim ack adalah dua scope berbeda:
+ * pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.read'])->group(function (): void {
+    Route::get('finance-postings', [FinancePostingFeedController::class, 'index']);
+});
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.ack'])->group(function (): void {
+    Route::post('finance-postings/{posting_id}/ack', [FinancePostingFeedController::class, 'ack'])
+        ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*');
 });
 
 /*
@@ -43,6 +76,8 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  */
 Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->group(function (): void {
     Route::post('tenants', [TenantProvisioningController::class, 'store']);
+    // Dibaca admin.erp saat menerbitkan lisensi situs; lihat TenantEntitlementController.
+    Route::get('tenants/{tenant}/entitlements', [TenantEntitlementController::class, 'show']);
     Route::post('environments/{environment}/provision', [EnvironmentProvisioningController::class, 'store']);
     Route::get('fleet', [FleetController::class, 'index']);
     Route::post('environments/upgrade', [FleetController::class, 'upgrade']);

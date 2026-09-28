@@ -9,7 +9,8 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 ## Struktur fitur
 
 - Setiap fitur atau halaman baru wajib memiliki folder sendiri pada API dan UI. Jangan menambahkan controller, model, page, atau komponen khusus fitur ke root bersama.
-- API menaruh kode khusus fitur di `api/app/Http/Controllers/<fitur>/` dan `api/app/Models/<fitur>/`. UI menaruh page, form, konfigurasi, dan komponen khususnya di `ui/src/<fitur>/`.
+- API menaruh kode khusus fitur di `src/Http/Controllers/transaksi/<Fitur>/` dan `src/Models/transaksi/<Fitur>/` (master di `master/`). UI menaruh page, form, konfigurasi, dan komponen khususnya di `ui/transactions/<fitur>/`.
+- Rute fitur ada di `routes/api/<fitur>.php`, satu berkas per fitur, dimuat otomatis oleh `routes/api.php` di bawah prefix dan middleware yang sama. Nama berkasnya bahasa Inggris seperti nama kode lain; alamat URL-nya tetap. Rute spesifik yang harus didahulukan dari `{id}` (misalnya `penerimaan-aset/vendor`) ditaruh di berkas yang sama, sebelum rute `{id}`-nya.
 - Kode lintas fitur saja yang boleh tetap di root/shared: controller dan model dasar, middleware, service integrasi, support, shell aplikasi, API client, dan style global.
 - Nama folder fitur memakai nama domain yang konsisten pada API dan UI. Jika fitur tumbuh, tambahkan subfolder lokal seperti `Components`, `Requests`, atau `Services` di dalam folder fitur; jangan membuat folder global baru hanya untuk satu fitur.
 - Detail pola dan contoh berada di `docs/agent.md` dan `docs/skills/struktur-fitur.md`.
@@ -28,13 +29,13 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 - Format, status, dan counter nomor adalah keputusan owner/admin tenant di Control Plane. Manifest hanya mendeklarasikan reference dan allowed scope.
 - Arsip adalah soft delete. Jangan mengganti dengan hard delete: record lama masih direferensikan data turunan.
 - Master klasifikasi **datar dan saling lepas**, mengikuti model Dynamics 365 F&O: aset menunjuk `group_aset_id` (sumbu finansial) dan `jenis_aset_id` (sumbu teknis) secara langsung dan sejajar. Jangan menambah tingkat klasifikasi baru sebagai tabel; pembedaan yang lebih rinci diselesaikan lewat atribut.
-- Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_penerimaan_aset.parent_asset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
+- Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_aset.induk_aset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
 
 ## Menambah atau mengubah master
 
 1. Tabel baru mengikuti bentuk yang sama: `id` ULID, `tenant_id`, `creation_key`, `kode`, `nama`, `keterangan`, `aktif`, soft delete, `unique(tenant_id, kode)`, `unique(tenant_id, creation_key)`.
 2. Foreign key ke master lain wajib **gabungan dengan `tenant_id`** — `(tenant_id, parent_id)` → `(tenant_id, id)` — sehingga induk lintas tenant ditolak database, bukan hanya validasi aplikasi. Tabel induk perlu `unique(tenant_id, id)`.
-3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
+3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya, lalu slug-nya didaftarkan di `$masters` pada `routes/api/master-data.php`. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
 4. `app.yaml` wajib menambah empat lapis Dynamics 365 secara terpisah — entry point, permission, privilege, duty — plus satu reference nomor. Kode privilege tidak boleh sama dengan kode permission.
 5. Perbarui `contracts/src/` (lalu `python contracts/bundle.py`), `README.md`, dan `database/README.md` pada perubahan yang sama.
 
@@ -42,23 +43,31 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 
 Urutannya penting: yang murah lebih dulu, tetapi tidak boleh berhenti sebelum yang terakhir.
 
+Perintahnya ditulis dari akar repo. Sebelumnya blok ini menyuruh `cd api` dan `cd ui`,
+peninggalan masa modul ini dua aplikasi tersendiri. `ui/` memang masih ada — itu sumber
+layarnya — dan `api/` menyisakan satu `Dockerfile`, tetapi tidak satu pun dari keduanya
+punya `artisan` atau `package.json` lagi. Keduanya dijalankan dari `apps/core`.
+
+Satu run test pada satu waktu: `core_erp_test` dipakai bersama, dan dua run serentak saling
+menjatuhkan tabel sehingga gagalnya menyamar jadi regresi kode.
+
 ```bash
-cd api && php artisan test
+cd apps/core && php artisan test --testsuite=Module
 ```
 
 ```bash
-cd api && vendor/bin/pint --test && vendor/bin/pint --test ../database
+cd apps/core && php vendor/laravel/pint/builds/pint --test ../../modules/apperp/management-aset
 ```
 
 ```bash
-python loadtest/check-manifest.py app.yaml
+cd modules/apperp/management-aset/loadtest && python check-manifest.py
 ```
 
 ```bash
-cd ui && npm run build
+cd apps/core && npm run types:check && npm run lint:check && npm run build
 ```
 
-Lalu **load test wajib** — lihat `loadtest/README.md`. Sebuah modul belum selesai hanya karena test feature lulus. Test feature berjalan satu request pada satu proses terhadap SQLite; ia tidak dapat melihat koneksi habis, nomor ganda, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
+Lalu **load test wajib** — lihat `loadtest/README.md`. Sebuah modul belum selesai hanya karena test feature lulus. Test feature berjalan satu request pada satu proses; ia tidak dapat melihat koneksi habis, nomor ganda, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
 
 Minimum yang harus dipenuhi: 1000+ VU serentak, 100+ tenant, 2+ instance API di belakang load balancer, PostgreSQL asli, 90 detik pada beban penuh. Gate kebenaran (0 pelanggaran, 0 error aplikasi) berlaku di perangkat keras apa pun. Gate latensi diukur pada concurrency yang masih tertahan, bukan pada titik jenuh.
 

@@ -1,0 +1,189 @@
+# Dokumen mutasi aset — berita acara serah terima.
+#
+# Ia memindahkan sumbu fisik dan tanggung jawab (lokasi, unit pengguna, penanggung jawab),
+# bukan sumbu finansial. Padanannya di Dynamics 365 adalah `Install asset at location` pada
+# Asset Management, bukan `Transfer fixed assets` pada Fixed assets: yang terakhir
+# memindahkan dimensi keuangan **per buku** dan menerbitkan jurnal, sedangkan app ini tidak
+# menjurnal sama sekali. Karena itu tidak ada field dimensi per buku, nilai pindah, maupun
+# akun asal/tujuan di sini.
+/api/v1/mutasi-aset:
+  get:
+    tags:
+    - Mutasi aset
+    operationId: listAsetTransfers
+    summary: Menampilkan berita acara serah terima dalam jangkauan organisasi pengguna
+    parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, selesai]
+    - name: dari
+      in: query
+      required: false
+      description: Batas bawah tanggal serah terima, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    - name: sampai
+      in: query
+      required: false
+      description: Batas atas tanggal serah terima, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    responses:
+      '200':
+        description: Daftar mutasi aset beserta jumlah baris dan nama lokasi tujuan
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Mutasi aset
+    operationId: createAsetTransfer
+    summary: Membuat draf berita acara serah terima; aset belum berpindah sampai diselesaikan
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AsetTransferWrite'
+    responses:
+      '200':
+        description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+      '201':
+        description: Draf mutasi dibuat, nomor diterbitkan Number Sequence Core
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        $ref: '#/components/responses/IdempotencyConflict'
+      '422':
+        description: Aset di luar jangkauan organisasi, sudah dilepas, atau muncul dua kali
+/api/v1/mutasi-aset/{id}:
+  get:
+    tags:
+    - Mutasi aset
+    operationId: showAsetTransfer
+    summary: Membaca satu berita acara beserta barisnya dan keadaan asal tiap aset
+    description: |
+      Keadaan asal tiap baris (`asal_lokasi_efektif_id`, `asal_org_unit_efektif_id`,
+      `asal_custodian_efektif_id`) adalah nilai beku bila dokumen sudah selesai, dan
+      keadaan aset **sekarang** selama dokumen masih draf. Klien tidak perlu memilih
+      sendiri di antara keduanya, dan tidak boleh mengirimkannya kembali saat menyimpan.
+
+      Setiap id unit kerja dan id pengguna dipulangkan berpasangan dengan namanya
+      (`tujuan_org_unit_nama`, `diserahkan_oleh_nama`, `diterima_oleh_nama`, dan pada
+      baris `asal_org_unit_nama` serta `asal_custodian_nama`). Nama dibaca dari Core
+      saat permintaan dilayani, bukan disimpan sebagai snapshot: nama orang dan nama
+      unit berubah karena sebab di luar aset, dan dokumen yang membekukannya akan
+      menampilkan ejaan lama selamanya. Nama bernilai `null` berarti unit atau
+      keanggotaannya sudah tidak ada di Core.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Mutasi beserta barisnya
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Mutasi aset
+    operationId: updateAsetTransfer
+    summary: Mengubah draf berita acara; seluruh baris diganti
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/AsetTransferWrite'
+            - type: object
+              required: [version]
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+    responses:
+      '200':
+        description: Mutasi setelah diubah
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: Mutasi yang sudah selesai tidak dapat diubah
+  delete:
+    tags:
+    - Mutasi aset
+    operationId: archiveAsetTransfer
+    summary: Mengarsipkan draf berita acara
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [version]
+            properties:
+              version:
+                type: integer
+                minimum: 1
+    responses:
+      '204':
+        description: Draf diarsipkan
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: Mutasi yang sudah selesai tidak dapat diarsipkan
+/api/v1/mutasi-aset/{id}/selesaikan:
+  post:
+    tags:
+    - Mutasi aset
+    operationId: completeAsetTransfer
+    summary: Menyelesaikan serah terima; penempatan setiap aset pada dokumen berpindah
+    description: |
+      Memerlukan permission `management-aset.aset.mutate`, bukan permission dokumen ini:
+      menyusun berita acara dan benar-benar memindahkan aset adalah dua wewenang berbeda.
+
+      Untuk setiap baris: keadaan asal dibekukan, satu baris riwayat penempatan dibuat
+      dengan `mutasi_aset_id` menunjuk dokumen ini, dan aset diperbarui lokasi, unit
+      penanggung jawab, serta dimensi keuangannya. `lifecycle_state` aset **tidak**
+      disentuh — di Dynamics 365 memasang aset pada functional location dan mengubah
+      lifecycle state juga dua tindakan terpisah.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [version]
+            properties:
+              version:
+                type: integer
+                minimum: 1
+    responses:
+      '200':
+        description: Mutasi setelah diselesaikan, beserta barisnya
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: Dokumen tanpa baris, sudah selesai, atau salah satu asetnya sudah dilepas

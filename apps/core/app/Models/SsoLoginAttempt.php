@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $subject
  * @property ?string $subject_email
  * @property ?string $handoff_token_hash
+ * @property ?string $invitation_id
  * @property Carbon $expires_at
  * @property ?Carbon $completed_at
  * @property ?Carbon $consumed_at
@@ -53,6 +54,7 @@ class SsoLoginAttempt extends Model
         'subject',
         'subject_email',
         'handoff_token_hash',
+        'invitation_id',
         'expires_at',
         'completed_at',
         'consumed_at',
@@ -87,6 +89,16 @@ class SsoLoginAttempt extends Model
     public function isLinking(): bool
     {
         return $this->link_user_id !== null;
+    }
+
+    /**
+     * Upacara menukarkan undangan terikat SSO: orangnya belum punya akun di sini, atau punya tetapi
+     * belum jadi anggota tenant ini. Ketiga upacara saling eksklusif, dan `callback` memilih di
+     * antaranya lewat dua penanya ini.
+     */
+    public function isJoining(): bool
+    {
+        return $this->invitation_id !== null;
     }
 
     public function hasExpired(): bool

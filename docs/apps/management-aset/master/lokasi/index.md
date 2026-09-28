@@ -22,7 +22,12 @@ Lokasi punya kolom `org_unit_id`. Kalau diisi, ia berarti: **barang yang berada 
 Saat aset dibuat atau dipindahkan, `financial_dimension_org_unit_id` pada aset diisi dengan urutan:
 
 1. Unit kerja yang dipetakan pada lokasinya, kalau ada.
-2. Kalau lokasi tidak dipetakan, unit kerja pemakai aset.
+2. Kalau lokasinya tidak dipetakan, unit kerja lokasi induk terdekat yang dipetakan (K-08 feed posting finance).
+3. Kalau tidak ada satu pun lokasi di jalur ke akar yang dipetakan, unit kerja pemakai aset.
+
+**Kenapa induk ikut dicari:** satu poli bisa tersebar di beberapa lantai dan ruang. Memetakan setiap ruang satu per satu membuat ruang yang lupa dipetakan diam-diam membebani unit pemakai. Dengan pewarisan, cukup lantainya yang dipetakan, dan memindahkan aset antar ruang di bawah lantai yang sama tidak mengubah jurnalnya.
+
+Aturannya satu fungsi, `Services/LocationDimension::resolve()`, dipakai penerimaan dan mutasi supaya keduanya tidak pernah menjawab berbeda. Pendakiannya dibatasi 32 tingkat dan berhenti pada siklus. Siklus hanya mungkin bila datanya rusak, karena penulisan lokasi sudah menolaknya; bila terjadi, pendakian berhenti, melapor ke pemantauan kesalahan, dan aset memakai unit pemakainya, bukan menggagalkan penerimaan.
 
 Jadi memindahkan aset ke gudang yang dipetakan ke unit lain **ikut memindahkan pembebanan biayanya**. Ini disengaja: kalau barangnya pindah tanggung jawab, biayanya juga.
 
@@ -56,7 +61,7 @@ Group aset boleh menentukan lokasi bawaan. Nilai itu hanya mengisi kekosongan sa
 | `src/Http/Controllers/master/LokasiAsetController.php` | Master lokasi |
 | `src/Http/Controllers/master/TipeLokasiAsetController.php` | Tipe lokasi |
 | `database/migrations/2026_08_07_110000_create_asset_location_type_and_dimension_bridge.php` | Tipe lokasi dan jembatan dimensi |
-| `AssetController::locationDimension()` | Pemetaan lokasi ke unit kerja |
+| `src/Services/LocationDimension.php` | Pewarisan unit kerja dari lokasi dan induknya |
 
 ## Halaman terkait
 

@@ -7,13 +7,25 @@ name: coreerp
 # build`; di sini seluruh image sudah dimuat dari `images.tar.gz` oleh `update.sh` sebelum satu
 # container pun dinyalakan.
 #
-# Dua image di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
+# Image pendamping di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
 # membacanya dari berkas ini untuk menentukan apa saja yang harus ikut disimpan ke dalam bundle.
-# Menggantinya menjadi variabel membuat keduanya lolos dari pembacaan itu, dan bundle-nya akan
-# terlihat lengkap sampai ia dicoba di mesin tanpa internet.
+# Menggantinya menjadi variabel membuatnya lolos dari pembacaan itu, dan bundle-nya akan terlihat
+# lengkap padahal masih harus menariknya dari registry saat dipasang.
 #
 # `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
 # bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
+#
+# **Setiap layanan `pull_policy: never`.** Compose tidak pernah menarik image; yang menyiapkannya adalah
+# update.sh (bundle) atau agen situs (rilis v2: ditarik lewat digest dari registry kita, lalu diberi tag
+# lokal `coreerp.local/*` yang ditulis perakit ke `compose.yaml` rilis). Dua alasan yang sama beratnya:
+#
+# - tag lokal yang terhapus harus membuat Compose **gagal**, bukan diam-diam menarik `docker.io/...` — nama
+#   yang dapat didaftarkan siapa pun di Docker Hub, dan yang tidak pernah diperiksa tanda tangannya;
+# - host registry tidak pernah tertulis di server klien. Registry dapat pindah tanpa menyentuh klien, dan
+#   berkas compose yang menyebut host itu justru mengundang Compose menariknya sendiri.
+#
+# Image pendamping di bawah tetap ditulis dengan nama sumbernya, karena perakit membacanya dari sini;
+# `compose.yaml` rilis v2 menggantinya dengan tag lokal.
 
 x-edition-environment: &edition-environment
   APP_ENV: ${APP_ENV:-production}
@@ -48,9 +60,9 @@ x-edition-environment: &edition-environment
   # Trace OpenTelemetry. Variabel ini **harus** ada di sini, bukan di `.env` Laravel: SDK-nya
   # menyalakan diri saat autoload Composer, sebelum Laravel membaca `.env` sama sekali.
   #
-  # Mati secara bawaan, dan itu disengaja. Bundle ini dipasang di mesin pelanggan yang sering
-  # tidak punya jalan keluar ke internet; kalau ekspor menyala sementara alamat kolektornya tak
-  # terjangkau, setiap request membayar waktu tunggu koneksi TCP sebelum proses PHP-nya berakhir.
+  # Mati secara bawaan, dan itu disengaja. Bundle ini dipasang di mesin pelanggan yang umumnya
+  # tidak punya kolektor trace; kalau ekspor menyala sementara alamat kolektornya tak terjangkau,
+  # setiap request membayar waktu tunggu koneksi TCP sebelum proses PHP-nya berakhir.
   # Menyalakannya cukup satu baris di `.env` pemasangan: OTEL_PHP_AUTOLOAD_ENABLED=true.
   OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_AUTOLOAD_ENABLED:-false}
   # Bukan variabel yang boleh ditimpa dari luar: nilainya dibedakan per peran di blok layanan
@@ -101,23 +113,32 @@ x-edition-environment: &edition-environment
   # Lisensi bertanda tangan yang dipasang agen situs, beserta kunci publik pemeriksanya. Keduanya
   # datang lewat bind mount `x-license-mount` di bawah, bukan dari image: lisensi berganti tanpa rilis.
   #
-  # Core membacanya **hanya untuk menampilkan peringatan** ketika masa sewa mendekat atau lewat, dan
-  # tidak pernah untuk mengunci. Klien kita fasilitas kesehatan; aplikasi yang berhenti karena tagihan
-  # berarti pelayanan pasien yang berhenti. Pemasangan tanpa agen — on-prem beli putus — tidak punya
-  # berkas ini sama sekali, dan Core harus tetap berjalan tanpa peringatan apa pun.
+  # Image membawa kode seluruh modul, jadi lisensilah yang menentukan app mana yang boleh dibuka, dan
+  # lisensi yang habis, hilang, atau salah tanda tangan mengunci pengguna tenant. Kunci itu hanya
+  # berlaku bila COREERP_LICENSE_REQUIRED bernilai true.
+  #
+  # Bawaannya **false**, dan itu disengaja. Pemasangan beli-putus dan SaaS tidak punya agen maupun
+  # berkas lisensi; bawaan true akan mengunci mereka pada pembaruan compose berikutnya tanpa ada yang
+  # berubah di sisi mereka. On-prem dikelola menyetelnya true lewat `deploy/agent/env.template`.
+  #
+  # Nilainya tinggal di `.env` server klien, jadi root di sana dapat mematikannya, dan berkas ini tidak
+  # dapat mencegahnya. Yang mengetahuinya laporan agen: `license_required` membawa nilai yang dibaca
+  # agen dari `.env` yang sama, dan admin.erp memperingatkan situs on-prem dikelola yang melaporkan false.
+  COREERP_LICENSE_REQUIRED: ${COREERP_LICENSE_REQUIRED:-false}
   COREERP_LICENSE_PATH: /run/coreerp-license/license.json
   COREERP_LICENSE_PUBLIC_KEY_PATH: /run/coreerp-license/license-public.pem
 
-# Hanya-baca: yang menulis lisensi hanya agen di host, setelah tanda tangannya diperiksa. Container
-# yang dapat menulis ke sini dapat memadamkan peringatannya sendiri.
+# Hanya-baca: yang menulis lisensi hanya agen di host, setelah tanda tangan, situs, dan formatnya
+# diperiksa. Container yang dapat menulis ke sini dapat mengganti lisensinya sendiri.
 #
 # Bila foldernya tidak ada, Docker membuatnya kosong; itu keadaan yang benar untuk pemasangan tanpa
-# agen.
+# agen, yang lisensinya tidak wajib.
 x-license-mount: &license-mount ${COREERP_LICENSE_DIR:-/opt/coreerp/agent/license}:/run/coreerp-license:ro
 
 services:
   core-db:
     image: postgres:16-alpine
+    pull_policy: never
     restart: unless-stopped
     environment:
       POSTGRES_DB: core_erp
@@ -154,6 +175,7 @@ services:
   # sini khusus untuk rilis, di mana menahan justru yang benar.
   core-migrate:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: 'no'
     depends_on:
       core-db:
@@ -163,6 +185,10 @@ services:
       # Migrasi bukan lalu lintas yang perlu dilihat sebagai trace, dan ia berjalan justru pada
       # saat kolektor belum tentu sudah siap. Dimatikan di sini saja, bukan di anchor.
       OTEL_PHP_AUTOLOAD_ENABLED: 'false'
+      # Layanan ini tidak me-mount folder lisensi, jadi lisensi yang wajib terbaca "hilang" di sini.
+      # Migrasi adalah pekerjaan vendor, bukan pengguna tenant: situs yang terkunci justru harus tetap
+      # dapat menerima rilis yang memperbaikinya.
+      COREERP_LICENSE_REQUIRED: 'false'
     entrypoint: ['sh', '-c']
     command:
       - >-
@@ -173,6 +199,7 @@ services:
 
   core-app:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -195,7 +222,16 @@ services:
       - core-logs:/repo/apps/core/storage/logs
       - *license-mount
     ports:
-      - '${CORE_APP_PORT:-8000}:80'
+      # Bawaan 0.0.0.0 menjaga pemasangan beli-putus yang sudah berjalan: port aplikasinya mungkin
+      # dijangkau langsung dari jaringan klinik, dan pembaruan tidak boleh memutusnya. On-prem dikelola
+      # mengikatnya ke 127.0.0.1 lewat `deploy/agent/env.template`, karena ia berdiri di belakang proxy
+      # HTTPS — core-proxy di bawah, atau reverse proxy klien — dan port yang diterbitkan Docker melewati
+      # firewall host.
+      #
+      # Satu beda dengan bentuk tanpa alamat yang dipakai sebelumnya: bentuk itu juga menerbitkan port di
+      # IPv6 (`::`), sedangkan 0.0.0.0 hanya IPv4 — terlihat di `docker inspect` pada Docker Engine 29.
+      # Pemasangan yang menjangkau port ini lewat IPv6 kehilangan jalur itu pada bawaan ini.
+      - '${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80'
     healthcheck:
       test: ['CMD', 'php', '-r', "exit(@file_get_contents('http://127.0.0.1/up') === false);"]
       interval: 10s
@@ -204,6 +240,7 @@ services:
 
   core-worker:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -228,6 +265,7 @@ services:
   # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
   core-scheduler:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -249,6 +287,7 @@ services:
   # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.
   core-renderer:
     image: gotenberg/gotenberg:8
+    pull_policy: never
     restart: unless-stopped
     command:
       - gotenberg
@@ -263,6 +302,50 @@ services:
       timeout: 5s
       retries: 12
 
+  # Proxy HTTPS di depan core-app untuk server klien yang dipasang agen. Aplikasinya menuntut HTTPS
+  # (SESSION_SECURE_COOKIE), dan server klinik yang tidak punya reverse proxy tidak dapat dimasuki dari
+  # peramban tanpa seseorang menyetelnya dengan tangan. Caddy mengambil sertifikat Let's Encrypt untuk
+  # COREERP_APP_HOST sendiri, dan mengalihkan HTTP ke HTTPS.
+  #
+  # **Hanya menyala dengan profil `proxy`**, yang ditulis pasang.sh ke `.env` server klien sebagai
+  # COMPOSE_PROFILES. Bundle beli-putus memakai berkas yang sama dan tidak pernah menyetelnya: bagi Compose
+  # layanan ini tidak ada, dan port 80 dan 443 — yang lazim sudah dipakai web server klinik — tidak disentuh.
+  # Server yang sudah punya reverse proxy sendiri dipasang dengan `pasang.sh --proxy-luar`, juga tanpa profil.
+  # update.sh menanyakan Compose apakah layanan ini menyala, lalu menyalakannya sesudah core-app sehat.
+  #
+  # Port 80 dan 443 diterbitkan ke semua alamat dengan sengaja: inilah pintu masuk dari internet. Aplikasinya
+  # sendiri tetap hanya di CORE_APP_BIND.
+  #
+  # `--from` bawaan `localhost` berlaku sampai agen menulis alamat tenant dari admin.erp ke `.env`. Untuk
+  # localhost Caddy hanya memakai CA internalnya, jadi tidak ada sertifikat publik yang diminta untuk nama
+  # yang tidak dipilih siapa pun. Host diteruskan apa adanya, dan `X-Forwarded-*` kiriman klien dibuang lalu
+  # ditulis ulang Caddy; Core mempercayai header itu lewat COREERP_TRUSTED_PROXIES.
+  #
+  # Tag versi pasti: tag yang bergerak (`caddy:2`) mengganti Caddy di antara dua rilis tanpa berkas ini
+  # berubah. Perakit menyalinnya ke registry kita lewat digest seperti pendamping lain.
+  core-proxy:
+    image: caddy:2.11.4-alpine
+    pull_policy: never
+    restart: unless-stopped
+    profiles: [proxy]
+    depends_on:
+      core-app:
+        condition: service_healthy
+    command: caddy reverse-proxy --from ${COREERP_APP_HOST:-localhost} --to core-app:80
+    ports:
+      - '80:80'
+      - '443:443'
+      # HTTP/3.
+      - '443:443/udp'
+    networks:
+      - default
+    volumes:
+      # Sertifikat dan kunci akun ACME. Tanpa volume keduanya hilang bersama container pada setiap pembaruan
+      # yang membuat ulang proxy, dan Let's Encrypt membatasi penerbitan ulang untuk nama yang sama: beberapa
+      # pembaruan dalam seminggu dapat meninggalkan situs tanpa sertifikat.
+      - core-proxy-data:/data
+      - core-proxy-config:/config
+
 networks:
   default:
   # Tanpa jalan keluar: container di sini hanya dapat dihubungi container lain pada network yang
@@ -275,3 +358,5 @@ volumes:
   core-db-data:
   core-storage:
   core-logs:
+  core-proxy-data:
+  core-proxy-config:

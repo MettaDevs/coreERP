@@ -1,0 +1,730 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
+openapi: 3.1.0
+info:
+  title: CoreERP — perintah pusat admin
+  version: 1.0.0
+  description: |
+    Perintah dari konsol operator vendor ke Core: melahirkan tenant, menyiapkan dan memutakhirkan
+    environment, dan membaca armada. Dijaga `controlPlaneToken`, token bersama yang menyatakan
+    **proses mana** yang memanggil, bukan operator mana; jejak audit per orang datang dari konsol.
+
+    Kontrak inilah yang dibaca test pusat admin (`apps/control-plane`) untuk memastikan perintah
+    yang dikirimnya sesuai dengan yang diterima Core.
+servers:
+- url: /api/internal/v1
+  description: Relatif terhadap host Core; path lengkapnya `/api/internal/v1/...`.
+security:
+- controlPlaneToken: []
+tags:
+- name: Pusat admin
+  description: Perintah dari konsol operator vendor.
+paths:
+  /tenants:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.tenants.store
+      summary: Lahirkan tenant beserta admin pertamanya
+      description: |
+        **Pemanggilnya pusat admin, bukan app module.** Satu-satunya endpoint di berkas ini
+        yang tidak memakai kredensial app, dan satu-satunya yang bekerja pada tenant yang
+        belum ada — jadi tiga header kredensial itu memang tidak dapat dipakai di sini.
+        Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
+        `App\Http\Middleware\ControlPlaneOnly`.
+
+        Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
+        persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena
+        itu bukan hanya baris `tenants`: client, environment produksi, keanggotaan owner,
+        role Owner beserta seluruh duty app yang dibeli, entitlement, satuan bawaan, dan
+        pemasangan tiap module yang ada di edisi ini.
+
+        Kata sandi sementara **dibuat Core**, tidak pernah dikirim pemanggil, dan dipulangkan
+        **sekali** di balasan ini. Ia tidak dapat dibaca lagi setelahnya; yang tersimpan hanya
+        hash-nya. Pemiliknya wajib menggantinya saat masuk pertama — sampai itu terjadi, satu
+        satunya halaman yang dapat dicapainya adalah layar ganti kata sandi.
+
+        Nama fieldnya bahasa Indonesia karena pembaca dan penulisnya operator, bukan app.
+
+        Balasannya sengaja **tanpa envelope `data`** — berbeda dari seluruh endpoint lain di
+        berkas ini. Aturan envelope itu milik permukaan app-ke-Core; yang ini perintah
+        vendor-ke-vendor dengan satu pemanggil yang diketahui namanya.
+      security:
+      - controlPlaneToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - legal_name
+              - admin_name
+              - admin_email
+              - app_ids
+              properties:
+                legal_name:
+                  type: string
+                  maxLength: 255
+                  description: |
+                    Nama pelanggan — perusahaan atau grupnya. Menjadi nama tenant dan dasar
+                    slug-nya, dan slug itulah yang muncul sebagai label pertama pada alamat
+                    lingkungannya.
+
+                    **Bukan** nama badan hukum tertentu: satu tenant boleh memuat beberapa badan
+                    hukum sekaligus, dan masing-masing didaftarkan di dalam ERP sebagai organisasi
+                    berjenis legal entity, lengkap dengan kode perusahaan dan kode negaranya.
+                first_environment:
+                  type: string
+                  enum:
+                  - production
+                  - demo
+                  - none
+                  default: production
+                  description: |
+                    Jenis tempat kerja pertama tenant ini.
+
+                    Bawaannya `production`, dan itu yang dipakai pendaftaran mandiri: orang yang
+                    mendaftar sendiri memang datang untuk bekerja. Operator yang melahirkan tenant
+                    bagi calon pelanggan biasanya memilih `demo` — produksi yang terlanjur lahir
+                    adalah tempat kerja kosong yang tidak pernah dipakai siapa pun sekaligus alamat
+                    yang sudah terpakai.
+
+                    `none` melahirkan tenant tanpa satu pun lingkungan. Entitlement-nya tetap
+                    tercatat, jadi lingkungan yang dibuat kemudian memasang module yang sama persis.
+                first_environment_expires_at:
+                  type: string
+                  format: date
+                  description: |
+                    Tanggal berakhir, **wajib bila `first_environment` bernilai `demo`** dan
+                    diabaikan selainnya. Demo tanpa tanggal berakhir tinggal selamanya, dan tidak
+                    ada yang menyadarinya sampai disknya penuh.
+                first_environment_hosting:
+                  type: string
+                  enum:
+                  - provider
+                  - client_server
+                  default: provider
+                  description: |
+                    Tempat lingkungan pertama berjalan.
+
+                    `provider` — di server kami, persis seperti sebelum field ini ada.
+
+                    `client_server` — produksi tenant ini dipasang di server milik klien lewat satu
+                    perintah pasang dari admin.erp. **Hanya sah bersama `first_environment`
+                    `production`** (atau tanpa `first_environment`, yang berarti produksi); selainnya
+                    ditolak 422 pada field ini. Lingkungannya lahir dengan `hosting = client_server`
+                    dan status `provisioning` — belum berjalan sampai perintah pasangnya dijalankan —
+                    tanpa database di server ini, dan tanpa satu pun module terpasang di sini.
+                    Entitlement app-nya tetap tercatat; dari situlah edisi paketnya diturunkan.
+
+                    Core di server ini tidak pernah merutekan, menyiapkan, menyalin, memperbarui,
+                    atau memasang module ke lingkungan seperti itu: alamatnya dijawab 404, dan
+                    perintah atas lingkungan itu ditolak 409.
+                admin_name:
+                  type: string
+                  maxLength: 255
+                  description: Nama orang yang menjadi owner pertama tenant ini.
+                admin_email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: |
+                    Dirapikan menjadi huruf kecil sebelum diperiksa, lalu wajib belum terdaftar.
+                    Email yang sudah punya akun ditolak 422 — sampai "satu orang banyak tenant"
+                    dikerjakan, tidak ada jalur menambahkan orang yang sudah punya akun ke tenant
+                    kedua.
+                app_ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                  description: |
+                    App yang dibeli pelanggan. Tiap id wajib ada di katalog dengan status
+                    `available`; app yang belum tersedia ditolak 422. Prerequisite transitifnya
+                    ikut ditambahkan sendiri oleh graph dependency.
+      responses:
+        '201':
+          description: Tenant lahir. `temporary_password` hanya muncul di sini, sekali.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - tenant_id
+                - environment_id
+                - email
+                - temporary_password
+                properties:
+                  tenant_id:
+                    type: string
+                    format: ulid
+                  environment_id:
+                    type: string
+                    format: ulid
+                    description: Environment `production` pertama tenant ini.
+                  email:
+                    type: string
+                    format: email
+                  temporary_password:
+                    type: string
+                    description: Dibuat Core, tidak dapat dibaca lagi setelah balasan ini.
+        '401':
+          description: |
+            Token pusat admin salah, tidak dikirim, atau pemasangan ini memang tidak menyetel
+            token sama sekali — dan yang terakhir juga 401, bukan terbuka.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: |
+            Email sudah terdaftar, app tidak tersedia, field wajib kurang, atau
+            `first_environment_hosting` `client_server` bersama jenis selain produksi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /tenants/{tenant}/entitlements:
+    get:
+      tags:
+      - Pusat admin
+      operationId: internal.tenants.entitlements.show
+      summary: App yang sedang berhak dipakai sebuah tenant
+      description: |
+        Dibaca pusat admin saat menerbitkan **lisensi situs versi 2**: daftar `apps` di lisensi
+        disalin dari jawaban ini. `tenant_app_entitlements` milik Core, jadi pusat admin bertanya
+        ke sini alih-alih menyimpan salinannya sendiri — salinan yang menyimpang pada hari pertama
+        seseorang menambah app lewat Core. Rencananya di `docs/todo/lisensi-mengunci`.
+
+        **Sedang berhak** berarti ketiganya sekaligus: `status` `active`, `starts_at` kosong atau
+        tidak di masa depan, dan `ends_at` kosong atau di masa depan. Status saja tidak cukup: hak
+        yang berakhir kemarin masih berstatus `active` sampai ada yang mengubahnya.
+
+        `tenant` di URL tidak melanggar aturan "`tenant_id` tidak pernah dari URL" di kepala berkas
+        ini: aturan itu milik permukaan app-ke-Core, dan pemanggil ini pusat admin yang memang
+        bekerja pada banyak tenant. Balasannya tanpa envelope `data`, dengan alasan yang sama
+        seperti `/tenants`.
+
+        **Kegagalan endpoint ini tidak boleh menggagalkan laporan agen** di sisi pusat admin:
+        laporan tetap diterima dan penerbitan lisensi dicoba lagi setelah jeda.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: tenant
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `tenants`.
+      responses:
+        '200':
+          description: Hak app tenant itu saat ini. Daftar kosong sah — tenant yang hanya memakai Core.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - tenant_id
+                - apps
+                properties:
+                  tenant_id:
+                    type: string
+                    format: ulid
+                  apps:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      pattern: ^[a-z0-9][a-z0-9-]*$
+                    description: |
+                      Id app, unik dan terurut naik. Bentuknya sama dengan yang diterima pembaca
+                      lisensi di Core; id lain membuat lisensi yang memuatnya ditolak seluruhnya.
+              example:
+                tenant_id: 01j9zq3v6n8m2k4h7g5f3d1c0b
+                apps:
+                - human-resources
+                - management-aset
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant itu tidak ada di Core.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /environments/{environment}/provision:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.environments.provision
+      summary: Siapkan database sebuah lingkungan, lalu pasang module yang dibeli tenantnya
+      description: |
+        **Pemanggilnya pusat admin, bukan app module** — penjaganya token bersama yang sama
+        dengan `/tenants`.
+
+        Di belakangnya berjalan `environment:provision`, dan urutannya menentukan: database
+        dibuat, seluruh migration Core dijalankan ke dalamnya, `database_name` dicatat,
+        **lalu** tiap module yang dibeli tenantnya dipasang beserta data awalnya. Statusnya
+        naik ke `active` sesudah semuanya — lingkungan yang setengah terisi harus menjadi
+        tempat yang tidak dapat dimasuki, bukan tempat yang dimasuki lalu ternyata separuh.
+
+        **Sinkron, dan itu keputusan.** Ia menjalankan migration sungguhan dan dapat memakan
+        puluhan detik; pemanggil wajib memberi tenggat yang jauh lebih longgar daripada
+        endpoint lain di berkas ini. Sambungan yang putus tidak membatalkan apa pun di sisi
+        Core — perintahnya berjalan sampai selesai.
+
+        **Aman diulang.** Nama database dihitung dari baris yang sama, "database sudah ada"
+        diperlakukan berhasil, dan migration yang sudah teraplikasi dilewati sendiri. Panggilan
+        kedua yang datang selagi yang pertama masih berjalan ditolak oleh kunci operasinya,
+        bukan dilayani sebagai penyiapan kedua di atas yang pertama.
+
+        Balasannya tanpa envelope `data`, dengan alasan yang sama seperti `/tenants`.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `environments` yang disiapkan.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requested_by:
+                  type: integer
+                  description: |
+                    Id user yang menekan tombolnya. Tercatat pada `environment_operations` supaya
+                    kolom "Oleh" di layar riwayat menyebut orangnya. Dihilangkan bila id-nya tidak
+                    ada sebagai user di sini — kolomnya berkunci asing, dan id yang tidak ada akan
+                    menjatuhkan penyiapannya demi sebuah nama. Kosong berarti riwayatnya berbunyi
+                    "Sistem", persis seperti perintah yang diketik di terminal.
+      responses:
+        '200':
+          description: Lingkungan disiapkan dan aktif.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - database
+                - modules
+                properties:
+                  status:
+                    type: string
+                    description: Status barisnya sesudah penyiapan; `active` bila berhasil.
+                  database:
+                    type: string
+                    nullable: true
+                    description: Nama database yang kini dipakai lingkungan ini.
+                  modules:
+                    type: array
+                    description: |
+                      Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
+                      tenantnya. Kosong bila tenantnya tidak membeli satu pun module yang ada
+                      di edisi ini — atau bila daftarnya tidak terbaca, yang sengaja tidak
+                      menggagalkan penyiapan yang sudah berhasil.
+                    items:
+                      type: object
+                      required:
+                      - id
+                      - version
+                      - status
+                      - seeded
+                      properties:
+                        id:
+                          type: string
+                        version:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                          - installed
+                          - disabled
+                          - uninstalled
+                        seeded:
+                          type: boolean
+                          description: Data awal module ini sudah pernah diisi.
+                  output:
+                    type: string
+                    description: Keluaran mentah perintahnya, untuk ditempel ke laporan.
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Lingkungan itu tidak ada di registry, atau sudah dihapus lunak.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: |
+            Statusnya bukan `provisioning` maupun `degraded`. Menyiapkan ulang lingkungan yang
+            sudah hidup akan menimpa isinya, jadi ia ditolak — dan ini keadaan yang dapat
+            berubah sendiri sebelum orangnya menekan tombol, bukan permintaan yang salah bentuk.
+
+            Atau lingkungan itu berjalan di server klien (`hosting = client_server`): database
+            dan isinya ada di sana, bukan di server ini, dan penyiapannya dikerjakan perintah
+            pasang. Ditolak apa pun statusnya — produksi server klien memang lahir `provisioning`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: |
+            Penyiapannya berjalan dan gagal. Lingkungannya turun ke `degraded`, dan `message`
+            memuat alasan yang tercatat di `environment_operations` — bukan keluaran perintahnya,
+            karena yang tercatat itulah yang masih dapat dibaca besok.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /fleet:
+    get:
+      tags:
+      - Pusat admin
+      operationId: internal.fleet.index
+      summary: Keadaan seluruh armada dalam satu jawaban
+      description: |
+        Versi tiap lingkungan dibandingkan terhadap versi image yang sedang berjalan, beserta
+        operasi terakhirnya. **Pemanggilnya pusat admin**, dan penjaganya token bersama yang sama
+        dengan endpoint pusat admin lainnya.
+
+        Satu panggilan, bukan satu per lingkungan, karena yang dibaca layar adalah
+        **perbandingannya** — dan versi image adalah pengetahuan Core, diturunkan dari isi folder
+        migration yang tidak ada di container konsol.
+
+        **Ia tidak membuka satu pun database lingkungan.** Seluruh isinya dibaca dari tabel sisi
+        pusat: `environments` menyimpan sidik skema tiap lingkungan, `environment_operations`
+        menyimpan riwayatnya. Daftar module per lingkungan memang menuntut database lingkungannya,
+        dan karena itu ia tinggal di layar rincian satu lingkungan — bukan di sini.
+
+        **Lingkungan yang berjalan di server klien tidak ikut.** Armada ini adalah yang dijalankan
+        server ini; server klien diperbarui agennya dengan paket edisinya sendiri, dan sidiknya
+        tidak dapat dibandingkan dengan image di sini.
+      security:
+      - controlPlaneToken: []
+      responses:
+        '200':
+          description: Keadaan armada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - platform_fingerprint
+                - counts
+                - environments
+                properties:
+                  platform_fingerprint:
+                    type: string
+                    description: |
+                      Nama berkas migration terakhir di dalam image yang sedang berjalan. Inilah
+                      "boleh naik ke mana", dan ia dikirim sekali di kepala jawaban karena
+                      jawabannya cuma satu untuk seluruh armada.
+                  counts:
+                    type: object
+                    description: Hitungan per keadaan, untuk kepala halaman.
+                    properties:
+                      current:
+                        type: integer
+                      behind:
+                        type: integer
+                      failed:
+                        type: integer
+                      unknown:
+                        type: integer
+                  environments:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - id
+                      - tenant
+                      - name
+                      - slug
+                      - kind
+                      - status
+                      - database
+                      - fingerprint
+                      - state
+                      - last_operation
+                      properties:
+                        id:
+                          type: string
+                          format: ulid
+                        tenant:
+                          type: string
+                        name:
+                          type: string
+                        slug:
+                          type: string
+                        kind:
+                          type: string
+                          enum:
+                          - production
+                          - sandbox
+                          - demo
+                        status:
+                          type: string
+                        database:
+                          type: string
+                          nullable: true
+                          description: Kosong berarti lingkungan ini tinggal di database pusat.
+                        fingerprint:
+                          type: string
+                          nullable: true
+                          description: |
+                            Sidik skema lingkungan itu. Untuk lingkungan tanpa database sendiri,
+                            yang dikirim sidik database pusat — karena di sanalah ia tinggal.
+                        state:
+                          type: string
+                          enum:
+                          - current
+                          - behind
+                          - failed
+                          - unknown
+                          description: |
+                            Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
+                            yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
+                            punya skema sama sekali.
+                        last_operation:
+                          type: object
+                          nullable: true
+                          properties:
+                            kind:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                              - running
+                              - succeeded
+                              - failed
+                            step:
+                              type: string
+                              nullable: true
+                            reason:
+                              type: string
+                              nullable: true
+                            started_at:
+                              type: string
+                              nullable: true
+                            finished_at:
+                              type: string
+                              nullable: true
+                            requested_by:
+                              type: string
+                              nullable: true
+                              description: Kosong berarti penjadwal, bukan manusia.
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /environments/upgrade:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.fleet.upgrade
+      summary: Antrekan pembaruan untuk setiap lingkungan yang tertinggal
+      description: |
+        Mengantrekan satu job per lingkungan yang **perlu** diperbarui, lalu memulangkan 202
+        seketika. Yang sudah mutakhir dilewati: mengantrekan semuanya tiap kali tombolnya ditekan
+        berarti dua ratus job yang tidak melakukan apa pun, dan "berapa yang sedang berjalan"
+        berhenti terbaca karena angkanya selalu penuh.
+
+        **Kemajuannya dipantau dari daftar operasi, bukan dari balasan ini.** Balasan ini sudah
+        ditutup jauh sebelum job pertama selesai. Business Central menyatakan aturan yang sama
+        sebagai aturan, dan `GET /fleet` yang menjawabnya.
+
+        Sasarannya dihitung **saat eksekusi**, jadi lingkungan yang lahir semenit sesudah ini
+        dipanggil ikut pada panggilan berikutnya tanpa didaftarkan ke mana pun.
+      security:
+      - controlPlaneToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  description: |
+                    Antrekan juga yang sidiknya sudah sama dengan image. Ada untuk satu keadaan
+                    nyata: migration yang isinya diubah tanpa mengubah nama berkasnya — sidiknya
+                    tidak bergerak, databasenya tertinggal.
+                requested_by:
+                  type: integer
+                  description: |
+                    Id user yang menekan tombolnya, dicatat pada `environment_operations`.
+                    Dihilangkan bila id-nya tidak ada sebagai user di sini.
+      responses:
+        '202':
+          description: Job sudah diantrekan. Kosong berarti tidak ada yang perlu diperbarui.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - queued
+                - queued_count
+                properties:
+                  queued:
+                    type: array
+                    items:
+                      type: string
+                      format: ulid
+                  queued_count:
+                    type: integer
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /environments/{environment}/upgrade:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.environments.upgrade
+      summary: Antrekan pembaruan untuk satu lingkungan
+      description: |
+        Sama dengan `POST /environments/upgrade`, dibatasi ke satu baris. Lingkungan yang statusnya
+        tidak boleh diperbarui — sedang disiapkan, sedang disalin, sudah diarsipkan — dilewati
+        tanpa job, dan `queued_count` nol yang menyebutnya.
+
+        Lingkungan yang berjalan di server klien tidak dilewati diam-diam melainkan ditolak 409:
+        ia disebut dengan id-nya, dan jawaban kosong akan terbaca seperti pembaruan yang tidak
+        perlu.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `environments` yang diperbarui.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                requested_by:
+                  type: integer
+      responses:
+        '202':
+          description: Job sudah diantrekan, atau tidak ada yang perlu dikerjakan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - queued
+                - queued_count
+                properties:
+                  queued:
+                    type: array
+                    items:
+                      type: string
+                      format: ulid
+                  queued_count:
+                    type: integer
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Lingkungan itu tidak ada di registry, atau sudah diarsipkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: |
+            Lingkungan itu berjalan di server klien. Pembaruannya dikerjakan agen di server itu,
+            bukan rilis server ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  securitySchemes:
+    controlPlaneToken:
+      type: http
+      scheme: bearer
+      description: |
+        Token bersama yang dipegang pusat admin dan Core (`COREERP_CONTROL_PLANE_TOKEN`).
+        Ia menyatakan **proses mana** yang memanggil, bukan operator mana — jejak audit per
+        orang tetap harus datang dari sisi konsol. Kosong di sisi Core berarti pemasangan itu
+        menolak setiap perintah pusat admin.
+  responses:
+    RateLimited:
+      description: |
+        Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
+        per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
+        tidak dapat menghabiskan kuota app lain.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
+    ValidationError:
+      type: object
+      required:
+      - message
+      - errors
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string

@@ -1,0 +1,13 @@
+type: object
+required: [status]
+properties:
+  status: { type: string, enum: [posted, rejected] }
+  external_reference:
+    type: [string, 'null']
+    maxLength: 120
+    description: Wajib untuk `posted`. Nomor voucher atau faktur di aplikasi finance.
+  reason_code:
+    type: [string, 'null']
+    enum: [PERIOD_CLOSED, UNKNOWN_ACCOUNT, UNKNOWN_DIMENSION, UNKNOWN_VENDOR, UNKNOWN_LEGAL_ENTITY, INVALID, null]
+    description: Wajib untuk `rejected`.
+  reason: { type: [string, 'null'], maxLength: 1000, description: Wajib untuk `rejected`. }

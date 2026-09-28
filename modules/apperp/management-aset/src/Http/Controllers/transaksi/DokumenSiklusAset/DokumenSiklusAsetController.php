@@ -9,12 +9,13 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Services\PersetujuanAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 use RuntimeException;
 use stdClass;
 
@@ -55,25 +56,25 @@ class DokumenSiklusAsetController extends Controller
         $tenant = $this->tenant($request);
         $data = $request->validate([
             'legal_entity_id' => ['required', 'ulid'], 'responsible_org_unit_id' => ['required', 'ulid'], 'tanggal' => ['required', 'date'],
-            'asset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_penerimaan_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'aset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
             'nilai' => ['nullable', 'numeric', 'min:0'], 'keterangan' => ['nullable', 'string', 'max:2000'],
         ]);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         if (in_array($type, ['dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'], true)) {
-            validator($data, ['asset_id' => ['required']])->validate();
+            validator($data, ['aset_id' => ['required']])->validate();
         }
-        if ($data['asset_id'] ?? null) {
-            $asset = app(OrganizationScope::class)->assetQuery(
-                Asset::query()->where('id', $data['asset_id']),
+        if ($data['aset_id'] ?? null) {
+            $aset = app(OrganizationScope::class)->asetQuery(
+                Aset::query()->where('id', $data['aset_id']),
                 $request,
             )->toBase()->first();
-            abort_unless($asset, 404);
-            abort_unless($asset->legal_entity_id === $data['legal_entity_id'] && $asset->responsible_org_unit_id === $data['responsible_org_unit_id'], 422, 'Entitas dan unit kerja dokumen harus sama dengan aset.');
+            abort_unless($aset, 404);
+            abort_unless($aset->legal_entity_id === $data['legal_entity_id'] && $aset->responsible_org_unit_id === $data['responsible_org_unit_id'], 422, 'Entitas dan unit kerja dokumen harus sama dengan aset.');
             if ($type === 'dekomisioning-aset') {
-                abort_if(in_array($asset->lifecycle_state, ['decommissioned', 'disposed'], true), 422, 'Aset ini sudah tidak aktif atau sudah dilepas.');
+                abort_unless(StatusAset::bolehDidekomisioning($aset->lifecycle_state), 422, 'Aset ini sudah tidak aktif atau sudah dilepas.');
             }
             if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
-                abort_unless($asset->lifecycle_state === 'decommissioned', 422, 'Aset harus disetujui untuk dekomisioning sebelum dijual atau dimusnahkan.');
+                abort_unless(StatusAset::bolehDilepas($aset->lifecycle_state), 422, 'Aset harus disetujui untuk dekomisioning sebelum dijual atau dimusnahkan.');
             }
         }
         $existing = DokumenSiklusAset::query()->where('creation_key', $key)->toBase()->first();
@@ -89,7 +90,7 @@ class DokumenSiklusAsetController extends Controller
 
             return response()->json(['data' => $this->dokumen((string) $existing->id)], 200, ['Idempotent-Replayed' => 'true']);
         }
-        $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'asset_id' => $data['asset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
+        $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'aset_id' => $data['aset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
         try {
             // Nomor, dokumen, dan pengajuan persetujuan pada satu transaksi.
             //
@@ -103,7 +104,7 @@ class DokumenSiklusAsetController extends Controller
                 $record['kode'] = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
                 (new DokumenSiklusAset)->forceFill($record)->save();
                 if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
-                    $this->dispose((string) $record['asset_id'], (string) $record['tanggal']);
+                    $this->dispose((string) $record['aset_id'], (string) $record['tanggal']);
                 }
                 if ($type === 'dekomisioning-aset') {
                     $this->submitWorkflow((object) $record, $tenant, (string) $data['legal_entity_id'], $key, $workflow);
@@ -139,13 +140,13 @@ class DokumenSiklusAsetController extends Controller
      *
      * Ini murni subledger: menutup buku tidak menjurnal apa pun.
      */
-    private function dispose(string $assetId, string $tanggal): void
+    private function dispose(string $asetId, string $tanggal): void
     {
-        Asset::query()
-            ->where('id', $assetId)
-            ->update(['lifecycle_state' => 'disposed', 'updated_at' => now()]);
-        AssetBook::query()
-            ->where(['asset_id' => $assetId, 'status' => 'active'])
+        Aset::query()
+            ->where('id', $asetId)
+            ->update(['lifecycle_state' => StatusAset::DILEPAS, 'updated_at' => now()]);
+        BukuAset::query()
+            ->where(['aset_id' => $asetId, 'status' => 'active'])
             ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
 
@@ -156,7 +157,7 @@ class DokumenSiklusAsetController extends Controller
     private function submitWorkflow(stdClass $record, string $tenant, string $legalEntityId, string $key, PersetujuanAset $workflow): void
     {
         try {
-            $workflowId = $workflow->ajukanDekomisioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->asset_id);
+            $workflowId = $workflow->ajukanDekomisioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->aset_id);
         } catch (RuntimeException $exception) {
             // 422, bukan 503. Core berada di proses yang sama, jadi "layanan persetujuan belum
             // dapat dihubungi" tidak pernah lagi benar. Yang tersisa adalah permintaan yang

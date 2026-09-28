@@ -106,6 +106,17 @@ final class ProvisionEnvironment extends Command
             return self::FAILURE;
         }
 
+        // Berdiri sebelum pemeriksaan status, dan itu yang menentukan. Produksi server klien lahir
+        // berstatus `provisioning` — status yang justru diterima perintah ini. Tanpa penolakan di
+        // depan, ia membuat database dan menjalankan seluruh migration lebih dulu, lalu baru ditolak
+        // `environments_server_klien_hanya_produksi` saat `database_name` dicatat: database yatim
+        // berisi skema lengkap, dan lingkungan yang turun ke `degraded` tanpa pernah salah apa pun.
+        if ($environment->hostedOnClientServer()) {
+            $this->error($environment->clientServerRefusal('Penyiapan database'));
+
+            return self::FAILURE;
+        }
+
         if (! in_array($environment->status, self::ALLOWED_STATUSES, true)) {
             $this->error(sprintf(
                 'Environment "%s" berstatus %s. Yang boleh disiapkan hanya %s — menyiapkan ulang '
