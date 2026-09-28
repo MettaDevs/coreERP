@@ -33,7 +33,7 @@ Run these skills in order; do not duplicate their detailed rules here:
 
 Inventory only readable business masters and documents; exclude IDs, joins, logs, and internal rows. For each candidate, explicitly decide `required`, `not required`, or `deferred`.
 
-When required, the owning app declares the reference in `app.yaml`; Core materializes it and the tenant administrator adjusts it in **Atur nomor**. The user can deliberately exclude a declared reference. Do not infer references from tables or hardcode app references in Core. After approval, use `number-sequence-design` for scope, prefix, range, format, and verification.
+When required, the owning app declares the reference in its manifest (`app.yaml`, or the feature's file under `manifest/`); Core materializes it and the tenant administrator adjusts it in **Atur nomor**. The user can deliberately exclude a declared reference. Do not infer references from tables or hardcode app references in Core. After approval, use `number-sequence-design` for scope, prefix, range, format, and verification.
 
 ## Workflow and SoD decision
 

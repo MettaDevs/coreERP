@@ -1,0 +1,46 @@
+security:
+  entry_points:
+    - code: management-aset.penerimaan-aset.form
+      name: Layar penerimaan aset
+      type: form
+    - code: management-aset.penerimaan-aset.api
+      name: API penerimaan aset
+      type: api
+  permissions:
+    - code: management-aset.penerimaan-aset.read
+      name: Lihat penerimaan aset
+      entry_point: management-aset.penerimaan-aset.form
+      access: read
+    - code: management-aset.penerimaan-aset.create
+      name: Buat penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: create
+    - code: management-aset.penerimaan-aset.update
+      name: Ubah penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: update
+    - code: management-aset.penerimaan-aset.archive
+      name: Arsipkan penerimaan aset
+      entry_point: management-aset.penerimaan-aset.api
+      access: delete
+  privileges:
+    # Menyusun berkas penerimaannya. Terpisah dari `management-aset.aset.receive` dengan
+    # alasan yang sama seperti pada mutasi: juru tulis boleh menyiapkan dokumennya, yang
+    # berwenang menambah aset ke register yang menyelesaikannya.
+    - code: management-aset.penerimaan-aset.maintain
+      name: Kelola dokumen penerimaan aset
+      permissions:
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+    - code: management-aset.penerimaan-aset.retire
+      name: Arsipkan dokumen penerimaan aset
+      permissions:
+        - management-aset.penerimaan-aset.archive
+number_sequences:
+  references:
+    - code: management-aset.penerimaan-aset
+      name: Nomor penerimaan aset
+      default_prefix: PNRA
+      allowed_scopes:
+        - legal_entity

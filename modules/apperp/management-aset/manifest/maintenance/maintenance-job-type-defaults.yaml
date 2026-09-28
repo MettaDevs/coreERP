@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.maintenance-job-type-defaults.form
+      name: Layar default jenis pekerjaan maintenance
+      type: form
+    - code: management-aset.maintenance-job-type-defaults.api
+      name: API default jenis pekerjaan maintenance
+      type: api
+  permissions:
+    - code: management-aset.maintenance-job-type-defaults.read
+      name: Lihat default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.form
+      access: read
+    - code: management-aset.maintenance-job-type-defaults.create
+      name: Tambah default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: create
+    - code: management-aset.maintenance-job-type-defaults.update
+      name: Ubah default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: update
+    - code: management-aset.maintenance-job-type-defaults.archive
+      name: Arsipkan default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: delete
+  privileges:
+    - code: management-aset.maintenance-job-type-defaults.maintain
+      name: Pelihara default jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-defaults.read
+        - management-aset.maintenance-job-type-defaults.create
+        - management-aset.maintenance-job-type-defaults.update
+    - code: management-aset.maintenance-job-type-defaults.retire
+      name: Arsipkan default jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-defaults.archive
+  duties:
+    - code: management-aset.maintenance-job-type-defaults.manage
+      name: Kelola default jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-type-defaults.maintain
+        - management-aset.maintenance-job-type-defaults.retire
+number_sequences:
+  references:
+    - code: management-aset.maintenance-job-type-defaults
+      name: Kode default jenis pekerjaan maintenance
+      default_prefix: DJMA
+      allowed_scopes:
+        - tenant

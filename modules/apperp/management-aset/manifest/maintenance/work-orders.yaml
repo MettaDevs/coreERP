@@ -1,0 +1,72 @@
+security:
+  entry_points:
+    - code: management-aset.pemeliharaan-aset.form
+      name: Layar pemeliharaan aset
+      type: form
+    - code: management-aset.pemeliharaan-aset.api
+      name: API pemeliharaan aset
+      type: api
+  permissions:
+    - code: management-aset.pemeliharaan-aset.read
+      name: Lihat pemeliharaan aset
+      entry_point: management-aset.pemeliharaan-aset.form
+      access: read
+    - code: management-aset.pemeliharaan-aset.create
+      name: Catat pemeliharaan aset
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: create
+    - code: management-aset.pemeliharaan-aset.update
+      name: Ubah work order pemeliharaan draf
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: update
+    - code: management-aset.pemeliharaan-aset.archive
+      name: Arsipkan work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: delete
+    - code: management-aset.pemeliharaan-aset.schedule
+      name: Jadwalkan, tugaskan, dan batalkan work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
+    - code: management-aset.pemeliharaan-aset.execute
+      name: Kerjakan work order pemeliharaan dan isi checklist
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
+    - code: management-aset.pemeliharaan-aset.close
+      name: Tutup dan kunci work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
+  privileges:
+    - code: management-aset.pemeliharaan-aset.maintain
+      name: Susun work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.create, management-aset.pemeliharaan-aset.update]
+    - code: management-aset.pemeliharaan-aset.retire
+      name: Arsipkan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.archive]
+    # Dipisahkan supaya penjadwalan, pengerjaan, dan penutupan dapat diberikan kepada
+    # orang yang berbeda. Teknisi harus dapat mengerjakan tanpa dapat membuat atau
+    # menutup work order; penyelia menutup tanpa perlu ikut mengerjakan.
+    - code: management-aset.pemeliharaan-aset.dispatch
+      name: Jadwalkan dan tugaskan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.schedule]
+    - code: management-aset.pemeliharaan-aset.perform
+      name: Kerjakan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.execute]
+    - code: management-aset.pemeliharaan-aset.finalize
+      name: Tutup work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.close]
+  duties:
+    - code: management-aset.pemeliharaan-aset.manage
+      name: Kelola work order pemeliharaan
+      privileges: [management-aset.pemeliharaan-aset.maintain, management-aset.pemeliharaan-aset.retire, management-aset.pemeliharaan-aset.dispatch]
+    - code: management-aset.pemeliharaan-aset.execute-work
+      name: Kerjakan work order pemeliharaan di lapangan
+      privileges: [management-aset.pemeliharaan-aset.perform]
+    - code: management-aset.pemeliharaan-aset.close-work
+      name: Tutup work order pemeliharaan yang sudah selesai
+      privileges: [management-aset.pemeliharaan-aset.finalize]
+number_sequences:
+  references:
+    - code: management-aset.pemeliharaan-aset
+      name: Nomor pemeliharaan aset
+      default_prefix: PMHA
+      allowed_scopes: [legal_entity]

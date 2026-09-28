@@ -1,0 +1,11 @@
+reports:
+  - code: management-aset.daftar-work-order
+    name: Daftar work order
+    description: Seluruh work order dalam jangkauan Anda, satu baris per work order, untuk diolah di Excel.
+    permission: management-aset.pemeliharaan-aset.read
+    parameters: [status, dari, sampai]
+    builtin_layouts:
+      - key: standar
+        name: Daftar work order standar (Excel)
+        description: Satu lembar dengan kolom identitas, jadwal, dan ringkasan jam.
+        format: xlsx

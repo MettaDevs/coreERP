@@ -1,0 +1,7 @@
+security:
+  duties:
+    - code: management-aset.fixed-assets-setup.view
+      name: Lihat pengaturan aset tetap
+      privileges:
+        - management-aset.fixed-asset-parameters.view
+        - management-aset.fixed-asset-posting-profiles.view

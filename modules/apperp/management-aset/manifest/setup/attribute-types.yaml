@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.tipe-atribut.form
+      name: Layar tipe atribut
+      type: form
+    - code: management-aset.tipe-atribut.api
+      name: API tipe atribut
+      type: api
+  permissions:
+    - code: management-aset.tipe-atribut.read
+      name: Lihat tipe atribut
+      entry_point: management-aset.tipe-atribut.form
+      access: read
+    - code: management-aset.tipe-atribut.create
+      name: Tambah tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: create
+    - code: management-aset.tipe-atribut.update
+      name: Ubah tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: update
+    - code: management-aset.tipe-atribut.archive
+      name: Arsipkan tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: delete
+  privileges:
+    - code: management-aset.tipe-atribut.maintain
+      name: Pelihara tipe atribut
+      permissions:
+        - management-aset.tipe-atribut.read
+        - management-aset.tipe-atribut.create
+        - management-aset.tipe-atribut.update
+    - code: management-aset.tipe-atribut.retire
+      name: Arsipkan tipe atribut
+      permissions:
+        - management-aset.tipe-atribut.archive
+  duties:
+    - code: management-aset.tipe-atribut.manage
+      name: Kelola tipe atribut
+      privileges:
+        - management-aset.tipe-atribut.maintain
+        - management-aset.tipe-atribut.retire
+number_sequences:
+  references:
+    - code: management-aset.tipe-atribut
+      name: Kode tipe atribut
+      default_prefix: TATR
+      allowed_scopes:
+        - tenant

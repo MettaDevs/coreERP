@@ -1,0 +1,65 @@
+security:
+  entry_points:
+    - code: management-aset.aset.form
+      name: Layar register aset
+      type: form
+    - code: management-aset.aset.api
+      name: API register aset
+      type: api
+  permissions:
+    - code: management-aset.aset.read
+      name: Lihat register aset
+      entry_point: management-aset.aset.form
+      access: read
+    # Sejak 18 September 2026 izin ini menjaga penyelesaian dokumen penerimaan, bukan
+    # sebuah endpoint pembuatan aset — endpoint itu sudah tidak ada.
+    - code: management-aset.aset.create
+      name: Daftarkan aset ke register
+      entry_point: management-aset.aset.api
+      access: create
+    - code: management-aset.aset.update
+      name: Koreksi data aset
+      entry_point: management-aset.aset.api
+      access: update
+    - code: management-aset.aset.mutate
+      name: Mutasi aset
+      entry_point: management-aset.aset.api
+      access: invoke
+  privileges:
+    # Menerima aset dari ujung ke ujung: menyusun berkasnya sekaligus menyelesaikannya.
+    #
+    # Izin dokumen ikut di sini sejak `POST /aset` dipensiunkan 18 September 2026. Tanpa
+    # itu privilege bernama "Terima aset" tidak cukup untuk menerima aset apa pun, karena
+    # tidak ada lagi jalan masuk ke register selain lewat dokumen penerimaan.
+    - code: management-aset.aset.receive
+      name: Terima aset
+      permissions:
+        - management-aset.aset.read
+        - management-aset.aset.create
+        - management-aset.aset.update
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+    # Menyelesaikan serah terima: yang benar-benar memindahkan penempatan aset.
+    - code: management-aset.aset.transfer
+      name: Mutasi aset
+      permissions:
+        - management-aset.aset.mutate
+        - management-aset.mutasi-aset.read
+  duties:
+    - code: management-aset.aset.manage
+      name: Kelola register aset
+      privileges:
+        - management-aset.aset.receive
+        - management-aset.aset.transfer
+        - management-aset.mutasi-aset.maintain
+        - management-aset.mutasi-aset.retire
+        - management-aset.penerimaan-aset.maintain
+        - management-aset.penerimaan-aset.retire
+number_sequences:
+  references:
+    - code: management-aset.aset
+      name: Nomor aset
+      default_prefix: ASTA
+      allowed_scopes:
+        - legal_entity

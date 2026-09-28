@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Support\Modules\ModuleManifestFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,7 +13,6 @@ use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
-use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 /**
@@ -502,17 +502,16 @@ class PenyediaLaporanTest extends TestCase
 
     public function test_every_registered_report_is_declared_for_printing(): void
     {
-        // Dialog cetak mencari laporan di katalog Core, yang dibaca dari blok `reports:` app.yaml.
-        // Laporan yang terdaftar di module tetapi terlewat di manifest tampil di pratinjau,
-        // lalu tombol Cetak-nya menjawab 404.
-        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
-        $this->assertIsArray($manifest);
+        // Dialog cetak mencari laporan di katalog Core, yang dibaca dari berkas laporan di
+        // `manifest/reports/`. Laporan yang terdaftar di module tetapi terlewat di manifest tampil
+        // di pratinjau, lalu tombol Cetak-nya menjawab 404.
+        $manifest = ModuleManifestFiles::read(dirname(__DIR__, 2));
         $this->assertIsArray($manifest['reports']);
         $declared = array_column($manifest['reports'], null, 'code');
 
         foreach (app(ReportRegistry::class)->all() as $definition) {
             $code = 'management-aset.'.$definition->code();
-            $this->assertArrayHasKey($code, $declared, "Laporan `{$code}` belum didaftarkan di blok reports app.yaml.");
+            $this->assertArrayHasKey($code, $declared, "Laporan `{$code}` belum didaftarkan di `manifest/reports/`.");
             $this->assertSame($definition->permission(), $declared[$code]['permission'], $code);
             $this->assertSame(
                 array_map(static fn ($layout): array => [$layout->key, $layout->format], $definition->builtinLayouts()),

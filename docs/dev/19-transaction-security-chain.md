@@ -8,7 +8,7 @@ Dokumen ini menyatukan aturannya menjadi satu rantai yang bisa dibaca sekali jal
 
 ```mermaid
 flowchart TD
-    subgraph M["1 · Dideklarasikan manifest app (app.yaml)"]
+    subgraph M["1 · Dideklarasikan manifest app (app.yaml dan manifest/)"]
         EP["Entry point<br/><small>form · menu_item · api · report · action</small>"]
         PM["Permission<br/><small>entry point + access level</small>"]
         PV["Privilege<br/><small>satu tugas</small>"]

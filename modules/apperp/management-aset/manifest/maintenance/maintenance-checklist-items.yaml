@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.item-checklist-maintenance.form
+      name: Layar item checklist maintenance
+      type: form
+    - code: management-aset.item-checklist-maintenance.api
+      name: API item checklist maintenance
+      type: api
+  permissions:
+    - code: management-aset.item-checklist-maintenance.read
+      name: Lihat item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.form
+      access: read
+    - code: management-aset.item-checklist-maintenance.create
+      name: Tambah item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: create
+    - code: management-aset.item-checklist-maintenance.update
+      name: Ubah item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: update
+    - code: management-aset.item-checklist-maintenance.archive
+      name: Arsipkan item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: delete
+  privileges:
+    - code: management-aset.item-checklist-maintenance.maintain
+      name: Pelihara item checklist maintenance
+      permissions:
+        - management-aset.item-checklist-maintenance.read
+        - management-aset.item-checklist-maintenance.create
+        - management-aset.item-checklist-maintenance.update
+    - code: management-aset.item-checklist-maintenance.retire
+      name: Arsipkan item checklist maintenance
+      permissions:
+        - management-aset.item-checklist-maintenance.archive
+  duties:
+    - code: management-aset.item-checklist-maintenance.manage
+      name: Kelola item checklist maintenance
+      privileges:
+        - management-aset.item-checklist-maintenance.maintain
+        - management-aset.item-checklist-maintenance.retire
+number_sequences:
+  references:
+    - code: management-aset.item-checklist-maintenance
+      name: Kode item checklist maintenance
+      default_prefix: ICMA
+      allowed_scopes:
+        - tenant

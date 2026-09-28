@@ -39,7 +39,7 @@ sequenceDiagram
 
 ## 1. Deklarasi di Manifest App (`app.yaml`)
 
-Setiap aplikasi yang memiliki proses persetujuan wajib mendeklarasikan `workflow_types` pada `app.yaml`:
+Setiap aplikasi yang memiliki proses persetujuan wajib mendeklarasikan `workflow_types` pada manifest-nya, di `app.yaml` atau di berkas fitur di `manifest/`:
 
 ```yaml
 workflow_types:

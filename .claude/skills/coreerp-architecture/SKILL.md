@@ -106,7 +106,7 @@ The chain `role → duty → privilege → permission → entry point` has to su
 - Privilege codes must differ from permission codes. Reject a manifest that reuses one.
 - `access_level` is declared, never derived. Splitting it out of a permission code string (`…archive` → access level `archive`) invents levels that do not exist.
 - Valid access levels are exactly `read`, `update`, `create`, `correct`, `delete`, and `invoke`. CoreERP delete-lifecycle actions (`archive`, `void`, `retire`) use `delete`; a service operation with no CRUD meaning uses `invoke`.
-- Manifest keys mirror the Control Plane catalog payload exactly, so `app.yaml` posts verbatim with no transformation layer to drift.
+- Manifest keys mirror the Control Plane catalog payload exactly, so the manifest (`app.yaml` plus the lists split into `manifest/`) posts verbatim with no transformation layer to drift.
 
 #### Security role hierarchy
 

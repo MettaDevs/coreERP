@@ -1,0 +1,15 @@
+security:
+  entry_points:
+    - code: management-aset.fixed-asset-parameters.form
+      name: Layar parameter aset tetap
+      type: form
+  permissions:
+    - code: management-aset.fixed-asset-parameters.read
+      name: Lihat parameter aset tetap
+      entry_point: management-aset.fixed-asset-parameters.form
+      access: read
+  privileges:
+    - code: management-aset.fixed-asset-parameters.view
+      name: Lihat parameter aset tetap
+      permissions:
+        - management-aset.fixed-asset-parameters.read

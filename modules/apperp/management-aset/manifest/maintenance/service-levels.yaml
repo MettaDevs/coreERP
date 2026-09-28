@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.tingkat-layanan.form
+      name: Layar tingkat layanan
+      type: form
+    - code: management-aset.tingkat-layanan.api
+      name: API tingkat layanan
+      type: api
+  permissions:
+    - code: management-aset.tingkat-layanan.read
+      name: Lihat tingkat layanan
+      entry_point: management-aset.tingkat-layanan.form
+      access: read
+    - code: management-aset.tingkat-layanan.create
+      name: Tambah tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: create
+    - code: management-aset.tingkat-layanan.update
+      name: Ubah tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: update
+    - code: management-aset.tingkat-layanan.archive
+      name: Arsipkan tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: delete
+  privileges:
+    - code: management-aset.tingkat-layanan.maintain
+      name: Pelihara tingkat layanan
+      permissions:
+        - management-aset.tingkat-layanan.read
+        - management-aset.tingkat-layanan.create
+        - management-aset.tingkat-layanan.update
+    - code: management-aset.tingkat-layanan.retire
+      name: Arsipkan tingkat layanan
+      permissions:
+        - management-aset.tingkat-layanan.archive
+  duties:
+    - code: management-aset.tingkat-layanan.manage
+      name: Kelola tingkat layanan
+      privileges:
+        - management-aset.tingkat-layanan.maintain
+        - management-aset.tingkat-layanan.retire
+number_sequences:
+  references:
+    - code: management-aset.tingkat-layanan
+      name: Kode tingkat layanan
+      default_prefix: TGLY
+      allowed_scopes:
+        - tenant

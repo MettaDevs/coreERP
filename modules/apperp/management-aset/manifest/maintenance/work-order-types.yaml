@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.tipe-work-order.form
+      name: Layar tipe work order
+      type: form
+    - code: management-aset.tipe-work-order.api
+      name: API tipe work order
+      type: api
+  permissions:
+    - code: management-aset.tipe-work-order.read
+      name: Lihat tipe work order
+      entry_point: management-aset.tipe-work-order.form
+      access: read
+    - code: management-aset.tipe-work-order.create
+      name: Tambah tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: create
+    - code: management-aset.tipe-work-order.update
+      name: Ubah tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: update
+    - code: management-aset.tipe-work-order.archive
+      name: Arsipkan tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: delete
+  privileges:
+    - code: management-aset.tipe-work-order.maintain
+      name: Pelihara tipe work order
+      permissions:
+        - management-aset.tipe-work-order.read
+        - management-aset.tipe-work-order.create
+        - management-aset.tipe-work-order.update
+    - code: management-aset.tipe-work-order.retire
+      name: Arsipkan tipe work order
+      permissions:
+        - management-aset.tipe-work-order.archive
+  duties:
+    - code: management-aset.tipe-work-order.manage
+      name: Kelola tipe work order
+      privileges:
+        - management-aset.tipe-work-order.maintain
+        - management-aset.tipe-work-order.retire
+number_sequences:
+  references:
+    - code: management-aset.tipe-work-order
+      name: Kode tipe work order
+      default_prefix: TPWO
+      allowed_scopes:
+        - tenant

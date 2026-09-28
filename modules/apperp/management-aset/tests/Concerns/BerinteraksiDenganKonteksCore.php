@@ -6,13 +6,13 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Modules\ModuleManifestFiles;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Cara test module masuk sebagai pengguna: lewat Core, bukan lewat token.
@@ -87,7 +87,7 @@ trait BerinteraksiDenganKonteksCore
      * serta penghitung benar-benar ada untuk tenant ini — persis seperti tenant sungguhan setelah
      * provisioning.
      *
-     * Daftarnya dibaca dari `app.yaml` module, bukan ditulis ulang di sini. Daftar kedua akan
+     * Daftarnya dibaca dari manifest module, bukan ditulis ulang di sini. Daftar kedua akan
      * menyimpang dari manifestnya pada hari seseorang menambah satu referensi, dan yang menyimpang
      * gagal dengan pesan "reference tidak dikenal" yang tidak menyebut sebabnya.
      */
@@ -96,7 +96,7 @@ trait BerinteraksiDenganKonteksCore
         $this->pastikanKatalogModule();
         $this->seed(NumberSequenceProfileSeeder::class);
 
-        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+        $manifest = ModuleManifestFiles::read(dirname(__DIR__, 2));
         $referensi = $manifest['number_sequences']['references'] ?? [];
 
         foreach (is_array($referensi) ? $referensi : [] as $baris) {
@@ -202,7 +202,7 @@ trait BerinteraksiDenganKonteksCore
      */
     protected function awalanNomor(string $kodeReferensi): string
     {
-        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+        $manifest = ModuleManifestFiles::read(dirname(__DIR__, 2));
 
         foreach ($manifest['number_sequences']['references'] ?? [] as $baris) {
             if (($baris['code'] ?? null) === $kodeReferensi) {
@@ -210,7 +210,7 @@ trait BerinteraksiDenganKonteksCore
             }
         }
 
-        throw new \RuntimeException(sprintf('Referensi nomor "%s" tidak ada di app.yaml module.', $kodeReferensi));
+        throw new \RuntimeException(sprintf('Referensi nomor "%s" tidak ada di manifest module.', $kodeReferensi));
     }
 
     /**
@@ -793,9 +793,9 @@ trait BerinteraksiDenganKonteksCore
                 'scope' => 'legal_entity',
                 'code' => self::TIPE_WORKFLOW_DEKOMISIONING,
                 'name' => 'Verifikasi usulan dekomisioning aset',
-                // Sama dengan yang dinyatakan `app.yaml` module. Field yang diwajibkan di sini
-                // diperiksa Core sebelum instance dibuat, jadi menuliskannya berbeda akan
-                // membuat test lulus atas skema yang tidak pernah dipasang di produksi.
+                // Sama dengan `manifest/fixed-asset/asset-decommissioning.yaml`. Field yang
+                // diwajibkan di sini diperiksa Core sebelum instance dibuat, jadi menuliskannya
+                // berbeda akan membuat test lulus atas skema yang tidak pernah dipasang di produksi.
                 'decision_context_schema' => json_encode(['required' => ['document_id', 'aset_id']], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),

@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.trade.form
+      name: Layar bidang keahlian
+      type: form
+    - code: management-aset.trade.api
+      name: API bidang keahlian
+      type: api
+  permissions:
+    - code: management-aset.trade.read
+      name: Lihat bidang keahlian
+      entry_point: management-aset.trade.form
+      access: read
+    - code: management-aset.trade.create
+      name: Tambah bidang keahlian
+      entry_point: management-aset.trade.api
+      access: create
+    - code: management-aset.trade.update
+      name: Ubah bidang keahlian
+      entry_point: management-aset.trade.api
+      access: update
+    - code: management-aset.trade.archive
+      name: Arsipkan bidang keahlian
+      entry_point: management-aset.trade.api
+      access: delete
+  privileges:
+    - code: management-aset.trade.maintain
+      name: Pelihara bidang keahlian
+      permissions:
+        - management-aset.trade.read
+        - management-aset.trade.create
+        - management-aset.trade.update
+    - code: management-aset.trade.retire
+      name: Arsipkan bidang keahlian
+      permissions:
+        - management-aset.trade.archive
+  duties:
+    - code: management-aset.trade.manage
+      name: Kelola bidang keahlian
+      privileges:
+        - management-aset.trade.maintain
+        - management-aset.trade.retire
+number_sequences:
+  references:
+    - code: management-aset.trade
+      name: Kode bidang keahlian
+      default_prefix: TRDE
+      allowed_scopes:
+        - tenant

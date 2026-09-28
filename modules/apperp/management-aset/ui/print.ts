@@ -22,7 +22,7 @@ export const APP_ID = 'management-aset';
 export const EVENT_CETAK = 'coreerp:print';
 
 export type PrintRequest = {
-    /** Kode laporan pada `app.yaml`, tanpa awalan ID app. */
+    /** Kode laporan pada manifest module (`manifest/reports/`), tanpa awalan ID app. */
     report: string;
     /** Judul dialog untuk pengguna, misalnya "Cetak work order PMHA-000012". */
     title: string;

@@ -66,7 +66,7 @@ What gets replaced is the word with **no technical reason** that already has a p
 
 | Dimension | Source of truth |
 | --- | --- |
-| Screens | `.form` entry points in `app.yaml` — closest thing to "every feature" |
+| Screens | `.form` entry points in `app.yaml` and the module's `manifest/` folder — closest thing to "every feature" |
 | Controllers, services, support classes, middleware | the directories themselves |
 | Tests | `api/tests/` — the page should say where to add one |
 | Load-test scenarios | `loadtest/k6/` |

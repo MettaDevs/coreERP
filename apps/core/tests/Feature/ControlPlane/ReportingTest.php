@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Modules\ModuleManifestFiles;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -18,7 +19,6 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PhpOffice\PhpWord\IOFactory as WordFactory;
 use PhpOffice\PhpWord\PhpWord;
-use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 /**
@@ -33,7 +33,7 @@ use Tests\TestCase;
  * tidak pernah memeriksa izin apa pun.
  *
  * Sekarang tidak ada yang dipalsukan di antara Core dan module. Katalognya didaftarkan dari
- * `app.yaml` module lewat perintah pendaftaran yang sama dengan yang dipakai on-prem,
+ * manifest module lewat perintah pendaftaran yang sama dengan yang dipakai on-prem,
  * pengguna memegang izinnya lewat rantai role -> duty -> privilege -> permission yang
  * sungguhan, dan datasetnya dibaca dari work order yang benar-benar ada di database.
  *
@@ -114,7 +114,7 @@ class ReportingTest extends TestCase
         $laporan = collect($data)->firstWhere('code', self::KODE_LAPORAN);
 
         $this->assertNotNull($laporan, sprintf(
-            'Katalog laporan tidak memuat `%s`. Barisnya berasal dari blok `reports` app.yaml module; '
+            'Katalog laporan tidak memuat `%s`. Barisnya berasal dari blok `reports` manifest module; '
             .'kalau ia hilang, yang hilang bukan sekadar satu entri daftar melainkan tombol Cetak pada '
             .'layar work order, dan tidak ada pesan kesalahan di mana pun yang menyebutkannya.',
             self::KODE_LAPORAN,
@@ -379,7 +379,7 @@ class ReportingTest extends TestCase
     }
 
     /**
-     * Mendaftarkan katalog app dari `app.yaml` module aset yang sungguhan.
+     * Mendaftarkan katalog app dari manifest module aset yang sungguhan.
      *
      * Barisnya tidak lagi ditulis tangan di test ini. Yang dipakai adalah perintah
      * `app:register-manifest` — jalur yang sama dengan yang dijalankan admin on-prem — supaya
@@ -451,8 +451,7 @@ class ReportingTest extends TestCase
      */
     private function laporanDiManifest(): array
     {
-        /** @var array<string, mixed> $manifest */
-        $manifest = Yaml::parseFile($this->berkasManifest());
+        $manifest = ModuleManifestFiles::read(dirname(base_path(), 2).'/modules/apperp/management-aset');
 
         foreach ($manifest['reports'] ?? [] as $laporan) {
             if (($laporan['code'] ?? null) === self::KODE_LAPORAN) {
@@ -460,12 +459,7 @@ class ReportingTest extends TestCase
             }
         }
 
-        $this->fail(sprintf('app.yaml module aset tidak lagi mendeklarasikan laporan `%s`.', self::KODE_LAPORAN));
-    }
-
-    private function berkasManifest(): string
-    {
-        return dirname(base_path(), 2).'/modules/apperp/management-aset/app.yaml';
+        $this->fail(sprintf('Manifest module aset tidak lagi mendeklarasikan laporan `%s`.', self::KODE_LAPORAN));
     }
 
     private function memberWithoutRoles(): User

@@ -81,7 +81,7 @@ dihapus — alasannya di [Kontrak](/apps/management-aset/arsitektur/kontrak).
 
 Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant lewat trait `MilikTenant`.
 
-**Reference nomor** — daftar lengkapnya di `app.yaml` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
+**Reference nomor** — daftar lengkapnya di berkas fitur `manifest/` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
 
 **Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. Modul mengonsumsi keputusannya lewat event `KeputusanWorkflowDiambil` yang dipancarkan di dalam transaksi keputusan Core; setelah `approved` diterapkan, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
 

@@ -1,0 +1,11 @@
+reports:
+  - code: management-aset.work-order
+    name: Work order
+    description: Satu work order lengkap dengan baris pekerjaan dan checklist-nya.
+    permission: management-aset.pemeliharaan-aset.read
+    parameters: [id]
+    builtin_layouts:
+      - key: standar
+        name: Work order standar (Word)
+        description: Header, tabel baris pekerjaan, dan checklist per baris.
+        format: docx

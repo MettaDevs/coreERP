@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.maintenance-job-types.form
+      name: Layar jenis pekerjaan maintenance
+      type: form
+    - code: management-aset.maintenance-job-types.api
+      name: API jenis pekerjaan maintenance
+      type: api
+  permissions:
+    - code: management-aset.maintenance-job-types.read
+      name: Lihat jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.form
+      access: read
+    - code: management-aset.maintenance-job-types.create
+      name: Tambah jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: create
+    - code: management-aset.maintenance-job-types.update
+      name: Ubah jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: update
+    - code: management-aset.maintenance-job-types.archive
+      name: Arsipkan jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: delete
+  privileges:
+    - code: management-aset.maintenance-job-types.maintain
+      name: Pelihara jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-types.read
+        - management-aset.maintenance-job-types.create
+        - management-aset.maintenance-job-types.update
+    - code: management-aset.maintenance-job-types.retire
+      name: Arsipkan jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-types.archive
+  duties:
+    - code: management-aset.maintenance-job-types.manage
+      name: Kelola jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-types.maintain
+        - management-aset.maintenance-job-types.retire
+number_sequences:
+  references:
+    - code: management-aset.maintenance-job-types
+      name: Kode jenis pekerjaan maintenance
+      default_prefix: JPMA
+      allowed_scopes:
+        - tenant

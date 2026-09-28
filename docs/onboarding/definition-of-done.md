@@ -34,7 +34,7 @@ Semua di atas, plus:
 Build lokal lulus **bukan** bukti perubahan UI sudah tayang. Jangan melaporkan selesai berdasarkan type-check saja.
 :::
 
-Kalau kamu mengubah navigasi atau security di `app.yaml`, tambahan:
+Kalau kamu mengubah navigasi atau security di `app.yaml` atau di folder `manifest/`, tambahan:
 
 - [ ] `app:register-manifest <id module>` dijalankan lewat container `core-app`
 - [ ] Kolom `apps.navigation` di database runtime diverifikasi
