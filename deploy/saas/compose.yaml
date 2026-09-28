@@ -32,6 +32,13 @@
 # rusak: `environment:upgrade` yang menemukan kunci operasi sudah dipegang akan melewatinya dan
 # keluar dengan kode sukses. Itu sudah ada testnya.
 
+# ## Image pihak ketiga ditulis `${NAMA_IMAGE:-sumber}`, tanpa kecuali
+#
+# Perakit menyalin setiap `sumber` ke Harbor (`coreerp/saas/<nama>:<rilis>`) lewat digest, dan pasang-rilis.sh
+# menariknya dari sana lalu mengisi `NAMA_IMAGE` dengan rujukan digest itu. Jadi SaaS dev tidak menarik apa pun
+# dari Docker Hub, dan image yang dipakai terkunci per rilis. Image yang ditulis harfiah ditolak perakit. Alasannya
+# MinIO, 28 September 2026: image-nya hilang dari Docker Hub dan quay.io, dan pemasangan rilis berhenti.
+
 name: coreerp-saas
 
 x-app-environment: &app-environment
@@ -65,14 +72,15 @@ x-app-environment: &app-environment
   # ketahuan: berkas yang diunggah ke node kedua tidak ada di node pertama, tanpa satu pun galat —
   # ia hanya "kadang hilang" tergantung node mana yang kebetulan melayani permintaan unduhnya.
   #
-  # `config/filesystems.php` sudah punya disk `s3` lengkap dengan endpoint dan path-style, jadi
-  # MinIO tidak menuntut satu baris kode pun.
+  # `config/filesystems.php` sudah punya disk `s3` lengkap dengan endpoint dan path-style, dan driver-nya
+  # (`league/flysystem-aws-s3-v3`) ada di dependency Core sejak 28 September 2026 — sebelumnya tidak, sehingga
+  # disk ini belum pernah benar-benar berfungsi. Penyimpannya RustFS, lihat `core-rustfs` di bawah.
   FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
-  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-coreerp}
-  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD wajib}
+  AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-coreerp}
+  AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?RUSTFS_SECRET_KEY wajib}
   AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
   AWS_BUCKET: ${AWS_BUCKET:-coreerp}
-  AWS_ENDPOINT: ${AWS_ENDPOINT:-http://core-minio:9000}
+  AWS_ENDPOINT: ${AWS_ENDPOINT:-http://core-rustfs:9000}
   AWS_USE_PATH_STYLE_ENDPOINT: 'true'
 
   COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
@@ -119,7 +127,7 @@ services:
 
   core-db:
     profiles: [data]
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-core_erp}
@@ -137,44 +145,54 @@ services:
     volumes:
       - core-db-data:/var/lib/postgresql/data
 
-  # Image diambil dari quay.io, BUKAN Docker Hub.
+  # Object storage: RustFS, pengganti MinIO sejak 28 September 2026 (keputusan pemilik produk).
   #
-  # `minio/mc` di Docker Hub menjawab "pull access denied ... repository does not exist" — MinIO
-  # memindahkan distribusi resminya, dan yang tertinggal di sana tidak dapat ditarik tanpa login.
-  # Ditemukan saat penyebaran pertama, bukan saat menulis berkas ini.
+  # MinIO menghentikan distribusi gratisnya bertahap: berhenti menerbitkan image (Oktober 2025), mengarsipkan
+  # repositorinya (Februari 2026), lalu image-nya hilang dari Docker Hub dan quay.io menolak tarikan tanpa login
+  # — pemasangan rilis 0.9.0 gagal karenanya. Versi gratis terakhirnya juga membawa CVE-2026-40344 yang tidak
+  # akan ditambal. RustFS berlisensi Apache 2.0, berbicara S3 yang sama, dan tidak menuntut lisensi apa pun.
   #
-  # Keduanya tetap dapat ditimpa lewat env, untuk mesin yang punya cermin registry sendiri.
-  core-minio:
+  # Versinya dipin: `latest` pada penyimpan data berarti pembaruan tanpa sengaja di tengah pemasangan.
+  # Container berjalan sebagai uid 10001; volume bernama yang baru mewarisi kepemilikan `/data` dari image.
+  core-rustfs:
     profiles: [data]
-    image: ${MINIO_IMAGE:-quay.io/minio/minio:latest}
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.0}
     restart: unless-stopped
-    command: ['server', '/data', '--console-address', ':9001']
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-coreerp}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD wajib}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-coreerp}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?RUSTFS_SECRET_KEY wajib}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ':9000'
+      # Konsol web RustFS tidak dipakai; yang tidak menyala tidak perlu dijaga.
+      RUSTFS_CONSOLE_ENABLE: 'false'
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9000/health']
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 10s
     ports:
-      - '${MINIO_BIND:-127.0.0.1}:9000:9000'
+      - '${RUSTFS_BIND:-127.0.0.1}:9000:9000'
     volumes:
-      - core-minio-data:/data
+      - core-rustfs-data:/data
 
-  # Sekali jalan, dan aman diulang: `mb --ignore-existing` tidak mengeluh pada bucket yang sudah ada.
-  core-minio-init:
+  # Sekali jalan, dan aman diulang: `rclone mkdir` tidak mengeluh pada bucket yang sudah ada. RustFS tidak
+  # membawa klien S3 sendiri, dan `mc` milik MinIO tidak lagi dapat ditarik, jadi dipakai rclone (MIT).
+  core-rustfs-init:
     profiles: [data]
-    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:latest}
+    image: ${RCLONE_IMAGE:-rclone/rclone:1.75.1}
     restart: 'no'
     depends_on:
-      core-minio:
+      core-rustfs:
         condition: service_healthy
-    entrypoint: ['sh', '-c']
-    command:
-      - >-
-        mc alias set lokal http://core-minio:9000 "${MINIO_ROOT_USER:-coreerp}" "${MINIO_ROOT_PASSWORD}" &&
-        mc mb --ignore-existing "lokal/${AWS_BUCKET:-coreerp}"
+    environment:
+      RCLONE_CONFIG_CORE_TYPE: s3
+      RCLONE_CONFIG_CORE_PROVIDER: Other
+      RCLONE_CONFIG_CORE_ENDPOINT: http://core-rustfs:9000
+      RCLONE_CONFIG_CORE_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-coreerp}
+      RCLONE_CONFIG_CORE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?RUSTFS_SECRET_KEY wajib}
+      RCLONE_CONFIG_CORE_FORCE_PATH_STYLE: 'true'
+    command: ['mkdir', 'core:${AWS_BUCKET:-coreerp}']
 
   # ------------------------------------------------------------------ migrasi
 
@@ -289,7 +307,7 @@ services:
 
   core-renderer:
     profiles: [app, worker]
-    image: gotenberg/gotenberg:8
+    image: ${GOTENBERG_IMAGE:-gotenberg/gotenberg:8}
     restart: unless-stopped
     command:
       - gotenberg
@@ -377,5 +395,5 @@ networks:
 volumes:
   core-console-storage:
   core-db-data:
-  core-minio-data:
+  core-rustfs-data:
   core-logs:

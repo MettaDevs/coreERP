@@ -403,7 +403,7 @@ class NoInternalHttpTest extends TestCase
         DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $buku, 'tenant_id' => $tenantId, 'creation_key' => 'buku-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku tahun fiskal', 'aktif' => true,
-            'posting_layer' => 'current', 'export_to_backoffice' => false,
+            'posting_layer' => 'current',
             'depreciation_profile_id' => $profil, 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('aset_m_group_buku_penyusutan')->insert([

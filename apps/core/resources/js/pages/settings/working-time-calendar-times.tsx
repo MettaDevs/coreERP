@@ -11,7 +11,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
+import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
     Table,
     TableBody,
@@ -126,7 +128,7 @@ export default function WorkingTimeCalendarTimes({
     const [filterFrom, setFilterFrom] = useState(from);
     const [filterTo, setFilterTo] = useState(to);
 
-    // Compose Dialog state
+    // Dialog penyusunan jadwal
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [composeTemplateId, setComposeTemplateId] = useState<string>(
         templates.length > 0 ? templates[0].id : '',
@@ -198,11 +200,9 @@ export default function WorkingTimeCalendarTimes({
 
         router.put(
             `/settings/working-time-calendars/${calendar.id}/days/${day.id}`,
-            {
-                control: newControl,
-                closed_for_pickup:
-                    newControl === 'closed' ? true : day.closed_for_pickup,
-            },
+            // Hanya statusnya yang dikirim. Tutup pengambilan tidak ikut berubah, dan jumlah
+            // jam dihitung ulang server dari baris jam kerja hari itu.
+            { control: newControl },
             {
                 preserveScroll: true,
                 onFinish: () => setIsUpdatingDay(false),
@@ -215,8 +215,8 @@ export default function WorkingTimeCalendarTimes({
             <Head
                 title={
                     calendar
-                        ? `Jadwal Kerja - ${calendar.code}`
-                        : 'Jadwal Kerja'
+                        ? `Jadwal kerja - ${calendar.code}`
+                        : 'Jadwal kerja'
                 }
             />
 
@@ -237,25 +237,31 @@ export default function WorkingTimeCalendarTimes({
                         {allCalendars.length > 0 ? (
                             <div className="flex items-center gap-1.5">
                                 <span className="font-medium text-muted-foreground">
-                                    Pilih Kalender:
+                                    Kalender:
                                 </span>
-                                <select
-                                    value={calendar?.id ?? ''}
-                                    onChange={(e) => {
-                                        if (e.target.value) {
-                                            router.visit(
-                                                `/settings/working-time-calendar-times/${e.target.value}`,
-                                            );
-                                        }
-                                    }}
-                                    className="h-7 rounded border border-input bg-background px-2 text-xs font-semibold text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    {allCalendars.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.code} - {c.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="w-64">
+                                    <NativeSelect
+                                        size="sm"
+                                        aria-label="Kalender"
+                                        value={calendar?.id ?? ''}
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                router.visit(
+                                                    `/settings/working-time-calendar-times/${e.target.value}`,
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        {allCalendars.map((c) => (
+                                            <NativeSelectOption
+                                                key={c.id}
+                                                value={c.id}
+                                            >
+                                                {c.code} - {c.name}
+                                            </NativeSelectOption>
+                                        ))}
+                                    </NativeSelect>
+                                </div>
                             </div>
                         ) : (
                             <span className="text-xs text-muted-foreground">
@@ -275,7 +281,7 @@ export default function WorkingTimeCalendarTimes({
                                 className="ml-2 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                             >
                                 <Play className="size-3.5 fill-current" />
-                                <span>Buat jadwal dari pola (Compose)</span>
+                                <span>Buat jadwal dari pola</span>
                             </Button>
                         )}
 
@@ -289,7 +295,7 @@ export default function WorkingTimeCalendarTimes({
                                 className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
                             >
                                 <Play className="size-3 fill-current text-primary" />
-                                <span>Halaman Jadwal dari Pola</span>
+                                <span>Halaman jadwal dari pola</span>
                             </Link>
                         )}
                     </div>
@@ -302,6 +308,7 @@ export default function WorkingTimeCalendarTimes({
                             </span>
                             <Input
                                 type="date"
+                                aria-label="Dari tanggal"
                                 value={filterFrom}
                                 onChange={(e) => setFilterFrom(e.target.value)}
                                 className="h-7 w-36 text-xs"
@@ -309,6 +316,7 @@ export default function WorkingTimeCalendarTimes({
                             <span className="text-muted-foreground">s/d</span>
                             <Input
                                 type="date"
+                                aria-label="Sampai tanggal"
                                 value={filterTo}
                                 onChange={(e) => setFilterTo(e.target.value)}
                                 className="h-7 w-36 text-xs"
@@ -342,23 +350,18 @@ export default function WorkingTimeCalendarTimes({
                                 href="/settings/working-time-calendars"
                                 className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                             >
-                                Buka Kalender Kerja
+                                Buka kalender kerja
                             </Link>
                         </div>
                     </div>
                 ) : (
-                    /* 2-Level Grid Layout: Working Days (Top) & Working Times (Bottom) */
+                    /* Hari kerja di atas, jam kerja hari terpilih di bawah */
                     <div className="flex flex-1 flex-col gap-4 p-4">
-                        {/* Top Panel: Working days */}
+                        {/* Daftar hari kerja */}
                         <div className="flex flex-col rounded-md border border-border bg-card">
-                            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-                                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Hari Kerja (Working Days) — Total:{' '}
-                                    {days.length} hari
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    Klik baris untuk melihat rincian jam kerja
-                                    di bawah
+                            <div className="border-b border-border px-4 py-2.5">
+                                <span className="text-sm font-semibold text-foreground">
+                                    Hari kerja — {days.length} hari
                                 </span>
                             </div>
 
@@ -382,13 +385,13 @@ export default function WorkingTimeCalendarTimes({
                                                 Bulan
                                             </TableHead>
                                             <TableHead className="w-28 text-center">
-                                                Kontrol
+                                                Status
                                             </TableHead>
                                             <TableHead className="w-36 text-center">
-                                                Tutup Pengambilan
+                                                Tutup pengambilan
                                             </TableHead>
                                             <TableHead className="w-28 text-right">
-                                                Total Jam
+                                                Total jam
                                             </TableHead>
                                             {canManage && (
                                                 <TableHead className="w-24 text-center">
@@ -405,12 +408,18 @@ export default function WorkingTimeCalendarTimes({
                                                     className="py-8 text-center text-muted-foreground"
                                                 >
                                                     Belum ada jadwal kerja untuk
-                                                    periode ini. Klik{' '}
-                                                    <strong>
-                                                        Buat jadwal dari pola
-                                                        (Compose)
-                                                    </strong>{' '}
-                                                    untuk meng-generate jadwal.
+                                                    periode ini.
+                                                    {canManage && (
+                                                        <>
+                                                            {' '}
+                                                            Klik{' '}
+                                                            <strong>
+                                                                Buat jadwal dari
+                                                                pola
+                                                            </strong>{' '}
+                                                            untuk menyusunnya.
+                                                        </>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
@@ -482,18 +491,18 @@ export default function WorkingTimeCalendarTimes({
                                                                 className={cn(
                                                                     'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                                                                     isOpen
-                                                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                                                                        ? 'bg-success/15 text-success'
                                                                         : 'bg-muted text-muted-foreground',
                                                                 )}
                                                             >
                                                                 {isOpen
-                                                                    ? 'Open'
-                                                                    : 'Closed'}
+                                                                    ? 'Kerja'
+                                                                    : 'Libur'}
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-center">
                                                             {day.closed_for_pickup ? (
-                                                                <Check className="mx-auto size-4 text-amber-600" />
+                                                                <Check className="mx-auto size-4 text-warning" />
                                                             ) : (
                                                                 '-'
                                                             )}
@@ -526,8 +535,8 @@ export default function WorkingTimeCalendarTimes({
                                                                     className="h-6 px-2 text-[11px]"
                                                                 >
                                                                     {isOpen
-                                                                        ? 'Tutup'
-                                                                        : 'Buka'}
+                                                                        ? 'Jadikan libur'
+                                                                        : 'Jadikan hari kerja'}
                                                                 </Button>
                                                             </TableCell>
                                                         )}
@@ -540,15 +549,12 @@ export default function WorkingTimeCalendarTimes({
                             </div>
                         </div>
 
-                        {/* Bottom Panel: Working times detail for selected day */}
+                        {/* Jam kerja hari yang dipilih */}
                         <div className="flex flex-1 flex-col rounded-md border border-border bg-card">
                             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-                                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Rincian Jam Kerja (Working Times) — Tanggal:{' '}
-                                    <strong className="text-foreground">
-                                        {selectedDay ? selectedDay.date : '-'}
-                                    </strong>{' '}
-                                    (
+                                <span className="text-sm font-semibold text-foreground">
+                                    Jam kerja —{' '}
+                                    {selectedDay ? selectedDay.date : '-'} (
                                     {selectedDay
                                         ? DAY_NAMES[selectedDay.day_of_week]
                                         : '-'}
@@ -570,17 +576,17 @@ export default function WorkingTimeCalendarTimes({
                                                 Kalender
                                             </TableHead>
                                             <TableHead className="w-28">
-                                                Dari Jam
+                                                Dari jam
                                             </TableHead>
                                             <TableHead className="w-28">
-                                                Sampai Jam
+                                                Sampai jam
                                             </TableHead>
                                             <TableHead className="w-32 text-right">
                                                 Efisiensi (%)
                                             </TableHead>
                                             <TableHead>Properti</TableHead>
                                             <TableHead className="w-32 text-right">
-                                                Durasi Jam
+                                                Durasi
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -642,109 +648,102 @@ export default function WorkingTimeCalendarTimes({
                 )}
             </div>
 
-            {/* Dialog Compose Working Times (Section 4 in D365 Blueprint) */}
+            {/* Dialog penyusunan jadwal dari pola jam kerja */}
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>
-                            Buat Jadwal dari Pola (Compose Working Times)
-                        </DialogTitle>
+                        <DialogTitle>Buat jadwal dari pola</DialogTitle>
                         <DialogDescription>
-                            Generate jadwal hari dan jam kerja secara otomatis
-                            untuk rentang tanggal tertentu berdasarkan pola jam
-                            kerja yang dipilih.
+                            Susun hari dan jam kerja kalender ini untuk rentang
+                            tanggal tertentu dari pola jam kerja yang dipilih.
                         </DialogDescription>
                     </DialogHeader>
 
                     <DialogBody className="space-y-4 py-2">
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Kalender Tujuan
-                            </label>
-                            <Input
-                                value={
-                                    calendar
-                                        ? `${calendar.code} - ${calendar.name}`
-                                        : ''
-                                }
-                                disabled
-                                className="mt-1 bg-muted font-semibold"
-                            />
-                        </div>
+                        <Input
+                            label="Kalender tujuan"
+                            value={
+                                calendar
+                                    ? `${calendar.code} - ${calendar.name}`
+                                    : ''
+                            }
+                            readOnly
+                        />
 
-                        <div>
-                            <label className="text-xs font-semibold text-foreground">
-                                Pola Jam Kerja (Template){' '}
-                                <span className="text-destructive">*</span>
-                            </label>
-                            {templates.length === 0 ? (
-                                <p className="mt-1 text-xs text-destructive">
-                                    Belum ada template pola jam kerja yang
-                                    aktif. Buat template terlebih dahulu di menu{' '}
-                                    <strong>Pola jam kerja</strong>.
-                                </p>
-                            ) : (
-                                <select
+                        {templates.length === 0 ? (
+                            <p className="text-xs text-destructive">
+                                Belum ada pola jam kerja aktif untuk entitas
+                                legal kalender ini. Buat polanya terlebih dahulu
+                                di menu <strong>Pola jam kerja</strong>.
+                            </p>
+                        ) : (
+                            <Field
+                                data-invalid={Boolean(
+                                    composeErrors.template_id,
+                                )}
+                            >
+                                <NativeSelect
+                                    label="Pola jam kerja"
                                     value={composeTemplateId}
                                     onChange={(e) =>
                                         setComposeTemplateId(e.target.value)
                                     }
-                                    className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
                                 >
                                     {templates.map((tpl) => (
-                                        <option key={tpl.id} value={tpl.id}>
+                                        <NativeSelectOption
+                                            key={tpl.id}
+                                            value={tpl.id}
+                                        >
                                             {tpl.code} - {tpl.name}
-                                        </option>
+                                        </NativeSelectOption>
                                     ))}
-                                </select>
-                            )}
-                            {composeErrors.template_id && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {composeErrors.template_id}
-                                </p>
-                            )}
-                        </div>
+                                </NativeSelect>
+                                {composeErrors.template_id && (
+                                    <FieldError>
+                                        {composeErrors.template_id}
+                                    </FieldError>
+                                )}
+                            </Field>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-xs font-semibold text-foreground">
-                                    Dari Tanggal{' '}
-                                    <span className="text-destructive">*</span>
-                                </label>
+                            <Field
+                                data-invalid={Boolean(composeErrors.from_date)}
+                            >
                                 <Input
+                                    label="Dari tanggal"
                                     type="date"
+                                    required
                                     value={composeFromDate}
                                     onChange={(e) =>
                                         setComposeFromDate(e.target.value)
                                     }
-                                    className="mt-1"
                                 />
                                 {composeErrors.from_date && (
-                                    <p className="mt-1 text-xs text-destructive">
+                                    <FieldError>
                                         {composeErrors.from_date}
-                                    </p>
+                                    </FieldError>
                                 )}
-                            </div>
+                            </Field>
 
-                            <div>
-                                <label className="text-xs font-semibold text-foreground">
-                                    Sampai Tanggal{' '}
-                                    <span className="text-destructive">*</span>
-                                </label>
+                            <Field
+                                data-invalid={Boolean(composeErrors.to_date)}
+                            >
                                 <Input
+                                    label="Sampai tanggal"
                                     type="date"
+                                    required
                                     value={composeToDate}
                                     onChange={(e) =>
                                         setComposeToDate(e.target.value)
                                     }
-                                    className="mt-1"
                                 />
                                 {composeErrors.to_date && (
-                                    <p className="mt-1 text-xs text-destructive">
+                                    <FieldError>
                                         {composeErrors.to_date}
-                                    </p>
+                                    </FieldError>
                                 )}
-                            </div>
+                            </Field>
                         </div>
 
                         <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
@@ -753,8 +752,8 @@ export default function WorkingTimeCalendarTimes({
                             </p>
                             <p className="mt-0.5">
                                 Jadwal yang sudah ada pada rentang tanggal
-                                tersebut akan diperbarui sesuai pola jam kerja
-                                mingguan dari template yang dipilih.
+                                tersebut akan ditimpa sesuai pola jam kerja yang
+                                dipilih. Rentang paling panjang 3 tahun.
                             </p>
                         </div>
                     </DialogBody>
@@ -769,7 +768,7 @@ export default function WorkingTimeCalendarTimes({
                                 !composeToDate
                             }
                         >
-                            {isComposing ? 'Memproses…' : 'Eksekusi Jadwal'}
+                            {isComposing ? 'Menyusun jadwal…' : 'Susun jadwal'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsComposeOpen(false)} />
                     </DialogFooter>
