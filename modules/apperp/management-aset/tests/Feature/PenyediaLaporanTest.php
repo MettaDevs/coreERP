@@ -12,6 +12,7 @@ use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 /**
@@ -280,6 +281,189 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('Gudang Cakung', $baris['asal_lokasi']);
         $this->assertSame('Ruang Implementor', $baris['tujuan_lokasi']);
         $this->assertSame('17/09/2026', $baris['tanggal']);
+    }
+
+    public function test_depreciation_report_reads_amounts_from_the_asset_book_records(): void
+    {
+        $data = $this->depreciationBooks();
+        $izin = ['management-aset.penyusutan.read'];
+
+        $laporan = $this->penyedia()->dataset('laporan-penyusutan-aset', $this->konteks($izin), ['periode' => '2026-08']);
+
+        // Aset yang diperoleh sesudah Agustus dan buku yang ditutup sebelum Agustus tidak ikut;
+        // buku fiskal tidak ikut karena tanpa pilihan buku yang dipakai buku komersial.
+        $this->assertSame(['AST-DEP-1', 'AST-DEP-4'], array_column($laporan['tables']['baris'], 'kode'));
+        $baris = $laporan['tables']['baris'][0];
+        // Saldo awal 10 juta + Juni + Juli + Agustus, dikurangi pembalik Juli. Usulan Mei yang
+        // belum difinalkan dan periode September tidak ikut.
+        $this->assertSame('15000000.00', $baris['akumulasi_penyusutan']);
+        $this->assertSame('2500000.00', $baris['penyusutan_bulan_ini']);
+        $this->assertSame('5000000.00', $baris['penyusutan_tahun_berjalan']);
+        $this->assertSame('105000000.00', $baris['nilai_buku_akhir']);
+        $this->assertSame('Komersial', $baris['buku']);
+        $this->assertSame('2025-12', $baris['bulan_perolehan']);
+        // Empat bulan dari sistem lama + tiga periode final - satu yang dibalik.
+        $this->assertSame([4, 48, 6, 42], [
+            $baris['umur_ekonomis_tahun'], $baris['umur_ekonomis_bulan'],
+            $baris['umur_ekonomis_saat_ini'], $baris['sisa_umur_ekonomis_bulan'],
+        ]);
+        $this->assertEquals(25, $baris['persentase_penyusutan']);
+
+        // Buku yang belum pernah disusutkan tampil apa adanya, tanpa akumulasi perkiraan.
+        $this->assertSame('0.00', $laporan['tables']['baris'][1]['akumulasi_penyusutan']);
+        $this->assertSame('30000000.00', $laporan['tables']['baris'][1]['nilai_buku_akhir']);
+
+        $this->assertSame('150000000.00', $laporan['fields']['total_nilai_perolehan']);
+        $this->assertSame('15000000.00', $laporan['fields']['total_akumulasi_penyusutan']);
+        $this->assertSame('Semua buku komersial', $laporan['fields']['filter_buku']);
+        $this->assertSame('Semua', $laporan['fields']['filter_group']);
+
+        // Layar memakai format yang sama dengan hasil cetak.
+        $this->headers($izin)
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-penyusutan-aset?periode=2026-08')
+            ->assertOk()
+            ->assertJsonPath('data.fields.filter_periode', 'Agustus 2026')
+            ->assertJsonPath('data.fields.total_akumulasi_penyusutan', 'Rp 15.000.000,00')
+            ->assertJsonPath('data.tables.baris.0.akumulasi_penyusutan', 'Rp 15.000.000,00')
+            ->assertJsonPath('data.tables.baris.0.bulan_perolehan', 'Desember 2025')
+            ->assertJsonPath('data.tables.baris.0.umur_ekonomis_tahun', '4')
+            ->assertJsonPath('data.tables.baris.0.persentase_penyusutan', '25%');
+
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-penyusutan-aset', $this->konteks(['management-aset.aset.read']), []),
+        );
+
+        // Kepala laporan menyebut nama filter, bukan id-nya.
+        $denganGroup = $this->penyedia()->dataset('laporan-penyusutan-aset', $this->konteks($izin), [
+            'periode' => '2026-08', 'group_aset_id' => $data['group'],
+        ]);
+        $this->assertSame('Elektronik', $denganGroup['fields']['filter_group']);
+    }
+
+    public function test_depreciation_report_follows_the_fiscal_year_and_the_chosen_book(): void
+    {
+        $data = $this->depreciationBooks();
+        $konteks = $this->konteks(['management-aset.penyusutan.read']);
+
+        // Tahun buku Juli–Juni: tahun berjalan pada Agustus hanya Juli (dibalik) dan Agustus.
+        $this->buatKalenderFiskalUji($this->tenantId, $this->legalEntityId, '2026-07-01', '2027-06-30');
+        $komersial = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08']);
+        $this->assertSame('2500000.00', $komersial['tables']['baris'][0]['penyusutan_tahun_berjalan']);
+
+        $fiskal = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'buku_id' => $data['fiskal']]);
+        $this->assertSame(['AST-DEP-1'], array_column($fiskal['tables']['baris'], 'kode'));
+        $this->assertSame('Fiskal', $fiskal['tables']['baris'][0]['buku']);
+        $this->assertSame('Fiskal', $fiskal['fields']['filter_buku']);
+
+        $this->assertGagalDengan(
+            'Parameter laporan tidak diterima',
+            fn () => $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-13']),
+        );
+    }
+
+    public function test_every_registered_report_is_declared_for_printing(): void
+    {
+        // Dialog cetak mencari laporan di katalog Core, yang dibaca dari blok `reports:` app.yaml.
+        // Laporan yang terdaftar di module tetapi terlewat di manifest tampil di pratinjau,
+        // lalu tombol Cetak-nya menjawab 404.
+        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+        $this->assertIsArray($manifest);
+        $this->assertIsArray($manifest['reports']);
+        $declared = array_column($manifest['reports'], null, 'code');
+
+        foreach (app(ReportRegistry::class)->all() as $definition) {
+            $code = 'management-aset.'.$definition->code();
+            $this->assertArrayHasKey($code, $declared, "Laporan `{$code}` belum didaftarkan di blok reports app.yaml.");
+            $this->assertSame($definition->permission(), $declared[$code]['permission'], $code);
+            $this->assertSame(
+                array_map(static fn ($layout): array => [$layout->key, $layout->format], $definition->builtinLayouts()),
+                array_map(static fn (array $layout): array => [$layout['key'], $layout['format']], $declared[$code]['builtin_layouts']),
+                $code,
+            );
+        }
+    }
+
+    /**
+     * Buku aset untuk laporan penyusutan Agustus 2026.
+     *
+     * - AST-DEP-1: buku komersial dengan saldo awal sistem lama, periode final Juni sampai
+     *   Agustus (Juli dibalik), usulan Mei yang belum difinalkan, dan periode September;
+     *   ditambah buku fiskal tanpa periode.
+     * - AST-DEP-2: diperoleh September, sesudah periode laporan.
+     * - AST-DEP-3: bukunya ditutup Juli karena asetnya dilepas.
+     * - AST-DEP-4: diperoleh Agustus, belum pernah disusutkan.
+     *
+     * @return array{group: string, fiskal: string}
+     */
+    private function depreciationBooks(): array
+    {
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $group = $this->master('aset_m_group_aset', 'Elektronik', 'GRPA-D1');
+        $jenis = $this->master('aset_m_jenis_aset', 'Laptop', 'JNSA-D1');
+        $profil = $this->master('aset_m_profil_penyusutan', 'Garis lurus 4 tahun', 'PRF-D1', [
+            'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 48,
+        ]);
+        $komersial = $this->master('aset_m_buku_penyusutan', 'Komersial', 'KOM-D1', ['posting_layer' => 'current']);
+        $fiskal = $this->master('aset_m_buku_penyusutan', 'Fiskal', 'FIS-D1', ['posting_layer' => 'tax']);
+
+        $aset = fn (string $kode, string $diperoleh, int $nilai): string => $this->insertAsset($kode, $diperoleh, $nilai, $group, $jenis);
+        $buku = function (string $asetId, string $bukuId, int $nilai, array $extra = []) use ($profil): string {
+            $id = (string) Str::ulid();
+            DB::table('aset_tr_buku_aset')->insert([
+                'id' => $id, 'tenant_id' => $this->tenantId, 'aset_id' => $asetId, 'buku_id' => $bukuId,
+                'depreciation_profile_id' => $profil, 'book_code' => $bukuId, 'useful_life_periods' => 48,
+                'acquisition_value' => $nilai, 'accumulated_depreciation' => 0, 'net_book_value' => $nilai,
+                'status' => 'active', ...$extra, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return $id;
+        };
+
+        $pertama = $aset('AST-DEP-1', '2025-12-10', 120000000);
+        $bukuPertama = $buku($pertama, $komersial, 120000000, [
+            'opening_accumulated_depreciation' => 10000000, 'elapsed_periods_offset' => 4,
+        ]);
+        $buku($pertama, $fiskal, 120000000);
+        $this->period($bukuPertama, '2026-05-31', 2500000, 'proposed');
+        $this->period($bukuPertama, '2026-06-30', 2500000);
+        $juli = $this->period($bukuPertama, '2026-07-31', 2500000);
+        $this->period($bukuPertama, '2026-07-31', -2500000, reverses: $juli);
+        $this->period($bukuPertama, '2026-08-31', 2500000);
+        $this->period($bukuPertama, '2026-09-30', 2500000);
+
+        $buku($aset('AST-DEP-2', '2026-09-05', 50000000), $komersial, 50000000);
+        $buku($aset('AST-DEP-3', '2024-01-01', 80000000), $komersial, 80000000, ['status' => 'closed', 'closed_on' => '2026-07-20']);
+        $buku($aset('AST-DEP-4', '2026-08-20', 30000000), $komersial, 30000000);
+
+        return ['group' => $group, 'fiskal' => $fiskal];
+    }
+
+    private function insertAsset(string $kode, string $diperoleh, int $nilai, string $group, string $jenis): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('aset_tr_aset')->insert([
+            'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
+            'nama' => 'Aset '.$kode, 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis, 'serial_number' => 'SN-'.$kode,
+            'acquired_on' => $diperoleh, 'acquisition_value' => $nilai, 'currency_code' => 'IDR',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    private function period(string $bukuAsetId, string $akhir, int $nilai, string $status = 'final', ?string $reverses = null): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('aset_tr_penyusutan_aset')->insert([
+            'id' => $id, 'tenant_id' => $this->tenantId, 'buku_aset_id' => $bukuAsetId,
+            'legal_entity_id' => $this->legalEntityId, 'usage_org_unit_id' => $this->orgUnitId,
+            'period_starts_on' => substr($akhir, 0, 8).'01', 'period_ends_on' => $akhir, 'amount' => $nilai,
+            'status' => $status, 'reverses_period_id' => $reverses, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
     }
 
     /** @param list<string> $permissions */
