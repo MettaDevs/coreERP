@@ -196,7 +196,7 @@ class PenyediaLaporanTest extends TestCase
         $this->workOrder();
         $konteks = $this->konteks(['management-aset.penyusutan.read']);
 
-        $asset = DB::table('aset_tr_penerimaan_aset')->where('kode', 'AST-WO-1')->first();
+        $asset = DB::table('aset_tr_aset')->where('kode', 'AST-WO-1')->first();
         $this->assertNotNull($asset);
 
         // Pasang buku aset
@@ -204,7 +204,7 @@ class PenyediaLaporanTest extends TestCase
         DB::table('aset_tr_buku_aset')->insert([
             'id' => $bookId,
             'tenant_id' => $this->tenantId,
-            'asset_id' => $asset->id,
+            'aset_id' => $asset->id,
             'book_code' => 'KOMERSIAL',
             'useful_life_periods' => 48,
             'acquisition_value' => 250000000,
