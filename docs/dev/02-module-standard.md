@@ -350,6 +350,23 @@ Satu bentuk query yang juga dilarang: **memberi alias pada tabel utama**. Penyar
 disisipkan dengan nama tabel yang sebenarnya, jadi tabel utama yang beralias membuat penyaringannya
 menunjuk nama yang tidak ada lagi di query itu. Tabel yang di-`join` tetap boleh beralias.
 
+### Kolom jejak pembuat dan pengubah
+
+Setiap tabel ber-`tenant_id`, di Core maupun module, membawa `created_by_user_id` dan
+`updated_by_user_id` (bigint, menunjuk `users.id`), padanan `SystemCreatedBy` dan `SystemModifiedBy`
+di Business Central. Isinya bukan urusan kode module: trigger PostgreSQL `coreerp_stamp_audit_actor`
+mengisinya dari pengguna yang sedang login, termasuk update lewat query builder yang tidak melewati
+event model. Pembuat tidak dapat ditimpa; pengubah yang kosong berarti baris itu diubah sistem.
+
+Tabel baru memanggil `AuditColumns::add($table)` di dalam `Schema::create`, lalu
+`AuditColumns::attach('<tabel>')` sesudahnya (`App\Support\Modules\Contracts\AuditColumns`).
+`AuditColumnsBoundaryTest` dan `ModuleTableBoundaryTest` menolak tabel tenant yang lupa. Job antrean
+yang menulis data atas nama pengguna membungkus pekerjaannya dengan `AuditActor::runAs()`, seperti
+`RunReportExport`.
+
+Kolom ini hanya ringkasan per baris. Riwayat setiap perubahan, field demi field, milik log perubahan
+([analisa gap BC, gap 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)).
+
 ### Penghapusan lunak
 
 Tidak ada baris yang dihapus fisik. Menghapus berarti mengisi `deleted_at`; baris itu tetap ada di

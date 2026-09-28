@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\TenantMembership;
+use App\Support\Database\AuditActor;
 use App\Support\Reporting\ExportStatus;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
@@ -50,6 +51,13 @@ final class RunReportExport implements ShouldQueue
         if ($export === null || $export->status !== ExportStatus::QUEUED) {
             return;
         }
+
+        // Worker hidup lama: pelaku dipasang untuk job ini saja, supaya tidak terbawa ke job berikutnya.
+        AuditActor::runAs($export->user_id, fn () => $this->export($export, $catalog, $client, $layouts, $pipeline, $identities));
+    }
+
+    private function export(\stdClass $export, ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities): void
+    {
         $this->update(['status' => ExportStatus::RUNNING, 'progress' => 5, 'started_at' => now()]);
 
         $layout = null;

@@ -9,12 +9,15 @@ use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
+use App\Support\Database\AuditActor;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\License\SiteLicense;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
@@ -149,6 +152,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
         });
+
+        // Pelaku untuk kolom jejak: dipasang setiap kali guard memegang pengguna, termasuk saat
+        // sesi dipulihkan di tiap permintaan, dan dilepas saat keluar.
+        Event::listen(Authenticated::class, fn (Authenticated $event) => AuditActor::set($event->user->getAuthIdentifier()));
+        Event::listen(Logout::class, fn () => AuditActor::clear());
 
         // Keyed per app and tenant so one noisy app cannot starve another, and so a stolen token cannot burn a
         // tenant's number range as fast as the network allows. Credential checks are bcrypt, so this also bounds
