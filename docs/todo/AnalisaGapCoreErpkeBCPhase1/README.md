@@ -23,7 +23,7 @@ Nomor di bawah mengikuti daftar gap yang dibahas bersama pemilik produk, supaya 
 | --- | --- | --- | --- |
 | 1 | Jejak siapa yang membuat dan mengubah setiap baris | Ya | [Gap 1 dan 6](#gap-1-6) |
 | 2 | Pengaman edit bersamaan | Ya | [Gap 2](#gap-2) |
-| 3 | Tanggal kerja, serta tautan pengguna ke pekerja HR | Ya, sebagian menunggu keputusan | [Gap 3](#gap-3) |
+| 3 | Tanggal kerja, serta tautan pengguna ke pekerja HR | Ya | [Gap 3](#gap-3) |
 | 4 | Retensi data log yang bisa diatur | Ya | [Gap 4](#gap-4) |
 | 5 | Klasifikasi data pribadi per kolom | Ya | [Gap 5](#gap-5) |
 | 6 | Log perubahan per field dan riwayat per record | Ya | [Gap 1 dan 6](#gap-1-6) |
@@ -185,9 +185,23 @@ GenJournalLine."Posting Date" := WorkDate();
 BC juga punya *Allow Posting From/To* per pengguna di `User Setup`. Itu batas periode posting, dan
 baru relevan saat finance dibangun ([gap 12](#di-luar-fase-1)).
 
-**CoreERP** belum punya. Bentuk kecil yang disarankan: tanggal kerja per pengguna (bawaannya hari ini)
-yang dipakai sebagai tanggal bawaan di form transaksi. Apakah ini masuk fase 1 masih menunggu keputusan
-pemilik (K-04).
+Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
+
+- **Perubahannya sementara.** Setelah pengguna keluar atau pindah company, tanggal kerja kembali ke
+  bawaannya, yaitu hari ini.
+- **Selama tanggal kerja bukan hari ini, layar yang bisa diedit memberi tanda.** Ada pengingat di atas
+  halaman dengan tautan ke **My Settings**, yang bisa ditutup untuk sisa sesi. Setelah ditutup, tanggal
+  kerja tetap tampil di judul halaman.
+
+**CoreERP** belum punya. Pemilik memutuskan (K-04) tanggal kerja masuk fase 1 dan diisi di halaman
+**My Profile**. Bentuknya:
+
+1. Tanggal kerja per pengguna per sesi, bawaannya hari ini. Nilainya kembali ke hari ini saat pengguna
+   login ulang, atau pindah tenant atau legal entity (padanan pindah company di BC).
+2. Diisi di **My Profile**.
+3. Menjadi tanggal bawaan di form transaksi, menggantikan "hari ini" yang sekarang ditulis di tiap form.
+4. Selama tanggal kerja bukan hari ini, Shell menampilkan pengingat yang mengarah ke **My Profile** dan
+   bisa ditutup untuk sisa sesi.
 
 ### Pengguna, pekerja HR, dan jadwal kerja
 
@@ -345,6 +359,8 @@ proyek. Tidak ada lampiran pada entry buku besar, jurnal, tabel setup, atau data
 
 ### Bagaimana di CoreERP
 
+Pemilik menyetujui bentuk BC (K-09): **satu tabel lampiran untuk semua record**.
+
 1. Satu layanan lampiran di Core, dipakai semua module lewat panggilan dalam proses. Module tidak
    menyimpan berkas sendiri-sendiri.
 2. Datanya menempel pada jenis record dan ID record, dengan baris dokumen sebagai opsi, seperti kunci
@@ -440,11 +456,12 @@ yang jelas. Laporan tetap di server.
 | K-01 | Nama kolom jejak dan apa yang dirujuk | `created_by_user_id` dan `updated_by_user_id`, merujuk `users.id`, sejalan dengan `integration_clients` |
 | K-02 | Penangkap log perubahan | Trigger PostgreSQL, pelaku lewat `set_config` per transaksi |
 | K-03 | Versi baris | Kolom versi eksplisit, bukan kolom sistem `xmin` |
-| K-04 | Tanggal kerja per pengguna | Menunggu pemilik: masuk fase 1 atau tidak |
+| K-04 | Tanggal kerja per pengguna | **Diputuskan 28 Sep 2026:** masuk fase 1, diisi di My Profile, perilaku seperti BC |
 | K-05 | Daftar awal tabel yang boleh diretensi | Log number sequence, hasil ekspor laporan, dan entri log perubahan |
 | K-06 | Bentuk deklarasi klasifikasi di kode | Atribut kelas untuk bawaan tabel, konstanta untuk kolom |
 | K-07 | Lampiran ikut berpindah antar dokumen | Ditunda; fase 1 hanya melampirkan ke satu record |
 | K-08 | Job latar per tenant | Fase 2, bersama notifikasi |
+| K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
 
 ## Sumber {#sumber}
 

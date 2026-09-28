@@ -28,17 +28,20 @@ Area 3, 5, dan 7 tidak saling bergantung dan boleh dikerjakan paralel sejak kepu
 
 ### 0. [ ] Keputusan yang masih terbuka
 
-**Tempat:** pemilik produk · **Setelah:** — · **Selesai bila:** K-01 sampai K-08 dijawab dan dicatat di
+**Tempat:** pemilik produk · **Setelah:** — · **Selesai bila:** K-01 sampai K-09 dijawab dan dicatat di
 tabel keputusan README.
 
 - [ ] 0.1 K-01 nama kolom jejak dan rujukannya. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
 - [ ] 0.2 K-02 penangkap log perubahan: trigger PostgreSQL atau event Eloquent. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
 - [ ] 0.3 K-03 versi baris: kolom eksplisit atau `xmin`. [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2)
-- [ ] 0.4 K-04 tanggal kerja per pengguna masuk fase 1 atau tidak. [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
+- [x] 0.4 K-04 tanggal kerja per pengguna: masuk fase 1, diisi di My Profile, perilaku seperti BC
+      (diputuskan pemilik 28 September 2026). [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
 - [ ] 0.5 K-05 daftar awal tabel yang boleh diretensi. [README: Gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)
 - [ ] 0.6 K-06 bentuk deklarasi klasifikasi di kode. [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)
 - [ ] 0.7 K-07 lampiran ikut berpindah antar dokumen atau tidak. [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
 - [ ] 0.8 K-08 job latar per tenant di fase 2 bersama notifikasi. [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10)
+- [x] 0.9 K-09 lampiran memakai satu tabel untuk semua record, seperti `Document Attachment` BC
+      (diputuskan pemilik 28 September 2026). [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
 
 ### 1. [ ] Kolom jejak pembuat dan pengubah (gap 1)
 
@@ -132,13 +135,16 @@ Rujukan: [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 
 ### 7. [ ] Tanggal kerja dan tautan pengguna ke pekerja (gap 3)
 
-**Tempat:** Core dan module HR · **Setelah:** 0.4 · **Selesai bila:** butir yang disetujui K-04 selesai
-dan test B-7 lulus.
+**Tempat:** Core (My Profile, Shell) dan module HR · **Setelah:** 0.4 · **Selesai bila:** tanggal kerja
+bisa diisi di My Profile dan dipakai form transaksi, dan test B-7 lulus.
 
 Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
-- [ ] 7.1 Bila K-04 disetujui: tanggal kerja per pengguna, dipakai sebagai tanggal bawaan di form
-      transaksi.
+- [ ] 7.1 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
+- [ ] 7.1a Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
+- [ ] 7.1b Form transaksi memakai tanggal kerja sebagai tanggal bawaan.
+- [ ] 7.1c Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
+      untuk sisa sesi.
 - [ ] 7.2 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
 - [ ] 7.3 Pekerja yang tertaut tampil di layar pengguna.
 - [ ] 7.4 Catatan di backlog HR: tautan pekerja ke template jam kerja dibuat saat absensi atau
@@ -173,7 +179,8 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
       sampai ke exporter telemetri.
 - [ ] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
       lampirannya. Lampiran tidak bocor antar tenant. Hash yang tidak cocok terdeteksi.
-- [ ] **B-7** (area 7) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
-      tidak bisa tertaut ke dua pekerja.
+- [ ] **B-7** (area 7) Tanggal kerja yang diisi dipakai form, dan kembali ke hari ini setelah login ulang
+      atau pindah tenant/legal entity. Usulan tautan hanya menawarkan keanggotaan tenant yang sama.
+      Satu keanggotaan tidak bisa tertaut ke dua pekerja.
 - [ ] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
       terlalu besar tetap tidak diulang.
