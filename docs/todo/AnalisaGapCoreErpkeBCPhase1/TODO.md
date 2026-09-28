@@ -29,7 +29,7 @@ tidak menunggu keputusan apa pun dan boleh dikerjakan kapan saja.
 
 ## Bagian A: pembuatan
 
-### 0. [ ] Keputusan yang masih terbuka
+### 0. [x] Keputusan
 
 **Tempat:** pemilik produk · **Setelah:** — · **Selesai bila:** K-01 sampai K-10 dijawab dan dicatat di
 tabel keputusan README.
@@ -37,18 +37,21 @@ tabel keputusan README.
 Butir area ini keputusan, bukan kode. `[x]` di sini berarti sudah diputuskan pemilik dan dicatat di
 README; syarat test pada legenda status berlaku mulai area 1.
 
-- [ ] 0.1 K-01 nama kolom jejak dan rujukannya. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
-- [ ] 0.2 K-02 penangkap log perubahan: trigger PostgreSQL atau event Eloquent. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
-- [ ] 0.3 K-03 versi baris: kolom eksplisit atau `xmin`. [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2)
+Semua keputusan diambil pemilik pada 28 September 2026; isinya di tabel Keputusan README.
+
+- [x] 0.1 K-01 nama kolom jejak: `created_by_user_id`/`updated_by_user_id` ke `users.id`.
+      [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
+- [x] 0.2 K-02 penangkap log perubahan: trigger PostgreSQL. [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)
+- [x] 0.3 K-03 versi baris: kolom eksplisit. [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2)
 - [x] 0.4 K-04 tanggal kerja per pengguna: masuk fase 1, diisi di My Profile, perilaku seperti BC
       (diputuskan pemilik 28 September 2026). [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
-- [ ] 0.5 K-05 daftar awal tabel yang boleh diretensi. [README: Gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)
-- [ ] 0.6 K-06 bentuk deklarasi klasifikasi di kode. [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)
-- [ ] 0.7 K-07 lampiran ikut berpindah antar dokumen atau tidak. [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
-- [ ] 0.8 K-08 job latar per tenant di fase 2 bersama notifikasi. [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10)
+- [x] 0.5 K-05 daftar awal tabel yang boleh diretensi. [README: Gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)
+- [x] 0.6 K-06 bentuk deklarasi klasifikasi di kode. [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)
+- [x] 0.7 K-07 lampiran belum ikut berpindah antar dokumen di fase 1. [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
+- [x] 0.8 K-08 job latar per tenant di fase 2 bersama notifikasi. [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10)
 - [x] 0.9 K-09 lampiran memakai satu tabel untuk semua record, seperti `Document Attachment` BC
       (diputuskan pemilik 28 September 2026). [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)
-- [ ] 0.10 K-10 nilai bawaan zona waktu pengguna: setelan entitas legal, atau dihitung dari alamat.
+- [x] 0.10 K-10 nilai bawaan zona waktu pengguna: setelan zona waktu entitas legal.
       [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3)
 
 ### 1. [ ] Kolom jejak pembuat dan pengubah (gap 1)
