@@ -19,7 +19,7 @@
 # - Commit /opt/coreerp harus sama dengan commit rilis: compose dan migrasi datang dari commit yang sama dengan
 #   image-nya.
 # - Image ditarik lewat digest dengan robot pull-only milik SaaS dev, ke DOCKER_CONFIG sementara, dan RepoDigests
-#   dicocokkan sebelum apa pun dinyalakan.
+#   dicocokkan sebelum apa pun dinyalakan — termasuk image pihak ketiga, yang disalin perakit ke Harbor.
 # - Penyalaan bertahap dengan `compose wait`, bukan `up --wait` sekaligus: container sekali-jalan memulangkan 1
 #   pada `up --wait` walaupun berhasil, dan migrasi yang gagal pun memulangkan 1 — keduanya tidak terbedakan.
 
@@ -86,19 +86,44 @@ sed -n "s/^REGISTRY_PASSWORD='\(.*\)'\$/\1/p" "$BERKAS_ROBOT" | tail -n 1 | tr -
     | docker login "$registry" --username "$pengguna" --password-stdin >/dev/null 2>&1 \
     || gagal "Robot SaaS dev tidak dapat login ke $registry."
 
-for satu in "$image_core" "$image_konsol"; do
-    rujukan="$registry/$satu"
+tarik() {
+    local rujukan="$registry/$1"
     docker pull --quiet "$rujukan" >/dev/null || gagal "Menarik $rujukan gagal."
     docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$rujukan" | grep -qxF -- "$rujukan" \
         || gagal "Image yang ditarik bukan $rujukan (RepoDigests tidak cocok)."
     printf '    %s\n' "$rujukan"
-done
+}
+tarik "$image_core"
+tarik "$image_konsol"
+
+# Image pihak ketiga (PostgreSQL, RustFS, rclone, Gotenberg, …) disalin perakit ke Harbor dan dicatat di saas.json
+# sebagai `NAMA_IMAGE → rujukan digest`. Variabel itu diekspor di bawah, dan compose — yang menulis setiap image
+# pihak ketiga `${NAMA_IMAGE:-sumber}` — memakai salinan Harbor, tidak pernah Docker Hub. Rilis yang dirakit sebelum
+# 28 September 2026 belum punya catatan ini; untuknya compose kembali ke sumber aslinya, supaya pemasangan ulang
+# atau mundur ke rilis lama tetap dapat berjalan.
+declare -A image_pihak_ketiga=()
+# Dibaca lewat `$(...)`, bukan `< <(...)`: jq yang gagal di dalam substitusi proses tidak menghentikan skrip, dan
+# saas.json yang rusak akan terbaca sebagai rilis lama tanpa image pihak ketiga — diam-diam kembali ke Docker Hub.
+daftar_pihak_ketiga="$(jq -r '.pihak_ketiga // {} | to_entries[] | "\(.key)\t\(.value)"' "$catatan")" \
+    || gagal "saas.json rilis $rilis tidak terbaca."
+while IFS=$'\t' read -r variabel rujukan; do
+    [ -n "$variabel" ] || continue
+    [[ $variabel =~ ^[A-Z][A-Z0-9_]*_IMAGE$ ]] || gagal "saas.json rilis $rilis menyebut variabel image yang tidak sah: $variabel"
+    [[ $rujukan =~ ^[a-z0-9]+(/[a-z0-9._-]+)+@sha256:[a-f0-9]{64}$ ]] \
+        || gagal "saas.json rilis $rilis menyebut image pihak ketiga yang tidak sah: $rujukan"
+    tarik "$rujukan"
+    image_pihak_ketiga["$variabel"]="$registry/$rujukan"
+done <<< "$daftar_pihak_ketiga"
+[ "${#image_pihak_ketiga[@]}" -gt 0 ] || printf '    rilis ini belum menyalin image pihak ketiga ke Harbor; compose memakai sumber aslinya\n'
 docker logout "$registry" >/dev/null 2>&1 || true
 
 # Nilai di saas.env dikalahkan lingkungan proses: compose mendahulukan variabel shell atas --env-file. Image
 # dirujuk lewat digest yang baru ditarik, jadi compose tidak pernah menariknya lagi.
 export COREERP_IMAGE="$registry/$image_core"
 export CONSOLE_IMAGE="$registry/$image_konsol"
+for variabel in "${!image_pihak_ketiga[@]}"; do
+    export "$variabel=${image_pihak_ketiga[$variabel]}"
+done
 
 compose() {
     docker compose --env-file "$BERKAS_ENV" \
@@ -107,7 +132,7 @@ compose() {
 
 langkah 'Data'
 compose --profile data up -d
-compose --profile data wait core-minio-init
+compose --profile data wait core-rustfs-init
 
 langkah 'Migrasi'
 # `--force-recreate` supaya ia benar-benar berjalan setiap pemasangan: rilis yang image-nya sama dengan yang

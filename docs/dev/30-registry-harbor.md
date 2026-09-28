@@ -32,10 +32,18 @@ publik sejak pemasangan, dan apa pun yang tanpa sengaja didorong ke sana akan da
 | `coreerp/core` | Image aplikasi: Core dan seluruh modul, dari `deploy/perakit/Dockerfile` | Nomor rilis |
 | `coreerp/konsol` | Image admin.erp, dari `apps/control-plane/Dockerfile`. Dipakai SaaS dev, tidak pernah dipasang di server klien | Nomor rilis |
 | `coreerp/pendamping/<nama>` | Salinan image pihak ketiga yang dijalankan compose klien — PostgreSQL, Gotenberg, dan yang lain | Nomor rilis |
+| `coreerp/saas/<nama>` | Salinan image pihak ketiga yang dijalankan SaaS dev — PostgreSQL, RustFS, rclone, Gotenberg, Traefik. Tidak pernah dipasang di server klien | Nomor rilis |
 
 Daftar pendamping tidak ditulis di mana pun selain `deploy/compose.edition.yaml`: perakit membaca setiap baris
 `image:` literal di sana dan menyalinnya. Menambah service berimage baru di compose itu otomatis menambah
 pendamping pada rilis berikutnya.
+
+SaaS dev memakai aturan yang sama dengan bentuk berbeda. Di `deploy/saas/compose.yaml` dan `compose.traefik.yaml`
+setiap image pihak ketiga ditulis `${NAMA_IMAGE:-sumber}`; perakit menyalin setiap `sumber` ke `coreerp/saas/`,
+mencatat `NAMA_IMAGE → rujukan digest` di `saas.json`, dan `pasang-rilis.sh` menariknya dari Harbor lalu mengisi
+variabelnya. Image yang ditulis harfiah di compose SaaS ditolak perakit. Sejak 28 September 2026 tidak ada server
+milik kita yang menarik dari Docker Hub; pemicunya MinIO, yang image-nya hilang dari Docker Hub dan quay.io sehingga
+pemasangan rilis berhenti.
 
 ## Robot
 
