@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Modules\Apperp\ManagementAset\Models\master\GroupAset;
-use Modules\Apperp\ManagementAset\Models\master\JenisAset;
-use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
+use Brick\Math\BigDecimal;
+use Illuminate\Database\Query\JoinClause;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
+use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -16,8 +17,19 @@ use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
 /**
- * Laporan penjualan aset: satu baris per dokumen siklus penjualan aset,
- * memuat tanggal penjualan, kode & nama aset, nilai penjualan, nilai buku, dan laba/rugi.
+ * Laporan penjualan aset: aset yang dijual dalam rentang tanggal, satu baris per dokumen
+ * penjualan, dengan nilai penjualan, nilai buku saat dijual, dan laba/rugi pelepasannya.
+ * Padanannya pelepasan "Disposal - sale" di Dynamics 365.
+ *
+ * Sama dengan pemusnahan, dokumen penjualan tidak punya alur persetujuan sendiri: persetujuannya
+ * ada pada dekomisioning sebelumnya, dan saat dokumen penjualan disimpan asetnya langsung dilepas
+ * dan bukunya ditutup pada tanggal dokumen. Status dokumennya selalu `draft`, jadi tidak
+ * ditampilkan.
+ *
+ * Nilai buku dan laba/rugi dibaca dari satu buku, buku komersial bila tidak ada yang dipilih.
+ * Buku itu dipilih di syarat join: menggabungkan semua buku membuat aset yang punya buku komersial
+ * dan fiskal muncul dua kali, dan nilai penjualannya ikut terjumlah dua kali. Nilai penjualan yang
+ * tidak diisi di dokumen tampil kosong, bukan nol, dan laba/ruginya ikut kosong.
  */
 final class AssetDisposalSaleReport implements ReportDefinition
 {
@@ -33,7 +45,7 @@ final class AssetDisposalSaleReport implements ReportDefinition
 
     public function description(): string
     {
-        return 'Daftar transaksi penjualan aset lengkap dengan nomor bukti, tanggal penjualan, keterangan, dan nilai penjualan.';
+        return 'Aset yang dijual dalam rentang tanggal, beserta nilai penjualan, nilai buku saat dijual, dan laba/ruginya.';
     }
 
     public function permission(): string
@@ -44,22 +56,14 @@ final class AssetDisposalSaleReport implements ReportDefinition
     public function builtinLayouts(): array
     {
         return [
-            new BuiltinLayout(
-                'standar',
-                'Laporan penjualan aset standar (Excel)',
-                'Daftar transaksi penjualan aset lengkap dengan nomor bukti, tanggal penjualan, keterangan, dan nilai penjualan.',
-                'xlsx'
-            ),
+            new BuiltinLayout('standar', 'Laporan penjualan aset standar (Excel)', 'Satu baris per aset yang dijual: bukti, tanggal, nilai penjualan, nilai buku, dan laba/rugi.', 'xlsx'),
         ];
     }
 
     public function parameterRules(): array
     {
         return [
-            'group_aset_id' => ['nullable', 'string'],
-            'kelompok_harta_fiskal_id' => ['nullable', 'string'],
-            'jenis_aset_id' => ['nullable', 'string'],
-            'asset_id' => ['nullable', 'string'],
+            ...AssetReportFilters::rules(),
             'dari' => ['nullable', 'date_format:Y-m-d'],
             'sampai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:dari'],
         ];
@@ -67,71 +71,52 @@ final class AssetDisposalSaleReport implements ReportDefinition
 
     public function fields(): array
     {
-        $header = [
-            'filter_group_aset' => 'Filter group aset',
-            'filter_golongan_aset' => 'Filter golongan aset',
-            'filter_jenis_aset' => 'Filter jenis aset',
-            'filter_nama_aset' => 'Filter nama aset',
-            'filter_dari' => 'Filter tanggal mulai',
-            'filter_sampai' => 'Filter tanggal akhir',
-            'jumlah_penjualan' => 'Jumlah penjualan',
-            'total_nilai_penjualan' => 'Total nilai penjualan',
-            'dicetak_pada' => 'Tanggal cetak',
-        ];
-
-        $rows = [
-            'baris.nomor' => 'No',
-            'baris.no_bukti' => 'No bukti penjualan',
-            'baris.tanggal_penjualan' => 'Tanggal penjualan',
-            'baris.kode_aset' => 'Kode aset',
-            'baris.nama_aset' => 'Item aset',
-            'baris.spesifikasi' => 'Spesifikasi',
-            'baris.nilai_penjualan' => 'Nilai penjualan',
-            'baris.nilai_buku' => 'Nilai buku',
-            'baris.laba_rugi' => 'Laba / rugi',
-            'baris.keterangan' => 'Keterangan',
-            'baris.status_dokumen' => 'Status dokumen',
-        ];
-
         return [
-            ...array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null], array_keys($header), $header),
-            ...array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => 'baris'], array_keys($rows), $rows),
+            ...AssetReportFilters::fields(),
+            ['key' => 'filter_dari', 'label' => 'Filter tanggal awal', 'table' => null, 'type' => 'date'],
+            ['key' => 'filter_sampai', 'label' => 'Filter tanggal akhir', 'table' => null, 'type' => 'date'],
+            ['key' => 'jumlah_penjualan', 'label' => 'Jumlah penjualan', 'table' => null],
+            ['key' => 'total_nilai_penjualan', 'label' => 'Total nilai penjualan', 'table' => null, 'type' => 'money'],
+            ['key' => 'total_nilai_buku', 'label' => 'Total nilai buku saat dijual', 'table' => null, 'type' => 'money'],
+            ['key' => 'total_laba_rugi', 'label' => 'Total laba/rugi', 'table' => null, 'type' => 'money'],
+            ['key' => 'dicetak_pada', 'label' => 'Tanggal cetak', 'table' => null],
+            ['key' => 'baris.nomor', 'label' => 'No.', 'table' => 'baris'],
+            ['key' => 'baris.no_bukti', 'label' => 'No. bukti', 'table' => 'baris'],
+            ['key' => 'baris.tanggal_penjualan', 'label' => 'Tanggal penjualan', 'table' => 'baris', 'type' => 'date'],
+            ['key' => 'baris.kode_aset', 'label' => 'Kode aset', 'table' => 'baris'],
+            ['key' => 'baris.nama_aset', 'label' => 'Nama aset', 'table' => 'baris'],
+            ['key' => 'baris.spesifikasi', 'label' => 'Spesifikasi', 'table' => 'baris'],
+            ['key' => 'baris.buku', 'label' => 'Buku penyusutan', 'table' => 'baris'],
+            ['key' => 'baris.nilai_penjualan', 'label' => 'Nilai penjualan', 'table' => 'baris', 'type' => 'money'],
+            ['key' => 'baris.nilai_buku', 'label' => 'Nilai buku saat dijual', 'table' => 'baris', 'type' => 'money'],
+            ['key' => 'baris.laba_rugi', 'label' => 'Laba / rugi', 'table' => 'baris', 'type' => 'money'],
+            ['key' => 'baris.keterangan', 'label' => 'Keterangan', 'table' => 'baris'],
         ];
     }
 
     public function data(ReportContext $context, array $parameters): ReportData
     {
-        // Tabel utama tidak beralias
+        $bookId = is_string($parameters['buku_id'] ?? null) && $parameters['buku_id'] !== '' ? $parameters['buku_id'] : null;
+
         $query = DokumenSiklusAset::query()
             ->where('aset_tr_dokumen_siklus_aset.jenis_dokumen', 'penjualan-aset')
-            ->leftJoin('aset_tr_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_dokumen_siklus_aset.aset_id')
-                    ->on('aset.tenant_id', '=', 'aset_tr_dokumen_siklus_aset.tenant_id');
+            ->join('aset_tr_aset as aset', fn (JoinClause $join) => $join->on('aset.id', '=', 'aset_tr_dokumen_siklus_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_dokumen_siklus_aset.tenant_id'))
+            ->leftJoin('aset_m_model_aset as model', fn (JoinClause $join) => $join->on('model.id', '=', 'aset.model_aset_id')->on('model.tenant_id', '=', 'aset.tenant_id'))
+            ->leftJoin('aset_tr_buku_aset as buku', function (JoinClause $join) use ($bookId): void {
+                $join->on('buku.aset_id', '=', 'aset.id')->on('buku.tenant_id', '=', 'aset.tenant_id');
+                if ($bookId !== null) {
+                    $join->where('buku.buku_id', '=', $bookId);
+                } else {
+                    $join->where(fn ($query) => $query->whereNull('buku.buku_id')->orWhereIn(
+                        'buku.buku_id',
+                        BukuPenyusutan::query()->where('posting_layer', 'current')->select('id'),
+                    ));
+                }
             })
-            ->leftJoin('aset_tr_buku_aset as buku', function ($join): void {
-                $join->on('buku.aset_id', '=', 'aset.id')
-                    ->on('buku.tenant_id', '=', 'aset.tenant_id');
-            });
+            ->leftJoin('aset_m_buku_penyusutan as master_buku', fn (JoinClause $join) => $join->on('master_buku.id', '=', 'buku.buku_id')->on('master_buku.tenant_id', '=', 'buku.tenant_id'));
 
-        app(OrganizationScope::class)->query(
-            $query,
-            $context->request(),
-            'aset_tr_dokumen_siklus_aset.legal_entity_id',
-            'aset_tr_dokumen_siklus_aset.responsible_org_unit_id'
-        );
-
-        if (! empty($parameters['group_aset_id'])) {
-            $query->where('aset.group_aset_id', $parameters['group_aset_id']);
-        }
-        if (! empty($parameters['kelompok_harta_fiskal_id'])) {
-            $query->where('aset.kelompok_harta_fiskal_id', $parameters['kelompok_harta_fiskal_id']);
-        }
-        if (! empty($parameters['jenis_aset_id'])) {
-            $query->where('aset.jenis_aset_id', $parameters['jenis_aset_id']);
-        }
-        if (! empty($parameters['asset_id'])) {
-            $query->where('aset_tr_dokumen_siklus_aset.aset_id', $parameters['asset_id']);
-        }
+        app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_dokumen_siklus_aset.legal_entity_id', 'aset_tr_dokumen_siklus_aset.responsible_org_unit_id');
+        AssetReportFilters::apply($query, $parameters, 'aset');
         if (! empty($parameters['dari'])) {
             $query->where('aset_tr_dokumen_siklus_aset.tanggal', '>=', $parameters['dari']);
         }
@@ -141,111 +126,65 @@ final class AssetDisposalSaleReport implements ReportDefinition
 
         $rows = $query
             ->select([
-                'aset_tr_dokumen_siklus_aset.id',
-                'aset_tr_dokumen_siklus_aset.kode as dokumen_kode',
-                'aset_tr_dokumen_siklus_aset.tanggal as dokumen_tanggal',
-                'aset_tr_dokumen_siklus_aset.status as dokumen_status',
-                'aset_tr_dokumen_siklus_aset.nilai as dokumen_nilai',
-                'aset_tr_dokumen_siklus_aset.keterangan as dokumen_keterangan',
-                'aset.kode as asset_kode',
-                'aset.nama as asset_nama',
-                'aset.model_number as asset_model_number',
-                'aset.serial_number as asset_serial_number',
-                'buku.net_book_value as buku_net_book_value',
+                'aset_tr_dokumen_siklus_aset.id', 'aset_tr_dokumen_siklus_aset.kode as no_bukti',
+                'aset_tr_dokumen_siklus_aset.tanggal', 'aset_tr_dokumen_siklus_aset.nilai',
+                'aset_tr_dokumen_siklus_aset.keterangan',
+                'aset.kode as aset_kode', 'aset.nama as aset_nama', 'aset.model_number', 'aset.serial_number',
+                'model.nama as model_nama', 'buku.book_code', 'buku.net_book_value', 'master_buku.nama as buku_nama',
             ])
-            ->orderBy('aset_tr_dokumen_siklus_aset.tanggal', 'desc')
-            ->orderBy('aset_tr_dokumen_siklus_aset.kode', 'desc')
+            ->orderBy('aset_tr_dokumen_siklus_aset.tanggal')
+            ->orderBy('aset_tr_dokumen_siklus_aset.kode')
+            ->orderBy('buku.book_code')
             ->toBase()
             ->get();
 
-        // Resolusi filter label
-        $groupLabel = ! empty($parameters['group_aset_id'])
-            ? (GroupAset::where('id', $parameters['group_aset_id'])->value('nama') ?? 'Semua group')
-            : 'Semua group';
+        $totals = ['nilai_penjualan' => BigDecimal::zero(), 'nilai_buku' => BigDecimal::zero(), 'laba_rugi' => BigDecimal::zero()];
+        $counted = [];
+        $lines = [];
+        foreach ($rows as $index => $row) {
+            $sale = $row->nilai === null ? null : BigDecimal::of((string) $row->nilai);
+            $bookValue = $row->net_book_value === null ? null : BigDecimal::of((string) $row->net_book_value);
+            $gain = $sale !== null && $bookValue !== null ? $sale->minus($bookValue) : null;
+            // Aset dengan dua buku yang cocok tampil dua baris, tetapi penjualannya satu: nilai
+            // penjualan dijumlah sekali per dokumen.
+            if ($sale !== null && ! isset($counted[$row->id])) {
+                $totals['nilai_penjualan'] = $totals['nilai_penjualan']->plus($sale);
+                $counted[$row->id] = true;
+            }
+            foreach (['nilai_buku' => $bookValue, 'laba_rugi' => $gain] as $key => $amount) {
+                if ($amount !== null) {
+                    $totals[$key] = $totals[$key]->plus($amount);
+                }
+            }
 
-        $golonganLabel = ! empty($parameters['kelompok_harta_fiskal_id'])
-            ? (KelompokHartaFiskal::where('id', $parameters['kelompok_harta_fiskal_id'])->value('label') ?? 'Semua golongan')
-            : 'Semua golongan';
-
-        $jenisLabel = ! empty($parameters['jenis_aset_id'])
-            ? (JenisAset::where('id', $parameters['jenis_aset_id'])->value('nama') ?? 'Semua jenis')
-            : 'Semua jenis';
-
-        $asetLabel = ! empty($parameters['asset_id'])
-            ? (Aset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
-            : 'Semua aset';
-
-        $nomor = 1;
-        $totalNilaiPenjualan = 0.0;
-
-        $tableRows = $rows->map(function (object $row) use (&$nomor, &$totalNilaiPenjualan): array {
-            $spesifikasi = trim(($row->asset_model_number ?? '').' '.($row->asset_serial_number ?? ''));
-            $nilaiPenjualan = (float) ($row->dokumen_nilai ?? 0);
-            $totalNilaiPenjualan += $nilaiPenjualan;
-
-            $nilaiBuku = $row->buku_net_book_value !== null ? (float) $row->buku_net_book_value : null;
-            $labaRugi = $nilaiBuku !== null ? ($nilaiPenjualan - $nilaiBuku) : null;
-
-            $statusLabel = match ($row->dokumen_status) {
-                'draft' => 'Draf',
-                'submitted' => 'Diajukan',
-                'approved', 'disetujui' => 'Disetujui',
-                'completed' => 'Selesai',
-                'cancelled' => 'Dibatalkan',
-                default => (string) ($row->dokumen_status ?? '—'),
-            };
-
-            return [
-                'nomor' => (string) ($nomor++),
-                'no_bukti' => (string) ($row->dokumen_kode ?? '—'),
-                'tanggal_penjualan' => $this->formatDate($row->dokumen_tanggal),
-                'asset_kode' => (string) ($row->asset_kode ?? '—'),
-                'asset_nama' => (string) ($row->asset_nama ?? '—'),
-                'spesifikasi' => $spesifikasi !== '' ? $spesifikasi : '—',
-                'nilai_penjualan' => $this->formatCurrency($nilaiPenjualan),
-                'nilai_penjualan_raw' => $nilaiPenjualan,
-                'nilai_buku' => $nilaiBuku !== null ? $this->formatCurrency($nilaiBuku) : '—',
-                'laba_rugi' => $labaRugi !== null ? $this->formatCurrency($labaRugi) : '—',
-                'keterangan' => (string) ($row->dokumen_keterangan ?? '—'),
-                'status_dokumen' => $statusLabel,
+            $lines[] = [
+                'nomor' => $index + 1,
+                'no_bukti' => $row->no_bukti,
+                'tanggal_penjualan' => substr((string) $row->tanggal, 0, 10),
+                'kode_aset' => $row->aset_kode,
+                'nama_aset' => $row->aset_nama,
+                'spesifikasi' => AssetSpecification::describe($row->model_nama, $row->model_number, $row->serial_number),
+                'buku' => $row->buku_nama ?? $row->book_code ?? '—',
+                'nilai_penjualan' => $sale === null ? null : (string) $sale,
+                'nilai_buku' => $bookValue === null ? null : (string) $bookValue,
+                'laba_rugi' => $gain === null ? null : (string) $gain,
+                'keterangan' => $row->keterangan ?: '—',
             ];
-        })->all();
+        }
 
         return new ReportData(
             fields: [
-                'filter_group_aset' => $groupLabel,
-                'filter_golongan_aset' => $golonganLabel,
-                'filter_jenis_aset' => $jenisLabel,
-                'filter_nama_aset' => $asetLabel,
-                'filter_dari' => $parameters['dari'] ?? '',
-                'filter_sampai' => $parameters['sampai'] ?? '',
-                'jumlah_penjualan' => count($tableRows),
-                'total_nilai_penjualan' => $this->formatCurrency($totalNilaiPenjualan),
+                ...AssetReportFilters::names($parameters),
+                'filter_dari' => $parameters['dari'] ?? 'Semua',
+                'filter_sampai' => $parameters['sampai'] ?? 'Semua',
+                'jumlah_penjualan' => count(array_unique($rows->pluck('id')->all())),
+                'total_nilai_penjualan' => (string) $totals['nilai_penjualan'],
+                'total_nilai_buku' => (string) $totals['nilai_buku'],
+                'total_laba_rugi' => (string) $totals['laba_rugi'],
                 'dicetak_pada' => now()->format('d/m/Y H:i'),
             ],
-            tables: [
-                'baris' => array_values($tableRows),
-            ],
+            tables: ['baris' => $lines],
             fileName: 'laporan-penjualan-aset-'.now()->format('Ymd-Hi'),
         );
-    }
-
-    private function formatDate(?string $value): string
-    {
-        if ($value === null || $value === '') {
-            return '—';
-        }
-
-        $timestamp = strtotime($value);
-        if ($timestamp === false) {
-            return $value;
-        }
-
-        return date('d/m/Y', $timestamp);
-    }
-
-    private function formatCurrency(float|int|string $value): string
-    {
-        return 'Rp '.number_format((float) $value, 0, ',', '.');
     }
 }

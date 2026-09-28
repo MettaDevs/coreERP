@@ -6,24 +6,43 @@ import {
     AssetGroupFilter,
     AssetTypeFilter,
     DateFilter,
+    DepreciationBookFilter,
     FiscalClassificationFilter,
 } from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
+/**
+ * Satu baris laporan penjualan, satu aset yang dijual. Uang dan tanggal sudah diformat Core
+ * persis seperti hasil cetaknya; nilai yang tidak ada datang sebagai teks kosong.
+ */
 export type SaleReportRow = {
-    nomor?: number;
-    no_bukti?: string;
-    tanggal_penjualan?: string;
-    asset_kode?: string;
-    asset_nama?: string;
-    spesifikasi?: string;
-    nilai_penjualan?: string | number;
-    nilai_buku?: string | number;
-    laba_rugi?: string | number;
-    keterangan?: string;
-    status_dokumen?: string;
-} & Record<string, unknown>;
+    nomor: number;
+    no_bukti: string;
+    tanggal_penjualan: string;
+    kode_aset: string;
+    nama_aset: string;
+    spesifikasi: string;
+    buku: string;
+    nilai_penjualan: string;
+    nilai_buku: string;
+    laba_rugi: string;
+    keterangan: string;
+};
+
+const shown = (value: string | number | null | undefined) =>
+    value === null || value === undefined || value === '' ? '—' : String(value);
+
+/** Kolom uang: rata kanan, isinya teks yang sudah diformat Core. */
+const moneyColumn = (
+    id: keyof SaleReportRow,
+    header: string,
+): DataTableColumn<SaleReportRow> => ({
+    id,
+    header,
+    cell: (row) => shown(row[id]),
+    align: 'right',
+});
 
 export default function LaporanPenjualanAsetPage() {
     const {
@@ -32,6 +51,7 @@ export default function LaporanPenjualanAsetPage() {
         hasActiveFilters,
         resetFilters,
         rows,
+        fields,
         loading,
         error,
         refetch,
@@ -43,110 +63,60 @@ export default function LaporanPenjualanAsetPage() {
                 id: 'no_bukti',
                 header: 'No. bukti',
                 cell: (row) => (
-                    <span className="font-mono text-xs font-semibold">
-                        {String(row.no_bukti ?? '-')}
+                    <span className="text-primary font-mono text-xs font-semibold">
+                        {shown(row.no_bukti)}
                     </span>
                 ),
             },
             {
                 id: 'tanggal_penjualan',
-                header: 'Tgl penjualan',
-                cell: (row) => String(row.tanggal_penjualan ?? '-'),
+                header: 'Tanggal penjualan',
+                cell: (row) => shown(row.tanggal_penjualan),
             },
             {
-                id: 'asset_kode',
+                id: 'kode_aset',
                 header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {shown(row.kode_aset)}
                     </span>
                 ),
             },
             {
-                id: 'asset_nama',
-                header: 'Item aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                id: 'nama_aset',
+                header: 'Nama aset',
+                cell: (row) => shown(row.nama_aset),
             },
             {
                 id: 'spesifikasi',
                 header: 'Spesifikasi',
-                cell: (row) => String(row.spesifikasi ?? '-'),
-            },
-            {
-                id: 'nilai_penjualan',
-                header: 'Nilai penjualan',
                 cell: (row) => (
-                    <span className="font-medium">
-                        {String(row.nilai_penjualan ?? '-')}
+                    <span className="text-muted-foreground text-xs">
+                        {shown(row.spesifikasi)}
                     </span>
                 ),
-                align: 'right',
             },
-            {
-                id: 'nilai_buku',
-                header: 'Nilai buku',
-                cell: (row) => String(row.nilai_buku ?? '-'),
-                align: 'right',
-            },
-            {
-                id: 'laba_rugi',
-                header: 'Laba / (rugi)',
-                cell: (row) => (
-                    <span className="text-primary font-medium">
-                        {String(row.laba_rugi ?? '-')}
-                    </span>
-                ),
-                align: 'right',
-            },
+            { id: 'buku', header: 'Buku', cell: (row) => shown(row.buku) },
+            moneyColumn('nilai_penjualan', 'Nilai penjualan'),
+            moneyColumn('nilai_buku', 'Nilai buku saat dijual'),
+            moneyColumn('laba_rugi', 'Laba / rugi'),
             {
                 id: 'keterangan',
                 header: 'Keterangan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
-                        {String(row.keterangan ?? '-')}
+                        {shown(row.keterangan)}
                     </span>
                 ),
-            },
-            {
-                id: 'status_dokumen',
-                header: 'Status dokumen',
-                cell: (row) => (
-                    <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(row.status_dokumen ?? '-')}
-                    </span>
-                ),
-                align: 'center',
             },
         ],
         [],
     );
 
-    const totalNilaiPenjualan = useMemo(() => {
-        const total = rows.reduce((acc, row) => {
-            const val =
-                typeof row.nilai_penjualan_raw === 'number'
-                    ? row.nilai_penjualan_raw
-                    : parseFloat(
-                          String(row.nilai_penjualan ?? 0).replace(
-                              /[^\d.-]/g,
-                              '',
-                          ),
-                      ) || 0;
-
-            return acc + val;
-        }, 0);
-
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            maximumFractionDigits: 0,
-        }).format(total);
-    }, [rows]);
-
     return (
         <ReportPageLayout<SaleReportRow>
             title="Laporan penjualan aset"
-            description="Rekapitulasi transaksi pelepasan aset secara komersial beserta nilai realisasi dan laba/rugi pelepasan."
+            description="Aset yang dijual dalam rentang tanggal, beserta nilai penjualan, nilai buku saat dijual, dan laba/ruginya."
             reportCode="laporan-penjualan-aset"
             filters={filters}
             filterBar={
@@ -154,28 +124,38 @@ export default function LaporanPenjualanAsetPage() {
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
                 >
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                    <DepreciationBookFilter {...bindFilter('buku_id')} />
                     <AssetGroupFilter {...bindFilter('group_aset_id')} />
                     <FiscalClassificationFilter
                         {...bindFilter('kelompok_harta_fiskal_id')}
                     />
                     <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
                 </ReportFilterBar>
             }
             columns={columns}
             rows={rows}
             loading={loading}
             error={error}
+            // Total dari dataset, sama dengan baris total hasil cetak; tidak dijumlah ulang di
+            // sini dari teks yang sudah diformat.
             totalSummary={
-                <div className="flex items-center justify-between text-sm font-semibold">
-                    <span>Total Nilai Penjualan ({rows.length} transaksi)</span>
-                    <span className="font-mono">{totalNilaiPenjualan}</span>
-                </div>
+                rows.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+                        <span>
+                            Total nilai penjualan (
+                            {shown(fields.jumlah_penjualan)} penjualan)
+                        </span>
+                        <span className="font-mono">
+                            {shown(fields.total_nilai_penjualan)}
+                        </span>
+                    </div>
+                )
             }
             onRefresh={refetch}
         />
