@@ -1,0 +1,46 @@
+security:
+  entry_points:
+    - code: management-aset.dekomisioning-aset.form
+      name: Layar dekomisioning aset
+      type: form
+    - code: management-aset.dekomisioning-aset.api
+      name: API dekomisioning aset
+      type: api
+  permissions:
+    - code: management-aset.dekomisioning-aset.read
+      name: Lihat dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.form
+      access: read
+    - code: management-aset.dekomisioning-aset.create
+      name: Buat usulan dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.api
+      access: create
+    - code: management-aset.dekomisioning-aset.verify
+      name: Verifikasi dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.api
+      access: invoke
+  privileges:
+    - code: management-aset.dekomisioning-aset.maintain
+      name: Kelola usulan dekomisioning aset
+      permissions: [management-aset.dekomisioning-aset.read, management-aset.dekomisioning-aset.create]
+    - code: management-aset.dekomisioning-aset.verify-request
+      name: Verifikasi usulan dekomisioning aset
+      permissions: [management-aset.dekomisioning-aset.verify]
+  duties:
+    - code: management-aset.dekomisioning-aset.manage
+      name: Kelola dekomisioning aset
+      privileges: [management-aset.dekomisioning-aset.maintain]
+    - code: management-aset.dekomisioning-aset.verify
+      name: Verifikasi dekomisioning aset
+      privileges: [management-aset.dekomisioning-aset.verify-request]
+number_sequences:
+  references:
+    - code: management-aset.dekomisioning-aset
+      name: Nomor dekomisioning aset
+      default_prefix: DKMA
+      allowed_scopes: [legal_entity]
+workflow_types:
+  - code: management-aset.dekomisioning-aset-verification
+    name: Verifikasi usulan dekomisioning aset
+    decision_context_schema:
+      required: [document_id, aset_id]

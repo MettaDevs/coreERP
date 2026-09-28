@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.tindakan-perbaikan.form
+      name: Layar tindakan perbaikan
+      type: form
+    - code: management-aset.tindakan-perbaikan.api
+      name: API tindakan perbaikan
+      type: api
+  permissions:
+    - code: management-aset.tindakan-perbaikan.read
+      name: Lihat tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.form
+      access: read
+    - code: management-aset.tindakan-perbaikan.create
+      name: Tambah tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: create
+    - code: management-aset.tindakan-perbaikan.update
+      name: Ubah tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: update
+    - code: management-aset.tindakan-perbaikan.archive
+      name: Arsipkan tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: delete
+  privileges:
+    - code: management-aset.tindakan-perbaikan.maintain
+      name: Pelihara tindakan perbaikan
+      permissions:
+        - management-aset.tindakan-perbaikan.read
+        - management-aset.tindakan-perbaikan.create
+        - management-aset.tindakan-perbaikan.update
+    - code: management-aset.tindakan-perbaikan.retire
+      name: Arsipkan tindakan perbaikan
+      permissions:
+        - management-aset.tindakan-perbaikan.archive
+  duties:
+    - code: management-aset.tindakan-perbaikan.manage
+      name: Kelola tindakan perbaikan
+      privileges:
+        - management-aset.tindakan-perbaikan.maintain
+        - management-aset.tindakan-perbaikan.retire
+number_sequences:
+  references:
+    - code: management-aset.tindakan-perbaikan
+      name: Kode tindakan perbaikan
+      default_prefix: TDPB
+      allowed_scopes:
+        - tenant

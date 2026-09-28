@@ -1,0 +1,31 @@
+security:
+  entry_points:
+    - code: management-aset.permintaan-pembelian-aset.form
+      name: Layar permintaan pembelian aset
+      type: form
+    - code: management-aset.permintaan-pembelian-aset.api
+      name: API permintaan pembelian aset
+      type: api
+  permissions:
+    - code: management-aset.permintaan-pembelian-aset.read
+      name: Lihat permintaan pembelian aset
+      entry_point: management-aset.permintaan-pembelian-aset.form
+      access: read
+    - code: management-aset.permintaan-pembelian-aset.create
+      name: Buat permintaan pembelian aset
+      entry_point: management-aset.permintaan-pembelian-aset.api
+      access: create
+  privileges:
+    - code: management-aset.permintaan-pembelian-aset.maintain
+      name: Kelola permintaan pembelian aset
+      permissions: [management-aset.permintaan-pembelian-aset.read, management-aset.permintaan-pembelian-aset.create]
+  duties:
+    - code: management-aset.permintaan-pembelian-aset.manage
+      name: Kelola permintaan pembelian aset
+      privileges: [management-aset.permintaan-pembelian-aset.maintain]
+number_sequences:
+  references:
+    - code: management-aset.permintaan-pembelian-aset
+      name: Nomor permintaan pembelian aset
+      default_prefix: RPPA
+      allowed_scopes: [legal_entity]

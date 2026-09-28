@@ -14,7 +14,8 @@ sendiri. Perbedaan lengkapnya ada pada **Dua bentuk module yang hidup berdamping
 modules/
 └─ apperp/                        # publisher
    └─ management-aset/            # module
-      ├─ app.yaml                 # manifest: entry point, permission, privilege, duty, nomor, workflow
+      ├─ app.yaml                 # manifest: identitas dan menu module
+      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow, laporan
       ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
       ├─ src/                     # PHP: Http/, Models/, Services/, Actions/, Providers/
       ├─ database/migrations/     # migration module saja

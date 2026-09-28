@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.sebab-kerusakan.form
+      name: Layar sebab kerusakan
+      type: form
+    - code: management-aset.sebab-kerusakan.api
+      name: API sebab kerusakan
+      type: api
+  permissions:
+    - code: management-aset.sebab-kerusakan.read
+      name: Lihat sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.form
+      access: read
+    - code: management-aset.sebab-kerusakan.create
+      name: Tambah sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: create
+    - code: management-aset.sebab-kerusakan.update
+      name: Ubah sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: update
+    - code: management-aset.sebab-kerusakan.archive
+      name: Arsipkan sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: delete
+  privileges:
+    - code: management-aset.sebab-kerusakan.maintain
+      name: Pelihara sebab kerusakan
+      permissions:
+        - management-aset.sebab-kerusakan.read
+        - management-aset.sebab-kerusakan.create
+        - management-aset.sebab-kerusakan.update
+    - code: management-aset.sebab-kerusakan.retire
+      name: Arsipkan sebab kerusakan
+      permissions:
+        - management-aset.sebab-kerusakan.archive
+  duties:
+    - code: management-aset.sebab-kerusakan.manage
+      name: Kelola sebab kerusakan
+      privileges:
+        - management-aset.sebab-kerusakan.maintain
+        - management-aset.sebab-kerusakan.retire
+number_sequences:
+  references:
+    - code: management-aset.sebab-kerusakan
+      name: Kode sebab kerusakan
+      default_prefix: SBKR
+      allowed_scopes:
+        - tenant

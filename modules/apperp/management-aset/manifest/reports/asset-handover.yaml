@@ -1,0 +1,11 @@
+reports:
+  - code: management-aset.berita-acara-serah-terima
+    name: Berita acara serah terima aset
+    description: Satu berita acara serah terima beserta seluruh aset yang berpindah di dalamnya.
+    permission: management-aset.mutasi-aset.read
+    parameters: [id]
+    builtin_layouts:
+      - key: standar
+        name: Berita acara standar (Word)
+        description: Kop, identitas kedua pihak, tabel aset, dan blok tanda tangan.
+        format: docx

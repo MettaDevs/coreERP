@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
+use App\Support\Modules\ModuleManifestFiles;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModulSedangDipindah;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Penjaga susunan manifest module: `app.yaml` dan tabel awalan pada `modules/README.md`.
@@ -267,6 +267,48 @@ class SusunanManifestModulTest extends TestCase
             ['modul' => 1, 'entry_point' => 1, 'permission' => 3, 'privilege' => 2, 'duty' => 1],
             $angka,
         );
+    }
+
+    /**
+     * Rantai yang ditulis di folder `manifest/` diperiksa sama seperti yang ditulis di `app.yaml`.
+     *
+     * Module aset memindahkan seluruh daftar berkodenya ke `manifest/`, sehingga `app.yaml`-nya
+     * tidak lagi memuat satu pun permission. Penjaga yang hanya membaca `app.yaml` melewati module
+     * itu tanpa satu pun kesalahan, dan tetap hijau karena module lain masih punya rantai untuk
+     * dihitung.
+     */
+    public function test_security_chain_in_manifest_folder_is_checked(): void
+    {
+        $akar = $this->akarSementaraBaru();
+
+        $this->tulisManifest($akar, 'apperp', 'modul-pecahan', [
+            'id: modul-pecahan',
+            'name: Modul Pecahan',
+            'version: 0.1.0',
+            'publisher: apperp',
+            'kind: internal-fixture',
+            'table_prefix: pecahan_',
+        ]);
+        $this->writeFile($akar.'/apperp/modul-pecahan/manifest/master/barang.yaml', [
+            'security:',
+            '  entry_points:',
+            '    - code: modul-pecahan.barang.form',
+            '      name: Layar barang',
+            '  permissions:',
+            '    - code: modul-pecahan.barang.read',
+            '      entry_point: modul-pecahan.barang.form',
+            '  privileges:',
+            '    - code: modul-pecahan.barang.maintain',
+            '      permissions: [modul-pecahan.barang.read]',
+        ]);
+
+        ['pelanggaran' => $pelanggaran, 'angka' => $angka] = $this->periksaRantaiKeamanan($akar);
+
+        $this->assertSame(
+            ['modules/apperp/modul-pecahan: privilege "modul-pecahan.barang.maintain" tidak masuk satu pun duty.'],
+            $pelanggaran,
+        );
+        $this->assertSame(['modul' => 1, 'entry_point' => 1, 'permission' => 1, 'privilege' => 1, 'duty' => 0], $angka);
     }
 
     /**
@@ -569,11 +611,11 @@ class SusunanManifestModulTest extends TestCase
         $hasil = [];
 
         foreach (glob($akar.'/*/*/app.yaml') ?: [] as $berkas) {
-            /** @var mixed $isi */
-            $isi = Yaml::parseFile($berkas);
             $folder = dirname($berkas);
 
-            $hasil[basename(dirname($folder)).'/'.basename($folder)] = is_array($isi) ? $isi : [];
+            // Manifest gabungan, bukan `app.yaml` saja: module aset menulis seluruh rantainya di
+            // `manifest/`, dan penjaga yang hanya membaca `app.yaml` akan melewatinya tanpa suara.
+            $hasil[basename(dirname($folder)).'/'.basename($folder)] = ModuleManifestFiles::read($folder);
         }
 
         ksort($hasil);
@@ -895,6 +937,13 @@ class SusunanManifestModulTest extends TestCase
         $tujuan = $akar.'/'.$penerbit.'/'.$folder;
         mkdir($tujuan, 0o777, true);
         file_put_contents($tujuan.'/app.yaml', implode("\n", $baris)."\n");
+    }
+
+    /** @param  list<string>  $lines */
+    private function writeFile(string $path, array $lines): void
+    {
+        mkdir(dirname($path), 0o777, true);
+        file_put_contents($path, implode("\n", $lines)."\n");
     }
 
     private function hapusFolder(string $folder): void

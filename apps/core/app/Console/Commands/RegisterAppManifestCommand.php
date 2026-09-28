@@ -5,16 +5,19 @@ namespace App\Console\Commands;
 use App\Actions\Provider\RegisterAppCatalog;
 use App\Http\Requests\Provider\AppCatalogRequest;
 use App\Support\Modules\ModuleManifest;
+use App\Support\Modules\ModuleManifestFiles;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Validator as ValidatorInstance;
+use RuntimeException;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Mendaftarkan katalog app dari `app.yaml` module yang ada di dalam repo.
+ * Mendaftarkan katalog app dari manifest module yang ada di dalam repo: `app.yaml` ditambah berkas
+ * fitur di folder `manifest/`-nya, digabung `ModuleManifestFiles`.
  *
  * Manifest adalah sumber kebenaran katalog. Command ini memakai aturan validasi,
  * normalisasi payload, dan action yang sama dengan endpoint provider
@@ -44,7 +47,7 @@ class RegisterAppManifestCommand extends Command
         {module? : ID module yang didaftarkan; kosong berarti semua module yang dilayani}
         {--dry-run : Tampilkan hasil pemetaan tanpa menulis ke database}';
 
-    protected $description = 'Daftarkan module yang ada di repo ke katalog Core dari app.yaml-nya';
+    protected $description = 'Daftarkan module yang ada di repo ke katalog Core dari manifest-nya (app.yaml dan folder manifest/)';
 
     public function handle(ModuleRegistry $registry, RegisterAppCatalog $registrar): int
     {
@@ -200,19 +203,11 @@ class RegisterAppManifestCommand extends Command
 
     private function daftarkan(ModuleManifest $module, RegisterAppCatalog $registrar): int
     {
-        $berkas = $module->folder.'/app.yaml';
-
+        // `app.yaml` ditambah berkas fitur di `manifest/`; lihat `ModuleManifestFiles`.
         try {
-            /** @var mixed $manifest */
-            $manifest = Yaml::parseFile($berkas);
-        } catch (ParseException $exception) {
-            $this->components->error("Manifest {$berkas} bukan YAML yang valid: ".$exception->getMessage());
-
-            return self::FAILURE;
-        }
-
-        if (! is_array($manifest)) {
-            $this->components->error("Manifest {$berkas} harus berupa map di level teratas.");
+            $manifest = ModuleManifestFiles::read($module->folder);
+        } catch (RuntimeException $exception) {
+            $this->components->error("Manifest module {$module->id} tidak bisa dibaca: ".$exception->getMessage());
 
             return self::FAILURE;
         }
@@ -233,7 +228,7 @@ class RegisterAppManifestCommand extends Command
         $validator = $this->validatorFor($request);
 
         if ($validator->fails()) {
-            $this->components->error("Manifest {$berkas} ditolak validasi katalog:");
+            $this->components->error("Manifest module {$module->id} ditolak validasi katalog:");
             $this->components->bulletList($validator->errors()->all());
 
             return self::FAILURE;

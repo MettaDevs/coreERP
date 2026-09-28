@@ -1,0 +1,29 @@
+security:
+  entry_points:
+    - code: management-aset.validasi-status-work-order.form
+      name: Layar validasi status work order
+      type: form
+    - code: management-aset.validasi-status-work-order.api
+      name: API validasi status work order
+      type: api
+  permissions:
+    - code: management-aset.validasi-status-work-order.read
+      name: Lihat aturan validasi status work order
+      entry_point: management-aset.validasi-status-work-order.form
+      access: read
+    - code: management-aset.validasi-status-work-order.update
+      name: Ubah aturan validasi status work order
+      entry_point: management-aset.validasi-status-work-order.api
+      access: update
+  privileges:
+    # Tidak ada tambah dan hapus: barisnya matriks tetap yang disemai saat provisioning.
+    - code: management-aset.validasi-status-work-order.maintain
+      name: Atur aturan validasi status work order
+      permissions:
+        - management-aset.validasi-status-work-order.read
+        - management-aset.validasi-status-work-order.update
+  duties:
+    - code: management-aset.validasi-status-work-order.manage
+      name: Kelola aturan validasi status work order
+      privileges:
+        - management-aset.validasi-status-work-order.maintain

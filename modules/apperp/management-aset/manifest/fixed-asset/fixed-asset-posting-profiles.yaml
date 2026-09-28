@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.fixed-asset-posting-profiles.form
+      name: Layar posting group aset
+      type: form
+    - code: management-aset.fixed-asset-posting-profiles.api
+      name: API posting group aset
+      type: api
+  permissions:
+    - code: management-aset.fixed-asset-posting-profiles.read
+      name: Lihat posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.form
+      access: read
+    - code: management-aset.fixed-asset-posting-profiles.create
+      name: Tambah baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: create
+    - code: management-aset.fixed-asset-posting-profiles.update
+      name: Ubah akun posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: update
+    - code: management-aset.fixed-asset-posting-profiles.archive
+      name: Arsipkan baris posting group aset
+      entry_point: management-aset.fixed-asset-posting-profiles.api
+      access: delete
+  privileges:
+    - code: management-aset.fixed-asset-posting-profiles.view
+      name: Lihat posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.read
+    - code: management-aset.fixed-asset-posting-profiles.maintain
+      name: Pelihara posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.read
+        - management-aset.fixed-asset-posting-profiles.create
+        - management-aset.fixed-asset-posting-profiles.update
+    - code: management-aset.fixed-asset-posting-profiles.retire
+      name: Arsipkan posting group aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.archive
+  duties:
+    # Duty tersendiri, bukan tambahan pada duty yang sudah ada: role yang sudah memegang duty
+    # lama tidak boleh diam-diam dapat mengubah akun jurnal (keputusan pemilik produk,
+    # 22 September 2026).
+    - code: management-aset.fixed-asset-posting-profiles.manage
+      name: Kelola posting group aset
+      privileges:
+        - management-aset.fixed-asset-posting-profiles.maintain
+        - management-aset.fixed-asset-posting-profiles.retire

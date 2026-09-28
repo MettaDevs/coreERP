@@ -1,0 +1,18 @@
+security:
+  entry_points:
+    - code: management-aset.monitoring-aset.form
+      name: Layar monitoring aset
+      type: form
+  permissions:
+    - code: management-aset.monitoring-aset.read
+      name: Lihat monitoring aset
+      entry_point: management-aset.monitoring-aset.form
+      access: read
+  privileges:
+    - code: management-aset.monitoring-aset.view
+      name: Pantau aset
+      permissions: [management-aset.monitoring-aset.read]
+  duties:
+    - code: management-aset.monitoring-aset.manage
+      name: Pantau aset
+      privileges: [management-aset.monitoring-aset.view]

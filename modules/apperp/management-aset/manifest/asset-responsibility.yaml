@@ -1,0 +1,51 @@
+security:
+  data_policies:
+    # Ejaan `asset` pada kode di bawah disengaja, dan berlaku untuk seluruh kode kebijakan,
+    # permission, entry point, dan duty di `manifest/`. Semuanya pengenal yang tercatat di
+    # katalog Core dan pada peran serta hibah lingkup milik tenant; menggantinya membuat
+    # `app:register-manifest` menolak pembaruan selama masih ada peran yang memakainya, dan
+    # membuat hibah lingkup yang sudah ada tidak lagi cocok. Yang dibaca orang adalah label
+    # dan id menu, dan keduanya memang sudah berbahasa Indonesia.
+    - code: management-aset.asset-responsibility
+      name: Akses aset menurut unit penanggung jawab
+      protected_permissions:
+        - management-aset.aset.read
+        - management-aset.aset.create
+        - management-aset.aset.update
+        - management-aset.aset.mutate
+        - management-aset.mutasi-aset.read
+        - management-aset.mutasi-aset.create
+        - management-aset.mutasi-aset.update
+        - management-aset.mutasi-aset.archive
+        - management-aset.penerimaan-aset.read
+        - management-aset.penerimaan-aset.create
+        - management-aset.penerimaan-aset.update
+        - management-aset.penerimaan-aset.archive
+        - management-aset.perencanaan-aset.read
+        - management-aset.perencanaan-aset.create
+        - management-aset.perencanaan-aset.update
+        - management-aset.perencanaan-aset.archive
+        - management-aset.permintaan-pembelian-aset.read
+        - management-aset.permintaan-pembelian-aset.create
+        - management-aset.pemeliharaan-aset.read
+        - management-aset.pemeliharaan-aset.create
+        - management-aset.pemeliharaan-aset.update
+        - management-aset.pemeliharaan-aset.archive
+        - management-aset.pemeliharaan-aset.schedule
+        - management-aset.pemeliharaan-aset.execute
+        - management-aset.pemeliharaan-aset.close
+        - management-aset.dekomisioning-aset.read
+        - management-aset.dekomisioning-aset.create
+        - management-aset.dekomisioning-aset.verify
+        - management-aset.penjualan-aset.read
+        - management-aset.penjualan-aset.create
+        - management-aset.pemusnahan-aset.read
+        - management-aset.pemusnahan-aset.create
+        - management-aset.penyusutan.read
+        - management-aset.penyusutan.create
+        - management-aset.penyusutan.finalize
+        - management-aset.penyusutan.correct
+        - management-aset.penyusutan.post
+      requires_legal_entity: true
+      requires_operating_unit: true
+      allows_descendants: true

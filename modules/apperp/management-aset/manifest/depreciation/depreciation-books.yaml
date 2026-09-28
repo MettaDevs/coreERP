@@ -1,0 +1,51 @@
+security:
+  entry_points:
+    - code: management-aset.buku-penyusutan.form
+      name: Layar buku penyusutan
+      type: form
+    - code: management-aset.buku-penyusutan.api
+      name: API buku penyusutan
+      type: api
+  permissions:
+    - code: management-aset.buku-penyusutan.read
+      name: Lihat buku penyusutan
+      entry_point: management-aset.buku-penyusutan.form
+      access: read
+    - code: management-aset.buku-penyusutan.create
+      name: Tambah buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: create
+    - code: management-aset.buku-penyusutan.update
+      name: Ubah buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: update
+    - code: management-aset.buku-penyusutan.archive
+      name: Arsipkan buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: delete
+  privileges:
+    - code: management-aset.buku-penyusutan.maintain
+      name: Pelihara buku penyusutan
+      permissions:
+        - management-aset.buku-penyusutan.read
+        - management-aset.buku-penyusutan.create
+        - management-aset.buku-penyusutan.update
+    - code: management-aset.buku-penyusutan.retire
+      name: Arsipkan buku penyusutan
+      permissions:
+        - management-aset.buku-penyusutan.archive
+  duties:
+    - code: management-aset.buku-penyusutan.manage
+      name: Kelola buku penyusutan
+      privileges:
+        - management-aset.buku-penyusutan.maintain
+        - management-aset.buku-penyusutan.retire
+number_sequences:
+  references:
+    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
+    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
+    - code: management-aset.buku-penyusutan
+      name: Kode buku penyusutan
+      default_prefix: BKPY
+      allowed_scopes:
+        - tenant

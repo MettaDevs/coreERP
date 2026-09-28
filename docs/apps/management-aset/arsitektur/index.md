@@ -12,7 +12,9 @@ database/           Migration modul, seluruhnya bertabel berawalan `aset_`.
 ui/                 Halaman React. Ikut build shell Core; tidak ada iframe.
 contracts/          Janji ke kode di luar modul ini.
 loadtest/           Stack uji beban lengkap.
-app.yaml            Manifest: entry point, permission, privilege, duty, reference nomor.
+app.yaml            Identitas modul dan menu.
+manifest/           Entry point, permission, privilege, duty, reference nomor, workflow, dan
+                    laporan: satu berkas per fitur, per area seperti Fixed Assets di BC.
 ```
 
 Modul berjalan di dalam runtime Core. Ia tidak punya `artisan`, `Dockerfile`, `.env`, maupun

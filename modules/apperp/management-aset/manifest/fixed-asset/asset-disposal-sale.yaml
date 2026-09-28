@@ -1,0 +1,31 @@
+security:
+  entry_points:
+    - code: management-aset.penjualan-aset.form
+      name: Layar penjualan aset
+      type: form
+    - code: management-aset.penjualan-aset.api
+      name: API penjualan aset
+      type: api
+  permissions:
+    - code: management-aset.penjualan-aset.read
+      name: Lihat penjualan aset
+      entry_point: management-aset.penjualan-aset.form
+      access: read
+    - code: management-aset.penjualan-aset.create
+      name: Buat usulan penjualan aset
+      entry_point: management-aset.penjualan-aset.api
+      access: create
+  privileges:
+    - code: management-aset.penjualan-aset.maintain
+      name: Kelola penjualan aset
+      permissions: [management-aset.penjualan-aset.read, management-aset.penjualan-aset.create]
+  duties:
+    - code: management-aset.penjualan-aset.manage
+      name: Kelola penjualan aset
+      privileges: [management-aset.penjualan-aset.maintain]
+number_sequences:
+  references:
+    - code: management-aset.penjualan-aset
+      name: Nomor penjualan aset
+      default_prefix: PJLA
+      allowed_scopes: [legal_entity]

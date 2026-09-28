@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.profil-penyusutan.form
+      name: Layar profil penyusutan
+      type: form
+    - code: management-aset.profil-penyusutan.api
+      name: API profil penyusutan
+      type: api
+  permissions:
+    - code: management-aset.profil-penyusutan.read
+      name: Lihat profil penyusutan
+      entry_point: management-aset.profil-penyusutan.form
+      access: read
+    - code: management-aset.profil-penyusutan.create
+      name: Tambah profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: create
+    - code: management-aset.profil-penyusutan.update
+      name: Ubah profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: update
+    - code: management-aset.profil-penyusutan.archive
+      name: Arsipkan profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: delete
+  privileges:
+    - code: management-aset.profil-penyusutan.maintain
+      name: Pelihara profil penyusutan
+      permissions:
+        - management-aset.profil-penyusutan.read
+        - management-aset.profil-penyusutan.create
+        - management-aset.profil-penyusutan.update
+    - code: management-aset.profil-penyusutan.retire
+      name: Arsipkan profil penyusutan
+      permissions:
+        - management-aset.profil-penyusutan.archive
+  duties:
+    - code: management-aset.profil-penyusutan.manage
+      name: Kelola profil penyusutan
+      privileges:
+        - management-aset.profil-penyusutan.maintain
+        - management-aset.profil-penyusutan.retire
+number_sequences:
+  references:
+    - code: management-aset.profil-penyusutan
+      name: Kode profil penyusutan
+      default_prefix: DPRE
+      allowed_scopes:
+        - tenant

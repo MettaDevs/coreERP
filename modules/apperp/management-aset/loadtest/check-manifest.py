@@ -1,4 +1,4 @@
-"""Validate app.yaml against the Control Plane catalog contract.
+"""Validate the module manifest (app.yaml plus manifest/**/*.yaml) against the catalog contract.
 
 Mirrors apps/core/app/Http/Requests/Provider/AppCatalogRequest.php, including the
 four Dynamics 365 layers (entry point -> permission -> privilege -> duty) and the rule that
@@ -10,6 +10,7 @@ Usage: python check-manifest.py ../app.yaml
 
 import re
 import sys
+from pathlib import Path
 
 import yaml
 
@@ -21,6 +22,47 @@ CODE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 path = sys.argv[1] if len(sys.argv) > 1 else "../app.yaml"
 with open(path, encoding="utf-8") as handle:
     manifest = yaml.safe_load(handle)
+
+# Daftar berkode module ini ditulis di manifest/<area>/<fitur>.yaml, bukan di app.yaml. Core
+# menggabungkannya dengan cara yang sama (App\Support\Modules\ModuleManifestFiles): daftar
+# disambung, app.yaml lebih dulu, lalu berkas menurut jalurnya. Kode ganda tertangkap pemeriksaan
+# duplikat di bawah.
+LISTS = [
+    ("security", "data_policies"),
+    ("security", "entry_points"),
+    ("security", "permissions"),
+    ("security", "privileges"),
+    ("security", "duties"),
+    ("number_sequences", "references"),
+    ("workflow_types",),
+    ("reports",),
+]
+
+
+def listed(tree, keys):
+    value = tree.get(keys[0])
+    if len(keys) == 2:
+        value = (value or {}).get(keys[1])
+    return value or []
+
+
+def extend(tree, keys, entries):
+    if len(keys) == 1:
+        tree[keys[0]] = listed(tree, keys) + entries
+        return
+    parent = tree.get(keys[0]) or {}
+    parent[keys[1]] = listed(tree, keys) + entries
+    tree[keys[0]] = parent
+
+
+folder = Path(path).resolve().parent
+for fragment_path in sorted((folder / "manifest").rglob("*.yaml"), key=lambda p: p.relative_to(folder).as_posix()):
+    with open(fragment_path, encoding="utf-8") as handle:
+        fragment = yaml.safe_load(handle) or {}
+    for keys in LISTS:
+        entries = listed(fragment, keys)
+        if entries:
+            extend(manifest, keys, entries)
 
 app_id = manifest["id"]
 security = manifest["security"]

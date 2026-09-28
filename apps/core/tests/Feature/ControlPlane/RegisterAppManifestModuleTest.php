@@ -8,6 +8,9 @@ use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModulSedangDipindah;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
@@ -22,55 +25,17 @@ use Tests\TestCase;
  *    yang menemukannya adalah tenant yang izinnya tiba-tiba tidak ada.
  * 2. **Menjalankannya dua kali sama dengan sekali.** Pembaruan on-premise dijalankan admin
  *    pelanggan yang tidak punya cara mengetahui apakah perintahnya sudah pernah jalan.
+ *
+ * **Tidak ada lagi angka tetap.** Sampai 28 September 2026 test ini juga memaku jumlah tiap
+ * kelompok sebagai angka yang ditulis tangan, penjaga pemindahan module aset ke dalam repo pada
+ * 10 September. Pemindahan itu sudah lama selesai, sedangkan angkanya menjadi satu tempat yang wajib
+ * disunting setiap PR yang menambah izin atau laporan, dan setiap dua PR seperti itu bentrok di
+ * sini. Yang tetap dijaga adalah hal pertama di atas: jumlahnya dihitung dari berkas manifest
+ * module itu sendiri, lalu harus sama dengan isi katalog.
  */
 class RegisterAppManifestModuleTest extends TestCase
 {
     use RefreshDatabase;
-
-    /**
-     * Jumlah baris tiap kelompok manifest aset sebelum module dipindah ke dalam repo.
-     *
-     * Angka ini bukan hiasan: "sama persis dengan sebelum pemindahan" hanya dapat dibuktikan
-     * bila ada angka sebelumnya yang tertulis. Bila salah satunya berubah, yang berubah
-     * adalah `app.yaml` module — dan perubahan itu harus disengaja, bukan efek samping.
-     */
-    private const JUMLAH_SEBELUM_PEMINDAHAN = [
-        // 17 September 2026, mutasi aset: +1 entry point (`mutasi-aset.api`), +3 permission
-        // (create/update/archive), +2 privilege (maintain/retire), +1 reference nomor
-        // (`MUTA`), dan +2 laporan (berita acara serah terima dan daftar mutasi).
-        //
-        // 18 September 2026, penerimaan aset: +2 entry point (`penerimaan-aset.form` dan
-        // `.api`), +4 permission (read/create/update/archive), +2 privilege
-        // (maintain/retire), dan +1 reference nomor (`PNRA`). Duty tidak bertambah:
-        // keduanya menempel pada `management-aset.aset.manage` yang sudah ada.
-        //
-        // 23 September 2026, posting group aset (feed posting finance area 8): +1 entry point
-        // (`fixed-asset-posting-profiles.api`), +3 permission (create/update/archive), +2
-        // privilege (maintain/retire), dan +1 duty (`fixed-asset-posting-profiles.manage`),
-        // tersendiri supaya role lama tidak diam-diam dapat mengubah akun jurnal.
-        //
-        // 24 September 2026, "Post penyusutan" (feed posting finance area 11): +1 permission
-        // (`penyusutan.post`, invoke), +1 privilege (`penyusutan.post-to-finance`), dan +1 duty
-        // (`penyusutan.finance-posting`), tersendiri supaya role yang mengelola penyusutan tidak
-        // diam-diam dapat mengirim jurnalnya ke aplikasi finance.
-        //
-        // 28 September 2026, laporan penyusutan aset (#153): +1 laporan
-        // (`laporan-penyusutan-aset`). Tanpa baris manifest ini tombol Cetak menjawab 404
-        // walau pratinjaunya tampil, karena dialog cetak mencari laporan di katalog Core.
-        //
-        // 28 September 2026, laporan pemusnahan aset (#154): +1 laporan
-        // (`laporan-pemusnahan-aset`).
-        //
-        // 28 September 2026, laporan penjualan aset (#157): +1 laporan
-        // (`laporan-penjualan-aset`).
-        'entry_points' => 69,
-        'permissions' => 133,
-        'privileges' => 71,
-        'duties' => 38,
-        'number_sequence_references' => 31,
-        'workflow_types' => 2,
-        'reports' => 7,
-    ];
 
     private string $akarSementara;
 
@@ -94,25 +59,11 @@ class RegisterAppManifestModuleTest extends TestCase
 
         $this->artisan('app:register-manifest')->assertSuccessful();
 
-        $manifest = $this->manifestAset();
+        $diManifest = $this->countEntriesInManifestFiles();
 
-        $diManifest = [
-            'entry_points' => count($manifest['security']['entry_points']),
-            'permissions' => count($manifest['security']['permissions']),
-            'privileges' => count($manifest['security']['privileges']),
-            'duties' => count($manifest['security']['duties']),
-            'number_sequence_references' => count($manifest['number_sequences']['references']),
-            'workflow_types' => count($manifest['workflow_types']),
-            'reports' => count($manifest['reports']),
-        ];
-
-        $this->assertSame(
-            self::JUMLAH_SEBELUM_PEMINDAHAN,
-            $diManifest,
-            'Isi app.yaml module aset berubah jumlahnya dibanding sebelum pemindahan. Kalau '
-            .'perubahan itu disengaja, angka acuan di test ini yang harus ikut diperbarui; '
-            .'kalau tidak, ada baris manifest yang hilang atau tergandakan saat pemindahan.',
-        );
+        foreach ($diManifest as $kelompok => $jumlah) {
+            $this->assertGreaterThan(0, $jumlah, "Tidak ada {$kelompok} yang terbaca dari berkas manifest; hitungannya salah alamat.");
+        }
 
         $this->assertSame(
             $diManifest,
@@ -203,7 +154,8 @@ class RegisterAppManifestModuleTest extends TestCase
     /**
      * Menyalin manifest module aset yang sungguhan ke akar module sementara.
      *
-     * Manifestnya dipakai apa adanya karena yang dibuktikan test ini justru jumlah barisnya.
+     * Manifestnya, `app.yaml` beserta folder `manifest/`, dipakai apa adanya karena yang
+     * dibuktikan test ini justru jumlah barisnya.
      * Nama foldernya yang dibuat berbeda: nama folder itulah yang menentukan apakah sebuah
      * module masih terhitung sedang dipindah masuk.
      */
@@ -215,29 +167,72 @@ class RegisterAppManifestModuleTest extends TestCase
             mkdir($tujuan, 0777, true);
         }
 
-        copy($this->berkasManifestAset(), $tujuan.'/app.yaml');
+        copy($this->assetModuleFolder().'/app.yaml', $tujuan.'/app.yaml');
+        $this->copyFolder($this->assetModuleFolder().'/manifest', $tujuan.'/manifest');
 
         $this->app->instance(ModuleRegistry::class, new ModuleRegistry($this->akarSementara));
     }
 
-    private function berkasManifestAset(): string
+    private function assetModuleFolder(): string
     {
-        return dirname(base_path(), 2).'/modules/apperp/management-aset/app.yaml';
+        return dirname(base_path(), 2).'/modules/apperp/management-aset';
     }
 
-    /** @return array<string, mixed> */
-    private function manifestAset(): array
+    /**
+     * Jumlah baris tiap kelompok, dihitung langsung dari setiap berkas manifest module aset.
+     *
+     * Sengaja tidak memakai `ModuleManifestFiles`. Kalau pembaca itu melewatkan sebuah berkas,
+     * perintah pendaftaran dan hitungan ini akan sama-sama kekurangan baris, dan test tetap hijau.
+     *
+     * @return array<string, int>
+     */
+    private function countEntriesInManifestFiles(): array
     {
-        /** @var array<string, mixed> $isi */
-        $isi = Yaml::parseFile($this->berkasManifestAset());
+        $files = [$this->assetModuleFolder().'/app.yaml'];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->assetModuleFolder().'/manifest', RecursiveDirectoryIterator::SKIP_DOTS));
 
-        return $isi;
+        /** @var SplFileInfo $file */
+        foreach ($iterator as $file) {
+            if ($file->getExtension() === 'yaml') {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        $counts = array_fill_keys(['data_policies', 'entry_points', 'permissions', 'privileges', 'duties', 'number_sequence_references', 'workflow_types', 'reports'], 0);
+
+        foreach ($files as $path) {
+            /** @var array<string, mixed> $content */
+            $content = Yaml::parseFile($path);
+            $counts['data_policies'] += count($content['security']['data_policies'] ?? []);
+            $counts['entry_points'] += count($content['security']['entry_points'] ?? []);
+            $counts['permissions'] += count($content['security']['permissions'] ?? []);
+            $counts['privileges'] += count($content['security']['privileges'] ?? []);
+            $counts['duties'] += count($content['security']['duties'] ?? []);
+            $counts['number_sequence_references'] += count($content['number_sequences']['references'] ?? []);
+            $counts['workflow_types'] += count($content['workflow_types'] ?? []);
+            $counts['reports'] += count($content['reports'] ?? []);
+        }
+
+        return $counts;
+    }
+
+    private function copyFolder(string $from, string $to): void
+    {
+        mkdir($to, 0o777, true);
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($from, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
+
+        /** @var SplFileInfo $item */
+        foreach ($iterator as $item) {
+            $target = $to.'/'.substr($item->getPathname(), strlen($from) + 1);
+            $item->isDir() ? mkdir($target, 0o777, true) : copy($item->getPathname(), $target);
+        }
     }
 
     /** @return array<string, int> */
     private function jumlahDiKatalog(string $appId): array
     {
         return [
+            'data_policies' => DB::table('app_data_policies')->where('app_id', $appId)->count(),
             'entry_points' => DB::table('app_entry_points')->where('app_id', $appId)->count(),
             'permissions' => DB::table('permissions')->where('app_id', $appId)->count(),
             'privileges' => DB::table('security_privileges')->where('app_id', $appId)->count(),

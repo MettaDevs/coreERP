@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.model-aset.form
+      name: Bagian model pada layar pabrikan dan model
+      type: form
+    - code: management-aset.model-aset.api
+      name: API model aset
+      type: api
+  permissions:
+    - code: management-aset.model-aset.read
+      name: Lihat model aset
+      entry_point: management-aset.model-aset.form
+      access: read
+    - code: management-aset.model-aset.create
+      name: Tambah model aset
+      entry_point: management-aset.model-aset.api
+      access: create
+    - code: management-aset.model-aset.update
+      name: Ubah model aset
+      entry_point: management-aset.model-aset.api
+      access: update
+    - code: management-aset.model-aset.archive
+      name: Arsipkan model aset
+      entry_point: management-aset.model-aset.api
+      access: delete
+  privileges:
+    - code: management-aset.model-aset.maintain
+      name: Pelihara model aset
+      permissions:
+        - management-aset.model-aset.read
+        - management-aset.model-aset.create
+        - management-aset.model-aset.update
+    - code: management-aset.model-aset.retire
+      name: Arsipkan model aset
+      permissions:
+        - management-aset.model-aset.archive
+  duties:
+    - code: management-aset.model-aset.manage
+      name: Kelola model aset
+      privileges:
+        - management-aset.model-aset.maintain
+        - management-aset.model-aset.retire
+number_sequences:
+  references:
+    - code: management-aset.model-aset
+      name: Kode model aset
+      default_prefix: MDLA
+      allowed_scopes:
+        - tenant

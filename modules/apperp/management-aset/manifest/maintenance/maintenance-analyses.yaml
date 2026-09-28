@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.analisa-maintenance.form
+      name: Layar analisa maintenance
+      type: form
+    - code: management-aset.analisa-maintenance.api
+      name: API analisa maintenance
+      type: api
+  permissions:
+    - code: management-aset.analisa-maintenance.read
+      name: Lihat analisa maintenance
+      entry_point: management-aset.analisa-maintenance.form
+      access: read
+    - code: management-aset.analisa-maintenance.create
+      name: Tambah analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: create
+    - code: management-aset.analisa-maintenance.update
+      name: Ubah analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: update
+    - code: management-aset.analisa-maintenance.archive
+      name: Arsipkan analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: delete
+  privileges:
+    - code: management-aset.analisa-maintenance.maintain
+      name: Pelihara analisa maintenance
+      permissions:
+        - management-aset.analisa-maintenance.read
+        - management-aset.analisa-maintenance.create
+        - management-aset.analisa-maintenance.update
+    - code: management-aset.analisa-maintenance.retire
+      name: Arsipkan analisa maintenance
+      permissions:
+        - management-aset.analisa-maintenance.archive
+  duties:
+    - code: management-aset.analisa-maintenance.manage
+      name: Kelola analisa maintenance
+      privileges:
+        - management-aset.analisa-maintenance.maintain
+        - management-aset.analisa-maintenance.retire
+number_sequences:
+  references:
+    - code: management-aset.analisa-maintenance
+      name: Kode analisa maintenance
+      default_prefix: ANMA
+      allowed_scopes:
+        - tenant

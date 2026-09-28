@@ -71,6 +71,7 @@ Aturan penurunan namespace dan awalan tabel, beserta contoh yang sudah jalan, ad
 | Berkas | Keterangan |
 | --- | --- |
 | `app.yaml` | Manifest: identitas, navigasi, empat lapis keamanan, reference nomor, data policy, tipe workflow |
+| `manifest/` | Opsional: daftar berkode yang sama, dipecah satu berkas per fitur supaya tim tidak bentrok ([aturannya](../dev/02-module-standard.md#daftar-berkode-dipecah-ke-folder-manifest)) |
 | `composer.json` | Package lokal, autoload PSR-4 untuk namespace module |
 | `src/` | PHP module: `Http/`, `Models/`, `Services/`, `Listeners/`, dan penyedia layanannya |
 | `database/migrations/` | Migration module saja, seluruhnya bertabel berawalan |
@@ -221,11 +222,11 @@ transaksi dokumen yang sedang disimpan.
 Deklarasikan data policy **hanya bila** resource-nya memang perlu dibatasi organisasi. Ikuti Data policy decision gate di `.agents/skills/coreerp-architecture/SKILL.md`.
 
 ::: tip Contoh manifest utuh yang sudah jalan
-`modules/apperp/management-aset/app.yaml`. Blok `security`-nya jauh lebih panjang dari sisanya. Baca itu sebelum menulis manifest sendiri.
+Module aset: identitas dan menunya di `modules/apperp/management-aset/app.yaml`, daftar berkodenya di folder `manifest/` di sebelahnya, satu berkas per fitur. Baca itu sebelum menulis manifest sendiri.
 :::
 
 ::: tip Gate keluar
-`app.yaml` berisi identitas, menu, dan permission yang sebenarnya — bukan placeholder.
+Manifest (`app.yaml`, beserta `manifest/` bila dipecah) berisi identitas, menu, dan permission yang sebenarnya — bukan placeholder.
 `app:register-manifest <id module>` diterima Control Plane tanpa error validasi. Bentuk berjalur
 berkas sudah tidak diterima; perintahnya menerima **id module**.
 :::

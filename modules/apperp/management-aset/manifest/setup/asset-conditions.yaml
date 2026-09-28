@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.kondisi-aset.form
+      name: Layar kondisi aset
+      type: form
+    - code: management-aset.kondisi-aset.api
+      name: API kondisi aset
+      type: api
+  permissions:
+    - code: management-aset.kondisi-aset.read
+      name: Lihat kondisi aset
+      entry_point: management-aset.kondisi-aset.form
+      access: read
+    - code: management-aset.kondisi-aset.create
+      name: Tambah kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: create
+    - code: management-aset.kondisi-aset.update
+      name: Ubah kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: update
+    - code: management-aset.kondisi-aset.archive
+      name: Arsipkan kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: delete
+  privileges:
+    - code: management-aset.kondisi-aset.maintain
+      name: Pelihara kondisi aset
+      permissions:
+        - management-aset.kondisi-aset.read
+        - management-aset.kondisi-aset.create
+        - management-aset.kondisi-aset.update
+    - code: management-aset.kondisi-aset.retire
+      name: Arsipkan kondisi aset
+      permissions:
+        - management-aset.kondisi-aset.archive
+  duties:
+    - code: management-aset.kondisi-aset.manage
+      name: Kelola kondisi aset
+      privileges:
+        - management-aset.kondisi-aset.maintain
+        - management-aset.kondisi-aset.retire
+number_sequences:
+  references:
+    - code: management-aset.kondisi-aset
+      name: Kode kondisi aset
+      default_prefix: KNDA
+      allowed_scopes:
+        - tenant

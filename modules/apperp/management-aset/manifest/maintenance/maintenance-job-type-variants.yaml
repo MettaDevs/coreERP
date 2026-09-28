@@ -1,0 +1,46 @@
+security:
+  entry_points:
+    - code: management-aset.maintenance-job-type-variants.api
+      name: API varian jenis pekerjaan maintenance
+      type: api
+  permissions:
+    - code: management-aset.maintenance-job-type-variants.read
+      name: Lihat varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: read
+    - code: management-aset.maintenance-job-type-variants.create
+      name: Tambah varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: create
+    - code: management-aset.maintenance-job-type-variants.update
+      name: Ubah varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: update
+    - code: management-aset.maintenance-job-type-variants.archive
+      name: Arsipkan varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: delete
+  privileges:
+    - code: management-aset.maintenance-job-type-variants.maintain
+      name: Pelihara varian jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-variants.read
+        - management-aset.maintenance-job-type-variants.create
+        - management-aset.maintenance-job-type-variants.update
+    - code: management-aset.maintenance-job-type-variants.retire
+      name: Arsipkan varian jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-variants.archive
+  duties:
+    - code: management-aset.maintenance-job-type-variants.manage
+      name: Kelola varian jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-type-variants.maintain
+        - management-aset.maintenance-job-type-variants.retire
+number_sequences:
+  references:
+    - code: management-aset.maintenance-job-type-variants
+      name: Kode varian jenis pekerjaan maintenance
+      default_prefix: VJMA
+      allowed_scopes:
+        - tenant

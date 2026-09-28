@@ -1,0 +1,36 @@
+security:
+  entry_points:
+    - code: management-aset.pemusnahan-aset.form
+      name: Layar pemusnahan aset
+      type: form
+    - code: management-aset.pemusnahan-aset.api
+      name: API pemusnahan aset
+      type: api
+  permissions:
+    - code: management-aset.pemusnahan-aset.read
+      name: Lihat pemusnahan aset
+      entry_point: management-aset.pemusnahan-aset.form
+      access: read
+    - code: management-aset.pemusnahan-aset.create
+      name: Buat usulan pemusnahan aset
+      entry_point: management-aset.pemusnahan-aset.api
+      access: create
+  privileges:
+    - code: management-aset.pemusnahan-aset.maintain
+      name: Kelola pemusnahan aset
+      permissions: [management-aset.pemusnahan-aset.read, management-aset.pemusnahan-aset.create]
+  duties:
+    - code: management-aset.pemusnahan-aset.manage
+      name: Kelola pemusnahan aset
+      privileges: [management-aset.pemusnahan-aset.maintain]
+number_sequences:
+  references:
+    - code: management-aset.pemusnahan-aset
+      name: Nomor pemusnahan aset
+      default_prefix: PMSA
+      allowed_scopes: [legal_entity]
+workflow_types:
+  - code: management-aset.pemusnahan-aset-verification
+    name: Verifikasi usulan pemusnahan aset
+    decision_context_schema:
+      required: [document_id, aset_id]

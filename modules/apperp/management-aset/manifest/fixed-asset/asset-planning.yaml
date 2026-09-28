@@ -1,0 +1,42 @@
+security:
+  entry_points:
+    - code: management-aset.perencanaan-aset.form
+      name: Layar perencanaan aset
+      type: form
+    - code: management-aset.perencanaan-aset.api
+      name: API perencanaan aset
+      type: api
+  permissions:
+    - code: management-aset.perencanaan-aset.read
+      name: Lihat perencanaan aset
+      entry_point: management-aset.perencanaan-aset.form
+      access: read
+    - code: management-aset.perencanaan-aset.create
+      name: Buat perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: create
+    - code: management-aset.perencanaan-aset.update
+      name: Ubah perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: update
+    - code: management-aset.perencanaan-aset.archive
+      name: Arsipkan perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: delete
+  privileges:
+    - code: management-aset.perencanaan-aset.maintain
+      name: Kelola perencanaan aset
+      permissions: [management-aset.perencanaan-aset.read, management-aset.perencanaan-aset.create, management-aset.perencanaan-aset.update]
+    - code: management-aset.perencanaan-aset.retire
+      name: Arsipkan perencanaan aset
+      permissions: [management-aset.perencanaan-aset.archive]
+  duties:
+    - code: management-aset.perencanaan-aset.manage
+      name: Kelola perencanaan aset
+      privileges: [management-aset.perencanaan-aset.maintain, management-aset.perencanaan-aset.retire]
+number_sequences:
+  references:
+    - code: management-aset.perencanaan-aset
+      name: Nomor perencanaan aset
+      default_prefix: PLNA
+      allowed_scopes: [legal_entity]

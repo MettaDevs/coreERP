@@ -329,7 +329,7 @@ Arsip memakai soft delete agar record yang kelak direferensikan data turunan tid
 
 Setiap master memiliki reference Number Sequence sendiri. Master tenant memakai scope `tenant`, sedangkan nomor aset dan dokumen siklus memakai scope `legal_entity`. Aplikasi tidak menyimpan counter dan tidak menerima `kode` dari klien; nilai `kode` yang dikirim klien diabaikan.
 
-Prefix di bawah adalah `default_prefix` pada `app.yaml`; `loadtest/verify.sql` memeriksa prefix yang sama supaya nomor yang tertukar antar reference langsung ketahuan.
+Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadtest/verify.sql` memeriksa prefix yang sama supaya nomor yang tertukar antar reference langsung ketahuan.
 
 | Reference | Prefix | Scope |
 | --- | --- | --- |
@@ -371,7 +371,7 @@ Rencana membawa entitas legal dan unit kerja dari konteks CoreERP yang aktif, no
 
 ## Setup
 
-1. Daftarkan `app.yaml` ke katalog dengan `php artisan app:register-manifest management-aset`. Registrasi perlu dikirim ulang setiap kali daftar permission, duty, atau reference nomor bertambah.
+1. Daftarkan manifest (`app.yaml` beserta folder `manifest/`) ke katalog dengan `php artisan app:register-manifest management-aset`. Registrasi perlu dikirim ulang setiap kali daftar permission, duty, atau reference nomor bertambah.
 2. Pasang module untuk tenant dengan `php artisan module:install management-aset <tenant>` — atau biarkan pendaftaran usaha melakukannya. Di sanalah migration module dijalankan dan catatan pemasangannya dibuat.
 3. Setelah module tercatat **terpasang**, Control Plane mematerialisasi seluruh reference pada **Nomor dokumen** dengan scope dari manifest. Verifikasi daftar dan preview di halaman tersebut; seed tenant baru baru menerbitkan nomor setelah tahap ini siap.
 

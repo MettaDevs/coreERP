@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.lokasi-aset.form
+      name: Layar lokasi aset
+      type: form
+    - code: management-aset.lokasi-aset.api
+      name: API lokasi aset
+      type: api
+  permissions:
+    - code: management-aset.lokasi-aset.read
+      name: Lihat lokasi aset
+      entry_point: management-aset.lokasi-aset.form
+      access: read
+    - code: management-aset.lokasi-aset.create
+      name: Tambah lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: create
+    - code: management-aset.lokasi-aset.update
+      name: Ubah lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: update
+    - code: management-aset.lokasi-aset.archive
+      name: Arsipkan lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: delete
+  privileges:
+    - code: management-aset.lokasi-aset.maintain
+      name: Pelihara lokasi aset
+      permissions:
+        - management-aset.lokasi-aset.read
+        - management-aset.lokasi-aset.create
+        - management-aset.lokasi-aset.update
+    - code: management-aset.lokasi-aset.retire
+      name: Arsipkan lokasi aset
+      permissions:
+        - management-aset.lokasi-aset.archive
+  duties:
+    - code: management-aset.lokasi-aset.manage
+      name: Kelola lokasi aset
+      privileges:
+        - management-aset.lokasi-aset.maintain
+        - management-aset.lokasi-aset.retire
+number_sequences:
+  references:
+    - code: management-aset.lokasi-aset
+      name: Kode lokasi aset
+      default_prefix: LOCA
+      allowed_scopes:
+        - tenant

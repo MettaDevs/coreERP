@@ -13,7 +13,8 @@ sendiri, tetapi **tidak** punya container, database, maupun token layanan sendir
 modules/
 └─ apperp/                        # penerbit
    └─ management-aset/            # module
-      ├─ app.yaml                 # manifest: entry point, permission, privilege, duty, nomor, workflow
+      ├─ app.yaml                 # manifest: identitas dan menu module
+      ├─ manifest/                # daftar berkode per fitur: izin, nomor, workflow, laporan
       ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
       ├─ src/                     # PHP: Http/, Models/, Services/, Listeners/, Reporting/
       ├─ database/migrations/     # migration module saja
@@ -150,6 +151,34 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 
 Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
+### Daftar berkode dipecah ke folder `manifest/`
+
+Semua blok berkode di atas boleh ditulis di `app.yaml`. Module yang dikerjakan banyak orang
+menaruhnya di folder `manifest/`: kebijakan data, entry point, permission, privilege, duty,
+reference nomor, jenis workflow, dan laporan, satu berkas per fitur yang dikelompokkan per area.
+`app.yaml` tinggal memuat identitas module dan menunya.
+
+Bentuk ini meniru Business Central. Di sana `app.json` hanya memuat identitas, dan setiap objek
+adalah berkas sendiri di folder areanya; lihat [folder Fixed Assets di BCApps](https://github.com/microsoft/BCApps/tree/main/src/Layers/W1/BaseApp/FixedAssets).
+Alasannya sama dengan `routes/api/<fitur>.php`: dua orang yang mengerjakan fitur berbeda tidak
+menyunting berkas yang sama, jadi merge mereka tidak bentrok. Blok `reports` di satu berkas dulu
+membuat setiap PR laporan bentrok dengan PR laporan lain.
+
+`app:register-manifest` menggabungkan keduanya lewat `App\Support\Modules\ModuleManifestFiles`:
+
+- Daftar hanya disambung, isi `app.yaml` lebih dulu, lalu berkas `manifest/` menurut jalurnya.
+  Urutan itu tidak menentukan isi katalog, karena pendaftaran mencocokkan baris menurut kodenya.
+- Berkas di `manifest/` hanya boleh memuat daftar berkode. Identitas atau menu yang ditulis di
+  sana ditolak, karena tidak pernah dibaca dan penulisnya akan mengira perubahannya berlaku.
+- Kode yang dinyatakan dua kali ditolak dengan menyebut kedua berkasnya.
+- Berkas berakhiran `.yml` ditolak, bukan dilewati diam-diam.
+
+Empat lapis keamanan tidak berubah karena dipecah: setiap berkas fitur tetap menulis entry
+point, permission, privilege, dan duty-nya sendiri, dan penjaga rantai di
+`apps/core/tests/Feature/Boundary/SusunanManifestModulTest.php` membaca manifest gabungan. Module aset
+memakai area `setup`, `fixed-asset`, `depreciation`, `maintenance`, dan `reports`, mengikuti
+folder Fixed Assets di Business Central.
+
 ### Dependency app
 
 `dependsOn` adalah map dari ID app ke rentang versi, bukan daftar nama produk dan
@@ -172,7 +201,7 @@ semua prerequisite `ready` pada placement yang sama. Ini mekanisme teknis; layar
 penjualan harus menerangkan prerequisite sebagai bagian dari paket, bukan meminta
 pembeli mencari atau membeli app teknis satu per satu.
 
-Contoh manifest utuh yang sudah berjalan ada di `modules/apperp/management-aset/app.yaml`; blok `security`-nya jauh lebih panjang dari contoh di atas, yang sengaja dipersingkat.
+Contoh manifest utuh yang sudah berjalan ada di module aset: identitas dan menunya di `modules/apperp/management-aset/app.yaml`, daftar berkodenya di folder `manifest/` di sebelahnya. Isinya jauh lebih panjang dari contoh di atas, yang sengaja dipersingkat.
 
 ::: tip Mencari langkah mengerjakannya?
 Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan, berkas yang wajib ada, dan gate per tahap ada di [jalur membangun modul baru](../apps/membangun-app-baru.md).
@@ -195,7 +224,7 @@ Manifest wajib mendeklarasikan keempat lapis secara terpisah, mengikuti [role-ba
 
 Kode privilege tidak boleh sama dengan kode permission. Tanpa aturan ini, manifest dapat memakai satu kode untuk dua lapis dan rantai `duty → privilege → permission` berubah menjadi satu lapis bersalin tiga. Core menolak manifest semacam itu.
 
-Nama key manifest sama persis dengan payload API katalog Core, sehingga `app.yaml` dapat dikirim apa adanya tanpa lapisan transformasi.
+Nama key manifest sama persis dengan payload API katalog Core, sehingga manifest gabungan `app.yaml` dan `manifest/` dapat dikirim apa adanya tanpa lapisan transformasi.
 
 ## Ownership dan data
 
@@ -433,7 +462,7 @@ terima database—ditulis di kontrak sebelum pelanggan pergi, bukan sesudah.
 
 ### Yang ada di dalam folder module, dan yang dilarang ada
 
-Satu module berisi `app.yaml`, `src/`, `database/migrations/`, `routes/`, `ui/`, `tests/`,
+Satu module berisi `app.yaml` (beserta `manifest/` bila daftarnya dipecah), `src/`, `database/migrations/`, `routes/`, `ui/`, `tests/`,
 `contracts/`, dan `composer.json`. Bentuk minimalnya ada di `modules/_template/`, dan
 `module:make` yang menyalinnya.
 

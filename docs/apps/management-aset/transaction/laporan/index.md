@@ -19,7 +19,7 @@ kosong pada worker, persis kegagalan yang paling sulit ditemukan.
 
 ## Laporan yang ada
 
-Daftar lengkapnya didaftarkan di `src/ModuleServiceProvider.php` pada `ReportRegistry` dan dideklarasikan di blok `reports` pada `app.yaml`; keduanya harus sejalan.
+Daftar lengkapnya didaftarkan di `src/ModuleServiceProvider.php` pada `ReportRegistry` dan dideklarasikan satu berkas per laporan di `manifest/reports/`; keduanya harus sejalan.
 
 | Kode manifest | Kelas | Parameter | Layout bawaan | Hak data |
 | --- | --- | --- | --- | --- |
@@ -96,7 +96,7 @@ Tombol **Cetak** ada di halaman rincian work order dan **Ekspor daftar** di daft
 
 1. Tulis kelas yang mengimplementasikan `ReportDefinition` di `src/Reporting/Definitions/`. Dataset memakai `OrganizationScope` seperti endpoint detailnya.
 2. Tulis pembangun layout bawaannya sebagai satu kelas baru di `src/Reporting/Layouts/Builtin/` (turunan `BuiltinLayoutBuilder`), jalankan `php artisan management-aset:build-builtin-layouts`, commit berkasnya. Tidak ada daftar yang perlu disunting.
-3. Daftarkan di `ModuleServiceProvider` pada `ReportRegistry`, dan di blok `reports` pada `app.yaml`.
+3. Daftarkan di `ModuleServiceProvider` pada `ReportRegistry`, dan tulis blok `reports`-nya sebagai berkas baru di `manifest/reports/`. Berkas laporan lain tidak perlu disentuh.
 4. Tambahkan tombol cetak pada halaman record-nya dengan `requestPrint()`.
 5. Tambahkan test di `PenyediaLaporanTest` untuk placeholder utama dan penolakan di luar scope, lalu perbarui halaman ini.
 

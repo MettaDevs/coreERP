@@ -83,7 +83,7 @@ Non-continuous memakai `issue`. Continuous memakai `reserve` lalu `confirm` atau
 
 ## Manifest app
 
-Reference dideklarasikan pada `app.yaml`:
+Reference dideklarasikan pada manifest module, di `app.yaml` atau di berkas fitur di `manifest/` ([daftar berkode yang dipecah](02-module-standard.md#daftar-berkode-dipecah-ke-folder-manifest)):
 
 ```yaml
 number_sequences:
@@ -255,7 +255,7 @@ psql -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
 
 ### Bahan uji dibaca dari manifest, bukan disalin ke test
 
-Daftar reference nomor milik sebuah module beserta awalannya dibaca dari `app.yaml` module itu, tidak
+Daftar reference nomor milik sebuah module beserta awalannya dibaca dari manifest module itu, tidak
 ditulis ulang di dalam berkas test. Daftar kedua akan menyimpang dari yang pertama, dan yang
 menyimpang lebih berbahaya daripada yang tidak ada. Membacanya dari manifest juga membuat assertion
 sekaligus membuktikan bahwa reference yang benar memang dipakai.

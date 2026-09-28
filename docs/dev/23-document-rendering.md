@@ -21,7 +21,7 @@ Karena itu mesinnya milik Core, seperti Number Sequence, Workflow, dan Fiscal Ca
 | Lapis | Padanan BC | Pemilik | Di mana |
 | --- | --- | --- | --- |
 | Dataset | Report dataset | Developer module | Kelas definisi laporan di module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses |
-| Katalog laporan | Report object | Manifest app | Blok `reports` di `app.yaml`, disalin ke tabel `app_reports` Core saat registrasi |
+| Katalog laporan | Report object | Manifest app | Blok `reports` di manifest module (`app.yaml` atau satu berkas per laporan di `manifest/`), disalin ke tabel `app_reports` Core saat registrasi |
 | Layout bawaan | Extension layout | Release app | Berkas `.docx`/`.xlsx` di app, dibaca Core lewat kontrak yang sama dan disimpan per versi release |
 | Layout unggahan | User-defined layout | Tenant | Tabel `report_layouts` Core, ber-`tenant_id`, opsional `legal_entity_id` |
 | Layout default | Report Selections + Document Layouts | Tenant per legal entity | Tabel `report_layout_defaults` Core; legal entity mengalahkan tenant |
@@ -48,7 +48,7 @@ Tidak ada framework yang dibangun ulang. Untuk satu laporan:
 
 1. Satu kelas dataset: kode, nama, permission datanya, aturan parameter, daftar placeholder, dan query yang memakai scope organisasi yang sama dengan endpoint detailnya.
 2. Satu layout bawaan `.docx` atau `.xlsx`, dibangkitkan dari kode lewat command supaya perubahannya terbaca di review.
-3. Blok `reports` di `app.yaml`.
+3. Blok `reports` di manifest module. Module aset menulisnya satu berkas per laporan di `manifest/reports/`, supaya dua orang yang membuat laporan berbeda tidak menyunting berkas yang sama.
 4. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya.
 5. Tombol Cetak pada halaman record yang meminta Shell mencetak.
 

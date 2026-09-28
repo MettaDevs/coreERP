@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.maintenance-checklist-variables.form
+      name: Layar variabel checklist maintenance
+      type: form
+    - code: management-aset.maintenance-checklist-variables.api
+      name: API variabel checklist maintenance
+      type: api
+  permissions:
+    - code: management-aset.maintenance-checklist-variables.read
+      name: Lihat variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.form
+      access: read
+    - code: management-aset.maintenance-checklist-variables.create
+      name: Tambah variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: create
+    - code: management-aset.maintenance-checklist-variables.update
+      name: Ubah variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: update
+    - code: management-aset.maintenance-checklist-variables.archive
+      name: Arsipkan variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: delete
+  privileges:
+    - code: management-aset.maintenance-checklist-variables.maintain
+      name: Pelihara variabel checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-variables.read
+        - management-aset.maintenance-checklist-variables.create
+        - management-aset.maintenance-checklist-variables.update
+    - code: management-aset.maintenance-checklist-variables.retire
+      name: Arsipkan variabel checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-variables.archive
+  duties:
+    - code: management-aset.maintenance-checklist-variables.manage
+      name: Kelola variabel checklist maintenance
+      privileges:
+        - management-aset.maintenance-checklist-variables.maintain
+        - management-aset.maintenance-checklist-variables.retire
+number_sequences:
+  references:
+    - code: management-aset.maintenance-checklist-variables
+      name: Kode variabel checklist maintenance
+      default_prefix: VCMA
+      allowed_scopes:
+        - tenant
