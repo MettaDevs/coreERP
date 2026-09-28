@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    FiscalClassificationFilter,
+    PeriodFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -40,7 +47,8 @@ export type DepreciationReportRow = {
 export default function LaporanPenyusutanAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -52,7 +60,7 @@ export default function LaporanPenyusutanAsetPage() {
         () => [
             {
                 id: 'asset_kode',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="text-primary font-mono text-xs font-semibold">
                         {String(row.asset_kode ?? row.kode ?? '-')}
@@ -61,7 +69,7 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'asset_nama',
-                header: 'Nama Aset',
+                header: 'Nama aset',
                 cell: (row) => String(row.asset_nama ?? row.nama ?? '-'),
             },
             {
@@ -75,7 +83,7 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'group_aset',
-                header: 'Group Aset',
+                header: 'Group aset',
                 cell: (row) => String(row.group_aset ?? row.group ?? '-'),
             },
             {
@@ -85,7 +93,7 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'jenis_aset',
-                header: 'Jenis Aset',
+                header: 'Jenis aset',
                 cell: (row) => String(row.jenis_aset ?? row.jenis ?? '-'),
             },
             {
@@ -101,21 +109,21 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'ue_tahun',
-                header: 'UE (Thn)',
+                header: 'UE (thn)',
                 cell: (row) =>
                     Number(row.ue_tahun ?? row.umur_ekonomis_tahun ?? 0),
                 align: 'right',
             },
             {
                 id: 'ue_bulan',
-                header: 'UE (Bln)',
+                header: 'UE (bln)',
                 cell: (row) =>
                     Number(row.ue_bulan ?? row.umur_ekonomis_bulan ?? 0),
                 align: 'right',
             },
             {
                 id: 'ue_saat_ini',
-                header: 'UE Berjalan',
+                header: 'UE berjalan',
                 cell: (row) =>
                     Number(row.ue_saat_ini ?? row.umur_ekonomis_saat_ini ?? 0),
                 align: 'right',
@@ -131,19 +139,19 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'persentase_penyusutan',
-                header: '% Susut',
+                header: '% susut',
                 cell: (row) => String(row.persentase_penyusutan ?? '-'),
                 align: 'center',
             },
             {
                 id: 'nilai_perolehan',
-                header: 'Nilai Perolehan',
+                header: 'Nilai perolehan',
                 cell: (row) => String(row.nilai_perolehan ?? '-'),
                 align: 'right',
             },
             {
                 id: 'penyusutan_tahun',
-                header: 'Susut / Thn',
+                header: 'Susut / thn',
                 cell: (row) =>
                     String(
                         row.penyusutan_tahun ?? row.penyusutan_per_tahun ?? '-',
@@ -152,7 +160,7 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'penyusutan_bulan',
-                header: 'Susut / Bln',
+                header: 'Susut / bln',
                 cell: (row) =>
                     String(
                         row.penyusutan_bulan ?? row.penyusutan_per_bulan ?? '-',
@@ -161,13 +169,13 @@ export default function LaporanPenyusutanAsetPage() {
             },
             {
                 id: 'akumulasi_penyusutan',
-                header: 'Akum. Penyusutan',
+                header: 'Akum. penyusutan',
                 cell: (row) => String(row.akumulasi_penyusutan ?? '-'),
                 align: 'right',
             },
             {
                 id: 'nilai_buku_akhir',
-                header: 'Nilai Buku Akhir',
+                header: 'Nilai buku akhir',
                 cell: (row) => (
                     <span className="text-primary font-semibold">
                         {String(row.nilai_buku_akhir ?? '-')}
@@ -181,20 +189,23 @@ export default function LaporanPenyusutanAsetPage() {
 
     return (
         <ReportPageLayout<DepreciationReportRow>
-            title="Laporan Penyusutan Aset"
+            title="Laporan penyusutan aset"
             description="Perhitungan amortisasi dan penyusutan nilai buku aset tetap per periode buku fiskal."
             reportCode="laporan-penyusutan-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                    showSingleMonth={true}
-                    showDateRange={false}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <PeriodFilter {...bindFilter('periode')} />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}
