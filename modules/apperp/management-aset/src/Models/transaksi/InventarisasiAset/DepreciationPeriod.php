@@ -18,9 +18,12 @@ use Illuminate\Support\Carbon;
  *
  * `amount` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan float.
  *
+ * `posted_posting_id` menyebut posting finance yang membawa periode ini (TODO 11.1): proses "Post
+ * penyusutan" untuk periode asli, pembalikannya untuk baris pembalik. Kosong berarti belum di-post.
+ *
  * @property string $id
  * @property string $tenant_id
- * @property string $asset_book_id
+ * @property string $buku_aset_id
  * @property string $legal_entity_id
  * @property ?string $usage_org_unit_id
  * @property Carbon $period_starts_on
@@ -28,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string $amount
  * @property string $status
  * @property ?string $reverses_period_id
+ * @property ?string $posted_posting_id
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
@@ -39,8 +43,8 @@ class DepreciationPeriod extends Model
     protected $table = 'aset_tr_penyusutan_aset';
 
     protected $fillable = [
-        'tenant_id', 'asset_book_id', 'legal_entity_id', 'usage_org_unit_id',
-        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id',
+        'tenant_id', 'buku_aset_id', 'legal_entity_id', 'usage_org_unit_id',
+        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id', 'posted_posting_id',
     ];
 
     /** @return array<string, string> */
@@ -53,9 +57,9 @@ class DepreciationPeriod extends Model
         ];
     }
 
-    /** @return BelongsTo<AssetBook, $this> */
-    public function assetBook(): BelongsTo
+    /** @return BelongsTo<BukuAset, $this> */
+    public function asetBook(): BelongsTo
     {
-        return $this->belongsTo(AssetBook::class, 'asset_book_id');
+        return $this->belongsTo(BukuAset::class, 'buku_aset_id');
     }
 }

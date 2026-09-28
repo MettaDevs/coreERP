@@ -69,3 +69,35 @@
         $ref: '#/components/responses/Unauthenticated'
       '403':
         $ref: '#/components/responses/Forbidden'
+/api/v1/reference-data/unit-kerja:
+  get:
+    tags:
+    - Reference data
+    operationId: listOperatingUnits
+    summary: Unit kerja tenant milik Core, untuk dropdown yang menampilkan nama
+    description: |
+      Modul menyimpan id unit kerja sebagai teks opaque dan tidak pernah menanyakannya
+      ke database Core; daftar ini dibaca lewat kontrak `DirektoriOrganisasi` di dalam
+      proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
+
+      Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
+      pemeliharaan — sama seperti daftar satuan.
+    responses:
+      '200':
+        description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
+      '403':
+        description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+/api/v1/reference-data/anggota:
+  get:
+    tags:
+    - Reference data
+    operationId: listTenantMembers
+    summary: Anggota tenant milik Core, berkunci id pengguna
+    description: |
+      `id` adalah id **pengguna**, bukan id keanggotaan, karena itulah yang dibawa
+      konteks permintaan dan yang tersimpan pada kolom penanggung jawab modul ini.
+    responses:
+      '200':
+        description: Daftar anggota dengan nama dan email
+      '403':
+        description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini

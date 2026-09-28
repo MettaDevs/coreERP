@@ -44,9 +44,12 @@ return [
      *
      * Menambah baris di sini berarti menyatakan label itu memang bukan milik pelanggan. Itu
      * keputusan produk, bukan keputusan pembangunan — pelanggan yang slug-nya kebetulan `api` akan
-     * kehilangan alamatnya tanpa pernah tahu kenapa.
+     * kehilangan alamatnya tanpa pernah tahu kenapa. Pendaftaran usaha membaca daftar yang sama,
+     * jadi tenant BARU tidak pernah memperoleh label ini; tenant lama yang sudah memakainya tidak.
+     *
+     * `registry` adalah registry image Harbor, `registry.<base_domain>` — lihat deploy/registry.
      */
-    'reserved_labels' => ['admin', 'www', 'api'],
+    'reserved_labels' => ['admin', 'www', 'api', 'registry'],
 
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
@@ -80,6 +83,13 @@ return [
     // Requests per minute per app+tenant on the internal number sequence API. Sized for normal document traffic,
     // not for a caller trying to burn a tenant's number range.
     'internal_api_rate_limit' => env('COREERP_INTERNAL_API_RATE_LIMIT', 600),
+    // Permintaan per menit per klien integrasi (sistem di luar CoreERP, misalnya aplikasi finance
+    // yang menarik feed posting). Tarikan wajar sekali per beberapa detik; ini batas kewarasan.
+    'integration_api_rate_limit' => env('COREERP_INTEGRATION_API_RATE_LIMIT', 120),
+    // Berapa jam posting finance terus dicoba dikirim ke klien mode push yang sedang tidak dapat
+    // dijangkau (408, 429, 5xx, atau tidak menjawab) sebelum ditandai gagal dan menunggu tangan
+    // manusia di layar pantau. Jedanya 1, 2, 4, … sampai 60 menit.
+    'finance_push_retry_hours' => env('COREERP_FINANCE_PUSH_RETRY_HOURS', 24),
     'registration_rate_limit' => env('COREERP_REGISTRATION_RATE_LIMIT', 5),
     'password_breach_check' => env('COREERP_PASSWORD_BREACH_CHECK', true),
 
@@ -149,29 +159,57 @@ return [
         'issuer' => env('COREERP_SSO_ISSUER'),
         'client_id' => env('COREERP_SSO_CLIENT_ID'),
         'client_secret' => env('COREERP_SSO_CLIENT_SECRET'),
+
+        /*
+         * API pengelolaan penyedia — mencari pengguna, dan meminta penyedia mengirim email undangan.
+         * Bukan bagian OIDC: alamatnya tidak ada di dokumen discovery, jadi ia satu-satunya alamat
+         * penyedia yang harus disebut. Kosong berarti diturunkan dari issuer dengan akhiran `/api/v1`.
+         *
+         * Kredensialnya bawaan mengikuti pasangan di atas, karena penyedia memeriksa client id dan
+         * secret Passport yang sama dan tidak mengenal kredensial mesin tersendiri. Dua kunci di
+         * bawah ada supaya client kedua yang kelak didaftarkan cukup disetel, tanpa menyentuh kode.
+         */
+        'api_url' => env('COREERP_SSO_API_URL'),
+        'api_client_id' => env('COREERP_SSO_API_CLIENT_ID'),
+        'api_client_secret' => env('COREERP_SSO_API_CLIENT_SECRET'),
+
+        /*
+         * Nama aplikasi yang ditulis penyedia di email undangannya, dan berapa hari undangan berlaku.
+         * Penyedia membatasi 1 sampai 30 hari; `expires_at` undangan diisi angka yang sama supaya
+         * kalimat di email dan keadaan di sini tidak pernah berbeda.
+         */
+        'invitation_app_name' => env('COREERP_SSO_INVITATION_APP_NAME', 'CoreERP'),
+        'invitation_days' => (int) env('COREERP_SSO_INVITATION_DAYS', 7),
     ],
 
     /*
-     * Lisensi situs on-prem — sebuah tanda, bukan kunci.
+     * Lisensi situs on-prem dikelola — sebuah kunci, bila diwajibkan.
      *
      * Berkasnya diterbitkan admin.erp, ditandatangani kunci rilis, lalu dipasang agen di server
-     * pelanggan. Core membacanya **hanya untuk menampilkan peringatan**: ketika masa berlakunya
-     * mendekat, sudah lewat, atau berkasnya tidak dapat dipercaya. Tidak ada permintaan yang
-     * ditolak dan tidak ada fitur yang disembunyikan karenanya. Pelanggan kita fasilitas kesehatan;
-     * aplikasi yang berhenti berarti pelayanan pasien berhenti. Pembayaran ditegakkan lewat kontrak,
-     * bukan lewat kode. Pembacanya App\Support\License\SiteLicense.
+     * pelanggan. Isinya menyebut app mana yang dibeli dan sampai kapan. Bila `required` menyala,
+     * lisensi yang habis, hilang, atau bertanda tangan salah mengunci pengguna tenant, dan app yang
+     * tidak tercantum tidak dapat dibuka. Alasan kenapa ia berubah dari tanda menjadi kunci, beserta
+     * apa yang tetap terbuka, ada di App\Support\License\SiteLicense dan `docs/todo/lisensi-mengunci`.
      *
-     * `path` kosong berarti fitur ini mati, dan itu bawaannya: SaaS dan lingkungan lokal memang
-     * tidak punya lisensi situs, jadi tidak ada yang perlu diperingatkan. Tanda tangannya dibaca
-     * dari `<path>.sig` di sebelahnya — satu jalur yang disetel, bukan dua yang dapat menunjuk
-     * pasangan yang berbeda.
+     * `required` berbawaan mati, dan itu disengaja: SaaS dan pemasangan beli-putus tidak pernah
+     * terkunci. Yang menyalakannya `.env` server on-prem dikelola, ditulis agen saat pemasangan.
+     * Diurai dengan `FILTER_VALIDATE_BOOLEAN` supaya `true`, `1`, dan `on` menyala, sedangkan kosong
+     * dan `false` tidak — string `"false"` yang dibaca sebagai benar akan mengunci server yang tidak
+     * pernah diminta terkunci.
+     *
+     * `path` kosong tanpa `required` berarti fitur ini mati. `path` kosong **dengan** `required`
+     * berarti terkunci. Tanda tangannya dibaca dari `<path>.sig` di sebelahnya — satu jalur yang
+     * disetel, bukan dua yang dapat menunjuk pasangan yang berbeda.
      */
     'license' => [
+        'required' => filter_var(env('COREERP_LICENSE_REQUIRED', false), FILTER_VALIDATE_BOOLEAN),
         'path' => env('COREERP_LICENSE_PATH'),
         'public_key_path' => env('COREERP_LICENSE_PUBLIC_KEY_PATH'),
-        // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Tiga puluh hari cukup
-        // untuk satu siklus penagihan dan pengiriman berkas baru, termasuk lewat flashdisk.
-        'warn_days' => 30,
+        // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Lisensi berlaku 30 hari
+        // dan diperpanjang otomatis ketika sisanya 10 hari, jadi dalam keadaan sehat peringatan ini
+        // tidak pernah terlihat. Begitu ia tampil, perpanjangannya sudah gagal beberapa hari berturut-
+        // turut — dan tujuh hari adalah waktu untuk memperbaikinya sebelum pelayanan terkunci.
+        'warn_days' => 7,
     ],
 
 ];

@@ -178,14 +178,21 @@ return [
         'books' => [
             [
                 'template_key' => 'id:pmk72-2023:buku:komersial:v1',
+                // Kode diketik (K-24): ikut terkirim ke aplikasi finance di rincian posting.
+                'code' => 'KOMERSIAL',
                 'name' => 'Buku komersial',
                 'posting_layer' => 'current',
                 'description' => 'Buku untuk kebijakan akuntansi tenant. Umur manfaat dan profilnya ditentukan tenant.',
             ],
             [
                 'template_key' => 'id:pmk72-2023:buku:fiskal:v1',
+                // Kode diketik (K-24): ikut terkirim ke aplikasi finance di rincian posting.
+                'code' => 'FISKAL',
                 'name' => 'Buku fiskal/pajak',
-                'posting_layer' => 'tax',
+                // Memorandum: dihitung untuk pelaporan pajak, tetapi tidak pernah di-post. Aplikasi
+                // finance hanya punya satu lapisan GL, jadi buku fiskal yang di-post akan
+                // menjurnal penyusutan aset yang sama dua kali (K-15, TODO 8.4.1).
+                'posting_layer' => 'none',
                 'description' => 'Buku untuk referensi penyusutan pajak Indonesia berdasarkan template PMK 72 Tahun 2023.',
             ],
         ],

@@ -1,0 +1,4 @@
+description: Field request tidak valid.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/ValidationError' }

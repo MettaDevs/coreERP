@@ -1,0 +1,50 @@
+post:
+  tags: [Number sequence]
+  operationId: internal.number-sequences.issue
+  summary: Terbitkan satu nomor dokumen
+  description: |
+    Hanya untuk sequence **non-continuous**. Sequence berkelanjutan wajib memakai
+    `reserve` lalu `confirm`, karena hanya jalur itu yang menjamin tidak ada lompatan
+    nomor; memanggil `issue` padanya menghasilkan 422.
+
+    Pengulangan dengan `idempotency_key` yang sama pada app dan sequence yang sama
+    mengembalikan nomor yang sama, bukan nomor kedua.
+  parameters:
+    - $ref: '#/components/parameters/SequenceReference'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          allOf:
+            - $ref: '#/components/schemas/NumberSequenceContext'
+            - type: object
+              required: [idempotency_key]
+              properties:
+                idempotency_key: { $ref: '#/components/schemas/IdempotencyKey' }
+                manual_value:
+                  type: [string, 'null']
+                  maxLength: 255
+                  description: |
+                    Hanya sah bila sequence mengizinkan nilai manual. Sequence
+                    berkelanjutan tidak pernah mengizinkannya.
+  responses:
+    '200':
+      description: Nomor diterbitkan, atau pemutaran ulang idempotency key yang sama.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/IssuedNumber' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422':
+      description: |
+        Sequence berkelanjutan, sequence tidak aktif untuk scope yang dikirim,
+        atau field tidak valid.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

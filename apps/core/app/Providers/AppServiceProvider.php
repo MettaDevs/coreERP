@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Passkey;
 use App\Models\User;
+use App\Support\Access\CorePermissions;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
@@ -48,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
          * salah.
          */
         $this->app->scoped(CurrentWorkspace::class);
+        $this->app->scoped(CorePermissions::class);
         $this->app->scoped(DataPolicyAccessResolver::class);
 
         // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
@@ -64,9 +67,10 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->scoped(ActiveEnvironment::class);
 
-        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — dan scoped, bukan
-        // singleton, supaya berkas baru yang dipasang agen terbaca pada permintaan berikutnya tanpa
-        // menunggu pekerja PHP diganti. Alasan lengkapnya di kelas itu.
+        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — ada empat pintu app
+        // dan satu middleware kunci yang menanyakannya. Scoped, bukan singleton, supaya lisensi baru
+        // yang dipasang agen membuka kunci pada permintaan berikutnya tanpa menunggu pekerja PHP
+        // diganti. Alasan lengkapnya di kelas itu.
         $this->app->scoped(SiteLicense::class);
     }
 
@@ -122,24 +126,25 @@ class AppServiceProvider extends ServiceProvider
         // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
         OutboundGuard::install();
 
-        Gate::define(
-            'manage-access',
-            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
-        );
-        Gate::define(
-            'manage-number-sequences',
-            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
-        );
-        Gate::define(
-            'manage-report-layouts',
-            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
-        );
-        Gate::define(
-            'manage-reference-data',
-            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
-        );
+        // Gate lama tetap bernama sama, tetapi kini membaca permission ubah kelompok layarnya masing-masing
+        // lewat rantai security role (SEC-22), bukan penanda owner/admin.
+        foreach ([
+            'manage-access' => CoreSecurityCatalog::ACCESS_UPDATE,
+            'manage-number-sequences' => CoreSecurityCatalog::NUMBER_SEQUENCE_UPDATE,
+            'manage-report-layouts' => CoreSecurityCatalog::REPORT_LAYOUT_UPDATE,
+            'manage-reference-data' => CoreSecurityCatalog::REFERENCE_DATA_UPDATE,
+        ] as $gate => $permission) {
+            Gate::define($gate, fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
+        }
+        // Gate umum untuk rute layar Core: `->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::VENDOR_READ))`.
+        // Kode permission-nya dari `CoreSecurityCatalog`, jadi penjaga sebuah rute terbaca di berkas rutenya sendiri.
+        Gate::define('core', fn (User $user, string $permission): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
         Gate::define('monitor-identities', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
         Gate::define('manage-app-catalog', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
+        // Dokumen API internal di portal `/docs`: referensi Scramble untuk layar CoreERP dan
+        // kontrak app serta pusat admin. Nama gate ditentukan Scramble (`RestrictedDocsAccess`).
+        // Kontrak integrasi untuk sistem luar tidak dijaga gate ini; ia terbit tanpa login.
+        Gate::define('viewApiDocs', fn (?User $user): bool => $user?->providerAccess()->where('role', 'provider_admin')->exists() ?? false);
 
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
@@ -154,6 +159,22 @@ class AppServiceProvider extends ServiceProvider
             $request->header('X-CoreERP-App-Id', 'unknown'),
             $request->header('X-CoreERP-Tenant-Id', 'unknown'),
         ])));
+
+        // Per klien integrasi, dikunci pada id di depan token — bukan per alamat IP, karena satu
+        // aplikasi finance biasanya memanggil dari satu alamat dan yang perlu dibatasi adalah
+        // kliennya. Permintaan tanpa token dibatasi per alamat supaya tebakan token tetap murah
+        // untuk ditolak.
+        RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.integration_api_rate_limit', 120)
+        )->by(self::kunciKlienIntegrasi($request)));
+
+        // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
+        RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
+            ? Limit::perMinute((int) config('coreerp.internal_api_rate_limit', 600))->by(implode(':', [
+                $request->header('X-CoreERP-App-Id', 'unknown'),
+                $request->header('X-CoreERP-Tenant-Id', 'unknown'),
+            ]))
+            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::kunciKlienIntegrasi($request)));
     }
 
     /**
@@ -212,5 +233,14 @@ class AppServiceProvider extends ServiceProvider
         // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
         // menjadi pelepasan yang lebih tepat sasaran.
         Event::forget(MessageLogged::class);
+    }
+
+    /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
+    private static function kunciKlienIntegrasi(Request $request): string
+    {
+        $token = (string) $request->bearerToken();
+        $id = str_contains($token, '.') ? strstr($token, '.', true) : '';
+
+        return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
     }
 }

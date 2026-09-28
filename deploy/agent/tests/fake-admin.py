@@ -13,6 +13,11 @@ Ini bukan admin.erp versi kecil. Tugasnya satu: menolak apa pun yang tidak sesua
   yang melewatkan `minimum` tanpa suara membuat pengujian lulus untuk alasan yang salah.
 
 Endpoint `/_test/...` dipakai `run-tests.sh` untuk mengantre operasi dan membaca apa yang diterima.
+
+Berkas pemasang disajikan seperti admin.erp menyajikannya (PS-07 di docs/todo/pasang-satu-perintah):
+`/pasang.sh` dengan alamat server ini ditanam di isiannya, dan `/agen/<berkas>` byte persis dari berkas yang
+diuji. Pengujian pasang.sh karena itu berjalan lewat jalur yang sama dengan server klien, tanpa jalan pintas
+di skrip yang dipasang.
 """
 
 import argparse
@@ -26,16 +31,21 @@ import subprocess
 import tempfile
 import threading
 import time
+import traceback
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 BATAS_SELISIH_DETIK = 300
 LEASE_DETIK = 900
+ISIAN_ALAMAT_ADMIN = b'@@COREERP_ADMIN_URL@@'
+# Host registry yang dijawab kredensial tiruan. Bukan host sungguhan: shim docker tidak pernah menyambung.
+REGISTRY_UJI = 'registry.uji.test'
+BERKAS_AGEN = ('coreerp-agent', 'coreerp-agent.service', 'coreerp-agent.timer', 'env.template', 'update.sh', 'kunci-rilis.pub')
 
 KATA_KUNCI_SKEMA = {
     'type', 'properties', 'required', 'additionalProperties', 'enum', 'maxLength', 'minLength',
-    'maxItems', 'items', 'pattern', 'format', 'description', '$ref',
+    'maxItems', 'items', 'pattern', 'format', 'description', '$ref', 'minimum',
 }
 POLA_DATE_TIME = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$')
 POLA_DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
@@ -142,6 +152,10 @@ class Kontrak:
             if skema.get('format') == 'date' and not POLA_DATE.match(nilai):
                 galat.append(f'{jalur}: bukan date')
 
+        if isinstance(nilai, (int, float)) and not isinstance(nilai, bool):
+            if 'minimum' in skema and nilai < skema['minimum']:
+                galat.append(f'{jalur}: lebih kecil dari {skema["minimum"]}')
+
         if isinstance(nilai, list):
             if 'maxItems' in skema and len(nilai) > skema['maxItems']:
                 galat.append(f'{jalur}: lebih dari {skema["maxItems"]} anggota')
@@ -195,10 +209,13 @@ def kunci_publik_sah(pem):
 
 
 class Admin:
-    def __init__(self, kontrak, folder_rilis, kunci_lisensi):
+    def __init__(self, kontrak, folder_rilis, kunci_lisensi, pasang, berkas_agen):
         self.kontrak = kontrak
         self.folder_rilis = folder_rilis
         self.kunci_lisensi = kunci_lisensi
+        self.pasang = pasang
+        self.berkas_agen = berkas_agen
+        self.isi_agen_pengganti = {}
         self.kunci = threading.Lock()
         self.token = {}
         self.situs = {}
@@ -207,11 +224,36 @@ class Admin:
         self.urutan = []
         self.permintaan = []
         self.interval = 60
+        # Kredensial registry: setiap permintaan dicatat tanpa kata sandinya. `kredensial_paksa` adalah antrean
+        # jawaban yang dipakai lebih dulu sebelum jalur biasa; lihat /_test/registry-credential.
+        self.kredensial = []
+        self.kredensial_paksa = []
 
     def kedaluwarsakan(self, operasi):
         if operasi['status'] == 'running' and operasi['lease_until'] < time.time():
             operasi['status'] = 'failed'
             operasi['failure_message'] = 'lease habis'
+
+    def buat_operasi(self, site_id, data):
+        """Dipanggil dengan self.kunci dipegang."""
+        nomor = f'op-{len(self.urutan) + 1:04d}'
+        self.operasi[nomor] = {
+            'id': nomor,
+            'site_id': site_id,
+            'operation': data['operation'],
+            'parameters': data.get('parameters', {}),
+            'status': 'requested',
+            'lease_until': 0,
+            'langkah': [],
+            'percobaan_langkah': 0,
+            'failure_message': None,
+            'lepas_setelah': data.get('lepas_setelah'),
+            'tanpa_validasi': bool(data.get('tanpa_validasi')),
+            # Klaim sebanyak ini dijawab 204 dulu — admin.erp yang belum menentukan rilisnya.
+            'sembunyi_klaim': int(data.get('sembunyi_klaim') or 0),
+        }
+        self.urutan.append(nomor)
+        return nomor
 
 
 class Penangan(BaseHTTPRequestHandler):
@@ -251,6 +293,9 @@ class Penangan(BaseHTTPRequestHandler):
                 muatan['message'] = t.message
             badan, jenis = json.dumps(muatan).encode(), 'application/json'
         except Exception as e:  # noqa: BLE001 — server uji melaporkan apa pun sebagai 500
+            # Juga ke stderr, yang ditulis run-tests.sh ke log/fake-admin.log: agen tidak mencetak isi jawaban
+            # 500, dan tanpa ini sebabnya hilang bersama jawabannya.
+            traceback.print_exc()
             status, badan, jenis = 500, json.dumps({'error': 'internal', 'message': repr(e)}).encode(), 'application/json'
 
         # Permintaan `/_test/...` tidak dicatat: pengujian yang menghitung permintaan agen tidak boleh ikut
@@ -351,6 +396,12 @@ class Penangan(BaseHTTPRequestHandler):
         if jalur.startswith('/_test/'):
             return self.rute_uji(metode, jalur, isi)
 
+        if metode == 'get' and jalur == '/pasang.sh':
+            return self.skrip_pasang()
+        m = re.fullmatch(r'/agen/([^/]+)', jalur)
+        if metode == 'get' and m:
+            return self.berkas_agen(m.group(1))
+
         if not jalur.startswith('/api/'):
             raise Tolak(404, 'not_found')
         dalam = jalur[len('/api'):]
@@ -372,8 +423,27 @@ class Penangan(BaseHTTPRequestHandler):
             return self.berkas_rilis(*m.groups())
         if metode == 'post' and dalam == '/agent/v1/key':
             return self.ganti_kunci(situs, isi)
+        if metode == 'post' and dalam == '/agent/v1/registry-credential':
+            return self.kredensial_registry(situs, isi)
 
         raise Tolak(404, 'not_found')
+
+    def skrip_pasang(self):
+        # Alamat yang ditanam alamat server ini sendiri, seperti admin.erp menanam APP_URL-nya. Setiap
+        # kemunculan isian diganti, sama dengan `str_replace` di admin.erp.
+        alamat = f'http://127.0.0.1:{self.server.server_address[1]}'.encode()
+        with open(self.admin.pasang, 'rb') as f:
+            return 200, f.read().replace(ISIAN_ALAMAT_ADMIN, alamat), 'text/plain; charset=utf-8'
+
+    def berkas_agen(self, nama):
+        if nama not in BERKAS_AGEN:
+            raise Tolak(404, 'not_found')
+        with self.admin.kunci:
+            pengganti = self.admin.isi_agen_pengganti.get(nama)
+        if pengganti is not None:
+            return 200, pengganti, 'text/plain; charset=utf-8'
+        with open(self.admin.berkas_agen[nama], 'rb') as f:
+            return 200, f.read(), 'text/plain; charset=utf-8'
 
     def enroll(self, isi):
         data = self.json_isi(isi, '/agent/v1/enroll', 'post')
@@ -388,6 +458,10 @@ class Penangan(BaseHTTPRequestHandler):
             situs = ulid()
             tenant = token['tenant_id']
             self.admin.situs[situs] = {'public_key': data['public_key'], 'dicabut': False, 'riwayat_kunci': []}
+            # Operasi yang dibuat bersama tokennya, seperti "Buat perintah pasang" membuat operasi install
+            # sebelum server klien pernah mendaftar.
+            for operasi in token['operasi']:
+                self.admin.buat_operasi(situs, operasi)
 
         return self.json_jawaban(201, {
             'site_id': situs,
@@ -402,9 +476,16 @@ class Penangan(BaseHTTPRequestHandler):
         data = self.json_isi(isi, '/agent/v1/report', 'post')
         if data['site_id'] != situs:
             raise Tolak(422, 'invalid', 'site_id berbeda dari keyid')
+        jawaban = {'interval_seconds': self.admin.interval}
         with self.admin.kunci:
-            self.admin.laporan.append({'site_id': situs, 'isi': data})
-        return self.json_jawaban(200, {'interval_seconds': self.admin.interval}, '/agent/v1/report', 'post')
+            # Lisensi titipan pengujian ikut di jawaban laporan berikutnya saja, lalu dibuang — seperti
+            # admin.erp sungguhan yang berhenti menyertakannya begitu perpanjangan tidak lagi jatuh tempo.
+            # Keputusan jatuh tempo milik admin.erp, bukan agen, jadi tidak ditirukan di sini.
+            lisensi = self.admin.situs.get(situs, {}).pop('lisensi_laporan', None)
+            if lisensi is not None:
+                jawaban['license'] = lisensi
+            self.admin.laporan.append({'site_id': situs, 'isi': data, 'lisensi_dijawab': lisensi is not None})
+        return self.json_jawaban(200, jawaban, '/agent/v1/report', 'post')
 
     def klaim(self, situs, isi):
         self.json_isi(isi, '/agent/v1/operations/claim', 'post')
@@ -416,6 +497,9 @@ class Penangan(BaseHTTPRequestHandler):
                 return 204, None, None
             pilihan = next((o for o in milik if o['status'] == 'requested'), None)
             if pilihan is None:
+                return 204, None, None
+            if pilihan['sembunyi_klaim'] > 0:
+                pilihan['sembunyi_klaim'] -= 1
                 return 204, None, None
             pilihan['status'] = 'running'
             pilihan['lease_until'] = time.time() + LEASE_DETIK
@@ -489,6 +573,52 @@ class Penangan(BaseHTTPRequestHandler):
             raise Putus()
         return 200, None, None
 
+    def kredensial_registry(self, situs, isi):
+        jalur_kontrak = '/agent/v1/registry-credential'
+        data = self.json_isi(isi, jalur_kontrak, 'post')
+
+        with self.admin.kunci:
+            catatan = {'site_id': situs, 'operation_id': data['operation_id'], 'status': None}
+            self.admin.kredensial.append(catatan)
+            # Satu anggota antrean per permintaan: null berarti jalur biasa, 409 atau 503 dijawab apa adanya, dan
+            # objek mengganti bidang jawaban 200 — registry, username, password — untuk permintaan itu saja.
+            paksa = self.admin.kredensial_paksa.pop(0) if self.admin.kredensial_paksa else None
+            operasi = self.admin.operasi.get(data['operation_id'])
+            if operasi is not None:
+                self.admin.kedaluwarsakan(operasi)
+            # Aturan kontrak: hanya operasi install atau upgrade yang sedang dipegang situs ini. Tiruan yang
+            # menjawab siapa pun membuat agen yang mengirim operation_id keliru tetap lulus.
+            dipegang = (
+                operasi is not None and operasi['site_id'] == situs
+                and operasi['operation'] in ('install', 'upgrade') and operasi['status'] == 'running'
+            )
+            ke = None
+            if not isinstance(paksa, int) and dipegang:
+                operasi['kredensial_ke'] = operasi.get('kredensial_ke', 0) + 1
+                ke = operasi['kredensial_ke']
+
+        if paksa == 503:
+            catatan['status'] = 503
+            return self.json_jawaban(503, {'error': 'registry_unavailable'}, jalur_kontrak, 'post')
+        if isinstance(paksa, int) and paksa != 409:
+            raise RuntimeError(f'status paksa kredensial tidak didukung tiruan: {paksa}')
+        if paksa == 409 or not dipegang:
+            catatan['status'] = 409
+            return self.json_jawaban(409, {'error': 'operation_not_held'}, jalur_kontrak, 'post')
+
+        # Satu robot per operasi; memanggil ulang mengganti robotnya. Kata sandi berawalan tetap supaya pengujian
+        # dapat mencarinya di disk dan di log tanpa tiruan ini pernah menyebutnya di /_test/state.
+        jawaban = {
+            'registry': REGISTRY_UJI,
+            'username': f'robot$coreerp+{data["operation_id"]}',
+            'password': f'SandiRobotUji-{data["operation_id"]}-{ke}',
+            'expires_at': iso(time.time() + 86400),
+        }
+        if isinstance(paksa, dict):
+            jawaban.update({k: v for k, v in paksa.items() if k in ('registry', 'username', 'password')})
+        catatan['status'] = 200
+        return self.json_jawaban(200, jawaban, jalur_kontrak, 'post')
+
     # --- endpoint pengujian -----------------------------------------------------------------------
 
     def rute_uji(self, metode, jalur, isi):
@@ -500,27 +630,24 @@ class Penangan(BaseHTTPRequestHandler):
                     'dipakai': False,
                     'tenant_id': data.get('tenant_id') or ulid(),
                     'tenant_name': data.get('tenant_name') or 'Apotek Uji',
+                    'operasi': data.get('operasi') or [],
                 }
             return 201, b'{}', 'application/json'
 
         if metode == 'post' and jalur == '/_test/operations':
             with self.admin.kunci:
-                nomor = f'op-{len(self.admin.urutan) + 1:04d}'
-                self.admin.operasi[nomor] = {
-                    'id': nomor,
-                    'site_id': data['site_id'],
-                    'operation': data['operation'],
-                    'parameters': data.get('parameters', {}),
-                    'status': 'requested',
-                    'lease_until': 0,
-                    'langkah': [],
-                    'percobaan_langkah': 0,
-                    'failure_message': None,
-                    'lepas_setelah': data.get('lepas_setelah'),
-                    'tanpa_validasi': bool(data.get('tanpa_validasi')),
-                }
-                self.admin.urutan.append(nomor)
+                nomor = self.admin.buat_operasi(data['site_id'], data)
             return 201, json.dumps({'id': nomor}).encode(), 'application/json'
+
+        # {"isi": "..."} menggantikan isi /agen/<berkas>; {"isi": null} mengembalikan berkas aslinya.
+        m = re.fullmatch(r'/_test/agen/([^/]+)', jalur)
+        if metode == 'post' and m and m.group(1) in BERKAS_AGEN:
+            with self.admin.kunci:
+                if data.get('isi') is None:
+                    self.admin.isi_agen_pengganti.pop(m.group(1), None)
+                else:
+                    self.admin.isi_agen_pengganti[m.group(1)] = data['isi'].encode()
+            return 200, b'{}', 'application/json'
 
         if metode == 'get' and jalur == '/_test/state':
             with self.admin.kunci:
@@ -530,6 +657,7 @@ class Penangan(BaseHTTPRequestHandler):
                     'reports': self.admin.laporan,
                     'operations': [self.admin.operasi[i] for i in self.admin.urutan],
                     'requests': self.admin.permintaan,
+                    'registry_credentials': self.admin.kredensial,
                 }
                 return 200, json.dumps(keadaan).encode(), 'application/json'
 
@@ -537,6 +665,19 @@ class Penangan(BaseHTTPRequestHandler):
         if metode == 'post' and m:
             with self.admin.kunci:
                 self.admin.situs[m.group(1)]['putus_ganti_kunci'] = True
+            return 200, b'{}', 'application/json'
+
+        m = re.fullmatch(r'/_test/sites/([^/]+)/lisensi-laporan', jalur)
+        if metode == 'post' and m:
+            with self.admin.kunci:
+                self.admin.situs[m.group(1)]['lisensi_laporan'] = data
+            return 200, b'{}', 'application/json'
+
+        # {"jawab": [null, 409, 503, {"registry": "..."}, ...]} — jawaban permintaan kredensial berikutnya, berurutan;
+        # sesudah antreannya habis, jalur biasa. {} mengosongkan antrean.
+        if metode == 'post' and jalur == '/_test/registry-credential':
+            with self.admin.kunci:
+                self.admin.kredensial_paksa = list(data.get('jawab', []))
             return 200, b'{}', 'application/json'
 
         m = re.fullmatch(r'/_test/operations/([^/]+)/expire', jalur)
@@ -559,6 +700,11 @@ def utama():
     argumen.add_argument('--releases', required=True, help='folder <edisi>/<rilis>/<berkas>')
     argumen.add_argument('--license-public-key', required=True, help='kunci publik lisensi (PEM)')
     argumen.add_argument('--port-file', required=True, help='berkas tempat nomor port ditulis')
+    argumen.add_argument('--pasang', required=True, help='pasang.sh yang disajikan di /pasang.sh')
+    argumen.add_argument('--agen', required=True, help='coreerp-agent yang disajikan di /agen/coreerp-agent')
+    argumen.add_argument('--update-sh', required=True, help='update.sh yang disajikan di /agen/update.sh')
+    argumen.add_argument('--folder-agen', required=True, help='folder unit systemd dan env.template')
+    argumen.add_argument('--release-public-key', required=True, help='kunci publik rilis di /agen/kunci-rilis.pub')
     a = argumen.parse_args()
 
     with open(a.contract) as f:
@@ -566,8 +712,17 @@ def utama():
     with open(a.license_public_key) as f:
         kunci_lisensi = f.read()
 
+    berkas_agen = {
+        'coreerp-agent': a.agen,
+        'coreerp-agent.service': os.path.join(a.folder_agen, 'coreerp-agent.service'),
+        'coreerp-agent.timer': os.path.join(a.folder_agen, 'coreerp-agent.timer'),
+        'env.template': os.path.join(a.folder_agen, 'env.template'),
+        'update.sh': a.update_sh,
+        'kunci-rilis.pub': a.release_public_key,
+    }
+
     server = ThreadingHTTPServer(('127.0.0.1', 0), Penangan)
-    server.admin = Admin(kontrak, a.releases, kunci_lisensi)
+    server.admin = Admin(kontrak, a.releases, kunci_lisensi, a.pasang, berkas_agen)
 
     sementara = a.port_file + '.baru'
     with open(sementara, 'w') as f:

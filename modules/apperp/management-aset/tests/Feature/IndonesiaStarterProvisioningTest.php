@@ -65,15 +65,14 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseHas('aset_m_buku_penyusutan', [
             'tenant_id' => $tenant,
             'creation_key' => 'buku-penyusutan:starter:id:pmk72-2023:buku:fiskal:v1',
-            'posting_layer' => 'tax',
-            'export_to_backoffice' => false,
+            // Memorandum: buku fiskal yang di-post akan menjurnal penyusutan dua kali (K-15).
+            'posting_layer' => 'none',
         ]);
         $this->assertDatabaseHas('aset_m_buku_penyusutan', [
             'tenant_id' => $tenant,
             'creation_key' => 'buku-penyusutan:starter:id:pmk72-2023:buku:komersial:v1',
             'posting_layer' => 'current',
             'depreciation_profile_id' => null,
-            'export_to_backoffice' => false,
         ]);
 
         $classificationId = (string) DB::table('aset_m_kelompok_harta_fiskal')

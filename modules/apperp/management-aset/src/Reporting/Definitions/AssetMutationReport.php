@@ -7,8 +7,8 @@ namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetPlacement;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -102,13 +102,13 @@ final class AssetMutationReport implements ReportDefinition
     public function data(ReportContext $context, array $parameters): ReportData
     {
         // Tabel utama tidak diberi alias agar scope tenant berjalan semestinya.
-        $query = AssetPlacement::query()
-            ->join('aset_tr_penerimaan_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', 'aset_tr_penempatan_aset.asset_id')
+        $query = PenempatanAset::query()
+            ->join('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', 'aset_tr_penempatan_aset.aset_id')
                     ->on('aset.tenant_id', '=', 'aset_tr_penempatan_aset.tenant_id');
             })
             ->leftJoin('aset_m_lokasi_aset as lokasi_tujuan', function ($join): void {
-                $join->on('lokasi_tujuan.id', '=', 'aset_tr_penempatan_aset.asset_location_id')
+                $join->on('lokasi_tujuan.id', '=', 'aset_tr_penempatan_aset.lokasi_aset_id')
                     ->on('lokasi_tujuan.tenant_id', '=', 'aset_tr_penempatan_aset.tenant_id');
             })
             ->leftJoin('aset_m_kondisi_aset as kondisi', function ($join): void {
@@ -116,7 +116,7 @@ final class AssetMutationReport implements ReportDefinition
                     ->on('kondisi.tenant_id', '=', 'aset.tenant_id');
             });
 
-        app(OrganizationScope::class)->assetQuery($query, $context->request(), 'aset');
+        app(OrganizationScope::class)->asetQuery($query, $context->request(), 'aset');
 
         if (! empty($parameters['group_aset_id'])) {
             $query->where('aset.group_aset_id', $parameters['group_aset_id']);
@@ -128,7 +128,7 @@ final class AssetMutationReport implements ReportDefinition
             $query->where('aset.jenis_aset_id', $parameters['jenis_aset_id']);
         }
         if (! empty($parameters['asset_id'])) {
-            $query->where('aset_tr_penempatan_aset.asset_id', $parameters['asset_id']);
+            $query->where('aset_tr_penempatan_aset.aset_id', $parameters['asset_id']);
         }
         if (! empty($parameters['dari'])) {
             $query->where('aset_tr_penempatan_aset.effective_on', '>=', $parameters['dari']);
@@ -138,13 +138,13 @@ final class AssetMutationReport implements ReportDefinition
         }
 
         // Subquery untuk lokasi asal dari penempatan sebelumnya untuk aset yang sama
-        $lokasiAsalSub = AssetPlacement::from('aset_tr_penempatan_aset as p_prev')
+        $lokasiAsalSub = PenempatanAset::from('aset_tr_penempatan_aset as p_prev')
             ->leftJoin('aset_m_lokasi_aset as loc_prev', function ($join): void {
-                $join->on('loc_prev.id', '=', 'p_prev.asset_location_id')
+                $join->on('loc_prev.id', '=', 'p_prev.lokasi_aset_id')
                     ->on('loc_prev.tenant_id', '=', 'p_prev.tenant_id');
             })
             ->select('loc_prev.nama')
-            ->whereColumn('p_prev.asset_id', 'aset_tr_penempatan_aset.asset_id')
+            ->whereColumn('p_prev.aset_id', 'aset_tr_penempatan_aset.aset_id')
             ->whereColumn('p_prev.tenant_id', 'aset_tr_penempatan_aset.tenant_id')
             ->where(function ($q): void {
                 $q->whereColumn('p_prev.effective_on', '<', 'aset_tr_penempatan_aset.effective_on')
@@ -164,9 +164,9 @@ final class AssetMutationReport implements ReportDefinition
             ->limit(1);
 
         // Subquery untuk penanggung jawab asal (custodian penempatan sebelumnya)
-        $custodianAsalSub = AssetPlacement::from('aset_tr_penempatan_aset as p_prev')
+        $custodianAsalSub = PenempatanAset::from('aset_tr_penempatan_aset as p_prev')
             ->select('p_prev.custodian_user_id')
-            ->whereColumn('p_prev.asset_id', 'aset_tr_penempatan_aset.asset_id')
+            ->whereColumn('p_prev.aset_id', 'aset_tr_penempatan_aset.aset_id')
             ->whereColumn('p_prev.tenant_id', 'aset_tr_penempatan_aset.tenant_id')
             ->where(function ($q): void {
                 $q->whereColumn('p_prev.effective_on', '<', 'aset_tr_penempatan_aset.effective_on')
@@ -218,7 +218,7 @@ final class AssetMutationReport implements ReportDefinition
             : 'Semua jenis';
 
         $asetLabel = ! empty($parameters['asset_id'])
-            ? (Asset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
+            ? (Aset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
             : 'Semua aset';
 
         $nomor = 1;

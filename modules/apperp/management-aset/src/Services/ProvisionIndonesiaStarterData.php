@@ -476,8 +476,6 @@ final class ProvisionIndonesiaStarterData
                 'keterangan' => $item['description'],
                 'aktif' => true,
                 'posting_layer' => $item['posting_layer'],
-                // Finance/backoffice belum memiliki kontrak posting untuk app ini.
-                'export_to_backoffice' => false,
                 'round_off_depreciation' => 0,
                 // Tidak ada buku starter yang diberi umur manfaat universal. Buku fiskal
                 // mendapat profil berversi lewat matriks; buku komersial tetap menunggu
@@ -485,10 +483,10 @@ final class ProvisionIndonesiaStarterData
                 'depreciation_profile_id' => null,
                 'alternative_profile_id' => null,
             ];
-            $ids[$item['template_key']] = $this->ensureNumberedMaster(
+            $ids[$item['template_key']] = $this->ensureCodedMaster(
                 $tenantId,
                 BukuPenyusutan::class,
-                'management-aset.buku-penyusutan',
+                $item['code'],
                 'buku-penyusutan:starter:'.$item['template_key'],
                 $values,
             );
@@ -656,6 +654,38 @@ final class ProvisionIndonesiaStarterData
         }
 
         return $id;
+    }
+
+    /**
+     * Seperti `ensureNumberedMaster`, untuk master berkode ketik (K-24): kodenya dari template,
+     * misalnya `KOMERSIAL`, bukan dari urutan nomor. Record starter yang sudah ada — termasuk yang
+     * lahir sebelum kodenya diketik dan masih memegang kode bernomor — dikenali lewat
+     * `creation_key` dan dibiarkan apa adanya; kode lama tidak diganti (8.7.3).
+     *
+     * @param  class-string<MasterData>  $model
+     * @param  array<string, mixed>  $values
+     */
+    private function ensureCodedMaster(string $tenantId, string $model, string $code, string $creationKey, array $values): string
+    {
+        $existing = $model::withTrashed()->where('creation_key', $creationKey)->toBase()->first();
+        if ($existing) {
+            return $existing->id;
+        }
+
+        try {
+            return $this->simpan($model, $tenantId, [
+                'creation_key' => $creationKey,
+                'kode' => $code,
+                ...$values,
+            ]);
+        } catch (QueryException $exception) {
+            $existing = $model::withTrashed()->where('creation_key', $creationKey)->toBase()->first();
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return $existing->id;
+        }
     }
 
     /**

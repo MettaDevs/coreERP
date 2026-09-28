@@ -173,6 +173,25 @@ trait BerinteraksiDenganKonteksCore
     }
 
     /**
+     * Melengkapi kiriman pembuatan master berkode ketik dengan kode, bila test tidak menyebutnya.
+     *
+     * Group aset dan buku penyusutan tidak lagi diberi nomor oleh Core; kodenya diketik (K-24
+     * feed posting finance) dan wajib ada. Test yang tidak sedang menguji kode itu cukup memanggil
+     * ini, supaya setiap helper pembuat master tidak menulis ulang aturannya sendiri.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function denganKodeKetik(string $resource, array $payload): array
+    {
+        if (! in_array($resource, ['group-aset', 'buku-penyusutan'], true) || array_key_exists('kode', $payload)) {
+            return $payload;
+        }
+
+        return ['kode' => 'UJI-'.strtoupper(Str::random(10)), ...$payload];
+    }
+
+    /**
      * Awalan nomor yang dijanjikan manifest untuk sebuah referensi.
      *
      * Dipakai test yang memeriksa kode yang diterbitkan. Membacanya dari manifest, bukan
@@ -312,19 +331,104 @@ trait BerinteraksiDenganKonteksCore
      */
     protected function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
     {
-        if ($organisasiId === null || DB::table('organizations')->where('id', $organisasiId)->exists()) {
+        if ($organisasiId === null) {
             return;
         }
 
-        DB::table('organizations')->insert([
-            'id' => $organisasiId,
-            'tenant_id' => $tenantId,
-            'name' => 'Organisasi uji '.Str::lower(Str::random(6)),
-            'classification' => $klasifikasi,
-            'status' => 'active',
-            'created_at' => now(),
-            'updated_at' => now(),
+        if (! DB::table('organizations')->where('id', $organisasiId)->exists()) {
+            DB::table('organizations')->insert([
+                'id' => $organisasiId,
+                'tenant_id' => $tenantId,
+                'name' => 'Organisasi uji '.Str::lower(Str::random(6)),
+                'classification' => $klasifikasi,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Entitas legal juga punya baris `legal_entities`: kontrak setelan posting finance dan
+        // penerbit posting mencarinya di sana, bukan di `organizations` saja.
+        if ($klasifikasi === 'legal_entity' && ! DB::table('legal_entities')->where('organization_id', $organisasiId)->exists()) {
+            DB::table('legal_entities')->insert([
+                'organization_id' => $organisasiId,
+                'tenant_id' => $tenantId,
+                'company_code' => 'LE-'.strtoupper(Str::random(8)),
+                'country_code' => 'ID',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Group aset yang belum punya buku yang di-post ke finance diberi satu buku uji ber-lapisan
+     * `current` yang tidak menyusut.
+     *
+     * Sejak jurnal perolehan terbit saat penerimaan diselesaikan (area 9), penerimaan untuk group
+     * tanpa buku seperti itu ditolak, mengikuti D365 yang menghentikan posting faktur aset tanpa
+     * buku ber-lapisan Current. Test yang tidak sedang menguji buku tetap dapat menerima aset:
+     * bukunya tidak menyusut, jadi penyusutan yang diuji tidak berubah. Aturan penolakannya sendiri
+     * diuji di `PenerimaanAsetTest`.
+     */
+    protected function pastikanBukuDiPostUji(string $tenantId, string $groupAsetId): void
+    {
+        $ada = DB::table('aset_m_group_buku_penyusutan as matriks')
+            ->join('aset_m_buku_penyusutan as buku', 'buku.id', '=', 'matriks.buku_id')
+            ->where('matriks.group_aset_id', $groupAsetId)
+            ->whereNull('buku.deleted_at')
+            ->where('buku.aktif', true)
+            ->where('buku.posting_layer', '!=', 'none')
+            ->exists();
+        if ($ada) {
+            return;
+        }
+
+        $buku = DB::table('aset_m_buku_penyusutan')->where('tenant_id', $tenantId)->where('creation_key', 'uji-buku-di-post')->value('id');
+        if (! is_string($buku)) {
+            $buku = (string) Str::ulid();
+            DB::table('aset_m_buku_penyusutan')->insert([
+                'id' => $buku, 'tenant_id' => $tenantId, 'creation_key' => 'uji-buku-di-post',
+                'kode' => 'UJI-POST-'.strtoupper(Str::random(6)), 'nama' => 'Buku uji yang di-post', 'aktif' => true,
+                'posting_layer' => 'current', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('aset_m_group_buku_penyusutan')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'group_aset_id' => $groupAsetId,
+            'buku_id' => $buku, 'depreciate' => false, 'created_at' => now(), 'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Vendor milik Core untuk satu entitas legal, dibuat sekali per entitas (K-06).
+     *
+     * Penerimaan pembelian pada entitas bermode `direct_payable` — mode bawaan entitas yang belum
+     * disetel — wajib membawa vendor (TODO 9.2.1). Test yang tidak sedang menguji vendor cukup
+     * memakai vendor ini; barisnya ditulis langsung seperti organisasi uji, bukan lewat layar
+     * vendor Core yang hanya terbuka untuk owner.
+     */
+    protected function pastikanVendorUji(string $tenantId, string $legalEntityId, string $nama = 'PT Pemasok Uji'): string
+    {
+        $this->pastikanOrganisasiAda($tenantId, $legalEntityId, 'legal_entity');
+        $kunci = 'uji-vendor:'.$legalEntityId.':'.Str::slug($nama);
+        $ada = DB::table('vendors')->where('tenant_id', $tenantId)->where('creation_key', $kunci)->value('id');
+        if (is_string($ada)) {
+            return $ada;
+        }
+
+        $party = strtolower((string) Str::ulid());
+        DB::table('parties')->insert([
+            'id' => $party, 'tenant_id' => $tenantId, 'type' => 'organization', 'name' => $nama,
+            'search_name' => Str::lower($nama), 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $vendor = strtolower((string) Str::ulid());
+        DB::table('vendors')->insert([
+            'id' => $vendor, 'tenant_id' => $tenantId, 'legal_entity_id' => $legalEntityId, 'party_id' => $party,
+            'number' => 'VND-'.strtoupper(Str::random(8)), 'status' => 'active', 'creation_key' => $kunci,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $vendor;
     }
 
     /**
@@ -474,7 +578,6 @@ trait BerinteraksiDenganKonteksCore
             $membership = TenantMembership::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $pengguna->id,
-                'system_role' => 'user',
                 'status' => 'active',
             ]);
 
@@ -493,7 +596,7 @@ trait BerinteraksiDenganKonteksCore
 
         // Tanpa lingkup yang disebut test, pengguna diberi tanggung jawab atas **seluruh**
         // organisasi tenantnya. Itu bentuk yang sama dengan token lama, yang selalu membawa
-        // `asset-responsibility` dengan `all => true` kecuali test menyebut lain. Lingkup
+        // `aset-responsibility` dengan `all => true` kecuali test menyebut lain. Lingkup
         // kosong akan menolak hampir semua permintaan dengan 403, dan test yang sebenarnya
         // menguji hal lain akan gagal karena sebab yang tidak ada hubungannya.
         $lingkup = $kebijakanData === []
@@ -693,7 +796,7 @@ trait BerinteraksiDenganKonteksCore
                 // Sama dengan yang dinyatakan `app.yaml` module. Field yang diwajibkan di sini
                 // diperiksa Core sebelum instance dibuat, jadi menuliskannya berbeda akan
                 // membuat test lulus atas skema yang tidak pernah dipasang di produksi.
-                'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
+                'decision_context_schema' => json_encode(['required' => ['document_id', 'aset_id']], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

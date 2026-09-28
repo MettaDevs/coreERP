@@ -37,9 +37,20 @@ export default withMermaid({
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
     'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
     'todo/on-prem-dikelola/README.md': 'todo/on-prem-dikelola/index.md',
+    'todo/opt-in-image-tunggal/README.md':
+      'todo/opt-in-image-tunggal/index.md',
+    'todo/registry-harbor/README.md': 'todo/registry-harbor/index.md',
+    'todo/feed-posting-finance/README.md': 'todo/feed-posting-finance/index.md',
+    'todo/lisensi-mengunci/README.md': 'todo/lisensi-mengunci/index.md',
+    'todo/pasang-satu-perintah/README.md':
+      'todo/pasang-satu-perintah/index.md',
+    'todo/rilis-kompatibel-mundur/README.md':
+      'todo/rilis-kompatibel-mundur/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
+    'todo/produksi-database-sendiri/README.md':
+      'todo/produksi-database-sendiri/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -128,6 +139,7 @@ export default withMermaid({
             { text: 'Pabrikan dan model', link: '/apps/management-aset/master/katalog-model/' },
             { text: 'Lokasi dan dimensi keuangan', link: '/apps/management-aset/master/lokasi/' },
             { text: 'Penyusutan: profil dan buku', link: '/apps/management-aset/master/depresiasi/' },
+            { text: 'Posting group aset', link: '/apps/management-aset/master/posting-group/' },
             { text: 'Setup maintenance', link: '/apps/management-aset/master/maintenance/' },
             { text: 'Master work order', link: '/apps/management-aset/master/work-order/' },
           ],
@@ -183,6 +195,7 @@ export default withMermaid({
             { text: 'Dokumen cetak, layout, dan ekspor', link: '/dev/23-document-rendering' },
             { text: 'API dan integration bridge', link: '/dev/04-api-and-integration' },
             { text: 'Integrasi sistem eksternal', link: '/dev/12-external-module-integration' },
+            { text: 'Feed posting finance', link: '/dev/34-feed-posting-finance' },
             { text: 'Kustomisasi dan addon', link: '/dev/05-customization-and-addons' },
           ],
         },
@@ -200,6 +213,10 @@ export default withMermaid({
           text: 'Rilis dan operasi',
           collapsed: true,
           items: [
+            { text: 'Dari branch sampai server klien', link: '/dev/29-alur-rilis-server-klien' },
+            { text: 'Registry Harbor', link: '/dev/30-registry-harbor' },
+            { text: 'admin.erp: konsol operator', link: '/dev/31-admin-erp-control-plane' },
+            { text: 'SSO', link: '/dev/32-sso' },
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
             { text: 'Mendaftarkan katalog produk', link: '/dev/13-publishing-an-app-release' },
             { text: 'CI/CD polyrepo', link: '/dev/22-ci-cd' },
@@ -263,6 +280,40 @@ export default withMermaid({
                   text: 'On-prem yang dikelola vendor',
                   link: '/todo/on-prem-dikelola/',
                 },
+                {
+                  text: 'Registry image sendiri dengan Harbor',
+                  link: '/todo/registry-harbor/',
+                },
+                {
+                  text: 'Lisensi yang mengunci',
+                  link: '/todo/lisensi-mengunci/',
+                },
+                {
+                  text: 'Pemasangan satu perintah',
+                  link: '/todo/pasang-satu-perintah/',
+                },
+                {
+                  text: 'Mundur tanpa kehilangan data',
+                  link: '/todo/rilis-kompatibel-mundur/',
+                },
+                {
+                  text: 'Opt-in: satu image untuk semua klien',
+                  link: '/todo/opt-in-image-tunggal/',
+                },
+              ],
+            },
+            {
+              text: 'Integrasi finance',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Feed posting finance (PRD)',
+                  link: '/todo/feed-posting-finance/',
+                },
+                {
+                  text: 'TODO feed posting finance',
+                  link: '/todo/feed-posting-finance/TODO',
+                },
               ],
             },
             {
@@ -272,6 +323,14 @@ export default withMermaid({
                 {
                   text: 'Environment dan pusat admin',
                   link: '/todo/environment-dan-pusat-admin/',
+                },
+                {
+                  text: 'Production database sendiri',
+                  link: '/todo/produksi-database-sendiri/',
+                },
+                {
+                  text: 'TODO production database sendiri',
+                  link: '/todo/produksi-database-sendiri/TODO',
                 },
               ],
             },

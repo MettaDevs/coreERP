@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property ?string $step
  * @property ?string $failure_message
+ * @property ?array<string, mixed> $detail
  * @property Carbon $started_at
  * @property ?Carbon $finished_at
  */

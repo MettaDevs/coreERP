@@ -1,6 +1,6 @@
 ---
 name: coreerp-architecture
-description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, module installation, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another module calls.
+description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, module installation, deployment, product launcher, upgrades, database migrations or release rollback, release numbering, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another module calls.
 ---
 
 # CoreERP Architecture
@@ -15,6 +15,9 @@ Read only the sections relevant to the task:
 - `docs/dev/01a-tenant-and-org-hierarchy.md` defines the CoreERP organization model.
 - `docs/dev/08-query-scopes-and-schema.md` defines organization persistence and query scope.
 - `docs/dev/09-identity-and-access.md` defines workforce and responsibility-based access.
+- `docs/dev/03-release-and-on-prem.md` defines releases, updates, and the N-1 schema rule that makes rolling back an image safe without touching the database.
+- `docs/dev/29-alur-rilis-server-klien.md` defines how merged code becomes a release that SaaS dev and managed client servers run, and how release numbers are chosen.
+- `docs/dev/30-registry-harbor.md` defines the Harbor registry, per-operation pull credentials, and digest-only pulls; the `coreerp-harbor` skill holds the working rules for that path.
 - `docs/references/dynamics-365-organization-model.md` records the Microsoft Dynamics 365 sources and the mapping decisions used by CoreERP.
 
 The Dynamics reference governs organization, workforce, and responsibility-based security inside a tenant. CoreERP's tenant, entitlement, deployment, and on-prem boundaries remain separate decisions.
@@ -177,10 +180,22 @@ Before adding or changing anything reachable from outside the module — any
 3. **An undocumented cross-module surface is an incomplete change.** If a route
    exists that another app calls and it is absent from the contract, the change is
    not finished. Absence is the most common failure here and it is invisible in
-   tests — nothing fails when a contract omits an endpoint. For Control Plane, the
-   app-facing surface lives in `contracts/openapi-internal.yaml` and is enforced by
-   `python contracts/check-contract-coverage.py`, which also runs in CI. Run it after
-   any change to `routes/api.php`.
+   tests — nothing fails when a contract omits an endpoint. For Core, the `internal/v1`
+   surface is written by hand in `apps/core/contracts/internal/` — one file per path and
+   per component, one root per reader — and assembled by `python contracts/bundle.py` into
+   `contracts/openapi-internal.yaml` (every reader) and `contracts/terbit/` (one spec per
+   reader). Never edit the assembled files. `python contracts/check-contract-coverage.py`
+   compares the router with the combined bundle; both it and `bundle.py --check` run in
+   CI. Run them after any change to `routes/api.php` or the contract.
+
+   **Readers outside CoreERP get one root per domain, not one root for everything.**
+   `integrasi-finance.yaml` serves the finance application; a later HR or procurement
+   integration gets its own `integrasi-<domain>.yaml`, with its own guide and version, so a
+   partner reads only what it uses. A root's `x-portal` decides whether it is published
+   without login at `/docs`; integration domains are, while the module-app and pusat-admin
+   contracts stay behind the `viewApiDocs` gate. An endpoint read by two readers is written
+   once in `paths/` and referenced from both roots; the bundler keeps only the security
+   schemes each root knows, so every reader sees its own way in.
 
    **Every app carries its own coverage check, not only Control Plane**, and it runs in
    CI — a checker no pipeline invokes is a file, not a gate. Three things decide whether
@@ -238,6 +253,21 @@ Before adding or changing anything reachable from outside the module — any
    spec into `paths/` and `components/` joined by `$ref`, and commit a bundled
    artifact next to the split source for tooling that cannot resolve cross-file
    refs. One 10k-line spec guarantees merge conflicts between unrelated features.
+   Core's `contracts/internal/` and `contracts/bundle.py` are the reference layout: a
+   bundle check in CI proves the committed artifacts match their sources.
+11. **A list of values the reader must choose from is found by searching, not by reading
+   everything.** Readers type the field name into the docs search and click the first
+   hit. Give the list its own guide heading and its own schema in `components/schemas`,
+   name every value in the parameter that accepts it, and pin all the places that repeat
+   it with a test — `DocsPortalTest` does this for `posting_type`. Check it in the
+   rendered docs with the words a reader would type before calling it done.
+   - A list that grows is written with `examples`, not `enum`: rule 7 makes widening an
+     enum breaking.
+   - Guide headings carry no inline code. Scalar builds the search link from the whole
+     heading text but drops the code when it gives the rendered heading its id, so the
+     search result points at an anchor that does not exist. An underscore without
+     backticks is safe.
+   - Do not add an endpoint only to list static values; the owner chose documentation.
 
 #### Envelope fields cannot be added retroactively
 
@@ -294,6 +324,54 @@ Before implementing organization, workforce, or access changes:
 5. Add the smallest test that rejects cross-tenant references, invalid classification, hierarchy cycles/history rewrites, or scope escalation relevant to the change.
 
 If the required source of truth does not exist, stop and report the missing registry or schema. Do not substitute entitlement, hard-coded catalog data, or optimistic UI and call it installed.
+
+### Schema change and rollback gate
+
+Apply before writing or reviewing any migration in `apps/core/database/migrations` or `modules/*/*/database/migrations`. The canonical rule is `docs/dev/03-release-and-on-prem.md`, section "Perubahan skema dan mundur".
+
+**A bad release is rolled back by running the previous image, never by rolling back the database.** Migrations do not roll back and `down()` is never used in production. Restoring a backup discards every transaction written after the update, which on a clinic server means medical records and receipts.
+
+Every release must therefore be **N-1 compatible**: the schema after release N's migrations must still work with release N-1's code.
+
+- **Allowed in one release:** new tables; new columns that are nullable or have a default; indexes; constraints that only loosen.
+- **Not allowed in the release that needs them:**
+  - dropping or renaming a column or table;
+  - changing a column type;
+  - `SET NOT NULL`;
+  - adding a required column without a default to an existing table;
+  - a constraint that tightens.
+- **Breaking changes use expand/contract across releases:**
+  1. add the new column or table;
+  2. write both and backfill;
+  3. read the new one;
+  4. drop the old one at least one release after no code reads it.
+- **The drop migration** carries a `@kontrak <reason>` docblock tag. A pattern that looks destructive but is safe for old code, such as widening a type, carries `@kompatibel-mundur <reason>`. Both need a real reason; they are reviewed decisions, not silent exceptions.
+- **The guard is `apps/core/tests/Feature/Boundary/MigrasiKompatibelMundurTest.php`.** Never add a new migration to its frozen `SEBELUM_ATURAN` list; that list only shrinks.
+- **After an update, recover in this order:**
+  1. turn the feature off;
+  2. roll forward to a fix release;
+  3. run the previous image on the current database.
+
+  Restoring the database happens only inside the update itself (`scripts/update.sh` restores the pre-migration backup when migration or health fails) or as a human disaster-recovery decision, never as a button.
+
+If a requested change cannot be made N-1 compatible in one release, stop and propose the expand/contract split instead of writing the destructive migration.
+
+### Release number gate
+
+Apply when choosing the number entered in the `rilis` workflow (**Run workflow**, which runs `deploy/perakit/rakit.sh --rilis` on the first server), when advising someone which number to use, or when writing docs, tests, or code that parse or compare release numbers. The canonical rule is `docs/dev/29-alur-rilis-server-klien.md`, section "Nomor rilis".
+
+Code enforces only the form and the order: one number has one content, a number already in Harbor is burned, and releases only move forward. The meaning of each part is a team convention that no checker enforces, so apply it deliberately.
+
+- **Always exactly three parts, `MAJOR.MINOR.PATCH`.** No suffix (`-rc1`), no leading zeros, no fourth build number. Every step on GitHub and the first server (`rilis.yml`, `deploy-dev.yml`, `coreerp-rilis`, `rakit.sh`, `pasang-rilis.sh`) and admin.erp accept two to four parts with leading zeros, while the agent rejects leading zeros. A number only the agent rejects is still pushed to Harbor, registered, and deployed to SaaS dev, then burned. PHP `version_compare` ranks `0.2.0` above `0.2`, while the agent treats them as equal. Three plain parts is the only form every component agrees on.
+- **PATCH:** fixes only, with no migration since the previous release's commit. A fix that needs a migration ships as MINOR. Check it with the migration diff command in the canonical section: it needs `':(glob)modules/*/*/database/migrations/**'`, because a plain `modules/*/*/database/migrations` pathspec silently matches no module file.
+- **MINOR:** new features or modules, and any migration that passes the schema change and rollback gate, including an `@kontrak` step.
+- **MAJOR:** a change someone outside the code must act on:
+  - a removed feature, or behavior users must be told about before the update;
+  - an incompatible change to an endpoint or event used outside CoreERP;
+  - a client-server requirement the agent cannot install itself.
+- **Do not bump MAJOR for `@kontrak`.** Rolling back one release stays safe under N-1. The deeper rollback floor belongs in the release manifest (MK-02 in `docs/todo/rilis-kompatibel-mundur`), not in the number.
+- **Stay on `0.MINOR.PATCH` until the first production client server.** That install is `1.0.0`.
+- **Traceability lives in the manifest, not the number.** Manifest v2 carries `commit`, which admin.erp requires, and the image carries `org.opencontainers.image.revision`. Never add a build counter to answer "which code is this".
 
 ## Module completion gate: concurrency and load
 

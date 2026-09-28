@@ -213,10 +213,10 @@
           <mxGeometry x="20" y="300" width="260" height="30" as="geometry" />
         </mxCell>
 
-        <mxCell id="B_man" value="&lt;b&gt;Manifest edisi customer&lt;/b&gt;&lt;br&gt;&lt;br&gt;apotek-sejahtera:&lt;br&gt;&amp;nbsp;&amp;nbsp;kasir, inventory, farmasi&lt;br&gt;&lt;br&gt;praktek-dr-budi:&lt;br&gt;&amp;nbsp;&amp;nbsp;registrasi, rawat-jalan, kasir" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+        <mxCell id="B_man" value="&lt;b&gt;Lisensi per klien (admin.erp)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Apotek Sejahtera:&lt;br&gt;&amp;nbsp;&amp;nbsp;kasir, inventory, farmasi&lt;br&gt;&lt;br&gt;Praktek dr. Budi:&lt;br&gt;&amp;nbsp;&amp;nbsp;registrasi, rawat-jalan, kasir" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
           <mxGeometry x="440" y="56" width="300" height="150" as="geometry" />
         </mxCell>
-        <mxCell id="B_ci" value="&lt;b&gt;CI: build image per edisi&lt;/b&gt;&lt;br&gt;composer require hanya package di manifest&lt;br&gt;+ build UI shell dengan modul itu&lt;br&gt;→ 1 image + compose bertanda tangan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+        <mxCell id="B_ci" value="&lt;b&gt;CI: build 1 image per rilis&lt;/b&gt;&lt;br&gt;seluruh modul ikut, bahan uji dipangkas&lt;br&gt;+ build UI shell dengan modul itu&lt;br&gt;→ 1 image + compose bertanda tangan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
           <mxGeometry x="440" y="270" width="300" height="110" as="geometry" />
         </mxCell>
 

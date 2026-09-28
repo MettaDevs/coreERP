@@ -10,17 +10,19 @@ use App\Models\Client;
 use App\Models\Environment;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\SecurityDuty;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Access\OwnerRoleDuties;
 use App\Support\AppDependencyGraph;
+use App\Support\ControlPlane\EnvironmentAddress;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Satu-satunya jalur yang melahirkan tenant, dan sejak hari ini ia dipakai dua pintu.
@@ -46,11 +48,18 @@ class RegisterBusiness
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool,first_environment?:'production'|'demo'|'none',first_environment_expires_at?:?string,tenant_id?:string}  $data
+     * Kata sandinya datang dalam salah satu dari dua bentuk, tidak pernah keduanya: `password` teks
+     * polos yang di-hash di sini, atau `password_hash` yang sudah di-hash di tempat lain. Yang kedua
+     * dipakai `tenant:bootstrap-site` di server klien — kata sandi sementara owner dibuat admin.erp,
+     * dan hanya hash bcrypt-nya yang menempuh jalan ke server itu. Teks polosnya tidak pernah ada di
+     * server klien sama sekali, jadi tidak ada log, riwayat shell, atau keluaran perintah di sana yang
+     * dapat membocorkannya.
+     *
+     * @param  array{name:string,email:string,password?:string,password_hash?:string,business_name:string,app_ids:list<string>,must_change_password?:bool,first_environment?:'production'|'demo'|'none',first_environment_expires_at?:?string,first_environment_hosting?:'provider'|'client_server',tenant_id?:string}  $data
      */
     public function handle(array $data): User
     {
-        $hashedPassword = Hash::make($data['password']);
+        $hashedPassword = $this->hashedPassword($data);
         $wajibGantiSandi = $data['must_change_password'] ?? false;
 
         return DB::transaction(function () use ($data, $hashedPassword, $wajibGantiSandi): User {
@@ -129,6 +138,17 @@ class RegisterBusiness
             $jenisPertama = $data['first_environment'] ?? 'production';
             $environment = null;
 
+            /*
+             * Di mana lingkungan pertama itu berjalan — di server kami, atau di server klien.
+             *
+             * Hanya produksi yang boleh di server klien, dan yang menjaganya
+             * `environments_server_klien_hanya_produksi`, bukan baris ini: permintaan yang
+             * menggabungkan server klien dengan demo sudah ditolak validasi pintunya, dan jalur yang
+             * lupa memvalidasi berhenti di PostgreSQL di dalam transaksi yang sama.
+             */
+            $hosting = $data['first_environment_hosting'] ?? Environment::HOSTING_PROVIDER;
+            $diServerKlien = $hosting === Environment::HOSTING_CLIENT_SERVER;
+
             if ($jenisPertama !== 'none') {
                 $produksi = $jenisPertama === 'production';
 
@@ -138,10 +158,16 @@ class RegisterBusiness
                     'name' => $produksi ? 'Production' : 'Peragaan',
                     'slug' => $produksi ? $slug : 'peragaan',
                     'database_name' => null,
+                    'hosting' => $hosting,
                     // Produksi ikut database bawaan, jadi ia langsung dapat dimasuki. Yang bukan
                     // produksi belum punya database sama sekali sampai seseorang menekan Siapkan —
                     // menyatakannya aktif berarti mengiklankan alamat yang dijawab 503.
-                    'status' => $produksi ? 'active' : 'provisioning',
+                    //
+                    // Produksi di server klien juga belum berjalan: ia baru ada sesudah perintah
+                    // pasang dijalankan di server itu. `provisioning` adalah status registry untuk
+                    // "belum berjalan", dan `active` di sini akan terbaca di setiap layar sebagai
+                    // tempat kerja yang sudah dapat dipakai pelanggan.
+                    'status' => $produksi && ! $diServerKlien ? 'active' : 'provisioning',
                     // Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya
                     // alasan lingkungan terpisah dapat dipercaya memegang salinan data sungguhan.
                     'outbound_allowed' => $produksi,
@@ -151,7 +177,6 @@ class RegisterBusiness
             $membership = TenantMembership::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
-                'system_role' => 'owner',
                 'status' => 'active',
             ]);
             // Indeks navigasi: ia menentukan environment mana yang muncul di pengalih, bukan apa
@@ -178,14 +203,16 @@ class RegisterBusiness
                 ]);
             }
 
+            // Owner memegang semua duty yang sah untuk tenant ini — duty Core dan duty app yang dibeli — dan
+            // disamakan lagi setiap kali katalog berubah (`OwnerRoleDuties`). Tidak ada lagi owner/admin di
+            // keanggotaan: hak mengelola tenant datang dari role ini (SEC-22).
             $ownerRole = Role::create([
                 'tenant_id' => $tenant->id,
                 'name' => 'Owner',
                 'is_active' => true,
+                'is_owner' => true,
             ]);
-            $ownerRole->duties()->sync(
-                SecurityDuty::query()->whereIn('app_id', $appIds)->pluck('code'),
-            );
+            app(OwnerRoleDuties::class)->sync($ownerRole);
             $ownerAssignment = RoleAssignment::create([
                 'membership_id' => $membership->id,
                 'role_id' => $ownerRole->id,
@@ -217,6 +244,19 @@ class RegisterBusiness
                  * dasar seluruh rancangan: entitlement milik tenant, pemasangan milik lingkungan.
                  */
                 if (! $environment instanceof Environment) {
+                    return;
+                }
+
+                /*
+                 * Server klien sama: tidak ada tempat di server ini untuk memasang module-nya.
+                 *
+                 * Module tenant itu dipasang di servernya sendiri, oleh `tenant:bootstrap-site` di
+                 * dalam paket yang hanya berisi app yang dibelinya. Menjalankan pemasangan di sini
+                 * akan ditolak `InstallModule` — sesudah commit, sehingga tenant yang sudah lahir
+                 * dijawab 500 — dan urutan nomor draf di database bersama tidak dipakai siapa pun.
+                 * Entitlement-nya tetap tercatat di atas; dari situlah edisi situsnya diturunkan.
+                 */
+                if ($environment->hostedOnClientServer()) {
                     return;
                 }
 
@@ -268,12 +308,78 @@ class RegisterBusiness
         });
     }
 
+    /**
+     * Hash kata sandi owner, dari salah satu bentuk masukannya.
+     *
+     * Hash yang diberikan diperiksa lebih dulu dengan dua pertanyaan yang sama persis dengan yang
+     * diajukan cast `hashed` milik `User`, dan urutannya menentukan. Cast itu **menyimpan apa adanya**
+     * nilai yang sudah berbentuk hash — itu yang membuat jalur ini mungkin — tetapi ia melempar
+     * `RuntimeException` bila biaya hash-nya melebihi `BCRYPT_ROUNDS` server ini. Dilempar dari
+     * `User::create`, penolakan itu datang di tengah transaksi dengan pesan bahasa Inggris yang tidak
+     * menyebut sebabnya. Di sini ia datang sebelum satu baris pun ditulis, dengan kalimatnya sendiri.
+     *
+     * Nilai yang **tidak** berbentuk hash ditolak, bukan di-hash. Cast yang sama akan meng-hash-nya
+     * diam-diam, dan owner berakhir dengan kata sandi berupa teks hash itu sendiri — akun yang tidak
+     * dapat dimasuki siapa pun, dengan kata sandi yang ditunjukkan admin.erp tidak pernah cocok.
+     *
+     * @param  array{password?:string,password_hash?:string}  $data
+     */
+    private function hashedPassword(array $data): string
+    {
+        $given = $data['password_hash'] ?? null;
+
+        if ($given === null) {
+            if (! isset($data['password'])) {
+                throw new InvalidArgumentException('Pendaftaran usaha membutuhkan kata sandi owner, dalam bentuk teks atau hash.');
+            }
+
+            return Hash::make($data['password']);
+        }
+
+        if (isset($data['password'])) {
+            throw new InvalidArgumentException('Kata sandi owner diberikan dua kali — sebagai teks dan sebagai hash. Hanya salah satunya yang boleh dikirim.');
+        }
+
+        if (! Hash::isHashed($given)) {
+            throw new InvalidArgumentException('Hash kata sandi owner tidak dikenali sebagai hash yang dipakai server ini.');
+        }
+
+        // Pertanyaan yang sama dengan `BcryptHasher::verifyConfiguration`, yang dipanggil cast `hashed`,
+        // ditulis ulang di sini dengan fungsi PHP sendiri. Method Laravel itu `@internal` dan
+        // docblock-nya salah menyebut parameternya larik, jadi memanggilnya berarti menekan analisa
+        // statis; `password_get_info` memberi jawaban yang sama dengan tipe yang benar. Driver selain
+        // bcrypt ikut ditolak, karena cast akan memeriksanya dengan hasher driver itu dan menolak hash
+        // bcrypt mana pun.
+        $info = password_get_info($given);
+        $cost = $info['options']['cost'] ?? null;
+
+        if (config('hashing.driver') !== 'bcrypt'
+            || $info['algoName'] !== 'bcrypt'
+            || ! is_int($cost)
+            || $cost > (int) config('hashing.bcrypt.rounds', 12)) {
+            throw new InvalidArgumentException(sprintf(
+                'Hash kata sandi owner tidak sesuai setelan hash server ini: harus bcrypt, dengan biaya paling '
+                .'tinggi BCRYPT_ROUNDS=%s (driver hash server: %s). Server ini menolak menyimpannya; samakan '
+                .'setelan hash di admin.erp dan di server ini.',
+                (string) config('hashing.bcrypt.rounds'),
+                (string) config('hashing.driver'),
+            ));
+        }
+
+        return $given;
+    }
+
     private function uniqueSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'business';
         $slug = $base;
+        // Slug tenant menjadi label alamat produksinya, `<slug>.<base_domain>`. Label yang dipakai
+        // layanan kita sendiri — konsol di `admin`, registry image di `registry` — dijawab router
+        // Traefik yang berprioritas lebih tinggi, jadi tenant yang memperoleh slug itu lahir dengan
+        // alamat yang tidak pernah sampai ke Core. Daftarnya sama dengan yang dibaca pengurai alamat.
+        $reserved = EnvironmentAddress::reservedLabels();
 
-        while (Tenant::query()->where('slug', $slug)->exists() || Client::query()->where('slug', $slug)->exists()) {
+        while (in_array($slug, $reserved, true) || Tenant::query()->where('slug', $slug)->exists() || Client::query()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.Str::lower(Str::random(6));
         }
 

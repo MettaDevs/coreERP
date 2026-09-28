@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteRelease;
+use ControlPlane\Sites\ClientServerSetup;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -108,16 +110,91 @@ class ReleaseRegistrationTest extends SiteTestCase
         $this->assertSame(0, SiteRelease::query()->count());
     }
 
+    /**
+     * Manifest v2 dari perakit (`deploy/perakit/rakit.sh`): satu image untuk semua klien, di registry sendiri,
+     * tanpa edisi dan tanpa host. Rilisnya tersimpan di bawah edisi tunggal, jalur yang dipakai panel "Server
+     * klien" untuk memilih rilis pemasangan.
+     */
+    public function test_a_v2_manifest_is_registered_under_the_single_image_edition(): void
+    {
+        $digest = 'sha256:'.str_repeat('c', 64);
+
+        $this->register($this->releaseFiles(manifest: $this->manifestV2(['digest' => $digest])))
+            ->assertCreated()
+            ->assertJsonPath('edition', Site::SINGLE_IMAGE_EDITION)
+            ->assertJsonPath('release', '0.2.0');
+
+        $release = SiteRelease::query()->sole();
+        $this->assertSame('coreerp/core@'.$digest, $release->image);
+        $this->assertSame($digest, $release->digest);
+        $this->assertSame('0.2.0', ClientServerSetup::newestRelease(Site::SINGLE_IMAGE_EDITION));
+    }
+
+    /**
+     * Manifest v2 yang menunjuk tempat lain tidak dapat ditarik dengan kredensial yang diterbitkan konsol ini.
+     * Lebih baik ditolak di sini daripada gagal di server klien, di tengah pemasangan.
+     */
+    public function test_v2_manifests_that_point_outside_the_registry_project_or_skip_a_digest_are_refused(): void
+    {
+        $postgres = ['nama' => 'postgres', 'image' => 'coreerp/pendamping/postgres', 'digest' => 'sha256:'.str_repeat('e', 64)];
+
+        $refused = [
+            'host di image' => ['image' => 'registry.erp.grenery.xyz/coreerp/core'],
+            'project lain' => ['image' => 'lain/core'],
+            'image bertag' => ['image' => 'coreerp/core:0.2.0'],
+            'tanpa config_digest' => ['config_digest' => null],
+            'digest bukan sha256' => ['digest' => 'sha256:xyz'],
+            'tanpa commit' => ['commit' => null],
+            'pendamping di luar project' => ['pendamping' => [['nama' => 'postgres', 'image' => 'library/postgres', 'digest' => $postgres['digest']]]],
+            'pendamping bertag' => ['pendamping' => [['nama' => 'postgres', 'image' => 'coreerp/pendamping/postgres', 'digest' => '16-alpine']]],
+            'pendamping kembar' => ['pendamping' => [$postgres, $postgres]],
+            'pendamping bukan daftar' => ['pendamping' => ['postgres' => $postgres]],
+        ];
+
+        foreach ($refused as $label => $override) {
+            $this->register($this->releaseFiles(manifest: $this->manifestV2($override)))
+                ->assertStatus(422)
+                ->assertJsonPath('error', 'manifest_invalid');
+            $this->assertSame(0, SiteRelease::query()->count(), $label);
+        }
+    }
+
     // ------------------------------------------------------------------ pembantu
 
-    /** @return array{manifest: string, compose: string, update_script: string, checksums: string, signature: string} */
+    /**
+     * @param  array<string, mixed>  $override
+     * @return array<string, mixed>
+     */
+    private function manifestV2(array $override = []): array
+    {
+        return array_filter([
+            'versi' => 2,
+            'rilis' => '0.2.0',
+            'commit' => str_repeat('d', 40),
+            'image' => 'coreerp/core',
+            'digest' => 'sha256:'.str_repeat('a', 64),
+            'config_digest' => 'sha256:'.str_repeat('b', 64),
+            'pendamping' => [
+                ['nama' => 'gotenberg', 'image' => 'coreerp/pendamping/gotenberg', 'digest' => 'sha256:'.str_repeat('f', 64)],
+                ['nama' => 'postgres', 'image' => 'coreerp/pendamping/postgres', 'digest' => 'sha256:'.str_repeat('e', 64)],
+            ],
+            'dibangun_pada' => '2026-09-15T04:43:37Z',
+            ...$override,
+        ], fn ($value): bool => $value !== null);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $manifest
+     * @return array{manifest: string, compose: string, update_script: string, checksums: string, signature: string}
+     */
     private function releaseFiles(
         string $compose = "name: coreerp\n",
         int $signingSlot = 5,
         ?string $extraChecksumLine = null,
         string $image = '',
+        ?array $manifest = null,
     ): array {
-        $manifest = (string) json_encode([
+        $manifest = (string) json_encode($manifest ?? [
             'edisi' => 'apotek-sejahtera',
             'rilis' => '0.2.0',
             'image' => $image !== '' ? $image : 'ghcr.io/mettadevs/coreerp/edisi-apotek-sejahtera@sha256:'.str_repeat('a', 64),

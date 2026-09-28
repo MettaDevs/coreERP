@@ -11,9 +11,19 @@ import {
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { KindBadge, ModuleStatusBadge, StatusBadge } from '@/components/badges';
+import {
+    InstallStateBadge,
+    KindBadge,
+    ModuleStatusBadge,
+    StatusBadge,
+} from '@/components/badges';
 import Shell from '@/components/shell';
 import { labelFor, operationLabels, resultLabels } from '@/lib/display';
+import ClientServerPanel from '@/pages/environments/client-server-panel';
+import type {
+    InstallCommand,
+    ServerClient,
+} from '@/pages/environments/client-server-panel';
 
 type Environment = {
     id: string;
@@ -21,6 +31,7 @@ type Environment = {
     slug: string;
     kind: string;
     status: string;
+    hosting: string;
     outboundAllowed: boolean;
     database: string;
     ownDatabase: boolean;
@@ -63,15 +74,22 @@ export default function Show({
     history,
     modules,
     canProvision,
+    serverClient,
+    installCommand,
 }: {
     environment: Environment;
     history: Operation[];
     modules: Module[];
     canProvision: boolean;
+    serverClient: ServerClient | null;
+    installCommand: InstallCommand | null;
 }) {
     const last = history[0];
     const [running, setRunning] = useState(false);
     const retry = environment.status === 'degraded';
+    // Produksi di server klien tidak punya database di server kita. Spanduk penyiapan dan daftar
+    // module membaca server kita, jadi keduanya digantikan panel "Server klien".
+    const onClientServer = environment.hosting === 'client_server';
 
     // Penyiapan gagal dipulangkan sebagai galat validasi bernama `provision`, bukan sebagai prop
     // tersendiri. Karena `router.post` dipakai di sini alih-alih `useForm`, tidak ada objek
@@ -81,7 +99,8 @@ export default function Show({
     // Spanduknya muncul juga ketika penyiapan tidak diizinkan, asalkan databasenya memang belum
     // ada. Layar yang diam pada keadaan itu memaksa operator menebak apakah ia sedang melihat
     // lingkungan yang belum siap atau lingkungan yang sudah siap tetapi kosong.
-    const showBanner = canProvision || !environment.ownDatabase;
+    const showBanner =
+        !onClientServer && (canProvision || !environment.ownDatabase);
     const sentence = retry
         ? 'Penyiapan terakhirnya berhenti di tengah jalan. Menjalankannya lagi aman: ia melanjutkan langkah yang belum selesai, bukan memulai dari nol.'
         : environment.ownDatabase
@@ -163,6 +182,14 @@ export default function Show({
                 </section>
             )}
 
+            {serverClient && (
+                <ClientServerPanel
+                    environmentId={environment.id}
+                    serverClient={serverClient}
+                    installCommand={installCommand}
+                />
+            )}
+
             <div className="grid gap-6 lg:grid-cols-2">
                 <section className="rounded-lg border bg-background p-5">
                     <h2 className="mb-2 text-sm font-semibold">Keterangan</h2>
@@ -185,19 +212,55 @@ export default function Show({
                                 >
                                     {environment.url}
                                 </a>
-                                {environment.status !== 'active' && (
-                                    <span className="ms-2 text-xs text-muted-foreground">
-                                        — belum dapat dibuka sampai statusnya
-                                        Aktif
-                                    </span>
-                                )}
+                                {onClientServer
+                                    ? // Hanya selama belum terpasang. Server yang sudah melapor, atau pernah
+                                      // melapor lalu berhenti, sudah melewati kedua langkah itu.
+                                      !['ready', 'stale'].includes(
+                                          serverClient?.progress.state ?? '',
+                                      ) && (
+                                          <span className="ms-2 text-xs text-muted-foreground">
+                                              — terbuka setelah record DNS dan
+                                              pemasangan di server klien selesai
+                                          </span>
+                                      )
+                                    : environment.status !== 'active' && (
+                                          <span className="ms-2 text-xs text-muted-foreground">
+                                              — belum dapat dibuka sampai
+                                              statusnya Aktif
+                                          </span>
+                                      )}
                             </Row>
                         )}
                         <Row label="Jenis">
                             <KindBadge kind={environment.kind} />
                         </Row>
+                        <Row label="Berjalan di">
+                            {onClientServer ? (
+                                <span className="text-end">
+                                    Server klien
+                                    {serverClient?.site?.serverAddress && (
+                                        <span className="block font-mono text-xs font-normal text-muted-foreground">
+                                            {serverClient.site.serverAddress}
+                                        </span>
+                                    )}
+                                </span>
+                            ) : (
+                                'Server kita'
+                            )}
+                        </Row>
+                        {/*
+                            Produksi di server klien tidak pernah disiapkan di server kita, jadi status
+                            registry-nya menetap "Sedang disiapkan". Keadaan yang berarti bagi operator
+                            adalah keadaan pemasangannya — kata yang sama dengan panel di atas.
+                        */}
                         <Row label="Status">
-                            <StatusBadge status={environment.status} />
+                            {serverClient ? (
+                                <InstallStateBadge
+                                    state={serverClient.progress.state}
+                                />
+                            ) : (
+                                <StatusBadge status={environment.status} />
+                            )}
                         </Row>
                         <Row label="Slug">
                             <span className="font-mono text-xs">
@@ -214,14 +277,25 @@ export default function Show({
                                 {environment.id}
                             </span>
                         </Row>
-                        <Row label="Database">
-                            <span className="font-mono text-xs">
-                                {environment.database}
-                            </span>
-                        </Row>
-                        <Row label="Database sendiri">
-                            {environment.ownDatabase ? 'Ya' : 'Tidak'}
-                        </Row>
+                        {/*
+                            Nama database yang dikirim server untuk lingkungan tanpa `database_name`
+                            adalah database pooled di server kita. Bagi produksi di server klien nama itu
+                            bukan tempat datanya, dan menampilkannya mengundang orang mencarinya di sana.
+                        */}
+                        {onClientServer ? (
+                            <Row label="Database">Di server klien</Row>
+                        ) : (
+                            <>
+                                <Row label="Database">
+                                    <span className="font-mono text-xs">
+                                        {environment.database}
+                                    </span>
+                                </Row>
+                                <Row label="Database sendiri">
+                                    {environment.ownDatabase ? 'Ya' : 'Tidak'}
+                                </Row>
+                            </>
+                        )}
                         <Row label="Kirim keluar">
                             {environment.outboundAllowed ? 'Ya' : 'Tidak'}
                         </Row>
@@ -263,62 +337,65 @@ export default function Show({
                 </section>
             </div>
 
-            <section className="space-y-3">
-                <h2 className="text-sm font-semibold">Module terpasang</h2>
-                {modules.length === 0 ? (
-                    <div className="rounded-lg border border-dashed bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-                        {environment.ownDatabase
-                            ? 'Lingkungan ini sudah punya database sendiri, tetapi belum satu pun module dipasang di dalamnya. Yang ada di sana baru tabel milik Core; pemakainya akan masuk ke tempat kerja yang kosong.'
-                            : 'Belum ada database yang dapat memuat module. Siapkan databasenya lebih dulu.'}
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto rounded-lg border bg-background">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>ID</TableHead>
-                                    <TableHead>Nama</TableHead>
-                                    <TableHead>Versi</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Data awal</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {modules.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-mono text-xs">
-                                            {item.id}
-                                        </TableCell>
-                                        <TableCell className="font-medium">
-                                            {item.name}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs">
-                                            {item.version}
-                                        </TableCell>
-                                        <TableCell>
-                                            <ModuleStatusBadge
-                                                status={item.status}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {item.seeded
-                                                ? 'Sudah terisi'
-                                                : 'Belum'}
-                                        </TableCell>
+            {!onClientServer && (
+                <section className="space-y-3">
+                    <h2 className="text-sm font-semibold">Module terpasang</h2>
+                    {modules.length === 0 ? (
+                        <div className="rounded-lg border border-dashed bg-background px-4 py-8 text-center text-sm text-muted-foreground">
+                            {environment.ownDatabase
+                                ? 'Lingkungan ini sudah punya database sendiri, tetapi belum satu pun module dipasang di dalamnya. Yang ada di sana baru tabel milik Core; pemakainya akan masuk ke tempat kerja yang kosong.'
+                                : 'Belum ada database yang dapat memuat module. Siapkan databasenya lebih dulu.'}
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto rounded-lg border bg-background">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Nama</TableHead>
+                                        <TableHead>Versi</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Data awal</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                    Yang terdaftar di sini adalah module di dalam database
-                    lingkungan ini, bukan yang dibeli tenantnya. Keduanya dapat
-                    berbeda: pembelian tercatat pada tenant, pemasangan terjadi
-                    pada tiap lingkungan — dan lingkungan yang baru lahir belum
-                    memuat satu pun dari yang sudah dibeli.
-                </p>
-            </section>
+                                </TableHeader>
+                                <TableBody>
+                                    {modules.map((item) => (
+                                        <TableRow key={item.id}>
+                                            <TableCell className="font-mono text-xs">
+                                                {item.id}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {item.name}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs">
+                                                {item.version}
+                                            </TableCell>
+                                            <TableCell>
+                                                <ModuleStatusBadge
+                                                    status={item.status}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {item.seeded
+                                                    ? 'Sudah terisi'
+                                                    : 'Belum'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        Yang terdaftar di sini adalah module di dalam database
+                        lingkungan ini, bukan yang dibeli tenantnya. Keduanya
+                        dapat berbeda: pembelian tercatat pada tenant,
+                        pemasangan terjadi pada tiap lingkungan — dan lingkungan
+                        yang baru lahir belum memuat satu pun dari yang sudah
+                        dibeli.
+                    </p>
+                </section>
+            )}
 
             <section className="space-y-3">
                 <h2 className="text-sm font-semibold">Riwayat lengkap</h2>

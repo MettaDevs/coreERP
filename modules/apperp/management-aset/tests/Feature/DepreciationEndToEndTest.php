@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class DepreciationEndToEndTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -151,15 +152,15 @@ class DepreciationEndToEndTest extends TestCase
         $jenis = $this->master('jenis-aset', ['nama' => 'Mobil']);
         $komersial = $this->profil('Komersial', ['method' => 'straight_line', 'useful_life_periods' => 10]);
         $fiskal = $this->profil('Fiskal', ['method' => 'straight_line', 'useful_life_periods' => 5]);
-        $bukuK = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'export_to_backoffice' => true, 'depreciation_profile_id' => $komersial]);
-        $bukuF = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'tax', 'export_to_backoffice' => false, 'depreciation_profile_id' => $fiskal]);
+        $bukuK = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'depreciation_profile_id' => $komersial]);
+        $bukuF = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'none', 'depreciation_profile_id' => $fiskal]);
         $this->matrix($group, [
             ['buku_id' => $bukuK, 'useful_life_periods' => 10, 'convention' => 'full_month'],
             ['buku_id' => $bukuF, 'useful_life_periods' => 5, 'convention' => 'full_month'],
         ])->assertOk();
-        $asset = $this->receive($group, $jenis, 1000);
+        $aset = $this->receive($group, $jenis, 1000);
 
-        $books = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
+        $books = DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
         $this->fastForward($books[5], 5);
         $this->fastForward($books[10], 5);
 
@@ -167,26 +168,9 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(0.0, $this->netBookValue($books[5]));
         $this->assertSame(500.0, $this->netBookValue($books[10]));
 
-        // Buku fiskal tidak diekspor, jadi backoffice tidak menjurnal dua kali.
-        $exported = DB::table('aset_tr_export_penyusutan as e')
-            ->join('aset_tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
-            ->pluck('p.asset_book_id')->unique();
-        $this->assertTrue($exported->contains($books[10]));
-        $this->assertFalse($exported->contains($books[5]));
-    }
-
-    public function test_payload_export_tidak_membawa_resolusi_finance(): void
-    {
-        $book = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
-        $this->fastForward($book, 1);
-
-        $payload = json_decode((string) DB::table('aset_tr_export_penyusutan')->value('payload'), true);
-        // Barisnya harus benar-benar ada; tanpa ini `null` akan lolos sebagai "tidak
-        // membawa akun" dan test berhenti membuktikan apa pun.
-        $this->assertIsArray($payload, 'Buku yang mengekspor harus menghasilkan satu baris export.');
-        $this->assertArrayNotHasKey('akun', $payload);
-        $this->assertArrayNotHasKey('posting_layer', $payload);
-        $this->assertArrayNotHasKey('financial_dimension_org_unit_id', $payload);
+        // Kedua buku tidak lagi menulis ekspor. Buku fiskal memorandum juga tidak pernah di-post ke
+        // finance: proses "Post penyusutan" menolaknya (`DepreciationPostingTest`).
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
     }
 
     public function test_dasar_tahun_kalender_dan_fiskal_menghasilkan_awal_yang_berbeda(): void
@@ -238,7 +222,7 @@ class DepreciationEndToEndTest extends TestCase
         // Buku milik tenant lain tidak dapat dipakai membuat proposal.
         $this->sebagaiPengguna($tenantLain, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
-                'asset_book_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
+                'buku_aset_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertNotFound();
 
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $this->tenantId)->count());
@@ -261,14 +245,29 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(2, DB::table('aset_tr_penyusutan_aset')->count());
     }
 
+    /**
+     * Ekspor lama berhenti ditulis sejak "Post penyusutan" (feed posting finance, TODO 11.4), untuk
+     * buku yang di-post maupun memorandum, lewat finalisasi maupun pembalikan. Jurnal penyusutan kini
+     * satu posting ringkas per proses post, dan pembaliknya mengikuti apakah periode aslinya sudah
+     * di-post (`DepreciationPostingTest`).
+     */
+    public function test_finalisasi_dan_pembalikan_tidak_lagi_menulis_ekspor(): void
+    {
+        $memorandum = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200);
+        $this->reverse($this->finalizedPeriod($memorandum));
+        $diPost = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, diPost: true);
+        $this->reverse($this->finalizedPeriod($diPost));
+
+        $this->assertSame(4, DB::table('aset_tr_penyusutan_aset')->count());
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
+    }
+
     // ---- penyusun skenario -------------------------------------------------
 
     /**
      * Menyiapkan satu aset lengkap dengan bukunya dan mengembalikan id buku aset.
      *
-     * Ekspor ke backoffice mati kecuali diminta, mengikuti default produk: bridge ke
-     * Finance harus dipilih secara sadar. Test yang memeriksa isi payload ekspor wajib
-     * menyalakannya sendiri, supaya jelas bahwa ekspor itu bagian dari skenarionya.
+     * Bukunya memorandum (`posting_layer = none`) kecuali `$diPost`, yang memberinya lapisan current.
      *
      * @param  array<string, mixed>  $profile
      */
@@ -278,7 +277,7 @@ class DepreciationEndToEndTest extends TestCase
         float $residual = 0,
         string $convention = 'full_month',
         string $placedInService = '2026-06-15',
-        bool $export = false,
+        bool $diPost = false,
     ): string {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
@@ -286,7 +285,7 @@ class DepreciationEndToEndTest extends TestCase
         $buku = $this->master('buku-penyusutan', [
             'nama' => 'Buku '.Str::random(6),
             'depreciation_profile_id' => $profilId,
-            'export_to_backoffice' => $export,
+            'posting_layer' => $diPost ? 'current' : 'none',
         ]);
         $this->matrix($group, [[
             'buku_id' => $buku,
@@ -294,9 +293,11 @@ class DepreciationEndToEndTest extends TestCase
             'convention' => $convention,
         ]])->assertOk();
 
-        $asset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
+        $aset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
 
-        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
+        // Buku memorandum saja tidak cukup untuk menerima aset (area 9), jadi penerimaan menambah
+        // buku uji yang di-post tetapi tidak menyusut. Yang dikembalikan tetap buku skenario ini.
+        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->where('buku_id', $buku)->value('id');
     }
 
     /**
@@ -327,7 +328,7 @@ class DepreciationEndToEndTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
-                'asset_book_id' => $bookId,
+                'buku_aset_id' => $bookId,
                 'period_starts_on' => $start,
                 'period_ends_on' => $end,
                 'consumption_amount' => $consumption,
@@ -342,6 +343,21 @@ class DepreciationEndToEndTest extends TestCase
         $this->finalize($id);
 
         return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
+    }
+
+    private function finalizedPeriod(string $bookId): string
+    {
+        $periodId = (string) $this->propose($bookId, 1)->json('data.id');
+        $this->finalize($periodId);
+
+        return $periodId;
+    }
+
+    private function reverse(string $periodId): void
+    {
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
+            ->assertCreated();
     }
 
     private function finalize(string $periodId): void
@@ -371,7 +387,7 @@ class DepreciationEndToEndTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload))
             ->assertCreated()->json('data.id');
     }
 
@@ -398,16 +414,14 @@ class DepreciationEndToEndTest extends TestCase
 
     private function receive(string $group, string $jenis, float $acquisition, float $residual = 0, string $placedInService = '2026-06-15'): string
     {
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $this->legalEntityId,
-                'nama' => 'Aset penyusutan ujung ke ujung',
-                'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
-                'acquired_on' => '2026-06-01', 'placed_in_service_on' => $placedInService,
-                'acquisition_value' => $acquisition, 'residual_value' => $residual,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
-            ])->assertCreated()->json('data.id');
+        return $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $this->legalEntityId,
+            'nama' => 'Aset penyusutan ujung ke ujung',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
+            'acquired_on' => '2026-06-01', 'placed_in_service_on' => $placedInService,
+            'acquisition_value' => $acquisition, 'residual_value' => $residual,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
+        ]);
     }
 
     /** @return list<string> */

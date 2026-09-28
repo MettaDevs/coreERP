@@ -21,7 +21,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * @property ?string $jenis_aset_id
  * @property ?string $pabrikan_aset_id
  * @property ?string $model_aset_id
- * @property ?string $asset_id
+ * @property ?string $aset_id
  * @property string $hours
  * @property int $items_count
  * @property int $expenses_count
@@ -35,7 +35,7 @@ class MaintenanceJobTypeDefault extends MasterData
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
         'maintenance_job_type_id', 'variant_id', 'trade', 'functional_location_id',
-        'jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_id', 'hours',
+        'jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'aset_id', 'hours',
         'items_count', 'expenses_count', 'fees_count', 'checklist_template_id',
     ];
 

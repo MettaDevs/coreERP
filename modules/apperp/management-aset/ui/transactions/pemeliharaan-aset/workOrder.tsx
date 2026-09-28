@@ -20,7 +20,7 @@ export type Option = {
 
 export type JobLine = {
     id?: string;
-    asset_id: string;
+    aset_id: string;
     maintenance_job_type_id: string;
     variant_id: string;
     trade_id: string;
@@ -36,7 +36,7 @@ export type JobLine = {
     tindakan_perbaikan_keterangan?: string | null;
     hasil?: string | null;
     catatan: string;
-    asset_kode?: string;
+    aset_kode?: string;
     job_type_nama?: string;
     trade_nama?: string;
     variant_nama?: string;
@@ -130,7 +130,7 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export const emptyJob = (): JobLine => ({
-    asset_id: '',
+    aset_id: '',
     maintenance_job_type_id: '',
     variant_id: '',
     trade_id: '',

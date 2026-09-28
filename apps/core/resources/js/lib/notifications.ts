@@ -72,6 +72,12 @@ function read(): ShellNotification[] {
             .filter((item) => Date.parse(item.createdAt) >= cutoff)
             .slice(0, MAX_ITEMS);
     } catch {
+        // Dikecualikan dengan sadar, dan hanya di sini. Penyimpanan peramban yang diblokir
+        // adalah keadaan sehari-hari — mode privat, setelan pihak ketiga — bukan kegagalan yang
+        // perlu dilaporkan, dan daftar ini memang boleh kosong pada kunjungan pertama siapa pun.
+        // Yang hilang karenanya hanya pemberitahuan yang belum sempat dibaca di tab ini, tidak
+        // ada fakta yang dinyatakan salah kepada siapa pun.
+        // eslint-disable-next-line no-restricted-syntax
         return [];
     }
 }

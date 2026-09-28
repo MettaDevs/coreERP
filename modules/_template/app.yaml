@@ -19,8 +19,9 @@ description: Cetakan module. Ganti seluruh isi berkas ini dengan identitas modul
 publisher: penerbit-contoh
 version: 0.1.0
 
-# `business-app` adalah module yang boleh sampai ke pelanggan. Yang hanya ada sebagai bahan
-# uji di repo ini memakai `internal-fixture`, dan pembangun bundle edisi menolaknya.
+# `business-app` adalah module yang boleh sampai ke pelanggan. Bahan uji penjaga batas memakai
+# `internal-fixture`, dan ia tidak tinggal di folder ini melainkan di
+# `apps/core/tests/Fixtures/modules`; pembangun image tetap menolaknya kalau ia muncul di sini.
 kind: business-app
 
 requires:

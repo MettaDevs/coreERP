@@ -10,11 +10,19 @@ use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
 use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeCalendarController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
+use App\Http\Controllers\Docs\DocsPortalController;
+use App\Http\Controllers\Finance\CurrencyPrecisionController;
+use App\Http\Controllers\Finance\FinancePostingMonitorController;
+use App\Http\Controllers\Finance\FinancePostingSettingController;
+use App\Http\Controllers\Finance\IntegrationClientController;
+use App\Http\Controllers\Finance\ReferenceAccountController;
+use App\Http\Controllers\Finance\VendorController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
 use App\Http\Controllers\NumberSequence\NumberSequenceController;
 use App\Http\Controllers\Onboarding\BusinessRegistrationController;
+use App\Http\Controllers\Onboarding\InvitationLandingController;
 use App\Http\Controllers\Onboarding\InvitationRedemptionController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\PrintIdentityController;
@@ -30,37 +38,28 @@ use App\Http\Controllers\Reporting\ReportLayoutController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
 Route::inertia('/', 'welcome')->name('home');
 Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
 
+/*
+ * Portal dokumentasi API. Kontrak integrasi untuk sistem di luar CoreERP terbit tanpa login;
+ * referensi internal dijaga gate `viewApiDocs`. Alasannya di DocsPortalController.
+ */
+Route::get('docs', DocsPortalController::class)->name('docs.portal');
+Route::get('docs/kontrak/{spesifikasi}.yaml', [DocsPortalController::class, 'kontrak'])
+    ->where('spesifikasi', '[a-z-]+')
+    ->name('docs.kontrak');
+
 Route::middleware(RestrictedDocsAccess::class)->group(function () {
-    Route::get('docs', function () {
-        $specifications = CoreApp::query()->where('status', 'available')->orderBy('name')->get()
-            ->map(fn (CoreApp $app): array => [
-                'id' => $app->id,
-                'name' => $app->name,
-                'url' => route('docs.openapi', $app->id),
-            ])
-            ->prepend([
-                'id' => 'control-plane',
-                'name' => config('app.name').' Control Plane',
-                'url' => route('scramble.docs.document'),
-            ])
-            ->values();
-        $selected = $specifications->firstWhere('id', request()->query('spec')) ?? $specifications->first();
-
-        return view('api-portal', compact('selected', 'specifications'));
-    })->name('docs.portal');
-
     // Contract dimiliki repository app penerbit, bukan repository platform ini.
     // Portal hanya mengarahkan ke contract yang didaftarkan app pada katalog.
     Route::get('docs/openapi/{document}', function (string $document) {
@@ -87,10 +86,16 @@ Route::get('api/v1/control/apps', fn () => response()->json([
  * Yang memilih jalurnya adalah controller-nya, dari ada atau tidaknya pengguna pada permintaan.
  * Orang baru mengirim nama, email, dan kata sandi; orang yang sudah masuk hanya mengirim kodenya.
  */
-Route::get('join', fn () => Inertia::render('auth/join', [
-    'passwordRules' => Password::defaults()->toPasswordRulesString(),
-    'authenticated' => auth()->check(),
-]))->name('join');
+Route::get('join', [InvitationRedemptionController::class, 'show'])->name('join');
+
+/*
+ * Pendaratan tautan undangan di domain dasar. Penyedia SSO menolak mengirim email yang tautannya
+ * menuju host di luar alamat balik client — dan alamat balik itu ada di domain dasar, bukan di
+ * alamat tenant. Lihat `InvitationLandingController`.
+ */
+Route::get('undangan', InvitationLandingController::class)
+    ->middleware('throttle:30,1')
+    ->name('undangan');
 Route::post('join', [InvitationRedemptionController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('join.store');
@@ -114,6 +119,14 @@ Route::middleware(['auth', RequirePassword::class, 'throttle:10,1'])->group(func
     Route::post('sso/hubungkan', [SsoLoginController::class, 'connect'])->name('sso.connect');
     Route::delete('sso/hubungkan', [SsoLoginController::class, 'disconnect'])->name('sso.disconnect');
 });
+/*
+ * Menukarkan undangan terikat SSO. Tamu saja: undangan terikat dibuktikan lewat upacara, bukan lewat
+ * sesi yang kebetulan sedang terbuka. Orang yang sudah masuk dan ingin tenant kedua memakai kode
+ * anonim, atau keluar dulu.
+ */
+Route::post('sso/gabung', [SsoLoginController::class, 'join'])
+    ->middleware(['guest', 'throttle:5,1'])
+    ->name('sso.join');
 Route::get('sso/callback', [SsoLoginController::class, 'callback'])
     ->middleware('throttle:30,1')
     ->name('sso.callback');
@@ -153,7 +166,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('apps.host');
 
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
-    Route::get('settings/access', [AccessController::class, 'index'])->name('access.index');
+    Route::get('settings/access', [AccessController::class, 'index'])->name('access.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
     Route::get('settings/security-configuration', [SecurityConfigurationController::class, 'index'])->name('security-configuration.index');
     Route::post('settings/security-configuration/privileges', [SecurityConfigurationController::class, 'storePrivilege'])->name('security-configuration.privileges.store');
     Route::put('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'updatePrivilege'])->name('security-configuration.privileges.update');
@@ -164,63 +177,63 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/privileges/{privilege}/duplicate', [SecurityConfigurationController::class, 'duplicatePrivilege'])->name('security-configuration.privileges.duplicate');
     Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
     Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
-    Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index');
-    Route::inertia('settings/global-address-book', 'settings/global-address-book/index')->name('global-address-book.index');
-    Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
+    Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::inertia('settings/global-address-book', 'settings/global-address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
-    Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
-    Route::get('settings/working-time-templates', [WorkingTimeTemplateController::class, 'index'])->name('working-time-templates.index');
+    Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
+    Route::get('settings/working-time-templates', [WorkingTimeTemplateController::class, 'index'])->name('working-time-templates.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::post('settings/working-time-templates', [WorkingTimeTemplateController::class, 'store'])->name('working-time-templates.store');
     Route::put('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'update'])->name('working-time-templates.update');
     Route::delete('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'destroy'])->name('working-time-templates.destroy');
     Route::put('settings/working-time-templates/{template}/lines', [WorkingTimeTemplateController::class, 'updateLines'])->name('working-time-templates.lines.update');
     Route::post('settings/working-time-templates/{template}/copy', [WorkingTimeTemplateController::class, 'copy'])->name('working-time-templates.copy');
-    Route::get('settings/working-time-calendars', [WorkingTimeCalendarController::class, 'index'])->name('working-time-calendars.index');
+    Route::get('settings/working-time-calendars', [WorkingTimeCalendarController::class, 'index'])->name('working-time-calendars.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::post('settings/working-time-calendars', [WorkingTimeCalendarController::class, 'store'])->name('working-time-calendars.store');
     Route::put('settings/working-time-calendars/{calendar}', [WorkingTimeCalendarController::class, 'update'])->name('working-time-calendars.update');
     Route::delete('settings/working-time-calendars/{calendar}', [WorkingTimeCalendarController::class, 'destroy'])->name('working-time-calendars.destroy');
     Route::post('settings/working-time-calendars/{calendar}/copy', [WorkingTimeCalendarController::class, 'copy'])->name('working-time-calendars.copy');
-    Route::get('settings/working-time-calendars/{calendar}/times', [WorkingTimeCalendarController::class, 'times'])->name('working-time-calendars.times');
-    Route::get('settings/working-time-calendar-times/{calendar?}', [WorkingTimeCalendarController::class, 'times'])->name('working-time-calendar-times.index');
+    Route::get('settings/working-time-calendars/{calendar}/times', [WorkingTimeCalendarController::class, 'times'])->name('working-time-calendars.times')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
+    Route::get('settings/working-time-calendar-times/{calendar?}', [WorkingTimeCalendarController::class, 'times'])->name('working-time-calendar-times.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::put('settings/working-time-calendars/{calendar}/days/{day}', [WorkingTimeCalendarController::class, 'updateDay'])->name('working-time-calendars.days.update');
     Route::post('settings/working-time-calendars/{calendar}/compose', [WorkingTimeCalendarController::class, 'compose'])->name('working-time-calendars.compose');
-    Route::get('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composePage'])->name('working-time-calendars.compose-page');
+    Route::get('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composePage'])->name('working-time-calendars.compose-page')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::post('settings/compose-working-times', [WorkingTimeCalendarController::class, 'composeFromPage'])->name('working-time-calendars.compose-from-page');
-    Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index');
+    Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     Route::get('settings/address_setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     // Countries
-    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store');
-    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy');
+    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Provinces
-    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store');
-    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy');
+    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Regencies
-    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store');
-    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy');
+    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Districts
-    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store');
-    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy');
+    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Villages
-    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store');
-    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy');
+    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Streets (RT/RW)
-    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store');
-    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy');
+    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Buildings (Gedung/Unit/Lantai)
-    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store');
-    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy');
+    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Postal Codes
-    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store');
-    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy');
+    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Group of houses
-    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store');
-    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy');
+    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Land plots
-    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store');
-    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy');
+    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Parameters
-    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store');
+    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Hierarchy Lookups (Bottom-Up and Top-Down)
     Route::get('settings/address-setup/lookup/bottom-up', [AddressSetupController::class, 'lookupBottomUp'])->name('address-setup.lookup.bottom-up');
     Route::get('settings/address-setup/lookup/top-down', [AddressSetupController::class, 'lookupTopDown'])->name('address-setup.lookup.top-down');
@@ -229,16 +242,28 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup/villages-paginated', [AddressSetupController::class, 'getVillagesPaginated'])->name('address-setup.villages.paginated');
     // External Codes & Translations
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
-    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store');
-    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy');
+    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
-    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store');
-    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy');
+    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
 
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
-    Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
+    Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REPORT_LAYOUT_READ));
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
-    Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
+    Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
+    // Presisi uang per mata uang untuk feed posting finance; lihat docs/todo/feed-posting-finance.
+    Route::get('settings/currencies', [CurrencyPrecisionController::class, 'index'])->name('currencies.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
+    Route::put('settings/currencies/{currency}', [CurrencyPrecisionController::class, 'update'])->name('currencies.update');
+    // Daftar akun referensi milik aplikasi finance pelanggan; lihat docs/todo/feed-posting-finance.
+    Route::get('settings/finance-accounts', [ReferenceAccountController::class, 'index'])->name('finance-accounts.index');
+    Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::FINANCE_SETUP_READ));
+    // Klien integrasi: sistem di luar CoreERP yang membaca feed posting finance.
+    Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
+    // Vendor: party berperan vendor per entitas legal, dipakai dokumen penerimaan dan feed posting.
+    Route::get('settings/vendors', [VendorController::class, 'index'])->name('vendors.index');
+    // Pantau posting finance: daftar, detail jurnal, dan tindak lanjut posting yang tertahan.
+    Route::get('settings/finance-postings', [FinancePostingMonitorController::class, 'index'])->name('finance-postings.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -285,6 +310,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('access.invitations.store');
     Route::patch('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'update'])
         ->name('access.invitations.update');
+    Route::post('settings/access/invitations/{invitationCode}/kirim-ulang', [InvitationCodeController::class, 'resend'])
+        ->middleware('throttle:10,1')
+        ->name('settings.access.invitations.resend');
     Route::delete('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'destroy'])
         ->name('access.invitations.destroy');
 
@@ -305,10 +333,10 @@ Route::middleware(['auth'])->group(function () {
         Route::put('workspace-context', [WorkspaceContextController::class, 'update'])
             ->name('workspace-context.update');
         Route::apiResource('roles', RoleController::class);
-        Route::get('memberships/{membership}', [MembershipController::class, 'show'])->name('memberships.show');
+        Route::get('memberships/{membership}', [MembershipController::class, 'show'])->name('memberships.show')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
         Route::patch('memberships/{membership}', [MembershipController::class, 'update'])->name('memberships.update');
         Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
-        Route::get('number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
+        Route::get('number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
         Route::patch('number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
         Route::post('number-sequences/{sequence}/advance', [NumberSequenceController::class, 'advance'])->name('number-sequences.advance');
         Route::get('fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
@@ -345,13 +373,34 @@ Route::middleware(['auth'])->group(function () {
         Route::post('organizations/{organization}/contacts', [OrganizationContactController::class, 'store'])->name('organizations.contacts.store');
         Route::put('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'update'])->name('organizations.contacts.update');
         Route::delete('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'destroy'])->name('organizations.contacts.destroy');
+        // Setelan feed posting finance per entitas legal: aktif, cutover, dan mode penyelesaian.
+        Route::get('organizations/{organization}/finance-posting', [FinancePostingSettingController::class, 'show'])->name('organizations.finance-posting.show');
+        Route::put('organizations/{organization}/finance-posting', [FinancePostingSettingController::class, 'update'])->name('organizations.finance-posting.update');
+        Route::post('organizations/{organization}/finance-posting/settlement-modes', [FinancePostingSettingController::class, 'storeMode'])->name('organizations.finance-posting.settlement-modes.store');
+        Route::delete('organizations/{organization}/finance-posting/settlement-modes/{mode}', [FinancePostingSettingController::class, 'destroyMode'])->name('organizations.finance-posting.settlement-modes.destroy');
+        Route::post('finance-reference-accounts/imports', [ReferenceAccountController::class, 'import'])
+            ->middleware('throttle:20,1')
+            ->name('finance-reference-accounts.imports.store');
+        Route::patch('finance-reference-accounts/{account}', [ReferenceAccountController::class, 'update'])->name('finance-reference-accounts.update');
+        Route::post('integration-clients', [IntegrationClientController::class, 'store'])->middleware('throttle:20,1')->name('integration-clients.store');
+        Route::patch('integration-clients/{integrationClient}', [IntegrationClientController::class, 'update'])->name('integration-clients.update');
+        Route::post('integration-clients/{integrationClient}/revoke', [IntegrationClientController::class, 'revoke'])->name('integration-clients.revoke');
+        Route::post('integration-clients/{integrationClient}/rotate-token', [IntegrationClientController::class, 'rotateToken'])->middleware('throttle:20,1')->name('integration-clients.rotate-token');
+        Route::post('integration-clients/{integrationClient}/rotate-signing-secret', [IntegrationClientController::class, 'rotateSigningSecret'])->middleware('throttle:20,1')->name('integration-clients.rotate-signing-secret');
+        Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
+        Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
+        Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');
+        Route::patch('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
+        Route::get('finance-postings/{financePosting}', [FinancePostingMonitorController::class, 'show'])->name('finance-postings.show');
+        Route::post('finance-postings/{financePosting}/revalidate', [FinancePostingMonitorController::class, 'revalidate'])->middleware('throttle:30,1')->name('finance-postings.revalidate');
+        Route::post('finance-postings/{financePosting}/mark-manual', [FinancePostingMonitorController::class, 'markManual'])->middleware('throttle:30,1')->name('finance-postings.mark-manual');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');
         Route::get('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'logo'])->name('organizations.print-identity.logos.show');
         Route::patch('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'updateLogo'])->name('organizations.print-identity.logos.update');
         Route::delete('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'destroyLogo'])->name('organizations.print-identity.logos.destroy');
-        Route::get('invitation-codes', [InvitationCodeController::class, 'index'])->name('invitation-codes.index');
+        Route::get('invitation-codes', [InvitationCodeController::class, 'index'])->name('invitation-codes.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
         Route::post('invitation-codes', [InvitationCodeController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('invitation-codes.store');
