@@ -189,10 +189,12 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('Gudang Cakung', $baris['asal_lokasi']);
         $this->assertSame('Ruang Implementor', $baris['tujuan_lokasi']);
         $this->assertSame('17/09/2026', $baris['tanggal']);
+    }
+
     public function test_laporan_pemusnahan_aset_dataset(): void
     {
         $this->workOrder();
-        $asset = DB::table('aset_tr_penerimaan_aset')->where('kode', 'AST-WO-1')->first();
+        $asset = DB::table('aset_tr_aset')->where('kode', 'AST-WO-1')->first();
         $this->assertNotNull($asset);
 
         // Pasang buku aset
@@ -200,7 +202,7 @@ class PenyediaLaporanTest extends TestCase
         DB::table('aset_tr_buku_aset')->insert([
             'id' => $bookId,
             'tenant_id' => $this->tenantId,
-            'asset_id' => $asset->id,
+            'aset_id' => $asset->id,
             'book_code' => 'KOMERSIAL',
             'useful_life_periods' => 48,
             'acquisition_value' => 250000000,
@@ -220,7 +222,7 @@ class PenyediaLaporanTest extends TestCase
             'kode' => 'PMS-000001',
             'legal_entity_id' => $this->legalEntityId,
             'responsible_org_unit_id' => $this->orgUnitId,
-            'asset_id' => $asset->id,
+            'aset_id' => $asset->id,
             'tanggal' => '2026-08-25',
             'status' => 'approved',
             'nilai' => 200000000,
