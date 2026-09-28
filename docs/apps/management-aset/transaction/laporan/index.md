@@ -54,7 +54,7 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 
 **Record di luar scope dijawab dengan pesan pengguna, bukan kegagalan server.** `ReportDataException` membawa kalimat yang sama dengan yang dilihat pengguna di layar, dan Core meneruskannya apa adanya ke baris ekspor. Modul tidak menyebut kelas pengecualian Core — ia hanya menyebut kontraknya — jadi penerjemahannya menjadi kegagalan laporan dikerjakan Core di sisi pemanggil.
 
-**Nilai diformat di dataset, bukan di layout.** Tanggal `d/m/Y H:i`, jam dua desimal, status berlabel Indonesia. Semua layout satu laporan menampilkan tanggal dengan cara yang sama tanpa pembuat template perlu tahu format apa pun.
+**Uang, angka, persen, tanggal, dan bulan diformat Core, bukan di dataset.** Placeholder seperti itu menyatakan `type` (`money`, `number`, `percent`, `date`, `month`) di `fields()` dan dikirim mentah dari `data()`; Core yang menulisnya sebagai teks di Word dan layar pratinjau, dan sebagai angka atau tanggal asli di Excel. Jangan menulis `number_format` rupiah atau nama bulan di definisi laporan. Nilai lain — status berlabel Indonesia, jam, tanggal dan waktu pada laporan lama — tetap diformat di dataset, supaya semua layout satu laporan menampilkannya dengan cara yang sama.
 
 **Parameter divalidasi di app.** Manifest hanya menyebut nama parameter; aturannya (`ulid`, `date_format`, `in:`) ada di `parameterRules()` tiap definisi, karena app yang tahu artinya.
 

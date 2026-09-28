@@ -41,4 +41,18 @@ return [
     // Cetak berkali-kali tidak boleh membuat pengguna lain menunggu.
     'max_active_per_user' => (int) env('COREERP_REPORTING_MAX_ACTIVE_PER_USER', 5),
     'history_per_user' => 50,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Format nilai bertipe
+    |--------------------------------------------------------------------------
+    |
+    | Placeholder yang menyatakan `'type' => 'money'` pada `fields()` definisi laporan
+    | diformat Core dengan mata uang ini. Fase ini hanya IDR (K-19). Presisinya tidak ditulis
+    | di sini: ia dibaca dari setelan mata uang tenant, sama dengan pembulatan jurnal.
+    |
+    */
+
+    'currency' => 'IDR',
+    'currency_symbols' => ['IDR' => 'Rp'],
 ];
