@@ -32,6 +32,13 @@
 # rusak: `environment:upgrade` yang menemukan kunci operasi sudah dipegang akan melewatinya dan
 # keluar dengan kode sukses. Itu sudah ada testnya.
 
+# ## Image pihak ketiga ditulis `${NAMA_IMAGE:-sumber}`, tanpa kecuali
+#
+# Perakit menyalin setiap `sumber` ke Harbor (`coreerp/saas/<nama>:<rilis>`) lewat digest, dan pasang-rilis.sh
+# menariknya dari sana lalu mengisi `NAMA_IMAGE` dengan rujukan digest itu. Jadi SaaS dev tidak menarik apa pun
+# dari Docker Hub, dan image yang dipakai terkunci per rilis. Image yang ditulis harfiah ditolak perakit. Alasannya
+# MinIO, 28 September 2026: image-nya hilang dari Docker Hub dan quay.io, dan pemasangan rilis berhenti.
+
 name: coreerp-saas
 
 x-app-environment: &app-environment
@@ -120,7 +127,7 @@ services:
 
   core-db:
     profiles: [data]
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-core_erp}
@@ -300,7 +307,7 @@ services:
 
   core-renderer:
     profiles: [app, worker]
-    image: gotenberg/gotenberg:8
+    image: ${GOTENBERG_IMAGE:-gotenberg/gotenberg:8}
     restart: unless-stopped
     command:
       - gotenberg
