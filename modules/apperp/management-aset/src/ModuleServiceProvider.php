@@ -14,6 +14,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Apperp\ManagementAset\Console\Commands\BangunLayoutLaporanBawaan;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMutationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
@@ -64,6 +65,7 @@ final class ModuleServiceProvider extends ServiceProvider
             $registry->register(new WorkOrderList);
             $registry->register(new BeritaAcaraSerahTerima);
             $registry->register(new DaftarMutasiAset);
+            $registry->register(new AssetMutationReport);
 
             return $registry;
         });
