@@ -12,6 +12,10 @@ use InvalidArgumentException;
  *
  * `images` adalah placeholder gambar — hari ini hanya logo kop dari identitas cetak —
  * yang ditambahkan Core, bukan app. Nilainya path berkas lokal dan lebar dalam mm.
+ *
+ * `formats` adalah cara menampilkan placeholder yang menyatakan tipenya pada `fields()`
+ * definisi laporan (`money`, `date`, …). Nilainya tetap mentah di sini; renderer yang
+ * memformatnya menurut keluarannya, lihat {@see ValueFormat}.
  */
 final class ReportData
 {
@@ -19,16 +23,21 @@ final class ReportData
      * @param  array<string, string|int|float|null>  $fields
      * @param  array<string, list<array<string, string|int|float|null>>>  $tables
      * @param  array<string, array{path: string, width_mm: int}>  $images
+     * @param  array<string, ValueFormat>  $formats  Per placeholder: `total`, `baris.nilai`.
      */
     public function __construct(
         public readonly array $fields,
         public readonly array $tables,
         public readonly string $fileName,
         public readonly array $images = [],
+        public readonly array $formats = [],
     ) {}
 
-    /** @param array<string, mixed> $payload Isi `data` dari jawaban endpoint dataset app. */
-    public static function fromArray(array $payload): self
+    /**
+     * @param  array<string, mixed>  $payload  Isi `data` dari jawaban endpoint dataset app.
+     * @param  array<string, ValueFormat>  $formats
+     */
+    public static function fromArray(array $payload, array $formats = []): self
     {
         $fields = $payload['fields'] ?? null;
         $tables = $payload['tables'] ?? null;
@@ -60,7 +69,7 @@ final class ReportData
             }, $rows));
         }
 
-        return new self($cleanFields, $cleanTables, $fileName);
+        return new self($cleanFields, $cleanTables, $fileName, [], $formats);
     }
 
     /**
@@ -72,7 +81,7 @@ final class ReportData
      */
     public function withIdentity(array $fields, array $images): self
     {
-        return new self([...$fields, ...$this->fields], $this->tables, $this->fileName, [...$images, ...$this->images]);
+        return new self([...$fields, ...$this->fields], $this->tables, $this->fileName, [...$images, ...$this->images], $this->formats);
     }
 
     public function rowCount(): int

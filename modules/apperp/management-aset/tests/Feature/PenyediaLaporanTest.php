@@ -7,6 +7,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
+use Modules\Apperp\ManagementAset\Reporting\ReportContext;
+use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
+use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
@@ -157,6 +161,69 @@ class PenyediaLaporanTest extends TestCase
             ->getJson($url.'?dari=bukan-tanggal')
             ->assertStatus(422)
             ->assertJsonPath('message', fn (string $pesan): bool => str_contains($pesan, 'Parameter laporan tidak diterima'));
+    }
+
+    public function test_preview_formats_typed_values_like_the_printed_document(): void
+    {
+        // Laporan uji yang menyatakan tipe kolomnya. Datasetnya mentah; yang memformat Core,
+        // lewat aturan yang sama dengan pengisi dokumen Word.
+        app(ReportRegistry::class)->register(new class implements ReportDefinition
+        {
+            public function code(): string
+            {
+                return 'uji-format';
+            }
+
+            public function name(): string
+            {
+                return 'Uji format';
+            }
+
+            public function description(): string
+            {
+                return '';
+            }
+
+            public function permission(): string
+            {
+                return 'management-aset.aset.read';
+            }
+
+            public function builtinLayouts(): array
+            {
+                return [];
+            }
+
+            public function parameterRules(): array
+            {
+                return [];
+            }
+
+            public function fields(): array
+            {
+                return [
+                    ['key' => 'total', 'label' => 'Total', 'table' => null, 'type' => 'money'],
+                    ['key' => 'baris.nama', 'label' => 'Nama', 'table' => 'baris'],
+                    ['key' => 'baris.nilai', 'label' => 'Nilai', 'table' => 'baris', 'type' => 'money'],
+                    ['key' => 'baris.tanggal', 'label' => 'Tanggal', 'table' => 'baris', 'type' => 'date'],
+                ];
+            }
+
+            public function data(ReportContext $context, array $parameters): ReportData
+            {
+                return new ReportData(
+                    ['total' => '1500.50'],
+                    ['baris' => [['nama' => 'Kursi', 'nilai' => 1000, 'tanggal' => '2026-07-23']]],
+                    'uji-format',
+                );
+            }
+        });
+
+        $this->headers(['management-aset.aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/uji-format')
+            ->assertOk()
+            ->assertJsonPath('data.fields.total', 'Rp 1.500,50')
+            ->assertJsonPath('data.tables.baris.0', ['nama' => 'Kursi', 'nilai' => 'Rp 1.000,00', 'tanggal' => '23/07/2026']);
     }
 
     public function test_berita_acara_hanya_dapat_dicetak_setelah_mutasi_diselesaikan(): void

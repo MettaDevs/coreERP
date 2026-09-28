@@ -42,7 +42,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
 
     /**
      * @param  array<string, mixed>  $konteks
-     * @return array{fields: list<array{key: string, label: string, table: ?string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
      */
     public function definisi(string $kodeLaporan, array $konteks): array
     {
