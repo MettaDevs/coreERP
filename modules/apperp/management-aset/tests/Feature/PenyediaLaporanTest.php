@@ -115,24 +115,48 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame([], $ditutup['tables']['baris']);
     }
 
-    public function test_endpoint_preview_laporan_mengembalikan_data(): void
+    public function test_pratinjau_menampilkan_baris_yang_sama_dengan_hasil_cetak(): void
     {
         $this->workOrder();
+        $izin = ['management-aset.pemeliharaan-aset.read'];
 
-        $this->headers([])
-            ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order')
-            ->assertForbidden();
-
-        $response = $this->headers(['management-aset.pemeliharaan-aset.read'])
+        // Yang diuji endpoint pratinjau generik, jadi laporan contohnya boleh laporan mana pun
+        // yang sudah ada. Janjinya satu: yang dilihat di layar sama dengan yang tercetak.
+        $layar = $this->headers($izin)
             ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order')
             ->assertOk()
-            ->json();
+            ->json('data');
+        $cetak = $this->penyedia()->dataset('daftar-work-order', $this->konteks($izin), []);
 
-        $this->assertArrayHasKey('data', $response);
-        $this->assertArrayHasKey('fields', $response['data']);
-        $this->assertArrayHasKey('tables', $response['data']);
-        $this->assertArrayHasKey('baris', $response['data']['tables']);
-        $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
+        $this->assertNotEmpty($layar['tables']['baris']);
+        $this->assertEquals(json_decode((string) json_encode($cetak['tables']), true), $layar['tables']);
+
+        // Filter di layar sampai ke laporan, bukan disaring ulang di browser.
+        $this->headers($izin)
+            ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order?status=ditutup')
+            ->assertOk()
+            ->assertJsonPath('data.fields.jumlah_work_order', 0)
+            ->assertJsonPath('data.tables.baris', []);
+    }
+
+    public function test_pratinjau_menolak_tanpa_izin_data_kode_asing_dan_parameter_salah(): void
+    {
+        $this->workOrder();
+        $url = '/api/modules/management-aset/v1/laporan/daftar-work-order';
+
+        // Pengguna ini lolos pintu module karena memegang izin aset, jadi yang menolaknya
+        // adalah pemeriksaan izin laporan itu sendiri. Pengguna tanpa izin sama sekali
+        // sudah ditolak middleware lebih dulu dan tidak menguji apa pun di sini.
+        $this->headers(['management-aset.aset.read'])->getJson($url)->assertForbidden();
+
+        $izin = ['management-aset.pemeliharaan-aset.read'];
+        $this->headers($izin)
+            ->getJson('/api/modules/management-aset/v1/laporan/tidak-ada')
+            ->assertNotFound();
+        $this->headers($izin)
+            ->getJson($url.'?dari=bukan-tanggal')
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn (string $pesan): bool => str_contains($pesan, 'Parameter laporan tidak diterima'));
     }
 
     public function test_laporan_monitoring_aset_dataset(): void

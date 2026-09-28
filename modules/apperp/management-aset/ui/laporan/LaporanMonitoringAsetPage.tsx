@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    DateFilter,
+    FiscalClassificationFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -30,7 +37,8 @@ export type MonitoringReportRow = {
 export default function LaporanMonitoringAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -42,12 +50,12 @@ export default function LaporanMonitoringAsetPage() {
         () => [
             {
                 id: 'tgl_monitoring',
-                header: 'Tgl Monitoring',
+                header: 'Tgl monitoring',
                 cell: (row) => String(row.tgl_monitoring ?? '-'),
             },
             {
                 id: 'no_bukti',
-                header: 'No. Bukti',
+                header: 'No. bukti',
                 cell: (row) => (
                     <span className="text-primary font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? '-')}
@@ -56,7 +64,7 @@ export default function LaporanMonitoringAsetPage() {
             },
             {
                 id: 'asset_kode',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
                         {String(row.asset_kode ?? row.kode_aset ?? '-')}
@@ -65,7 +73,7 @@ export default function LaporanMonitoringAsetPage() {
             },
             {
                 id: 'asset_nama',
-                header: 'Nama Aset',
+                header: 'Nama aset',
                 cell: (row) => String(row.asset_nama ?? row.nama_aset ?? '-'),
             },
             {
@@ -91,17 +99,17 @@ export default function LaporanMonitoringAsetPage() {
             },
             {
                 id: 'kondisi_sistem',
-                header: 'Kondisi Sistem',
+                header: 'Kondisi sistem',
                 cell: (row) => String(row.kondisi_sistem ?? '-'),
             },
             {
                 id: 'kondisi_fisik',
-                header: 'Kondisi Fisik',
+                header: 'Kondisi fisik',
                 cell: (row) => String(row.kondisi_fisik ?? '-'),
             },
             {
                 id: 'status_monitoring',
-                header: 'Status Monitoring',
+                header: 'Status monitoring',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
                         {String(row.status_monitoring ?? '-')}
@@ -120,19 +128,19 @@ export default function LaporanMonitoringAsetPage() {
             },
             {
                 id: 'nilai_perolehan',
-                header: 'Nilai Perolehan',
+                header: 'Nilai perolehan',
                 cell: (row) => String(row.nilai_perolehan ?? '-'),
                 align: 'right',
             },
             {
                 id: 'akumulasi_penyusutan',
-                header: 'Akum. Penyusutan',
+                header: 'Akum. penyusutan',
                 cell: (row) => String(row.akumulasi_penyusutan ?? '-'),
                 align: 'right',
             },
             {
                 id: 'nilai_buku_akhir',
-                header: 'Nilai Buku Akhir',
+                header: 'Nilai buku akhir',
                 cell: (row) => (
                     <span className="text-primary font-semibold">
                         {String(
@@ -144,12 +152,12 @@ export default function LaporanMonitoringAsetPage() {
             },
             {
                 id: 'penanggung_jawab',
-                header: 'Penanggung Jawab',
+                header: 'Penanggung jawab',
                 cell: (row) => String(row.penanggung_jawab ?? '-'),
             },
             {
                 id: 'unit_organisasi',
-                header: 'Unit Organisasi',
+                header: 'Unit organisasi',
                 cell: (row) => String(row.unit_organisasi ?? '-'),
             },
         ],
@@ -158,18 +166,27 @@ export default function LaporanMonitoringAsetPage() {
 
     return (
         <ReportPageLayout<MonitoringReportRow>
-            title="Laporan Monitoring Aset"
+            title="Laporan monitoring aset"
             description="Laporan kondisi fisik, utilisasi, dan pemantauan keberadaan aset di lapangan."
             reportCode="laporan-monitoring-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}
