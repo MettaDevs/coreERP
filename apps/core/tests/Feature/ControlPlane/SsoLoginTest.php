@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -40,6 +41,7 @@ use Tests\TestCase;
  */
 class SsoLoginTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private const ISSUER = 'https://sso.uji';
@@ -178,7 +180,7 @@ class SsoLoginTest extends TestCase
     {
         $other = $this->tenantWithProduction('tenantb');
         $user = User::factory()->create(['email' => 'orang-b@contoh.co.id']);
-        TenantMembership::create(['tenant_id' => $other->id, 'user_id' => $user->id, 'system_role' => 'owner', 'status' => 'active']);
+        $this->makeOwner(TenantMembership::create(['tenant_id' => $other->id, 'user_id' => $user->id, 'status' => 'active']));
         ExternalIdentity::create(['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => 'subjek-b']);
 
         $this->completeCeremony('subjek-b', email: 'orang-b@contoh.co.id')
@@ -738,12 +740,11 @@ class SsoLoginTest extends TestCase
     private function memberWithEmail(string $email): User
     {
         $user = User::factory()->create(['email' => $email]);
-        TenantMembership::create([
+        $this->makeOwner(TenantMembership::create([
             'tenant_id' => $this->tenant->id,
             'user_id' => $user->id,
-            'system_role' => 'owner',
             'status' => 'active',
-        ]);
+        ]));
 
         return $user;
     }

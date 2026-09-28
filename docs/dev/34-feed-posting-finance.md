@@ -122,19 +122,19 @@ Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PenerbitPosting`, di 
 | `POST /api/internal/v1/finance-postings/{posting_id}/ack` | Ack pembaca | Klien integrasi dengan scope `finance-postings.ack` |
 | `GET /api/internal/v1/vendors` | Sinkron vendor untuk tabel penerjemah pembaca | Scope `vendors.read` |
 | `GET /api/internal/v1/operating-units` | Sinkron nomor unit untuk tabel penerjemah pembaca | Scope `operating-units.read`, atau kredensial app module |
-| `GET /settings/finance-postings` | Layar pantau | Owner atau admin |
-| `GET /api/v1/finance-postings/{id}` | Detail satu posting | Owner atau admin |
-| `POST /api/v1/finance-postings/{id}/revalidate` | Validasi ulang | Owner atau admin |
-| `POST /api/v1/finance-postings/{id}/mark-manual` | Tandai manual, `reason` wajib | Owner atau admin |
-| `GET`, `PUT /api/v1/organizations/{organization}/finance-posting` | Setelan feed satu entitas legal; `PUT` memicu penilaian ulang cutover | Membaca: semua anggota tenant. Mengubah: owner atau admin. |
-| `/api/v1/integration-clients…` | Klien integrasi: terbitkan, ubah, cabut, token baru, signing secret baru, kirim uji | Owner atau admin |
+| `GET /settings/finance-postings` | Layar pantau | Duty Pantau posting (lihat), permission `core.finance-posting.read` |
+| `GET /api/v1/finance-postings/{id}` | Detail satu posting | `core.finance-posting.read` |
+| `POST /api/v1/finance-postings/{id}/revalidate` | Validasi ulang | Duty Pantau posting (tindak lanjut), permission `core.finance-posting.process` |
+| `POST /api/v1/finance-postings/{id}/mark-manual` | Tandai manual, `reason` wajib | `core.finance-posting.process` |
+| `GET`, `PUT /api/v1/organizations/{organization}/finance-posting` | Setelan feed satu entitas legal; `PUT` memicu penilaian ulang cutover | Membaca: semua anggota tenant. Mengubah: `core.finance-setup.update`. |
+| `/api/v1/integration-clients…` | Klien integrasi: terbitkan, ubah, cabut, token baru, signing secret baru, kirim uji | Melihat: `core.finance-setup.read`. Mengubah: `core.finance-setup.update` |
 
 Ditambah perintah `finance-postings:push`, dijadwalkan setiap menit di `apps/core/routes/console.php`.
 
 Kenapa dibagi begitu:
 
 - **Pull dan ack adalah dua scope.** Pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.
-- **Layar pantau tertutup bagi anggota biasa, termasuk untuk melihat**, karena isinya jurnal keuangan tenant. Core belum punya katalog izin sendiri, jadi izin terpisah untuk melihat dan menindaklanjuti (TODO 7.4) menunggu katalog itu. Sementara itu penjaganya `canManageAccess()`, yaitu owner atau admin. Prop `canManage` sudah dikirim ke halaman, supaya halamannya tidak perlu berubah ketika izinnya dipisah.
+- **Layar pantau tertutup bagi yang tidak memegang duty Pantau posting, termasuk untuk melihat**, karena isinya jurnal keuangan tenant. Melihat dan menindaklanjuti adalah dua duty (TODO 7.4): pemegang duty lihat membuka layar dan detailnya, tetapi tombol Validasi ulang dan Tandai manual hanya muncul — dan hanya diterima server — bagi pemegang duty tindak lanjut. Prop `canManage` membawa jawaban itu ke halaman.
 - **Posting dan klien integrasi milik tenant lain dijawab 404, bukan 403.** Keberadaannya pun tidak boleh terbaca.
 
 ## Penerbit dan urutan pemeriksaannya

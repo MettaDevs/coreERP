@@ -5,6 +5,8 @@ namespace App\Actions\Access;
 use App\Models\InvitationCode;
 use App\Models\Role;
 use App\Models\TenantMembership;
+use App\Support\Access\AccessGuards;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -26,14 +28,11 @@ class UpdateInvitation
 {
     public function __construct(private readonly DataPolicyScopeResolver $scopeResolver) {}
 
-    /** @param  array{system_role:string,label:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data */
+    /** @param  array{label:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data */
     public function handle(TenantMembership $actor, InvitationCode $invitation, array $data): InvitationCode
     {
-        if (! $actor->canManageAccess() || $invitation->tenant_id !== $actor->tenant_id) {
+        if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || $invitation->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
-        }
-        if ($data['system_role'] === 'owner') {
-            throw ValidationException::withMessages(['system_role' => 'Invitations cannot grant owner access.']);
         }
         // Kode yang dicabut tidak dapat ditukar siapa pun, jadi mengubahnya
         // tidak mengubah akses siapa pun — hanya mengaburkan jejak audit.
@@ -56,6 +55,11 @@ class UpdateInvitation
         if ($roles->count() !== $roleIds->count()) {
             throw ValidationException::withMessages(['role_ids' => 'Role harus berasal dari tenant aktif.']);
         }
+        // Undangan yang sebelum atau sesudah perubahan membawa role Owner hanya boleh diubah pemegang Owner.
+        AccessGuards::assertMayGrantRoles($actor, array_values(array_unique([
+            ...$roleIds->map(strval(...))->all(),
+            ...$invitation->roles()->pluck('roles.id')->map(strval(...))->all(),
+        ])));
 
         $scopes = collect($data['assignments'])->flatMap(function (array $assignment) use ($actor, $roles): array {
             $this->scopeResolver->assertNoRedundantGrants($assignment['policy_scopes']);
@@ -72,7 +76,6 @@ class UpdateInvitation
 
         return DB::transaction(function () use ($actor, $invitation, $data, $roleIds, $scopes, $before): InvitationCode {
             $invitation->update([
-                'system_role' => $data['system_role'],
                 'label' => $data['label'] ?? null,
             ]);
             $invitation->roles()->sync($roleIds->all());
@@ -117,11 +120,10 @@ class UpdateInvitation
             ->count('membership_id');
     }
 
-    /** @return array{system_role:string,label:?string,role_ids:array<int,string>,policy_scopes:array<int,array<string,mixed>>} */
+    /** @return array{label:?string,role_ids:array<int,string>,policy_scopes:array<int,array<string,mixed>>} */
     private function snapshot(InvitationCode $invitation): array
     {
         return [
-            'system_role' => $invitation->system_role,
             'label' => $invitation->label,
             'role_ids' => $invitation->roles()->pluck('roles.id')->sort()->values()->all(),
             'policy_scopes' => DB::table('invitation_data_policy_scopes')

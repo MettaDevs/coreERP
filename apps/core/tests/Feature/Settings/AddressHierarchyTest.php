@@ -2,18 +2,23 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Models\Client;
 use App\Models\ReferenceData\AddressHierarchy\Country;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
 use App\Models\ReferenceData\AddressHierarchy\Village;
+use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 class AddressHierarchyTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     protected User $user;
@@ -23,6 +28,29 @@ class AddressHierarchyTest extends TestCase
         parent::setUp();
         $this->seed(IndonesianAddressHierarchySeeder::class);
         $this->user = User::factory()->create();
+
+        // Mengubah wilayah butuh duty Kelola data referensi (SEC-22).
+        $client = Client::create(['legal_name' => 'PT Metta', 'slug' => 'metta', 'status' => 'active']);
+        $tenant = Tenant::create(['client_id' => $client->id, 'name' => 'PT Metta', 'slug' => 'metta', 'status' => 'active']);
+        $this->grantDuties(
+            TenantMembership::create(['tenant_id' => $tenant->id, 'user_id' => $this->user->id, 'status' => 'active']),
+            ['core.reference-data.manage'],
+        );
+    }
+
+    public function test_changing_regions_needs_the_manage_reference_data_duty(): void
+    {
+        $reader = User::factory()->create();
+        $this->grantDuties(
+            TenantMembership::create(['tenant_id' => $this->user->activeMembership()->tenant_id, 'user_id' => $reader->id, 'status' => 'active']),
+            ['core.reference-data.inquire'],
+        );
+
+        $this->actingAs($reader)->get(route('address-setup.index'))->assertOk();
+        $this->actingAs($reader)->post(route('address-setup.provinces.store'), [
+            'country_code' => 'SG', 'code' => 'SG-CR', 'name' => 'Central Region', 'active' => true,
+        ])->assertForbidden();
+        $this->assertDatabaseMissing('ref_provinces', ['code' => 'SG-CR']);
     }
 
     /** Test 1 — Top Down Traversal: Indonesia -> Bali -> Badung -> Kuta Selatan -> Benoa */

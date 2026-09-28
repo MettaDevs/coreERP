@@ -18,10 +18,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 class NumberSequenceTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     public function test_non_continuous_sequence_uses_a_durable_preallocated_block_and_is_idempotent(): void
@@ -44,12 +46,11 @@ class NumberSequenceTest extends TestCase
     {
         [$sequence, $context] = $this->sequence();
         $user = User::factory()->create();
-        TenantMembership::query()->create([
+        $this->makeOwner(TenantMembership::query()->create([
             'tenant_id' => $context['tenant_id'],
             'user_id' => $user->id,
-            'system_role' => 'owner',
             'status' => 'active',
-        ]);
+        ]));
 
         $this->actingAs($user)
             ->patch("/settings/number-sequences/{$sequence->id}", $this->settings([

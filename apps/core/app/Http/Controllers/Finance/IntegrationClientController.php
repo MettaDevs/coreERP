@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Finance;
 use App\Http\Controllers\Controller;
 use App\Models\IntegrationClient;
 use App\Models\TenantMembership;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Integration\PushDestination;
 use App\Support\Integration\SignedPush;
@@ -34,7 +35,7 @@ final class IntegrationClientController extends Controller
 {
     public function index(Request $request): Response
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_READ);
 
         return Inertia::render('settings/integration-clients', [
             'clients' => IntegrationClient::query()
@@ -51,7 +52,7 @@ final class IntegrationClientController extends Controller
 
     public function store(Request $request, PushDestination $tujuan): JsonResponse
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
         $data = $this->validated($request, $membership->tenant_id, $tujuan);
         $rahasia = Str::random(48);
         $penanda = $data['delivery_mode'] === IntegrationClient::PUSH ? Str::random(48) : null;
@@ -79,7 +80,7 @@ final class IntegrationClientController extends Controller
 
     public function update(Request $request, IntegrationClient $integrationClient, PushDestination $tujuan): JsonResponse
     {
-        $membership = $this->admin($request);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
         $client = $this->milik($membership, $integrationClient, aktif: true);
         $data = $this->validated($request, $membership->tenant_id, $tujuan, $client);
 
@@ -107,7 +108,7 @@ final class IntegrationClientController extends Controller
     /** Mencabut berlaku pada permintaan berikutnya. Klien yang dicabut tidak dapat dihidupkan lagi. */
     public function revoke(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->admin($request), $integrationClient, aktif: true);
+        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
         $client->fill(['status' => IntegrationClient::REVOKED, 'revoked_at' => now()])->save();
 
         return response()->json(['data' => $this->present($client)]);
@@ -115,7 +116,7 @@ final class IntegrationClientController extends Controller
 
     public function rotateToken(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->admin($request), $integrationClient, aktif: true);
+        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
         $rahasia = Str::random(48);
         $client->fill(['token_digest' => IntegrationClient::digest($rahasia)])->save();
 
@@ -124,7 +125,7 @@ final class IntegrationClientController extends Controller
 
     public function rotateSigningSecret(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->admin($request), $integrationClient, aktif: true);
+        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Signing secret hanya dipakai klien mode push.']);
         }
@@ -140,7 +141,7 @@ final class IntegrationClientController extends Controller
      */
     public function testPush(Request $request, IntegrationClient $integrationClient, SignedPush $push, ActiveEnvironment $lingkungan): JsonResponse
     {
-        $client = $this->milik($this->admin($request), $integrationClient, aktif: true);
+        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Kirim uji hanya untuk klien mode push.']);
         }
@@ -267,10 +268,11 @@ final class IntegrationClientController extends Controller
             && IpUtils::checkIp($alamat, $nilai);
     }
 
-    private function admin(Request $request): TenantMembership
+    /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
+    private function authorizedMembership(Request $request, string $permission): TenantMembership
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->canManageAccess(), 403);
+        abort_unless($membership->hasCorePermission($permission), 403);
 
         return $membership;
     }

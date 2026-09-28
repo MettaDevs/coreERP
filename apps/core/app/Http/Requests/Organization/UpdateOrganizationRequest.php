@@ -4,6 +4,7 @@ namespace App\Http\Requests\Organization;
 
 use App\Models\OperatingUnit;
 use App\Models\Organization;
+use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,7 +12,7 @@ class UpdateOrganizationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('manage-access') ?? false;
+        return $this->user()?->can('core', CoreSecurityCatalog::ORGANIZATION_UPDATE) ?? false;
     }
 
     /** Lihat OrganizationRequest::prepareForValidation(). */

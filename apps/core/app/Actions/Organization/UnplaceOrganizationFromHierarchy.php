@@ -5,6 +5,7 @@ namespace App\Actions\Organization;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
+use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -13,7 +14,7 @@ class UnplaceOrganizationFromHierarchy
 {
     public function handle(TenantMembership $actor, OrganizationHierarchyVersion $version, OrganizationHierarchyNode $node): void
     {
-        if (! $actor->canManageAccess() || $version->hierarchy->tenant_id !== $actor->tenant_id || $node->version_id !== $version->id) {
+        if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $version->hierarchy->tenant_id !== $actor->tenant_id || $node->version_id !== $version->id) {
             throw new AuthorizationException;
         }
         if ($version->status !== 'draft') {

@@ -6,15 +6,20 @@ use App\Actions\Access\UpsertRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\RoleRequest;
 use App\Models\Role;
+use App\Support\Access\AccessGuards;
+use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class RoleController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $membership = $this->currentMembership($request);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
 
         return response()->json(['data' => Role::query()
             ->where('tenant_id', $membership->tenant_id)
@@ -34,6 +39,7 @@ class RoleController extends Controller
     {
         $membership = $this->currentMembership($request);
         abort_unless($role->tenant_id === $membership->tenant_id, 404);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
 
         return response()->json(['data' => $role->load('duties', 'children:id,name')]);
     }
@@ -46,8 +52,14 @@ class RoleController extends Controller
     public function destroy(Request $request, Role $role): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        abort_unless($membership->canManageAccess() && $role->tenant_id === $membership->tenant_id, 403);
-        $role->delete();
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) && $role->tenant_id === $membership->tenant_id, 403);
+        if ($role->is_owner) {
+            throw ValidationException::withMessages(['role' => 'Role Owner tidak dapat dihapus.']);
+        }
+        DB::transaction(function () use ($role, $membership): void {
+            $role->delete();
+            AccessGuards::assertNotLockedOut($membership->tenant_id);
+        });
 
         return $request->is('api/*') ? response()->json(null, 204) : back();
     }

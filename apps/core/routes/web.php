@@ -37,6 +37,7 @@ use App\Http\Controllers\Reporting\ReportLayoutController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
@@ -164,7 +165,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('apps.host');
 
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
-    Route::get('settings/access', [AccessController::class, 'index'])->name('access.index');
+    Route::get('settings/access', [AccessController::class, 'index'])->name('access.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
     Route::get('settings/security-configuration', [SecurityConfigurationController::class, 'index'])->name('security-configuration.index');
     Route::post('settings/security-configuration/privileges', [SecurityConfigurationController::class, 'storePrivilege'])->name('security-configuration.privileges.store');
     Route::put('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'updatePrivilege'])->name('security-configuration.privileges.update');
@@ -175,52 +176,52 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/privileges/{privilege}/duplicate', [SecurityConfigurationController::class, 'duplicatePrivilege'])->name('security-configuration.privileges.duplicate');
     Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
     Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
-    Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index');
-    Route::inertia('settings/global-address-book', 'settings/global-address-book/index')->name('global-address-book.index');
-    Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
+    Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::inertia('settings/global-address-book', 'settings/global-address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
-    Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
-    Route::get('settings/working-time-templates', [WorkingTimeTemplateController::class, 'index'])->name('working-time-templates.index');
+    Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
+    Route::get('settings/working-time-templates', [WorkingTimeTemplateController::class, 'index'])->name('working-time-templates.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::post('settings/working-time-templates', [WorkingTimeTemplateController::class, 'store'])->name('working-time-templates.store');
     Route::put('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'update'])->name('working-time-templates.update');
     Route::delete('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'destroy'])->name('working-time-templates.destroy');
     Route::put('settings/working-time-templates/{template}/lines', [WorkingTimeTemplateController::class, 'updateLines'])->name('working-time-templates.lines.update');
     Route::post('settings/working-time-templates/{template}/copy', [WorkingTimeTemplateController::class, 'copy'])->name('working-time-templates.copy');
-    Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index');
+    Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     Route::get('settings/address_setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     // Countries
-    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store');
-    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy');
+    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Provinces
-    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store');
-    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy');
+    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Regencies
-    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store');
-    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy');
+    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Districts
-    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store');
-    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy');
+    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Villages
-    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store');
-    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy');
+    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Streets (RT/RW)
-    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store');
-    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy');
+    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Buildings (Gedung/Unit/Lantai)
-    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store');
-    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy');
+    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Postal Codes
-    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store');
-    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy');
+    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Group of houses
-    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store');
-    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy');
+    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Land plots
-    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store');
-    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy');
+    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Parameters
-    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store');
+    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Hierarchy Lookups (Bottom-Up and Top-Down)
     Route::get('settings/address-setup/lookup/bottom-up', [AddressSetupController::class, 'lookupBottomUp'])->name('address-setup.lookup.bottom-up');
     Route::get('settings/address-setup/lookup/top-down', [AddressSetupController::class, 'lookupTopDown'])->name('address-setup.lookup.top-down');
@@ -229,22 +230,22 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup/villages-paginated', [AddressSetupController::class, 'getVillagesPaginated'])->name('address-setup.villages.paginated');
     // External Codes & Translations
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
-    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store');
-    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy');
+    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
-    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store');
-    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy');
+    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
 
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
-    Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
+    Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REPORT_LAYOUT_READ));
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
-    Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
+    Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     // Presisi uang per mata uang untuk feed posting finance; lihat docs/todo/feed-posting-finance.
-    Route::get('settings/currencies', [CurrencyPrecisionController::class, 'index'])->name('currencies.index');
+    Route::get('settings/currencies', [CurrencyPrecisionController::class, 'index'])->name('currencies.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::put('settings/currencies/{currency}', [CurrencyPrecisionController::class, 'update'])->name('currencies.update');
     // Daftar akun referensi milik aplikasi finance pelanggan; lihat docs/todo/feed-posting-finance.
     Route::get('settings/finance-accounts', [ReferenceAccountController::class, 'index'])->name('finance-accounts.index');
-    Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template');
+    Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::FINANCE_SETUP_READ));
     // Klien integrasi: sistem di luar CoreERP yang membaca feed posting finance.
     Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
     // Vendor: party berperan vendor per entitas legal, dipakai dokumen penerimaan dan feed posting.
@@ -320,10 +321,10 @@ Route::middleware(['auth'])->group(function () {
         Route::put('workspace-context', [WorkspaceContextController::class, 'update'])
             ->name('workspace-context.update');
         Route::apiResource('roles', RoleController::class);
-        Route::get('memberships/{membership}', [MembershipController::class, 'show'])->name('memberships.show');
+        Route::get('memberships/{membership}', [MembershipController::class, 'show'])->name('memberships.show')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
         Route::patch('memberships/{membership}', [MembershipController::class, 'update'])->name('memberships.update');
         Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
-        Route::get('number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
+        Route::get('number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
         Route::patch('number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
         Route::post('number-sequences/{sequence}/advance', [NumberSequenceController::class, 'advance'])->name('number-sequences.advance');
         Route::get('fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
@@ -387,7 +388,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'logo'])->name('organizations.print-identity.logos.show');
         Route::patch('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'updateLogo'])->name('organizations.print-identity.logos.update');
         Route::delete('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'destroyLogo'])->name('organizations.print-identity.logos.destroy');
-        Route::get('invitation-codes', [InvitationCodeController::class, 'index'])->name('invitation-codes.index');
+        Route::get('invitation-codes', [InvitationCodeController::class, 'index'])->name('invitation-codes.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ACCESS_READ));
         Route::post('invitation-codes', [InvitationCodeController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('invitation-codes.store');

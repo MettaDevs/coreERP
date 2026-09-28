@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceSettlementMode;
 use App\Models\Organization;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -142,8 +143,6 @@ final class FinancePostingSettingController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($organization->tenant_id === $membership->tenant_id, 404);
         abort_unless($organization->classification === 'legal_entity', 404);
-        if ($manage) {
-            abort_unless($membership->canManageAccess(), 403);
-        }
+        abort_unless($membership->hasCorePermission($manage ? CoreSecurityCatalog::FINANCE_SETUP_UPDATE : CoreSecurityCatalog::FINANCE_SETUP_READ), 403);
     }
 }

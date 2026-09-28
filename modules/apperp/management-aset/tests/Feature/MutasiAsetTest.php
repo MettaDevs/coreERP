@@ -370,7 +370,6 @@ class MutasiAsetTest extends TestCase
         TenantMembership::create([
             'tenant_id' => $this->tenantId,
             'user_id' => $pengguna->id,
-            'system_role' => 'user',
             'status' => 'active',
         ]);
 
