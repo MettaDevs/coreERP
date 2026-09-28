@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, errorMessage } from '../../api';
+import type { FilterProps } from './ReportFilters';
 
+/** Jawaban `GET /laporan/{code}`: dataset yang sama dengan yang dibaca mesin cetak Core. */
 export type ReportApiResponse = {
     data: {
         fields: Record<string, string | number | null>;
         tables: Record<string, Record<string, unknown>[]>;
         file_name: string;
-        row_count: number;
     };
 };
 
@@ -17,9 +18,6 @@ export function useReportData<T = Record<string, unknown>>(
     const [filters, setFilters] =
         useState<Record<string, string>>(initialFilters);
     const [rows, setRows] = useState<T[]>([]);
-    const [fields, setFields] = useState<
-        Record<string, string | number | null>
-    >({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [refreshKey, setRefreshKey] = useState(0);
@@ -45,10 +43,7 @@ export function useReportData<T = Record<string, unknown>>(
                 const res = await api<ReportApiResponse>(url);
 
                 if (!cancelled) {
-                    const tableData = (res.data?.tables?.baris ?? []) as T[];
-
-                    setRows(tableData);
-                    setFields(res.data?.fields ?? {});
+                    setRows((res.data?.tables?.baris ?? []) as T[]);
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -76,6 +71,12 @@ export function useReportData<T = Record<string, unknown>>(
         setFilters(initialFilters);
     };
 
+    /** Mengikat satu parameter laporan ke satu komponen filter. */
+    const bindFilter = (key: string): FilterProps => ({
+        value: filters[key],
+        onChange: (value) => updateFilter(key, value),
+    });
+
     const refetch = useCallback(() => {
         setRefreshKey((k) => k + 1);
     }, []);
@@ -85,8 +86,9 @@ export function useReportData<T = Record<string, unknown>>(
         setFilters,
         updateFilter,
         resetFilters,
+        bindFilter,
+        hasActiveFilters: Object.values(filters).some((value) => value !== ''),
         rows,
-        fields,
         loading,
         error,
         refetch,

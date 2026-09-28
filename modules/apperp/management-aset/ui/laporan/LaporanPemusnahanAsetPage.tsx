@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
+import {
+    AssetFilter,
+    AssetGroupFilter,
+    AssetTypeFilter,
+    DateFilter,
+    FiscalClassificationFilter,
+} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -21,7 +28,8 @@ export type DisposalReportRow = {
 export default function LaporanPemusnahanAsetPage() {
     const {
         filters,
-        updateFilter,
+        bindFilter,
+        hasActiveFilters,
         resetFilters,
         rows,
         loading,
@@ -33,7 +41,7 @@ export default function LaporanPemusnahanAsetPage() {
         () => [
             {
                 id: 'no_bukti',
-                header: 'No. Bukti',
+                header: 'No. bukti',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? '-')}
@@ -42,12 +50,12 @@ export default function LaporanPemusnahanAsetPage() {
             },
             {
                 id: 'tanggal_pemusnahan',
-                header: 'Tgl Pemusnahan',
+                header: 'Tgl pemusnahan',
                 cell: (row) => String(row.tanggal_pemusnahan ?? '-'),
             },
             {
                 id: 'asset_kode',
-                header: 'Kode Aset',
+                header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
                         {String(row.asset_kode ?? '-')}
@@ -56,7 +64,7 @@ export default function LaporanPemusnahanAsetPage() {
             },
             {
                 id: 'asset_nama',
-                header: 'Item Aset',
+                header: 'Item aset',
                 cell: (row) => String(row.asset_nama ?? '-'),
             },
             {
@@ -66,7 +74,7 @@ export default function LaporanPemusnahanAsetPage() {
             },
             {
                 id: 'kondisi_aset',
-                header: 'Kondisi Aset',
+                header: 'Kondisi aset',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
                         {String(row.kondisi_aset ?? '-')}
@@ -76,19 +84,19 @@ export default function LaporanPemusnahanAsetPage() {
             },
             {
                 id: 'nilai_perolehan',
-                header: 'Nilai Perolehan',
+                header: 'Nilai perolehan',
                 cell: (row) => String(row.nilai_perolehan ?? '-'),
                 align: 'right',
             },
             {
                 id: 'nilai_buku_akhir',
-                header: 'Nilai Buku Akhir',
+                header: 'Nilai buku akhir',
                 cell: (row) => String(row.nilai_buku_akhir ?? '-'),
                 align: 'right',
             },
             {
                 id: 'keterangan',
-                header: 'Keterangan / Alasan',
+                header: 'Keterangan / alasan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
                         {String(row.keterangan ?? '-')}
@@ -97,7 +105,7 @@ export default function LaporanPemusnahanAsetPage() {
             },
             {
                 id: 'status_dokumen',
-                header: 'Status Dokumen',
+                header: 'Status dokumen',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
                         {String(row.status_dokumen ?? '-')}
@@ -111,18 +119,27 @@ export default function LaporanPemusnahanAsetPage() {
 
     return (
         <ReportPageLayout<DisposalReportRow>
-            title="Laporan Pemusnahan Aset"
+            title="Laporan pemusnahan aset"
             description="Daftar penghapusan aset rusak berat atau tidak bernilai ekonomis beserta berita acara pemusnahan."
             reportCode="laporan-pemusnahan-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar
-                    filters={filters}
-                    onFilterChange={updateFilter}
+                    canReset={hasActiveFilters}
                     onReset={resetFilters}
-                    onRefresh={refetch}
-                    loading={loading}
-                />
+                >
+                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <FiscalClassificationFilter
+                        {...bindFilter('kelompok_harta_fiskal_id')}
+                    />
+                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetFilter {...bindFilter('asset_id')} />
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                </ReportFilterBar>
             }
             columns={columns}
             rows={rows}
