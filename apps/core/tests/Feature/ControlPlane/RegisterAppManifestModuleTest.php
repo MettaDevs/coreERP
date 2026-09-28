@@ -53,13 +53,16 @@ class RegisterAppManifestModuleTest extends TestCase
         // (`penyusutan.post`, invoke), +1 privilege (`penyusutan.post-to-finance`), dan +1 duty
         // (`penyusutan.finance-posting`), tersendiri supaya role yang mengelola penyusutan tidak
         // diam-diam dapat mengirim jurnalnya ke aplikasi finance.
+        //
+        // Menu laporan aset (PR laporan per jenis): +1 laporan tiap PR, di sini
+        // `laporan-pemeliharaan-aset`.
         'entry_points' => 69,
         'permissions' => 133,
         'privileges' => 71,
         'duties' => 38,
         'number_sequence_references' => 31,
         'workflow_types' => 2,
-        'reports' => 4,
+        'reports' => 5,
     ];
 
     private string $akarSementara;
