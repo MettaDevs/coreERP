@@ -13,6 +13,21 @@ use Symfony\Component\Yaml\Yaml;
  * Daftar yang ditulis tangan adalah berkas pusat yang diperebutkan semua orang: setiap
  * module baru menyentuhnya, setiap cabang membentrokkannya, dan sebuah module yang lupa
  * didaftarkan gagal dengan cara yang membingungkan. Itu salah satu penyakit sistem lama.
+ *
+ * ## Kenapa akarnya lebih dari satu
+ *
+ * `modules/` di akar repo hanya berisi module yang **dijual**. Bahan uji penjaga batas —
+ * `contoh-a` dan `contoh-b` — dulu tinggal di sana juga, dan itu berarti satu-satunya hal yang
+ * memisahkan "Contoh A" dari layar klien adalah sebuah pemangkasan saat membangun image. Sejak
+ * 18 September 2026 keduanya pindah ke `apps/core/tests/Fixtures/modules`, tempat yang memang
+ * tidak pernah ikut ke image: tahap akhir Dockerfile membuang seluruh `apps/core/tests`.
+ *
+ * Registry karena itu memindai **daftar** akar, bukan satu. Lingkungan test menambahkan akar
+ * bahan uji lewat `config('modules.akar')`; produksi tidak pernah menyebutnya, jadi tidak ada
+ * jalan bagi bahan uji untuk ikut walaupun berkasnya tersalin karena kekeliruan.
+ *
+ * Akar yang sama disebut dua kali tidak menghasilkan module ganda: yang dipindai berkasnya, dan
+ * `glob` atas pola yang sama memulangkan berkas yang sama.
  */
 final class ModuleRegistry
 {
@@ -22,7 +37,16 @@ final class ModuleRegistry
     /** @var list<ModuleManifest>|null */
     private ?array $moduleTermasukDipindah = null;
 
-    public function __construct(private readonly string $akar) {}
+    /** @var list<string> */
+    private readonly array $akar;
+
+    /**
+     * @param  string|list<string>  $akar  Satu folder module, atau beberapa.
+     */
+    public function __construct(string|array $akar)
+    {
+        $this->akar = array_values(array_unique(is_string($akar) ? [$akar] : $akar));
+    }
 
     /**
      * Semua module yang ditemukan, diurutkan menurut id supaya keluarannya tetap sama
@@ -101,10 +125,21 @@ final class ModuleRegistry
     /** @return list<string> */
     private function berkasManifest(): array
     {
-        $pola = $this->akar.'/*/*/app.yaml';
-        $berkas = glob($pola);
+        $hasil = [];
 
-        return $berkas === false ? [] : $berkas;
+        foreach ($this->akar as $akar) {
+            $berkas = glob($akar.'/*/*/app.yaml');
+
+            if ($berkas === false) {
+                continue;
+            }
+
+            foreach ($berkas as $satu) {
+                $hasil[] = $satu;
+            }
+        }
+
+        return array_values(array_unique($hasil));
     }
 
     /**
@@ -127,9 +162,8 @@ final class ModuleRegistry
         // repo kebetulan menulis `depends_on: []`, dan daftar kosong tidak dapat dibedakan dari
         // peta kosong — jadi tidak ada yang gagal, dan tidak ada yang menyadarinya. Begitu
         // sebuah module benar-benar menyatakan dependency, katalog akan mencatatnya sementara
-        // runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya, dan
-        // `EditionResolver` berhenti menariknya ke dalam image edisi. Pelanggan menerima image
-        // yang kekurangan module yang dibutuhkan module lain, tanpa satu pun kesalahan.
+        // runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya. Tenant memakai
+        // module yang kekurangan module lain yang dibutuhkannya, tanpa satu pun kesalahan.
         $daftar = $isi['dependsOn'] ?? [];
 
         // `??` di atas sudah menyingkirkan null, jadi yang tersisa diperiksa hanya kosongnya.

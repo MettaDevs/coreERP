@@ -1,0 +1,9 @@
+type: object
+description: |
+  Scope organisasi permintaan. Keduanya opsional pada tingkat schema karena
+  sequence ber-scope tenant tidak memerlukannya, tetapi sequence dengan reset
+  fiskal wajib menyertakan `legal_entity_id` — kalender fiskal milik legal entity
+  dan tidak pernah milik operating unit.
+properties:
+  legal_entity_id: { type: [string, 'null'], format: ulid }
+  org_unit_id: { type: [string, 'null'], format: ulid }

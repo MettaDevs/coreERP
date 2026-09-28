@@ -5,7 +5,7 @@ namespace Modules\Apperp\ManagementAset\Models\master;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
 /**
- * Urgensi penanganan sebuah work order; padanan "Service level" pada modul Asset
+ * Urgensi penanganan sebuah work order; padanan "Service level" pada modul Aset
  * management Dynamics 365 F&O.
  *
  * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada

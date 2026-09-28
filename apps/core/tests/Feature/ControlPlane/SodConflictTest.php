@@ -31,7 +31,7 @@ class SodConflictTest extends TestCase
         $user = User::factory()->create();
         $this->member = TenantMembership::create([
             'tenant_id' => $this->owner->activeMembership()->tenant_id,
-            'user_id' => $user->id, 'system_role' => 'user', 'status' => 'active',
+            'user_id' => $user->id, 'status' => 'active',
         ]);
     }
 
@@ -49,7 +49,6 @@ class SodConflictTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$this->member->id}", [
-            'system_role' => 'user',
             'assignments' => [['role_id' => $first->id], ['role_id' => $second->id]],
         ])->assertUnprocessable()->assertJsonValidationErrors('assignments');
 

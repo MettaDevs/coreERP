@@ -389,7 +389,7 @@ class WorkOrderExecutionTest extends TestCase
 
         $this->assertCount(1, $data);
         $this->assertSame($milikSaya['id'], $data[0]['pemeliharaan_aset_id']);
-        $this->assertSame('AST-WO-1', $data[0]['asset_kode']);
+        $this->assertSame('AST-WO-1', $data[0]['aset_kode']);
     }
 
     // ---------- alur bantu ----------
@@ -493,7 +493,7 @@ class WorkOrderExecutionTest extends TestCase
             'keterangan' => 'Ban depan kanan bocor',
             'dijadwalkan_mulai' => array_key_exists('dijadwalkan_mulai', $ubah) ? $ubah['dijadwalkan_mulai'] : '2026-08-16 08:00:00',
             'details' => [[
-                'asset_id' => $this->masters()['asset'],
+                'aset_id' => $this->masters()['aset'],
                 'maintenance_job_type_id' => $this->masters()['jobType'],
                 // Penugasan memakai id pengguna sungguhan; 'montir-1' hanya nama panggilan di test.
                 'ditugaskan_ke_user_id' => $ubah['ditugaskan_ke'] ?? $this->idPengguna('montir-1'),
@@ -522,7 +522,7 @@ class WorkOrderExecutionTest extends TestCase
             ['line_number' => 2, 'type' => 'variable', 'nama' => 'Kondisi alur ban', 'variable_id' => $semai['variable'], 'wajib' => true],
             ['line_number' => 3, 'type' => 'template', 'nama' => 'Rem dan roda', 'nested_template_id' => $semai['nested'], 'wajib' => false],
         ]);
-        $semai['asset'] = $this->asset($semai);
+        $semai['aset'] = $this->aset($semai);
         // Tenant nyata menerima aturan ini lewat provisioning; test menyemainya sendiri
         // karena ia membuat tenant secara langsung tanpa melewati jalur itu.
         $this->aturan('selesai', 'checklist_wajib', true, 'error');
@@ -564,10 +564,10 @@ class WorkOrderExecutionTest extends TestCase
     }
 
     /** @param array<string, string> $semai */
-    private function asset(array $semai): string
+    private function aset(array $semai): string
     {
         $id = (string) Str::ulid();
-        DB::table('aset_tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_aset')->insert([
             'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-WO-1',
             'nama' => 'Aset work order eksekusi',
             'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,

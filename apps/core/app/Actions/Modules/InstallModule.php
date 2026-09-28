@@ -71,6 +71,21 @@ final class InstallModule
             return $this->install($moduleId, $tenantId);
         }
 
+        /*
+         * Ditolak, bukan disaring — dan bedanya menentukan di sini lebih daripada di mana pun.
+         *
+         * Menyaring produksi server klien dari `productionEnvironment()` membuat `$target` kosong,
+         * dan cabang di atas lalu memasang modulenya ke database bawaan: migration, catatan
+         * pemasangan, dan data awal tenant itu mendarat di database bersama server ini, untuk tenant
+         * yang tidak bekerja di sini. Membiarkannya lolos berakhir di tempat yang sama lewat jalan
+         * lain — `database_name` kosong berarti `runWithin` tidak menggeser apa pun.
+         *
+         * Di server klien sendiri produksinya `provider`, jadi jalur pemasangan di sana tidak berubah.
+         */
+        if ($target->hostedOnClientServer()) {
+            throw new RuntimeException($target->clientServerRefusal(sprintf('Pemasangan module "%s"', $moduleId)));
+        }
+
         return $this->connections->runWithin(
             $target,
             fn (): ModuleInstallation => $this->install($moduleId, $tenantId),

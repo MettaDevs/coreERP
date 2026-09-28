@@ -71,6 +71,8 @@ type RoleRef = { id: string; name: string };
 type Role = {
     id: string;
     name: string;
+    /** Role Owner: selalu memegang semua duty yang sah, diatur otomatis oleh server. */
+    is_owner: boolean;
     duty_codes: string[];
     child_roles: RoleRef[];
     parent_roles: RoleRef[];
@@ -1768,7 +1770,12 @@ export default function SecurityConfiguration({
                                             apps={apps}
                                             duties={duties}
                                         />
-                                        {selectedRole ? (
+                                        {selectedRole?.is_owner ? (
+                                            <span className="text-xs text-muted-foreground">
+                                                Role Owner diatur otomatis dan
+                                                selalu memegang semua duty.
+                                            </span>
+                                        ) : selectedRole ? (
                                             <>
                                                 <RoleDialog
                                                     apps={apps}

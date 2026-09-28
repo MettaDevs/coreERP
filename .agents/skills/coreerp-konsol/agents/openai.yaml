@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP admin.erp"
+  short_description: "Guardrails for the operator console and SSO"
+  default_prompt: "Use $coreerp-konsol before changing apps/control-plane, the agent API contract, central-side tables, operator authentication, or SSO in either application."

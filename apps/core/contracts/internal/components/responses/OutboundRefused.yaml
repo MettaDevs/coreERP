@@ -1,0 +1,6 @@
+description: |
+  Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+  penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }

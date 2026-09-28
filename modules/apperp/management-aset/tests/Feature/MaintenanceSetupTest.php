@@ -79,7 +79,7 @@ class MaintenanceSetupTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('aset_m_maintenance_job_type_variant', ['id' => $variant, 'maintenance_job_type_id' => $jobType]);
-        $this->assertDatabaseHas('aset_m_maintenance_job_type_asset_type', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
+        $this->assertDatabaseHas('aset_m_maintenance_job_type_jenis_aset', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
     }
 
     public function test_baris_pengukuran_boleh_disimpan_tanpa_satuan(): void
@@ -165,7 +165,7 @@ class MaintenanceSetupTest extends TestCase
     {
         return $this->withContext(array_merge($this->permissions($resource), $resource === 'jenis-aset' ? [] : []))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::lower(Str::random(12)))
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload));
     }
 
     /** @param list<string> $permissions */

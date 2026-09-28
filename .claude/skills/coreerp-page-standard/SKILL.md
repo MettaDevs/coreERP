@@ -15,7 +15,7 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 3. Identify ownership: Shell owns global header, rail, sidebar, search, theme, and account controls; the app renders business content only.
 4. Implement the smallest composition that matches the reference.
 5. Compare desktop/mobile, light/dark, keyboard focus, loading, error, populated, and empty states.
-6. Build or type-check the changed package and run `graphify update .`.
+6. Build or type-check the changed package.
 
 ## Page hierarchy
 

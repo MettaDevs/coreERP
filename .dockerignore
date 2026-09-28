@@ -2,7 +2,6 @@
 .git
 .github
 docs
-graphify-out
 artifacts
 **/node_modules
 **/vendor

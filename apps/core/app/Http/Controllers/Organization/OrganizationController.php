@@ -18,6 +18,7 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
+use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,7 @@ class OrganizationController extends Controller
                 'purposes.allowedOrganizationTypes',
                 'versions' => fn ($query) => $query->orderByDesc('version_number'),
                 'versions.nodes.organization:id,name,classification',
-                'versions.nodes.organization.operatingUnit:organization_id,type',
+                'versions.nodes.organization.operatingUnit:organization_id,type,number',
                 'versions.nodes.parentNode:id,organization_id',
                 'versions.nodes.parentNode.organization:id,name',
             ])
@@ -58,7 +59,7 @@ class OrganizationController extends Controller
             ->get();
 
         return Inertia::render('settings/organization', [
-            'canManage' => $membership->canManageAccess(),
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
             'section' => $section,
             'tenant' => $membership->tenant->only(['id', 'name']),
             'organizations' => $organizations,

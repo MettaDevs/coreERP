@@ -226,7 +226,7 @@ jobs:
       #
       # `--exclude-group=lambat` pada pull request. Satu berkas — DepreciationScaleTest —
       # menyapu 40 kombinasi penyusutan sampai akhir masa manfaat, dan satu methodnya sendiri
-      # 56 detik: tujuh persen seluruh suite. Dengan dua pekerja, satu pekerja menjalankannya
+      # 30 sampai 60 detik di mesin pengembang. Dengan dua pekerja, satu pekerja menjalankannya
       # sendirian sementara yang lain selesai, dan itulah ekor yang menggantung di akhir run.
       #
       # Jadwal mingguan menjalankan semuanya tanpa pengecualian. Yang dijaga sapuan itu berubah

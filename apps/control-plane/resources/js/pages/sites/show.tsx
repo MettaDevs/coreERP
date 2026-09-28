@@ -1,3 +1,4 @@
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
@@ -9,17 +10,34 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { ArrowUpCircle, ExternalLink } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { SiteStateBadge } from '@/components/badges';
+import { FinanceFeedBadge, InstallStateBadge } from '@/components/badges';
+import CopyButton from '@/components/copy-button';
+import DnsStatus from '@/components/dns-status';
+import type { DnsInfo } from '@/components/dns-status';
+import {
+    ServerAddressField,
+    ServerAdvancedFields,
+} from '@/components/server-settings-fields';
 import Shell from '@/components/shell';
 import {
-    connectivityLabels,
+    financePostingStatusLabels,
     labelFor,
+    siteAuditLabels,
     siteOperationLabels,
     siteOperationStatusLabels,
 } from '@/lib/display';
+import { progressDetail } from '@/lib/install-progress';
+import type { InstallProgress } from '@/lib/install-progress';
+import { newerRelease } from '@/lib/release';
+import {
+    dateTimeText,
+    daysUntil,
+    durationText,
+    relativeTime,
+} from '@/lib/time';
 
 type Report = {
     containers?: { service: string; state: string; health?: string | null }[];
@@ -38,26 +56,66 @@ type Report = {
         step?: string | null;
     } | null;
     license_expires_at?: string | null;
+    license_required?: boolean | null;
     certificate_expires_at?: string | null;
     server_time?: string;
     agent_version?: string;
+};
+
+type License = {
+    validUntil: string | null;
+    issuedAt: string | null;
+    suspendedAt: string | null;
+    perpetual: boolean;
+    issuedPerpetual: boolean;
+    terms: {
+        perpetual: boolean;
+        validDays: number;
+        renewBeforeDays: number;
+        overridden: boolean;
+    };
+    defaultTerms: { validDays: number; renewBeforeDays: number };
+    notRequiredOnServer: boolean;
+};
+
+/** Penilaian `FinanceFeedHealth` atas `finance_feed` di laporan agen terakhir. */
+type FinanceFeed = {
+    state: string;
+    counts: Record<string, number> | null;
+    oldestPendingAt: string | null;
+    oldestPendingSeconds: number | null;
+    lastPulledAt: string | null;
+    /** Core di server ini sudah mengirim angka push; `false` untuk rilis Core yang lebih lama dari agennya. */
+    pushReported: boolean;
+    lastPushedAt: string | null;
+    failedPushes: number | null;
+    alerts: string[];
+    pendingAlertHours: number;
 };
 
 type Site = {
     id: string;
     name: string;
     tenant: string;
+    environment: { id: string; name: string } | null;
     edition: string;
-    connectivity: string;
     state: string;
+    serverAddress: string | null;
+    appUrl: string | null;
+    appUrlAutomatic: boolean;
+    dns: DnsInfo;
+    lastSeenIp: string | null;
     reportedRelease: string | null;
+    newestRelease: string | null;
     reportedDigest: string | null;
     lastSeenAt: string | null;
-    lastSeenVia: string | null;
-    address: string | null;
+    lastSeenIso: string | null;
     updateWindow: { start: string; end: string; timezone: string } | null;
     enrolledAt: string | null;
     lastReport: Report | null;
+    license: License;
+    financeFeed: FinanceFeed;
+    progress: InstallProgress;
 };
 
 type Operation = {
@@ -74,26 +132,36 @@ type Operation = {
 
 type AuditEvent = { id: string; action: string; by: string; at: string };
 
+/** Edisi satu image yang dipakai setiap server klien sejak 15 September 2026 — lihat `Site::SINGLE_IMAGE_EDITION`. */
+const SINGLE_IMAGE_EDITION = 'coreerp';
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex flex-wrap justify-between gap-4 border-b py-2.5 last:border-b-0">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-sm font-medium break-all">{children}</dd>
+            <dd className="text-end text-sm font-medium break-all">
+                {children}
+            </dd>
         </div>
     );
 }
 
 function Section({
+    id,
     title,
     description,
     children,
 }: {
+    id?: string;
     title: string;
     description?: string;
     children: ReactNode;
 }) {
     return (
-        <section className="space-y-4 rounded-lg border bg-background p-5">
+        <section
+            id={id}
+            className="scroll-mt-24 space-y-4 rounded-lg border bg-background p-5"
+        >
             <div>
                 <h2 className="text-sm font-semibold">{title}</h2>
                 {description && (
@@ -104,6 +172,26 @@ function Section({
             </div>
             {children}
         </section>
+    );
+}
+
+function Summary({
+    label,
+    children,
+    hint,
+}: {
+    label: string;
+    children: ReactNode;
+    hint?: ReactNode;
+}) {
+    return (
+        <div className="min-w-0 rounded-lg border bg-background p-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <div className="mt-1.5 min-w-0 text-sm font-medium">{children}</div>
+            {hint && (
+                <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
+            )}
+        </div>
     );
 }
 
@@ -131,149 +219,178 @@ function bytes(value?: number | null): string {
 }
 
 /**
- * Mengunduh berkas dari POST yang meminta konfirmasi.
+ * Setelan server: alamat mesin dan jendela pembaruan, bersama alamat aplikasi otomatis dan record DNS-nya.
  *
- * Paket pendaftaran dan lisensi offline tidak boleh lahir dari tautan GET — tautan dapat dibuka ulang
- * dari riwayat peramban dan setiap pembukaan menerbitkan token atau lisensi baru. Karena itu ia POST
- * bertoken CSRF, dan hasilnya disimpan sebagai berkas lewat blob.
+ * Isinya sama dengan "Setelan server" di panel halaman lingkungan, dan disimpan lewat aturan yang sama.
+ * Situs yang dicabut hanya ditampilkan, karena setelannya tidak lagi berarti apa pun.
  */
-async function postForDownload(
-    url: string,
-    body: Record<string, string>,
-    filename: string,
-): Promise<string | null> {
-    const xsrf = document.cookie
-        .split('; ')
-        .find((part) => part.startsWith('XSRF-TOKEN='))
-        ?.split('=')[1];
-
-    const response = await fetch(url, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf) : '',
-        },
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const errors = payload?.errors as Record<string, string[]> | undefined;
-
-        return errors ? Object.values(errors).flat()[0] : 'Permintaan ditolak.';
-    }
-
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-
-    return null;
-}
-
-function ConfirmName({
+function ServerSettingsSection({
     site,
-    value,
-    onChange,
-    error,
+    revoked,
 }: {
     site: Site;
-    value: string;
-    onChange: (value: string) => void;
-    error?: string;
+    revoked: boolean;
 }) {
-    return (
-        <div className="space-y-2">
-            <Input
-                label={`Ketik "${site.name}" untuk melanjutkan`}
-                required
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-            />
-            <FieldError message={error} />
-        </div>
-    );
-}
+    const { data, setData, patch, processing, errors } = useForm({
+        server_address: site.serverAddress ?? '',
+        update_window_start: site.updateWindow?.start ?? '',
+        update_window_end: site.updateWindow?.end ?? '',
+    });
+    const refusal = (errors as Record<string, string | undefined>).settings;
 
-function Enrollment({ site }: { site: Site }) {
-    const { enrollment } = usePage<{
-        enrollment: { command: string; expiresAt: string } | null;
-    }>().props;
-    const online = useForm({ confirm_name: '' });
-    const [confirmName, setConfirmName] = useState('');
-    const [downloadError, setDownloadError] = useState<string | null>(null);
-
-    if (site.connectivity === 'online') {
+    if (revoked) {
         return (
-            <Section
-                title="Pendaftaran"
-                description="Perintah pasang dijalankan sekali di server klien sebagai root. Tokennya sekali pakai dan kedaluwarsa dalam satu jam; perintahnya hanya tampil sekali."
-            >
-                {enrollment && (
-                    <div className="space-y-2">
-                        <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
-                            {enrollment.command}
-                        </pre>
-                        <p className="text-xs text-muted-foreground">
-                            Berlaku sampai {enrollment.expiresAt}. Menutup
-                            halaman ini menghilangkannya.
-                        </p>
-                    </div>
-                )}
-                <form
-                    className="space-y-3"
-                    onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        online.post(`/situs/${site.id}/pendaftaran-online`, {
-                            preserveScroll: true,
-                            onSuccess: () => online.reset(),
-                        });
-                    }}
-                >
-                    <ConfirmName
-                        site={site}
-                        value={online.data.confirm_name}
-                        onChange={(v) => online.setData('confirm_name', v)}
-                        error={online.errors.confirm_name}
-                    />
-                    <Button type="submit" disabled={online.processing}>
-                        Buat perintah pasang
-                    </Button>
-                </form>
+            <Section id="setelan" title="Setelan server">
+                <dl>
+                    <Row label="Alamat server">{site.serverAddress ?? '—'}</Row>
+                    <Row label="Alamat aplikasi">{site.appUrl ?? '—'}</Row>
+                    <Row label="Jendela pembaruan">
+                        {site.updateWindow
+                            ? `${site.updateWindow.start}–${site.updateWindow.end} (${site.updateWindow.timezone})`
+                            : 'Kapan saja'}
+                    </Row>
+                </dl>
             </Section>
         );
     }
 
     return (
         <Section
-            title="Pendaftaran offline"
-            description="Paket berisi id situs dan token pendaftaran yang berlaku 30 hari. Simpan sebagai site.json di flashdisk, bawa bersama bundle rilis pertama, lalu jalankan pasang.sh --paket di server klien. Kunci situs terikat ketika file laporan pertamanya diunggah di bawah."
+            id="setelan"
+            title="Setelan server"
+            description="Alamat aplikasi dibentuk sistem dan record DNS-nya mengikuti alamat server. Tidak satu pun isian ini mengubah server klien; jendela pembaruan berlaku pada pembaruan berikutnya."
         >
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">
+                    Alamat aplikasi{site.appUrlAutomatic ? ' (otomatis)' : ''}
+                </p>
+                {site.appUrlAutomatic ? (
+                    <DnsStatus
+                        siteId={site.id}
+                        appUrl={site.appUrl}
+                        dns={site.dns}
+                        serverAddress={site.serverAddress}
+                    />
+                ) : (
+                    <p className="font-mono text-sm break-all">
+                        {site.appUrl ?? 'Tidak dicatat'}
+                    </p>
+                )}
+            </div>
             <form
-                className="space-y-3"
-                onSubmit={async (e: FormEvent) => {
+                className="space-y-4"
+                onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    setDownloadError(
-                        await postForDownload(
-                            `/situs/${site.id}/paket-pendaftaran`,
-                            { confirm_name: confirmName },
-                            'site.json',
-                        ),
-                    );
+                    patch(`/situs/${site.id}/setelan`, {
+                        preserveScroll: true,
+                    });
                 }}
             >
-                <ConfirmName
-                    site={site}
-                    value={confirmName}
-                    onChange={setConfirmName}
-                    error={downloadError ?? undefined}
+                {refusal && (
+                    <p role="alert" className="text-sm text-destructive">
+                        {refusal}
+                    </p>
+                )}
+                <ServerAddressField
+                    value={data.server_address}
+                    onChange={(value) => setData('server_address', value)}
+                    error={errors.server_address}
+                    lastSeenIp={site.lastSeenIp}
                 />
-                <Button type="submit">Unduh paket pendaftaran</Button>
+                <ServerAdvancedFields
+                    data={data}
+                    setData={setData}
+                    errors={errors}
+                />
+                <Button type="submit" variant="outline" disabled={processing}>
+                    Simpan setelan
+                </Button>
+            </form>
+        </Section>
+    );
+}
+
+/**
+ * Pemasangan server klien yang lahir dari halaman lingkungan: keadaannya di sini, tombolnya di sana.
+ *
+ * Perintah pasang membuat token pendaftaran dan operasi pasang sekaligus, dan hanya panel di halaman
+ * lingkungan yang melakukannya. Menaruh tombol kedua di sini berarti dua tempat yang menampilkan kata sandi
+ * sementara yang sama hanya sekali.
+ */
+function Installation({ site }: { site: Site }) {
+    const detail = progressDetail(site.progress);
+
+    return (
+        <Section
+            title="Pemasangan"
+            description="Perintah pasang dibuat dan dipantau dari panel Server klien di halaman lingkungannya."
+        >
+            <div className="flex flex-wrap items-center gap-2">
+                <InstallStateBadge state={site.progress.state} />
+                {detail && (
+                    <span className="text-sm text-muted-foreground">
+                        {detail}
+                    </span>
+                )}
+            </div>
+            {site.progress.failureMessage && (
+                <p className="text-sm whitespace-pre-line text-destructive">
+                    {site.progress.failureMessage}
+                </p>
+            )}
+            {site.environment && (
+                <Button asChild>
+                    <Link href={`/lingkungan/${site.environment.id}`}>
+                        Buka panel pemasangan
+                    </Link>
+                </Button>
+            )}
+        </Section>
+    );
+}
+
+/** Pendaftaran tangan untuk situs lama tanpa lingkungan — satu-satunya yang masih memakainya. */
+function Enrollment({ site }: { site: Site }) {
+    const { enrollment } = usePage<{
+        enrollment: { command: string; expiresAt: string } | null;
+    }>().props;
+    const form = useForm({});
+
+    return (
+        <Section
+            title="Pendaftaran"
+            description="Situs lama tanpa lingkungan. Perintah pasang dijalankan sekali di server klien sebagai root; tokennya sekali pakai, kedaluwarsa dalam satu jam, dan perintahnya hanya tampil sekali."
+        >
+            {enrollment && (
+                <div className="space-y-2">
+                    <div className="flex justify-end">
+                        <CopyButton
+                            text={enrollment.command}
+                            label="Salin perintah"
+                        />
+                    </div>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
+                        {enrollment.command}
+                    </pre>
+                    <p className="text-xs text-muted-foreground">
+                        Berlaku sampai {enrollment.expiresAt}. Menutup halaman
+                        ini menghilangkannya.
+                    </p>
+                </div>
+            )}
+            <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    form.post(`/situs/${site.id}/pendaftaran`, {
+                        preserveScroll: true,
+                        onSuccess: () => form.reset(),
+                    });
+                }}
+            >
+                <Button type="submit" disabled={form.processing}>
+                    Buat perintah pasang
+                </Button>
             </form>
         </Section>
     );
@@ -281,18 +398,21 @@ function Enrollment({ site }: { site: Site }) {
 
 function RequestOperation({
     site,
+    operations,
     releases,
     licenseKeyConfigured,
+    licenseValidDays,
 }: {
     site: Site;
+    operations: string[];
     releases: string[];
     licenseKeyConfigured: boolean;
+    licenseValidDays: number;
 }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         operation: 'backup',
         release: releases[0] ?? '',
         valid_until: '',
-        confirm_name: '',
     });
 
     return (
@@ -306,7 +426,6 @@ function RequestOperation({
                     e.preventDefault();
                     post(`/situs/${site.id}/operasi`, {
                         preserveScroll: true,
-                        onSuccess: () => reset('confirm_name'),
                     });
                 }}
             >
@@ -315,9 +434,13 @@ function RequestOperation({
                     value={data.operation}
                     onChange={(e) => setData('operation', e.target.value)}
                 >
-                    {Object.entries(siteOperationLabels).map(([key, label]) => (
+                    {/*
+                        Daftarnya dari server, bukan dari seluruh label. Label memuat `install`
+                        untuk riwayat, dan pemasangan hanya lahir dari "Buat perintah pasang".
+                    */}
+                    {operations.map((key) => (
                         <option key={key} value={key}>
-                            {label}
+                            {labelFor(siteOperationLabels, key)}
                         </option>
                     ))}
                 </NativeSelect>
@@ -326,7 +449,7 @@ function RequestOperation({
                     (releases.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             Belum ada rilis terdaftar yang lebih baru dari rilis
-                            terpasang untuk edisi {site.edition}.
+                            yang terpasang di server ini.
                         </p>
                     ) : (
                         <NativeSelect
@@ -344,15 +467,21 @@ function RequestOperation({
 
                 {data.operation === 'install_license' && (
                     <>
-                        <Input
-                            label="Lisensi berlaku sampai"
-                            type="date"
-                            required
-                            value={data.valid_until}
-                            onChange={(e) =>
-                                setData('valid_until', e.target.value)
-                            }
-                        />
+                        <div className="space-y-1">
+                            <Input
+                                label="Lisensi berlaku sampai"
+                                type="date"
+                                value={data.valid_until}
+                                onChange={(e) =>
+                                    setData('valid_until', e.target.value)
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Kosongkan untuk {licenseValidDays} hari sejak
+                                hari ini. Daftar app diambil dari app yang aktif
+                                untuk tenant ini.
+                            </p>
+                        </div>
                         {!licenseKeyConfigured && (
                             <p className="text-sm text-destructive">
                                 Kunci lisensi belum disetel di konsol ini, jadi
@@ -362,12 +491,6 @@ function RequestOperation({
                     </>
                 )}
 
-                <ConfirmName
-                    site={site}
-                    value={data.confirm_name}
-                    onChange={(v) => setData('confirm_name', v)}
-                    error={errors.confirm_name}
-                />
                 <FieldError message={errors.operation} />
 
                 <Button type="submit" disabled={processing}>
@@ -382,103 +505,22 @@ function RequestOperation({
     );
 }
 
-function OfflineTools({ site }: { site: Site }) {
-    const upload = useForm<{ report: File | null }>({ report: null });
-    const [validUntil, setValidUntil] = useState('');
-    const [confirmName, setConfirmName] = useState('');
-    const [licenseError, setLicenseError] = useState<string | null>(null);
-
-    return (
-        <>
-            <Section
-                title="Unggah file laporan"
-                description="File laporan ditulis agen dengan coreerp-agent write-report dan dibawa pulang. File pertama situs yang belum terdaftar sekaligus mengikat kunci situsnya."
-            >
-                <form
-                    className="space-y-3"
-                    onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        upload.post(`/situs/${site.id}/laporan`, {
-                            preserveScroll: true,
-                            forceFormData: true,
-                            onSuccess: () => upload.reset(),
-                        });
-                    }}
-                >
-                    <Input
-                        type="file"
-                        accept="application/json,.json"
-                        onChange={(e) =>
-                            upload.setData(
-                                'report',
-                                e.target.files?.[0] ?? null,
-                            )
-                        }
-                    />
-                    <FieldError message={upload.errors.report} />
-                    <Button
-                        type="submit"
-                        disabled={
-                            upload.processing || upload.data.report === null
-                        }
-                    >
-                        Unggah
-                    </Button>
-                </form>
-            </Section>
-
-            {site.state !== 'not_enrolled' && (
-                <Section
-                    title="Lisensi offline"
-                    description="Lisensi bertanda tangan untuk dibawa ke server dan dipasang dengan coreerp-agent install-license. Lisensi yang habis hanya memunculkan peringatan; aplikasinya tidak dikunci."
-                >
-                    <form
-                        className="space-y-3"
-                        onSubmit={async (e: FormEvent) => {
-                            e.preventDefault();
-                            setLicenseError(
-                                await postForDownload(
-                                    `/situs/${site.id}/lisensi-offline`,
-                                    {
-                                        valid_until: validUntil,
-                                        confirm_name: confirmName,
-                                    },
-                                    `lisensi-${site.id}.json`,
-                                ),
-                            );
-                        }}
-                    >
-                        <Input
-                            label="Berlaku sampai"
-                            type="date"
-                            required
-                            value={validUntil}
-                            onChange={(e) => setValidUntil(e.target.value)}
-                        />
-                        <ConfirmName
-                            site={site}
-                            value={confirmName}
-                            onChange={setConfirmName}
-                            error={licenseError ?? undefined}
-                        />
-                        <Button type="submit">Unduh lisensi</Button>
-                    </form>
-                </Section>
-            )}
-        </>
-    );
-}
-
 function Revoke({ site }: { site: Site }) {
-    const { data, setData, post, processing, errors } = useForm({
-        confirm_name: '',
-    });
+    const { post, processing } = useForm({});
 
     return (
-        <Section
-            title="Cabut situs"
-            description="Tanda tangan agen situs ini berhenti diterima dan permintaan yang menunggu dibatalkan. Aplikasinya di server klien tetap berjalan — yang berhenti pengelolaannya, bukan pelayanan pasien. Tidak dapat dibatalkan dari layar ini."
-        >
+        <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
+            <div>
+                <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
+                    Cabut server klien
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Tanda tangan agen server ini berhenti diterima dan
+                    permintaan yang menunggu dibatalkan. Aplikasinya di server
+                    klien tetap berjalan — yang berhenti pengelolaannya, bukan
+                    pelayanan pasien. Tidak dapat dibatalkan dari layar ini.
+                </p>
+            </div>
             <form
                 className="space-y-3"
                 onSubmit={(e: FormEvent) => {
@@ -486,50 +528,428 @@ function Revoke({ site }: { site: Site }) {
                     post(`/situs/${site.id}/cabut`, { preserveScroll: true });
                 }}
             >
-                <ConfirmName
-                    site={site}
-                    value={data.confirm_name}
-                    onChange={(v) => setData('confirm_name', v)}
-                    error={errors.confirm_name}
-                />
                 <Button
                     type="submit"
                     variant="destructive"
                     disabled={processing}
                 >
-                    Cabut situs
+                    Cabut server klien
                 </Button>
             </form>
+        </section>
+    );
+}
+
+/**
+ * Lisensi yang diterbitkan konsol ini, dan tombol yang menghentikan atau melanjutkan perpanjangannya.
+ *
+ * Yang ditampilkan di sini lisensi yang *dikirim*. Yang *terpasang* di server klien ada di "Laporan
+ * terakhir"; selisih keduanya berarti agen gagal memasangnya.
+ */
+/** Satu kalimat yang menyebut masa yang berlaku, dan dari mana angkanya datang. */
+function termsSentence(license: License): string {
+    const { terms } = license;
+
+    if (terms.perpetual) {
+        return license.issuedPerpetual
+            ? 'Permanen'
+            : 'Permanen mulai penerbitan berikutnya; yang terpasang sekarang masih bertanggal';
+    }
+
+    const asal = terms.overridden
+        ? 'khusus situs ini'
+        : 'mengikuti bawaan konsol';
+    const dasar = `${terms.validDays} hari, diperpanjang ${terms.renewBeforeDays} hari sebelum habis (${asal})`;
+
+    return license.issuedPerpetual
+        ? `${dasar}. Yang terpasang sekarang masih lisensi permanen, dan diganti pada penerbitan berikutnya`
+        : dasar;
+}
+
+/**
+ * Mengubah masa lisensi situs ini: mengikuti bawaan, angka sendiri, atau permanen.
+ *
+ * Permanen berarti lisensinya tidak pernah habis — bukan bahwa seluruh modul terbuka. Daftar app tetap
+ * datang dari app yang dibeli tenant, jadi kalimat di layar tidak boleh menjanjikan yang sebaliknya.
+ */
+function LicenseTermsForm({ site }: { site: Site }) {
+    const { terms, defaultTerms } = site.license;
+    const { data, setData, post, processing, errors } = useForm({
+        mode: terms.perpetual
+            ? 'perpetual'
+            : terms.overridden
+              ? 'custom'
+              : 'default',
+        valid_days: String(terms.validDays),
+        renew_before_days: String(terms.renewBeforeDays),
+    });
+
+    return (
+        <form
+            className="space-y-3 border-t pt-4"
+            onSubmit={(e: FormEvent) => {
+                e.preventDefault();
+                post(`/situs/${site.id}/lisensi/masa`, {
+                    preserveScroll: true,
+                });
+            }}
+        >
+            <NativeSelect
+                label="Masa lisensi"
+                value={data.mode}
+                onChange={(e) => setData('mode', e.target.value)}
+            >
+                <option value="default">
+                    Bawaan konsol — {defaultTerms.validDays} hari, diperpanjang{' '}
+                    {defaultTerms.renewBeforeDays} hari sebelum habis
+                </option>
+                <option value="custom">Angka sendiri untuk situs ini</option>
+                <option value="perpetual">
+                    Permanen — tanpa tanggal berakhir
+                </option>
+            </NativeSelect>
+
+            {data.mode === 'custom' && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                        <Input
+                            label="Masa berlaku (hari)"
+                            type="number"
+                            min={1}
+                            max={3650}
+                            required
+                            value={data.valid_days}
+                            onChange={(e) =>
+                                setData('valid_days', e.target.value)
+                            }
+                        />
+                        <FieldError message={errors.valid_days} />
+                    </div>
+                    <div className="space-y-2">
+                        <Input
+                            label="Diperpanjang berapa hari sebelum habis"
+                            type="number"
+                            min={1}
+                            max={365}
+                            required
+                            value={data.renew_before_days}
+                            onChange={(e) =>
+                                setData('renew_before_days', e.target.value)
+                            }
+                        />
+                        <FieldError message={errors.renew_before_days} />
+                    </div>
+                </div>
+            )}
+
+            {data.mode === 'perpetual' && (
+                <p className="text-sm text-muted-foreground">
+                    Lisensi permanen tidak pernah habis, jadi aplikasi di server
+                    klien ini tidak akan pernah terkunci karena masa lisensi —
+                    termasuk ketika konsol ini mati berbulan-bulan. App yang
+                    boleh dibuka tetap mengikuti yang dibeli tenant.
+                </p>
+            )}
+
+            <Button type="submit" variant="outline" disabled={processing}>
+                Simpan masa lisensi
+            </Button>
+        </form>
+    );
+}
+
+function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
+    const { license } = site;
+    const suspended = license.suspendedAt !== null;
+    const { post, processing } = useForm({});
+
+    return (
+        <Section
+            title="Lisensi"
+            description="Diperpanjang otomatis lewat laporan agen. Menghentikan perpanjangan tidak menyentuh server klien: lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya, lalu aplikasinya terkunci."
+        >
+            <dl>
+                <Row label="Berlaku sampai">
+                    {license.issuedPerpetual
+                        ? 'Permanen, tanpa tanggal berakhir'
+                        : (license.validUntil ?? '—')}
+                </Row>
+                <Row label="Terakhir diterbitkan">
+                    {license.issuedAt ?? 'Belum pernah'}
+                </Row>
+                <Row label="Masa lisensi">{termsSentence(license)}</Row>
+                <Row label="Perpanjangan otomatis">
+                    {license.issuedPerpetual && license.perpetual
+                        ? 'Tidak diperpanjang; lisensi permanen tidak pernah habis'
+                        : suspended
+                          ? `Perpanjangan dihentikan sejak ${license.suspendedAt}`
+                          : 'Berjalan'}
+                </Row>
+            </dl>
+
+            {!revoked && <LicenseTermsForm site={site} />}
+
+            {!revoked && (
+                <form
+                    className="space-y-3"
+                    onSubmit={(e: FormEvent) => {
+                        e.preventDefault();
+                        post(
+                            `/situs/${site.id}/lisensi/${suspended ? 'lanjutkan' : 'hentikan'}`,
+                            {
+                                preserveScroll: true,
+                            },
+                        );
+                    }}
+                >
+                    <Button
+                        type="submit"
+                        variant={suspended ? 'default' : 'destructive'}
+                        disabled={processing}
+                    >
+                        {suspended
+                            ? 'Lanjutkan perpanjangan lisensi'
+                            : 'Hentikan perpanjangan lisensi'}
+                    </Button>
+                </form>
+            )}
+        </Section>
+    );
+}
+
+function ContainerBadge({
+    container,
+}: {
+    container: { service: string; state: string; health?: string | null };
+}) {
+    const good =
+        container.state === 'running' &&
+        (!container.health || container.health === 'healthy');
+    const classes = good
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200';
+
+    return (
+        <Badge variant="outline" className={`font-mono ${classes}`}>
+            {container.service}
+            <span className="font-sans opacity-80">
+                {container.health ?? container.state}
+            </span>
+        </Badge>
+    );
+}
+
+/** Urutan yang sama dengan layar Pantau posting di Core: yang perlu ditindaklanjuti lebih dulu. */
+const FEED_STATUSES = ['held', 'pending', 'rejected', 'manual', 'posted'];
+
+/** Status yang jumlahnya di atas nol menandai feed perlu perhatian. */
+const FEED_PROBLEM_STATUSES = ['held', 'rejected'];
+
+const COUNT = new Intl.NumberFormat('id');
+
+function feedStateHint(feed: FinanceFeed, reported: boolean): string | null {
+    switch (feed.state) {
+        case 'not_reported':
+            return reported
+                ? 'Agen di server ini belum mengirim ringkasan feed; agen versi lama belum mengenalnya.'
+                : 'Server ini belum pernah melapor.';
+        case 'unreadable':
+            return 'Agen tidak mendapat ringkasan dari Core. Rilis Core di server ini mungkin belum memilikinya, atau core-app tidak menjawab.';
+        case 'unused':
+            return 'Belum ada posting, dan aplikasi finance belum pernah melakukan pull maupun menerima push.';
+        case 'healthy':
+            return `Tidak ada yang ditolak, tertahan, atau gagal di-push, dan tidak ada yang pending lebih dari ${feed.pendingAlertHours} jam.`;
+        default:
+            return null;
+    }
+}
+
+function feedAlertText(alert: string, feed: FinanceFeed): string {
+    const counts = feed.counts ?? {};
+
+    switch (alert) {
+        case 'rejected':
+            return `${COUNT.format(counts.rejected ?? 0)} posting ditolak aplikasi finance.`;
+        case 'held':
+            return `${COUNT.format(counts.held ?? 0)} posting tertahan di CoreERP dan belum dapat sampai ke aplikasi finance.`;
+        case 'push_failed':
+            return `${COUNT.format(feed.failedPushes ?? 0)} kiriman push gagal dan tidak dicoba lagi otomatis. Postingnya masih pending; periksa alamat tujuan klien integrasinya.`;
+        case 'pending_old':
+            return `Posting pending tertua sudah menunggu ${durationText(feed.oldestPendingSeconds ?? 0)}, lebih lama dari ${feed.pendingAlertHours} jam.`;
+        default:
+            return alert;
+    }
+}
+
+/**
+ * Feed posting finance di server ini: angka dari Core yang dibawa laporan agen terakhir, dinilai `FinanceFeedHealth`.
+ *
+ * Isi jurnal tidak ada di sini, dan memang tidak boleh ada: data keuangan klinik tidak keluar dari servernya. Yang
+ * ditampilkan cukup untuk tahu apa yang harus ditanyakan; rincian dan tindak lanjutnya di layar Pantau posting pada
+ * aplikasi server itu. Umur posting tertua dihitung saat laporan terakhir, bukan saat halaman ini dibuka.
+ */
+function FinanceFeedSection({
+    feed,
+    reported,
+}: {
+    feed: FinanceFeed;
+    reported: boolean;
+}) {
+    const hint = feedStateHint(feed, reported);
+    const pendingOld = feed.alerts.includes('pending_old');
+    const pulled = relativeTime(feed.lastPulledAt);
+    const pushed = relativeTime(feed.lastPushedAt);
+
+    return (
+        <Section
+            id="feed-finance"
+            title="Feed posting finance"
+            description="Ringkasan dari Core di server ini, dibawa laporan agen: jumlah dan waktu saja, tanpa isi jurnal. Rincian dan tindak lanjutnya di Posting finance › Pantau posting pada aplikasi server ini."
+        >
+            <div className="flex flex-wrap items-center gap-2">
+                <FinanceFeedBadge state={feed.state} />
+                {hint && (
+                    <span className="text-sm text-muted-foreground">
+                        {hint}
+                    </span>
+                )}
+            </div>
+
+            {feed.alerts.length > 0 && (
+                <ul className="list-disc space-y-1 ps-5 text-sm text-red-700 dark:text-red-300">
+                    {feed.alerts.map((alert) => (
+                        <li key={alert}>{feedAlertText(alert, feed)}</li>
+                    ))}
+                </ul>
+            )}
+
+            {feed.counts && (
+                <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        {FEED_STATUSES.map((status) => {
+                            const count = feed.counts?.[status] ?? 0;
+                            const problem =
+                                count > 0 &&
+                                FEED_PROBLEM_STATUSES.includes(status);
+
+                            return (
+                                <div
+                                    key={status}
+                                    className={
+                                        problem
+                                            ? 'rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/40'
+                                            : 'rounded-lg border p-3'
+                                    }
+                                >
+                                    <p className="text-xs text-muted-foreground">
+                                        {labelFor(
+                                            financePostingStatusLabels,
+                                            status,
+                                        )}
+                                    </p>
+                                    <p
+                                        className={`mt-1 text-lg font-semibold tabular-nums ${problem ? 'text-red-700 dark:text-red-200' : ''}`}
+                                    >
+                                        {COUNT.format(count)}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <dl>
+                        <Row label="Pending tertua">
+                            {feed.oldestPendingAt ? (
+                                <span
+                                    className={
+                                        pendingOld
+                                            ? 'text-red-700 dark:text-red-300'
+                                            : undefined
+                                    }
+                                >
+                                    {`${durationText(feed.oldestPendingSeconds ?? 0)} (terbit ${dateTimeText(feed.oldestPendingAt)})`}
+                                </span>
+                            ) : (
+                                'Tidak ada yang menunggu'
+                            )}
+                        </Row>
+                        <Row label="Pull terakhir">
+                            {feed.lastPulledAt
+                                ? `${dateTimeText(feed.lastPulledAt)}${pulled ? ` (${pulled})` : ''}`
+                                : 'Belum pernah di-pull'}
+                        </Row>
+                        <Row label="Push terakhir">
+                            {!feed.pushReported
+                                ? 'Belum dilaporkan'
+                                : feed.lastPushedAt
+                                  ? `${dateTimeText(feed.lastPushedAt)}${pushed ? ` (${pushed})` : ''}`
+                                  : 'Belum pernah ada push'}
+                        </Row>
+                        <Row label="Push gagal">
+                            {!feed.pushReported ? (
+                                'Belum dilaporkan'
+                            ) : (
+                                <span
+                                    className={
+                                        (feed.failedPushes ?? 0) > 0
+                                            ? 'text-red-700 dark:text-red-300'
+                                            : undefined
+                                    }
+                                >
+                                    {COUNT.format(feed.failedPushes ?? 0)}
+                                </span>
+                            )}
+                        </Row>
+                    </dl>
+                </>
+            )}
         </Section>
     );
 }
 
 /**
- * Rincian satu situs: keadaan terakhir, tindakan, riwayat operasi, dan jejak audit.
+ * Rincian satu server klien: ringkasan di atas, setelan dan laporan, tindakan, lalu riwayat.
  *
- * Tindakan yang tersedia mengikuti keadaan situsnya, bukan disembunyikan setelah ditekan. Situs yang
- * belum terdaftar hanya menawarkan pendaftaran; situs offline tidak menawarkan operasi, karena agennya
- * tidak pernah menarik apa pun — ia menerima paket lewat flashdisk.
+ * Tindakan yang tersedia mengikuti keadaannya, bukan disembunyikan setelah ditekan. Server yang belum
+ * terdaftar menaut ke panel pemasangannya — atau, untuk situs lama tanpa lingkungan, menawarkan pendaftaran.
  */
 export default function Show({
     site,
     history,
+    operations,
     releases,
     audit,
     licenseKeyConfigured,
+    licenseValidDays,
 }: {
     site: Site;
     history: Operation[];
+    operations: string[];
     releases: string[];
     audit: AuditEvent[];
     licenseKeyConfigured: boolean;
+    licenseValidDays: number;
 }) {
     const report = site.lastReport;
     const revoked = site.state === 'revoked';
     const operationError = usePage().props.errors.operation;
+    const newer = newerRelease(site.reportedRelease, site.newestRelease);
+    const seen = relativeTime(site.lastSeenIso);
+    const licenseDays = daysUntil(site.license.validUntil);
 
     return (
-        <Shell title={site.name} description={`Milik ${site.tenant}`}>
+        <Shell
+            title={site.name}
+            description={`Milik ${site.tenant}`}
+            actions={
+                site.environment && (
+                    <Button asChild variant="outline">
+                        <Link href={`/lingkungan/${site.environment.id}`}>
+                            Lingkungan {site.environment.name}
+                        </Link>
+                    </Button>
+                )
+            }
+        >
             <Head title={site.name} />
 
             {operationError && (
@@ -541,44 +961,108 @@ export default function Show({
                 </div>
             )}
 
+            {site.license.notRequiredOnServer && (
+                <div
+                    role="alert"
+                    className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                    Server ini tidak mewajibkan lisensi — periksa berkas .env di
+                    server klien.
+                </div>
+            )}
+
+            {site.financeFeed.state === 'attention' && (
+                <div
+                    role="alert"
+                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
+                >
+                    Feed posting finance di server ini perlu perhatian: ada
+                    jurnal yang belum dibukukan aplikasi finance klinik.{' '}
+                    <a
+                        href="#feed-finance"
+                        className="font-medium underline underline-offset-4"
+                    >
+                        Lihat rinciannya
+                    </a>
+                </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Summary
+                    label="Keadaan"
+                    hint={
+                        seen
+                            ? `Terakhir terlihat ${seen}`
+                            : 'Belum pernah melapor'
+                    }
+                >
+                    <InstallStateBadge state={site.progress.state} />
+                </Summary>
+                <Summary
+                    label="Alamat server"
+                    hint={
+                        site.lastSeenIp
+                            ? `Agen melapor dari ${site.lastSeenIp}`
+                            : undefined
+                    }
+                >
+                    {site.serverAddress ? (
+                        <span className="flex items-center gap-1">
+                            <span className="truncate font-mono">
+                                {site.serverAddress}
+                            </span>
+                            <CopyButton
+                                text={site.serverAddress}
+                                label="Salin alamat server"
+                                iconOnly
+                            />
+                        </span>
+                    ) : (
+                        <a
+                            href="#setelan"
+                            className="font-normal text-amber-700 hover:underline dark:text-amber-300"
+                        >
+                            Belum dicatat
+                        </a>
+                    )}
+                </Summary>
+                <Summary
+                    label="Rilis terpasang"
+                    hint={
+                        newer ? (
+                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                                <ArrowUpCircle className="size-3.5" />
+                                {newer} tersedia
+                            </span>
+                        ) : site.newestRelease ? (
+                            `Terbaru ${site.newestRelease}`
+                        ) : undefined
+                    }
+                >
+                    <span className="font-mono">
+                        {site.reportedRelease ?? '—'}
+                    </span>
+                </Summary>
+                <Summary
+                    label="Lisensi berlaku sampai"
+                    hint={
+                        site.license.issuedPerpetual
+                            ? 'Tidak pernah habis'
+                            : licenseDays === null
+                              ? 'Belum diterbitkan'
+                              : licenseDays < 0
+                                ? `Habis ${Math.abs(licenseDays)} hari lalu`
+                                : `${licenseDays} hari lagi`
+                    }
+                >
+                    {site.license.issuedPerpetual
+                        ? 'Permanen'
+                        : (site.license.validUntil ?? '—')}
+                </Summary>
+            </div>
+
             <div className="grid gap-6 lg:grid-cols-2">
-                <Section title="Keterangan">
-                    <dl>
-                        <Row label="Keadaan">
-                            <SiteStateBadge state={site.state} />
-                        </Row>
-                        <Row label="Edisi">{site.edition}</Row>
-                        <Row label="Internet keluar">
-                            {labelFor(connectivityLabels, site.connectivity)}
-                        </Row>
-                        <Row label="Rilis terpasang">
-                            {site.reportedRelease ?? '—'}
-                        </Row>
-                        <Row label="Terakhir terlihat">
-                            {site.lastSeenAt
-                                ? `${site.lastSeenAt} lewat ${site.lastSeenVia === 'file' ? 'file laporan' : 'heartbeat'}`
-                                : 'Belum pernah'}
-                        </Row>
-                        <Row label="Jendela pembaruan">
-                            {site.updateWindow
-                                ? `${site.updateWindow.start}–${site.updateWindow.end} (${site.updateWindow.timezone})`
-                                : 'Kapan saja'}
-                        </Row>
-                        <Row label="Terdaftar">{site.enrolledAt ?? '—'}</Row>
-                        {site.address && (
-                            <Row label="Alamat">
-                                <a
-                                    href={site.address}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="underline underline-offset-4"
-                                >
-                                    {site.address}
-                                </a>
-                            </Row>
-                        )}
-                    </dl>
-                </Section>
+                <ServerSettingsSection site={site} revoked={revoked} />
 
                 <Section
                     title="Laporan terakhir"
@@ -586,14 +1070,21 @@ export default function Show({
                 >
                     {report ? (
                         <dl>
-                            <Row label="Container">
-                                {(report.containers ?? [])
-                                    .map(
-                                        (c) =>
-                                            `${c.service}: ${c.state}${c.health ? ` (${c.health})` : ''}`,
-                                    )
-                                    .join(', ') || '—'}
-                            </Row>
+                            {(report.containers ?? []).length > 0 && (
+                                <div className="space-y-2 border-b py-2.5">
+                                    <dt className="text-sm text-muted-foreground">
+                                        Container
+                                    </dt>
+                                    <dd className="flex flex-wrap gap-1.5">
+                                        {(report.containers ?? []).map((c) => (
+                                            <ContainerBadge
+                                                key={c.service}
+                                                container={c}
+                                            />
+                                        ))}
+                                    </dd>
+                                </div>
+                            )}
                             <Row label="Sisa disk data">
                                 {bytes(report.disk?.data_free_bytes)}
                             </Row>
@@ -605,7 +1096,7 @@ export default function Show({
                                     ? `${report.last_backup.at} — ${labelFor(siteOperationStatusLabels, report.last_backup.result)}, ${bytes(report.last_backup.size_bytes)}`
                                     : 'Belum ada'}
                             </Row>
-                            <Row label="Lisensi berakhir">
+                            <Row label="Lisensi terpasang berakhir">
                                 {report.license_expires_at ?? '—'}
                             </Row>
                             <Row label="Sertifikat berakhir">
@@ -614,33 +1105,64 @@ export default function Show({
                             <Row label="Versi agen">
                                 {report.agent_version ?? '—'}
                             </Row>
+                            <Row label="Terdaftar">
+                                {site.enrolledAt ?? '—'}
+                            </Row>
+                            {site.edition !== SINGLE_IMAGE_EDITION && (
+                                <Row label="Edisi">{site.edition}</Row>
+                            )}
+                            {site.reportedDigest && (
+                                <Row label="Digest">
+                                    <span className="font-mono text-xs font-normal">
+                                        {site.reportedDigest}
+                                    </span>
+                                </Row>
+                            )}
                         </dl>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            Situs ini belum pernah melapor.
+                            Server ini belum pernah melapor. Laporan pertama
+                            datang sekitar satu menit setelah agennya terpasang.
                         </p>
+                    )}
+                    {site.appUrl && (
+                        <a
+                            href={site.appUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
+                        >
+                            Buka aplikasi
+                            <ExternalLink className="size-3.5" />
+                        </a>
                     )}
                 </Section>
             </div>
 
-            {!revoked && (
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {site.state === 'not_enrolled' && (
+            <FinanceFeedSection
+                feed={site.financeFeed}
+                reported={report !== null}
+            />
+
+            <div className="grid gap-6 lg:grid-cols-2">
+                {!revoked &&
+                    site.state === 'not_enrolled' &&
+                    (site.environment ? (
+                        <Installation site={site} />
+                    ) : (
                         <Enrollment site={site} />
-                    )}
-                    {site.connectivity === 'online' &&
-                        site.state !== 'not_enrolled' && (
-                            <RequestOperation
-                                site={site}
-                                releases={releases}
-                                licenseKeyConfigured={licenseKeyConfigured}
-                            />
-                        )}
-                    {site.connectivity === 'offline' && (
-                        <OfflineTools site={site} />
-                    )}
-                </div>
-            )}
+                    ))}
+                {!revoked && site.state !== 'not_enrolled' && (
+                    <RequestOperation
+                        site={site}
+                        operations={operations}
+                        releases={releases}
+                        licenseKeyConfigured={licenseKeyConfigured}
+                        licenseValidDays={licenseValidDays}
+                    />
+                )}
+                <LicenseRenewal site={site} revoked={revoked} />
+            </div>
 
             <Section title="Riwayat operasi">
                 <div className="overflow-x-auto">
@@ -727,23 +1249,36 @@ export default function Show({
 
             <Section
                 title="Jejak audit"
-                description="Tindakan operator terhadap situs ini. Jejaknya hanya dapat ditambah; database menolak perubahan dan penghapusan."
+                description="Tindakan operator dan sistem terhadap server ini. Jejaknya hanya dapat ditambah; database menolak perubahan dan penghapusan."
             >
                 {audit.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         Belum ada tindakan tercatat.
                     </p>
                 ) : (
-                    <ul className="space-y-1 text-sm">
+                    <ul className="divide-y text-sm">
                         {audit.map((event) => (
-                            <li key={event.id} className="flex flex-wrap gap-2">
-                                <span className="text-muted-foreground">
-                                    {event.at}
+                            <li
+                                key={event.id}
+                                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2"
+                            >
+                                <span>
+                                    <span className="font-medium">
+                                        {labelFor(
+                                            siteAuditLabels,
+                                            event.action,
+                                        )}
+                                    </span>
+                                    <span className="ms-2 text-muted-foreground">
+                                        oleh {event.by}
+                                    </span>
                                 </span>
-                                <span className="font-mono text-xs">
-                                    {event.action}
+                                <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
+                                    <span className="font-mono">
+                                        {event.action}
+                                    </span>
+                                    <span>{event.at}</span>
                                 </span>
-                                <span>oleh {event.by}</span>
                             </li>
                         ))}
                     </ul>

@@ -417,13 +417,16 @@ duty yang masih dipakai security role tenant, yang registrasinya ditolak agar ha
 hilang diam-diam. Kalau kamu memang hendak membuang duty semacam itu, lepaskan dulu relasi role-duty
 lewat migration kecil, baru daftarkan ulang manifest.
 
-Module ikut **image edisi** Core, bukan image sendiri. Sebuah edisi adalah satu berkas di
-`editions/` yang menyebut modul apa yang dibeli pelanggan; modul yang tidak disebut di sana tidak
-ada di dalam image, dan CI membuktikannya tiap pull request. Kalau module baru harus sampai ke
-seorang pelanggan, yang berubah adalah berkas edisinya, bukan alur rilisnya.
+Module ikut **image Core**, bukan image sendiri. Satu image berisi seluruh module dibagikan ke
+semua klien, dan yang menentukan module mana yang boleh dibuka sebuah tenant adalah lisensi dari
+admin.erp — bukan isi image. Module baru karena itu ikut ke rilis berikutnya begitu berkasnya ada;
+tidak ada berkas kedua yang harus disunting supaya ia sampai ke klien.
+
+Satu hal yang **tidak** ikut: module ber-`kind: internal-fixture`. Ia hidup di repo untuk menguji
+penjaga batas, dan CI membuktikan jejaknya tidak ada di dalam image pada tiap pull request.
 
 ::: tip Gate keluar
-Module muncul di katalog, `php artisan edition:resolve <berkas edisi>` memulangkannya untuk edisi yang memang membelinya, dan installation registry menyatakan `ready` setelah migration berhasil.
+Module muncul di katalog, `php artisan edition:modules` memulangkannya, dan installation registry menyatakan `ready` setelah migration berhasil.
 :::
 
 Detail: [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) dan [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis).

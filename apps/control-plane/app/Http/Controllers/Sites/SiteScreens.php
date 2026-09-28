@@ -4,89 +4,76 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers\Sites;
 
-use ControlPlane\Audit\OperatorAudit;
 use ControlPlane\Http\Controllers\Controller;
+use ControlPlane\Models\Environment;
 use ControlPlane\Models\OperatorAuditEvent;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
-use ControlPlane\Models\Tenant;
+use ControlPlane\Sites\ClientServerSetup;
+use ControlPlane\Sites\FinanceFeedHealth;
+use ControlPlane\Sites\InstallProgress;
+use ControlPlane\Sites\LicenseTerms;
+use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
-use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 /**
- * Layar Situs: daftar, pembuatan, dan rincian.
+ * Layar Server klien (`/situs`): daftar setiap mesin milik klien yang dikelola dari sini, dan rinciannya.
  *
- * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan — ada di
+ * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan, perpanjangan lisensi — ada di
  * `SiteActions`, terpisah dari yang hanya membaca, supaya setiap method yang menulis jejak audit
- * terkumpul di satu tempat yang mudah diperiksa.
+ * terkumpul di satu tempat yang mudah diperiksa. Setelan alamat dan jendela pembaruan ada di `SiteSettings`.
+ *
+ * ## Untuk apa daftar ini
+ *
+ * Satu tempat yang menjawab "server klien mana saja yang kita pegang, di alamat mana, dan mana yang perlu
+ * didatangi hari ini" — tanpa membuka halaman lingkungan tenant satu per satu. Karena itu setiap baris
+ * membawa alamat mesinnya, keadaan pemasangan, rilis terpasang terhadap rilis terbaru, dan masa lisensi.
+ *
+ * ## Tidak ada formulir "Situs baru" yang berdiri sendiri
+ *
+ * Formulir lama menanyakan hal yang sudah diketahui sistem — tenant, nama, edisi — dan tidak menyebut apakah
+ * sesuatu sudah terpasang. Tombol "Tambah server klien" di sini hanya memilih lingkungan produksi server
+ * klien yang belum punya server, lalu memakai pintu yang sama dengan panel di halaman lingkungan
+ * (`ClientServerSetup::prepare`). Situs lama yang lahir sebelum 15 September 2026 tanpa lingkungan tetap
+ * tampil dan tetap punya rinciannya.
  */
 final class SiteScreens extends Controller
 {
-    public function index(): InertiaResponse
+    public function index(SiteOperations $operations): InertiaResponse
     {
-        $sites = Site::query()
-            ->with('tenant:id,name')
+        $rows = Site::query()
+            ->with(['tenant:id,name', 'environment:id,name,tenant_id,kind,hosting', 'environment.tenant:id,slug'])
             ->orderBy('name')
-            ->get()
-            ->map(fn (Site $site): array => $this->row($site))
-            ->all();
+            ->get();
 
-        return Inertia::render('sites/index', [
-            'sites' => $sites,
-            'tenants' => Tenant::options(),
-        ]);
-    }
-
-    public function store(Request $request): RedirectResponse
-    {
-        $input = $request->validate([
-            'tenant_id' => ['required', 'string', 'exists:tenants,id'],
-            'name' => ['required', 'string', 'max:100'],
-            'edition' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
-            'address' => ['nullable', 'url:https,http', 'max:255'],
-            'connectivity' => ['required', 'in:'.implode(',', Site::CONNECTIVITIES)],
-            'update_window_start' => ['nullable', 'date_format:H:i', 'required_with:update_window_end'],
-            'update_window_end' => ['nullable', 'date_format:H:i', 'required_with:update_window_start'],
-        ], [
-            'edition.regex' => 'Edisi ditulis huruf kecil, angka, dan tanda hubung — sama dengan nama berkas di folder editions.',
-            'update_window_start.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-            'update_window_end.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-        ]);
-
-        try {
-            $site = DB::transaction(function () use ($request, $input): Site {
-                $site = Site::query()->create([
-                    ...$input,
-                    'profile' => 'managed_on_prem',
-                    'timezone' => 'Asia/Jakarta',
-                    'created_by' => $request->user()?->getAuthIdentifier(),
-                ]);
-
-                OperatorAudit::record($request, 'site.created', 'site', $site->id, [
-                    'tenant_id' => $site->tenant_id,
-                    'edition' => $site->edition,
-                    'connectivity' => $site->connectivity,
-                ]);
-
-                return $site;
-            });
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => 'Tenant ini sudah punya situs dengan nama itu.']);
+        foreach ($rows as $site) {
+            $operations->expireStale($site);
         }
 
-        return redirect('/situs/'.$site->id)->with('message', 'Situs "'.$site->name.'" tercatat. Buat perintah pasang atau paket pendaftarannya.');
+        $progress = InstallProgress::forSites($rows->all());
+        $newest = $this->newestReleases();
+
+        return Inertia::render('sites/index', [
+            'sites' => $rows
+                ->map(fn (Site $site): array => $this->row($site) + [
+                    'environment' => $site->environment !== null
+                        ? ['id' => $site->environment->id, 'name' => $site->environment->name]
+                        : null,
+                    'progress' => $progress[$site->id],
+                    'newestRelease' => $newest[$site->edition] ?? null,
+                ])
+                ->all(),
+            'candidates' => $this->candidates(),
+        ]);
     }
 
-    public function show(string $site, SiteOperations $operations): InertiaResponse
+    public function show(string $site, SiteOperations $operations, LicenseTerms $terms): InertiaResponse
     {
-        $row = Site::query()->with('tenant:id,name')->whereKey($site)->firstOrFail();
+        $row = Site::query()->with(['tenant:id,name', 'environment:id,name,tenant_id,kind,hosting', 'environment.tenant:id,slug'])->whereKey($site)->firstOrFail();
 
         // Tenggat yang habis ditutup sekarang, supaya layar tidak menampilkan operasi "berjalan" milik
         // agen yang sudah lama berhenti.
@@ -137,23 +124,63 @@ final class SiteScreens extends Controller
 
         return Inertia::render('sites/show', [
             'site' => $this->row($row) + [
-                'address' => $row->address,
+                'environment' => $row->environment !== null
+                    ? ['id' => $row->environment->id, 'name' => $row->environment->name]
+                    : null,
                 'profile' => $row->profile,
-                'updateWindow' => $row->updateWindow(),
+                'newestRelease' => ClientServerSetup::newestRelease($row->edition),
+                // Situs yang lahir dari halaman lingkungan dipasang dari sana. Rinciannya menampilkan
+                // keadaan pemasangan yang sama dan menaut ke panelnya, bukan formulir pendaftaran lama.
+                'progress' => InstallProgress::forSite($row),
                 'enrolledAt' => $row->enrolled_at?->toDateTimeString(),
                 'reportedDigest' => $row->reported_digest,
                 'lastReport' => $row->last_report,
+                'license' => [
+                    'validUntil' => $row->license_valid_until?->toDateString(),
+                    'issuedAt' => $row->license_issued_at?->toDateTimeString(),
+                    'suspendedAt' => $row->license_suspended_at?->toDateTimeString(),
+                    /*
+                     * Setelan dan keadaan dikirim terpisah. `perpetual` yang menyala sementara
+                     * `issuedPerpetual` masih mati berarti operator baru saja mengubahnya dan lisensi
+                     * permanennya belum sampai ke server klien — layar menyebutkan itu, bukan menyamakan
+                     * keduanya dan berbohong tentang apa yang sedang berlaku di klinik.
+                     */
+                    'perpetual' => $row->license_perpetual,
+                    'issuedPerpetual' => $row->licenseIssuedPerpetual(),
+                    'terms' => $terms->forSite($row),
+                    'defaultTerms' => $terms->defaults(),
+                    /*
+                     * Hanya `false` yang dilaporkan agen yang memicu peringatan. Kosong berarti agen
+                     * lama yang belum mengenal bidangnya, atau situs yang belum pernah melapor —
+                     * keduanya bukan bukti bahwa kewajiban lisensi dimatikan.
+                     */
+                    'notRequiredOnServer' => ($row->last_report['license_required'] ?? null) === false,
+                ],
+                // Dinilai di sini, bukan di layar: ambangnya satu, dan test membaca penilaian yang sama.
+                'financeFeed' => FinanceFeedHealth::fromReport($row->last_report),
             ],
             'history' => $history,
+            // Daftar formulir "Minta operasi", dari server. `install` tidak ada di sana — lihat
+            // `SiteOperation::MANUAL_OPERATIONS` — walaupun riwayat di bawahnya dapat memuatnya.
+            'operations' => SiteOperation::MANUAL_OPERATIONS,
             'releases' => $releases,
             'audit' => $audit,
             'licenseKeyConfigured' => config('sites.license_private_key_path') !== null
                 && is_readable((string) config('sites.license_private_key_path')),
+            'licenseValidDays' => $terms->forSite($row)['validDays'],
             'enrollment' => session('enrollment'),
         ]);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Bentuk yang sama untuk daftar dan rincian.
+     *
+     * Waktu dikirim dua kali: `lastSeenAt` untuk dibaca apa adanya, dan `lastSeenIso` — dengan zona waktunya —
+     * untuk dihitung layar menjadi "3 menit lalu". Menghitung selisih dari teks tanpa zona waktu membuat
+     * peramban di Jakarta membacanya tujuh jam lebih tua dari sebenarnya.
+     *
+     * @return array<string, mixed>
+     */
     private function row(Site $site): array
     {
         return [
@@ -161,16 +188,73 @@ final class SiteScreens extends Controller
             'name' => $site->name,
             'tenant' => $site->tenant->name ?? 'Tanpa tenant',
             'edition' => $site->edition,
-            'connectivity' => $site->connectivity,
             'state' => match (true) {
                 $site->revoked() => 'revoked',
                 ! $site->enrolled() => 'not_enrolled',
                 $site->stale() => 'stale',
                 default => 'enrolled',
             },
+            'serverAddress' => $site->server_address,
+            'appUrl' => $site->appUrl(),
+            'appUrlAutomatic' => $site->environment_id !== null,
+            'dns' => SiteDns::forScreen($site),
+            'lastSeenIp' => $site->last_seen_ip,
+            'updateWindow' => $site->updateWindow(),
             'reportedRelease' => $site->reported_release,
             'lastSeenAt' => $site->last_seen_at?->toDateTimeString(),
-            'lastSeenVia' => $site->last_seen_via,
+            'lastSeenIso' => $site->last_seen_at?->toIso8601String(),
+            'licenseValidUntil' => $site->license_valid_until?->toDateString(),
+            // Yang ditampilkan daftar adalah lisensi yang sedang berlaku, bukan setelan yang baru diubah:
+            // situs yang ditandai permanen tetapi lisensi permanennya belum diterbitkan masih memakai
+            // tanggal lamanya, dan daftar yang menulis "Permanen" di situ menyembunyikan tanggal itu.
+            'licensePerpetual' => $site->licenseIssuedPerpetual(),
+            'licenseSuspended' => $site->licenseRenewalSuspended(),
         ];
+    }
+
+    /**
+     * Rilis terdaftar terbaru per edisi, dengan satu query untuk seluruh daftar.
+     *
+     * @return array<string, string>
+     */
+    private function newestReleases(): array
+    {
+        $newest = [];
+
+        foreach (SiteRelease::query()->get(['edition', 'release']) as $release) {
+            $current = $newest[$release->edition] ?? null;
+
+            if ($current === null || SiteRelease::compare($release->release, $current) > 0) {
+                $newest[$release->edition] = $release->release;
+            }
+        }
+
+        return $newest;
+    }
+
+    /**
+     * Lingkungan yang dapat diberi server klien dari tombol "Tambah server klien": produksi di server klien
+     * yang belum dihapus dan belum punya situs. Aturan yang sama ditegakkan lagi oleh `ClientServerSetup`
+     * dan indeks `sites_satu_per_lingkungan`; daftar ini hanya supaya pilihan yang pasti ditolak tidak
+     * pernah ditawarkan.
+     *
+     * @return list<array{id: string, name: string, tenant: string}>
+     */
+    private function candidates(): array
+    {
+        return array_values(Environment::query()
+            ->with('tenant:id,name')
+            ->where('kind', 'production')
+            ->where('hosting', 'client_server')
+            ->whereNull('deleted_at')
+            ->whereNotExists(fn ($query) => $query->select(DB::raw(1))->from('sites')->whereColumn('sites.environment_id', 'environments.id'))
+            ->get()
+            ->map(fn (Environment $environment): array => [
+                'id' => $environment->id,
+                'name' => $environment->name,
+                'tenant' => $environment->tenant->name ?? 'Tanpa tenant',
+            ])
+            ->sortBy('tenant', SORT_NATURAL | SORT_FLAG_CASE)
+            ->all());
     }
 }
