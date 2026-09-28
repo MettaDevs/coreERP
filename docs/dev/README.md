@@ -31,7 +31,7 @@ Target yang dikunci:
 | [02-module-standard.md](02-module-standard.md) | Standar app: repository, release unit, manifest, database ownership, lifecycle, dan bantuan kontekstual per field |
 | [03-release-and-on-prem.md](03-release-and-on-prem.md) | Provisioning, Docker Compose edition, update, dan uninstall |
 | [04-api-and-integration.md](04-api-and-integration.md) | REST/OpenAPI, event/AsyncAPI, bridge POS-Booking, dan API governance |
-| [05-customization-and-addons.md](05-customization-and-addons.md) | Konfigurasi, addon private, extension customer, dan anti-fork policy |
+| [05-customization-and-addons.md](05-customization-and-addons.md) | Urutan jawaban untuk kebutuhan khusus pelanggan: setelan, fitur produk, integrasi, module khusus, tanpa fork |
 | [06-worktree-target.md](06-worktree-target.md) | Kondisi repo sekarang dan target pemisahan repository |
 | [07-reporting-and-replicas.md](07-reporting-and-replicas.md) | Read replica per app, reporting projection lintas app, dan consistency policy |
 | [08-query-scopes-and-schema.md](08-query-scopes-and-schema.md) | Schema organization/hierarchy target dan query tenant/legal-entity/organization scope |
