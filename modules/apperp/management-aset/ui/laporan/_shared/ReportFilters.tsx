@@ -104,6 +104,22 @@ export function FiscalClassificationFilter(props: FilterProps) {
     );
 }
 
+/**
+ * Filter buku penyusutan. Tanpa pilihan, laporan memakai buku komersial saja: buku fiskal
+ * menyusutkan aset yang sama, jadi menjumlahkan semua buku membuat totalnya dobel.
+ */
+export function DepreciationBookFilter(props: FilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="buku-penyusutan"
+            label="Buku penyusutan"
+            allLabel="Semua buku komersial"
+            unavailable="Pilihan buku penyusutan tidak dapat dimuat. Minta administrator memberi Anda akses lihat buku penyusutan."
+        />
+    );
+}
+
 type AssetOption = {
     id: string;
     kode: string;

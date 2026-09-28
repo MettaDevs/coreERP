@@ -14,6 +14,7 @@ use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
 use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
+use App\Services\Modules\ReportFormatterCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
 use App\Support\Finance\PostingAccountResolverRegistry;
 use App\Support\Modules\Contracts\DaftarAkun;
@@ -30,6 +31,7 @@ use App\Support\Modules\Contracts\PenerbitNomor;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Support\Modules\Contracts\ReportFormatter;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Contracts\Foundation\Application;
@@ -80,6 +82,9 @@ final class CoreServices
         // Feed posting finance: module menerbitkan jurnalnya di dalam transaksi dokumen sumbernya,
         // dan memakai pratinjau yang sama untuk menampilkan masalah sebelum konfirmasi.
         PenerbitPosting::class => PenerbitPostingCore::class,
+        // Laporan: layar pratinjau module memformat nilai bertipe (`money`, `date`, …) dengan
+        // aturan yang sama dengan renderer Core, supaya layar dan hasil cetak tidak berbeda.
+        ReportFormatter::class => ReportFormatterCore::class,
     ];
 
     /**

@@ -6,24 +6,32 @@ import {
     AssetGroupFilter,
     AssetTypeFilter,
     DateFilter,
+    DepreciationBookFilter,
     FiscalClassificationFilter,
 } from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
+/**
+ * Satu baris laporan pemusnahan, satu aset yang dimusnahkan. Uang dan tanggal sudah diformat
+ * Core persis seperti hasil cetaknya; nilai yang tidak ada datang sebagai teks kosong.
+ */
 export type DisposalReportRow = {
-    nomor?: number;
-    no_bukti?: string;
-    tanggal_pemusnahan?: string;
-    asset_kode?: string;
-    asset_nama?: string;
-    spesifikasi?: string;
-    kondisi_aset?: string;
-    nilai_perolehan?: string | number;
-    nilai_buku_akhir?: string | number;
-    keterangan?: string;
-    status_dokumen?: string;
-} & Record<string, unknown>;
+    nomor: number;
+    no_bukti: string;
+    tanggal: string;
+    kode_aset: string;
+    item_aset: string;
+    spesifikasi: string;
+    kondisi_aset: string;
+    buku: string;
+    nilai_perolehan: string;
+    nilai_buku_akhir: string;
+    keterangan: string;
+};
+
+const shown = (value: string | number | null | undefined) =>
+    value === null || value === undefined || value === '' ? '—' : String(value);
 
 export default function LaporanPemusnahanAsetPage() {
     const {
@@ -43,55 +51,55 @@ export default function LaporanPemusnahanAsetPage() {
                 id: 'no_bukti',
                 header: 'No. bukti',
                 cell: (row) => (
-                    <span className="font-mono text-xs font-semibold">
-                        {String(row.no_bukti ?? '-')}
+                    <span className="text-primary font-mono text-xs font-semibold">
+                        {shown(row.no_bukti)}
                     </span>
                 ),
             },
             {
-                id: 'tanggal_pemusnahan',
-                header: 'Tgl pemusnahan',
-                cell: (row) => String(row.tanggal_pemusnahan ?? '-'),
+                id: 'tanggal',
+                header: 'Tanggal pemusnahan',
+                cell: (row) => shown(row.tanggal),
             },
             {
-                id: 'asset_kode',
+                id: 'kode_aset',
                 header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {shown(row.kode_aset)}
                     </span>
                 ),
             },
             {
-                id: 'asset_nama',
-                header: 'Item aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                id: 'item_aset',
+                header: 'Nama aset',
+                cell: (row) => shown(row.item_aset),
             },
             {
                 id: 'spesifikasi',
                 header: 'Spesifikasi',
-                cell: (row) => String(row.spesifikasi ?? '-'),
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {shown(row.spesifikasi)}
+                    </span>
+                ),
             },
             {
                 id: 'kondisi_aset',
                 header: 'Kondisi aset',
-                cell: (row) => (
-                    <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(row.kondisi_aset ?? '-')}
-                    </span>
-                ),
-                align: 'center',
+                cell: (row) => shown(row.kondisi_aset),
             },
+            { id: 'buku', header: 'Buku', cell: (row) => shown(row.buku) },
             {
                 id: 'nilai_perolehan',
                 header: 'Nilai perolehan',
-                cell: (row) => String(row.nilai_perolehan ?? '-'),
+                cell: (row) => shown(row.nilai_perolehan),
                 align: 'right',
             },
             {
                 id: 'nilai_buku_akhir',
-                header: 'Nilai buku akhir',
-                cell: (row) => String(row.nilai_buku_akhir ?? '-'),
+                header: 'Nilai buku saat dimusnahkan',
+                cell: (row) => shown(row.nilai_buku_akhir),
                 align: 'right',
             },
             {
@@ -99,19 +107,9 @@ export default function LaporanPemusnahanAsetPage() {
                 header: 'Keterangan / alasan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
-                        {String(row.keterangan ?? '-')}
+                        {shown(row.keterangan)}
                     </span>
                 ),
-            },
-            {
-                id: 'status_dokumen',
-                header: 'Status dokumen',
-                cell: (row) => (
-                    <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(row.status_dokumen ?? '-')}
-                    </span>
-                ),
-                align: 'center',
             },
         ],
         [],
@@ -120,7 +118,7 @@ export default function LaporanPemusnahanAsetPage() {
     return (
         <ReportPageLayout<DisposalReportRow>
             title="Laporan pemusnahan aset"
-            description="Daftar penghapusan aset rusak berat atau tidak bernilai ekonomis beserta berita acara pemusnahan."
+            description="Aset yang dimusnahkan dalam rentang tanggal, beserta nilai perolehan dan nilai bukunya saat dimusnahkan."
             reportCode="laporan-pemusnahan-aset"
             filters={filters}
             filterBar={
@@ -128,17 +126,18 @@ export default function LaporanPemusnahanAsetPage() {
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
                 >
+                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
+                    <DateFilter
+                        label="Sampai tanggal"
+                        {...bindFilter('sampai')}
+                    />
+                    <DepreciationBookFilter {...bindFilter('buku_id')} />
                     <AssetGroupFilter {...bindFilter('group_aset_id')} />
                     <FiscalClassificationFilter
                         {...bindFilter('kelompok_harta_fiskal_id')}
                     />
                     <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
                 </ReportFilterBar>
             }
             columns={columns}
