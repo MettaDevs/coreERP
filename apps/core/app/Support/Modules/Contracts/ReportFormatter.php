@@ -7,8 +7,8 @@ namespace App\Support\Modules\Contracts;
 /**
  * Nilai laporan bertipe, diformat persis seperti yang akan tercetak.
  *
- * Mesin laporan Core memformat nilai yang menyatakan tipenya pada `fields()` —
- * `money`, `percent`, `date`, `month` — saat mengisi layout. Layar pratinjau laporan milik
+ * Mesin laporan Core memformat nilai yang menyatakan tipenya pada `fields()` — `money`,
+ * `number`, `percent`, `date`, `month` — saat mengisi layout. Layar pratinjau laporan milik
  * module memakai antarmuka ini supaya yang terlihat di layar sama dengan yang tercetak,
  * tanpa module menulis aturan rupiah dan tanggalnya sendiri. Nilai tanpa tipe dikembalikan
  * apa adanya.
