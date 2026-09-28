@@ -1,54 +1,141 @@
-# Customisasi tanpa fork CoreERP
+# Kebutuhan khusus pelanggan tanpa fork
 
-## Prinsip
+Halaman ini menjawab satu pertanyaan: **kalau seorang pelanggan meminta sesuatu yang belum ada di
+CoreERP, jawabannya ditaruh di mana.** Pilihannya berurutan, dari yang paling murah dirawat sampai
+yang paling khusus. Satu pilihan tidak pernah tersedia: salinan source untuk satu pelanggan.
 
-ERP memang membutuhkan variasi customer. Variasi tersebut tidak boleh menghasilkan branch source POS/Finance/Booking per customer, karena setiap update akan menjadi proyek migrasi tersendiri. Gunakan urutan solusi berikut, dari paling aman sampai paling khusus.
+Larangan itu bukan soal selera. Sistem lama menempuh jalan itu: setiap pelanggan memegang salinan
+source dan database-nya sendiri, sehingga setiap update menjadi proyek pindahan tersendiri untuk
+setiap pelanggan. CoreERP dibangun justru untuk keluar dari keadaan itu.
 
-| Level | Gunakan untuk | Contoh |
+## Yang mudah tertukar
+
+**Module khusus dan fitur produk.** Keduanya kode di repo ini, dan keduanya ikut ke image yang sama
+untuk semua klien. Bedanya hanya siapa yang boleh membukanya: fitur produk terbuka untuk setiap tenant
+yang membeli module-nya, sedangkan module khusus hanya untuk tenant yang lisensinya menyebut module itu.
+
+**Integrasi dan module.** Integrasi berjalan di luar CoreERP dan hanya menyentuh API serta event.
+Module berjalan di dalam runtime Core dan tunduk pada seluruh [standar module](02-module-standard.md).
+Pelanggan boleh membangun integrasinya sendiri, tetapi tidak pernah menaruh kode di dalam runtime.
+
+**Setelan dan kode.** Perbedaan yang dapat ditulis sebagai data (format nomor, akun posting, alur
+persetujuan) adalah setelan tenant. Menjawabnya dengan kode membuat setiap perubahan kecil harus
+menunggu rilis.
+
+## Urutan jawaban
+
+| Urutan | Dipakai bila | Bentuknya |
 | --- | --- | --- |
-| Konfigurasi | Perbedaan yang dapat dinyatakan sebagai data | custom field, template, tax, role, limit diskon |
-| Workflow/rule | Approval dan policy yang tidak mengubah core domain | purchase > 100 juta perlu 2 approval |
-| Integration connector | Hubungan dengan sistem eksternal | biometrik, bank, marketplace, mesin produksi |
-| Bridge/addon | Logic khusus customer atau integrasi dua module | POS-Booking policy, loyalty Client A |
-| Product feature | Kebutuhan berulang beberapa customer | jadikan capability module resmi |
-| Core fork | Hanya kontrak bespoke terpisah | Bukan pola SaaS normal |
+| 1. Setelan | Perbedaannya dapat ditulis sebagai data | Setelan tenant oleh owner/admin, termasuk [workflow persetujuan](21-visual-workflow-engine.md) |
+| 2. Fitur produk | Dibutuhkan lebih dari satu pelanggan, atau domainnya umum | Fitur module biasa, boleh dinyalakan per tenant |
+| 3. Integrasi di luar CoreERP | Kebutuhannya di luar inti ERP: dasbor khusus, form lapangan, notifikasi | Pelanggan atau partner membangunnya sendiri di atas API dan event, dengan alat apa pun |
+| 4. Module khusus | Hanya satu pelanggan, dan harus berjalan di dalam ERP | Module di `modules/` yang dilisensikan hanya ke tenant tertentu |
+| Tidak pernah | – | Salinan source atau branch per pelanggan |
 
-## Custom data dan rule
+Mulai dari urutan teratas, dan turun hanya bila urutan di atasnya tidak cukup. Semakin ke bawah,
+semakin banyak yang harus ikut dirawat setiap kali Core berubah.
 
-Module yang mendukung custom field menyimpan definisi dan value dalam database miliknya sendiri, misalnya `custom_field_definitions`, `custom_field_values`, atau `metadata jsonb` yang dibatasi schema/index-nya. Jangan menambah kolom fisik atau migration custom untuk setiap tenant.
+### 1. Setelan
 
-Rule/workflow dijalankan melalui DSL/configuration yang tervalidasi, bukan arbitrary PHP/JavaScript dari customer. Rules harus memiliki audit, version, test scenario, dan kemampuan rollback ke rule sebelumnya.
+Yang sudah menjadi setelan tenant antara lain format nomor dokumen (lihat
+[number sequence](14-number-sequences.md)), akun posting, dan workflow persetujuan.
+Setelan bertahan melewati update tanpa pekerjaan tambahan, karena yang berubah hanya data.
 
-## Private addon
+Custom field (kolom tambahan yang dibuat pelanggan sendiri) **belum ada**. Permintaan yang
+membutuhkannya turun ke urutan berikutnya sampai mekanisme itu benar-benar dibangun.
 
-Private addon adalah release unit biasa dengan publisher/customer namespace:
+### 2. Fitur produk
 
-```text
-addons/client-a/loyalty-policy/
-├── module.yaml
-├── api/                         # service dan image sendiri
-├── ui/                          # UI feature sendiri bila perlu
-├── database/migrations/
-└── contracts/                   # hanya contract publik yang dipakai
-```
+**Begitu pelanggan kedua meminta hal yang sama, atau domainnya jelas umum, ia menjadi fitur produk,
+bukan module khusus kedua.** Satu jalur kode diuji dan dipakai semua pelanggan. Dua module khusus
+untuk hal yang sama berarti dua jalur yang menua sendiri-sendiri dan sama-sama harus diperbaiki
+setiap kali Core berubah.
 
-Addon mendeklarasikan `dependsOn` sebagai map, misalnya `dependsOn: { pos: ^1.2 }`. Ia dapat di-deploy hanya kepada Client A, mempunyai `loyalty_policy_db` sendiri, dan di-upgrade secara independen. Bila client tidak membelinya, addon tidak ada di deployment mereka.
+Kalau fiturnya tidak cocok untuk semua pelanggan, ia dinyalakan lewat setelan tenant milik module itu,
+bukan dipisah menjadi module khusus.
 
-## Customer-authored extension
+### 3. Integrasi di luar CoreERP
 
-| Environment | Ketentuan |
-| --- | --- |
-| Managed cloud | Publisher namespace, signed image, manifest validation, least-privilege service account, contract test, dan security approval wajib. |
-| On-prem perpetual | Customer dapat menjalankan sidecar/addon sendiri, tetapi hanya mendapat API/event contract; tanpa query langsung DB atau perubahan source core. Support boundary mengikuti kontrak pembelian. |
+**CoreERP tidak membangun platform low-code.** Pelanggan boleh memakai Power Apps, n8n, spreadsheet,
+atau backoffice-nya sendiri. Yang disediakan CoreERP adalah API dan event yang layak dipakai alat apa
+pun. Membangun platform low-code sendiri berarti merawat produk kedua yang sama besarnya dengan ERP-nya,
+dan Microsoft sendiri pun menaruh Power Apps sebagai produk terpisah dari Business Central.
 
-Setiap extension memiliki dependency graph, permission, lifecycle install/uninstall, dan compatibility test yang sama dengan vendor module. Usage metering berlaku bila extension dipakai pada SaaS; on-prem perpetual tidak mengirim metering ke vendor. Ini adalah fondasi "AppExchange" CoreERP, tanpa membiarkan arbitrary code merusak control plane atau database product.
+Keadaan sekarang, supaya tidak dijanjikan lebih dari yang ada:
 
-## Productization rule
+- API module berversi sudah ada di `/api/modules/<id module>/v1/...`, dengan kontrak OpenAPI per
+  module. Jalurnya masih memakai sesi peramban, jadi sistem pelanggan belum dapat memanggilnya dari
+  server ke server. Kredensial token untuk itu direncanakan di
+  [API untuk integrator](/todo/api-untuk-integrator/).
+- Integrasi domain yang sudah berjalan memakai push/pull dengan signature, misalnya integrasi finance
+  yang spesifikasinya di `apps/core/contracts/terbit/integrasi-finance.yaml`.
 
-Jika custom feature diminta beberapa tenant dan domainnya umum, pindahkan ke core module/configuration product. Jika hanya masuk akal untuk satu customer, pertahankan sebagai private addon. Keputusan ini dicatat sebagai ADR bersama owner product dan engineering.
+Dua aturan berlaku untuk setiap integrasi:
 
-## Lihat juga
+- **Sistem luar menyimpan ID (ULID), bukan kode bisnis.** Kode boleh dipakai ulang setelah barisnya
+  diarsipkan, karena indeks unik kode bersifat parsial (`WHERE deleted_at IS NULL`, lihat
+  [penghapusan lunak](02-module-standard.md#penghapusan-lunak)). Integrasi yang menyimpan kode dapat
+  diam-diam menunjuk baris lain; ID tidak pernah dipakai ulang.
+- **Event untuk pihak luar sedikit dan stabil.** Event yang diterbitkan adalah janji jangka panjang;
+  nama dan aturan versinya ada di [API dan integrasi](04-api-and-integration.md). Kebutuhan internal
+  antar-module tidak perlu menjadi event yang diterbitkan.
 
-- [Standar module](02-module-standard.md) — batas app, addon app, dan extension
-- [API dan integration bridge](04-api-and-integration.md) — kontrak yang boleh dipakai addon
-- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — pendaftaran addon ke katalog
+### 4. Module khusus
+
+Module khusus adalah module biasa. Ia tinggal di `modules/`, memenuhi seluruh
+[standar module](02-module-standard.md), dan dipasang per tenant dengan `module:install` seperti module
+lain ([lifecycle app](02-module-standard.md#lifecycle-app)). Tiga hal membuatnya berbeda.
+
+**Ia ikut ke image yang sama dengan semua klien; yang menguncinya lisensi dari admin.erp.** Sejak 18
+September 2026 tidak ada lagi image per pelanggan (lihat `scripts/verify-edition.sh`). Akibatnya kode
+module khusus sampai ke server setiap klien on-prem, walaupun tidak terbuka di sana. Karena itu module
+khusus dinamai menurut kemampuannya, bukan menurut pelanggannya, dan tidak memuat nama, rahasia, atau
+data pelanggan mana pun. Aturan repo memang melarang nama perusahaan ditulis mati di kode.
+
+**Data tambahannya disimpan di tabelnya sendiri**, dengan kolom yang menunjuk ID milik module lain.
+Module tidak boleh menyentuh tabel module lain, termasuk menambah kolom ke sana. Business Central
+mengizinkan hal itu lewat `tableextension`; CoreERP sengaja tidak, karena batas tabel antar-module
+adalah satu-satunya yang membuat module dapat dicabut tanpa merusak module lain.
+
+**Titik sambung dibuat saat permintaan nyata pertama datang.** Kalau module khusus perlu ikut bereaksi
+saat module lain memposting sesuatu, atau perlu menambah field di layar module lain, titik sambungnya
+(event internal atau slot layar) ditambahkan ke module pemiliknya ketika kebutuhan itu benar-benar
+ada, bersama test-nya. Membuatnya lebih dulu berarti menebak bentuk yang belum pernah diminta siapa
+pun. Slot untuk menambah field di layar module lain saat ini belum ada.
+
+## Keputusan dicatat
+
+Setiap permintaan yang berakhir di urutan 2 atau 4 melewati
+[gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md). Proposalnya menyebut padanan
+Dynamics 365 bila ada, urutan yang dipilih, dan alasan urutan di atasnya tidak cukup. Module khusus
+yang kemudian diminta pelanggan kedua dipindahkan menjadi fitur produk, dan keputusan itu dicatat di
+proposal yang sama.
+
+## Pembanding: Business Central
+
+Business Central memecahkan masalah yang sama dengan bentuk yang mirip:
+
+- Kebutuhan satu pelanggan ditulis sebagai
+  [extension per tenant](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-extension-types-and-scope)
+  yang mengait event, sehingga kode dasarnya tidak pernah disunting dan update tetap berjalan untuk
+  semua pelanggan.
+- API untuk sistem luar adalah page tersendiri yang dikunci `SystemId`, bukan nomor bisnis, dan
+  berversi. Contohnya
+  [`APIV2Customers.Page.al`](https://github.com/microsoft/BCApps/blob/777e102e90a078b7256bf94b065ba50089abafa9/src/Apps/W1/APIV2/app/src/pages/APIV2Customers.Page.al).
+- Event di dalam prosesnya sangat banyak, sedangkan
+  [event bisnis](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/business-events-overview)
+  yang diterbitkan ke sistem luar hanya segelintir, misalnya pesanan penjualan dirilis atau faktur
+  pembelian diposting. Daftarnya ada di app
+  [`ExternalEvents`](https://github.com/microsoft/BCApps/tree/777e102e90a078b7256bf94b065ba50089abafa9/src/Apps/W1/ExternalEvents).
+- Power Apps dan Power Automate tersambung lewat API dan event bisnis tadi, sebagai produk terpisah.
+
+Yang tidak ditiru: menambah kolom atau field ke tabel dan layar milik app lain, dan menjalankan kode
+buatan pelanggan di dalam runtime.
+
+## Halaman terkait
+
+- [Standar module](02-module-standard.md) — batas tabel, lifecycle, dan jenis module
+- [API dan integrasi](04-api-and-integration.md) — kontrak dan event yang boleh dipakai pihak luar
+- [Visual workflow engine](21-visual-workflow-engine.md) — alur persetujuan sebagai setelan
+- [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — tempat keputusan dicatat
+- [API untuk integrator](/todo/api-untuk-integrator/) — rencana kredensial token untuk sistem pelanggan

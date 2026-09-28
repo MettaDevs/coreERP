@@ -688,14 +688,15 @@ aturan module di atas sudah berjalan di sana.
 
 ## Jenis app
 
-| Type | Pembuat | Contoh |
+| Jenis | Pembuat | Tempatnya |
 | --- | --- | --- |
-| Business app | Vendor | POS, Booking, Accounting |
-| Bridge app | Vendor/partner | POS-Booking Bridge |
-| Private addon app | Vendor/partner | Loyalty khusus customer |
-| Customer extension app | Customer melalui SDK dan approval | Connector mesin produksi |
+| Module bisnis | Vendor | `modules/`, dibuka lisensi tenant yang membelinya |
+| Module penghubung | Vendor | `modules/`, menyambung dua module tanpa menyentuh tabel milik keduanya |
+| Module khusus | Vendor atau partner | `modules/`, dilisensikan hanya ke tenant tertentu |
+| Integrasi pelanggan | Pelanggan atau partner | Di luar CoreERP, hanya lewat API dan event |
 
-Customer extension pada managed cloud tidak boleh mengunggah arbitrary container. Ia harus memakai publisher namespace, signed image, manifest tervalidasi, least-privilege permission, dan security review. Pada on-prem perpetual, customer dapat menjalankan sidecar sendiri tetapi hanya melalui API/event contract publik; tidak ada query langsung DB atau perubahan source Core. Support vendor berlaku sesuai batas kontrak, bukan melalui enrollment runtime wajib.
+Tidak ada jenis yang menjalankan kode buatan pelanggan di dalam runtime Core. Urutan memilih di antara
+keempatnya ada di [Kebutuhan khusus pelanggan tanpa fork](05-customization-and-addons.md).
 
 ## Lihat juga
 
@@ -703,5 +704,5 @@ Customer extension pada managed cloud tidak boleh mengunggah arbitrary container
 - [Rantai keamanan modul transaksi](19-transaction-security-chain.md) — empat lapis di atas diteruskan sampai ke user
 - [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
 - [API dan integration bridge](04-api-and-integration.md) — satu-satunya jalan komunikasi antar app
-- [Kustomisasi dan addon](05-customization-and-addons.md) — kebutuhan khusus customer tanpa fork
+- [Kebutuhan khusus pelanggan](05-customization-and-addons.md) — urutan jawaban tanpa fork
 - [Release dan on-prem](03-release-and-on-prem.md) — lifecycle install, upgrade, uninstall

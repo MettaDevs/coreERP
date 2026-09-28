@@ -94,7 +94,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | "Kolom scope apa yang harus saya pakai?" | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
 | "Perlu tidak fitur ini punya nomor?" | [Number sequence](/dev/14-number-sequences), [Gate penemuan](/dev/18-module-discovery-and-decision-gate) |
 | "Kenapa app saya tidak muncul sebagai terpasang?" | [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran) |
-| "Boleh tidak saya fork Core untuk kebutuhan customer?" | [Kustomisasi dan addon](/dev/05-customization-and-addons) — jawabannya tidak |
+| "Boleh tidak saya fork Core untuk kebutuhan customer?" | [Kebutuhan khusus pelanggan](/dev/05-customization-and-addons) — jawabannya tidak |
 | "Bagaimana app saya masuk katalog?" | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
 | "Saya harus bikin app baru atau menambah ke app yang ada?" | [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) |
 | "Saya ditugaskan ke app X, mulai dari mana?" | [Katalog app](/apps/) lalu hub app-nya |
