@@ -36,10 +36,11 @@ final class SumberLaporan
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $kebijakan,
         private readonly PelaksanaTenant $pelaksana,
+        private readonly ValueFormats $formats,
     ) {}
 
     /**
-     * @return array{fields: list<array{key: string, label: string, table: ?string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
      */
     public function definition(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): array
     {
@@ -62,18 +63,27 @@ final class SumberLaporan
         ), $legalEntityId, $orgUnitId);
     }
 
-    /** @param array<string, mixed> $parameters */
+    /**
+     * Dataset beserta format placeholder bertipenya.
+     *
+     * Formatnya dibaca dari definisi laporan yang sama, bukan dititipkan module di dalam
+     * dataset: tipe adalah bagian dari definisi, di samping label placeholder-nya, dan satu
+     * sumber berarti dataset dan definisi tidak dapat berselisih tentang kolom mana yang uang.
+     * Keduanya dibaca selagi tenant masih terikat, karena presisi uang adalah setelan tenant.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
     public function dataset(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $parameters): ReportData
     {
         $penyedia = $this->penyedia($report);
+        $kode = $this->kodeLokal($report, $penyedia);
 
-        $isi = $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->dataset(
-            $this->kodeLokal($report, $penyedia),
-            $konteks,
-            $parameters,
-        ), $legalEntityId, $orgUnitId);
+        [$isi, $formats] = $this->jalankan($report, $membership, fn (array $konteks): array => [
+            $penyedia->dataset($kode, $konteks, $parameters),
+            $this->formats->forFields((string) $konteks['tenant_id'], $penyedia->definisi($kode, $konteks)['fields']),
+        ], $legalEntityId, $orgUnitId);
 
-        return ReportData::fromArray($isi);
+        return ReportData::fromArray($isi, $formats);
     }
 
     private function penyedia(stdClass $report): PenyediaLaporanModul

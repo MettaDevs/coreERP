@@ -3,6 +3,7 @@
 namespace App\Support\Reporting\Rendering;
 
 use App\Support\Reporting\ReportData;
+use App\Support\Reporting\ValueFormat;
 use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Throwable;
@@ -18,6 +19,8 @@ use Throwable;
  *   dan dilaporkan sebagai kesalahan layout, bukan dicetak apa adanya.
  * - Placeholder yang tidak dikenal dikosongkan, bukan dibiarkan, supaya dokumen yang
  *   sampai ke vendor tidak pernah memuat `${...}`.
+ * - Nilai yang menyatakan tipenya (`money`, `date`, …) ditulis sebagai teks tampilnya,
+ *   lihat {@see ValueFormat}.
  */
 final class DocxTemplateRenderer
 {
@@ -37,7 +40,7 @@ final class DocxTemplateRenderer
                 continue;
             }
             $values = array_map(
-                fn (array $row): array => $this->rowValues($macros, $table, $row),
+                fn (array $row): array => $this->rowValues($macros, $table, $row, $data->formats),
                 $rows === [] ? [[]] : array_values($rows),
             );
             try {
@@ -63,7 +66,7 @@ final class DocxTemplateRenderer
             }
         }
         foreach ($data->fields as $key => $value) {
-            $template->setValue($key, $this->text($value));
+            $template->setValue($key, $this->text($value, $data->formats[$key] ?? null));
         }
         foreach ($template->getVariables() as $leftover) {
             $template->setValue($leftover, '');
@@ -78,21 +81,26 @@ final class DocxTemplateRenderer
     /**
      * @param  list<string>  $macros
      * @param  array<string, string|int|float|null>  $row
+     * @param  array<string, ValueFormat>  $formats
      * @return array<string, string>
      */
-    private function rowValues(array $macros, string $table, array $row): array
+    private function rowValues(array $macros, string $table, array $row, array $formats): array
     {
         $values = [];
         foreach ($macros as $macro) {
             $column = substr($macro, strlen($table) + 1);
-            $values[$macro] = $this->text($row[$column] ?? null);
+            $values[$macro] = $this->text($row[$column] ?? null, $formats[$macro] ?? null);
         }
 
         return $values;
     }
 
-    private function text(string|int|float|null $value): string
+    private function text(string|int|float|null $value, ?ValueFormat $format): string
     {
+        if ($format !== null) {
+            return $format->text($value);
+        }
+
         return $value === null ? '' : (string) $value;
     }
 
