@@ -35,7 +35,11 @@ final class SiteOperations
     /** @param  array<string, mixed>  $input */
     public function request(Request $request, Site $site, string $operation, array $input): SiteOperation
     {
-        if (! in_array($operation, SiteOperation::OPERATIONS, true)) {
+        if ($operation === 'install') {
+            throw new SiteRejected('operation_install_elsewhere', 'Pemasangan dibuat dari halaman lingkungan produksinya, lewat "Buat perintah pasang".');
+        }
+
+        if (! in_array($operation, SiteOperation::MANUAL_OPERATIONS, true)) {
             throw new SiteRejected('operation_unknown', 'Operasi tidak dikenal.');
         }
 
@@ -47,21 +51,18 @@ final class SiteOperations
             throw new SiteRejected('site_not_enrolled', 'Situs ini belum terdaftar; agen belum pernah menyambung.');
         }
 
-        if ($site->connectivity !== 'online') {
-            throw new SiteRejected(
-                'site_offline',
-                'Situs offline tidak menarik operasi. Pembaruannya dikirim sebagai bundle, dan lisensinya sebagai file.',
-            );
-        }
-
-        $parameters = match ($operation) {
-            'upgrade' => $this->upgradeParameters($site, $input),
-            'install_license' => $this->licenseParameters($site, $input),
-            default => [],
-        };
-
         try {
-            return DB::transaction(function () use ($request, $site, $operation, $parameters): SiteOperation {
+            return DB::transaction(function () use ($request, $site, $operation, $input): SiteOperation {
+                // Di dalam transaksi, karena menerbitkan lisensi menulis `sites.license_*` dan jejak
+                // auditnya sendiri. Permintaan yang kemudian ditolak indeks satu-permintaan-per-jenis
+                // tidak boleh meninggalkan catatan "lisensi diterbitkan" untuk lisensi yang tidak pernah
+                // diantar ke mana pun.
+                $parameters = match ($operation) {
+                    'upgrade' => $this->upgradeParameters($site, $input),
+                    'install_license' => $this->licenseParameters($request, $site, $input),
+                    default => [],
+                };
+
                 $created = SiteOperation::query()->create([
                     'site_id' => $site->id,
                     'operation' => $operation,
@@ -91,6 +92,30 @@ final class SiteOperations
         }
     }
 
+    /**
+     * Kolom yang ditulis setiap UPDATE massal yang menutup operasi.
+     *
+     * Satu tempat, karena penutupnya banyak — pembatalan, kedaluwarsa, tenggat habis, pencabutan situs,
+     * penghentian sewa, dan perintah pasang yang menggantikan pendahulunya — dan penutup yang lupa
+     * membuang hash kata sandi meninggalkannya selamanya di baris yang tidak lagi dibaca siapa pun.
+     * Operator `-` jsonb tidak mengubah apa pun pada parameter yang memang tidak membawanya, jadi
+     * ungkapan yang sama aman dipakai untuk setiap jenis operasi.
+     *
+     * @param  'cancelled'|'expired'|'failed'  $status
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public static function closingColumns(string $status, array $extra = []): array
+    {
+        return [
+            'status' => $status,
+            'finished_at' => now(),
+            'updated_at' => now(),
+            'parameters' => DB::raw("parameters - '".SiteOperation::PASSWORD_HASH_PARAMETER."'"),
+            ...$extra,
+        ];
+    }
+
     public function cancel(Request $request, Site $site, SiteOperation $operation): void
     {
         DB::transaction(function () use ($request, $site, $operation): void {
@@ -98,7 +123,7 @@ final class SiteOperations
                 ->whereKey($operation->id)
                 ->where('site_id', $site->id)
                 ->where('status', 'requested')
-                ->update(['status' => 'cancelled', 'finished_at' => now(), 'updated_at' => now()]);
+                ->update(self::closingColumns('cancelled'));
 
             if ($cancelled !== 1) {
                 throw new SiteRejected('operation_not_pending', 'Hanya operasi yang belum diambil agen yang dapat dibatalkan.');
@@ -120,18 +145,15 @@ final class SiteOperations
             ->where('site_id', $site->id)
             ->where('status', 'running')
             ->where('lease_until', '<', now())
-            ->update([
-                'status' => 'failed',
+            ->update(self::closingColumns('failed', [
                 'failure_message' => 'Tenggat habis: agen berhenti melapor sebelum operasi selesai. Periksa keadaan server sebelum meminta ulang.',
-                'finished_at' => now(),
-                'updated_at' => now(),
-            ]);
+            ]));
 
         SiteOperation::query()
             ->where('site_id', $site->id)
             ->where('status', 'requested')
             ->where('expires_at', '<', now())
-            ->update(['status' => 'expired', 'finished_at' => now(), 'updated_at' => now()]);
+            ->update(self::closingColumns('expired'));
     }
 
     /**
@@ -139,6 +161,12 @@ final class SiteOperations
      *
      * `upgrade` hanya diserahkan di dalam jendela pembaruan. Operasi lain kapan saja: cadangan,
      * lisensi, dan diagnosa tidak menyentuh aplikasi yang sedang melayani pasien.
+     *
+     * `install` juga kapan saja — pemasangan pertama belum menghentikan siapa pun, dan teknisi yang baru
+     * menempel perintah pasang sedang menunggu di lokasi — tetapi **hanya bila rilisnya sudah
+     * ditentukan**. Tanpa rilis agen tidak punya apa pun untuk dipasang; menyerahkannya berarti operasi
+     * yang pasti gagal, dan kegagalan itu menutup operasi beserta hash kata sandinya, sehingga rilis
+     * yang terdaftar sejam kemudian tidak lagi punya pemasangan yang menunggunya.
      */
     public function claim(Site $site, ?CarbonImmutable $now = null): ?SiteOperation
     {
@@ -166,9 +194,11 @@ final class SiteOperations
                 ->orderBy('requested_at')
                 ->get();
 
-            $next = $candidates->first(
-                fn (SiteOperation $operation): bool => $operation->operation !== 'upgrade' || $locked->withinUpdateWindow($now),
-            );
+            $next = $candidates->first(fn (SiteOperation $operation): bool => match ($operation->operation) {
+                'install' => is_string($operation->parameters['release'] ?? null) && $operation->parameters['release'] !== '',
+                'upgrade' => $locked->withinUpdateWindow($now),
+                default => true,
+            });
 
             if (! $next instanceof SiteOperation) {
                 return null;
@@ -206,6 +236,10 @@ final class SiteOperations
                 throw new SiteRejected('operation_not_held', 'Operasi ini tidak lagi dipegang agen ini.');
             }
 
+            // Hasil akhir membuang hash kata sandi dari parameternya, sama dengan setiap penutup lain —
+            // lihat `closingColumns()`.
+            $closedParameters = array_diff_key($operation->parameters, [SiteOperation::PASSWORD_HASH_PARAMETER => true]);
+
             $attributes = match ($status) {
                 'running' => [
                     'step' => $step,
@@ -214,6 +248,7 @@ final class SiteOperations
                 'succeeded' => [
                     'status' => 'succeeded',
                     'step' => $step,
+                    'parameters' => $closedParameters,
                     'finished_at' => now(),
                 ],
                 'failed' => [
@@ -222,6 +257,7 @@ final class SiteOperations
                     'failure_message' => $failureMessage !== null && trim($failureMessage) !== ''
                         ? $failureMessage
                         : 'Agen melaporkan gagal tanpa menyebut sebabnya.',
+                    'parameters' => $closedParameters,
                     'finished_at' => now(),
                 ],
                 default => throw new SiteRejected('step_status_invalid', 'Status langkah tidak dikenal.'),
@@ -263,17 +299,41 @@ final class SiteOperations
     }
 
     /**
+     * Tanggal kosong berarti masa bawaan penerbit (`sites.license_valid_days`). Tanggal yang diisi
+     * tetap diperiksa di sini.
+     *
      * @param  array<string, mixed>  $input
      * @return array{license: string, signature: string}
      */
-    private function licenseParameters(Site $site, array $input): array
+    private function licenseParameters(Request $request, Site $site, array $input): array
     {
-        $validUntil = is_string($input['valid_until'] ?? null) ? $input['valid_until'] : '';
+        $raw = $input['valid_until'] ?? null;
+        $validUntil = null;
 
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $validUntil) !== 1 || CarbonImmutable::createFromFormat('Y-m-d', $validUntil) === null) {
-            throw new SiteRejected('license_date_invalid', 'Tanggal berakhir lisensi harus berbentuk tahun-bulan-tanggal.');
+        if ($raw !== null && $raw !== '') {
+            $validUntil = is_string($raw) ? $raw : '';
+            $parsed = preg_match('/^\d{4}-\d{2}-\d{2}$/', $validUntil) === 1
+                ? CarbonImmutable::createFromFormat('!Y-m-d', $validUntil, $site->timezone)
+                : null;
+
+            // Dibandingkan bolak-balik: `2027-02-31` lolos pola dan diterima Carbon sebagai 3 Maret.
+            // Lisensi yang ditandatangani dengan tanggal yang tidak ada di kalender dibaca Core sebagai
+            // lisensi rusak — dan lisensi rusak mengunci.
+            if (! $parsed instanceof CarbonImmutable || $parsed->format('Y-m-d') !== $validUntil) {
+                throw new SiteRejected('license_date_invalid', 'Tanggal berakhir lisensi harus berbentuk tahun-bulan-tanggal.');
+            }
+
+            // Lisensi yang sudah habis saat diterbitkan mengunci klinik begitu terpasang. Menghentikan
+            // sewa punya tombolnya sendiri, dan tombol itu membiarkan lisensi yang berjalan habis.
+            if ($validUntil < CarbonImmutable::now($site->timezone)->toDateString()) {
+                throw new SiteRejected('license_date_past', 'Tanggal berakhir lisensi sudah lewat; lisensi itu akan langsung mengunci server klien.');
+            }
         }
 
-        return $this->licenses->issue($site, $validUntil);
+        try {
+            return $this->licenses->issueForOperator($request, $site, $validUntil);
+        } catch (EntitlementsUnavailable $e) {
+            throw new SiteRejected('entitlements_unavailable', 'Daftar app tenant tidak terbaca dari Core, jadi lisensi tidak diterbitkan. '.$e->getMessage());
+        }
     }
 }

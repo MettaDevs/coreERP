@@ -8,8 +8,11 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link } from '@inertiajs/react';
-import { KindBadge, StatusBadge } from '@/components/badges';
+import { Cloud, Server } from 'lucide-react';
+import { InstallStateBadge, KindBadge, StatusBadge } from '@/components/badges';
 import Shell from '@/components/shell';
+import { progressDetail } from '@/lib/install-progress';
+import type { InstallProgress } from '@/lib/install-progress';
 import CreateDialog from '@/pages/environments/create-dialog';
 
 type Row = {
@@ -18,11 +21,17 @@ type Row = {
     slug: string;
     kind: string;
     status: string;
+    hosting: string;
     outboundAllowed: boolean;
     database: string;
     url: string | null;
     expiresAt: string | null;
     tenant: string;
+    serverClient: InstallProgress | null;
+    site: {
+        id: string;
+        serverAddress: string | null;
+    } | null;
 };
 
 export default function Index({
@@ -49,6 +58,7 @@ export default function Index({
                             <TableHead>Nama</TableHead>
                             <TableHead>Tenant</TableHead>
                             <TableHead>Jenis</TableHead>
+                            <TableHead>Berjalan di</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Alamat</TableHead>
                             <TableHead>Berakhir</TableHead>
@@ -59,7 +69,7 @@ export default function Index({
                         {environments.length === 0 && (
                             <TableRow>
                                 <TableCell
-                                    colSpan={7}
+                                    colSpan={8}
                                     className="py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Belum ada lingkungan yang tercatat.
@@ -79,14 +89,58 @@ export default function Index({
                                     <KindBadge kind={row.kind} />
                                 </TableCell>
                                 <TableCell>
-                                    <StatusBadge status={row.status} />
+                                    {row.hosting === 'client_server' ? (
+                                        <span className="inline-flex items-start gap-1.5 text-sm">
+                                            <Server className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                                            <span>
+                                                Server klien
+                                                {row.site?.serverAddress && (
+                                                    <span className="block font-mono text-xs text-muted-foreground">
+                                                        {row.site.serverAddress}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-sm">
+                                            <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
+                                            Server kita
+                                        </span>
+                                    )}
+                                </TableCell>
+                                {/*
+                                    Produksi di server klien tidak pernah disiapkan di sini, jadi status
+                                    registry-nya menetap "Sedang disiapkan" selamanya — kata yang benar
+                                    secara teknis dan salah bagi pembacanya. Yang ditampilkan untuknya
+                                    keadaan pemasangan, dihitung `InstallProgress`.
+                                */}
+                                <TableCell>
+                                    {row.serverClient ? (
+                                        <div className="space-y-1">
+                                            <InstallStateBadge
+                                                state={row.serverClient.state}
+                                            />
+                                            {progressDetail(
+                                                row.serverClient,
+                                            ) && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {progressDetail(
+                                                        row.serverClient,
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <StatusBadge status={row.status} />
+                                    )}
                                 </TableCell>
                                 {/*
                                     Alamat menggantikan nama database di kolom ini.
 
                                     Keduanya sama-sama teknis, tetapi cuma satu yang perlu dikirim
                                     ke pelanggan — dan nama database tetap terbaca di halaman
-                                    rincian bagi yang memang mencarinya.
+                                    rincian bagi yang memang mencarinya. Produksi di server klien
+                                    memakai bentuk yang sama; record DNS-nya dibuat admin.erp.
                                 */}
                                 <TableCell className="max-w-[22rem] font-mono text-xs break-all">
                                     {row.url ? (

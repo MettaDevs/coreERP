@@ -3,8 +3,10 @@
 namespace App\Actions\Access;
 
 use App\Models\Role;
-use App\Models\SecurityDuty;
 use App\Models\TenantMembership;
+use App\Support\Access\AccessGuards;
+use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Access\TenantProducts;
 use App\Support\RoleHierarchy;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -17,23 +19,15 @@ class UpsertRole
     /** @param array{name:string,duty_codes:list<string>,child_role_ids?:list<string>} $data */
     public function handle(TenantMembership $actor, array $data, ?Role $role = null): Role
     {
-        if (! $actor->canManageAccess() || ($role && $role->tenant_id !== $actor->tenant_id)) {
+        if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || ($role && $role->tenant_id !== $actor->tenant_id)) {
             throw new AuthorizationException;
         }
-        $entitledAppIds = DB::table('tenant_app_entitlements')
-            ->where('tenant_id', $actor->tenant_id)
-            ->where('status', 'active')
-            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
-            ->pluck('app_id');
-        $validDuties = SecurityDuty::query()
-            ->where(function ($query) use ($actor, $entitledAppIds): void {
-                $query->whereIn('app_id', $entitledAppIds)
-                    ->orWhere(function ($query) use ($actor): void {
-                        $query->where('tenant_id', $actor->tenant_id)
-                            ->where('source', 'custom')
-                            ->where('status', 'active');
-                    });
-            })
+        // Role Owner memegang semua duty yang sah secara otomatis (`OwnerRoleDuties`); menyuntingnya tidak mengubah
+        // apa pun selain membingungkan jejaknya.
+        if ($role?->is_owner) {
+            throw ValidationException::withMessages(['name' => 'Role Owner diatur otomatis dan selalu memegang semua duty, jadi tidak dapat diubah.']);
+        }
+        $validDuties = TenantProducts::duties($actor->tenant_id)
             ->whereIn('code', $data['duty_codes'])
             ->pluck('code');
 
@@ -50,6 +44,11 @@ class UpsertRole
 
             if ($ownedChildren->count() !== count($childRoleIds)) {
                 throw ValidationException::withMessages(['child_role_ids' => 'Role turunan harus berasal dari tenant yang sama.']);
+            }
+            // Role induk mewarisi semua duty turunannya. Owner sebagai turunan akan membuat role mana pun setara
+            // Owner, dan role itu dapat diberikan tanpa melewati penjaga Owner (`AccessGuards`).
+            if (Role::query()->whereIn('id', $childRoleIds)->where('is_owner', true)->exists()) {
+                throw ValidationException::withMessages(['child_role_ids' => 'Role Owner tidak dapat dijadikan turunan role lain.']);
             }
         }
 
@@ -70,6 +69,8 @@ class UpsertRole
             $role->children()->sync(
                 collect($childRoleIds)->mapWithKeys(fn (string $id): array => [$id => ['tenant_id' => $actor->tenant_id]])->all(),
             );
+
+            AccessGuards::assertNotLockedOut($actor->tenant_id);
 
             return $role->load('duties', 'children');
         });

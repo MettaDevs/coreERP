@@ -23,10 +23,13 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { api, errorMessage } from '../../api';
+import { DepreciationPostingSheet } from './DepreciationPostingSheet';
+import type { BukuPost } from './DepreciationPostingSheet';
+import type { Context } from './penerimaan';
 
 type Book = {
     id: string;
-    asset_code: string;
+    aset_code: string;
     book_code: string;
     profile_name: string;
     method: string;
@@ -36,7 +39,7 @@ type Book = {
 };
 type Period = {
     id: string;
-    asset_code: string;
+    aset_code: string;
     book_code: string;
     period_starts_on: string;
     period_ends_on: string;
@@ -44,16 +47,62 @@ type Period = {
     status: string;
     currency_code: string;
     reverses_period_id: string | null;
+    buku_id: string | null;
+    /** Lapisan posting bukunya; `none` berarti buku itu tidak pernah mengirim ke aplikasi finance. */
+    posting_layer: string | null;
+    /** Posting finance yang membawa periode ini; kosong berarti belum di-post. */
+    posted_posting_id: string | null;
 };
+
+/**
+ * Buku yang dapat di-post dari periode yang tampil, dan tanggal akhir periode final terbaru yang
+ * belum di-post sebagai isian awal "Post penyusutan". Buku berlapisan `none` dilewati: menawarkannya
+ * hanya berujung pada penolakan, dan periodenya yang tidak pernah di-post akan menyesatkan tanggal awal.
+ */
+function pilihanPost(periods: Period[]): { books: BukuPost[]; akhir: string } {
+    const books = new Map<string, BukuPost>();
+    let akhir = '';
+
+    for (const period of periods) {
+        if (!period.buku_id || period.posting_layer === 'none') {
+            continue;
+        }
+
+        if (!books.has(period.buku_id)) {
+            books.set(period.buku_id, {
+                id: period.buku_id,
+                kode: period.book_code,
+            });
+        }
+
+        if (
+            period.status === 'final' &&
+            !period.reverses_period_id &&
+            !period.posted_posting_id &&
+            period.period_ends_on > akhir
+        ) {
+            akhir = period.period_ends_on;
+        }
+    }
+
+    return {
+        books: [...books.values()].sort((a, b) => a.kode.localeCompare(b.kode)),
+        akhir,
+    };
+}
 
 export default function DepreciationPage({
     canCreate,
     canFinalize,
     canCorrect,
+    canPost,
+    context,
 }: {
     canCreate: boolean;
     canFinalize: boolean;
     canCorrect: boolean;
+    canPost: boolean;
+    context: Context;
 }) {
     const [books, setBooks] = useState<Book[]>([]);
     const [periods, setPeriods] = useState<Period[]>([]);
@@ -61,6 +110,7 @@ export default function DepreciationPage({
     const [selected, setSelected] = useState<Book | null>(null);
     const [bulkOpen, setBulkOpen] = useState(false);
     const [bulkResult, setBulkResult] = useState('');
+    const [postOpen, setPostOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     // Effect adalah satu-satunya pemilik pengambilan data. Pemuatan ulang setelah
     // proposal, finalisasi, atau koreksi dinyatakan dengan menaikkan penanda ini.
@@ -104,6 +154,7 @@ export default function DepreciationPage({
         };
     }, [versiMuat]);
     const muatUlang = () => setVersiMuat((versi) => versi + 1);
+    const opsiPost = pilihanPost(periods);
     const propose = async (form: HTMLFormElement) => {
         if (!selected) {
             return;
@@ -116,7 +167,7 @@ export default function DepreciationPage({
             await api('/penyusutan/proposal', {
                 method: 'POST',
                 body: JSON.stringify({
-                    asset_book_id: selected.id,
+                    buku_aset_id: selected.id,
                     period_starts_on: data.get('period_starts_on'),
                     period_ends_on: data.get('period_ends_on'),
                     consumption_amount: data.get('consumption_amount') || null,
@@ -168,7 +219,7 @@ export default function DepreciationPage({
     const finalize = async (period: Period) => {
         if (
             !window.confirm(
-                `Finalisasi penyusutan ${period.asset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
+                `Finalisasi penyusutan ${period.aset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
             )
         ) {
             return;
@@ -207,7 +258,7 @@ export default function DepreciationPage({
         <div className="space-y-4">
             <Card className="rounded-none border-x-0 shadow-none">
                 <CardHeader className="border-b px-5 py-3">
-                    <CardTitle>Asset Book aktif</CardTitle>
+                    <CardTitle>Aset Book aktif</CardTitle>
                     <CardAction>
                         {canCreate && (
                             <Button
@@ -235,7 +286,7 @@ export default function DepreciationPage({
                         <Empty>
                             <EmptyHeader>
                                 <EmptyTitle>
-                                    Belum ada Asset Book aktif
+                                    Belum ada Aset Book aktif
                                 </EmptyTitle>
                                 <EmptyDescription>
                                     Terima aset dengan profil penyusutan agar
@@ -252,7 +303,7 @@ export default function DepreciationPage({
                                 >
                                     <div>
                                         <p className="font-medium">
-                                            {book.asset_code} · {book.book_code}
+                                            {book.aset_code} · {book.book_code}
                                         </p>
                                         <p className="text-muted-foreground text-sm">
                                             {book.profile_name} · {book.method}{' '}
@@ -285,6 +336,17 @@ export default function DepreciationPage({
             <Card className="rounded-none border-x-0 shadow-none">
                 <CardHeader className="border-b px-5 py-3">
                     <CardTitle>Periode penyusutan</CardTitle>
+                    <CardAction>
+                        {canPost && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setPostOpen(true)}
+                                disabled={!opsiPost.books.length}
+                            >
+                                Post penyusutan
+                            </Button>
+                        )}
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="px-0">
                     {!periods.length ? (
@@ -294,8 +356,8 @@ export default function DepreciationPage({
                                     Belum ada proposal penyusutan
                                 </EmptyTitle>
                                 <EmptyDescription>
-                                    Buat proposal dari Asset Book setelah
-                                    periode siap dihitung.
+                                    Buat proposal dari Aset Book setelah periode
+                                    siap dihitung.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -308,13 +370,15 @@ export default function DepreciationPage({
                                 >
                                     <div>
                                         <p className="font-medium">
-                                            {period.asset_code} ·{' '}
+                                            {period.aset_code} ·{' '}
                                             {period.book_code}
                                         </p>
                                         <p className="text-muted-foreground text-sm">
                                             {period.period_starts_on} s.d.{' '}
                                             {period.period_ends_on} ·{' '}
                                             {period.status}
+                                            {period.posted_posting_id &&
+                                                ' · sudah di-post'}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -353,6 +417,15 @@ export default function DepreciationPage({
                     )}
                 </CardContent>
             </Card>
+            {postOpen && (
+                <DepreciationPostingSheet
+                    context={context}
+                    books={opsiPost.books}
+                    defaultPeriodEnd={opsiPost.akhir}
+                    onClose={() => setPostOpen(false)}
+                    onPosted={muatUlang}
+                />
+            )}
             {bulkOpen && (
                 <Sheet
                     open
@@ -423,7 +496,7 @@ export default function DepreciationPage({
                             }}
                         >
                             <p className="text-muted-foreground text-sm">
-                                {selected.asset_code} · {selected.book_code} ·{' '}
+                                {selected.aset_code} · {selected.book_code} ·{' '}
                                 {selected.profile_name}
                             </p>
                             <Field>

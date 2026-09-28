@@ -37,7 +37,7 @@ export default function PabrikanModels({
     canCreate,
     canUpdate,
     canArchive,
-    canReadAssets,
+    canReadAset,
     onChanged,
 }: {
     manufacturer: MasterRecord;
@@ -46,7 +46,7 @@ export default function PabrikanModels({
     canCreate: boolean;
     canUpdate: boolean;
     canArchive: boolean;
-    canReadAssets: boolean;
+    canReadAset: boolean;
     onChanged: () => void;
 }) {
     const [items, setItems] = useState<PabrikanModelRecord[]>([]);
@@ -183,7 +183,7 @@ export default function PabrikanModels({
             width: 260,
         },
         {
-            id: 'asset-type',
+            id: 'aset-type',
             header: 'Jenis aset',
             cell: (item) => (
                 <span className="text-muted-foreground">
@@ -193,9 +193,9 @@ export default function PabrikanModels({
             width: 220,
         },
         {
-            id: 'assets',
+            id: 'aset',
             header: 'Aset',
-            cell: (item) => (canReadAssets ? (item.asset_count ?? '–') : '–'),
+            cell: (item) => (canReadAset ? (item.aset_count ?? '–') : '–'),
             width: 90,
         },
     ];

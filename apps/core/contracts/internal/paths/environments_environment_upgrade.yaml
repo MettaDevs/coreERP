@@ -1,0 +1,60 @@
+post:
+  tags: [Pusat admin]
+  operationId: internal.environments.upgrade
+  summary: Antrekan pembaruan untuk satu lingkungan
+  description: |
+    Sama dengan `POST /environments/upgrade`, dibatasi ke satu baris. Lingkungan yang statusnya
+    tidak boleh diperbarui — sedang disiapkan, sedang disalin, sudah diarsipkan — dilewati
+    tanpa job, dan `queued_count` nol yang menyebutnya.
+
+    Lingkungan yang berjalan di server klien tidak dilewati diam-diam melainkan ditolak 409:
+    ia disebut dengan id-nya, dan jawaban kosong akan terbaca seperti pembaruan yang tidak
+    perlu.
+  security:
+    - controlPlaneToken: []
+  parameters:
+    - name: environment
+      in: path
+      required: true
+      schema: { type: string, format: ulid }
+      description: Id baris `environments` yang diperbarui.
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            force: { type: boolean }
+            requested_by: { type: integer }
+  responses:
+    '202':
+      description: Job sudah diantrekan, atau tidak ada yang perlu dikerjakan.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [queued, queued_count]
+            properties:
+              queued:
+                type: array
+                items: { type: string, format: ulid }
+              queued_count: { type: integer }
+    '401':
+      description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '404':
+      description: Lingkungan itu tidak ada di registry, atau sudah diarsipkan.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '409':
+      description: |
+        Lingkungan itu berjalan di server klien. Pembaruannya dikerjakan agen di server itu,
+        bukan rilis server ini.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '429': { $ref: '#/components/responses/RateLimited' }

@@ -209,6 +209,40 @@ class CoreCommandContractTest extends TestCase
         }
     }
 
+    /** Pemanggil kelima: daftar app yang dibeli, dibaca penerbit lisensi. */
+    public function test_the_entitlements_address_is_in_the_contract(): void
+    {
+        $this->assertContains(
+            '/tenants/{tenant}/entitlements',
+            $this->contract['paths'],
+            'Kontrak Core tidak memuat rute daftar app tenant. Perpanjangan lisensi memanggil alamat yang '
+            .'tidak dijanjikan siapa pun, dan setiap lisensi berhenti diperpanjang tanpa satu test pun merah.'
+        );
+
+        $source = (string) file_get_contents(__DIR__.'/../../app/Sites/EntitlementsFromCore.php');
+
+        $this->assertStringContainsString(
+            "'/api/internal/v1/tenants/'",
+            $source,
+            'EntitlementsFromCore tidak lagi menyusun alamat di bawah /api/internal/v1/tenants/.'
+        );
+    }
+
+    /** Diulang dengan alasan yang sama dengan pemanggil di atas — cacat per pemanggil. */
+    public function test_the_entitlements_caller_also_uses_bearer(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../app/Sites/EntitlementsFromCore.php');
+
+        $this->assertStringContainsString(
+            'Http::withToken(',
+            $source,
+            'Kontrak menuntut token dikirim sebagai `Authorization: Bearer`, tetapi EntitlementsFromCore '
+            .'tidak memakai `Http::withToken()`.'
+        );
+
+        $this->assertStringNotContainsString('X-Control-Plane-Token', $source);
+    }
+
     /**
      * Mengantrekan bukan mengerjakan, dan tenggatnya harus menyebutkan yang mana.
      *

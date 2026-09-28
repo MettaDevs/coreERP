@@ -45,6 +45,19 @@ Test it by reading the sentence aloud to someone who does not speak English. If 
 
 Technical terms that name a thing stay as they are: `tenant_id`, endpoint, permission, idempotency, deploy, release, event, scope. Translating them makes the text harder to search against the code, not easier.
 
+The same holds for protocol and integration vocabulary, and it holds on screens, in validation messages, and in `contracts/` as much as in `docs/`. The owner's rule: GET stays GET, POST stays POST, PUT stays PUT.
+
+| Wrong | Write instead |
+| --- | --- |
+| "Mode Dorong", "Mode Tarik", "tarikan berikutnya" | push, pull, "pull berikutnya" |
+| "cakupan `vendors.read`" | scope `vendors.read` |
+| "awalan jenis posting" | prefix jenis posting |
+| "rahasia penanda tangan", "tanda tangan HMAC" | signing secret, signature HMAC |
+| "badan mentah", "stempel waktu", "kursor", "batas laju" | raw body, timestamp, cursor, rate limit |
+| "mengakui posting" | mengirim ack |
+
+The sentence around the term stays Indonesian: "Kirim ack setelah posting dibukukan", not a whole sentence switched to English. A business screen may still describe an effect in plain words instead of naming the mechanism — "Posting ini belum pernah sampai ke aplikasi finance" needs neither "pull" nor "tarik".
+
 What gets replaced is the word with **no technical reason** that already has a plain equivalent — "artefak" becomes "berkas", "krusial" becomes an explanation of why it matters. And no architecture term reaches a business user's screen; the forbidden list is in `docs/onboarding/glosarium.md`.
 
 ## Coverage is verified mechanically, never by feeling finished

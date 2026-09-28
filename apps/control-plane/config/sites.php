@@ -26,20 +26,45 @@ return [
     'release_token' => env('CONSOLE_RELEASE_TOKEN'),
 
     /*
-     * Pasangan kunci lisensi. Berbeda dari kunci rilis, kunci privat lisensi memang tinggal di sini:
-     * lisensi palsu hanya menyembunyikan peringatan di layar klien, tidak membuka apa pun, jadi ia
-     * tidak layak dijaga seketat kunci rilis.
+     * Pasangan kunci lisensi. Berbeda dari kunci rilis, kunci privat lisensi memang harus tinggal di
+     * sini: perpanjangan otomatis menandatangani lisensi di dalam jawaban laporan agen, tanpa manusia
+     * yang dapat diminta membawa kunci dari tempat lain.
+     *
+     * Sejak lisensi mengunci (`docs/todo/lisensi-mengunci`), kunci ini yang memutuskan app mana yang
+     * boleh dibuka di server klien. Konsol yang dibobol dapat menerbitkan lisensi untuk app yang tidak
+     * dibeli — jadi berkasnya dijaga seperti rahasia produksi lain, bukan seperti setelan tampilan.
      */
     'license_private_key_path' => env('CONSOLE_LICENSE_PRIVATE_KEY_PATH'),
     'license_public_key_path' => env('CONSOLE_LICENSE_PUBLIC_KEY_PATH'),
 
     /*
-     * Dari commit mana skrip pasang dan kunci publik rilis diambil. Keduanya diambil dari repo di
-     * GitHub, bukan dari konsol ini: kunci pemverifikasi yang diantar oleh pihak yang juga mengantar
-     * perintahnya tidak memverifikasi apa pun terhadap pihak itu.
+     * Masa berlaku lisensi yang diterbitkan tanpa tanggal dari operator.
+     *
+     * Tiga puluh hari, bukan setahun: sewa yang berhenti harus mengunci aplikasi dalam hitungan
+     * minggu. Ongkosnya ditanggung server yang tidak dapat menghubungi admin.erp selama tiga minggu
+     * lebih — ia ikut terkunci.
      */
-    'agent_source' => env('CONSOLE_AGENT_SOURCE', 'https://raw.githubusercontent.com/MettaDevs/coreERP'),
-    'agent_source_ref' => env('CONSOLE_AGENT_SOURCE_REF', 'main'),
+    'license_valid_days' => 30,
+
+    /*
+     * Lisensi baru disertakan di jawaban laporan begitu sisa masa lisensi terpasang sebanyak ini atau
+     * kurang.
+     *
+     * Sepuluh, bukan tujuh: peringatan di Core tampil tujuh hari sebelum habis. Perpanjangan yang
+     * mulai lebih awal dari peringatan itu selesai sebelum pengguna klinik pernah melihatnya, dan
+     * gangguan jaringan selama tiga hari pertama belum terlihat oleh siapa pun di klinik.
+     */
+    'license_renew_before_days' => 10,
+
+    /*
+     * Jeda terpendek antara dua penerbitan untuk situs yang sama, dan jeda sebelum mencoba lagi
+     * sesudah penerbitan gagal.
+     *
+     * Agen melapor setiap menit, dan laporan sesudah lisensi dikirim masih membawa tanggal lama bila
+     * agen gagal memasangnya. Tanpa jeda, setiap laporan itu melahirkan lisensi baru dan satu baris
+     * audit baru; dengan Core yang mati, setiap laporan menjadi satu panggilan yang pasti gagal.
+     */
+    'license_renew_cooldown_minutes' => 60,
 
     'interval_seconds' => 60,
 
@@ -52,15 +77,48 @@ return [
     /* Permintaan yang tidak pernah diambil agen berhenti menunggu sesudah ini. */
     'request_expiry_days' => 7,
 
-    /*
-     * Umur token pendaftaran. Online cukup satu jam: perintahnya dijalankan saat itu juga. Offline
-     * tiga puluh hari, karena paketnya dibawa dengan flashdisk ke lokasi klien.
-     */
-    'enrollment_token_minutes' => [
-        'online' => 60,
-        'offline' => 60 * 24 * 30,
-    ],
+    /* Umur token pendaftaran. Satu jam cukup: perintah pasangnya dijalankan saat itu juga. */
+    'enrollment_token_minutes' => 60,
 
-    /* Situs online yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
+    /* Situs yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
     'stale_after_seconds' => 180,
+
+    /*
+     * Akar susunan repo tempat berkas pemasang dibaca (`deploy/agent`, `scripts/update.sh`).
+     *
+     * Di laptop pengembang dan di image konsol keduanya dua tingkat di atas aplikasi ini — Dockerfile
+     * menirukan susunan itu. Setelan ini ada hanya supaya test dapat menunjuk salinan berkas tiruan;
+     * sengaja tanpa env, karena tidak ada alasan produksi untuk menyajikan berkas dari tempat lain.
+     */
+    'installer_source_root' => base_path('../..'),
+
+    /*
+     * Registry image Harbor (`docs/todo/registry-harbor`, `deploy/registry`).
+     *
+     * Dua alamat untuk satu registry, dan keduanya disengaja:
+     *
+     * - `registry_host` adalah nama yang diberikan kepada agen di server klien. Ia tidak pernah tersimpan di
+     *   server klien — datang lagi di setiap operasi — jadi registry dapat pindah tanpa menyentuh klien.
+     * - `registry_api_url` adalah jalan konsol ini ke API Harbor lewat jaringan Docker internal. Jalur admin
+     *   Harbor di internet dapat dibatasi daftar IP, dan panggilan konsol tidak perlu keluar mesin.
+     *
+     * Rahasia robot sistem tidak di sini melainkan di `console_settings`, terenkripsi, lewat
+     * `php artisan registry:robot-sistem` — lihat `ControlPlane\Registry\RegistrySettings`.
+     */
+    'registry_host' => env('CONSOLE_REGISTRY_HOST', 'registry.erp.grenery.xyz'),
+    'registry_api_url' => env('CONSOLE_REGISTRY_API_URL', 'http://harbor-registry-proxy:8080'),
+    'registry_project' => 'coreerp',
+
+    /*
+     * Umur robot situs dalam hari, satuan terkecil yang diterima Harbor. Batas atasnya saja: robot dihapus
+     * begitu operasinya ditutup, dan umur ini hanya penjaga bila penghapusan itu tidak pernah berhasil.
+     */
+    'registry_robot_days' => 1,
+
+    /*
+     * API Cloudflare untuk record DNS alamat server klien (`ControlPlane\Sites\SiteDns`). Tokennya tidak di
+     * sini melainkan di `console_settings`, terenkripsi, lewat `php artisan dns:token-cloudflare`. Alamat ini
+     * dapat diganti hanya supaya test menunjuk tiruan, bukan untuk dipindah ke penyedia lain.
+     */
+    'cloudflare_api_url' => env('CONSOLE_CLOUDFLARE_API_URL', 'https://api.cloudflare.com/client/v4'),
 ];

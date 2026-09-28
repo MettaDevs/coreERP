@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -41,7 +42,7 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
-        $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner']);
+        $this->assertTrue(TenantMembership::query()->where('status', 'active')->whereHas('roleAssignments.role', fn ($query) => $query->where('is_owner', true))->exists());
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
         $this->assertDatabaseCount('environments', 1);
         $this->assertDatabaseHas('environments', [

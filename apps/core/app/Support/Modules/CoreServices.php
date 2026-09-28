@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DaftarSatuanCore;
+use App\Services\Modules\DaftarVendorCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
 use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
+use App\Services\Modules\PenerbitPostingCore;
+use App\Services\Modules\PresisiMataUangCore;
+use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\Finance\PostingAccountResolverRegistry;
+use App\Support\Modules\Contracts\DaftarAkun;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Support\Modules\Contracts\DaftarVendor;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\KonteksPermintaan;
@@ -19,6 +27,10 @@ use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Support\Modules\Contracts\PenerbitPosting;
+use App\Support\Modules\Contracts\PostingAccountResolvers;
+use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Contracts\Foundation\Application;
 
@@ -54,6 +66,20 @@ final class CoreServices
         // Tanpa ini module harus menyebut kelas Core yang menyimpan tenant aktif, dan
         // batas yang berbunyi satu kalimat langsung runtuh.
         PelaksanaUntukTenant::class => PelaksanaTenant::class,
+        // Feed posting finance: module yang menyusun jurnal membaca kebijakan penyelesaian
+        // dan cutover entitas legal, dan membulatkan nilai dengan presisi yang sama dengan
+        // yang dipakai penerbit posting.
+        SetelanPostingFinance::class => SetelanPostingFinanceCore::class,
+        PresisiMataUang::class => PresisiMataUangCore::class,
+        // Feed posting finance: akun milik aplikasi finance pelanggan, dipilih di pemetaan
+        // posting module dan dibaca ulang setiap kali posting terbit.
+        DaftarAkun::class => DaftarAkunCore::class,
+        // Vendor milik Core (party berperan vendor per entitas legal), dipilih di dokumen
+        // penerimaan module dan disalin nomor serta namanya ke posting saat terbit.
+        DaftarVendor::class => DaftarVendorCore::class,
+        // Feed posting finance: module menerbitkan jurnalnya di dalam transaksi dokumen sumbernya,
+        // dan memakai pratinjau yang sama untuk menampilkan masalah sebelum konfirmasi.
+        PenerbitPosting::class => PenerbitPostingCore::class,
     ];
 
     /**
@@ -72,6 +98,10 @@ final class CoreServices
      */
     public const PEMETAAN_TUNGGAL = [
         DaftarLaporan::class => DaftarLaporanModul::class,
+        // Feed posting finance: posting yang dibentuk ulang membaca akunnya dari pemetaan module
+        // yang berlaku sekarang, supaya Validasi ulang dapat melepas posting yang tertahan karena
+        // pemetaannya dulu kosong.
+        PostingAccountResolvers::class => PostingAccountResolverRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void

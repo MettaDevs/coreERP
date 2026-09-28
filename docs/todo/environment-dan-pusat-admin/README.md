@@ -64,7 +64,7 @@ Kata **demo** tidak muncul satu kali pun di seluruh `docs/`. Halaman ini yang pe
 | Registry module dari berkas, tanpa daftar yang ditulis tangan | Ada | `App\Support\Modules\ModuleRegistry` |
 | Scope tenant yang gagal tertutup pada baca **dan** tulis | Ada | `TenantScope`, `MilikTenant` |
 | Konteks aktif per permintaan, dimemoisasi | Ada | `CurrentWorkspace`, `ResolveModuleContext` |
-| Menghitung modul sebuah edisi | Ada | `php artisan edition:resolve` |
+| Menghitung modul yang ikut ke dalam image | Ada | `php artisan edition:modules` |
 | Membuktikan modul yang tidak dibeli tidak ada di image | Ada, dijaga CI | `scripts/verify-edition.sh` |
 | Bundle on-prem beserta pemasangan dan jalur mundurnya | Ada, sudah dijalankan | [bundle on-prem](../bundle-on-prem/README.md) |
 | Identitas operator vendor | Ada, tetapi hanya dua izin | tabel `provider_access` |
@@ -258,10 +258,14 @@ tidak boleh dirancang dengan asumsi hanya ada kata sandi, dan **domain harus sud
 tenant sebelum orangnya mengetik apa pun** — karena itulah yang memungkinkan mengarahkan orang ke
 penyedia identitas yang benar.
 
-::: warning SSO belum ada di repo ini
-Nol Socialite, nol SAML, nol OIDC. Yang terpasang Fortify + passkey/WebAuthn — *passwordless*,
-bukan *single sign-on*. Pemilik produk menyatakan bentuknya sudah berdiri di server dan akan dibawa
-masuk kelak; sampai itu terjadi, **tidak ada satu baris pun di repo yang boleh berasumsi ia ada**.
+::: warning Bagian ini sudah usang
+Kalimat di atas ditulis sebelum SSO dibangun. **SSO OIDC sudah ada di repo ini sejak 13 September
+2026**, untuk pengguna tenant maupun untuk operator admin.erp, beserta undangan yang terikat subjek
+penyedia. Keadaan sekarang ada di [SSO](/dev/32-sso) dan
+[Identity dan access](/dev/09-identity-and-access#kapan-sebuah-tenant-memakai-sso).
+
+Yang masih benar dari rencana di atas: mode "penyedia milik pelanggan" baru berupa skema — tabelnya
+berdiri, integrasinya belum, dan pengarahan berdasarkan domain email belum dibaca kode mana pun.
 :::
 
 ### Operator vendor boleh masuk, tanpa jejak — untuk sekarang

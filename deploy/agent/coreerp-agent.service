@@ -13,7 +13,8 @@ After=network-online.target docker.service
 Type=oneshot
 ExecStart=/opt/coreerp/bin/coreerp-agent run
 # Setelan server yang tidak dibawa rilis, misalnya COREERP_FOLDER_CADANGAN ke disk kedua. Berkasnya
-# boleh tidak ada; tanda minus membuat ketiadaannya bukan kegagalan.
+# boleh tidak ada; tanda minus membuat ketiadaannya bukan kegagalan. Agen membaca berkas yang sama sendiri,
+# supaya perintah yang dijalankan tangan memakai setelan yang sama; aturan isinya ditulis di sana.
 EnvironmentFile=-/opt/coreerp/agent/agent.env
 Environment=COREERP_HOME=/opt/coreerp
 

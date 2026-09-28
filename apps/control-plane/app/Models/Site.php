@@ -14,17 +14,30 @@ use Illuminate\Support\Carbon;
 /**
  * Satu server milik klien yang dikelola dari konsol ini — tabel `sites` milik Core.
  *
- * Layarnya berbunyi "Situs". Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
- * pembaruan berpasangan, konektivitas dan profil yang dikenal — ditegakkan CHECK constraint di
- * migration `create_site_registry_tables`, bukan di kelas ini.
+ * Kelasnya `Site` dan alamatnya `/situs`, tetapi layarnya berbunyi "Server klien" sejak 15 September
+ * 2026: kata yang sama dengan panel di halaman lingkungan, dan kata yang langsung menjawab isi daftarnya.
+ * "Situs" terbaca seperti situs web. Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
+ * pembaruan berpasangan, profil yang dikenal — ditegakkan CHECK constraint di migration
+ * `create_site_registry_tables`, bukan di kelas ini.
+ *
+ * Alamat aplikasi situs yang lahir dari lingkungan diturunkan dari lingkungannya — lihat `appUrl()` — dan
+ * `address` hanya berlaku untuk situs lama tanpa lingkungan. `server_address` alamat mesinnya, dicatat
+ * operator; `last_seen_ip` asal laporan agen terakhir; `dns_*` record DNS yang dibuat admin.erp untuk alamat
+ * aplikasi itu. Alasannya di migration `add_server_address_to_sites` dan `add_dns_record_to_sites`.
  *
  * @property string $id
  * @property string $tenant_id
+ * @property ?string $environment_id
  * @property string $name
  * @property string $profile
  * @property string $edition
  * @property ?string $address
- * @property string $connectivity
+ * @property ?string $server_address
+ * @property ?string $last_seen_ip
+ * @property ?string $dns_record_id
+ * @property ?string $dns_name
+ * @property ?string $dns_target
+ * @property ?Carbon $dns_synced_at
  * @property ?string $update_window_start
  * @property ?string $update_window_end
  * @property string $timezone
@@ -35,8 +48,14 @@ use Illuminate\Support\Carbon;
  * @property ?string $reported_release
  * @property ?string $reported_digest
  * @property ?Carbon $last_seen_at
- * @property ?string $last_seen_via
  * @property ?array<string, mixed> $last_report
+ * @property ?Carbon $license_issued_at
+ * @property ?Carbon $license_valid_until
+ * @property ?Carbon $license_suspended_at
+ * @property bool $license_perpetual
+ * @property ?int $license_valid_days
+ * @property ?int $license_renew_before_days
+ * @property bool $license_issued_perpetual
  * @property ?int $created_by
  * @property ?Carbon $created_at
  */
@@ -46,17 +65,27 @@ class Site extends Model
 
     public const PROFILES = ['managed_on_prem'];
 
-    public const CONNECTIVITIES = ['online', 'offline'];
+    /**
+     * Edisi setiap situs yang lahir dari panel "Server klien".
+     *
+     * Sejak 15 September 2026 satu image dipakai semua klien (`docs/todo/registry-harbor`): image membawa
+     * Core dan seluruh modul, dan yang membedakan klien hanya lisensinya. Kolom `sites.edition` dan
+     * `site_releases.edition` masih ada karena alur rilis dan agen hari ini mencocokkan berkas rilis per
+     * edisi, jadi nilainya satu konstanta, bukan pilihan operator. PRD Harbor membuang kunci edisi itu
+     * dari manifest dan rilis; konstanta ini ikut dibuang bersamanya.
+     */
+    public const SINGLE_IMAGE_EDITION = 'coreerp';
 
     protected $table = 'sites';
 
     protected $fillable = [
         'tenant_id',
+        'environment_id',
         'name',
         'profile',
         'edition',
         'address',
-        'connectivity',
+        'server_address',
         'update_window_start',
         'update_window_end',
         'timezone',
@@ -67,9 +96,11 @@ class Site extends Model
         'reported_release',
         'reported_digest',
         'last_seen_at',
-        'last_seen_via',
         'last_report',
         'created_by',
+        // Kolom lisensi sengaja tidak ada di sini. Yang boleh menulisnya hanya penerbit lisensi dan
+        // tombol henti/lanjut perpanjangan, masing-masing dengan jejak auditnya; isian formulir yang
+        // kebetulan membawa `license_suspended_at` tidak boleh ikut tersimpan lewat `create()`.
     ];
 
     protected function casts(): array
@@ -79,13 +110,49 @@ class Site extends Model
             'revoked_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'last_report' => 'array',
+            'license_issued_at' => 'datetime',
+            'license_valid_until' => 'date',
+            'license_suspended_at' => 'datetime',
+            'license_perpetual' => 'boolean',
+            'license_valid_days' => 'integer',
+            'license_renew_before_days' => 'integer',
+            'license_issued_perpetual' => 'boolean',
+            'dns_synced_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Alamat yang dibuka pengguna klinik.
+     *
+     * Situs yang lahir dari lingkungan memakai alamat produksi lingkungannya, `<tenant>.<domain dasar>`, sama
+     * dengan produksi di server kita — admin.erp yang membuat record DNS-nya ke server klien. Ia tidak dapat
+     * diganti operator: domain milik klien belum didukung. Situs lama tanpa lingkungan tetap memakai alamat
+     * yang dicatat untuknya.
+     */
+    public function appUrl(): ?string
+    {
+        if ($this->environment_id === null) {
+            return $this->address;
+        }
+
+        return $this->environment?->url();
     }
 
     /** @return BelongsTo<Tenant, $this> */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Lingkungan produksi yang dijalankan situs ini. Kosong pada situs yang didaftarkan sebelum
+     * 15 September 2026 — lihat migration `add_environment_to_sites`.
+     *
+     * @return BelongsTo<Environment, $this>
+     */
+    public function environment(): BelongsTo
+    {
+        return $this->belongsTo(Environment::class);
     }
 
     /** @return HasMany<SiteOperation, $this> */
@@ -102,6 +169,17 @@ class Site extends Model
     public function revoked(): bool
     {
         return $this->revoked_at !== null;
+    }
+
+    public function licenseRenewalSuspended(): bool
+    {
+        return $this->license_suspended_at !== null;
+    }
+
+    /** Apakah lisensi yang **terakhir diterbitkan** untuk situs ini tidak bertanggal. */
+    public function licenseIssuedPerpetual(): bool
+    {
+        return $this->license_issued_at !== null && (bool) $this->license_issued_perpetual;
     }
 
     /**
@@ -126,13 +204,10 @@ class Site extends Model
             : $local >= $start || $local <= $end;
     }
 
-    /**
-     * Situs online yang laporannya berhenti datang. Situs offline tidak pernah "tertinggal": konsol
-     * ini memang tidak tahu keadaannya sesudah file laporan terakhir.
-     */
+    /** Situs terdaftar yang laporannya berhenti datang. */
     public function stale(): bool
     {
-        if ($this->connectivity !== 'online' || ! $this->enrolled()) {
+        if (! $this->enrolled()) {
             return false;
         }
 

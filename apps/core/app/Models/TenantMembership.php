@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Access\CorePermissions;
 use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $id
  * @property string $tenant_id
  * @property int $user_id
- * @property string $system_role
  * @property string $status
  * @property-read Tenant $tenant
  * @property-read User $user
@@ -22,7 +22,7 @@ class TenantMembership extends Model
     use HasUlids;
     use OwnedByControlPlane;
 
-    protected $fillable = ['tenant_id', 'user_id', 'system_role', 'status'];
+    protected $fillable = ['tenant_id', 'user_id', 'status'];
 
     /** @return BelongsTo<Tenant, $this> */
     public function tenant(): BelongsTo
@@ -42,8 +42,13 @@ class TenantMembership extends Model
         return $this->hasMany(RoleAssignment::class, 'membership_id');
     }
 
-    public function canManageAccess(): bool
+    /**
+     * Apakah anggota ini memegang satu permission layar Core (`CoreSecurityCatalog`) lewat role-nya.
+     *
+     * Pengganti `canManageAccess()`: owner dan admin tidak ada lagi di luar rantai security role (SEC-22).
+     */
+    public function hasCorePermission(string $permission): bool
     {
-        return $this->status === 'active' && in_array($this->system_role, ['owner', 'admin'], true);
+        return app(CorePermissions::class)->allows($this, $permission);
     }
 }

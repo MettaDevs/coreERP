@@ -1,0 +1,370 @@
+get:
+  tags: [Finance feed]
+  operationId: internal.finance-postings.index
+  summary: Posting finance yang siap dibukukan (mode pull)
+  security:
+    - integrationClient: []
+  description: |
+    Scope `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
+    prefix jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
+
+    Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
+    ulang pada **setiap** pull sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
+    jadi tidak ada cursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
+    posting yang terbit di tengah pull muncul pada pull berikutnya di tempat urutannya.
+
+    Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
+    dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
+    vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
+    tidak pernah dijurnal ke akun cadangan (K-18).
+  parameters:
+    - name: status
+      in: query
+      required: false
+      schema: { type: string, enum: [pending] }
+      description: Hanya `pending` yang disajikan. Disediakan supaya URL pembaca dapat menyebutnya.
+    - name: posting_type
+      in: query
+      required: false
+      schema: { type: string, maxLength: 80, pattern: '^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$' }
+      example: asset.*
+      description: |
+        Saring menurut jenis posting. Kosongkan untuk menerima semua jenis yang diizinkan untuk
+        klien Anda; itu cara yang dianjurkan.
+
+        Isi dengan salah satu nilai di bawah, atau prefix yang diakhiri `.*` untuk semua jenis dari
+        satu modul, misalnya `asset.*`:
+
+        - `asset.acquisition` — penerimaan aset diselesaikan
+        - `asset.acquisition_adjustment` — nilai perolehan dikoreksi
+        - `asset.opening_balance` — saldo awal aset lama saat mulai memakai feed
+        - `asset.depreciation` — proses "Post penyusutan" satu periode
+        - `asset.depreciation_reversal` — penyusutan satu periode dibalik
+
+        Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
+    - name: legal_entity
+      in: query
+      required: false
+      schema: { type: string, maxLength: 50 }
+      description: Kode perusahaan (`company_code`) atau id entitas legal.
+    - name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+  responses:
+    '200':
+      description: Posting yang belum di-ack, dalam urutan pembukuan.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, meta]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/FinancePosting' }
+              meta:
+                type: object
+                required: [count, has_more]
+                properties:
+                  count: { type: integer }
+                  has_more:
+                    type: boolean
+                    description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu pull lagi.
+          examples:
+            perolehan:
+              summary: Satu penerimaan ambulans, langsung ke hutang
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X8
+                    posting_type: asset.acquisition
+                    settlement_mode: direct_payable
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-09-28'
+                    document_date: '2026-09-28'
+                    occurred_at: '2026-09-28T23:50:00+07:00'
+                    published_at: '2026-09-28T16:50:04+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penerimaan-aset
+                      number: PNA-2026-09-0007
+                      description: Penerimaan ambulans
+                    vendor: { id: 01J9Z2BBBBBBBBBBBBBBBBBBBB, number: VND-000123, name: PT Karoseri Sehat }
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: PNA-2026-09-0007 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '1501', code: 1-1500, name: PPN Masukan }
+                        debit: '55000000.00'
+                        credit: '0.00'
+                        description: PPN Masukan · PNA-2026-09-0007 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 3
+                        account: { external_id: '2110', code: 2-1100, name: Hutang Usaha }
+                        debit: '0.00'
+                        credit: '555000000.00'
+                        description: PT Karoseri Sehat · PNA-2026-09-0007
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '555000000.00', credit: '555000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, acquisition_value: '500000000.00', tax_amount: '55000000.00' }
+                meta: { count: 1, has_more: false }
+            perolehan_clearing:
+              summary: Penerimaan yang sama pada entitas bermode clearing — kredit ke akun perantara, faktur hutangnya dibuat pembaca
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X9
+                    posting_type: asset.acquisition
+                    settlement_mode: clearing
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-09-28'
+                    document_date: '2026-09-28'
+                    occurred_at: '2026-09-28T23:50:00+07:00'
+                    published_at: '2026-09-28T16:50:04+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penerimaan-aset
+                      number: PNA-2026-09-0008
+                      description: Penerimaan ambulans
+                    vendor: { id: 01J9Z2BBBBBBBBBBBBBBBBBBBB, number: VND-000123, name: PT Karoseri Sehat }
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: PNA-2026-09-0008 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '1501', code: 1-1500, name: PPN Masukan }
+                        debit: '55000000.00'
+                        credit: '0.00'
+                        description: PPN Masukan · PNA-2026-09-0008 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 3
+                        account: { external_id: '2190', code: 2-1900, name: Aset Diterima Belum Difakturkan }
+                        debit: '0.00'
+                        credit: '555000000.00'
+                        description: PT Karoseri Sehat · PNA-2026-09-0008
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '555000000.00', credit: '555000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0013, asset_group: KENDARAAN, book: KOMERSIAL, acquisition_value: '500000000.00', tax_amount: '55000000.00' }
+                meta: { count: 1, has_more: false }
+            koreksi_perolehan:
+              summary: Faktur ambulans ternyata 510 juta, dikoreksi seminggu kemudian dengan mode jurnal asalnya
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-ADJ-01J9Z5D4E6F8G0H2J4K6M8N0P2-1
+                    posting_type: asset.acquisition_adjustment
+                    settlement_mode: direct_payable
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-10-05'
+                    document_date: '2026-10-05'
+                    occurred_at: '2026-10-05T10:15:00+07:00'
+                    published_at: '2026-10-05T03:15:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: koreksi-nilai-aset
+                      number: KEND-0012
+                      description: 'Koreksi nilai perolehan KEND-0012: Faktur ternyata 510.000.000'
+                    vendor: { id: 01J9Z2BBBBBBBBBBBBBBBBBBBB, number: VND-000123, name: PT Karoseri Sehat }
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
+                        debit: '10000000.00'
+                        credit: '0.00'
+                        description: Koreksi nilai perolehan · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '2110', code: 2-1100, name: Hutang Usaha }
+                        debit: '0.00'
+                        credit: '10000000.00'
+                        description: PT Karoseri Sehat · koreksi KEND-0012
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '10000000.00', credit: '10000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X8
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, acquisition_value_before: '500000000.00', acquisition_value_after: '510000000.00', adjustment_amount: '10000000.00' }
+                      reason: Faktur ternyata 510.000.000
+                meta: { count: 1, has_more: false }
+            saldo_awal:
+              summary: Saldo awal satu ambulans lama, bertanggal cutover
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-OPB-01J9Z4R8L3N5P7Q9S1T3V5W7Y9
+                    posting_type: asset.opening_balance
+                    settlement_mode: direct_payable
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-01-01'
+                    document_date: '2022-01-15'
+                    occurred_at: '2026-01-05T09:10:00+07:00'
+                    published_at: '2026-01-05T02:10:02+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penerimaan-aset
+                      number: PNA-2026-01-0003
+                      description: Saldo awal aset PNA-2026-01-0003
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '1459', code: 1-2390, name: Akumulasi Penyusutan - Kendaraan }
+                        debit: '0.00'
+                        credit: '200000000.00'
+                        description: Akumulasi penyusutan · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 3
+                        account: { external_id: '3900', code: 3-9000, name: Penyeimbang Saldo Awal }
+                        debit: '0.00'
+                        credit: '300000000.00'
+                        description: Saldo awal · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '500000000.00', credit: '500000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0003, asset_group: KENDARAAN, book: KOMERSIAL, acquisition_value: '500000000.00', accumulated_depreciation: '200000000.00', net_book_value: '300000000.00' }
+                meta: { count: 1, has_more: false }
+            penyusutan:
+              summary: Post penyusutan Oktober 2026 buku komersial, satu klinik dengan dua poli
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-DEP-01J9Z2AAAAAAAAAAAAAAAAAAAA-01J9Z3BBBBBBBBBBBBBBBBBBBB-20261031-1
+                    posting_type: asset.depreciation
+                    settlement_mode: null
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-10-31'
+                    document_date: '2026-10-31'
+                    occurred_at: '2026-11-02T08:30:00+07:00'
+                    published_at: '2026-11-02T01:30:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penyusutan
+                      number: null
+                      description: Penyusutan buku KOMERSIAL s.d. 31/10/2026
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '6510', code: 6-5100, name: Beban Penyusutan Kendaraan }
+                        debit: '2500000.00'
+                        credit: '0.00'
+                        description: Beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                          - { code: DEPARTMENT, display_name: Department, value_code: POLI-UMUM, value_display_name: Poli Umum, value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD }
+                      - line_no: 2
+                        account: { external_id: '6510', code: 6-5100, name: Beban Penyusutan Kendaraan }
+                        debit: '1200000.00'
+                        credit: '0.00'
+                        description: Beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                          - { code: DEPARTMENT, display_name: Department, value_code: UGD, value_display_name: UGD, value_id: 01J9Z2EEEEEEEEEEEEEEEEEEEE }
+                      - line_no: 3
+                        account: { external_id: '1459', code: 1-2390, name: Akumulasi Penyusutan - Kendaraan }
+                        debit: '0.00'
+                        credit: '3700000.00'
+                        description: Akumulasi penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '3700000.00', credit: '3700000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, period_starts_on: '2026-10-01', period_ends_on: '2026-10-31', depreciation_amount: '2500000.00' }
+                        - { asset_code: KEND-0015, asset_group: KENDARAAN, book: KOMERSIAL, period_starts_on: '2026-10-01', period_ends_on: '2026-10-31', depreciation_amount: '1200000.00' }
+                meta: { count: 1, has_more: false }
+            pembalikan_penyusutan:
+              summary: Penyusutan Oktober satu ambulans dibalik, bertanggal periode asalnya
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-DRV-01J9Z6T2V4X6Z8B0D2F4H6K8M0
+                    posting_type: asset.depreciation_reversal
+                    settlement_mode: null
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-10-31'
+                    document_date: '2026-10-31'
+                    occurred_at: '2026-11-10T14:05:00+07:00'
+                    published_at: '2026-11-10T07:05:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penyusutan
+                      number: null
+                      description: 'Pembalikan penyusutan KEND-0012 s.d. 31/10/2026: Salah periode'
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1459', code: 1-2390, name: Akumulasi Penyusutan - Kendaraan }
+                        debit: '2500000.00'
+                        credit: '0.00'
+                        description: Pembalikan akumulasi penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '6510', code: 6-5100, name: Beban Penyusutan Kendaraan }
+                        debit: '0.00'
+                        credit: '2500000.00'
+                        description: Pembalikan beban penyusutan s.d. 31/10/2026 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                          - { code: DEPARTMENT, display_name: Department, value_code: POLI-UMUM, value_display_name: Poli Umum, value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD }
+                    totals: { debit: '2500000.00', credit: '2500000.00' }
+                    reverses_posting_id: AST-DEP-01J9Z2AAAAAAAAAAAAAAAAAAAA-01J9Z3BBBBBBBBBBBBBBBBBBBB-20261031-1
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, period_starts_on: '2026-10-01', period_ends_on: '2026-10-31', depreciation_amount: '2500000.00' }
+                meta: { count: 1, has_more: false }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422': { $ref: '#/components/responses/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

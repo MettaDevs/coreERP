@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -34,6 +35,7 @@ use Illuminate\Support\Carbon;
  * @property string $slug
  * @property ?string $database_name
  * @property string $status
+ * @property string $hosting
  * @property bool $outbound_allowed
  * @property ?Carbon $expires_at
  * @property ?Carbon $deleted_at
@@ -46,6 +48,9 @@ class Environment extends Model
     /** Jenis yang dikenal registry. Sama persis dengan CHECK `environments_kind_dikenal`. */
     public const KINDS = ['production', 'sandbox', 'demo'];
 
+    /** Tempat lingkungan berjalan. Sama persis dengan CHECK `environments_hosting_dikenal`. */
+    public const HOSTINGS = ['provider', 'client_server'];
+
     protected $table = 'environments';
 
     protected $fillable = [
@@ -57,6 +62,7 @@ class Environment extends Model
         'source_environment_id',
         'expires_at',
         'outbound_allowed',
+        'hosting',
         'created_by',
     ];
 
@@ -83,6 +89,28 @@ class Environment extends Model
     public function operations(): HasMany
     {
         return $this->hasMany(EnvironmentOperation::class, 'environment_id');
+    }
+
+    /**
+     * Server klien yang menjalankan lingkungan ini. Paling banyak satu — `sites_satu_per_lingkungan`.
+     *
+     * @return HasOne<Site, $this>
+     */
+    public function site(): HasOne
+    {
+        return $this->hasOne(Site::class, 'environment_id');
+    }
+
+    /**
+     * Apakah lingkungan ini produksi yang berjalan di server milik klien.
+     *
+     * Hanya pada lingkungan seperti ini panel "Server klien" dan perintah pasang punya arti. Constraint
+     * `environments_server_klien_hanya_produksi` sudah menjamin `client_server` selalu produksi; jenisnya
+     * tetap diperiksa di sini supaya penjaga konsol tidak bergantung pada constraint di database lain.
+     */
+    public function runsOnClientServer(): bool
+    {
+        return $this->kind === 'production' && $this->hosting === 'client_server' && $this->deleted_at === null;
     }
 
     /**
@@ -118,6 +146,7 @@ class Environment extends Model
             'slug' => $this->slug,
             'kind' => $this->kind,
             'status' => $this->status,
+            'hosting' => $this->hosting,
             'outboundAllowed' => $this->outbound_allowed,
             'database' => $this->database(),
             'expiresAt' => $this->expires_at?->toDateString(),
@@ -146,6 +175,10 @@ class Environment extends Model
      * disusun ulang di layar. Dua tempat yang menyusun alamat yang sama akan menyimpang, dan
      * penyimpangannya berbentuk pelanggan yang tidak dapat masuk ke alamat yang dicetak sistem
      * itu sendiri.
+     *
+     * Produksi di server klien memakai bentuk yang sama. Core di server kita tidak merutekannya; alamat itu
+     * sampai ke server klien lewat record DNS yang dibuat admin.erp (`SiteDns`) dan mengalahkan wildcard
+     * domain dasar. Sampai record itu ada, alamatnya masih jatuh ke server kita dan tidak terbuka.
      */
     public function url(): ?string
     {

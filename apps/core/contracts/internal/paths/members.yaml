@@ -1,0 +1,28 @@
+get:
+  tags: [Directory]
+  operationId: internal.members.index
+  summary: Cari anggota tenant yang aktif
+  description: |
+    Terbatas pada app `human-resources`; app lain menerima 403. Hasil dibatasi
+    20 baris dan tidak mendukung pagination — ini pencarian pemilih, bukan export.
+  parameters:
+    - name: q
+      in: query
+      required: false
+      schema: { type: string }
+      description: Cocokkan sebagian nama atau email, tidak peka huruf besar-kecil.
+  responses:
+    '200':
+      description: Daftar anggota aktif.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/Member' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '429': { $ref: '#/components/responses/RateLimited' }

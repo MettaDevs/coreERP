@@ -1,0 +1,7 @@
+type: apiKey
+in: header
+name: X-CoreERP-Service-Token
+description: |
+  Service credential berbentuk `<credential_id>.<secret>`. Token lama tanpa
+  `credential_id` masih diterima tetapi memaksa pemindaian bcrypt per credential;
+  terbitkan ulang.

@@ -92,7 +92,14 @@ class ResolveEnvironment
 
         // Tenant + jenis menunjuk tepat satu lingkungan hidup: `environments_satu_produksi` dan
         // `environments_satu_per_jenis` di database pusat yang menjaminnya, bukan urutan baris.
+        //
+        // Produksi yang berjalan di server klien disaring di sini, dan jawabannya 404 — bukan 503,
+        // apa pun statusnya. Barisnya memang ada, tetapi isinya tidak di server ini: `database_name`
+        // yang kosong akan membuat `useForRequest` di bawah melayaninya dari database bersama, yaitu
+        // halaman masuk yang menerima akun tenant itu di atas data yang bukan datanya. Alamatnya pun
+        // bukan milik server ini lagi; klien membukanya di servernya sendiri.
         $environment = Environment::query()
+            ->hostedByProvider()
             ->whereHas('tenant', fn ($q) => $q->where('slug', $address->tenant))
             ->where('kind', $address->kind)
             ->whereNull('deleted_at')

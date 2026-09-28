@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#
+# Pemicu rilis: satu-satunya perintah root yang boleh dijalankan user `deploy` di server pertama, lewat
+# sudoers yang dipasang deploy/perakit/pasang-pemicu.sh. Dipanggil alur GitHub `rilis.yml`:
+#
+#   sudo /usr/local/sbin/coreerp-rilis 0.3.0 main
+#   sudo /usr/local/sbin/coreerp-rilis 0.3.0 1f2e3d4
+#
+# ## Kenapa pembungkus, bukan sudo untuk rakit.sh
+#
+# Perakit memegang kunci privat rilis dan kredensial robot perakit, jadi ia berjalan sebagai root. User
+# `deploy` sengaja tidak punya sudo; secret SSH-nya ada di GitHub, dan secret yang bocor tidak boleh berarti
+# root. Pembungkus ini menyempitkan yang dapat dilakukan pemegang secret itu menjadi satu hal: merakit rilis
+# dari commit yang **sudah ada di `main`** — commit yang lolos pull request dan CI. Commit dari cabang lain,
+# perintah lain, dan argumen tambahan ditolak.
+#
+# rakit.sh yang dijalankan diambil dari commit yang dirakit itu sendiri, bukan dari salinan yang terpasang
+# di sini, supaya perbaikan perakit ikut berlaku tanpa memasang ulang pembungkus ini.
+
+set -euo pipefail
+shopt -s inherit_errexit
+umask 022
+
+FOLDER_SUMBER='/var/lib/coreerp-perakit/sumber'
+REPO_SUMBER="${PERAKIT_REPO:-https://github.com/MettaDevs/coreERP.git}"
+FOLDER_LOG='/var/log/coreerp-rilis'
+KUNCI='/run/lock/coreerp-rilis.lock'
+
+gagal() {
+    printf 'GAGAL: %s\n' "$*" >&2
+    exit 1
+}
+
+[ "$(id -u)" -eq 0 ] || gagal 'Jalankan lewat sudo.'
+[ "$#" -eq 2 ] || gagal 'Pemakaian: coreerp-rilis NOMOR_RILIS main|SHA_COMMIT'
+
+rilis="$1"
+ref="$2"
+[[ $rilis =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || gagal "Nomor rilis tidak sah: '$rilis'"
+[[ $ref =~ ^(main|[0-9a-f]{7,40})$ ]] || gagal "Ref harus 'main' atau SHA commit, bukan '$ref'"
+
+# Satu rilis pada satu waktu: dua perakit yang berjalan bersamaan berbagi salinan sumber yang sama.
+exec 9> "$KUNCI"
+flock -n 9 || gagal 'Rilis lain sedang dirakit di server ini.'
+
+if [ ! -d "$FOLDER_SUMBER/.git" ]; then
+    git clone --quiet "$REPO_SUMBER" "$FOLDER_SUMBER"
+fi
+git -C "$FOLDER_SUMBER" fetch --quiet --prune origin
+
+[ "$ref" != main ] || ref='origin/main'
+commit="$(git -C "$FOLDER_SUMBER" rev-parse --verify --quiet "$ref^{commit}")" || gagal "Commit $ref tidak ditemukan."
+git -C "$FOLDER_SUMBER" merge-base --is-ancestor "$commit" origin/main \
+    || gagal "Commit $commit tidak ada di main. Rilis hanya dirakit dari commit yang sudah melewati pull request."
+
+install -d -m 0750 "$FOLDER_LOG"
+perakit="$(mktemp)"
+trap 'rm -f "$perakit"' EXIT
+git -C "$FOLDER_SUMBER" show "$commit:deploy/perakit/rakit.sh" > "$perakit" \
+    || gagal "Commit $commit tidak membawa deploy/perakit/rakit.sh."
+
+printf 'Merakit rilis %s dari commit %s\n' "$rilis" "$commit"
+set +e
+bash "$perakit" --rilis "$rilis" --ref "$commit" 2>&1 | tee "$FOLDER_LOG/$rilis.log"
+status="${PIPESTATUS[0]}"
+set -e
+exit "$status"

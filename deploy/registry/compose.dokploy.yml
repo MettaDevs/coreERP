@@ -1,0 +1,32 @@
+# Tindihan compose Harbor untuk server yang Traefik-nya milik Dokploy.
+#
+# `pasang.sh` menyalinnya ke /opt/harbor/harbor/docker-compose.override.yml. Nama itu dipilih supaya
+# `docker compose` yang dijalankan tangan di folder tersebut — tanpa `-f` — tetap membaca tindihan ini.
+# Tanpanya proxy Harbor kembali menerbitkan 8080 dan 9090 di semua alamat host.
+#
+# `docker-compose.yml` di folder yang sama ditulis ulang `prepare` setiap kali dijalankan, jadi perubahan
+# untuk mesin ini tidak pernah disunting di sana.
+
+services:
+  proxy:
+    # Satu-satunya pintu masuk dari luar adalah Traefik. `!reset` membuang kedua port bawaan installer
+    # (8080 untuk HTTP, 9090 untuk metrik); menimpanya dengan daftar kosong biasa tidak cukup, karena
+    # compose menggabungkan daftar port alih-alih menggantinya.
+    ports: !reset []
+    # Nama container bawaannya `nginx`. Nama container menjadi nama DNS di setiap jaringan yang ia
+    # masuki, dan `nginx` di dokploy-network terlalu mudah bertabrakan dengan layanan lain di mesin ini.
+    container_name: harbor-proxy
+    networks:
+      harbor:
+      dokploy-network:
+        # Alamat yang disebut rute Traefik dan kelak klien API admin.erp. Nama layanan compose (`proxy`)
+        # juga ikut terdaftar di jaringan ini — compose selalu menambahkannya — tetapi tidak ada yang
+        # boleh bergantung pada nama umum itu.
+        aliases:
+          - harbor-registry-proxy
+
+networks:
+  # Dibuat Dokploy. `external` berarti stack ini tidak pernah membuat maupun menghapusnya — merusaknya
+  # menjatuhkan setiap situs lain di mesin yang sama.
+  dokploy-network:
+    external: true

@@ -5,11 +5,10 @@ CoreERP adalah monorepo untuk platform ERP modular API-first.
 ```text
 apps/          aplikasi platform dan UI host
 modules/       module bisnis; berjalan di runtime Core, satu folder per module
-editions/      satu berkas per pelanggan: module apa yang dibeli dan rilis mana yang dipasang
 integrations/  bridge lintas module
 packages/      SDK dan contract lintas aplikasi
 deploy/        manifest deployment dan release tooling
-scripts/       pembangun dan pemeriksa image edisi
+scripts/       pembangun dan pemeriksa image
 docs/          desain kanonik
 ```
 

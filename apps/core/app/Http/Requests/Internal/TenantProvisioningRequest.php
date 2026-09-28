@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Internal;
 
+use App\Models\Environment;
 use App\Support\ControlPlane\TemporaryPassword;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -55,6 +57,18 @@ final class TenantProvisioningRequest extends FormRequest
         return is_string($nilai) && $nilai !== '' ? $nilai : null;
     }
 
+    /**
+     * Tempat lingkungan pertama berjalan, dipersempit dengan alasan yang sama seperti jenisnya.
+     *
+     * @return 'provider'|'client_server'
+     */
+    public function firstEnvironmentHosting(): string
+    {
+        return $this->string('first_environment_hosting', Environment::HOSTING_PROVIDER)->toString() === Environment::HOSTING_CLIENT_SERVER
+            ? Environment::HOSTING_CLIENT_SERVER
+            : Environment::HOSTING_PROVIDER;
+    }
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
@@ -81,6 +95,27 @@ final class TenantProvisioningRequest extends FormRequest
                 'required',
                 'date',
                 'after:today',
+            ],
+            /*
+             * Tempat lingkungan pertama berjalan, OPSIONAL dengan bawaan `provider`.
+             *
+             * `client_server` berarti produksi tenant ini dipasang di server milik klien lewat satu
+             * perintah pasang. Hanya produksi yang boleh: demo dan sandbox tetap di server kami, dan
+             * tenant tanpa lingkungan tidak punya apa pun untuk dipasang di mana pun. Ditolak di sini
+             * dengan 422 yang menyebut field-nya; constraint registry menolaknya sekali lagi, tetapi
+             * dari dalam transaksi dan sebagai 500.
+             */
+            'first_environment_hosting' => [
+                'sometimes',
+                'string',
+                'in:'.Environment::HOSTING_PROVIDER.','.Environment::HOSTING_CLIENT_SERVER,
+                // Masukan mentahnya yang dibaca, bukan `firstEnvironment()`: yang itu memetakan nilai
+                // tak dikenal ke `production`, dan penjaga ini tidak boleh lolos karena pemetaan itu.
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value === Environment::HOSTING_CLIENT_SERVER && $this->input('first_environment', 'production') !== 'production') {
+                        $fail('Server klien hanya menjalankan lingkungan produksi. Demo dan sandbox tetap berjalan di server kami.');
+                    }
+                },
             ],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],

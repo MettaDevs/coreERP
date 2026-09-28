@@ -5,29 +5,34 @@ declare(strict_types=1);
 namespace ControlPlane\Http\Controllers\Sites;
 
 use ControlPlane\Audit\OperatorAudit;
+use ControlPlane\Dns\DnsUnavailable;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
+use ControlPlane\Registry\RegistryCredentials;
 use ControlPlane\Sites\EnrollmentTokens;
-use ControlPlane\Sites\LicenseIssuer;
-use ControlPlane\Sites\OfflineReportFile;
+use ControlPlane\Sites\LicenseTerms;
+use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
 use ControlPlane\Sites\SiteRejected;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Tindakan operator yang mengubah, atau membuka jalan untuk mengubah, server milik klien.
  *
- * ## Konfirmasi tertulis
+ * ## Tanpa konfirmasi tertulis
  *
- * Setiap tindakan di sini meminta nama situs diketik ulang. Satu klik yang salah baris di daftar
- * situs tidak boleh cukup untuk memperbarui server fasilitas kesehatan yang keliru — dan nama yang
- * diketik membuat operator membaca situs mana yang sedang ia perintah.
+ * Sampai 16 September 2026 setiap tindakan di sini menuntut nama situs diketik ulang. Penjaga itu
+ * dibuang atas keputusan pemilik produk, dan pengalaman memakainya menjelaskan kenapa: konsol
+ * menamai situs `<Tenant> — Produksi` dengan tanda pisah panjang, yang tidak ada di papan ketik,
+ * sehingga satu-satunya cara lolos adalah menyalin-tempel nama itu. Penjaga yang selalu dilewati
+ * dengan salin-tempel tidak membuat siapa pun membaca nama yang diketiknya.
+ *
+ * Halamannya sendiri yang menanggung tugas itu: tiap tindakan berdiri di halaman satu situs, dengan
+ * namanya di judul.
  *
  * ## Jejak audit
  *
@@ -36,87 +41,42 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class SiteActions extends Controller
 {
-    public function issueOnlineEnrollment(Request $request, string $site, EnrollmentTokens $tokens): RedirectResponse
+    /**
+     * Token pendaftaran tanpa operasi pasang — hanya untuk situs lama yang lahir sebelum 15 September 2026
+     * tanpa lingkungan.
+     *
+     * Situs yang punya lingkungan dipasang dari panel di halaman lingkungannya, yang membuat token **dan**
+     * operasi `install` sekaligus. Token saja dari sini akan mendaftarkan agen yang tidak punya apa pun
+     * untuk dipasang, dan panel lingkungannya lalu menunjukkan keadaan yang tidak dibuat siapa pun.
+     */
+    public function issueEnrollment(Request $request, string $site, EnrollmentTokens $tokens): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
-        if ($row->connectivity !== 'online') {
-            throw ValidationException::withMessages(['confirm_name' => 'Situs offline didaftarkan lewat paket pendaftaran, bukan perintah pasang.']);
+        if ($row->environment_id !== null) {
+            throw ValidationException::withMessages(['operation' => 'Server klien ini dipasang dari halaman lingkungannya, lewat "Buat perintah pasang".']);
         }
 
         $issued = DB::transaction(function () use ($request, $row, $tokens): array {
-            $issued = $tokens->issue($row, 'online', $request->user()?->getAuthIdentifier());
+            $issued = $tokens->issue($row, $request->user()?->getAuthIdentifier());
             OperatorAudit::record($request, 'site.enrollment_token.issued', 'site', $row->id, [
-                'channel' => 'online',
                 'expires_at' => $issued['expires_at']->toIso8601String(),
             ]);
 
             return $issued;
         });
 
-        $source = rtrim((string) config('sites.agent_source'), '/');
-        $ref = (string) config('sites.agent_source_ref');
-
         // Perintahnya hanya lewat flash session: tampil sekali, tidak pernah di alamat, tidak pernah
         // di log. Token di dalamnya sekali pakai dan kedaluwarsa dalam satu jam.
         return redirect('/situs/'.$row->id)->with('enrollment', [
-            'command' => sprintf(
-                'curl -fsSL %s/%s/deploy/agent/pasang.sh | sudo bash -s -- --admin-url %s --token %s --ref %s',
-                $source,
-                $ref,
-                rtrim((string) config('app.url'), '/'),
-                $issued['token'],
-                $ref,
-            ),
+            'command' => EnrollmentTokens::installCommand($issued['token']),
             'expiresAt' => $issued['expires_at']->toDateTimeString(),
         ]);
     }
 
-    public function downloadOfflinePackage(Request $request, string $site, EnrollmentTokens $tokens, LicenseIssuer $licenses): Response
-    {
-        $row = $this->confirmedSite($request, $site);
-
-        if ($row->connectivity !== 'offline') {
-            throw ValidationException::withMessages(['confirm_name' => 'Situs online didaftarkan lewat perintah pasang.']);
-        }
-
-        if ($row->enrolled()) {
-            throw ValidationException::withMessages(['confirm_name' => 'Situs ini sudah terdaftar. Paket pendaftaran baru akan menimpa kunci situsnya.']);
-        }
-
-        $package = DB::transaction(function () use ($request, $row, $tokens, $licenses): array {
-            $issued = $tokens->issue($row, 'offline', $request->user()?->getAuthIdentifier());
-
-            OperatorAudit::record($request, 'site.enrollment_token.issued', 'site', $row->id, [
-                'channel' => 'offline',
-                'expires_at' => $issued['expires_at']->toIso8601String(),
-            ]);
-
-            return [
-                'site_id' => $row->id,
-                'tenant_id' => $row->tenant_id,
-                'tenant_name' => (string) $row->tenant()->value('name'),
-                'admin_url' => rtrim((string) config('app.url'), '/'),
-                'channel' => 'offline',
-                'enrollment_token' => $issued['token'],
-                'update_window' => $row->updateWindow(),
-                'license_public_key' => $licenses->publicKey(),
-                'license' => null,
-            ];
-        });
-
-        return response()->streamDownload(
-            static function () use ($package): void {
-                echo json_encode($package, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            },
-            'site.json',
-            ['Content-Type' => 'application/json', 'Cache-Control' => 'no-store'],
-        );
-    }
-
     public function requestOperation(Request $request, string $site, SiteOperations $operations): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
         $operation = (string) $request->input('operation');
 
         try {
@@ -142,56 +102,9 @@ final class SiteActions extends Controller
         return redirect('/situs/'.$row->id)->with('message', 'Permintaan operasi dibatalkan.');
     }
 
-    public function downloadOfflineLicense(Request $request, string $site, LicenseIssuer $licenses): Response
+    public function revoke(Request $request, string $site, RegistryCredentials $credentials, SiteDns $dns): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
-        $validUntil = (string) $request->input('valid_until');
-
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $validUntil) !== 1) {
-            throw ValidationException::withMessages(['valid_until' => 'Tanggal berakhir lisensi harus berbentuk tahun-bulan-tanggal.']);
-        }
-
-        try {
-            $license = DB::transaction(function () use ($request, $row, $licenses, $validUntil): array {
-                $license = $licenses->issue($row, $validUntil);
-                OperatorAudit::record($request, 'site.license.issued_offline', 'site', $row->id, ['valid_until' => $validUntil]);
-
-                return $license;
-            });
-        } catch (SiteRejected $e) {
-            throw ValidationException::withMessages(['valid_until' => $e->getMessage()]);
-        }
-
-        return response()->streamDownload(
-            static function () use ($license): void {
-                echo json_encode($license, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            },
-            'lisensi-'.$row->id.'.json',
-            ['Content-Type' => 'application/json', 'Cache-Control' => 'no-store'],
-        );
-    }
-
-    public function uploadReportFile(Request $request, string $site, OfflineReportFile $files): RedirectResponse
-    {
-        $row = Site::query()->whereKey($site)->firstOrFail();
-        $upload = $request->file('report');
-
-        if (! $upload instanceof UploadedFile || ! $upload->isValid() || $upload->getSize() > 512 * 1024) {
-            throw ValidationException::withMessages(['report' => 'Pilih file laporan situs, paling besar 512 KB.']);
-        }
-
-        try {
-            $files->accept($request, $row, (string) file_get_contents($upload->getRealPath()));
-        } catch (SiteRejected $e) {
-            throw ValidationException::withMessages(['report' => $e->getMessage()]);
-        }
-
-        return redirect('/situs/'.$row->id)->with('message', 'File laporan diterima.');
-    }
-
-    public function revoke(Request $request, string $site): RedirectResponse
-    {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         if ($row->revoked()) {
             return redirect('/situs/'.$row->id);
@@ -203,22 +116,128 @@ final class SiteActions extends Controller
             $cancelled = SiteOperation::query()
                 ->where('site_id', $row->id)
                 ->where('status', 'requested')
-                ->update(['status' => 'cancelled', 'finished_at' => now(), 'updated_at' => now()]);
+                ->update(SiteOperations::closingColumns('cancelled'));
 
             OperatorAudit::record($request, 'site.revoked', 'site', $row->id, ['cancelled_operations' => $cancelled]);
         });
 
-        return redirect('/situs/'.$row->id)->with('message', 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.');
-    }
+        // Sesudah pencabutan tersimpan, di luar transaksinya: Harbor yang tidak menjawab tidak boleh
+        // membatalkan pencabutan. Operasi yang masih `running` ikut, karena agennya tidak akan pernah
+        // dilayani lagi — situs yang dicabut tidak dapat menarik apa pun lagi (E2E-01).
+        $credentials->releaseClosed($row, $request->ip(), includeRunning: true);
 
-    private function confirmedSite(Request $request, string $site): Site
-    {
-        $row = Site::query()->whereKey($site)->firstOrFail();
+        // Record DNS alamat aplikasi dibuang juga, dengan alasan yang sama dengan robot registry: server yang tidak
+        // lagi dikelola tidak boleh terus memegang nama di domain kita. Cloudflare yang menolak tidak membatalkan
+        // pencabutan; recordnya tetap tercatat sehingga penghapusan dapat diulang dari sini.
+        $message = 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.';
 
-        if (! hash_equals($row->name, (string) $request->input('confirm_name'))) {
-            throw ValidationException::withMessages(['confirm_name' => 'Ketik nama situs persis seperti tertulis untuk melanjutkan.']);
+        try {
+            $dns->remove($request, $row);
+        } catch (DnsUnavailable $e) {
+            $message .= ' Record DNS '.$row->dns_name.' belum terhapus: '.$e->getMessage();
         }
 
-        return $row;
+        return redirect('/situs/'.$row->id)->with('message', $message);
+    }
+
+    /**
+     * Menghentikan sewa: lisensi berhenti diperpanjang, dan yang sedang berjalan habis dengan sendirinya.
+     *
+     * Permintaan `install_license` yang belum diambil agen ikut dibatalkan. Lisensi di dalamnya
+     * diterbitkan sebelum sewa dihentikan, dan membiarkannya diambil berarti sewa yang baru saja
+     * dihentikan diperpanjang oleh antrean.
+     */
+    public function suspendLicense(Request $request, string $site): RedirectResponse
+    {
+        $row = $this->site($site);
+
+        if ($row->licenseRenewalSuspended()) {
+            return redirect('/situs/'.$row->id);
+        }
+
+        DB::transaction(function () use ($request, $row): void {
+            $row->forceFill(['license_suspended_at' => now()])->save();
+
+            $cancelled = SiteOperation::query()
+                ->where('site_id', $row->id)
+                ->where('operation', 'install_license')
+                ->where('status', 'requested')
+                ->update(SiteOperations::closingColumns('cancelled'));
+
+            OperatorAudit::record($request, 'site.license.renewal_suspended', 'site', $row->id, [
+                'license_valid_until' => $row->license_valid_until?->toDateString(),
+                'cancelled_operations' => $cancelled,
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dihentikan. Lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya.');
+    }
+
+    /**
+     * Masa lisensi situs ini: mengikuti bawaan konsol, angka sendiri, atau tanpa tanggal berakhir.
+     *
+     * Berlaku pada penerbitan berikutnya, bukan pada lisensi yang sudah terpasang. Situs yang diubah
+     * menjadi permanen menerima lisensi tanpa tanggal pada laporan berikutnya yang lolos jeda
+     * perpanjangan; yang dikembalikan menjadi bertanggal menerima tanggal pada laporan berikutnya pula,
+     * karena laporan yang menyebut lisensi permanen membuat perpanjangannya jatuh tempo.
+     *
+     * Permanen berarti lisensinya tidak pernah habis — bukan bahwa seluruh modul terbuka. Daftar app di
+     * lisensi tetap datang dari app yang dibeli tenant.
+     */
+    public function updateLicenseTerms(Request $request, string $site, LicenseTerms $terms): RedirectResponse
+    {
+        $row = $this->site($site);
+
+        $data = $request->validate([
+            'mode' => ['required', 'in:default,custom,perpetual'],
+            'valid_days' => ['required_if:mode,custom', 'nullable', 'integer', 'min:1', 'max:'.LicenseTerms::MAX_VALID_DAYS],
+            // Perpanjangan yang tidak lebih awal dari masa lisensinya sendiri tidak pernah terjadi, dan
+            // lisensinya habis di klinik. Constraint database menjaga aturan yang sama.
+            'renew_before_days' => ['required_if:mode,custom', 'nullable', 'integer', 'min:1', 'max:'.LicenseTerms::MAX_RENEW_BEFORE_DAYS, 'lt:valid_days'],
+        ]);
+
+        $before = $terms->forSite($row);
+
+        DB::transaction(function () use ($request, $row, $data, $terms, $before): void {
+            $row->forceFill([
+                'license_perpetual' => $data['mode'] === 'perpetual',
+                'license_valid_days' => $data['mode'] === 'custom' ? (int) $data['valid_days'] : null,
+                'license_renew_before_days' => $data['mode'] === 'custom' ? (int) $data['renew_before_days'] : null,
+            ])->save();
+
+            OperatorAudit::record($request, 'site.license.terms_changed', 'site', $row->id, [
+                'from' => $before,
+                'to' => $terms->forSite($row->refresh()),
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', $data['mode'] === 'perpetual'
+            ? 'Situs ini memakai lisensi permanen. Lisensi tanpa tanggal berakhir dikirim pada penerbitan berikutnya.'
+            : 'Masa lisensi disimpan. Berlaku pada penerbitan berikutnya.');
+    }
+
+    public function resumeLicense(Request $request, string $site): RedirectResponse
+    {
+        $row = $this->site($site);
+
+        if (! $row->licenseRenewalSuspended()) {
+            return redirect('/situs/'.$row->id);
+        }
+
+        DB::transaction(function () use ($request, $row): void {
+            $suspendedAt = $row->license_suspended_at?->toIso8601String();
+            $row->forceFill(['license_suspended_at' => null])->save();
+
+            OperatorAudit::record($request, 'site.license.renewal_resumed', 'site', $row->id, [
+                'suspended_at' => $suspendedAt,
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dilanjutkan. Lisensi baru ikut di laporan agen berikutnya bila sudah jatuh tempo.');
+    }
+
+    private function site(string $site): Site
+    {
+        return Site::query()->whereKey($site)->firstOrFail();
     }
 }

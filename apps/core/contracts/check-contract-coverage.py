@@ -6,6 +6,15 @@ test suite fails when one is missing from the contract -- that is precisely how
 twelve endpoints ended up undocumented while every test stayed green. This check
 is the only thing that notices.
 
+Routes are read from the framework (`php artisan route:list --json`), not from the
+text of `routes/api.php`. A route registered in a loop, or through a helper, never
+appears there as a literal path, and a text match would report a clean run while
+missing it.
+
+The contract side is the combined bundle `contracts/openapi-internal.yaml`, assembled
+by `contracts/bundle.py` from the split sources in `contracts/internal/`. Run
+`python contracts/bundle.py --check` as well: it proves the bundle matches its sources.
+
 Run from `apps/core`:
 
     python contracts/check-contract-coverage.py
@@ -13,7 +22,9 @@ Run from `apps/core`:
 
 from __future__ import annotations
 
-import re
+import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,22 +33,40 @@ try:
 except ImportError:
     sys.exit("PyYAML is required: pip install pyyaml")
 
-ROUTES = Path("routes/api.php")
 CONTRACT = Path("contracts/openapi-internal.yaml")
+PREFIX = "api/internal/v1/"
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")
-
-ROUTE_PATTERN = re.compile(
-    r"Route::(" + "|".join(HTTP_METHODS) + r")\(\s*'([^']+)'",
-    re.IGNORECASE,
-)
 
 
 def routes_in_code() -> set[tuple[str, str]]:
-    source = ROUTES.read_text(encoding="utf-8")
-    return {
-        (match.group(1).upper(), "/" + match.group(2).lstrip("/"))
-        for match in ROUTE_PATTERN.finditer(source)
-    }
+    env = dict(os.environ)
+    # Only needed on machines whose PHP loads ext-opentelemetry; harmless elsewhere.
+    env.setdefault("OTEL_PHP_DISABLED_INSTRUMENTATIONS", "all")
+    result = subprocess.run(
+        ["php", "artisan", "route:list", "--json", "--path=" + PREFIX.rstrip("/")],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.exit("php artisan route:list failed:\n" + result.stderr + result.stdout)
+    try:
+        routes = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        sys.exit("php artisan route:list did not return JSON:\n" + result.stdout[:2000])
+
+    found: set[tuple[str, str]] = set()
+    for route in routes:
+        uri = route.get("uri", "")
+        if not uri.startswith(PREFIX):
+            continue
+        for method in str(route.get("method", "")).split("|"):
+            if method.lower() in HTTP_METHODS:
+                found.add((method.upper(), "/" + uri[len(PREFIX):]))
+    if not found:
+        sys.exit("No routes found under /" + PREFIX + " -- the check would pass without checking anything.")
+    return found
 
 
 def routes_in_contract() -> set[tuple[str, str]]:
@@ -58,9 +87,8 @@ def render(title: str, items: set[tuple[str, str]], hint: str) -> None:
 
 
 def main() -> int:
-    for path in (ROUTES, CONTRACT):
-        if not path.exists():
-            sys.exit(f"Not found: {path}. Run this from apps/core.")
+    if not CONTRACT.exists() or not Path("artisan").exists():
+        sys.exit(f"Not found: {CONTRACT} or artisan. Run this from apps/core.")
 
     code = routes_in_code()
     contract = routes_in_contract()
@@ -71,13 +99,14 @@ def main() -> int:
         print(f"OK: {len(code)} internal routes, all present in {CONTRACT}.")
         return 0
 
-    print(f"Contract drift between {ROUTES} and {CONTRACT}.")
+    print(f"Contract drift between the router and {CONTRACT}.")
     if undocumented:
         render(
             "Routes that other apps can call but nothing documents:",
             undocumented,
-            "Add them to the contract. A caller cannot integrate against a promise "
-            "that was never written down.",
+            "Add them under contracts/internal/ (a path file, and the root of every reader "
+            "that may call it), then run `python contracts/bundle.py`. A caller cannot "
+            "integrate against a promise that was never written down.",
         )
     if orphaned:
         render(
