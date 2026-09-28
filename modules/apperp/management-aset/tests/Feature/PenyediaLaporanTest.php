@@ -294,6 +294,7 @@ class PenyediaLaporanTest extends TestCase
         // buku fiskal tidak ikut karena tanpa pilihan buku yang dipakai buku komersial.
         $this->assertSame(['AST-DEP-1', 'AST-DEP-4'], array_column($laporan['tables']['baris'], 'kode'));
         $baris = $laporan['tables']['baris'][0];
+        $this->assertRowKeysDeclared('laporan-penyusutan-aset', $baris);
         // Saldo awal 10 juta + Juni + Juli + Agustus, dikurangi pembalik Juli. Usulan Mei yang
         // belum difinalkan dan periode September tidak ikut.
         $this->assertSame('15000000.00', $baris['akumulasi_penyusutan']);
@@ -372,6 +373,7 @@ class PenyediaLaporanTest extends TestCase
         // Hanya pemusnahan, berurutan menurut tanggal; penjualan di bulan yang sama tidak ikut.
         $this->assertSame(['AST-PMS-2', 'AST-PMS-1', 'AST-PMS-3'], array_column($laporan['tables']['baris'], 'kode_aset'));
         [$juli, $agustus, $tanpaBuku] = $laporan['tables']['baris'];
+        $this->assertRowKeysDeclared('laporan-pemusnahan-aset', $agustus);
         $this->assertSame(
             ['2026-08-10', 'Rusak berat', 'Komersial', '20000000.00', '5000000.00', 'Terbakar'],
             [$agustus['tanggal'], $agustus['kondisi_aset'], $agustus['buku'], $agustus['nilai_perolehan'], $agustus['nilai_buku_akhir'], $agustus['keterangan']],
@@ -417,6 +419,85 @@ class PenyediaLaporanTest extends TestCase
             'Anda tidak berhak membaca data laporan ini.',
             fn () => $this->penyedia()->dataset('laporan-pemusnahan-aset', $this->konteks(['management-aset.aset.read']), []),
         );
+    }
+
+    public function test_sale_report_counts_each_sale_once_and_reads_the_chosen_book(): void
+    {
+        $data = $this->soldAssets();
+        $izin = ['management-aset.penjualan-aset.read'];
+
+        $laporan = $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks($izin), []);
+
+        // Hanya penjualan, berurutan menurut tanggal; pemusnahan tidak ikut.
+        $this->assertSame(['AST-JUAL-2', 'AST-JUAL-1', 'AST-JUAL-3'], array_column($laporan['tables']['baris'], 'kode_aset'));
+        [$tanpaNilai, $lelang, $tanpaBuku] = $laporan['tables']['baris'];
+        $this->assertRowKeysDeclared('laporan-penjualan-aset', $lelang);
+        // AST-JUAL-1 punya buku komersial dan fiskal; tanpa pilihan hanya komersial yang dibaca.
+        $this->assertSame(
+            ['Komersial', '10000000.00', '6000000.00', '4000000.00'],
+            [$lelang['buku'], $lelang['nilai_penjualan'], $lelang['nilai_buku'], $lelang['laba_rugi']],
+        );
+        // Nilai penjualan yang tidak diisi tidak ditulis nol, dan laba/ruginya ikut kosong.
+        $this->assertSame([null, '3000000.00', null], [$tanpaNilai['nilai_penjualan'], $tanpaNilai['nilai_buku'], $tanpaNilai['laba_rugi']]);
+        $this->assertSame(['—', '500000.00', null], [$tanpaBuku['buku'], $tanpaBuku['nilai_penjualan'], $tanpaBuku['nilai_buku']]);
+        $this->assertArrayNotHasKey('status_dokumen', $lelang);
+
+        // Penjualan dijumlah sekali, bukan sekali per buku.
+        $this->assertSame(3, $laporan['fields']['jumlah_penjualan']);
+        $this->assertSame('10500000.00', $laporan['fields']['total_nilai_penjualan']);
+        $this->assertSame('9000000.00', $laporan['fields']['total_nilai_buku']);
+        $this->assertSame('4000000.00', $laporan['fields']['total_laba_rugi']);
+
+        $fiskal = $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks($izin), ['buku_id' => $data['fiskal']]);
+        $this->assertSame(['Fiskal', '9000000.00', '1000000.00'], [
+            $fiskal['tables']['baris'][1]['buku'], $fiskal['tables']['baris'][1]['nilai_buku'], $fiskal['tables']['baris'][1]['laba_rugi'],
+        ]);
+        $this->assertSame(['Fiskal', '10500000.00'], [$fiskal['fields']['filter_buku'], $fiskal['fields']['total_nilai_penjualan']]);
+
+        // Layar memakai format yang sama dengan hasil cetak.
+        $this->headers($izin)
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-penjualan-aset?dari=2026-08-01')
+            ->assertOk()
+            ->assertJsonPath('data.fields.jumlah_penjualan', 2)
+            ->assertJsonPath('data.fields.total_nilai_penjualan', 'Rp 10.500.000,00')
+            ->assertJsonPath('data.tables.baris.0.tanggal_penjualan', '12/08/2026')
+            ->assertJsonPath('data.tables.baris.0.laba_rugi', 'Rp 4.000.000,00');
+
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks(['management-aset.mutasi-aset.read']), []),
+        );
+    }
+
+    public function test_sale_value_is_totalled_once_when_an_asset_has_two_commercial_books(): void
+    {
+        // Satu group boleh memetakan dua buku berlapis Komersial; asetnya lalu punya dua buku yang
+        // sama-sama dibaca tanpa pilihan buku. Barisnya dua, penjualannya tetap satu.
+        $group = $this->master('aset_m_group_aset', 'Mesin', 'GRPA-J2');
+        $jenis = $this->master('aset_m_jenis_aset', 'Genset', 'JNSA-J2');
+        $asetId = $this->insertAsset('AST-JUAL-4', '2020-01-01', 40000000, $group, $jenis);
+        foreach (['KOM-A', 'KOM-B'] as $kode) {
+            $bukuId = $this->master('aset_m_buku_penyusutan', 'Komersial '.$kode, $kode, ['posting_layer' => 'current']);
+            DB::table('aset_tr_buku_aset')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $asetId, 'buku_id' => $bukuId,
+                'book_code' => $kode, 'acquisition_value' => 40000000, 'accumulated_depreciation' => 30000000,
+                'net_book_value' => 10000000, 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penjualan-aset.create'])
+            ->withHeader('Idempotency-Key', 'penjualan-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penjualan-aset', [
+                'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+                'aset_id' => $asetId, 'tanggal' => '2026-08-30', 'nilai' => 12000000,
+            ])
+            ->assertCreated();
+
+        $laporan = $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks(['management-aset.penjualan-aset.read']), []);
+
+        $this->assertCount(2, $laporan['tables']['baris']);
+        $this->assertSame(1, $laporan['fields']['jumlah_penjualan']);
+        $this->assertSame('12000000.00', $laporan['fields']['total_nilai_penjualan']);
     }
 
     public function test_every_registered_report_is_declared_for_printing(): void
@@ -550,6 +631,74 @@ class PenyediaLaporanTest extends TestCase
         }
 
         return ['group' => $group, 'fiskal' => $fiskal];
+    }
+
+    /**
+     * Setiap kolom baris dataset harus dinyatakan di `fields()`, dan sebaliknya. Halaman Layout
+     * laporan menawarkan placeholder dari `fields()`; kunci yang berbeda dengan datanya membuat
+     * layout buatan tenant mencetak kolom kosong tanpa satu pun kesalahan.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function assertRowKeysDeclared(string $kode, array $row): void
+    {
+        $declared = array_values(array_filter(array_map(
+            static fn (array $field): ?string => $field['table'] === 'baris' ? substr($field['key'], strlen('baris.')) : null,
+            $this->penyedia()->definisi($kode, $this->konteks([app(ReportRegistry::class)->get($kode)->permission()]))['fields'],
+        )));
+        $this->assertEqualsCanonicalizing($declared, array_keys($row), "Kolom baris {$kode} tidak sama dengan fields().");
+    }
+
+    /**
+     * Aset yang dijual lewat API seperti oleh pengguna, dengan dekomisioning dilewati seperti di
+     * `SiklusHidupAsetTest`; dokumen penjualannya sendiri melepas aset dan menutup bukunya.
+     *
+     * - AST-JUAL-1: buku komersial (nilai buku 6 juta) dan fiskal (9 juta), dijual 12 Agustus 10 juta;
+     * - AST-JUAL-2: buku komersial (3 juta), dijual 20 Juli tanpa nilai penjualan;
+     * - AST-JUAL-3: tanpa buku, dijual 25 Agustus 500 ribu;
+     * - AST-PMS-9: dimusnahkan 1 Agustus, bukan dijual.
+     *
+     * @return array{fiskal: string}
+     */
+    private function soldAssets(): array
+    {
+        $group = $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-J1');
+        $jenis = $this->master('aset_m_jenis_aset', 'Mobil', 'JNSA-J1');
+        $komersial = $this->master('aset_m_buku_penyusutan', 'Komersial', 'KOM-J1', ['posting_layer' => 'current']);
+        $fiskal = $this->master('aset_m_buku_penyusutan', 'Fiskal', 'FIS-J1', ['posting_layer' => 'tax']);
+        $buku = function (string $asetId, string $bukuId, int $perolehan, int $nilaiBuku): void {
+            DB::table('aset_tr_buku_aset')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $asetId, 'buku_id' => $bukuId,
+                'book_code' => $bukuId, 'acquisition_value' => $perolehan, 'accumulated_depreciation' => $perolehan - $nilaiBuku,
+                'net_book_value' => $nilaiBuku, 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        };
+
+        $lelang = $this->insertAsset('AST-JUAL-1', '2022-01-10', 15000000, $group, $jenis);
+        $buku($lelang, $komersial, 15000000, 6000000);
+        $buku($lelang, $fiskal, 15000000, 9000000);
+        $tanpaNilai = $this->insertAsset('AST-JUAL-2', '2023-02-01', 8000000, $group, $jenis);
+        $buku($tanpaNilai, $komersial, 8000000, 3000000);
+        $tanpaBuku = $this->insertAsset('AST-JUAL-3', '2021-06-01', 2000000, $group, $jenis);
+        $dimusnahkan = $this->insertAsset('AST-PMS-9', '2021-06-01', 1000000, $group, $jenis);
+
+        foreach ([
+            [$lelang, 'penjualan-aset', '2026-08-12', 10000000, 'Lelang'],
+            [$tanpaNilai, 'penjualan-aset', '2026-07-20', null, null],
+            [$tanpaBuku, 'penjualan-aset', '2026-08-25', 500000, null],
+            [$dimusnahkan, 'pemusnahan-aset', '2026-08-01', null, null],
+        ] as [$asetId, $dokumen, $tanggal, $nilai, $keterangan]) {
+            DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
+            $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.create'])
+                ->withHeader('Idempotency-Key', $dokumen.'-'.Str::ulid())
+                ->postJson('/api/modules/management-aset/v1/'.$dokumen, [
+                    'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+                    'aset_id' => $asetId, 'tanggal' => $tanggal, 'nilai' => $nilai, 'keterangan' => $keterangan,
+                ])
+                ->assertCreated();
+        }
+
+        return ['fiskal' => $fiskal];
     }
 
     private function insertAsset(string $kode, string $diperoleh, int $nilai, string $group, string $jenis): string

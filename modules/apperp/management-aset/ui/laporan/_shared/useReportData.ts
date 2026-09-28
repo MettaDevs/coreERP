@@ -18,6 +18,11 @@ export function useReportData<T = Record<string, unknown>>(
     const [filters, setFilters] =
         useState<Record<string, string>>(initialFilters);
     const [rows, setRows] = useState<T[]>([]);
+    // Nilai kepala laporan (total, jumlah, nama filter) persis seperti yang tercetak, supaya
+    // layar tidak menjumlah ulang teks yang sudah diformat.
+    const [fields, setFields] = useState<ReportApiResponse['data']['fields']>(
+        {},
+    );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [refreshKey, setRefreshKey] = useState(0);
@@ -44,11 +49,13 @@ export function useReportData<T = Record<string, unknown>>(
 
                 if (!cancelled) {
                     setRows((res.data?.tables?.baris ?? []) as T[]);
+                    setFields(res.data?.fields ?? {});
                 }
             } catch (err) {
                 if (!cancelled) {
                     setError(errorMessage(err, 'Gagal memuat data laporan.'));
                     setRows([]);
+                    setFields({});
                 }
             } finally {
                 if (!cancelled) {
@@ -89,6 +96,7 @@ export function useReportData<T = Record<string, unknown>>(
         bindFilter,
         hasActiveFilters: Object.values(filters).some((value) => value !== ''),
         rows,
+        fields,
         loading,
         error,
         refetch,

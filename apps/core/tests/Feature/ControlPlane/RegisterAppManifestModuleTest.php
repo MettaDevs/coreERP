@@ -60,13 +60,16 @@ class RegisterAppManifestModuleTest extends TestCase
         //
         // 28 September 2026, laporan pemusnahan aset (#154): +1 laporan
         // (`laporan-pemusnahan-aset`).
+        //
+        // 28 September 2026, laporan penjualan aset (#157): +1 laporan
+        // (`laporan-penjualan-aset`).
         'entry_points' => 69,
         'permissions' => 133,
         'privileges' => 71,
         'duties' => 38,
         'number_sequence_references' => 31,
         'workflow_types' => 2,
-        'reports' => 6,
+        'reports' => 7,
     ];
 
     private string $akarSementara;
