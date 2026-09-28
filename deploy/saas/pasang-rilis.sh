@@ -107,7 +107,7 @@ compose() {
 
 langkah 'Data'
 compose --profile data up -d
-compose --profile data wait core-minio-init
+compose --profile data wait core-rustfs-init
 
 langkah 'Migrasi'
 # `--force-recreate` supaya ia benar-benar berjalan setiap pemasangan: rilis yang image-nya sama dengan yang
