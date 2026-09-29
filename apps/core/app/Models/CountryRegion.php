@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Satu-satunya daftar negara di produk ini. Master wilayah dulu punya daftarnya
  * sendiri di `ref_countries` dengan kolom kode tiga huruf yang diisi campur alpha-2
- * dan alpha-3; keduanya disatukan ke sini pada 17 September 2026 karena satu negara
+ * dan alpha-3; keduanya disatukan ke sini pada 29 September 2026 karena satu negara
  * yang hidup dua kali membuat master wilayah tidak pernah menjadi master bagi alamat.
  *
  * @property string $code

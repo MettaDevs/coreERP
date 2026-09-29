@@ -56,11 +56,11 @@ return new class extends Migration
     public function up(): void
     {
         DB::transaction(function (): void {
-            $this->tambahKolomKeCountryRegions();
-            $this->pindahkanIsiRefCountries();
-            $this->petakanKodeTigaHurufDiTabelAnak();
-            $this->pastikanSetiapKodeAnakDikenal();
-            $this->alihkanForeignKey();
+            $this->addColumnsToCountryRegions();
+            $this->copyRefCountries();
+            $this->mapThreeLetterCodesInChildren();
+            $this->assertEveryChildCodeIsKnown();
+            $this->redirectForeignKeys();
 
             // `ref_countries` sengaja ditinggal, tidak dibuang. Mundur ke rilis sebelumnya
             // hanya mengganti image dan tidak memulihkan database; kode rilis lama masih
@@ -84,13 +84,13 @@ return new class extends Migration
                 where not exists (select 1 from ref_countries rc where rc.code = cr.code)
             ');
 
-            foreach (self::CHILDREN as [$tabel, $kolom]) {
-                $fk = $this->namaForeignKey($tabel, $kolom);
-                DB::statement("alter table {$tabel} drop constraint if exists {$fk}");
-                DB::statement("alter table {$tabel} alter column {$kolom} type varchar(3) using {$kolom}::varchar(3)");
+            foreach (self::CHILDREN as [$tableName, $column]) {
+                $fk = $this->foreignKeyName($tableName, $column);
+                DB::statement("alter table {$tableName} drop constraint if exists {$fk}");
+                DB::statement("alter table {$tableName} alter column {$column} type varchar(3) using {$column}::varchar(3)");
 
-                if ($tabel !== 'ref_country_hierarchy_levels') {
-                    DB::statement("alter table {$tabel} add constraint {$fk} foreign key ({$kolom}) references ref_countries(code) on delete cascade");
+                if ($tableName !== 'ref_country_hierarchy_levels') {
+                    DB::statement("alter table {$tableName} add constraint {$fk} foreign key ({$column}) references ref_countries(code) on delete cascade");
                 }
             }
 
@@ -101,7 +101,7 @@ return new class extends Migration
     }
 
     /** Kolom yang selama ini hanya dimiliki `ref_countries`. */
-    private function tambahKolomKeCountryRegions(): void
+    private function addColumnsToCountryRegions(): void
     {
         Schema::table('country_regions', function (Blueprint $table): void {
             $table->string('phone_code', 10)->nullable()->after('name');
@@ -116,7 +116,7 @@ return new class extends Migration
         DB::statement('alter table country_regions alter column iso3 drop not null');
     }
 
-    private function pindahkanIsiRefCountries(): void
+    private function copyRefCountries(): void
     {
         // Negara yang sudah ada di kedua tabel: ambil kolom tambahannya saja. Namanya
         // sengaja tidak ditimpa — `country_regions` memakai nama Indonesia.
@@ -148,15 +148,15 @@ return new class extends Migration
     }
 
     /** `IDN` menjadi `ID` lewat `iso3`, bukan lewat pemotongan dua huruf pertama. */
-    private function petakanKodeTigaHurufDiTabelAnak(): void
+    private function mapThreeLetterCodesInChildren(): void
     {
-        foreach (self::CHILDREN as [$tabel, $kolom]) {
+        foreach (self::CHILDREN as [$tableName, $column]) {
             DB::statement("
-                update {$tabel} anak
-                set {$kolom} = cr.code
+                update {$tableName} anak
+                set {$column} = cr.code
                 from country_regions cr
-                where length(trim(anak.{$kolom})) = 3
-                  and upper(trim(anak.{$kolom})) = cr.iso3
+                where length(trim(anak.{$column})) = 3
+                  and upper(trim(anak.{$column})) = cr.iso3
             ");
         }
 
@@ -178,53 +178,53 @@ return new class extends Migration
      * `country_regions`. Tanpa pemeriksaan ini, `alter column` akan memotong nilainya
      * diam-diam dan barisnya berpindah ke negara lain.
      */
-    private function pastikanSetiapKodeAnakDikenal(): void
+    private function assertEveryChildCodeIsKnown(): void
     {
-        $masalah = [];
+        $problems = [];
 
-        foreach (self::CHILDREN as [$tabel, $kolom]) {
-            /** @var list<object{nilai: string, jumlah: int}> $baris */
-            $baris = DB::select("
-                select anak.{$kolom} as nilai, count(*) as jumlah
-                from {$tabel} anak
-                where anak.{$kolom} is not null
-                  and not exists (select 1 from country_regions cr where cr.code = upper(trim(anak.{$kolom})))
-                group by anak.{$kolom}
+        foreach (self::CHILDREN as [$tableName, $column]) {
+            /** @var list<object{nilai: string, jumlah: int}> $row */
+            $row = DB::select("
+                select anak.{$column} as nilai, count(*) as jumlah
+                from {$tableName} anak
+                where anak.{$column} is not null
+                  and not exists (select 1 from country_regions cr where cr.code = upper(trim(anak.{$column})))
+                group by anak.{$column}
                 order by count(*) desc
                 limit 5
             ");
 
-            foreach ($baris as $b) {
-                $masalah[] = sprintf('%s.%s = "%s" (%d baris)', $tabel, $kolom, $b->nilai, $b->jumlah);
+            foreach ($row as $b) {
+                $problems[] = sprintf('%s.%s = "%s" (%d baris)', $tableName, $column, $b->nilai, $b->jumlah);
             }
         }
 
-        if ($masalah !== []) {
+        if ($problems !== []) {
             throw new RuntimeException(
                 'Penggabungan tabel negara dihentikan: ada kode negara yang tidak dikenal '.
-                "country_regions.\n- ".implode("\n- ", $masalah)."\n".
+                "country_regions.\n- ".implode("\n- ", $problems)."\n".
                 'Perbaiki atau hapus baris itu lebih dulu, lalu jalankan ulang migrasinya.',
             );
         }
     }
 
-    private function alihkanForeignKey(): void
+    private function redirectForeignKeys(): void
     {
-        foreach (self::CHILDREN as [$tabel, $kolom]) {
-            $fk = $this->namaForeignKey($tabel, $kolom);
+        foreach (self::CHILDREN as [$tableName, $column]) {
+            $fk = $this->foreignKeyName($tableName, $column);
 
-            DB::statement("alter table {$tabel} drop constraint if exists {$fk}");
-            DB::statement("update {$tabel} set {$kolom} = upper(trim({$kolom})) where {$kolom} is not null");
-            DB::statement("alter table {$tabel} alter column {$kolom} type char(2) using {$kolom}::char(2)");
+            DB::statement("alter table {$tableName} drop constraint if exists {$fk}");
+            DB::statement("update {$tableName} set {$column} = upper(trim({$column})) where {$column} is not null");
+            DB::statement("alter table {$tableName} alter column {$column} type char(2) using {$column}::char(2)");
 
             // `restrict`, bukan `cascade`: menghapus satu negara tidak boleh menghapus
             // seluruh provinsi, kode pos, dan zona waktunya tanpa ada yang bertanya.
-            DB::statement("alter table {$tabel} add constraint {$fk} foreign key ({$kolom}) references country_regions(code) on delete restrict");
+            DB::statement("alter table {$tableName} add constraint {$fk} foreign key ({$column}) references country_regions(code) on delete restrict");
         }
     }
 
-    private function namaForeignKey(string $tabel, string $kolom): string
+    private function foreignKeyName(string $tableName, string $column): string
     {
-        return "{$tabel}_{$kolom}_foreign";
+        return "{$tableName}_{$column}_foreign";
     }
 };

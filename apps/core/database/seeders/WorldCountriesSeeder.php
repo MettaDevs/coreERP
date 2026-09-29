@@ -272,9 +272,9 @@ class WorldCountriesSeeder extends Seeder
             // Negaranya sendiri sudah diisi migrasi `seed_country_regions` beserta nama
             // Indonesianya. Seeder ini hanya melengkapi kode telepon dan zona waktu;
             // menimpa `name` di sini akan mengembalikan seluruh daftar ke bahasa Inggris.
-            $sudahAda = DB::table('country_regions')->where('code', $c['code'])->exists();
+            $existing = DB::table('country_regions')->where('code', $c['code'])->exists();
 
-            if ($sudahAda) {
+            if ($existing) {
                 DB::table('country_regions')->where('code', $c['code'])->update([
                     'phone_code' => $c['phone_code'],
                     'timezone' => $c['timezone'],

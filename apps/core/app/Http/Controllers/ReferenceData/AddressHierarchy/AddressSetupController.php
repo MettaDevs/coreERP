@@ -336,7 +336,7 @@ final class AddressSetupController extends Controller
     }
 
     /*
-     * storeCountry() dan destroyCountry() dibuang pada 17 September 2026.
+     * storeCountry() dan destroyCountry() dibuang pada 29 September 2026.
      *
      * Tabel negara tidak punya kolom pemilik yang terisi — controller ini tidak pernah
      * menulis `tenant_id` sama sekali — sehingga baris yang dibuat satu tenant menjadi
@@ -348,15 +348,14 @@ final class AddressSetupController extends Controller
      */
 
     /*
-     * Method tulis di bawah ini tidak lagi punya rute sejak 17 September 2026.
+     * Method tulis di bawah ini tidak punya rute: master wilayah dikunci dari sisi tenant
+     * (OWN-05, diputuskan 29 September 2026), dan isinya datang dari migrasi, seeder, dan
+     * perintah impor.
      *
-     * Ia dipertahankan, bukan dibuang, karena isinya bukan sekadar simpan: ada aturan
-     * nama ganda per induk, penurunan zona waktu, penjagaan anak sebelum menghapus, dan
-     * pemetaan kode wilayah. Semua itu yang akan dipakai kembali begitu data bersama ini
-     * punya pemilik — lewat layar admin, atau lewat `tenant_id` yang benar-benar diisi.
-     *
-     * Yang tidak boleh dilakukan: memasang kembali rutenya tanpa menjawab pertanyaan
-     * kepemilikan itu lebih dulu. Lihat docs/todo/buku-alamat-global/, OWN-05.
+     * Ia dipertahankan karena isinya bukan sekadar simpan: ada aturan nama ganda per induk,
+     * penurunan zona waktu, penjagaan anak sebelum menghapus, dan pemetaan kode wilayah.
+     * Semua itu yang dipakai bila kelak admin produk diberi layar untuk data bersama ini.
+     * Jangan memasangnya kembali sebagai rute tenant. Lihat docs/todo/buku-alamat-global/.
      */
 
     public function storeProvince(Request $request): RedirectResponse

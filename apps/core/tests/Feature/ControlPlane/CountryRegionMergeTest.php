@@ -16,18 +16,20 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
  * Satu daftar negara, dan hanya satu.
  *
- * Sampai 17 September 2026 ada dua: `country_regions` yang dirujuk alamat pos, dan
+ * Sampai 29 September 2026 ada dua: `country_regions` yang dirujuk alamat pos, dan
  * `ref_countries` yang dirujuk master wilayah. Test ini menjaga agar keduanya tidak
  * tumbuh kembali menjadi dua, dan agar penghapusan negara tidak dapat menarik alamat
  * atau provinsi ikut hilang.
  */
 class CountryRegionMergeTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $admin;
@@ -50,25 +52,30 @@ class CountryRegionMergeTest extends TestCase
             'slug' => 'demo-enterprise',
             'status' => 'active',
         ]);
-        TenantMembership::create([
-            'tenant_id' => $this->tenant->id,
-            'user_id' => $this->admin->id,
-            'system_role' => 'owner',
-            'status' => 'active',
-        ]);
+        // Membaca master wilayah butuh duty Lihat data referensi, sama seperti layar lain (SEC-22).
+        $this->grantDuties(
+            TenantMembership::create([
+                'tenant_id' => $this->tenant->id,
+                'user_id' => $this->admin->id,
+                'system_role' => 'owner',
+                'status' => 'active',
+            ]),
+            ['core.reference-data.manage'],
+        );
     }
 
     public function test_ref_countries_no_longer_owns_anything(): void
     {
         // Tabelnya masih ada sebagai bekal mundur satu rilis, tetapi tidak boleh ada
         // satu pun foreign key yang masih menunjuknya.
-        $penunjuk = DB::select("
+        $reference = DB::select("
             select tc.table_name
             from information_schema.table_constraints tc
-            join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name
+            join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name and ccu.constraint_schema = tc.constraint_schema
             where tc.constraint_type = 'FOREIGN KEY' and ccu.table_name = 'ref_countries'
+              and tc.table_schema = current_schema()
         ");
-        $this->assertSame([], $penunjuk, 'Masih ada tabel yang menunjuk ref_countries.');
+        $this->assertSame([], $reference, 'Masih ada tabel yang menunjuk ref_countries.');
 
         $indonesia = CountryRegion::query()->find('ID');
         $this->assertNotNull($indonesia);
@@ -148,7 +155,7 @@ class CountryRegionMergeTest extends TestCase
         // Data wilayah dipakai bersama seluruh tenant dan tidak punya pemilik per baris,
         // jadi tidak ada pintu tulisnya sama sekali — bukan sekadar dijaga izin. Bahkan
         // pemilik tenant pun tidak dapat menambahnya.
-        $pintu = [
+        $door = [
             ['post', '/settings/address-setup/countries', ['code' => 'ZZ', 'name' => 'Karangan']],
             ['post', '/settings/address-setup/provinces', ['country_code' => 'ID', 'code' => '98', 'name' => 'Karangan']],
             ['post', '/settings/address-setup/villages', ['name' => 'Karangan']],
@@ -156,8 +163,8 @@ class CountryRegionMergeTest extends TestCase
             ['post', '/settings/address-setup/parameters', ['country_code' => 'ID']],
         ];
 
-        foreach ($pintu as [$cara, $alamat, $isi]) {
-            $this->actingAs($this->admin)->{$cara}($alamat, $isi)->assertNotFound();
+        foreach ($door as [$method, $address, $values]) {
+            $this->actingAs($this->admin)->{$method}($address, $values)->assertNotFound();
         }
 
         $this->assertDatabaseMissing('country_regions', ['code' => 'ZZ']);
