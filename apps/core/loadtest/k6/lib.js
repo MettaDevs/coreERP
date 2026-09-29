@@ -33,6 +33,7 @@ export const FIXTURE = __ENV.FIXTURE || 'f1';
 export const PASSWORD = 'Loadtest-Owner-2026!';
 
 const DUTY_SEMPIT = __ENV.NARROW_DUTY || 'management-aset.group-aset.manage';
+const ROLE_SEMPIT = 'Load test sempit';
 
 function email(index, tag) {
     return `load-${FIXTURE}${tag}-${index}@example.test`;
@@ -245,40 +246,65 @@ function kumpulkanCookie(jar) {
 }
 
 /**
- * Tenant dengan hak sengaja dipersempit: role Owner-nya disunting sampai hanya menyisakan
- * satu duty. Dipakai probe eskalasi hak — pemegangnya boleh membaca satu master dan wajib
- * ditolak pada master sebelahnya, juga ketika sistem sedang jenuh.
+ * Tenant dengan hak sengaja dipersempit: owner membuat role berisi satu duty, menerbitkan undangan
+ * dengan role itu, lalu anggota baru yang menukarnya menjadi pemegang sesi tenant ini. Role Owner
+ * sendiri diatur otomatis dan selalu memegang semua duty, jadi tidak dapat disunting. Dipakai probe
+ * eskalasi hak — pemegangnya boleh membaca satu master dan wajib ditolak pada master sebelahnya,
+ * juga ketika sistem sedang jenuh.
  */
 export function sempitkanTenant(tenant, dutyCode = DUTY_SEMPIT) {
-    const jar = new http.CookieJar();
+    const owner = paramsUntuk(bangunJar(tenant));
 
-    for (const [nama, nilai] of Object.entries(tenant.cookies)) {
-        jar.set(BASE, nama, nilai);
-    }
-
-    const params = { jar, headers: jsonHeaders(tenant.csrf) };
-
-    const daftar = http.get(`${BASE}/api/v1/roles`, params);
+    // 1. Role sempit: dibuat pada run pertama, disetel ulang pada run yang memakai fixture yang sama.
+    const daftar = http.get(`${BASE}/api/v1/roles`, owner);
 
     if (daftar.status !== 200) {
         fail(`setup role tenant sempit gagal: ${daftar.status} ${String(daftar.body).slice(0, 300)}`);
     }
 
-    const owner = (daftar.json('data') || []).find((role) => role.name === 'Owner');
+    const ada = (daftar.json('data') || []).find((role) => role.name === ROLE_SEMPIT);
+    const isi = JSON.stringify({ name: ROLE_SEMPIT, duty_codes: [dutyCode] });
+    const role = ada ? http.put(`${BASE}/api/v1/roles/${ada.id}`, isi, owner) : http.post(`${BASE}/api/v1/roles`, isi, owner);
 
-    if (!owner) {
-        fail('setup tenant sempit: role Owner tidak ditemukan');
+    if (![200, 201].includes(role.status)) {
+        fail(`setup penyempitan role gagal: ${role.status} ${String(role.body).slice(0, 300)}`);
     }
 
-    const disunting = http.put(
-        `${BASE}/api/v1/roles/${owner.id}`,
-        JSON.stringify({ name: 'Owner', duty_codes: [dutyCode] }),
-        params,
+    // 2. Undangan yang hanya membawa role itu, tanpa batas data.
+    const undangan = http.post(
+        `${BASE}/api/v1/invitation-codes`,
+        JSON.stringify({ assignments: [{ role_id: role.json('data.id'), policy_scopes: [] }] }),
+        owner,
     );
 
-    if (disunting.status !== 200) {
-        fail(`setup penyempitan role gagal: ${disunting.status} ${String(disunting.body).slice(0, 300)}`);
+    if (undangan.status !== 201) {
+        fail(`setup undangan tenant sempit gagal: ${undangan.status} ${String(undangan.body).slice(0, 300)}`);
     }
 
-    return tenant;
+    // 3. Anggota baru menukar undangan. Kodenya sekali pakai, jadi emailnya baru pada setiap run.
+    const jar = new http.CookieJar();
+    const form = http.get(`${BASE}/login`, { jar });
+
+    if (form.status !== 200) {
+        fail(`setup form tenant sempit gagal: ${form.status}`);
+    }
+
+    const alamat = `load-${FIXTURE}-sempit-${RUN_ID}-${Date.now()}@example.test`;
+    const tukar = http.post(
+        `${BASE}/api/v1/invitation-redemptions`,
+        JSON.stringify({
+            code: undangan.json('data.code'),
+            name: 'Anggota sempit',
+            email: alamat,
+            password: PASSWORD,
+            password_confirmation: PASSWORD,
+        }),
+        { jar, headers: jsonHeaders(csrfDari(jar)) },
+    );
+
+    if (tukar.status !== 201) {
+        fail(`setup penukaran undangan tenant sempit gagal: ${tukar.status} ${String(tukar.body).slice(0, 300)}`);
+    }
+
+    return { ...tenant, email: alamat, cookies: kumpulkanCookie(jar), csrf: csrfDari(jar) };
 }

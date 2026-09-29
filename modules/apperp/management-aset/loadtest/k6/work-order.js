@@ -168,7 +168,7 @@ function badanWorkOrder(tenant, keterangan) {
 
 export function setup() {
     const tenants = siapkanTenant(TENANT_COUNT, ['management-aset']);
-    // Tenant tambahan yang role Owner-nya dipersempit ke satu duty. Dipakai membuktikan batas
+    // Tenant tambahan yang sesinya milik anggota berhak satu duty. Dipakai membuktikan batas
     // hak tetap tegak saat sistem jenuh: pemegangnya boleh melist master group aset dan wajib
     // ditolak pada permukaan work order.
     const sempit = sempitkanTenant(siapkanTenant(1, ['management-aset'], 'sempit')[0]);

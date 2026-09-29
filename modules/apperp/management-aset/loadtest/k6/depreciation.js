@@ -180,7 +180,7 @@ function idDari(responses) {
 
 export function setup() {
     const tenants = siapkanTenant(TENANT_COUNT, ['management-aset']);
-    // Tenant tambahan yang role Owner-nya dipersempit ke satu duty, dipakai probe eskalasi hak.
+    // Tenant tambahan yang sesinya milik anggota berhak satu duty, dipakai probe eskalasi hak.
     const sempit = sempitkanTenant(siapkanTenant(1, ['management-aset'], 'sempit')[0]);
 
     const params = (tenant, kunci) => paramsUntuk(tenant, {}, kunci ? { 'Idempotency-Key': kunci } : undefined);
