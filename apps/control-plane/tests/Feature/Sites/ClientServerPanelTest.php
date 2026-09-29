@@ -305,6 +305,92 @@ final class ClientServerPanelTest extends SiteTestCase
             ->assertInertia(fn ($page) => $page->where('installCommand', null));
     }
 
+    /**
+     * Pilihan pemasangan masuk ke perintahnya, dan hanya ke sana.
+     *
+     * Tandanya dibaca `pasang.sh` di server klien dan ditulis ke `.env` di sana; konsol tidak
+     * menyimpannya. Yang tersimpan cuma catatan audit — "kenapa server itu tidak terkunci lisensi"
+     * adalah pertanyaan yang muncul berbulan-bulan kemudian, ketika perintahnya sudah lama hilang.
+     */
+    public function test_the_install_command_carries_the_chosen_options(): void
+    {
+        $operator = $this->operator();
+        [$environment, $site] = $this->prepared('PT Klinik Sehat');
+        $this->owner($site->tenant_id, 'Dewi Pemilik', 'dewi@klinik.test');
+        $this->fakeEntitlements($site, ['management-aset']);
+        $this->release('0.10.0');
+
+        $this->actingAs($operator)->post("/lingkungan/{$environment->id}/perintah-pasang", [
+            'kunci_lisensi' => true,
+            'proxy_luar' => true,
+            'app_port' => '8100',
+        ])->assertSessionHasNoErrors();
+
+        $issued = session('install_command');
+        $this->assertIsArray($issued);
+        $this->assertStringEndsWith(
+            ' --kunci-lisensi --proxy-luar --app-port 8100',
+            (string) $issued['command'],
+        );
+
+        $event = OperatorAuditEvent::query()->where('action', 'site.install_command.issued')->sole();
+        $this->assertTrue($event->detail['install_options']['lock_license']);
+        $this->assertTrue($event->detail['install_options']['external_proxy']);
+        $this->assertSame(8100, $event->detail['install_options']['app_port']);
+    }
+
+    /** Tanpa pilihan, perintahnya sama persis dengan sebelum pilihan itu ada. */
+    public function test_an_install_command_without_options_carries_no_flags(): void
+    {
+        $operator = $this->operator();
+        [$environment, $site] = $this->prepared('PT Klinik Sehat');
+        $this->owner($site->tenant_id, 'Dewi Pemilik', 'dewi@klinik.test');
+        $this->fakeEntitlements($site, ['management-aset']);
+        $this->release('0.10.0');
+
+        $this->actingAs($operator)
+            ->post("/lingkungan/{$environment->id}/perintah-pasang")
+            ->assertSessionHasNoErrors();
+
+        $issued = session('install_command');
+        $this->assertIsArray($issued);
+        $command = (string) $issued['command'];
+        // Berakhir tepat di token: tidak ada tanda lain sesudahnya.
+        $this->assertStringEndsWith(' --token '.$this->tokenIn($command), $command);
+        $this->assertStringNotContainsString('--kunci-lisensi', $command);
+        $this->assertStringNotContainsString('--proxy-luar', $command);
+        $this->assertStringNotContainsString('--app-port', $command);
+
+        $event = OperatorAuditEvent::query()->where('action', 'site.install_command.issued')->sole();
+        $this->assertFalse($event->detail['install_options']['lock_license']);
+        $this->assertNull($event->detail['install_options']['app_port']);
+    }
+
+    /**
+     * Port yang bukan port ditolak di sini, bukan di server klien.
+     *
+     * `8e3` dan `8000abc` lolos dari pemeriksaan yang lebih longgar, lalu menjadi argumen yang ditolak
+     * `pasang.sh` — sesudah teknisi menempelkannya di mesin orang lain. Tidak ada token maupun operasi
+     * yang lahir dari permintaan yang ditolak.
+     */
+    public function test_a_port_that_is_not_a_port_is_refused_before_anything_is_created(): void
+    {
+        $operator = $this->operator();
+        [$environment, $site] = $this->prepared('PT Klinik Sehat');
+        $this->owner($site->tenant_id, 'Dewi Pemilik', 'dewi@klinik.test');
+        $this->fakeEntitlements($site, ['management-aset']);
+        $this->release('0.10.0');
+
+        foreach (['8000abc', '8e3', '0', '65536', '-1'] as $salah) {
+            $this->actingAs($operator)
+                ->post("/lingkungan/{$environment->id}/perintah-pasang", ['app_port' => $salah])
+                ->assertSessionHasErrors('app_port');
+        }
+
+        $this->assertSame(0, SiteEnrollmentToken::query()->count());
+        $this->assertSame(0, SiteOperation::query()->count());
+    }
+
     public function test_the_password_the_hash_and_the_token_never_reach_the_audit_trail_or_the_logs(): void
     {
         $logged = [];

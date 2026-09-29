@@ -28,12 +28,13 @@ final class EnrollmentTokens
      * Alamatnya `APP_URL`, bukan host permintaan yang sedang dilayani: operator yang membuka konsol lewat
      * alamat internal tidak boleh menghasilkan perintah yang hanya dapat dijangkau dari jaringan kantor.
      */
-    public static function installCommand(string $token): string
+    public static function installCommand(string $token, ?InstallOptions $options = null): string
     {
         return sprintf(
-            'curl -fsSL %s/pasang.sh | sudo bash -s -- --token %s',
+            'curl -fsSL %s/pasang.sh | sudo bash -s -- --token %s%s',
             rtrim((string) config('app.url'), '/'),
             $token,
+            ($options ?? InstallOptions::none())->flags(),
         );
     }
 

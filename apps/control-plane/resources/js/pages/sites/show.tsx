@@ -17,6 +17,8 @@ import { FinanceFeedBadge, InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
 import DnsStatus from '@/components/dns-status';
 import type { DnsInfo } from '@/components/dns-status';
+import InstallOptionsFields from '@/components/install-options';
+import type { InstallOptionValues } from '@/components/install-options';
 import {
     ServerAddressField,
     ServerAdvancedFields,
@@ -354,7 +356,11 @@ function Enrollment({ site }: { site: Site }) {
     const { enrollment } = usePage<{
         enrollment: { command: string; expiresAt: string } | null;
     }>().props;
-    const form = useForm({});
+    const form = useForm<InstallOptionValues>({
+        kunci_lisensi: false,
+        proxy_luar: false,
+        app_port: '',
+    });
 
     return (
         <Section
@@ -388,6 +394,12 @@ function Enrollment({ site }: { site: Site }) {
                     });
                 }}
             >
+                <InstallOptionsFields
+                    value={form.data}
+                    onChange={(value) => form.setData(value)}
+                    portError={form.errors.app_port}
+                    disabled={form.processing}
+                />
                 <Button type="submit" disabled={form.processing}>
                     Buat perintah pasang
                 </Button>
