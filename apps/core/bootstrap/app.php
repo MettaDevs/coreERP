@@ -12,6 +12,7 @@ use App\Http\Middleware\RequireTenantMembershipAtAddress;
 use App\Http\Middleware\ResolveEnvironment;
 use App\Http\Middleware\ResolveModuleContext;
 use App\Http\Middleware\ResolvePasskeyOrigin;
+use App\Http\Middleware\ThrottleRequestsPerRoute;
 use App\Http\Middleware\WajibGantiSandi;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -44,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'integration-client' => AuthenticateIntegrationClient::class,
             // Rute yang dibaca module dan sistem luar sekaligus; lihat AuthenticateInternalCaller.
             'internal-caller' => AuthenticateInternalCaller::class,
+            // Batas angka dihitung per rute; lihat ThrottleRequestsPerRoute.
+            'throttle' => ThrottleRequestsPerRoute::class,
         ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 

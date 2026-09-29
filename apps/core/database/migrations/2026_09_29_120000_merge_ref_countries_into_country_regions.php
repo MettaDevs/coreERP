@@ -58,6 +58,7 @@ return new class extends Migration
         DB::transaction(function (): void {
             $this->addColumnsToCountryRegions();
             $this->copyRefCountries();
+            $this->removeThreeLetterTwins();
             $this->mapThreeLetterCodesInChildren();
             $this->assertEveryChildCodeIsKnown();
             $this->redirectForeignKeys();
@@ -148,6 +149,26 @@ return new class extends Migration
     }
 
     /** `IDN` menjadi `ID` lewat `iso3`, bukan lewat pemotongan dua huruf pertama. */
+    /**
+     * Seeder wilayah lama menanam tingkat hierarki dua kali, sekali dengan kode ISO3 dan sekali dengan
+     * ISO2, isinya sama. Konsolidasi 9 September 2026 sudah membuang kembarnya, tetapi seeder yang sama
+     * menanamnya lagi (282 baris di database dev, 21 September). Memetakan ISO3 ke ISO2 di atas kembar
+     * itu melanggar `ref_country_hier_level_unique`, jadi baris ISO3 yang sudah punya pasangan ISO2 pada
+     * tingkat yang sama dibuang lebih dulu. Tidak ada foreign key yang menunjuk tabel ini, dan barisnya
+     * data acuan hasil seeder, bukan data tenant.
+     */
+    private function removeThreeLetterTwins(): void
+    {
+        DB::statement('
+            delete from ref_country_hierarchy_levels tiga
+            using country_regions cr, ref_country_hierarchy_levels dua
+            where length(trim(tiga.country_code)) = 3
+              and upper(trim(tiga.country_code)) = cr.iso3
+              and dua.country_code = cr.code
+              and dua.level = tiga.level
+        ');
+    }
+
     private function mapThreeLetterCodesInChildren(): void
     {
         foreach (self::CHILDREN as [$tableName, $column]) {

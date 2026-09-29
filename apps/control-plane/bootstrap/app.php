@@ -3,6 +3,7 @@
 use ControlPlane\Http\Middleware\EndSessionAfterProviderLogout;
 use ControlPlane\Http\Middleware\HandleInertiaRequests;
 use ControlPlane\Http\Middleware\OperatorOnly;
+use ControlPlane\Http\Middleware\ThrottleRequestsPerRoute;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -37,6 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'operator' => OperatorOnly::class,
+            // Batas angka dihitung per rute; lihat ThrottleRequestsPerRoute.
+            'throttle' => ThrottleRequestsPerRoute::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

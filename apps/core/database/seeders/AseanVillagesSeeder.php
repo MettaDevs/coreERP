@@ -384,27 +384,19 @@ class AseanVillagesSeeder extends Seeder
             ['country_code' => 'SGP', 'level' => 4, 'level_code' => 'village',  'level_name' => 'Urban Sector / Estate', 'description' => 'Tingkat 4: Kawasan perkotaan/estate (City-state tanpa desa tradisional)'],
         ];
 
-        // Also duplicate ISO-2 equivalents so both ISO3 and ISO2 query lookups find these levels
+        // Daftar di atas ditulis dengan ISO3, tetapi negara hanya dikenal lewat ISO2 sejak
+        // `country_regions` menjadi satu-satunya tabel negara; baris ISO3 ditolak foreign key-nya.
         $iso2Map = [
             'IDN' => 'ID', 'THA' => 'TH', 'PHL' => 'PH', 'MYS' => 'MY', 'MMR' => 'MM',
             'VNM' => 'VN', 'KHM' => 'KH', 'LAO' => 'LA', 'TLS' => 'TL', 'BRN' => 'BN', 'SGP' => 'SG',
         ];
 
         foreach ($levels as $lvl) {
-            DB::table('ref_country_hierarchy_levels')->updateOrInsert(
-                ['country_code' => $lvl['country_code'], 'level' => $lvl['level']],
-                array_merge($lvl, [
-                    'id' => (string) Str::ulid(),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ])
-            );
-
             $iso2 = $iso2Map[$lvl['country_code']];
-            $lvlIso2 = array_merge($lvl, ['country_code' => $iso2]);
             DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                 ['country_code' => $iso2, 'level' => $lvl['level']],
-                array_merge($lvlIso2, [
+                array_merge($lvl, [
+                    'country_code' => $iso2,
                     'id' => (string) Str::ulid(),
                     'created_at' => $now,
                     'updated_at' => $now,
