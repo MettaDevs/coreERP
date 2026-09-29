@@ -611,57 +611,65 @@ export function OrganizationAddressesSection({
                             </FieldSet>
                             {!chosenShared && (
                                 <>
-                            <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                {text(
-                                    'street',
-                                    'Jalan dan nomor',
-                                    'Jl. I Gusti Ngurah Rai No. 8',
-                                )}
-                                {text(
-                                    'building',
-                                    'Gedung / blok / lantai',
-                                    'Rukan CBD Blok K',
-                                )}
-                                {text(
-                                    'district',
-                                    'Kelurahan / kecamatan',
-                                    'Mengwitani, Mengwi',
-                                )}
-                                {text('city', 'Kota / kabupaten', 'Badung')}
-                                {text('province', 'Provinsi', 'Bali')}
-                                {text('postal_code', 'Kode pos', '80351')}
-                            </FieldGroup>
-                            <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                <Field>
-                                    <NativeSelect
-                                        label="Negara"
-                                        value={form.country_region_code}
-                                        onChange={(event) =>
-                                            setForm((current) => ({
-                                                ...current,
-                                                country_region_code:
-                                                    event.target.value,
-                                            }))
-                                        }
-                                    >
-                                        {(list.meta?.countries ?? []).map(
-                                            (country) => (
-                                                <NativeSelectOption
-                                                    key={country.code}
-                                                    value={country.code}
-                                                >
-                                                    {country.name}
-                                                </NativeSelectOption>
-                                            ),
+                                    <FieldGroup className="grid gap-4 md:grid-cols-2">
+                                        {text(
+                                            'street',
+                                            'Jalan dan nomor',
+                                            'Jl. I Gusti Ngurah Rai No. 8',
                                         )}
-                                    </NativeSelect>
-                                    <FieldDescription>
-                                        Nama negara ikut tercetak hanya untuk
-                                        alamat di luar Indonesia.
-                                    </FieldDescription>
-                                </Field>
-                                {text('postbox', 'PO Box')}
-                            </FieldGroup>
+                                        {text(
+                                            'building',
+                                            'Gedung / blok / lantai',
+                                            'Rukan CBD Blok K',
+                                        )}
+                                        {text(
+                                            'district',
+                                            'Kelurahan / kecamatan',
+                                            'Mengwitani, Mengwi',
+                                        )}
+                                        {text(
+                                            'city',
+                                            'Kota / kabupaten',
+                                            'Badung',
+                                        )}
+                                        {text('province', 'Provinsi', 'Bali')}
+                                        {text(
+                                            'postal_code',
+                                            'Kode pos',
+                                            '80351',
+                                        )}
+                                    </FieldGroup>
+                                    <FieldGroup className="grid gap-4 md:grid-cols-2">
+                                        <Field>
+                                            <NativeSelect
+                                                label="Negara"
+                                                value={form.country_region_code}
+                                                onChange={(event) =>
+                                                    setForm((current) => ({
+                                                        ...current,
+                                                        country_region_code:
+                                                            event.target.value,
+                                                    }))
+                                                }
+                                            >
+                                                {(
+                                                    list.meta?.countries ?? []
+                                                ).map((country) => (
+                                                    <NativeSelectOption
+                                                        key={country.code}
+                                                        value={country.code}
+                                                    >
+                                                        {country.name}
+                                                    </NativeSelectOption>
+                                                ))}
+                                            </NativeSelect>
+                                            <FieldDescription>
+                                                Nama negara ikut tercetak hanya
+                                                untuk alamat di luar Indonesia.
+                                            </FieldDescription>
+                                        </Field>
+                                        {text('postbox', 'PO Box')}
+                                    </FieldGroup>
                                 </>
                             )}
                             <Field>

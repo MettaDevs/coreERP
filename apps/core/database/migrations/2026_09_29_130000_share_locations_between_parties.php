@@ -137,7 +137,9 @@ return new class extends Migration
 
         Schema::create('locations', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
+            // Tanpa foreign key ke `tenants` (sisi pusat, dibatasi `FkMenyeberangBatasTest`). Tabel yang menunjuk
+            // tempat memakai composite key `(tenant_id, location_id)`, jadi tenant lain tetap ditolak database.
+            $table->ulid('tenant_id');
             $table->string('name', 120);
             $table->timestamps();
             $table->softDeletes();
