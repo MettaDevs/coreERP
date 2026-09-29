@@ -26,10 +26,11 @@ COREERP_ADDRESS_PORT=8000
 ```
 
 Lalu nyalakan ulang kedua dev server. Alamatnya menjadi
-`http://<tenant>--<lingkungan>.<jenis>.erp.localhost:8000`, dan konsol mencetaknya persis begitu.
+`http://<tenant>.<jenis>.erp.localhost:8000` untuk demo atau sandbox, dan
+`http://<tenant>.erp.localhost:8000` untuk produksi. Konsol mencetaknya persis begitu.
 
 **Kenapa tanpa `hosts`.** `.localhost` dicadangkan RFC 6761 untuk mesin sendiri, termasuk setiap
-subdomainnya. Diukur di Windows 11 pada 13 September 2026: `pt-uji--peragaan.demo.erp.localhost`
+subdomainnya. Diukur di Windows 11 pada 13 September 2026: `pt-uji.demo.erp.localhost`
 diselesaikan ke `127.0.0.1` dan `::1` oleh sistem operasi, tanpa satu baris pun di `hosts`.
 
 **Jangan `.local`.** Nama itu milik mDNS (RFC 6762). Di mesin yang sama `pt-uji.erp.local` tidak
@@ -81,12 +82,12 @@ kembali.
 127.0.0.1 erp.grenery.xyz
 127.0.0.1 admin.erp.grenery.xyz
 127.0.0.1 pt-sinar-abadi.erp.grenery.xyz
-127.0.0.1 pt-sinar-abadi--peragaan-modul.demo.erp.grenery.xyz
+127.0.0.1 pt-sinar-abadi.demo.erp.grenery.xyz
 ```
 
 Baris ketiga dan keempat menyesuaikan tenant yang ada di database kerjamu. Alamatnya dihitung
 `EnvironmentAddress::forEnvironment()` — bentuknya `<tenant>.<domain>` untuk produksi dan
-`<tenant>--<lingkungan>.<jenis>.<domain>` untuk selainnya.
+`<tenant>.<jenis>.<domain>` untuk demo dan sandbox. Slug lingkungan tidak ikut ke alamat.
 
 ### 3. `.env` Core
 
@@ -141,7 +142,7 @@ docker volume rm coreerp-traefik_acme
 Saat alamatnya benar-benar menunjuk server, record-nya harus **abu-abu** di Cloudflare.
 
 Universal SSL gratis hanya mencakup apex dan wildcard **satu tingkat**: `grenery.xyz` dan
-`*.grenery.xyz`. Alamat demo kita — `<tenant>--<lingkungan>.demo.erp.grenery.xyz` — berada di
+`*.grenery.xyz`. Alamat demo kita — `<tenant>.demo.erp.grenery.xyz` — berada di
 tingkat kedua, dan tidak tercakup. Dengan proxy menyala, Cloudflare akan menyajikan sertifikatnya
 sendiri yang tidak cocok, dan peramban menolaknya mentah-mentah. Yang mencakup tingkat kedua hanya
 Advanced Certificate Manager, yang berbayar.

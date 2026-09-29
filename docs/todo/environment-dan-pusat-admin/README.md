@@ -1376,17 +1376,18 @@ pastikan setiap rute baru berada di dalam grup yang dijaga.
 
 ## Alamat dan sertifikat
 
-Pola yang diinginkan mengikuti Dynamics: `<pelanggan>-<lingkungan>.<jenis>.<domain>`, misalnya
-`ivs-uat.sandbox.contoh.co.id`.
+Pola alamat yang berlaku adalah produksi `<tenant>.<domain>`, sedangkan demo dan sandbox
+`<tenant>.<jenis>.<domain>`. Slug lingkungan tidak masuk ke hostname; satu tenant karena itu hanya
+memiliki satu lingkungan hidup untuk setiap jenis yang memakai label.
 
 Ia menabrak dua aturan TLS yang menentukan bentuk domainnya, dan keduanya lebih baik diketahui
 sekarang daripada saat sertifikatnya ditolak peramban:
 
-1. **Sebuah wildcard hanya mencakup satu label.** `*.contoh.co.id` **tidak** mencakup
-   `ivs-uat.sandbox.contoh.co.id` — RFC 6125 §6.4.3: *"the client SHOULD NOT compare against
+1. **Sebuah wildcard hanya mencakup satu label.** `*.erp.contoh.co.id` **tidak** mencakup
+   `ivs.demo.erp.contoh.co.id` — RFC 6125 §6.4.3: *"the client SHOULD NOT compare against
    anything but the left-most label."*
-2. **Wildcard juga tidak mencakup domain induknya sendiri.** `*.contoh.co.id` bukan
-   `contoh.co.id`, jadi apex harus ikut disebut.
+2. **Wildcard juga tidak mencakup domain induknya sendiri.** `*.erp.contoh.co.id` bukan
+   `erp.contoh.co.id`, jadi domain dasar harus ikut disebut.
 
 Dan Let's Encrypt hanya menerbitkan wildcard lewat **DNS-01** — *"Wildcard issuance must use the
 DNS-01 challenge"* — yang menuntut TXT record ditulis **mesin** tiap perpanjangan. HTTP-01 tidak
@@ -1399,7 +1400,7 @@ DNS-only bukan proxied.**
 
 | | |
 | --- | --- |
-| Nama dalam satu sertifikat | `*.contoh.co.id`, `*.demo.contoh.co.id`, `*.sandbox.contoh.co.id`, dan `contoh.co.id` |
+| Nama dalam satu sertifikat | `*.erp.contoh.co.id`, `*.demo.erp.contoh.co.id`, `*.sandbox.erp.contoh.co.id`, dan `erp.contoh.co.id` |
 | Kenapa satu sertifikat | Batasnya 100 nama per sertifikat — satu penerbitan cukup, bukan tiga |
 | Kenapa DNS-only | Supaya sertifikat yang kita terbitkan itulah yang dilihat peramban |
 | Token API | Dibatasi satu zona, izin `Zone:DNS:Edit` saja |
@@ -1817,15 +1818,7 @@ Bentuk alamatnya: produksi `<tenant>.erp.contoh.co.id`, demo dan sandbox
 hidup per jenis**, dijaga `environments_satu_produksi` dan `environments_satu_per_jenis` di database
 pusat.
 
-::: info Diganti 14 September 2026
-Bentuk pertamanya `<tenant>--<lingkungan>.<jenis>.contoh.co.id`, supaya satu tenant dapat punya
-banyak demo. Pemilik produk memilih alamat yang terbaca manusia di atas kemampuan itu. Slug
-lingkungan sebagai label sendiri (`<tenant>.<lingkungan>.…`) ditimbang dan ditolak: wildcard hanya
-mencakup satu label, jadi setiap nama lingkungan akan menuntut sertifikat wildcard baru. Peringatan
-tentang pemisah dua tanda hubung di bawah tetap disimpan sebagai riwayat.
-:::
-
-Ia **tidak pernah menyala** tanpa `COREERP_DOMAIN_DASAR`. Bukan gagal; tidak menyala. On-prem,
+Ia **tidak pernah menyala** tanpa `COREERP_BASE_DOMAIN`. Bukan gagal; tidak menyala. On-prem,
 lingkungan lokal, dan seluruh suite yang ada berjalan persis seperti sebelumnya.
 
 **Belum:** middleware ini belum memindahkan koneksi database. Itu menuntut penjaga koneksi beserta
