@@ -6,6 +6,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import EnvironmentBanner from '@/components/environment-banner';
 import SiteLicenseBanner from '@/components/site-license-banner';
+import WorkDateNotice from '@/components/work-date-notice';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
@@ -42,6 +43,8 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                             sampai ke kerangka ini.
                         */}
                         <SiteLicenseBanner />
+                        {/* Tanggal kerja yang bukan hari ini; yang ini boleh ditutup untuk sisa sesi. */}
+                        <WorkDateNotice />
                         <div className="min-w-0 flex-1 bg-muted/30">
                             {children}
                         </div>

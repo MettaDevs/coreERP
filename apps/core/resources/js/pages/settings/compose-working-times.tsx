@@ -15,6 +15,7 @@ import {
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useToday } from '@/hooks/use-work-date';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 export type TemplateLine = {
@@ -136,34 +137,33 @@ export default function ComposeWorkingTimesPage({
         });
     }, [selectedTemplate]);
 
+    const today = useToday();
+
     const setRange = (start: Date, end: Date) => {
         setFromDate(localDate(start));
         setToDate(localDate(end));
     };
 
-    const handleSetRangeCurrentMonth = () => {
-        const now = new Date();
+    // Bulan dan tahun "sekarang" dari hari ini menurut zona pengguna, bukan dari jam perangkat.
+    const [todayYear, todayMonth] = today.split('-').map(Number);
 
+    const handleSetRangeCurrentMonth = () => {
         setRange(
-            new Date(now.getFullYear(), now.getMonth(), 1),
-            new Date(now.getFullYear(), now.getMonth() + 1, 0),
+            new Date(todayYear, todayMonth - 1, 1),
+            new Date(todayYear, todayMonth, 0),
         );
     };
 
     const handleSetRangeNextMonth = () => {
-        const now = new Date();
-
         setRange(
-            new Date(now.getFullYear(), now.getMonth() + 1, 1),
-            new Date(now.getFullYear(), now.getMonth() + 2, 0),
+            new Date(todayYear, todayMonth, 1),
+            new Date(todayYear, todayMonth + 1, 0),
         );
     };
 
     const handleSetRangeCurrentYear = () => {
-        const year = new Date().getFullYear();
-
-        setFromDate(`${year}-01-01`);
-        setToDate(`${year}-12-31`);
+        setFromDate(`${todayYear}-01-01`);
+        setToDate(`${todayYear}-12-31`);
     };
 
     const handleSubmit = (e: React.FormEvent) => {

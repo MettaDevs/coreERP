@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\DateTimeSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 /* @chisel-password-confirmation */
@@ -12,6 +13,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::patch('settings/date-time', [DateTimeSettingsController::class, 'update'])->name('date-time.update');
+    Route::post('settings/date-time/dismiss-work-date-notice', [DateTimeSettingsController::class, 'dismissWorkDateNotice'])
+        ->name('date-time.dismiss-work-date-notice');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

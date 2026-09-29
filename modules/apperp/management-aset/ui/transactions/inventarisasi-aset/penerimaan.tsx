@@ -230,11 +230,14 @@ export const barisKosong = (): BarisPenerimaan => ({
     keterangan: '',
 });
 
-export const penerimaanKosong = (context: Context): EditablePenerimaan => ({
-    // Tanggal hari ini sebagai nilai awal: penerimaan hampir selalu dicatat pada hari
-    // barangnya datang, dan tanggal kosong pada dokumen bertanda tangan adalah cacat
-    // yang baru ketahuan setelah dicetak.
-    tanggal: new Date().toISOString().slice(0, 10),
+export const penerimaanKosong = (
+    context: Context,
+    workDate: string,
+): EditablePenerimaan => ({
+    // Tanggal kerja pengguna sebagai nilai awal, yang bawaannya hari ini: penerimaan hampir
+    // selalu dicatat pada hari barangnya datang, dan tanggal kosong pada dokumen bertanda
+    // tangan adalah cacat yang baru ketahuan setelah dicetak.
+    tanggal: workDate,
     tanggal_siap_pakai: '',
     responsible_org_unit_id: context.org_unit_id ?? '',
     receiving_org_unit_id: context.org_unit_id ?? '',

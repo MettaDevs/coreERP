@@ -168,18 +168,19 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 Zona waktu dikerjakan lebih dulu: "hari ini" pada tanggal kerja baru benar bila dihitung menurut zona
 pengguna.
 
-- [ ] 7.1 Setelan zona waktu per pengguna di My Profile, dengan nilai bawaan sesuai K-10.
-- [ ] 7.2 "Hari ini" dihitung dari jam server menurut zona pengguna, tidak pernah dari jam perangkat.
+- [x] 7.1 Setelan zona waktu per pengguna di My Profile, dengan nilai bawaan sesuai K-10.
+- [x] 7.2 "Hari ini" dihitung dari jam server menurut zona pengguna, tidak pernah dari jam perangkat.
       Form yang sekarang mengisi tanggal dengan `toISOString()` beralih ke nilai ini.
 - [ ] 7.3 Layar dan cetakan memformat waktu dengan zona pengguna; cetakan menuliskan zonanya, misalnya
       "28/09/2026 14:05 WITA".
 - [ ] 7.4 Module mengirim waktu UTC bertipe `datetime`, dan Core yang memformatnya lewat `ValueFormat`.
       Konteks laporan dan permintaan membawa zona pengguna untuk "hari ini" di module, misalnya periode
       bawaan dan nama berkas.
-- [ ] 7.5 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
-- [ ] 7.6 Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
-- [ ] 7.7 Form transaksi memakai tanggal kerja sebagai tanggal bawaan.
-- [ ] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
+- [x] 7.5 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
+- [x] 7.6 Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
+- [x] 7.7 Form transaksi memakai tanggal kerja sebagai tanggal bawaan. Sudah: penerimaan, mutasi, dan
+      perencanaan aset.
+- [x] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
       untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat.
 
 ### 8. [ ] Penyempurnaan ekspor laporan (gap 10)

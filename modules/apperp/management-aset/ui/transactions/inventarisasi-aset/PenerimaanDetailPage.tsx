@@ -1,6 +1,7 @@
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -99,8 +100,9 @@ export default function PenerimaanDetailPage({
     // yang sudah selesai memang tidak dapat disunting — dan ini bukan pengecualiannya,
     // karena nomor seri tidak pernah menjadi bagian dokumen.
     const canCorrect = bolehMengoreksiAset(permissions);
+    const { date: workDate } = useWorkDate();
     const [record, setRecord] = useState<EditablePenerimaan>(() =>
-        penerimaanKosong(context),
+        penerimaanKosong(context, workDate),
     );
     const [tersimpan, setTersimpan] = useState<Penerimaan | null>(null);
     const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);

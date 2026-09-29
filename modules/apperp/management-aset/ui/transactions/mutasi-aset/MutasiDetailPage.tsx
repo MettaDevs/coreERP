@@ -1,6 +1,7 @@
 import { FileText, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -79,7 +80,10 @@ export default function MutasiDetailPage({
 }) {
     const can = izin(permissions);
     const canMutate = bolehMemindahkan(permissions);
-    const [record, setRecord] = useState<EditableMutasi>(emptyMutasi);
+    const { date: workDate } = useWorkDate();
+    const [record, setRecord] = useState<EditableMutasi>(() =>
+        emptyMutasi(workDate),
+    );
     const [tersimpan, setTersimpan] = useState<Mutasi | null>(null);
     const [memuat, setMemuat] = useState(modeAwal !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);

@@ -17,6 +17,19 @@ final class CurrentWorkspace
     private const OPERATING_UNIT_KEY = 'workspace.org_unit_id';
 
     /**
+     * Tanggal kerja sesi ini, padanan *Work Date* Business Central.
+     *
+     * Disimpan di sesi, bukan di tabel, karena BC memperlakukannya sebagai pengaturan sementara:
+     * ia kembali ke hari ini saat pengguna keluar atau pindah company. Tanggal kerja yang tersimpan
+     * permanen adalah tanggal yang dilupakan orang, lalu diam-diam menjadi tanggal transaksi berminggu-
+     * minggu kemudian.
+     */
+    private const WORK_DATE_KEY = 'workspace.work_date';
+
+    /** Pengingat "tanggal kerja bukan hari ini" sudah ditutup untuk sisa sesi. */
+    private const WORK_DATE_NOTICE_KEY = 'workspace.work_date_notice_dismissed';
+
+    /**
      * Keanggotaan dan organisasi yang sudah dibaca pada permintaan ini.
      *
      * Kelas ini ditanyai berkali-kali dalam satu permintaan oleh pihak yang berbeda — middleware
@@ -85,7 +98,13 @@ final class CurrentWorkspace
         if ($membership) {
             $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
         } else {
-            $request->session()->forget([self::MEMBERSHIP_KEY, self::LEGAL_ENTITY_KEY, self::OPERATING_UNIT_KEY]);
+            $request->session()->forget([
+                self::MEMBERSHIP_KEY,
+                self::LEGAL_ENTITY_KEY,
+                self::OPERATING_UNIT_KEY,
+                self::WORK_DATE_KEY,
+                self::WORK_DATE_NOTICE_KEY,
+            ]);
         }
 
         return $membership;
@@ -141,9 +160,58 @@ final class CurrentWorkspace
         $this->ingatanKeanggotaan = [];
         $this->ingatanOrganisasi = [];
 
-        $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
+        // Pindah tenant atau legal entity adalah padanan pindah company di BC, dan di sana tanggal
+        // kerja kembali ke hari ini. Pindah unit operasi saja bukan pindah company.
+        $session = $request->session();
+        if ($session->get(self::MEMBERSHIP_KEY) !== $membership->id
+            || $session->get(self::LEGAL_ENTITY_KEY) !== $legalEntity?->id) {
+            $this->resetWorkDate($request);
+        }
+
+        $session->put(self::MEMBERSHIP_KEY, $membership->id);
         $this->storeSelection($request, self::LEGAL_ENTITY_KEY, $legalEntity);
         $this->storeSelection($request, self::OPERATING_UNIT_KEY, $operatingUnit);
+    }
+
+    /** Tanggal kerja sesi ini (`Y-m-d`), atau `null` bila pengguna memakai hari ini. */
+    public function workDate(Request $request): ?string
+    {
+        $value = $request->session()->get(self::WORK_DATE_KEY);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Mengganti tanggal kerja sesi ini; `null` mengembalikannya ke hari ini.
+     *
+     * Pengingat yang sudah ditutup ikut dibuka lagi: tanggal baru adalah keputusan baru, dan
+     * pengguna perlu melihat bahwa transaksi berikutnya akan memakainya.
+     */
+    public function setWorkDate(Request $request, ?string $date): void
+    {
+        if ($date === null) {
+            $this->resetWorkDate($request);
+
+            return;
+        }
+
+        $request->session()->put(self::WORK_DATE_KEY, $date);
+        $request->session()->forget(self::WORK_DATE_NOTICE_KEY);
+    }
+
+    public function dismissWorkDateNotice(Request $request): void
+    {
+        $request->session()->put(self::WORK_DATE_NOTICE_KEY, true);
+    }
+
+    public function workDateNoticeDismissed(Request $request): bool
+    {
+        return $request->session()->get(self::WORK_DATE_NOTICE_KEY) === true;
+    }
+
+    private function resetWorkDate(Request $request): void
+    {
+        $request->session()->forget([self::WORK_DATE_KEY, self::WORK_DATE_NOTICE_KEY]);
     }
 
     private function selected(Request $request, TenantMembership $membership, string $classification, string $key): ?Organization

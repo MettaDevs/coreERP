@@ -18,7 +18,7 @@ class UpdateOrganization
      * Nomor boleh diganti. Posting yang sudah terbit menyimpan nomor pada saat terbit, jadi mengganti
      * nomor tidak menulis ulang jurnal lama; yang berubah hanya posting berikutnya.
      *
-     * @param  array{name:string,company_code:?string,country_code:?string,operating_unit_type:?string,operating_unit_number?:?string}  $data
+     * @param  array{name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string}  $data
      */
     public function handle(TenantMembership $actor, Organization $organization, array $data): Organization
     {
@@ -43,6 +43,7 @@ class UpdateOrganization
                     $organization->legalEntity()->update([
                         'company_code' => $data['company_code'],
                         'country_code' => $data['country_code'],
+                        ...(($data['timezone'] ?? null) !== null ? ['timezone' => $data['timezone']] : []),
                     ]);
                 } else {
                     // `tenant_id` ikut ditulis setiap kali: operating unit yang lahir di rilis

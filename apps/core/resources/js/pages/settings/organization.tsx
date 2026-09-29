@@ -55,6 +55,7 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
+import { Select } from '@apperp/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
@@ -99,6 +100,7 @@ import {
 } from '@/components/organization/address-book-section';
 import { FinancePostingSection } from '@/components/organization/finance-posting-section';
 import { PrintIdentitySection } from '@/components/organization/print-identity-section';
+import { useToday } from '@/hooks/use-work-date';
 
 type OperatingUnit = { type: string; number: string | null };
 type Organization = {
@@ -106,7 +108,11 @@ type Organization = {
     name: string;
     classification: 'legal_entity' | 'operating_unit';
     status: string;
-    legal_entity: { company_code: string; country_code: string } | null;
+    legal_entity: {
+        company_code: string;
+        country_code: string;
+        timezone: string;
+    } | null;
     operating_unit: OperatingUnit | null;
 };
 type Purpose = {
@@ -178,6 +184,50 @@ function NomorBelumAda() {
     );
 }
 
+type TimezoneOption = { value: string; label: string };
+
+/**
+ * Zona waktu entitas legal: bawaan bagi pengguna yang belum memilih zonanya sendiri di My Profile (K-10).
+ * Saat form belum dalam mode ubah, nilainya tampil sebagai teks baca saja.
+ */
+function LegalEntityTimezoneField({
+    value,
+    onChange,
+    error,
+    editing = true,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    error?: string;
+    editing?: boolean;
+}) {
+    const { timezones } = usePage<{ timezones: TimezoneOption[] }>().props;
+    const label =
+        timezones.find((zone) => zone.value === value)?.label ?? value;
+
+    return (
+        <Field data-invalid={Boolean(error)}>
+            {editing ? (
+                <Select
+                    label="Zona waktu"
+                    items={timezones}
+                    value={value || null}
+                    onValueChange={(next) => next && onChange(next)}
+                    searchPlaceholder="Cari zona waktu..."
+                    emptyMessage="Zona waktu tidak ditemukan."
+                />
+            ) : (
+                <Input label="Zona waktu" value={label} readOnly />
+            )}
+            <FieldDescription>
+                Dipakai pengguna yang belum memilih zona waktunya sendiri di
+                profil.
+            </FieldDescription>
+            <FieldError>{error}</FieldError>
+        </Field>
+    );
+}
+
 function CreateOrganizationDialog({
     classification,
     operatingUnitTypes,
@@ -188,11 +238,14 @@ function CreateOrganizationDialog({
     triggerLabel: string;
 }) {
     const [open, setOpen] = useState(false);
+    const { clock } = usePage().props;
     const form = useForm({
         classification,
         name: '',
         company_code: '',
         country_code: 'ID',
+        // Bawaannya zona pengguna yang membuatnya; kosong berarti bawaan kolom di server.
+        timezone: clock?.timezone ?? '',
         operating_unit_type: 'department',
         operating_unit_number: '',
     });
@@ -311,6 +364,13 @@ function CreateOrganizationDialog({
                                             {form.errors.country_code}
                                         </FieldError>
                                     </Field>
+                                    <LegalEntityTimezoneField
+                                        value={form.data.timezone}
+                                        onChange={(value) =>
+                                            form.setData('timezone', value)
+                                        }
+                                        error={form.errors.timezone}
+                                    />
                                 </div>
                             ) : (
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -492,6 +552,7 @@ function OrganizationDetailPage({
         name: organization.name,
         company_code: organization.legal_entity?.company_code ?? '',
         country_code: organization.legal_entity?.country_code ?? 'ID',
+        timezone: organization.legal_entity?.timezone ?? '',
         operating_unit_type: organization.operating_unit?.type ?? 'department',
         operating_unit_number: organization.operating_unit?.number ?? '',
     });
@@ -812,6 +873,17 @@ function OrganizationDetailPage({
                                                     {form.errors.country_code}
                                                 </FieldError>
                                             </Field>
+                                            <LegalEntityTimezoneField
+                                                value={form.data.timezone}
+                                                onChange={(value) =>
+                                                    form.setData(
+                                                        'timezone',
+                                                        value,
+                                                    )
+                                                }
+                                                error={form.errors.timezone}
+                                                editing={editing}
+                                            />
                                         </>
                                     ) : (
                                         <>
@@ -956,11 +1028,12 @@ function CreateHierarchyDialog({
     purposes,
 }: Pick<Props, 'organizations' | 'purposes'>) {
     const [open, setOpen] = useState(false);
+    const today = useToday();
     const form = useForm({
         name: '',
         purpose_codes: [] as string[],
         root_organization_id: organizations[0]?.id ?? '',
-        effective_from: new Date().toISOString().slice(0, 10),
+        effective_from: today,
     });
 
     return (
@@ -1515,8 +1588,9 @@ function RemovePlacementAction({
 }
 
 function CreateVersionDraftAction({ version }: { version: Version }) {
+    const today = useToday();
     const form = useForm({
-        effective_from: new Date().toISOString().slice(0, 10),
+        effective_from: today,
     });
     const [open, setOpen] = useState(false);
 

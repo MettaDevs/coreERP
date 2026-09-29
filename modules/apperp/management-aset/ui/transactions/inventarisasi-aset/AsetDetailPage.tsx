@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChangeHistory } from '@/components/change-history';
 import type { ChangeHistoryPage } from '@/components/change-history';
+import { useToday } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -23,7 +24,6 @@ import { useMasterOptions } from '../../master/useMasterOptions';
 import {
     AcquisitionAdjustmentPreview,
     pesanKoreksi,
-    tanggalHariIni,
 } from './AcquisitionAdjustmentPreview';
 import type { HasilKoreksi } from './AcquisitionAdjustmentPreview';
 import type { Aset, RincianAset, Context, Placement } from './aset';
@@ -67,6 +67,8 @@ export default function AsetDetailPage({
     asetId?: string;
     mode: Mode;
 }) {
+    // Tanggal koreksi nilai perolehan: hari ini menurut zona pengguna, dari jam server (K-34).
+    const hariIni = useToday();
     const [detail, setDetail] = useState<RincianAset | null>(null);
     const [memuat, setMemuat] = useState(true);
     const [menyimpan, setMenyimpan] = useState(false);
@@ -304,7 +306,7 @@ export default function AsetDetailPage({
                             ? {
                                   acquisition_value: values.acquisition_value,
                                   reason: alasanKoreksi,
-                                  adjustment_date: tanggalHariIni(),
+                                  adjustment_date: hariIni,
                               }
                             : {}),
                     }),

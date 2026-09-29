@@ -1,6 +1,9 @@
 import { Button } from '@apperp/ui/button';
+import { FieldHint } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Form, Head, usePage } from '@inertiajs/react';
+import { Select } from '@apperp/ui/select';
+import { Form, Head, useForm, usePage } from '@inertiajs/react';
+import { CircleHelp } from 'lucide-react';
 /* @chisel-email-verification */
 import { Link } from '@inertiajs/react';
 /* @end-chisel-email-verification */
@@ -8,6 +11,7 @@ import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileCo
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
 import type { Auth } from '@/types';
@@ -18,14 +22,119 @@ type PageProps = {
     auth: Auth;
 };
 
+type DateTimeProps = {
+    timezone: string | null;
+    legal_entity_timezone: string | null;
+    timezones: { value: string; label: string }[];
+};
+
+/** Nilai pilihan "ikuti entitas legal"; disimpan sebagai zona kosong. */
+const FOLLOW_LEGAL_ENTITY = 'ikuti-entitas-legal';
+
+function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
+    const { date: workDate, today } = useWorkDate();
+    const form = useForm<{ timezone: string | null; work_date: string }>({
+        timezone: dateTime.timezone,
+        work_date: workDate,
+    });
+    const legalEntityZone = dateTime.timezones.find(
+        (zone) => zone.value === dateTime.legal_entity_timezone,
+    );
+    const zones = [
+        {
+            value: FOLLOW_LEGAL_ENTITY,
+            label: legalEntityZone
+                ? `Ikuti entitas legal (${legalEntityZone.label})`
+                : 'Ikuti entitas legal',
+        },
+        ...dateTime.timezones,
+    ];
+
+    return (
+        <div className="flex flex-col gap-6">
+            <Heading variant="small" title="Tanggal dan waktu" />
+
+            <form
+                className="space-y-6"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    form.patch('/settings/date-time', { preserveScroll: true });
+                }}
+            >
+                <div className="grid gap-2">
+                    <Select
+                        label="Zona waktu"
+                        items={zones}
+                        value={form.data.timezone ?? FOLLOW_LEGAL_ENTITY}
+                        onValueChange={(value) =>
+                            form.setData(
+                                'timezone',
+                                value === null || value === FOLLOW_LEGAL_ENTITY
+                                    ? null
+                                    : value,
+                            )
+                        }
+                        searchPlaceholder="Cari zona waktu..."
+                        emptyMessage="Zona waktu tidak ditemukan."
+                    />
+                    <InputError message={form.errors.timezone} />
+                </div>
+
+                <div className="grid gap-2">
+                    <div className="flex items-center gap-2">
+                        <Input
+                            id="work_date"
+                            type="date"
+                            label="Tanggal kerja"
+                            className="block w-full"
+                            value={form.data.work_date}
+                            onChange={(event) =>
+                                form.setData('work_date', event.target.value)
+                            }
+                        />
+                        <FieldHint hint="Tanggal bawaan untuk transaksi baru selama kamu masuk. Kembali ke hari ini saat kamu masuk lagi atau pindah tenant atau entitas legal.">
+                            <button
+                                type="button"
+                                aria-label="Bantuan tanggal kerja"
+                                className="text-muted-foreground"
+                            >
+                                <CircleHelp className="size-4" />
+                            </button>
+                        </FieldHint>
+                    </div>
+                    {form.data.work_date !== today && (
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => form.setData('work_date', today)}
+                            >
+                                Pakai hari ini
+                            </Button>
+                        </div>
+                    )}
+                    <InputError message={form.errors.work_date} />
+                </div>
+
+                <Button type="submit" disabled={form.processing}>
+                    Simpan
+                </Button>
+            </form>
+        </div>
+    );
+}
+
 export default function Profile(
     /* @chisel-email-verification */
     {
         mustVerifyEmail,
         status,
+        dateTime,
     }: {
         mustVerifyEmail: boolean;
         status?: string;
+        dateTime: DateTimeProps;
     },
     /* @end-chisel-email-verification */
 ) {
@@ -130,6 +239,8 @@ export default function Profile(
                         )}
                     </Form>
                 </div>
+
+                <DateTimeSettings dateTime={dateTime} />
 
                 <DeleteUser />
             </main>

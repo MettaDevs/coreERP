@@ -21,6 +21,11 @@ declare module '@inertiajs/core' {
                 navigation: HostedNavigation;
             };
             sidebarOpen: boolean;
+            clock: { timezone: string; today: string } | null;
+            workDate: {
+                value: string | null;
+                notice_dismissed: boolean;
+            } | null;
             [key: string]: unknown;
         };
     }
