@@ -32,9 +32,9 @@ namespace App\Support\ControlPlane;
  * `environments_satu_per_jenis`. Keduanya di database pusat — tanpa itu sebuah alamat dapat
  * menunjuk dua lingkungan, dan yang terpilih ditentukan urutan baris.
  *
- * Bentuk sebelumnya, `<tenant>--<lingkungan>.<jenis>.…`, memuat slug lingkungan supaya satu tenant
- * dapat punya banyak demo. Pemilik produk memilih alamat yang terbaca manusia di atas kemampuan itu
- * pada 14 September 2026. Pemisah dua tanda hubung yang dibutuhkan bentuk lama ikut hilang.
+ * Pemilik produk memilih bentuk yang terbaca manusia di atas kemampuan memiliki beberapa lingkungan
+ * hidup dengan jenis yang sama pada 14 September 2026. Karena slug lingkungan tidak masuk alamat,
+ * database menjaga agar setiap tenant hanya punya satu demo dan satu sandbox yang hidup.
  *
  * ## Ongkos TLS yang menentukan bentuk ini
  *
