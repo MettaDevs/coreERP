@@ -12,7 +12,6 @@ Bentuk lama — app dengan repository, database, image, dan token layanan sendir
 | --- | --- | --- | --- |
 | [Management Aset](/apps/management-aset/) | `management-aset` | Module di `modules/apperp/management-aset/` | Release pengembangan `0.1.0` |
 | [Human Resources](/apps/human-resources/) | `human-resources` | Module di `modules/apperp/human-resources/` | Release pengembangan `0.1.0` |
-| [Business Partner](/apps/business-partner/) | `business-partner` | Belum dipindah | Fondasi release pengembangan `0.1.0` |
 | [Procurement](/apps/procurement/) | `procurement` | Belum dipindah; akan datang sebagai module | Fondasi release pengembangan `0.1.0` |
 
 Daftar module yang benar-benar terpasang di sebuah runtime dibaca dari `php artisan module:list`,

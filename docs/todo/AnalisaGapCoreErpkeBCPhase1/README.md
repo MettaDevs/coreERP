@@ -46,6 +46,10 @@ Supaya tidak ada yang membangun ulang sesuatu yang sudah ada:
   sehingga sandbox hasil salinan tidak mengirim apa pun ke sistem sungguhan.
 - **Aturan SoD** (`sod_rules`, `sod_conflicts`). BC tidak punya; bentuknya mengikuti F&O.
 - **Workflow persetujuan, kalender fiskal, jam kerja, satuan ukur, party dan alamat, OpenTelemetry.**
+  Party dan alamat sengaja mengikuti bentuk F&O, bukan BC; perbandingannya dan sisa pekerjaannya ada di
+  [buku alamat global](/todo/buku-alamat-global/#perbandingan-dengan-business-central).
+  Party dan alamat sengaja mengikuti bentuk F&O, bukan BC; perbandingannya dan sisa pekerjaannya ada di
+  [buku alamat global](/todo/buku-alamat-global/#perbandingan-dengan-business-central).
 
 Sebagian temuan lama di [layanan platform](/todo/general/04-layanan-platform) sudah tidak berlaku:
 workflow, outbox, dan party kini ada. Yang masih berlaku dan dirujuk dari sini: `PLAT-02` (lampiran),

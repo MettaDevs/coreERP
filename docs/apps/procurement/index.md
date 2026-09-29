@@ -14,7 +14,7 @@ Procurement akan memiliki proses pengadaan. Satu record Procurement nantinya mew
 | Bentuk | Belum dibangun; akan datang sebagai module di runtime Core |
 | Repository | `app-erp-procurement` — repo lama, belum dipindah |
 | Database | database tenant Core, dengan awalan tabel `procurement_` |
-| Dependency app | `business-partner: ^0.1` |
+| Dependency app | tidak ada |
 
 ::: warning Belum dipindah, dan akan datang sebagai module
 Modul bisnis lain sudah pindah ke runtime Core dan memakai database tenant yang sama. Procurement
@@ -31,9 +31,9 @@ Procurement tidak memiliki party atau vendor sebagai data bersama. Ia akan menyi
 Pemecahan ini menghindari dua kesalahan yang sering tampak sama pada tahap awal:
 
 - Membuat tabel vendor sendiri di setiap app. Hasilnya, nama atau alamat satu pemasok mudah berbeda antara Procurement dan Accounts Payable.
-- Memindahkan seluruh fakta pemasok ke Business Partner. Hasil prakualifikasi, penawaran, atau status pengadaan lalu kehilangan pemilik proses yang jelas.
+- Memindahkan seluruh fakta pemasok ke pemilik identitas. Hasil prakualifikasi, penawaran, atau status pengadaan lalu kehilangan pemilik proses yang jelas.
 
-Ketika Procurement mulai memakai party, ia memakai kontrak Business Partner. Tidak ada foreign key, Eloquent relation, atau query langsung ke tabel milik module lain.
+Identitas pihak—nama, alamat, dan kontaknya—dimiliki Core di [buku alamat](/dev/24-global-address-book). Ketika Procurement mulai memakai party, ia memanggil kontrak buku alamat Core dan mencatat peran `vendor` pada registry peran. Tidak ada foreign key, Eloquent relation, atau query langsung ke tabel milik module lain.
 
 ## Status fondasi saat ini
 
@@ -43,22 +43,15 @@ Tidak ada master Procurement, termasuk prakualifikasi, yang sudah diimplementasi
 
 ## Dependency dan deployment
 
-Manifest Procurement menyatakan `business-partner: ^0.1`. Dependency ini dikelola sebagai fakta katalog di Core:
+Procurement **tidak menyatakan dependency app**. Ia dulu bergantung pada app `business-partner` untuk identitas pihak; app itu dihapus pada 17 September 2026 karena identitas party memang tinggal di Core, bukan di app bisnis. Yang dibutuhkan Procurement sekarang ada di Core: [buku alamat](/dev/24-global-address-book) untuk identitas, alamat, dan kontak, beserta registry peran untuk mencatat bahwa satu party adalah pemasok pada satu legal entity.
 
-1. Procurement hanya dapat didaftarkan bila Business Partner tersedia dan versinya cocok.
-2. Core menolak dependency yang membentuk siklus.
-3. Saat app dipilih untuk deployment, Business Partner ditempatkan lebih dahulu.
-4. Procurement tidak boleh dianggap siap hanya karena dependency tercatat; setiap app harus melalui migration dan health check placement-nya sendiri.
-
-Pernyataan dependency adalah cara produk memberi tahu deployment dan pemilihan app bahwa Business Partner adalah prerequisite. Ia bukan penggabungan database dan bukan pengganti contract lintas app.
+Mesin dependency katalog tetap ada dan tetap berlaku bila suatu saat Procurement bergantung pada module lain: dependency dicatat sebagai fakta katalog, siklus ditolak, dan module prasyarat dipasang lebih dulu. Ia bukan penggabungan database dan bukan pengganti contract lintas module.
 
 Untuk runtime lokal, jalankan:
 
 ```powershell
 .\start.ps1 -Build
 ```
-
-`erp-dev` akan menemukan Business Partner sebagai dependency transitif dan menjalankannya sebelum Procurement.
 
 ## Akses dan kontrak
 
@@ -68,13 +61,13 @@ Manifest saat ini hanya mendeklarasikan rantai baca untuk halaman placeholder:
 
 Hak master atau transaksi belum tersedia. Saat resource pertama disetujui, permission harus dipisah berdasarkan resource dan aksi yang sebenarnya, bukan diberi satu hak umum “kelola Procurement”.
 
-OpenAPI dan AsyncAPI ada sebagai berkas fondasi di repository Procurement. Belum ada endpoint atau event yang dipublikasikan untuk app lain. Contract Business Partner harus sudah ada sebelum Procurement menambahkan integrasi party.
+OpenAPI dan AsyncAPI ada sebagai berkas fondasi di repository Procurement. Belum ada endpoint atau event yang dipublikasikan untuk app lain. Untuk memakai party, Procurement memanggil kontrak buku alamat Core dalam satu proses; tidak ada contract lintas repo yang perlu menunggu.
 
-## Yang datang dari Core dan Business Partner
+## Yang datang dari Core
 
 Core memberi konteks tenant, otorisasi, katalog, dependency produk, entitlement, deployment, dan runtime status. Procurement tidak menyimpan ulang data tersebut.
 
-Business Partner akan memberi data party bersama setelah resource dan contract-nya tersedia. Procurement tetap bertanggung jawab penuh atas validasi dan lifecycle data proses yang dimilikinya sendiri.
+Identitas pemasok juga datang dari Core: party beserta alamat dan kontaknya ada di [buku alamat](/dev/24-global-address-book), dan "pihak ini pemasok kami" dicatat di registry peran per legal entity. Procurement tidak menyimpan nama atau alamat pemasok di tabelnya sendiri, dan tetap bertanggung jawab penuh atas validasi serta lifecycle data proses yang dimilikinya.
 
 ## Di mana kodenya
 
@@ -88,7 +81,7 @@ Business Partner akan memberi data party bersama setelah resource dan contract-n
 
 ## Halaman terkait
 
-- [Business Partner](/apps/business-partner/) — pemilik data pihak bisnis bersama
+- [Buku alamat](/dev/24-global-address-book) — identitas, alamat, dan kontak pihak, milik Core
 - [Katalog app](/apps/) — pola satu app satu repository dan batas ownership
 - [Membangun modul baru](/apps/membangun-app-baru) — gate sebelum resource atau proses baru dibuat
 - [Standar module](/dev/02-module-standard) — contract dan batas lintas app

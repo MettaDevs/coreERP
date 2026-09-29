@@ -156,7 +156,7 @@ final class ModuleRegistry
         // `AppCatalogRequest` — memakai `dependsOn` berisi **peta** id ke rentang versi:
         //
         //     dependsOn:
-        //       business-partner: ^0.1
+        //       human-resources: ^0.1
         //
         // Registry ini dulu membaca `depends_on` dan mengambil **nilai**-nya. Ketiga module di
         // repo kebetulan menulis `depends_on: []`, dan daftar kosong tidak dapat dibedakan dari
@@ -177,7 +177,7 @@ final class ModuleRegistry
         if (! is_array($daftar) || array_is_list($daftar)) {
             throw new \RuntimeException(sprintf(
                 'Manifest module menulis `dependsOn` sebagai daftar; yang benar peta id module ke rentang versi, '.
-                'misalnya `dependsOn:%s  business-partner: ^0.1`. Bentuk daftar terbaca kosong dan membuat '.
+                'misalnya `dependsOn:%s  human-resources: ^0.1`. Bentuk daftar terbaca kosong dan membuat '.
                 'prasyaratnya tidak dijaga siapa pun.',
                 PHP_EOL,
             ));

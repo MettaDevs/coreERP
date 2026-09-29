@@ -208,17 +208,17 @@ class AppCatalogManagementTest extends TestCase
 
     public function test_registration_stores_versioned_dependencies_and_returns_them(): void
     {
-        $this->availableApp('business-partner', '1.2.0');
-        $manifest = $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]);
+        $this->availableApp('app-dasar', '1.2.0');
+        $manifest = $this->manifest(['dependsOn' => ['app-dasar' => '^1.0']]);
 
         $this->actingAs($this->providerAdmin())
             ->postJson('/api/v1/provider/apps', $manifest)
             ->assertCreated()
-            ->assertJsonPath('data.dependsOn.business-partner', '^1.0');
+            ->assertJsonPath('data.dependsOn.app-dasar', '^1.0');
 
         $this->assertDatabaseHas('app_dependencies', [
             'app_id' => 'sample-app',
-            'depends_on_app_id' => 'business-partner',
+            'depends_on_app_id' => 'app-dasar',
             'version_range' => '^1.0',
         ]);
     }
@@ -230,14 +230,14 @@ class AppCatalogManagementTest extends TestCase
      */
     public function test_manifest_command_stores_versioned_dependencies(): void
     {
-        $this->availableApp('business-partner', '1.2.0');
+        $this->availableApp('app-dasar', '1.2.0');
         $akar = sys_get_temp_dir().'/coreerp-modul-manifest-'.bin2hex(random_bytes(6));
         $folder = $akar.'/apperp/sample-app';
         mkdir($folder, 0777, true);
 
         try {
             $manifest = $this->manifest([
-                'dependsOn' => ['business-partner' => '^1.0'],
+                'dependsOn' => ['app-dasar' => '^1.0'],
             ]);
             $manifest['ui'] = ['navigation' => $manifest['navigation']];
             $manifest['table_prefix'] = 'sample_';
@@ -256,7 +256,7 @@ class AppCatalogManagementTest extends TestCase
 
         $this->assertDatabaseHas('app_dependencies', [
             'app_id' => 'sample-app',
-            'depends_on_app_id' => 'business-partner',
+            'depends_on_app_id' => 'app-dasar',
             'version_range' => '^1.0',
         ]);
     }
@@ -266,22 +266,22 @@ class AppCatalogManagementTest extends TestCase
         $provider = $this->providerAdmin();
 
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['app-dasar' => '^1.0']]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('dependsOn.business-partner');
+            ->assertJsonValidationErrors('dependsOn.app-dasar');
 
-        $this->availableApp('business-partner', '1.0.0');
+        $this->availableApp('app-dasar', '1.0.0');
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^2.0']]))
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['app-dasar' => '^2.0']]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('dependsOn.business-partner');
+            ->assertJsonValidationErrors('dependsOn.app-dasar');
 
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['app-dasar' => '^1.0']]))
             ->assertCreated();
 
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifestFor('business-partner', [
+            ->postJson('/api/v1/provider/apps', $this->manifestFor('app-dasar', [
                 'dependsOn' => ['sample-app' => '^1.0'],
             ]))
             ->assertUnprocessable()
@@ -290,24 +290,24 @@ class AppCatalogManagementTest extends TestCase
 
     public function test_registration_rejects_a_version_that_breaks_registered_dependents(): void
     {
-        $this->availableApp('business-partner', '1.0.0');
+        $this->availableApp('app-dasar', '1.0.0');
         $provider = $this->providerAdmin();
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['app-dasar' => '^1.0']]))
             ->assertCreated();
 
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifestFor('business-partner', ['version' => '2.0.0']))
+            ->postJson('/api/v1/provider/apps', $this->manifestFor('app-dasar', ['version' => '2.0.0']))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('version');
     }
 
     public function test_registration_removes_dependencies_that_left_the_manifest(): void
     {
-        $this->availableApp('business-partner');
+        $this->availableApp('app-dasar');
         $provider = $this->providerAdmin();
         $this->actingAs($provider)
-            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['app-dasar' => '^1.0']]))
             ->assertCreated();
 
         $this->actingAs($provider)
@@ -316,7 +316,7 @@ class AppCatalogManagementTest extends TestCase
 
         $this->assertDatabaseMissing('app_dependencies', [
             'app_id' => 'sample-app',
-            'depends_on_app_id' => 'business-partner',
+            'depends_on_app_id' => 'app-dasar',
         ]);
     }
 

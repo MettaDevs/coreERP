@@ -78,16 +78,16 @@ class BusinessOnboardingTest extends TestCase
     public function test_registration_includes_transitive_app_dependencies(): void
     {
         CoreApp::query()->create([
-            'id' => 'business-partner',
+            'id' => 'app-dasar',
             'name' => 'Data pihak bisnis',
             'version' => '1.0.0',
             'status' => 'available',
-            'database_name' => 'app_erp_business_partner',
+            'database_name' => 'app_erp_dasar',
             'has_ui' => false,
         ]);
         DB::table('app_dependencies')->insert([
             'app_id' => 'app-uji',
-            'depends_on_app_id' => 'business-partner',
+            'depends_on_app_id' => 'app-dasar',
             'version_range' => '^1.0',
             'created_at' => now(),
             'updated_at' => now(),
@@ -103,7 +103,7 @@ class BusinessOnboardingTest extends TestCase
         ])->assertCreated();
 
         $tenant = Tenant::query()->where('slug', 'pt-dependency')->firstOrFail();
-        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'business-partner']);
+        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'app-dasar']);
         $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'app-uji']);
         Queue::assertNothingPushed();
     }
