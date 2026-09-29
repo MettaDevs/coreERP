@@ -23,8 +23,9 @@ return [
      * akun tetap di Core, dan konsol ini sengaja tidak punya satu pun jalur untuk itu.
      */
     'providers' => [
+        // `people`: Eloquent yang hanya membaca akun orang, didaftarkan `AppServiceProvider`.
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'people',
             'model' => User::class,
         ],
     ],

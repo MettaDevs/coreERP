@@ -153,14 +153,18 @@ from (
     having count(*) > 1
 ) d;
 
--- Log perubahan (area 2 analisa gap BC). Pelakunya variabel sesi `coreerp.user_id`; pelaku yang bukan
--- anggota tenant entrinya berarti nilai itu terbawa dari permintaan lain lewat koneksi yang dipakai ulang.
+-- Log perubahan (area 2 analisa gap BC). Pelakunya variabel sesi `coreerp.user_id`: anggota tenant entrinya,
+-- atau akun aplikasi klien integrasi milik tenant itu. Pelaku lain berarti nilai itu terbawa dari permintaan
+-- lain lewat koneksi yang dipakai ulang.
 insert into hasil_core
 select 'entri log berpelaku bukan anggota tenantnya', count(*)
 from change_log_entries e
 where e.created_by_user_id is not null
   and not exists (
       select 1 from tenant_memberships m where m.user_id = e.created_by_user_id and m.tenant_id::text = e.tenant_id::text
+  )
+  and not exists (
+      select 1 from integration_clients c where c.user_id = e.created_by_user_id and c.tenant_id::text = e.tenant_id::text
   );
 
 -- Tabel akses tanpa `tenant_id`: tenant entrinya dibaca trigger dari peran yang dirujuk.

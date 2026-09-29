@@ -9,6 +9,7 @@ use App\Models\FinancePostingDelivery;
 use App\Models\FinancePostingEvent;
 use App\Models\IntegrationClient;
 use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\Database\AuditActor;
 use App\Support\Integration\SignedPush;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Str;
@@ -41,6 +42,7 @@ final class PostingPusher
         private readonly SignedPush $push,
         private readonly PostingAcknowledger $ack,
         private readonly ActiveEnvironment $lingkungan,
+        private readonly IntegrationClientAccounts $accounts,
     ) {}
 
     /** @return array{clients: int, sent: int, retrying: int, failed: int, skipped: ?string} */
@@ -136,9 +138,14 @@ final class PostingPusher
                 'attempts' => $delivery->attempts, 'status_code' => $kode,
             ]);
 
+            // Ack di jawaban push keputusan klien, bukan sistem: dicatat atas nama akun aplikasinya,
+            // sama dengan `POST …/ack` lewat API.
             $ack = PostingAcknowledger::fromPushResponse($jawaban->json());
             if ($ack !== null) {
-                $this->ack->acknowledge($posting->id, $client, $ack);
+                AuditActor::runAs(
+                    $client->user_id ?? $this->accounts->ensure($client),
+                    fn () => $this->ack->acknowledge($posting->id, $client, $ack),
+                );
             }
 
             return self::SENT;

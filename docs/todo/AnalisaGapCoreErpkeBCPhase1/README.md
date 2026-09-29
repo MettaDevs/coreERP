@@ -177,16 +177,22 @@ penulisan ke tabel yang dicatat, dan biaya itu hanya terlihat pada beban serenta
   lokasi, kondisi, unit kerja, dan label status aset; akun pengguna yang ditautkan ke pekerja.
 - **Komponen `ChangeHistory` di Shell**, dipakai halaman aset: linimasa per penyimpanan, bernama pelaku,
   dengan nilai lama dan baru.
+- **Klien integrasi tercatat atas namanya sendiri** (keputusan pemilik 29 September 2026, opsi A): setiap
+  klien punya akun aplikasi, seperti kolom `User ID` pada Microsoft Entra Application di BC. Akun itu
+  tidak pernah dapat masuk dan bukan anggota tenant. Rinciannya di
+  [feed posting finance](/dev/34-feed-posting-finance#klien-integrasi).
 - **Load test dengan log aktif lulus**: penjenuhan `receipt-posting.js` 1000 VU dan 128 tenant, 0
   pelanggaran, 0 error 5xx, dan kedua `verify.sql` bernilai 0. Oracle-nya ditambah pemeriksaan bahwa
-  pelaku entri adalah anggota tenant entrinya dan setiap aset punya entri pembuatan di tenantnya sendiri.
+  pelaku entri adalah anggota tenant entrinya (atau akun aplikasi klien integrasinya) dan setiap aset
+  punya entri pembuatan di tenantnya sendiri.
   Biaya log terhadap latensi tidak terukur di atas selisih antar-run. Rinciannya di
   `apps/core/loadtest/README.md`.
 
 Yang belum tercakup, dan sengaja ditulis supaya tidak dianggap sudah:
 
-- Penulisan oleh klien integrasi tercatat sebagai sistem (pelaku kosong). BC mengaitkannya dengan
-  pengguna layanan; di CoreERP klien integrasi tidak punya baris `users`.
+- Jalur mesin lain masih tercatat sebagai sistem: kredensial app `internal/v1` (tidak punya pemanggil lagi
+  di repo), token admin.erp (`POST internal/v1/tenants` tidak membawa operatornya), dan perintah terjadwal.
+
 - Kolom pembuat lama tetap ada di samping kolom jejak: `invitation_codes.created_by`,
   `report_exports.user_id`, dan `finance_reference_account_imports.imported_by_user_id`.
 - Layar pekerja HR belum ada, jadi riwayat pekerja baru terbaca lewat rute admin.

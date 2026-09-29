@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use App\Models\Environment;
 use App\Models\IntegrationClient;
 use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\Database\AuditActor;
+use App\Support\Finance\IntegrationClientAccounts;
 use App\Support\Modules\TenantScope;
 use Closure;
 use Illuminate\Http\Request;
@@ -24,13 +26,20 @@ use Symfony\Component\HttpFoundation\Response;
  * Di salinan sandbox, seluruh rute ini menjawab 503 (TODO 4.3). Salinan produksi membawa klien
  * integrasi yang sama, dan tanpa penjagaan ini server uji akan menyajikan posting yang dibukukan
  * finance produksi.
+ *
+ * Klien tidak masuk lewat guard, jadi event `Authenticated` yang memasang pelaku tidak pernah menyala di
+ * sini. Pelakunya dipasang langsung: akun aplikasi klien itu ({@see IntegrationClientAccounts}), supaya
+ * penulisannya tercatat atas nama klien di kolom jejak dan log perubahan, bukan sebagai sistem.
  */
 final class AuthenticateIntegrationClient
 {
     /** Atribut permintaan tempat id klien yang terautentikasi disimpan. */
     public const ATRIBUT = 'coreerp.integration_client_id';
 
-    public function __construct(private readonly ActiveEnvironment $lingkungan) {}
+    public function __construct(
+        private readonly ActiveEnvironment $lingkungan,
+        private readonly IntegrationClientAccounts $accounts,
+    ) {}
 
     public function handle(Request $request, Closure $next, string ...$scopes): Response
     {
@@ -62,13 +71,21 @@ final class AuthenticateIntegrationClient
         $request->attributes->set('coreerp.tenant_id', $client->tenant_id);
         $request->attributes->set(self::ATRIBUT, $client->id);
 
-        // Sinyal hidup, bukan jejak audit — diperbarui paling sering sekali semenit supaya satu
-        // baris tidak menjadi titik tulis panas pada setiap tarikan.
-        if ($client->last_used_at === null || $client->last_used_at->lessThan(now()->subMinute())) {
-            $client->forceFill(['last_used_at' => now()])->saveQuietly();
-        }
+        // Klien lama yang lahir sebelum akun aplikasi ada mendapat akunnya pada panggilan pertama.
+        AuditActor::set($client->user_id ?? $this->accounts->ensure($client));
 
-        return $next($request);
+        try {
+            // Sinyal hidup, bukan jejak audit — diperbarui paling sering sekali semenit supaya satu
+            // baris tidak menjadi titik tulis panas pada setiap tarikan.
+            if ($client->last_used_at === null || $client->last_used_at->lessThan(now()->subMinute())) {
+                $client->forceFill(['last_used_at' => now()])->saveQuietly();
+            }
+
+            return $next($request);
+        } finally {
+            // Pelaku milik permintaan ini saja; koneksi yang dipakai ulang tidak boleh membawanya.
+            AuditActor::clear();
+        }
     }
 
     private function client(Request $request): ?IntegrationClient

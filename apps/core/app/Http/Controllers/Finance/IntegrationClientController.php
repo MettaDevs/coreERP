@@ -7,6 +7,7 @@ use App\Models\IntegrationClient;
 use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\Finance\IntegrationClientAccounts;
 use App\Support\Integration\PushDestination;
 use App\Support\Integration\SignedPush;
 use GuzzleHttp\Exception\ConnectException;
@@ -50,7 +51,7 @@ final class IntegrationClientController extends Controller
         ]);
     }
 
-    public function store(Request $request, PushDestination $tujuan): JsonResponse
+    public function store(Request $request, PushDestination $tujuan, IntegrationClientAccounts $accounts): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
         $data = $this->validated($request, $membership->tenant_id, $tujuan);
@@ -70,6 +71,7 @@ final class IntegrationClientController extends Controller
             'status' => IntegrationClient::ACTIVE,
             'created_by_user_id' => (string) $request->user()?->getAuthIdentifier(),
         ]);
+        $accounts->ensure($client);
 
         return response()->json([
             'data' => $this->present($client),
@@ -78,7 +80,7 @@ final class IntegrationClientController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, IntegrationClient $integrationClient, PushDestination $tujuan): JsonResponse
+    public function update(Request $request, IntegrationClient $integrationClient, PushDestination $tujuan, IntegrationClientAccounts $accounts): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
         $client = $this->milik($membership, $integrationClient, aktif: true);
@@ -101,6 +103,8 @@ final class IntegrationClientController extends Controller
                 ? null
                 : ($penandaBaru ?? $client->signing_secret),
         ])->save();
+        // Nama akun aplikasinya ikut, supaya riwayat menyebut nama klien yang sekarang.
+        $accounts->ensure($client);
 
         return response()->json(['data' => $this->present($client), 'signing_secret' => $penandaBaru]);
     }

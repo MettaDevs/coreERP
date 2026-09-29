@@ -16,7 +16,9 @@ class IdentityMonitorController extends Controller
     {
         abort_unless($request->user()->can('monitor-identities'), 403);
         $search = trim((string) $request->query('search'));
+        // Akun aplikasi klien integrasi bukan identitas yang dapat masuk; ia tidak dipantau di sini.
         $identities = User::query()
+            ->where('account_type', User::PERSON)
             ->when($search, fn ($query) => $query->where(fn ($nested) => $nested
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")))
@@ -50,7 +52,7 @@ class IdentityMonitorController extends Controller
     {
         abort_unless($request->user()->can('monitor-identities'), 403);
 
-        $users = User::query()->with(['memberships.tenant:id,name'])->latest()->paginate(20);
+        $users = User::query()->where('account_type', User::PERSON)->with(['memberships.tenant:id,name'])->latest()->paginate(20);
 
         return response()->json($users);
     }
