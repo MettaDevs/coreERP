@@ -14,6 +14,16 @@ harus diambil" dan kini sudah diambil.
 Ditulis supaya orang atau agen lain dapat mengerjakannya **tanpa ikut percakapan yang melahirkannya**:
 setiap keputusan membawa alasannya, dan setiap butir kerja membawa kriteria terima.
 
+::: tip Diperbarui 29 September 2026
+Halaman ini tertahan di cabang sejak 17 September, dan main bergerak di bawahnya. Yang berubah sejak itu:
+Core sudah menjadi warga katalog dan halamannya dijaga permission `core.*` (Tahap 0 hampir seluruhnya
+selesai, lihat [Tahap 0](#tahap-0-core-sebagai-warga-katalog)); vendor milik Core lahir sebagai party
+berperan `vendor`, jadi registry peran kini punya penulis; dan pemilik produk menyatakan bentuk F&O tetap
+dipakai setelah dibandingkan dengan Business Central (lihat
+[Perbandingan dengan Business Central](#perbandingan-dengan-business-central)). OWN-03 dan OWN-05 sudah
+diputuskan.
+:::
+
 ## Pertanyaan yang dijawab halaman ini
 
 - Apa yang sudah berjalan hari ini, dan bagian mana yang hanya tampak ada?
@@ -32,7 +42,7 @@ Dibaca langsung dari kode pada 17 September 2026, bukan dari dokumen.
 | `parties`, `party_locations`, `postal_addresses`, `electronic_addresses`, `organization_parties` | Ada dan dipakai | `apps/core/database/migrations/2026_07_27_020000_create_party_and_address_book_tables.php:45-133` |
 | Satu-satunya kode yang pernah **membuat** party | Buku alamat organisasi: legal entity dan operating unit | `apps/core/app/Support/AddressBook/OrganizationAddressBook.php:38` |
 | Satu-satunya kode yang **membaca** alamat | Identitas cetak, untuk kop dokumen | `apps/core/app/Support/AddressBook/OrganizationAddressBook.php:188-197` |
-| `party_role_registrations` | Tabel ada, tidak ada satu pun penulis maupun pembaca di seluruh repo | grep `PartyRoleRegistration` hanya mengenai model dan migrasinya |
+| `party_role_registrations` | Sejak 22 September punya satu penulis: pembuatan vendor mencatat peran `vendor` per legal entity | `apps/core/app/Actions/Finance/SaveVendor.php` |
 | Halaman **Buku Alamat Global** | Mockup: rute tanpa controller, tombol Simpan memanggil `alert`, nomor party diacak di browser | `apps/core/routes/web.php:167`, `apps/core/resources/js/pages/settings/global-address-book/index.tsx:189,215` |
 | Bagian **Relasi** pada halaman itu | Hanya state React, tidak ada tabelnya | `apps/core/resources/js/components/global-address-book/relationship-section.tsx` |
 | `party_types` (5 kode: person, organization, legal_entity, team, operating_unit) | Ada sebagai referensi, tidak dirujuk `parties.type` | `apps/core/database/migrations/2026_08_24_100000_create_party_types_table.php:20-26` |
@@ -41,8 +51,10 @@ Dibaca langsung dari kode pada 17 September 2026, bukan dari dokumen.
 | Alamat pos terhadap master wilayah itu | Tidak tersambung: provinsi, kota, dan kecamatan disimpan sebagai teks bebas | `…2026_07_27_020000_…:84-90` |
 | Tabel negara | **Dua**: `country_regions` (dirujuk `postal_addresses`) dan `ref_countries` (dipakai master wilayah) | `…2026_07_27_020000_…:38`, `…2026_08_24_110000_…:11` |
 
-Ringkasnya: yang berjalan adalah **buku alamat organisasi kita sendiri**. Sisanya tabel kosong, layar
-palsu, dan satu master wilayah yang tidak pernah bertemu alamat.
+Ringkasnya: yang berjalan adalah **buku alamat organisasi kita sendiri**, ditambah vendor milik Core yang
+memakai party. Sisanya tabel kosong, layar palsu, dan satu master wilayah yang tidak pernah bertemu alamat.
+Tabel di atas dibaca 17 September; baris vendor ditambahkan 29 September. Sebelum GAB-00, baca ulang dari
+kode.
 
 ### Bentuk sekarang
 
@@ -86,6 +98,33 @@ Dua alasan lain menguatkannya:
 - **Audit fondasi berhenti menunggu keputusan ini**, bukan menunggu kode. `ORG-01` mencatat dua
   rencana yang bertabrakan: alamat sebagai kolom pada legal entity, versus satu direktori bersama ala
   D365. Keputusan pemilik produk 17 September 2026: **direktori bersama**, mengikuti diagram D365.
+
+## Perbandingan dengan Business Central
+
+Analisa gap fase 1 memakai Business Central sebagai pembanding, jadi pertanyaan "kenapa buku alamat
+tidak mengikuti BC" pasti datang. Dibaca dari source Base App (`BCApps`, 29 September 2026):
+
+| Hal | Business Central | Rencana ini (F&O) |
+| --- | --- | --- |
+| Letak alamat | Kolom langsung di `Customer`, `Vendor`, `Company Information`, dan `Contact` | Tabel `locations` bersama, ditautkan ke party |
+| Alamat tambahan | Satu tabel per pemilik: `Ship-to Address` (pelanggan), `Order Address` (vendor), `Alternative Address` (pegawai); isinya salinan | Satu lokasi dengan banyak kegunaan |
+| Identitas bersama | `Contact` ditautkan ke customer, vendor, bank, atau pegawai lewat `Contact Business Relation` | `parties` + `party_role_registrations` |
+| Negara | Satu tabel `Country/Region`, dengan `Address Format` per negara | Satu tabel `country_regions` (GAB-24) |
+| Kode pos | `Post Code`: kode, kota, county, negara, **dan zona waktu** | Master wilayah `ref_*` sampai kelurahan |
+| Siapa mengubah negara dan kode pos | Setiap company mengubah tabelnya sendiri | Dikunci dari tenant (OWN-05) |
+
+**Bentuk F&O tetap dipakai** — keputusan pemilik produk, 29 September 2026. Alasannya: vendor milik Core
+sudah lahir sebagai party, dan pola BC yang menyalin alamat ke setiap tabel pemilik persis masalah yang
+diperingatkan `PLAT-04`. Dua hal diambil dari BC karena tidak bertentangan:
+
+- **Format alamat per negara** (`Address Format`) — dipasang bersama GAB-24 sebagai kolom di
+  `country_regions`, padanan `ref_address_parameters` untuk bentuk cetak.
+- **Zona waktu dari wilayah** (`Post Code."Time Zone"`) — master wilayah sudah menyimpan zona per wilayah;
+  zona entitas legal (area 7 analisa gap, K-10) dapat diusulkan dari alamatnya begitu alamat Indonesia
+  menunjuk wilayah (GAB-23). Hanya usulan: zona tetap dipilih manusia.
+
+Master wilayah sampai kelurahan tidak punya padanan di keduanya. Ia kebutuhan alamat Indonesia, bukan
+tiruan.
 
 ## Keputusan
 
@@ -357,10 +396,16 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 | --- | --- | --- |
 | OWN-01 | **Dijawab di halaman ini**, lihat [Izin buku alamat](#izin-buku-alamat-dan-core-sebagai-warga-katalog). Yang tersisa untukmu: menyetujui empat duty yang dipasang tenant ke role-nya | Kamu menyatakan setuju, atau menyebut duty mana yang dipecah lain |
 | OWN-02 | **Dijawab di halaman ini**: referensi `core.party`, awalan `PIHK`, non-continuous, lingkup tenant, tanpa reset | Kamu menyatakan setuju, atau menyebut awalan lain |
-| OWN-03 | Menyetujui penggabungan dua tabel negara, dan menunjuk siapa yang mengerjakan master wilayah yang ikut berubah | Keputusan tertulis; pemilik kerjanya tahu |
-| OWN-05 | Memutuskan nasib provinsi sampai kode pos: ikut dikunci seperti negara (isi dari seed saja), atau diberi pemilik dengan mengisi `tenant_id` sehingga tambahan satu tenant tidak bocor ke tenant lain | Keputusan tertulis di halaman ini, dan kodenya mengikuti |
+| OWN-03 | **Diputuskan 29 September 2026:** dua tabel negara digabung; dikerjakan Claude, termasuk master wilayah yang ikut berubah | — |
+| OWN-05 | **Diputuskan 29 September 2026: dikunci seperti negara.** Provinsi sampai kode pos diisi migrasi, seeder, dan perintah impor; tenant hanya membaca. Alasannya: isinya dari data resmi, dan salinan per tenant melipatgandakan puluhan ribu kelurahan tanpa manfaat. Perubahan oleh admin produk menyusul bila ada kebutuhan | Rute tulis dicabut dari sisi tenant (GAB-24) |
 
 ### Tahap 0 — Core sebagai warga katalog
+
+Keadaan 29 September 2026: CORE-01, CORE-03, dan CORE-06 sudah berjalan lewat katalog keamanan Core
+(`database/migrations/2026_09_25_120100_register_core_security_catalog.php`, `App\Support\Access\CoreSecurityCatalog`).
+Buku alamat belum punya kelompok sendiri: alamat dan kontak organisasi dijaga `core.organization.update`
+(`app/Http/Controllers/GlobalAddressBook/`), jadi CORE-02 dan CORE-04 tinggal memecahnya menjadi
+permission buku alamat. CORE-05 belum.
 
 | ID | Pekerjaan | Selesai bila | Setelah |
 | --- | --- | --- | --- |
@@ -372,6 +417,12 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 | CORE-06 | Duty Core tampil dan dapat dipasang ke role di `settings/access` | Test: role dengan duty `core.address-book.kelola-alamat` menghasilkan permission yang benar lewat `permissionsFor` | CORE-02 |
 
 ### Tahap 1 — Core, buku alamat
+
+Percobaan pertamanya (cabang `feat/buku-alamat-bentuk-lokasi`, 17 September) ditinggalkan dan ditulis
+ulang di atas main, karena tiga aturan menyusul sesudahnya: tempat tidak dihapus saat tautan terakhir
+dilepas (GAB-12), tidak ada baris yang dihapus fisik — melepas tautan dan kontak berarti mengisi
+`deleted_at` — dan setiap tabel tenant baru ikut log perubahan (area 2 analisa gap). Nama di kode ditulis
+bahasa Inggris. Rancangan tabel dan test berpacunya tetap dipakai sebagai contekan.
 
 | ID | Pekerjaan | Selesai bila | Setelah |
 | --- | --- | --- | --- |
@@ -410,7 +461,7 @@ peran berlaku per legal entity, dan tidak ada modul yang memegang legal entity h
 | GAB-21 | `party_relationships` dan jenis relasinya, termasuk sebutan arah balik | Kontak person sebuah organisasi dan keluarga pasien dapat dicatat; relasi ke diri sendiri ditolak |
 | GAB-22 | Halaman Buku Alamat Global sesungguhnya: daftar, detail, simpan, izin OWN-01 | Mockup dan `alert` hilang dari repo |
 | GAB-23 | Alamat terstruktur menunjuk `ref_villages`, bentuk cetak memakai `ref_address_parameters` | Alamat Indonesia tidak lagi teks bebas; alamat luar negeri tetap bisa disimpan |
-| GAB-24 | Satu tabel negara: kolom `ref_countries` pindah ke `country_regions`, master wilayah menunjuk ke sana | `ref_countries` tidak ada lagi; halaman Address setup tetap berjalan |
+| GAB-24 | Satu tabel negara: kolom `ref_countries` pindah ke `country_regions`, master wilayah menunjuk ke sana, format alamat per negara, dan rute tulis master wilayah dicabut dari tenant (OWN-05) | `ref_countries` tidak ada lagi; halaman Address setup tetap berjalan dan hanya membaca |
 | GAB-25 | Address book (grup) dan hak melihat per grup | Party dapat dipilah; tanpa grup, perilakunya sama seperti sebelumnya |
 
 ## Data bersama yang belum punya pemilik
