@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Alamat pos pada satu lokasi. `formatted` adalah bentuk tercetak saat alamat
+ * Alamat pos pada satu tempat ({@see Location}). `formatted` adalah bentuk tercetak saat alamat
  * disimpan; dokumen resmi menyalinnya supaya perubahan alamat kemudian tidak
  * menulis ulang dokumen lama.
  *
@@ -23,9 +23,9 @@ class PostalAddress extends Model
         'district', 'street', 'building', 'postbox', 'postal_code', 'formatted',
     ];
 
-    /** @return BelongsTo<PartyLocation, $this> */
+    /** @return BelongsTo<Location, $this> */
     public function location(): BelongsTo
     {
-        return $this->belongsTo(PartyLocation::class, 'location_id');
+        return $this->belongsTo(Location::class, 'location_id');
     }
 }
