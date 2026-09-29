@@ -73,9 +73,14 @@ class ModuleMigratorTest extends TestCase
 
         $this->assertTrue($this->tabelAda('contoh_a_m_barang'));
         $this->assertTrue($this->tabelAda('contoh_b_m_rak'));
+        // Riwayat module produk sudah tercatat lebih dulu oleh `Tests\TestCase`, persis database
+        // bersama setelah module-nya dipasang. Yang diamati hanya dua module contoh: bila riwayat
+        // yang satu tercatat atas nama yang lain, hasilnya tinggal satu nama dan test ini merah.
         $this->assertSame(
             ['contoh-a', 'contoh-b'],
-            DB::table(ModuleMigrator::TABEL_RIWAYAT)->distinct()->orderBy('module_id')->pluck('module_id')->all(),
+            DB::table(ModuleMigrator::TABEL_RIWAYAT)
+                ->whereIn('module_id', ['contoh-a', 'contoh-b'])
+                ->distinct()->orderBy('module_id')->pluck('module_id')->all(),
         );
     }
 

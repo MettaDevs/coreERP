@@ -2,6 +2,9 @@
 
 namespace Tests;
 
+use App\Support\Modules\ModuleMigrator;
+use App\Support\Modules\ModuleRegistry;
+use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Fortify\Features;
 
@@ -223,7 +226,51 @@ abstract class TestCase extends BaseTestCase
             );
         }
 
+        $this->migrateProductModulesWithCore();
+
         return parent::setUpTraits();
+    }
+
+    /**
+     * Tabel module produk dibuat sekali per database test, bersama migration Core — bukan di
+     * setiap test.
+     *
+     * Migration module tidak ikut `migrate:fresh`; ia dijalankan saat module dipasang. Di test,
+     * pemasangan itu terjadi di dalam transaksi `RefreshDatabase`, dan PostgreSQL ikut me-rollback
+     * DDL — jadi setiap test yang menyentuh module menjalankan ulang seluruh migration-nya (52 untuk
+     * aset, 0,8–1,2 detik di mesin yang sepi) lalu membuangnya lagi. Di sini migration itu
+     * dijalankan tepat setelah `migrate:fresh`, di luar transaksi, lewat `ModuleMigrator` yang sama
+     * dengan produksi. Riwayatnya tercatat di `core_module_migrations`, sehingga `InstallModule`
+     * berikutnya melewatinya — persis database bersama di produksi setelah tenant pertama memasang
+     * module itu.
+     *
+     * Yang dimigrasikan hanya module produk. Module fixture di `tests/Fixtures/modules` tetap
+     * dimigrasikan oleh test-nya sendiri, karena merekalah yang menguji migrator dan pemasangan.
+     *
+     * Dua konsekuensi yang wajib diketahui:
+     * - Kelas ber-`DatabaseTruncation` harus mengecualikan `core_module_migrations`. Tanpa riwayat
+     *   itu, pemasangan berikutnya mencoba membuat ulang tabel yang masih berdiri.
+     * - Test yang perlu melihat migration module membuat tabelnya sendiri harus membuang tabel itu
+     *   lebih dulu di dalam transaksinya; lihat `ModuleTableBoundaryTest`.
+     */
+    private function migrateProductModulesWithCore(): void
+    {
+        $this->app['events']->listen(DatabaseRefreshed::class, function (DatabaseRefreshed $event): void {
+            if ($event->database !== null && $event->database !== config('database.default')) {
+                return;
+            }
+
+            $fixtures = base_path('tests');
+            $roots = array_values(array_filter(
+                config()->array('modules.akar'),
+                static fn (mixed $root): bool => is_string($root) && ! str_starts_with($root, $fixtures),
+            ));
+
+            $migrator = $this->app->make(ModuleMigrator::class);
+            foreach ((new ModuleRegistry($roots))->semua() as $module) {
+                $migrator->naik($module);
+            }
+        });
     }
 
     /**

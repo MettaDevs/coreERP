@@ -43,6 +43,13 @@ class KonteksLaporanPermintaanTest extends TestCase
     {
         parent::setUp();
 
+        // Laporan ditulis oleh pelapor kesalahan, bukan oleh halaman error, dan yang dibaca test
+        // ini hanya berkas laporannya. Dengan debug menyala — nilai bawaan `.env` di mesin
+        // pengembang maupun CI — Laravel merender halaman error debug yang mewarnai kode sumber
+        // setiap frame: 5 sampai 7 detik per permintaan di Windows, untuk halaman yang tidak
+        // dibaca siapa pun. Produksi berjalan tanpa debug, jadi inilah jalur yang sebenarnya.
+        config(['app.debug' => false]);
+
         $this->seed(AppCatalogSeeder::class);
 
         $this->pemilik = app(RegisterBusiness::class)->handle([
