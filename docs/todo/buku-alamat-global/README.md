@@ -117,8 +117,8 @@ tidak mengikuti BC" pasti datang. Dibaca dari source Base App (`BCApps`, 29 Sept
 sudah lahir sebagai party, dan pola BC yang menyalin alamat ke setiap tabel pemilik persis masalah yang
 diperingatkan `PLAT-04`. Dua hal diambil dari BC karena tidak bertentangan:
 
-- **Format alamat per negara** (`Address Format`) — dipasang bersama GAB-24 sebagai kolom di
-  `country_regions`, padanan `ref_address_parameters` untuk bentuk cetak.
+- **Format alamat per negara** (`Address Format`) — padanannya sudah ada: `ref_address_parameters`
+  disimpan per negara. Yang belum, memakainya untuk bentuk cetak alamat (GAB-23).
 - **Zona waktu dari wilayah** (`Post Code."Time Zone"`) — master wilayah sudah menyimpan zona per wilayah;
   zona entitas legal (area 7 analisa gap, K-10) dapat diusulkan dari alamatnya begitu alamat Indonesia
   menunjuk wilayah (GAB-23). Hanya usulan: zona tetap dipilih manusia.
@@ -461,7 +461,7 @@ peran berlaku per legal entity, dan tidak ada modul yang memegang legal entity h
 | GAB-21 | `party_relationships` dan jenis relasinya, termasuk sebutan arah balik | Kontak person sebuah organisasi dan keluarga pasien dapat dicatat; relasi ke diri sendiri ditolak |
 | GAB-22 | Halaman Buku Alamat Global sesungguhnya: daftar, detail, simpan, izin OWN-01 | Mockup dan `alert` hilang dari repo |
 | GAB-23 | Alamat terstruktur menunjuk `ref_villages`, bentuk cetak memakai `ref_address_parameters` | Alamat Indonesia tidak lagi teks bebas; alamat luar negeri tetap bisa disimpan |
-| GAB-24 | Satu tabel negara: kolom `ref_countries` pindah ke `country_regions`, master wilayah menunjuk ke sana, format alamat per negara, dan rute tulis master wilayah dicabut dari tenant (OWN-05) | `ref_countries` tidak ada lagi; halaman Address setup tetap berjalan dan hanya membaca |
+| GAB-24 | Satu tabel negara: kolom `ref_countries` pindah ke `country_regions`, master wilayah menunjuk ke sana, dan rute tulis master wilayah dicabut dari tenant (OWN-05). `ref_countries` ditinggal satu rilis sebagai bekal mundur, lalu dibuang | Tidak ada foreign key yang menunjuk `ref_countries`; halaman Address setup tetap berjalan dan hanya membaca |
 | GAB-25 | Address book (grup) dan hak melihat per grup | Party dapat dipilah; tanpa grup, perilakunya sama seperti sebelumnya |
 
 ## Data bersama yang belum punya pemilik
