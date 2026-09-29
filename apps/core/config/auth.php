@@ -62,8 +62,10 @@ return [
     */
 
     'providers' => [
+        // `people`: Eloquent yang hanya membaca akun orang, didaftarkan `AppServiceProvider`. Akun
+        // aplikasi klien integrasi tidak pernah dapat masuk.
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'people',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

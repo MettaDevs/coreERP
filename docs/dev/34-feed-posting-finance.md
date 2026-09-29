@@ -355,6 +355,13 @@ Sistem di luar CoreERP masuk lewat klien integrasi, bukan kredensial app. Kreden
 
 **Mencabut klien bersifat final.** Klien yang dicabut tidak dapat dihidupkan lagi; buat klien baru.
 
+**Akun aplikasi.** Setiap klien punya baris `users` sendiri berjenis `application`, padanan User aplikasi di Business Central (`Microsoft Entra Application."User ID"`). `AuthenticateIntegrationClient` memasangnya sebagai pelaku permintaan, jadi penulisan klien, termasuk ack, tarikan, dan `last_used_at`, tercatat atas nama klien di kolom jejak dan log perubahan, bukan sebagai sistem. Ack yang datang di jawaban push dicatat atas nama yang sama oleh `PostingPusher`; pengiriman push sendiri tetap pekerjaan sistem.
+
+- Akunnya dibuat `IntegrationClientAccounts::ensure()` saat klien dibuat. Namanya disamakan saat klien diganti nama, dan akunnya tetap ada setelah klien dicabut supaya riwayat lamanya tetap bernama.
+- Klien yang lahir sebelum akun aplikasi ada mendapat akunnya pada panggilan pertama. Alamat akun diturunkan dari id klien (`integration-client-<id>@application.invalid`), jadi tautan yang terputus disambung ke akun yang sama, bukan akun kedua.
+- Akun aplikasi tidak pernah dapat masuk. Penyedia pengguna `people` di Core dan admin.erp hanya membaca `account_type = 'person'`, dan menjadi jalur bersama login kata sandi, pemulihan sesi, remember-me, dan tautan reset kata sandi. Akun ini bukan anggota tenant, jadi tidak muncul di daftar anggota, pemilih penerima tugas, maupun direktori organisasi. Pemantau identitas penyedia menyaringnya.
+- `users` tinggal di database pusat sedangkan `integration_clients` di database tenant, jadi `integration_clients.user_id` tidak ber-foreign key.
+
 **Rate limit** per klien, dikunci pada id di depan token (`coreerp.integration_api_rate_limit`, bawaan 120 per menit), bukan per alamat IP: satu aplikasi finance biasanya memanggil dari satu alamat, dan yang perlu dibatasi adalah kliennya. Permintaan tanpa token dibatasi per alamat. `last_used_at` diperbarui paling sering sekali semenit: ia tanda bahwa klien masih hidup, bukan jejak audit, dan setiap pull tidak perlu menulis ke baris klien yang sama.
 
 ## Layar pantau posting
@@ -533,7 +540,8 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | `apps/core/app/Support/Integration/PushDestination.php` | Aturan URL tujuan push |
 | `apps/core/app/Console/Commands/PushFinancePostings.php` | Perintah `finance-postings:push` |
 | `apps/core/app/Http/Controllers/Internal/FinancePostingFeedController.php` | Pull dan ack |
-| `apps/core/app/Http/Middleware/AuthenticateIntegrationClient.php` | Token, IP, scope, dan salinan sandbox |
+| `apps/core/app/Http/Middleware/AuthenticateIntegrationClient.php` | Token, IP, scope, salinan sandbox, dan pelaku permintaan |
+| `apps/core/app/Support/Finance/IntegrationClientAccounts.php` | Akun aplikasi klien integrasi |
 | `apps/core/app/Http/Middleware/AuthenticateInternalCaller.php` | Rute yang dibaca module dan klien integrasi sekaligus |
 | `apps/core/app/Http/Controllers/Finance/FinancePostingMonitorController.php` | Layar pantau dan aksinya |
 | `apps/core/app/Http/Controllers/Finance/FinancePostingSettingController.php` | Setelan feed per entitas legal |

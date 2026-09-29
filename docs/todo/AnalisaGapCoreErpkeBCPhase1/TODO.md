@@ -93,6 +93,8 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
       bernilai 0 termasuk pemeriksaan log yang baru. Hasilnya di `apps/core/loadtest/README.md`.
       `master-data.js` dan `work-order.js` belum cocok dengan API aset sejak 18 September; perbaikannya
       tugas terpisah.
+- [x] 2.11 Penulisan klien integrasi tercatat atas nama akun aplikasinya, bukan sistem (keputusan
+      pemilik 29 September 2026, opsi A). Akun itu tidak pernah dapat masuk.
 
 ### 3. [ ] Versi baris dan pengaman edit bersamaan (gap 2)
 

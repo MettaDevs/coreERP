@@ -29,6 +29,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
  * @property bool $must_change_password
+ * @property string $account_type
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -44,6 +45,16 @@ class User extends Authenticatable implements PasskeyUser
 
     use OwnedByControlPlane;
 
+    /** Akun seseorang: satu-satunya jenis yang dapat masuk. */
+    public const PERSON = 'person';
+
+    /**
+     * Akun aplikasi milik klien integrasi, seperti User aplikasi di Business Central: pelaku jejak dan log
+     * perubahan untuk penulisan klien itu. Tidak pernah dapat masuk (penyedia pengguna hanya membaca
+     * {@see self::PERSON}) dan bukan anggota tenant mana pun. Lihat `IntegrationClientAccounts`.
+     */
+    public const APPLICATION = 'application';
+
     /**
      * Bawaan kolom penanda, ditulis di model dan bukan hanya di skema.
      *
@@ -56,6 +67,7 @@ class User extends Authenticatable implements PasskeyUser
      */
     protected $attributes = [
         'must_change_password' => false,
+        'account_type' => self::PERSON,
     ];
 
     /**

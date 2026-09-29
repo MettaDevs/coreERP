@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace ControlPlane\Providers;
 
+use Illuminate\Auth\EloquentUserProvider;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,5 +47,13 @@ class AppServiceProvider extends ServiceProvider
 
         Model::preventSilentlyDiscardingAttributes();
         Model::preventLazyLoading($this->app->environment('local'));
+
+        /*
+         * Penyedia pengguna yang hanya membaca akun orang, kembaran penyedia `people` di Core. Akun
+         * aplikasi klien integrasi (`users.account_type = 'application'`) tidak pernah dapat masuk, di
+         * sini maupun di Core. Login kata sandi dan pemulihan sesi keduanya mencari lewat penyedia ini.
+         */
+        Auth::provider('people', fn (Application $app, array $config): EloquentUserProvider => (new EloquentUserProvider($app->make('hash'), $config['model']))
+            ->withQuery(fn (Builder $query) => $query->where('account_type', 'person')));
     }
 }

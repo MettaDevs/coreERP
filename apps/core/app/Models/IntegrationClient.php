@@ -24,7 +24,8 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * @property ?Carbon $last_used_at
  * @property ?Carbon $last_pulled_at
  * @property ?Carbon $revoked_at
- * @property ?string $created_by_user_id
+ * @property ?int $created_by_user_id
+ * @property ?int $user_id Akun aplikasi klien ini, lihat `IntegrationClientAccounts`.
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */

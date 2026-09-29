@@ -8,11 +8,13 @@ use App\Models\FinancePosting;
 use App\Models\FinancePostingDelivery;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceReferenceAccount;
+use App\Models\IntegrationClient;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\Database\AuditActor;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingPusher;
 use App\Support\Modules\Contracts\PenerbitPosting;
@@ -25,6 +27,7 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use RuntimeException;
 use Tests\Concerns\CocokDenganKontrak;
@@ -451,6 +454,73 @@ class FinancePostingFeedTest extends TestCase
 
         $this->assertSame(1, DB::table('finance_posting_events')->where('event', 'acknowledged_posted')->count());
         $this->tarik($token)->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_tarikan_dan_ack_tercatat_atas_nama_akun_aplikasi_klien(): void
+    {
+        $token = $this->token();
+        $akun = (int) IntegrationClient::query()->sole()->user_id;
+        $this->terbitkan($this->perolehan());
+        // Tenant mencatat perubahan posting, supaya pelaku di log perubahan ikut terbaca.
+        DB::table('change_log_setup_tables')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->membership->tenant_id, 'table_name' => 'finance_postings',
+            'log_insertion' => 'none', 'log_modification' => 'all', 'log_deletion' => 'none',
+        ]);
+
+        $this->tarik($token)->assertOk();
+        $this->assertSame($akun, (int) DB::table('integration_clients')->value('updated_by_user_id'));
+
+        $this->ack($token, 'AST-ACQ-0001', ['status' => 'posted', 'external_reference' => 'JV-2026-0001'])->assertOk();
+        $posting = FinancePosting::query()->where('posting_id', 'AST-ACQ-0001')->sole();
+        $this->assertSame($akun, (int) DB::table('finance_postings')->where('id', $posting->id)->value('updated_by_user_id'));
+        $this->assertSame([$akun], DB::table('change_log_entries')->where(['table_name' => 'finance_postings', 'field_name' => 'status'])
+            ->pluck('created_by_user_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all());
+
+        // Pelaku milik permintaan klien saja, dan dilepas bersamanya.
+        $this->assertSame('', (string) DB::selectOne("select current_setting('coreerp.user_id', true) as v")->v);
+
+        // Riwayat menyebut nama kliennya, bukan sistem.
+        $this->actingAs($this->owner)->getJson("/api/v1/change-log/finance_postings/{$posting->id}")
+            ->assertOk()->assertJsonPath('data.0.user_name', IntegrationClient::query()->sole()->name);
+    }
+
+    public function test_ack_di_jawaban_push_tercatat_atas_nama_akun_aplikasi_klien(): void
+    {
+        $this->klienPush();
+        Http::fake(['finance.example.test/*' => Http::response(['status' => 'posted', 'external_reference' => 'JV-PUSH-1'])]);
+        $this->terbitkan($this->perolehan());
+        // Perintah terjadwal berjalan tanpa pengguna.
+        AuditActor::clear();
+
+        app(PostingPusher::class)->run();
+
+        $this->assertSame((int) IntegrationClient::query()->sole()->user_id, (int) DB::table('finance_postings')->value('updated_by_user_id'));
+        // Pengiriman sendiri pekerjaan sistem, bukan keputusan klien.
+        $this->assertNull(DB::table('finance_posting_deliveries')->value('updated_by_user_id'));
+        $this->assertSame('', (string) DB::selectOne("select current_setting('coreerp.user_id', true) as v")->v);
+    }
+
+    public function test_klien_lama_tanpa_akun_mendapatkannya_pada_panggilan_pertama_tanpa_akun_ganda(): void
+    {
+        // Klien yang lahir sebelum akun aplikasi ada: barisnya ditulis langsung, tanpa akun.
+        $rahasia = Str::random(48);
+        $client = IntegrationClient::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'name' => 'Klien lama', 'token_digest' => IntegrationClient::digest($rahasia),
+            'scopes' => ['finance-postings.read'], 'allowed_ips' => [], 'posting_type_prefixes' => ['asset.'],
+            'delivery_mode' => 'pull', 'status' => IntegrationClient::ACTIVE,
+        ]);
+        $token = $client->id.'.'.$rahasia;
+
+        $this->tarik($token)->assertOk();
+        $akun = (int) $client->fresh()?->user_id;
+        $this->assertSame([User::APPLICATION, 'Klien lama'], [User::query()->findOrFail($akun)->account_type, User::query()->findOrFail($akun)->name]);
+        $this->assertSame($akun, (int) DB::table('integration_clients')->where('id', $client->id)->value('updated_by_user_id'));
+
+        // Tautan yang terputus disambung ke akun yang sama.
+        DB::table('integration_clients')->where('id', $client->id)->update(['user_id' => null]);
+        $this->tarik($token)->assertOk();
+        $this->assertSame($akun, (int) $client->fresh()?->user_id);
+        $this->assertSame(1, User::query()->where('account_type', User::APPLICATION)->where('name', 'Klien lama')->count());
     }
 
     public function test_ack_posting_tidak_dikenal_milik_tenant_lain_atau_yang_ditahan(): void

@@ -245,6 +245,21 @@ abstract class TestCase extends BaseTestCase
         return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }
 
+    /**
+     * Memasang ulang katalog layar Core sesudah `TRUNCATE apps ... CASCADE` di kelas ber-`DatabaseTruncation`.
+     *
+     * Katalognya ditulis migration, jadi ia ikut terhapus bersama `apps`, dan kelas test sesudahnya di proses
+     * yang sama mendapati role Owner tanpa duty Core. Hanya merah di CI paralel, dan hanya bila urutannya
+     * kebetulan begitu. Semua migration katalog (`*_security_catalog.php`) dijalankan berurutan, supaya
+     * katalog baru ikut tanpa harus diingat di sini; semuanya idempoten.
+     */
+    protected static function reinstallCoreSecurityCatalog(): void
+    {
+        foreach (glob(database_path('migrations/*_security_catalog.php')) ?: [] as $migration) {
+            (require $migration)->up();
+        }
+    }
+
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void
     {
         if (! Features::enabled($feature)) {

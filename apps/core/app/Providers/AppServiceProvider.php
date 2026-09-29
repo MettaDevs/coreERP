@@ -16,15 +16,19 @@ use App\Support\License\SiteLicense;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\MigrationsStarted;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -151,6 +155,12 @@ class AppServiceProvider extends ServiceProvider
         // kontrak app serta pusat admin. Nama gate ditentukan Scramble (`RestrictedDocsAccess`).
         // Kontrak integrasi untuk sistem luar tidak dijaga gate ini; ia terbit tanpa login.
         Gate::define('viewApiDocs', fn (?User $user): bool => $user?->providerAccess()->where('role', 'provider_admin')->exists() ?? false);
+
+        // Penyedia pengguna yang hanya membaca akun orang. Akun aplikasi klien integrasi tidak pernah
+        // dapat masuk: login kata sandi, pemulihan sesi, remember-me, dan tautan reset kata sandi
+        // semuanya mencari pengguna lewat penyedia ini (`config/auth.php`).
+        Auth::provider('people', fn (Application $app, array $config): EloquentUserProvider => (new EloquentUserProvider($app->make('hash'), $config['model']))
+            ->withQuery(fn (Builder $query) => $query->where('account_type', User::PERSON)));
 
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
