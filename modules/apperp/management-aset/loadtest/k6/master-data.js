@@ -494,6 +494,7 @@ function mutateAset(tenant) {
         }),
         paramsUntuk(tenant, { tags: { op: 'mutate_draft', resource: 'mutasi-aset' } }, { 'Idempotency-Key': kunci }),
     );
+
     if (!record(draf, writeLatency, 201, 'mutate draft 201')) {
         return;
     }

@@ -31,6 +31,7 @@ export function kodeManual(...bagian) {
  */
 export function tandaRun(runId) {
     let hash = 0;
+
     for (const huruf of String(runId)) {
         hash = (hash * 31 + huruf.charCodeAt(0)) >>> 0;
     }
@@ -120,6 +121,7 @@ export function lahirkanAset(jars, ids, kunci) {
 
     return aset.map((response, index) => {
         const id = response.json('data.0.id');
+
         if (!id) {
             fail(`setup aset tenant ${index}: penerimaan selesai tanpa aset ${String(response.body).slice(0, 300)}`);
         }
