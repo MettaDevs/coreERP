@@ -19,6 +19,7 @@ use App\Models\OrganizationHierarchy;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\UserClock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +67,7 @@ class OrganizationController extends Controller
             'hierarchies' => $hierarchies,
             'purposes' => HierarchyPurpose::query()->orderBy('name')->get(['code', 'name', 'description']),
             'operatingUnitTypes' => config('coreerp.operating_unit_types'),
+            'timezones' => UserClock::options(),
         ]);
     }
 

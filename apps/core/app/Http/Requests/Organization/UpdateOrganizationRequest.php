@@ -5,6 +5,7 @@ namespace App\Http\Requests\Organization;
 use App\Models\OperatingUnit;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
+use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,6 +41,8 @@ class UpdateOrganizationRequest extends FormRequest
                     ->ignore($organization->id, 'organization_id'),
             ],
             'country_code' => [Rule::requiredIf($organization->classification === 'legal_entity'), 'nullable', 'string', 'size:2'],
+            // Zona bawaan pengguna di entitas legal ini yang belum memilih zonanya sendiri (K-10).
+            'timezone' => [Rule::prohibitedIf($organization->classification !== 'legal_entity'), 'nullable', 'string', Rule::in(DateTimeZone::listIdentifiers())],
             'operating_unit_type' => [
                 Rule::requiredIf($organization->classification === 'operating_unit'),
                 'nullable',
@@ -61,6 +64,8 @@ class UpdateOrganizationRequest extends FormRequest
         return [
             'operating_unit_number.regex' => 'Nomor unit hanya boleh huruf besar, angka, dan tanda hubung, tanpa spasi.',
             'operating_unit_number.prohibited' => 'Nomor unit hanya untuk operating unit.',
+            'timezone.in' => 'Pilih zona waktu dari daftar.',
+            'timezone.prohibited' => 'Zona waktu hanya untuk entitas legal.',
         ];
     }
 
@@ -71,7 +76,7 @@ class UpdateOrganizationRequest extends FormRequest
      * nama — tidak boleh menghapus nomor yang sudah ada. Nomor itu sudah tertanam di tabel
      * penerjemah aplikasi finance; mengosongkannya diam-diam membuat posting berikutnya tertahan.
      *
-     * @return array{name:string,company_code:?string,country_code:?string,operating_unit_type:?string,operating_unit_number?:?string}
+     * @return array{name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number?:?string}
      */
     public function payload(): array
     {
@@ -79,6 +84,7 @@ class UpdateOrganizationRequest extends FormRequest
             'name' => $this->string('name')->toString(),
             'company_code' => strtoupper($this->string('company_code')->toString()) ?: null,
             'country_code' => strtoupper($this->string('country_code')->toString()) ?: null,
+            'timezone' => $this->string('timezone')->toString() ?: null,
             'operating_unit_type' => $this->string('operating_unit_type')->toString() ?: null,
         ];
 

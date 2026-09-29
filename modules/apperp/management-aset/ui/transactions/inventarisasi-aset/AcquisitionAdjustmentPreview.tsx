@@ -5,6 +5,7 @@ import type {
     PostingCheckLine,
     PostingCheckProblem,
 } from '@/components/finance/posting-check';
+import { useToday } from '@/hooks/use-work-date';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage } from '../../api';
@@ -35,20 +36,6 @@ export type HasilKoreksi = {
     note: string | null;
     posting: { posting_id: string; status: string } | null;
 } | null;
-
-/**
- * Tanggal hari ini menurut jam pengguna, `YYYY-MM-DD`. Jurnal koreksi bertanggal hari koreksi dilakukan
- * (K-34), dan jam server memakai UTC: menjelang pagi di Indonesia tanggalnya masih kemarin.
- */
-export function tanggalHariIni(): string {
-    const hari = new Date();
-
-    return [
-        hari.getFullYear(),
-        String(hari.getMonth() + 1).padStart(2, '0'),
-        String(hari.getDate()).padStart(2, '0'),
-    ].join('-');
-}
 
 /** Pesan sesudah koreksi disimpan, menurut jurnal koreksinya. */
 export function pesanKoreksi(hasil: HasilKoreksi): string {
@@ -103,6 +90,9 @@ export function AcquisitionAdjustmentPreview({
     reason: string;
     onReasonChange: (reason: string) => void;
 }) {
+    // Jurnal koreksi bertanggal hari koreksi dilakukan (K-34): hari ini menurut zona pengguna, dari
+    // jam server.
+    const hariIni = useToday();
     const [pratinjau, setPratinjau] = useState<PratinjauKoreksi | null>(null);
     const [galat, setGalat] = useState('');
     const [memuat, setMemuat] = useState(false);
@@ -114,7 +104,7 @@ export function AcquisitionAdjustmentPreview({
             api<{ data: PratinjauKoreksi }>(
                 `/aset/${asetId}/pratinjau-koreksi?${new URLSearchParams({
                     acquisition_value: after,
-                    adjustment_date: tanggalHariIni(),
+                    adjustment_date: hariIni,
                 }).toString()}`,
             )
                 .then((jawab) => {
@@ -145,7 +135,7 @@ export function AcquisitionAdjustmentPreview({
             dibatalkan = true;
             window.clearTimeout(jeda);
         };
-    }, [asetId, after]);
+    }, [asetId, after, hariIni]);
 
     const posting = pratinjau?.posting ?? null;
     const selisih = Number(pratinjau?.difference ?? 0);

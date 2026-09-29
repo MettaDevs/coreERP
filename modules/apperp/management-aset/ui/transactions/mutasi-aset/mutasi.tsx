@@ -90,11 +90,11 @@ export const emptyLine = (): MutasiLine => ({
     catatan: '',
 });
 
-export const emptyMutasi = (): EditableMutasi => ({
-    // Tanggal hari ini sebagai nilai awal: serah terima hampir selalu dicatat pada hari
-    // ia terjadi, dan tanggal kosong pada dokumen bertanda tangan adalah cacat yang baru
-    // ketahuan setelah dicetak.
-    tanggal: new Date().toISOString().slice(0, 10),
+export const emptyMutasi = (workDate: string): EditableMutasi => ({
+    // Tanggal kerja pengguna sebagai nilai awal, yang bawaannya hari ini: serah terima hampir
+    // selalu dicatat pada hari ia terjadi, dan tanggal kosong pada dokumen bertanda tangan
+    // adalah cacat yang baru ketahuan setelah dicetak.
+    tanggal: workDate,
     tujuan_lokasi_id: '',
     tujuan_org_unit_id: '',
     diserahkan_oleh_user_id: '',

@@ -16,6 +16,7 @@ import { NotificationBell } from '@/components/notification-bell';
 import { PrintDialog } from '@/components/print-dialog';
 import { ProductLauncher } from '@/components/product-launcher';
 import { UserMenuContent } from '@/components/user-menu-content';
+import { WorkDateBadge } from '@/components/work-date-notice';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
 import { cn } from '@/lib/utils';
 import { login } from '@/routes';
@@ -52,6 +53,7 @@ export function AppSidebarHeader({
                 <SidebarTrigger className="shrink-0" />
                 <div className="hidden h-6 w-px bg-border sm:block" />
                 <WorkspaceSwitcher />
+                <WorkDateBadge />
                 <div className="hidden h-6 w-px bg-border lg:block" />
                 <Button
                     variant="outline"

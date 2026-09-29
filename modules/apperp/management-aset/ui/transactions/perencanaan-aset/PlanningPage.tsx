@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -61,11 +62,14 @@ const emptyDetail = (): Detail => ({
     estimated_unit_price: '0',
 });
 
-const emptyPlan = (): Omit<Plan, 'id' | 'kode' | 'version' | 'status'> & {
+// Tanggal dan tahun rencana dari tanggal kerja pengguna, bukan dari jam perangkat.
+const emptyPlan = (
+    workDate: string,
+): Omit<Plan, 'id' | 'kode' | 'version' | 'status'> & {
     details: Detail[];
 } => ({
-    planned_on: new Date().toISOString().slice(0, 10),
-    planning_year: new Date().getFullYear(),
+    planned_on: workDate,
+    planning_year: Number(workDate.slice(0, 4)),
     planning_type: 'regular',
     funding_source: '',
     description: '',
@@ -202,6 +206,7 @@ export default function PlanningPage({
 }) {
     const can = (action: string) =>
         permissions.includes(`management-aset.perencanaan-aset.${action}`);
+    const { date: workDate } = useWorkDate();
     const [plans, setPlans] = useState<Plan[]>([]);
     const [types, setTypes] = useState<AsetType[]>([]);
     const [units, setUnits] = useState<AsetType[]>([]);
@@ -409,7 +414,9 @@ export default function PlanningPage({
                 {can('create') && (
                     <CardAction>
                         <Button
-                            onClick={() => setEditing(emptyPlan() as never)}
+                            onClick={() =>
+                                setEditing(emptyPlan(workDate) as never)
+                            }
                         >
                             Tambah rencana
                         </Button>

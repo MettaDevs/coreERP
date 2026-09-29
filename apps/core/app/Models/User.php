@@ -30,6 +30,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $two_factor_confirmed_at
  * @property bool $must_change_password
  * @property string $account_type
+ * @property string|null $timezone Zona IANA pilihan pengguna; kosong berarti ikut entitas legal aktif.
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at

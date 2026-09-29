@@ -346,6 +346,23 @@ Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
    bisa ditutup untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat, seperti di judul halaman
    BC.
 
+### Yang sudah dibangun (zona waktu dan tanggal kerja)
+
+- **Zona waktu pengguna** di My Profile (`users.timezone`). Kosong berarti ikut zona entitas legal aktif
+  (`legal_entities.timezone`, diisi di layar Organisasi, bawaan `Asia/Jakarta`), lalu zona aplikasi.
+  Penghitungnya `App\Support\UserClock`.
+- **"Hari ini" dari jam server** menurut zona itu, ikut setiap halaman sebagai `clock.today`. Layar yang
+  dulu mengisi tanggal dengan `toISOString()` atau jam peramban kini memakai nilai ini.
+- **Tanggal kerja** di My Profile, disimpan di sesi. Ia kembali ke hari ini saat login ulang atau pindah
+  tenant atau entitas legal, dan tanggal kerja yang sama dengan hari ini disimpan sebagai "hari ini"
+  supaya besok ikut bergeser. Form penerimaan, mutasi, dan perencanaan aset memakainya sebagai tanggal
+  bawaan.
+- **Pengingat di Shell** selama tanggal kerja bukan hari ini, dengan tautan ke My Profile dan tombol
+  "Pakai hari ini". Setelah ditutup, tanggal kerja tetap terlihat di header.
+
+Yang belum: layar dan cetakan belum memformat jam dengan zona pengguna, dan module belum menerima zona
+itu di konteks laporan (7.3 dan 7.4).
+
 ### Pengguna, pekerja HR, dan jadwal kerja
 
 Pertanyaan pemilik: apakah pengguna bisa dihubungkan ke jadwal kerja di Core, atau menunggu module HR?

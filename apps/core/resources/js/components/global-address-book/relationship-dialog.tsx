@@ -11,6 +11,7 @@ import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Users2 } from 'lucide-react';
 import { useState, useRef } from 'react';
+import { useToday } from '@/hooks/use-work-date';
 import type { RelationshipItem } from '@/types/global-address-book';
 
 interface RelationshipDialogProps {
@@ -52,9 +53,8 @@ export function RelationshipDialog({
     const [selectedPair, setSelectedPair] = useState('');
     const [partyBId, setPartyBId] = useState('');
     const [partyBName, setPartyBName] = useState('');
-    const [effectiveDate, setEffectiveDate] = useState(
-        new Date().toISOString().slice(0, 10),
-    );
+    const today = useToday();
+    const [effectiveDate, setEffectiveDate] = useState(today);
     const [expirationDate, setExpirationDate] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {

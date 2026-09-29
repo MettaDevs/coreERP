@@ -9,6 +9,7 @@ use App\Support\Access\CorePermissions;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use App\Support\License\SiteLicense;
+use App\Support\UserClock;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -116,6 +117,22 @@ class HandleInertiaRequests extends Middleware
                     'classification' => $item->classification,
                 ])->values(),
             ],
+            /*
+             * Zona waktu pengguna dan "hari ini" menurutnya, dihitung dari jam server. Layar tidak
+             * pernah menghitung hari ini dari jam perangkat (area 7, K-10).
+             */
+            'clock' => fn (): ?array => $user ? [
+                'timezone' => app(UserClock::class)->timezone($request),
+                'today' => app(UserClock::class)->today($request),
+            ] : null,
+            /*
+             * Tanggal kerja sesi ini, padanan Work Date Business Central: tanggal bawaan transaksi
+             * baru. `value` null berarti hari ini (`clock.today`).
+             */
+            'workDate' => fn (): ?array => $user ? [
+                'value' => $workspace->workDate($request),
+                'notice_dismissed' => $workspace->workDateNoticeDismissed($request),
+            ] : null,
             'entitledProducts' => fn (): array => $this->entitledProducts($membership),
             'launchableProducts' => fn (): array => $this->launchableProducts($membership),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

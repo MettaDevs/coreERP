@@ -4,6 +4,7 @@ namespace App\Http\Requests\Organization;
 
 use App\Models\OperatingUnit;
 use App\Support\Access\CoreSecurityCatalog;
+use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -38,6 +39,8 @@ class OrganizationRequest extends FormRequest
                 'regex:/^[A-Za-z0-9][A-Za-z0-9-]{1,15}$/',
             ],
             'country_code' => [Rule::requiredIf($this->input('classification') === 'legal_entity'), 'nullable', 'string', 'size:2'],
+            // Zona bawaan pengguna di entitas legal ini yang belum memilih zonanya sendiri (K-10).
+            'timezone' => ['prohibited_if:classification,operating_unit', 'nullable', 'string', Rule::in(DateTimeZone::listIdentifiers())],
             'operating_unit_type' => [
                 Rule::requiredIf($this->input('classification') === 'operating_unit'),
                 'nullable',
@@ -59,10 +62,12 @@ class OrganizationRequest extends FormRequest
         return [
             'operating_unit_number.regex' => 'Nomor unit hanya boleh huruf besar, angka, dan tanda hubung, tanpa spasi.',
             'operating_unit_number.prohibited_if' => 'Nomor unit hanya untuk operating unit.',
+            'timezone.in' => 'Pilih zona waktu dari daftar.',
+            'timezone.prohibited_if' => 'Zona waktu hanya untuk entitas legal.',
         ];
     }
 
-    /** @return array{classification:string,name:string,company_code:?string,country_code:?string,operating_unit_type:?string,operating_unit_number:?string} */
+    /** @return array{classification:string,name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number:?string} */
     public function payload(): array
     {
         return [
@@ -70,6 +75,7 @@ class OrganizationRequest extends FormRequest
             'name' => $this->string('name')->toString(),
             'company_code' => strtoupper($this->string('company_code')->toString()) ?: null,
             'country_code' => $this->string('country_code')->toString() ?: null,
+            'timezone' => $this->string('timezone')->toString() ?: null,
             'operating_unit_type' => $this->string('operating_unit_type')->toString() ?: null,
             'operating_unit_number' => $this->string('operating_unit_number')->toString() ?: null,
         ];

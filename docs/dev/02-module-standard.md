@@ -627,6 +627,26 @@ assertion pada test mana pun.
 
 Contract adalah batas integrasi, bukan shared domain model. Contract tetap dimiliki repository app penerbit. App consumer memakai versi contract yang dipublish dan menjalankan compatibility check di CI.
 
+## Tanggal bawaan dan hari ini
+
+Jam tidak pernah diambil dari perangkat pengguna. Layar module membaca dua nilai dari Core lewat
+`apps/core/resources/js/hooks/use-work-date.ts`:
+
+- `useWorkDate().date` adalah **tanggal kerja** pengguna, padanan *Work Date* di Business Central: nilai
+  awal field tanggal pada dokumen transaksi baru. Bawaannya hari ini, dan pengguna menggantinya di
+  My Profile untuk sisa sesi. Contohnya tanggal penerimaan, mutasi, dan perencanaan aset.
+- `useToday()` adalah hari ini menurut zona waktu pengguna, dihitung server. Pakai untuk tanggal yang
+  bukan tanggal transaksi, misalnya tanggal berlaku setelan, atau tanggal yang aturannya "hari ketika
+  tindakan dilakukan" seperti tanggal koreksi nilai perolehan (K-34).
+
+Jangan memakai `new Date().toISOString().slice(0, 10)`: itu tanggal UTC, jadi antara pukul 00.00 dan
+07.00 WIB masih tanggal kemarin. Jam peramban juga tidak dipakai, karena bisa salah atau berbeda zona dengan
+setelan pengguna.
+
+Zona pengguna adalah pilihannya di My Profile. Bila kosong, yang dipakai zona entitas legal aktif
+(`legal_entities.timezone`), lalu zona aplikasi. Penghitungnya `App\Support\UserClock`, dan hasilnya ikut
+setiap halaman Inertia sebagai `clock` dan `workDate`.
+
 ## Bantuan kontekstual pada halaman dan field
 
 UI app mengikuti pola **field description** Dynamics 365: setiap field dapat memiliki help text opsional, tetapi bantuan hanya ditulis untuk field yang rumit atau pemakaiannya tidak langsung jelas. Dynamics 365 juga menampilkan deskripsi saat pengguna mengarahkan pointer ke field dan tidak mengisi deskripsi pada semua halaman. Lihat [View and export field descriptions](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/get-started/view-export-field-descriptions).

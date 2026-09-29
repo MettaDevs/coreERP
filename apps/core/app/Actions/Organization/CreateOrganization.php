@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class CreateOrganization
 {
-    /** @param array{classification:string,name:string,company_code:?string,country_code:?string,operating_unit_type:?string,operating_unit_number?:?string} $data */
+    /** @param array{classification:string,name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string} $data */
     public function handle(TenantMembership $actor, array $data): Organization
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE)) {
@@ -43,6 +43,8 @@ class CreateOrganization
                         'tenant_id' => $actor->tenant_id,
                         'company_code' => $data['company_code'],
                         'country_code' => strtoupper((string) $data['country_code']),
+                        // Tanpa pilihan, bawaan kolomnya yang berlaku.
+                        ...(($data['timezone'] ?? null) !== null ? ['timezone' => $data['timezone']] : []),
                     ]);
                 } else {
                     $organization->operatingUnit()->create([
