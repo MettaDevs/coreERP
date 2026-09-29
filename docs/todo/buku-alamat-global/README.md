@@ -424,6 +424,18 @@ dilepas (GAB-12), tidak ada baris yang dihapus fisik — melepas tautan dan kont
 `deleted_at` — dan setiap tabel tenant baru ikut log perubahan (area 2 analisa gap). Nama di kode ditulis
 bahasa Inggris. Rancangan tabel dan test berpacunya tetap dipakai sebagai contekan.
 
+**Status 29 September 2026: Tahap 1 selesai** (GAB-00 sampai GAB-09, dan GAB-12). Hasil GAB-00 di database dev:
+3 party (semuanya party organisasi tenant sendiri), 2 tautan lokasi, 2 alamat pos, 5 kontak. Dua simpangan dari
+rencana di atas:
+
+- **GAB-07 hanya separuh.** `parties.type` kini dijaga foreign key ke `party_types`, tetapi party legal entity
+  dan operating unit **tetap** berjenis `organization`. Kontrak vendor yang sudah terbit
+  (`contracts/internal/components/schemas/Vendor.yaml`) menerbitkan `party_type` sebagai `organization|person`,
+  dan legal entity yang menjadi vendor akan melanggarnya. Organisasi dikenali lewat `organization_parties`;
+  `type` tetap berarti bentuk nama.
+- **Penulis "utama" diantrekan dengan mengunci baris party**, bukan menangkap 23505 dengan SAVEPOINT. Index
+  tetap penjaga terakhir, dan `SharedLocationConcurrencyTest` membuktikannya merah bila index dilepas.
+
 | ID | Pekerjaan | Selesai bila | Setelah |
 | --- | --- | --- | --- |
 | GAB-00 | Hitung isi `parties`, `party_locations`, `postal_addresses`, `electronic_addresses` di database dev dan SaaS dev | Jumlah baris per tabel tercatat di deskripsi PR, dan terbukti tidak ada party di luar organisasi tenant sendiri | — |

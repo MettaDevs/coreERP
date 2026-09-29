@@ -29,6 +29,8 @@ class SharedLocationConcurrencyTest extends TestCase
 
     /** @var list<string> */
     protected array $exceptTables = [
+        'change_log_setup_fields',
+        'change_log_setup_tables',
         'country_regions',
         'hierarchy_purposes',
         'location_purposes',
