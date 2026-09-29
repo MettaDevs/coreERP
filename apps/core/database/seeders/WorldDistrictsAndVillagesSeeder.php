@@ -865,21 +865,8 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             }
         }
 
+        // Hanya ISO2: `country_regions` satu-satunya tabel negara, dan baris ISO3 ditolak foreign key-nya.
         foreach ($worldDefinitions as $iso3 => $def) {
-            // Seed for ISO3
-            DB::table('ref_country_hierarchy_levels')->updateOrInsert(
-                ['country_code' => $iso3, 'level' => 4],
-                [
-                    'id' => (string) Str::ulid(),
-                    'level_code' => 'village',
-                    'level_name' => $def['term'],
-                    'description' => $def['desc'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
-            );
-
-            // Seed for ISO2 if available
             $iso2 = $iso2ByIso3[$iso3] ?? null;
             if ($iso2) {
                 DB::table('ref_country_hierarchy_levels')->updateOrInsert(
@@ -900,7 +887,7 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
         $allCountries = DB::table('country_regions')->get();
         foreach ($allCountries as $c) {
             $hasLevel = DB::table('ref_country_hierarchy_levels')
-                ->whereIn('country_code', array_filter([$c->code, $c->iso3]))
+                ->where('country_code', $c->code)
                 ->where('level', 4)
                 ->exists();
 
@@ -920,19 +907,6 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                     ]
                 );
 
-                if ($c->iso3) {
-                    DB::table('ref_country_hierarchy_levels')->updateOrInsert(
-                        ['country_code' => $c->iso3, 'level' => 4],
-                        [
-                            'id' => (string) Str::ulid(),
-                            'level_code' => 'village',
-                            'level_name' => $defaultTerm,
-                            'description' => $defaultDesc,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ]
-                    );
-                }
             }
         }
     }
