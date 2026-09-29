@@ -5,12 +5,14 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Reporting\DaftarLaporanModul;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -88,6 +90,11 @@ class ReportingTest extends TestCase
 
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->daftarkanKatalogDariManifest();
+        // Data awal Indonesia yang dikirim lewat `TenantDisiapkan` — 363 master bernomor, sekitar
+        // 3.500 statement per test — tidak dipakai laporan mana pun di sini: `buatWorkOrder()`
+        // menyusun master yang dibutuhkannya sendiri. Data itu diuji sendiri di
+        // `IndonesiaStarterProvisioningTest`.
+        Event::fake([TenantDisiapkan::class]);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant laporan',
             'app_ids' => ['management-aset'], 'email' => 'owner@laporan.test', 'password' => 'password',

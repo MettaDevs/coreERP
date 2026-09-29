@@ -7,6 +7,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
 use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Support\Modules\ModuleMigrator;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -38,6 +39,9 @@ class NumberSequenceInTransactionTest extends TestCase
         'hierarchy_purposes',
         'number_sequence_profiles',
         'party_types',
+        // Riwayat migration module, ditulis sekali per database test oleh Tests\TestCase. Tanpanya
+        // pemasangan module berikutnya mencoba membuat ulang tabel yang masih berdiri.
+        ModuleMigrator::TABEL_RIWAYAT,
     ];
 
     protected function tearDown(): void

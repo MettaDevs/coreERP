@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\NumberSequence\NumberSequenceService;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
+use App\Support\Modules\ModuleMigrator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
@@ -42,6 +43,9 @@ class NumberSequenceConcurrencyTest extends TestCase
         'hierarchy_purposes',
         'number_sequence_profiles',
         'party_types',
+        // Module migration history, written once per test database by Tests\TestCase. Without it the next
+        // module install tries to create tables that are still there.
+        ModuleMigrator::TABEL_RIWAYAT,
     ];
 
     /**

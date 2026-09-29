@@ -67,6 +67,18 @@ class ModuleTableBoundaryTest extends TestCase
                 $module['id'],
             ));
 
+            // Tabel module produk sudah dibuat sekali per database oleh `Tests\TestCase`. Penjaga
+            // ini harus melihat tabel yang lahir dari migration-nya sendiri, jadi tabel berawalan
+            // module itu dibuang lebih dulu — di dalam transaksi test, sehingga rollback
+            // mengembalikannya untuk test berikutnya.
+            $milikModule = array_values(array_filter(
+                $inspector->tabelSaatIni($connection),
+                static fn (string $tabel): bool => str_starts_with($tabel, $module['awalan']),
+            ));
+            if ($milikModule !== []) {
+                $connection->statement('DROP TABLE "'.implode('", "', $milikModule).'" CASCADE');
+            }
+
             $sebelum = $inspector->tabelSaatIni($connection);
 
             Artisan::call('migrate', [

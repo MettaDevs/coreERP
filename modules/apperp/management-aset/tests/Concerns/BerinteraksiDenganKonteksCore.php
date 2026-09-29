@@ -435,19 +435,18 @@ trait BerinteraksiDenganKonteksCore
      * Tenant beserta client pemiliknya, dibuat hanya bila belum ada.
      */
     /**
-     * Tabel module dibuat oleh test ini sendiri, bukan oleh migration Core.
+     * Jaring bila tabel module belum ada.
      *
      * Selama module masih terdaftar sedang dipindah, `ModuleServiceProvider` menjalankan
      * migrationnya bersama migration Core — satu-satunya cara tabelnya ada, karena module yang
      * sedang dipindah belum boleh dipasang untuk tenant mana pun. Entri itu dibuang pada 9
      * September 2026, dan bersamanya jalur tersebut.
      *
-     * Di produksi tabel ini dibuat `ModuleMigrator` saat module dipasang. Test tidak memasang
-     * module, jadi ia menjalankan migrationnya sendiri — pola yang sama dipakai
-     * `TenantScopeBoundaryTest` untuk module contoh.
-     *
-     * Dijalankan sekali per proses, bukan per tenant: tabelnya milik seluruh database dan
-     * dipisahkan `tenant_id`, bukan dibuat per tenant.
+     * Sekarang tabelnya dibuat sekali per database test oleh `Tests\TestCase`, tepat setelah
+     * `migrate:fresh` dan lewat `ModuleMigrator` yang sama dengan produksi, jadi pemeriksaan di
+     * bawah hampir selalu langsung pulang. Sebelumnya migration di sini berjalan di dalam
+     * transaksi `RefreshDatabase` dan ikut di-rollback: docblock ini mengklaim "sekali per
+     * proses", padahal setiap test menjalankan ulang seluruh migration module.
      */
     private function pastikanTabelModuleAda(): void
     {
