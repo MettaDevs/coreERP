@@ -152,6 +152,26 @@ from (
     having count(*) > 1
 ) d;
 
+-- Log perubahan (area 2 analisa gap BC). Pelakunya variabel sesi `coreerp.user_id`; pelaku yang bukan
+-- anggota tenant entrinya berarti nilai itu terbawa dari permintaan lain lewat koneksi yang dipakai ulang.
+insert into hasil_core
+select 'entri log berpelaku bukan anggota tenantnya', count(*)
+from change_log_entries e
+where e.created_by_user_id is not null
+  and not exists (
+      select 1 from tenant_memberships m where m.user_id = e.created_by_user_id and m.tenant_id::text = e.tenant_id::text
+  );
+
+-- Tabel akses tanpa `tenant_id`: tenant entrinya dibaca trigger dari peran yang dirujuk.
+insert into hasil_core
+select 'entri log peran atau penugasan peran di tenant lain', count(*)
+from change_log_entries e
+left join roles r on e.table_name = 'roles' and r.id::text = e.record_id
+left join role_assignments ra on e.table_name = 'role_assignments' and ra.id::text = e.record_id
+left join roles rr on rr.id = ra.role_id
+where e.table_name in ('roles', 'role_assignments')
+  and coalesce(r.tenant_id, rr.tenant_id)::text <> e.tenant_id::text;
+
 select pemeriksaan, pelanggaran from hasil_core order by pemeriksaan;
 
 \echo
@@ -160,7 +180,8 @@ select
     count(distinct user_id) as users,
     count(distinct tenant_id) as tenants,
     (select count(*) from tenant_number_sequences s where s.tenant_id in (select tenant_id from pengguna_run)) as sequences,
-    (select count(*) from number_sequence_issues) as nomor_terbit
+    (select count(*) from number_sequence_issues) as nomor_terbit,
+    (select count(*) from change_log_entries) as entri_log
 from pengguna_run;
 
 do $$

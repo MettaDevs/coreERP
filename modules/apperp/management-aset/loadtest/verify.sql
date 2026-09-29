@@ -532,6 +532,23 @@ union all select 'posting group ganda untuk group dan tanggal yang sama', n from
 union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
 union all select 'posting group menunjuk akun tenant lain atau yang tidak ada', n from posting_group_akun_asing;
 
+-- Log perubahan aset (area 2 analisa gap BC): bawaan modul mencatat pembuatan aset, jadi setiap aset
+-- punya entri pembuatan, dan entrinya berada di tenant aset itu.
+insert into hasil_aset
+select 'riwayat perubahan aset tercatat di tenant lain', count(*)
+from change_log_entries e
+join aset_tr_aset a on a.id::text = e.record_id
+where e.table_name = 'aset_tr_aset' and a.tenant_id::text <> e.tenant_id::text;
+
+insert into hasil_aset
+select 'aset tanpa entri log pembuatan', count(*)
+from aset_tr_aset a
+where not exists (
+    select 1 from change_log_entries e
+    where e.tenant_id::text = a.tenant_id::text and e.table_name = 'aset_tr_aset'
+      and e.record_id = a.id::text and e.change_type = 'insertion'
+);
+
 select pemeriksaan, pelanggaran from hasil_aset order by pemeriksaan;
 
 \echo
