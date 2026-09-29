@@ -55,6 +55,7 @@ class NumberSequenceTest extends TestCase
         $this->actingAs($user)
             ->patch("/settings/number-sequences/{$sequence->id}", $this->settings([
                 'preallocation_quantity' => 21,
+                'version' => $sequence->fresh()->version,
             ]))
             ->assertRedirect()
             ->assertSessionHasNoErrors();

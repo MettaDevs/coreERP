@@ -56,7 +56,7 @@ trait MenerbitkanJurnalPenerimaan
         $this->klinik = $this->organisasi(['classification' => 'operating_unit', 'name' => 'Klinik A', 'operating_unit_type' => 'business_unit', 'operating_unit_number' => 'KLN-A']);
         $this->poli = $this->organisasi(['classification' => 'operating_unit', 'name' => 'Poli Umum', 'operating_unit_type' => 'department', 'operating_unit_number' => 'POLI-UMUM']);
         $this->hierarki([[$this->klinik, $this->le], [$this->poli, $this->klinik]]);
-        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => true, 'cutover_date' => '2026-01-01'])->assertOk();
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => true, 'cutover_date' => '2026-01-01', 'version' => (int) DB::table('finance_posting_settings')->where('legal_entity_id', $this->le)->value('version')])->assertOk();
         $this->vendor = (string) $this->actingAs($this->owner)->postJson('/api/v1/vendors', ['legal_entity_id' => $this->le, 'party_name' => 'PT Karoseri Sehat'])
             ->assertCreated()->json('data.id');
 
@@ -95,10 +95,11 @@ trait MenerbitkanJurnalPenerimaan
         $versi = OrganizationHierarchyVersion::query()->whereHas('hierarchy', fn ($query) => $query->where('name', 'Struktur manajemen'))->firstOrFail();
         foreach ($penempatan as [$anak, $induk]) {
             $this->post("/settings/organization/hierarchy-versions/{$versi->id}/placements", [
+                'version' => $versi->hierarchy()->value('version'),
                 'organization_id' => $anak, 'parent_organization_id' => $induk,
             ])->assertSessionHasNoErrors();
         }
-        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish", ['version' => $versi->hierarchy()->value('version')])->assertSessionHasNoErrors();
     }
 
     /** Group aset dengan satu buku berlapisan `$postingLayer` pada matriksnya. */
@@ -134,7 +135,11 @@ trait MenerbitkanJurnalPenerimaan
         $this->sebagaiPengguna($this->tenantId, array_map(
             static fn (string $aksi): string => 'management-aset.fixed-asset-posting-profiles.'.$aksi,
             ['read', 'create', 'update'],
-        ))->putJson(self::API.'posting-group-aset/'.$group.'/'.$tanggal, $akun)->assertSuccessful();
+        ))->putJson(self::API.'posting-group-aset/'.$group.'/'.$tanggal, [
+            ...$akun,
+            // Baris yang sudah ada hanya dapat diubah dari versinya; baris baru tidak butuh versi.
+            'version' => DB::table('aset_m_posting_group')->where('group_aset_id', $group)->whereDate('effective_from', $tanggal)->whereNull('deleted_at')->value('version'),
+        ])->assertSuccessful();
     }
 
     /**

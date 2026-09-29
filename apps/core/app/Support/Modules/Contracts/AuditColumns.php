@@ -22,7 +22,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * Versi baris padanan `SystemRowVersion` BC (K-03): angka yang dinaikkan trigger
  * `coreerp_bump_row_version` pada setiap UPDATE, apa pun jalurnya. Nilai yang ditulis kode untuk kolom
- * itu diabaikan. Penyimpanan dari form dan API memeriksanya lewat {@see RowVersion}.
+ * itu diabaikan. Penyimpanan dari form dan API memeriksanya lewat {@see RowVersion}. Trigger itu dapat
+ * menerima daftar kolom aktivitas mesin, seperti `last_pulled_at` klien integrasi, yang tidak menaikkan
+ * versi bila hanya kolom itu yang berubah; {@see self::attach()} memasangnya tanpa daftar.
  *
  * Tabel tenant baru, di Core maupun module, memanggil {@see self::add()} di `Schema::create` lalu
  * {@see self::attach()} sesudahnya. `AuditColumnsBoundaryTest` dan `ModuleTableBoundaryTest` menolak

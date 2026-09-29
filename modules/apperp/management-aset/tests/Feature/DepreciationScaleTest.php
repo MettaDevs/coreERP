@@ -264,7 +264,7 @@ class DepreciationScaleTest extends TestCase
             'alternative_profile_id' => $alternative ? $this->profil($tenant, $alternative) : null,
         ]);
         $this->actingAsTenant($tenant)
-            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'), 'rows' => [[
                 'buku_id' => $buku,
                 'useful_life_periods' => $profile['useful_life_periods'] ?? null,
                 'convention' => 'full_month',

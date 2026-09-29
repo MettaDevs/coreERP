@@ -12,6 +12,7 @@ use App\Models\WorkingTimeCalendarLine;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
 use App\Support\CurrentWorkspace;
+use App\Support\Modules\Contracts\RowVersion;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -53,6 +54,7 @@ class WorkingTimeCalendarController extends Controller
                     'legal_entity_id' => $c->legal_entity_id,
                     'legal_entity_name' => $c->legalEntity?->name,
                     'company_code' => $c->legalEntity?->legalEntity?->company_code,
+                    'version' => $c->version,
                 ])
             : collect();
 
@@ -151,17 +153,20 @@ class WorkingTimeCalendarController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ], $this->codeMessages());
 
-        $calendar->update([
-            'code' => $validated['code'],
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'base_calendar_id' => $validated['base_calendar_id'] ?? null,
-            'standard_work_hours' => $validated['standard_work_hours'] ?? $calendar->standard_work_hours,
-            'is_active' => $validated['is_active'] ?? $calendar->is_active,
-        ]);
+        DB::transaction(function () use ($request, $calendar, $validated): void {
+            RowVersion::claim($calendar, RowVersion::expected($request));
+            $calendar->update([
+                'code' => $validated['code'],
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'base_calendar_id' => $validated['base_calendar_id'] ?? null,
+                'standard_work_hours' => $validated['standard_work_hours'] ?? $calendar->standard_work_hours,
+                'is_active' => $validated['is_active'] ?? $calendar->is_active,
+            ]);
+        });
 
         if ($request->wantsJson()) {
-            return response()->json(['data' => $calendar]);
+            return response()->json(['data' => $calendar->refresh()]);
         }
 
         return redirect()->route('working-time-calendars.index')
@@ -176,7 +181,10 @@ class WorkingTimeCalendarController extends Controller
         abort_if($calendar->tenant_id !== $membership->tenant_id, 404);
 
         $code = $calendar->code;
-        $calendar->delete();
+        DB::transaction(function () use ($request, $calendar): void {
+            RowVersion::claim($calendar, RowVersion::expected($request));
+            $calendar->delete();
+        });
 
         if ($request->wantsJson()) {
             return response()->json(['message' => "Kalender kerja {$code} berhasil diarsipkan."]);
@@ -287,6 +295,7 @@ class WorkingTimeCalendarController extends Controller
             'code' => $selectedCalendar->code,
             'name' => $selectedCalendar->name,
             'standard_work_hours' => (float) $selectedCalendar->standard_work_hours,
+            'version' => $selectedCalendar->version,
         ] : null;
 
         $allCalendarsData = $allCalendars->map(fn (WorkingTimeCalendar $c): array => [
@@ -294,6 +303,7 @@ class WorkingTimeCalendarController extends Controller
             'code' => $c->code,
             'name' => $c->name,
             'standard_work_hours' => (float) $c->standard_work_hours,
+            'version' => $c->version,
         ])->values()->all();
 
         if ($request->wantsJson() || $request->is('api/*')) {
@@ -353,7 +363,9 @@ class WorkingTimeCalendarController extends Controller
 
         $lines = isset($validated['lines']) ? $this->normalizeLines($validated['lines']) : null;
 
-        DB::transaction(function () use ($day, $validated, $calendar, $lines): void {
+        // Hari dan barisnya milik kalender; yang diklaim kalendernya, record yang dibuka pengguna.
+        DB::transaction(function () use ($request, $day, $validated, $calendar, $lines): void {
+            RowVersion::claim($calendar, RowVersion::expected($request));
             if ($lines !== null) {
                 $day->lines()->delete();
                 $now = now();
@@ -378,7 +390,7 @@ class WorkingTimeCalendarController extends Controller
         });
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'Hari kerja berhasil diperbarui.']);
+            return response()->json(['message' => 'Hari kerja berhasil diperbarui.', 'version' => $calendar->refresh()->version]);
         }
 
         return back()->with('success', 'Hari kerja berhasil diperbarui.');
@@ -417,6 +429,7 @@ class WorkingTimeCalendarController extends Controller
             'code' => (string) $c->code,
             'name' => (string) $c->name,
             'standard_work_hours' => (float) $c->standard_work_hours,
+            'version' => (int) $c->version,
         ])->values()->all();
 
         /** @var array<int, array<string, mixed>> $templatesData */
@@ -532,13 +545,19 @@ class WorkingTimeCalendarController extends Controller
             ->where('id', $validated['template_id'])
             ->firstOrFail();
 
-        $count = $service->compose($calendar, $template, $validated['from_date'], $validated['to_date']);
+        // Penyusunan mengganti hari-hari kalender; yang diklaim kalendernya.
+        $count = DB::transaction(function () use ($request, $calendar, $template, $validated, $service): int {
+            RowVersion::claim($calendar, RowVersion::expected($request));
+
+            return $service->compose($calendar, $template, $validated['from_date'], $validated['to_date']);
+        });
         $message = "Jadwal kerja kalender {$calendar->code} disusun dari pola {$template->code} untuk {$count} hari.";
 
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => $message,
                 'days_processed' => $count,
+                'version' => $calendar->refresh()->version,
             ]);
         }
 

@@ -57,12 +57,13 @@ class SecurityConfigurationDuplicateTest extends TestCase
         $this->actingAs($this->owner)->put("/settings/security-configuration/privileges/{$copy->code}", [
             'name' => 'Lihat entitas aset saja',
             'permission_codes' => ['app-uji.entitas.read'],
+            'version' => $copy->version,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(['app-uji.entitas.read'], $copy->refresh()->permissions->pluck('code')->all());
 
         $this->actingAs($this->owner)
-            ->post("/settings/security-configuration/privileges/{$copy->code}/publish")
+            ->post("/settings/security-configuration/privileges/{$copy->code}/publish", ['version' => $copy->fresh()->version])
             ->assertRedirect()->assertSessionHasNoErrors();
 
         $this->actingAs($this->owner)->post('/settings/security-configuration/duties', [
@@ -71,7 +72,7 @@ class SecurityConfigurationDuplicateTest extends TestCase
 
         $duty = SecurityDuty::query()->where('source', 'custom')->sole();
         $this->actingAs($this->owner)
-            ->post("/settings/security-configuration/duties/{$duty->code}/publish")
+            ->post("/settings/security-configuration/duties/{$duty->code}/publish", ['version' => $duty->version])
             ->assertRedirect()->assertSessionHasNoErrors();
 
         $roleId = $this->actingAs($this->owner)->postJson('/api/v1/roles', [
@@ -119,7 +120,7 @@ class SecurityConfigurationDuplicateTest extends TestCase
 
         $copy = SecurityPrivilege::query()->where('source', 'custom')->sole();
         $this->actingAs($this->owner)
-            ->delete("/settings/security-configuration/privileges/{$copy->code}")
+            ->delete("/settings/security-configuration/privileges/{$copy->code}", ['version' => $copy->version])
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(0, SecurityPrivilege::query()->where('source', 'custom')->count());
 

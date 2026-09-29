@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Finance;
 use App\Http\Controllers\Controller;
 use App\Models\CurrencyPrecision;
 use App\Support\Finance\MoneyPrecision;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,6 +29,7 @@ final class CurrencyPrecisionController extends Controller
     public function index(Request $request, MoneyPrecision $presisi): Response
     {
         $tenant = $this->currentMembership($request)->tenant_id;
+        $versions = CurrencyPrecision::query()->where('tenant_id', $tenant)->pluck('version', 'currency_code');
 
         return Inertia::render('settings/currencies', [
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,
@@ -39,6 +42,8 @@ final class CurrencyPrecisionController extends Controller
                     'code' => $kode,
                     'name' => self::NAMA[$kode],
                     ...$presisi->forCurrency($tenant, $kode),
+                    // 0 selama mata uang ini masih memakai bawaan; lihat RowVersion::claimIfExists().
+                    'version' => $versions[$kode] ?? 0,
                 ],
                 array_keys(self::NAMA),
             ),
@@ -60,10 +65,13 @@ final class CurrencyPrecisionController extends Controller
             'unit_amount_decimals.gte' => 'Presisi harga satuan tidak boleh lebih kasar dari presisi nilai.',
         ]);
 
-        CurrencyPrecision::query()->updateOrCreate(
-            ['tenant_id' => $tenant, 'currency_code' => $currency],
-            ['amount_decimals' => (int) $data['amount_decimals'], 'unit_amount_decimals' => (int) $data['unit_amount_decimals']],
-        );
+        $values = ['amount_decimals' => (int) $data['amount_decimals'], 'unit_amount_decimals' => (int) $data['unit_amount_decimals']];
+
+        DB::transaction(function () use ($request, $tenant, $currency, $values): void {
+            $key = ['tenant_id' => $tenant, 'currency_code' => $currency];
+            RowVersion::claimIfExists(CurrencyPrecision::query()->where($key), RowVersion::expected($request));
+            CurrencyPrecision::query()->updateOrCreate($key, $values);
+        });
 
         return back()->with('status', 'Presisi '.$currency.' disimpan. Berlaku untuk posting berikutnya.');
     }

@@ -12,6 +12,7 @@ use App\Support\Modules\Contracts\AuditColumns;
 use App\Support\Modules\Contracts\ChangeLogDefaults;
 use App\Support\Modules\Contracts\ChangeLogValueResolver;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
+use App\Support\Modules\Contracts\RowVersion;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
@@ -300,6 +301,7 @@ final class ChangeLogTest extends TestCase
         $this->actingAs($this->owner)->put('/settings/change-log/contoh_log', [
             'log_insertion' => false, 'log_modification' => true, 'log_deletion' => false,
             'fields' => ['catatan' => ['log_insertion' => false, 'log_modification' => true, 'log_deletion' => false]],
+            'version' => 0,
         ])->assertRedirect();
 
         $id = $this->insert('awal', 'catatan awal');
@@ -327,6 +329,33 @@ final class ChangeLogTest extends TestCase
         $this->actingAs($this->owner)->put('/settings/change-log/contoh_log', [
             ...$body, 'fields' => ['tenant_id' => ['log_insertion' => true]],
         ])->assertStatus(422);
+    }
+
+    public function test_setelan_tabel_menolak_versi_basi_dan_versi_kosong(): void
+    {
+        ChangeLogDefaults::register('contoh_log', 'Contoh', ['nama' => 'Nama', 'catatan' => 'Catatan']);
+        $body = fn (bool $catatan): array => [
+            'log_insertion' => false, 'log_modification' => true, 'log_deletion' => false,
+            'fields' => ['catatan' => ['log_insertion' => false, 'log_modification' => $catatan, 'log_deletion' => false]],
+        ];
+        $own = fn () => DB::table('change_log_setup_tables')->where('tenant_id', $this->membership->tenant_id)->where('table_name', 'contoh_log');
+        $catatan = fn (): bool => (bool) DB::table('change_log_setup_fields')->where('tenant_id', $this->membership->tenant_id)
+            ->where('table_name', 'contoh_log')->where('field_name', 'catatan')->value('log_modification');
+        $this->actingAs($this->owner)->from('/settings/change-log');
+
+        // Belum pernah disimpan: belum ada baris untuk diklaim, tetapi field version (0) tetap wajib.
+        $this->put('/settings/change-log/contoh_log', $body(true))->assertSessionHasErrors(['version' => RowVersion::REQUIRED_MESSAGE]);
+        $this->assertFalse($own()->exists());
+        $this->put('/settings/change-log/contoh_log', [...$body(true), 'version' => 0])->assertSessionHasNoErrors();
+        $this->put('/settings/change-log/contoh_log', [...$body(false), 'version' => 0])->assertSessionHasErrors(['version' => RowVersion::STALE_MESSAGE]);
+
+        $this->get('/settings/change-log')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('tables', fn (Collection $tables): bool => self::contohLog($tables)['version'] === 1));
+        $this->put('/settings/change-log/contoh_log', [...$body(true), 'version' => 1])->assertSessionHasNoErrors();
+        $this->put('/settings/change-log/contoh_log', [...$body(false), 'version' => 1])->assertSessionHasErrors(['version' => RowVersion::STALE_MESSAGE]);
+        $this->put('/settings/change-log/contoh_log', $body(false))->assertSessionHasErrors(['version' => RowVersion::REQUIRED_MESSAGE]);
+
+        $this->assertTrue($catatan(), 'Field dari penyimpanan pertama bertahan.');
     }
 
     public function test_pendaftaran_bawaan_idempoten_dan_mematikan_field_yang_tidak_lagi_disebut(): void

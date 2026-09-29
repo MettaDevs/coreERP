@@ -54,6 +54,7 @@ export default function RecordDetailPane({
     onRequestEdit,
     onDirtyChange,
     onSavingChange,
+    onVersionChange,
     onSaved,
 }: {
     formId: string;
@@ -65,6 +66,8 @@ export default function RecordDetailPane({
     onRequestEdit: () => void;
     onDirtyChange: (dirty: boolean) => void;
     onSavingChange: (saving: boolean) => void;
+    /** Rincian yang disimpan menaikkan versi record ini; induk mencatat versi barunya. */
+    onVersionChange: (version: number) => void;
     onSaved: (record: MasterRecord, created: boolean) => void;
 }) {
     const readOnly = mode === 'view';
@@ -257,6 +260,11 @@ export default function RecordDetailPane({
                 ? { kode, nama }
                 : { nama };
 
+            if (record) {
+                // Dari `record` saat menyimpan: rincian di panel ini dapat menaikkannya lebih dahulu.
+                payload.version = record.version;
+            }
+
             for (const field of allFields) {
                 // Field yang sedang tersembunyi tidak dikirim, supaya mengganti satu pilihan
                 // tidak diam-diam menyimpan nilai milik pilihan sebelumnya.
@@ -377,6 +385,8 @@ export default function RecordDetailPane({
                 <GroupBookMatrix
                     groupId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -395,6 +405,8 @@ export default function RecordDetailPane({
                 <JenisAsetAtribut
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -411,6 +423,8 @@ export default function RecordDetailPane({
                     loading={jenisAsetDetailLoading}
                     error={jenisAsetDetailError}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -427,6 +441,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jobTypeId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -441,6 +457,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistVariableValues
                     variableId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -454,6 +472,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistTemplateLines
                     templateId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -470,6 +490,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm">

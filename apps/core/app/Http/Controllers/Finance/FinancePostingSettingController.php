@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingSettings;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,8 +31,9 @@ final class FinancePostingSettingController extends Controller
     public function show(Request $request, Organization $organization): JsonResponse
     {
         $this->guard($request, $organization);
+        $data = $this->present($organization);
 
-        return response()->json(['data' => $this->present($organization)]);
+        return response()->json(['data' => $data])->header('ETag', RowVersion::etag($data['version']));
     }
 
     public function update(Request $request, Organization $organization, PostingPublisher $penerbit): JsonResponse
@@ -44,14 +46,21 @@ final class FinancePostingSettingController extends Controller
             'cutover_date.required_if_accepted' => 'Isi tanggal cutover sebelum mengaktifkan pengiriman posting. Tanpa cutover, seluruh riwayat yang sudah dijurnal manual ikut terkirim.',
         ]);
 
-        FinancePostingSetting::query()->updateOrCreate(
-            ['legal_entity_id' => $organization->id],
-            [
-                'tenant_id' => $organization->tenant_id,
-                'enabled' => (bool) $data['enabled'],
-                'cutover_date' => $data['cutover_date'] ?? null,
-            ],
-        );
+        $expected = RowVersion::expected($request);
+
+        DB::transaction(function () use ($organization, $data, $expected): void {
+            // Setelan baru lahir pada penyimpanan pertama; layar yang belum menemukannya mengirim versi 0.
+            RowVersion::claimIfExists(FinancePostingSetting::query()->whereKey($organization->id), $expected);
+
+            FinancePostingSetting::query()->updateOrCreate(
+                ['legal_entity_id' => $organization->id],
+                [
+                    'tenant_id' => $organization->tenant_id,
+                    'enabled' => (bool) $data['enabled'],
+                    'cutover_date' => $data['cutover_date'] ?? null,
+                ],
+            );
+        });
         // Posting yang sudah terbit tetapi belum pernah sampai ke pembaca mengikuti setelan baru:
         // yang kini sesudah cutover diperiksa dan disajikan, yang sebelumnya menjadi manual.
         $dinilaiUlang = $penerbit->reevaluateCutover($organization->tenant_id, $organization->id, $request->user()?->id);
@@ -108,7 +117,10 @@ final class FinancePostingSettingController extends Controller
             ]);
         }
 
-        $baris->delete();
+        DB::transaction(function () use ($request, $baris): void {
+            RowVersion::claim($baris, RowVersion::expected($request));
+            $baris->delete();
+        });
 
         return response()->noContent();
     }
@@ -119,6 +131,8 @@ final class FinancePostingSettingController extends Controller
         $setting = $this->settings->setting($organization->id);
 
         return [
+            // 0 selama setelan belum pernah disimpan; lihat RowVersion::claimIfExists().
+            'version' => (int) ($setting->version ?? 0),
             'enabled' => $setting->enabled ?? false,
             'cutover_date' => $setting?->cutover_date?->toDateString(),
             'current_mode' => $this->settings->settlementMode($organization->id, today()->toDateString()),
@@ -129,6 +143,7 @@ final class FinancePostingSettingController extends Controller
                 ->get()
                 ->map(static fn (FinanceSettlementMode $baris): array => [
                     'id' => $baris->id,
+                    'version' => (int) $baris->version,
                     'mode' => $baris->mode,
                     'effective_from' => $baris->effective_from->toDateString(),
                     'removable' => $baris->effective_from->isAfter(today()),

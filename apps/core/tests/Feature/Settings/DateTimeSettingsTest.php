@@ -156,6 +156,7 @@ final class DateTimeSettingsTest extends TestCase
         $this->assertDatabaseHas('legal_entities', ['organization_id' => $id, 'timezone' => 'Asia/Makassar']);
 
         $this->patch("/settings/organization/organizations/{$id}", [
+            'version' => DB::table('organizations')->where('id', $id)->value('version'),
             'classification' => 'legal_entity', 'name' => 'PT Metta Makassar', 'company_code' => 'MKS', 'country_code' => 'ID',
             'timezone' => 'Asia/Jayapura',
         ])->assertSessionHasNoErrors();

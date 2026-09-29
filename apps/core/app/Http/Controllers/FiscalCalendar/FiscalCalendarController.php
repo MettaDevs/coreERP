@@ -11,9 +11,11 @@ use App\Models\FiscalPeriod;
 use App\Models\FiscalYear;
 use App\Models\LegalEntity;
 use App\Models\Organization;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,6 +39,7 @@ class FiscalCalendarController extends Controller
                 'id' => $calendar->id,
                 'code' => $calendar->code,
                 'name' => $calendar->name,
+                'version' => $calendar->version,
                 'years' => $calendar->years->map(fn (FiscalYear $year): array => [
                     'id' => $year->id,
                     'name' => $year->name,
@@ -66,6 +69,7 @@ class FiscalCalendarController extends Controller
                 'name' => $organization->name,
                 'company_code' => $organization->legalEntity?->company_code,
                 'fiscal_calendar_id' => $organization->legalEntity?->fiscal_calendar_id,
+                'version' => $organization->legalEntity?->version,
             ]);
 
         if ($request->is('api/*')) {
@@ -101,7 +105,13 @@ class FiscalCalendarController extends Controller
             ?? $service->monthlyPeriods($startsOn, $request->integer('months'));
         $endsOn = end($periods)['ends_on'];
 
-        $year = $service->defineYear($calendar, $request->string('name')->toString(), $startsOn, $endsOn, $periods);
+        // Tahun fiskal tidak berversi sendiri; yang diklaim kalendernya, record yang dibuka pengguna. Tahun
+        // yang ditolak validasi layanan ikut membatalkan klaimnya.
+        $year = DB::transaction(function () use ($request, $calendar, $service, $startsOn, $endsOn, $periods): FiscalYear {
+            RowVersion::claim($calendar, RowVersion::expected($request));
+
+            return $service->defineYear($calendar, $request->string('name')->toString(), $startsOn, $endsOn, $periods);
+        });
 
         return $this->respond($request, ['id' => $year->id], 'Tahun fiskal ditambahkan.');
     }
@@ -121,7 +131,11 @@ class FiscalCalendarController extends Controller
             ->where('classification', 'legal_entity')
             ->firstOrFail();
 
-        LegalEntity::query()->whereKey($organization->id)->update(['fiscal_calendar_id' => $calendar->id]);
+        // Yang berubah baris entitas legalnya, jadi versi yang dikirim adalah versi entitas legal itu.
+        DB::transaction(function () use ($request, $organization, $calendar): void {
+            RowVersion::claim(LegalEntity::query()->whereKey($organization->id), RowVersion::expected($request));
+            LegalEntity::query()->whereKey($organization->id)->update(['fiscal_calendar_id' => $calendar->id]);
+        });
 
         return $this->respond($request, ['legal_entity_id' => $organization->id], 'Kalender fiskal ditetapkan.');
     }

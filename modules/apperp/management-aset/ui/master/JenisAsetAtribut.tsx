@@ -24,9 +24,14 @@ type Row = { tipe_atribut_id: string; wajib: boolean };
 export default function JenisAsetAtribut({
     jenisAsetId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     jenisAsetId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [types, setTypes] = useState<MasterOption[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
@@ -143,12 +148,20 @@ export default function JenisAsetAtribut({
         setSaved(false);
 
         try {
-            await api(`/jenis-aset/${jenisAsetId}/atribut`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    rows: rows.map((row, index) => ({ ...row, urutan: index })),
-                }),
-            });
+            const result = await api<{ version: number }>(
+                `/jenis-aset/${jenisAsetId}/atribut`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        rows: rows.map((row, index) => ({
+                            ...row,
+                            urutan: index,
+                        })),
+                    }),
+                },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(errorMessage(caught, 'Atribut belum dapat disimpan.'));

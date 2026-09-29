@@ -330,7 +330,7 @@ class DepreciationPostingTest extends TestCase
         $komersial = $this->bukuBerprofil('KOM-'.$kode, 'Komersial '.$nama, 'current', $masa);
         $kedua = $this->bukuBerprofil(($lapisanKedua === 'none' ? 'FIS-' : 'OPS-').$kode, 'Buku kedua '.$nama, $lapisanKedua, $masa);
         $this->sebagaiPengguna($this->tenantId, $this->izin('group-aset'))
-            ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', ['rows' => [
+            ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', ['version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'), 'rows' => [
                 ['buku_id' => $komersial, 'useful_life_periods' => $masa, 'convention' => 'full_month', 'depreciate' => true],
                 ['buku_id' => $kedua, 'useful_life_periods' => $masa, 'convention' => 'full_month', 'depreciate' => true],
             ]])->assertOk();
@@ -386,10 +386,10 @@ class DepreciationPostingTest extends TestCase
         $id = $this->organisasi(['classification' => 'operating_unit', 'name' => $nama, 'operating_unit_type' => 'department', 'operating_unit_number' => $nomor]);
         $terbit = OrganizationHierarchyVersion::query()->where('status', 'published')
             ->whereHas('hierarchy', fn ($query) => $query->where('name', 'Struktur manajemen'))->firstOrFail();
-        $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$terbit->id}/drafts", ['effective_from' => '2026-06-01'])->assertSessionHasNoErrors();
+        $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$terbit->id}/drafts", ['version' => $terbit->hierarchy()->value('version'), 'effective_from' => '2026-06-01'])->assertSessionHasNoErrors();
         $draf = OrganizationHierarchyVersion::query()->where('status', 'draft')->where('hierarchy_id', $terbit->hierarchy_id)->firstOrFail();
-        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/placements", ['organization_id' => $id, 'parent_organization_id' => $this->klinik])->assertSessionHasNoErrors();
-        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/placements", ['version' => $draf->hierarchy()->value('version'), 'organization_id' => $id, 'parent_organization_id' => $this->klinik])->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish", ['version' => $draf->hierarchy()->value('version')])->assertSessionHasNoErrors();
 
         return $id;
     }

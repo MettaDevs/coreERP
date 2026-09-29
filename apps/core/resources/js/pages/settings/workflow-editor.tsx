@@ -60,6 +60,7 @@ type Props = {
         name: string;
         enabled: boolean;
         legal_entity_id: string | null;
+        version: number;
     };
     workflowType: {
         id: string;
@@ -452,7 +453,7 @@ export default function WorkflowEditor({
         };
         router.put(
             `/settings/workflows/${workflow.id}/graph`,
-            payload as never,
+            { ...payload, version: workflow.version } as never,
             { preserveScroll: true },
         );
     };
@@ -460,13 +461,13 @@ export default function WorkflowEditor({
     const publish = () =>
         router.post(
             `/settings/workflows/${workflow.id}/publish`,
-            {},
+            { version: workflow.version },
             { preserveScroll: true },
         );
     const createDraft = () =>
         router.post(
             `/settings/workflows/${workflow.id}/draft`,
-            {},
+            { version: workflow.version },
             { preserveScroll: true },
         );
 

@@ -160,7 +160,10 @@ export default function MasterDetailPage({
         try {
             await api(`/${config.resource}/${selected.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ aktif: !selected.aktif }),
+                body: JSON.stringify({
+                    aktif: !selected.aktif,
+                    version: selected.version,
+                }),
             });
             setPage(1);
             await load();
@@ -178,6 +181,7 @@ export default function MasterDetailPage({
         try {
             await api(`/${config.resource}/${selected.id}`, {
                 method: 'DELETE',
+                body: JSON.stringify({ version: selected.version }),
             });
             setSelectedId(null);
             setPage(1);
@@ -213,6 +217,19 @@ export default function MasterDetailPage({
         setMode(created ? 'edit' : 'view');
         setPage(1);
         await load();
+    }
+
+    /**
+     * Rincian record (baris template, atribut, kaitan) disimpan dengan mengklaim versi record
+     * itu. Versi barunya dicatat pada daftar, satu-satunya pemegang versi, supaya penyimpanan
+     * berikutnya — rincian lain atau form-nya sendiri — berangkat dari versi terbaru.
+     */
+    function changeVersion(id: string, version: number) {
+        setItems((current) =>
+            current.map((item) =>
+                item.id === id ? { ...item, version } : item,
+            ),
+        );
     }
 
     const loadMore = useCallback(() => {
@@ -333,6 +350,11 @@ export default function MasterDetailPage({
                     onRequestEdit={() => setMode('edit')}
                     onDirtyChange={setDirty}
                     onSavingChange={setSaving}
+                    onVersionChange={(version) => {
+                        if (selectedId) {
+                            changeVersion(selectedId, version);
+                        }
+                    }}
                     onSaved={(savedRecord, created) => {
                         void handleSaved(savedRecord, created);
                     }}

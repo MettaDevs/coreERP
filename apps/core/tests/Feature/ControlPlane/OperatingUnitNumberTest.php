@@ -107,6 +107,7 @@ class OperatingUnitNumberTest extends TestCase
         $unit = $this->operatingUnit('Poli Umum', 'department', 'POLI-UMUM');
 
         $this->actingAs($this->owner)->patch("/settings/organization/organizations/{$unit->id}", [
+            'version' => $unit->fresh()->version,
             'name' => 'Poli Umum Lantai 2', 'operating_unit_type' => 'department',
         ])->assertSessionHasNoErrors();
 
@@ -119,11 +120,13 @@ class OperatingUnitNumberTest extends TestCase
         $unit = $this->operatingUnit('Poli Umum', 'department', 'POLI-UMUM');
 
         $this->actingAs($this->owner)->patch("/settings/organization/organizations/{$unit->id}", [
+            'version' => $unit->fresh()->version,
             'name' => 'Poli Umum', 'operating_unit_type' => 'department', 'operating_unit_number' => 'PU-01',
         ])->assertSessionHasNoErrors();
         $this->assertDatabaseHas('operating_units', ['organization_id' => $unit->id, 'number' => 'PU-01']);
 
         $this->patch("/settings/organization/organizations/{$unit->id}", [
+            'version' => $unit->fresh()->version,
             'name' => 'Poli Umum', 'operating_unit_type' => 'department', 'operating_unit_number' => '',
         ])->assertSessionHasNoErrors();
         $this->assertDatabaseHas('operating_units', ['organization_id' => $unit->id, 'number' => null]);
@@ -135,6 +138,7 @@ class OperatingUnitNumberTest extends TestCase
         $b = $this->operatingUnit('Klinik B', 'business_unit', 'KLN-B');
 
         $this->actingAs($this->owner)->patch("/settings/organization/organizations/{$b->id}", [
+            'version' => $b->fresh()->version,
             'name' => 'Klinik B', 'operating_unit_type' => 'business_unit', 'operating_unit_number' => 'KLN-A',
         ])->assertSessionHasErrors('operating_unit_number');
 
@@ -148,6 +152,7 @@ class OperatingUnitNumberTest extends TestCase
         DB::table('operating_units')->where('organization_id', $unit->id)->update(['tenant_id' => null]);
 
         $this->actingAs($this->owner)->patch("/settings/organization/organizations/{$unit->id}", [
+            'version' => $unit->fresh()->version,
             'name' => 'Poli Gigi', 'operating_unit_type' => 'department', 'operating_unit_number' => 'POLI-GIGI',
         ])->assertSessionHasNoErrors();
 
@@ -222,15 +227,17 @@ class OperatingUnitNumberTest extends TestCase
 
         // Mulai 1 Oktober poli pindah ke Klinik B.
         $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$versiSatu->id}/drafts", [
+            'version' => $versiSatu->hierarchy()->value('version'),
             'effective_from' => '2026-10-01',
         ])->assertSessionHasNoErrors();
         $versiDua = OrganizationHierarchyVersion::query()->where('status', 'draft')->firstOrFail();
         $node = OrganizationHierarchyNode::query()->where(['version_id' => $versiDua->id, 'organization_id' => $poli->id])->firstOrFail();
-        $this->delete("/settings/organization/hierarchy-versions/{$versiDua->id}/placements/{$node->id}")->assertSessionHasNoErrors();
+        $this->delete("/settings/organization/hierarchy-versions/{$versiDua->id}/placements/{$node->id}", ['version' => $versiDua->hierarchy()->value('version')])->assertSessionHasNoErrors();
         $this->post("/settings/organization/hierarchy-versions/{$versiDua->id}/placements", [
+            'version' => $versiDua->hierarchy()->value('version'),
             'organization_id' => $poli->id, 'parent_organization_id' => $klinikB->id,
         ])->assertSessionHasNoErrors();
-        $this->post("/settings/organization/hierarchy-versions/{$versiDua->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$versiDua->id}/publish", ['version' => $versiDua->hierarchy()->value('version')])->assertSessionHasNoErrors();
 
         $direktori = $this->direktori();
         $this->assertSame('KLN-A', $direktori->unitBisnisInduk($le->tenant_id, [$poli->id], '2026-09-30')[$poli->id]['nomor'] ?? null);
@@ -364,6 +371,7 @@ class OperatingUnitNumberTest extends TestCase
             ->firstOrFail();
         foreach ($penempatan as [$anak, $induk]) {
             $this->post("/settings/organization/hierarchy-versions/{$versi->id}/placements", [
+                'version' => $versi->hierarchy()->value('version'),
                 'organization_id' => $anak->id, 'parent_organization_id' => $induk->id,
             ])->assertSessionHasNoErrors();
         }
@@ -378,7 +386,7 @@ class OperatingUnitNumberTest extends TestCase
     private function hierarkiTerbit(string $nama, array $tujuan, Organization $akar, array $penempatan, string $berlaku): OrganizationHierarchyVersion
     {
         $versi = $this->hierarki($nama, $tujuan, $akar, $penempatan, $berlaku);
-        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish", ['version' => $versi->hierarchy()->value('version')])->assertSessionHasNoErrors();
 
         return $versi->refresh();
     }

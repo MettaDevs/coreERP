@@ -115,6 +115,40 @@ final class RowVersionTest extends TestCase
             ->assertSessionHasErrors(['version' => RowVersion::STALE_MESSAGE]);
     }
 
+    public function test_kolom_aktivitas_mesin_tidak_menaikkan_versi_tetapi_klaim_tetap_menaikkannya(): void
+    {
+        Schema::table('contoh_versi', fn (Blueprint $table) => $table->timestamp('last_pulled_at')->nullable());
+        DB::statement("CREATE OR REPLACE TRIGGER bump_row_version BEFORE UPDATE ON contoh_versi FOR EACH ROW EXECUTE FUNCTION coreerp_bump_row_version('last_pulled_at', 'updated_at')");
+        $id = $this->insert('klien');
+
+        DB::table('contoh_versi')->where('id', $id)->update(['last_pulled_at' => now(), 'updated_at' => now()]);
+        $this->assertSame(1, $this->version($id), 'Pull klien bukan perubahan yang dibuka orang di layar.');
+
+        DB::transaction(fn () => RowVersion::claim(DB::table('contoh_versi')->where('id', $id), 1));
+        $this->assertSame(2, $this->version($id), 'Klaim tidak mengubah kolom apa pun, dan tetap menaikkan versi.');
+
+        DB::table('contoh_versi')->where('id', $id)->update(['nama' => 'diubah admin', 'last_pulled_at' => now()]);
+        $this->assertSame(3, $this->version($id));
+    }
+
+    public function test_baris_yang_lahir_saat_pertama_disimpan_memakai_versi_0(): void
+    {
+        $query = fn () => DB::table('contoh_versi')->where('nama', 'setelan');
+
+        DB::transaction(function () use ($query): void {
+            $this->assertFalse(RowVersion::claimIfExists($query(), 0), 'Belum ada baris: penyimpanan dengan versi 0 yang membuatnya.');
+            $this->insert('setelan');
+        });
+
+        $this->assertStaleIn(fn () => RowVersion::claimIfExists($query(), 0));
+        DB::transaction(fn () => $this->assertTrue(RowVersion::claimIfExists($query(), 1)));
+        $this->assertSame(2, (int) $query()->value('version'));
+
+        // Versi di atas 0 untuk baris yang sudah tidak ada: penggunanya membuka baris yang kemudian dihapus.
+        $query()->delete();
+        $this->assertStaleIn(fn () => RowVersion::claimIfExists($query(), 2));
+    }
+
     public function test_kenaikan_versi_tidak_tercatat_di_log_perubahan(): void
     {
         DB::table('change_log_setup_tables')->insert([
@@ -134,6 +168,18 @@ final class RowVersionTest extends TestCase
         DB::table('contoh_versi')->insert(['id' => $id, 'tenant_id' => (string) Str::ulid(), 'nama' => $nama]);
 
         return $id;
+    }
+
+    private function assertStaleIn(\Closure $claim): void
+    {
+        request()->headers->set('Accept', 'application/json');
+
+        try {
+            DB::transaction($claim);
+            $this->fail('Klaim seharusnya ditolak sebagai data basi.');
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $rejected) {
+            $this->assertSame(409, $rejected->getResponse()->getStatusCode());
+        }
     }
 
     private function version(string $id): int

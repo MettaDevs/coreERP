@@ -96,7 +96,7 @@ class ReferenceAccountTest extends TestCase
 
         // Pengguna yang memutuskan menonaktifkannya.
         $this->actingAs($this->owner)
-            ->patchJson("/api/v1/finance-reference-accounts/{$lama}", ['active' => false])
+            ->patchJson("/api/v1/finance-reference-accounts/{$lama}", ['active' => false, 'version' => FinanceReferenceAccount::query()->findOrFail($lama)->version])
             ->assertOk()->assertJsonPath('data.active', false);
 
         $daftar = $this->app->make(DaftarAkun::class);
@@ -198,6 +198,24 @@ class ReferenceAccountTest extends TestCase
             ->assertNotFound();
         $this->actingAs($this->owner)->get('/settings/finance-accounts')
             ->assertInertia(fn (AssertableInertia $page) => $page->where('accounts.total', 3));
+    }
+
+    public function test_mengubah_status_akun_membutuhkan_versi_yang_dibuka(): void
+    {
+        $this->impor(self::COA);
+        $akun = FinanceReferenceAccount::query()->where('external_id', '1452')->firstOrFail();
+        $url = "/api/v1/finance-reference-accounts/{$akun->id}";
+
+        $this->actingAs($this->owner)->get('/settings/finance-accounts')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('accounts.data', fn ($baris): bool => collect($baris)->firstWhere('id', $akun->id)['version'] === $akun->version));
+
+        $jawaban = $this->patchJson($url, ['active' => false, 'version' => $akun->version])->assertOk()->assertJsonPath('data.active', false);
+        $this->assertSame($akun->fresh()?->version, $jawaban->json('data.version'));
+        $this->patchJson($url, ['active' => true, 'version' => $akun->version])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->patchJson($url, ['active' => true])->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+
+        $this->assertDatabaseHas('finance_reference_accounts', ['id' => $akun->id, 'active' => false]);
     }
 
     public function test_the_inquire_duty_views_accounts_but_cannot_import_or_change_them(): void

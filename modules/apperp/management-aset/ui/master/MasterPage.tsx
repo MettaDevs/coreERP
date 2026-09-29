@@ -53,13 +53,30 @@ function extraSectionFor(
     resource: string,
     record: MasterRecord,
     canEdit: boolean,
+    onVersionChange: (version: number) => void,
 ) {
+    // Rincian disimpan dengan mengklaim versi record pemiliknya, jadi versi itu satu dan
+    // dipegang bersama form: simpan rincian lalu simpan form tidak saling menolak.
     if (resource === 'group-aset') {
-        return <GroupBookMatrix groupId={record.id} canEdit={canEdit} />;
+        return (
+            <GroupBookMatrix
+                groupId={record.id}
+                canEdit={canEdit}
+                version={record.version}
+                onVersionChange={onVersionChange}
+            />
+        );
     }
 
     if (resource === 'tipe-atribut' && record.data_type === 'string') {
-        return <TipeAtributNilai tipeAtributId={record.id} canEdit={canEdit} />;
+        return (
+            <TipeAtributNilai
+                tipeAtributId={record.id}
+                canEdit={canEdit}
+                version={record.version}
+                onVersionChange={onVersionChange}
+            />
+        );
     }
 
     return undefined;
@@ -208,7 +225,10 @@ export default function MasterPage({
         try {
             await api(`/${config.resource}/${item.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ aktif: !item.aktif }),
+                body: JSON.stringify({
+                    aktif: !item.aktif,
+                    version: item.version,
+                }),
             });
             load();
         } catch (caught) {
@@ -226,7 +246,10 @@ export default function MasterPage({
         }
 
         try {
-            await api(`/${config.resource}/${item.id}`, { method: 'DELETE' });
+            await api(`/${config.resource}/${item.id}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ version: item.version }),
+            });
             load();
         } catch (caught) {
             setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
@@ -252,7 +275,7 @@ export default function MasterPage({
             selected.map((item) =>
                 api(`/${config.resource}/${item.id}`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ aktif }),
+                    body: JSON.stringify({ aktif, version: item.version }),
                 }),
             ),
         );
@@ -282,7 +305,10 @@ export default function MasterPage({
 
         const results = await Promise.allSettled(
             selected.map((item) =>
-                api(`/${config.resource}/${item.id}`, { method: 'DELETE' }),
+                api(`/${config.resource}/${item.id}`, {
+                    method: 'DELETE',
+                    body: JSON.stringify({ version: item.version }),
+                }),
             ),
         );
         const failed = results.filter(
@@ -295,6 +321,18 @@ export default function MasterPage({
         }
 
         load();
+    }
+
+    /** Versi baru sesudah rincian disimpan, untuk form yang terbuka dan baris daftarnya. */
+    function changeVersion(id: string, version: number) {
+        setEditing((current) =>
+            current?.id === id ? { ...current, version } : current,
+        );
+        setItems((current) =>
+            current.map((item) =>
+                item.id === id ? { ...item, version } : item,
+            ),
+        );
     }
 
     const typeLabel: Record<string, string> = {
@@ -652,6 +690,8 @@ export default function MasterPage({
                                   config.resource,
                                   editing,
                                   can('update'),
+                                  (version) =>
+                                      changeVersion(editing.id, version),
                               )
                             : undefined
                     }

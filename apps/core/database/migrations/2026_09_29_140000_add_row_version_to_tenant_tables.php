@@ -24,6 +24,13 @@ use Illuminate\Support\Facades\Schema;
  * di sana nomor rilis module yang terpasang, dan tidak ada form yang mengubahnya. Tabel module ditangani
  * migration module masing-masing.
  *
+ * Kolom aktivitas mesin tidak menaikkan versi (keputusan pemilik 29 September 2026). Klien integrasi
+ * menulis `last_pulled_at` pada setiap pull ke barisnya sendiri; bila itu dihitung, admin yang sedang
+ * mengubah klien yang aktif tidak pernah bisa menyimpan. Kolom itu diteruskan sebagai argumen trigger,
+ * dan UPDATE yang hanya mengubah kolom-kolom itu membiarkan versinya. `updated_at` ikut dalam daftar
+ * karena penulisan aktivitas lewat Eloquent juga mengisinya. UPDATE yang tidak mengubah apa pun, seperti
+ * klaim `RowVersion`, tetap menaikkan versi.
+ *
  * Log perubahan (gap 6) melewati kolom `version`, seperti `updated_at`: kenaikannya bukan perubahan
  * yang dibuat orang.
  */
@@ -50,6 +57,12 @@ return new class extends Migration
         'working_time_lines', 'working_time_templates',
     ];
 
+    /** Kolom aktivitas mesin per tabel; lihat docblock kelas. */
+    private const ACTIVITY_COLUMNS = [
+        'app_service_credentials' => ['last_used_at', 'updated_at'],
+        'integration_clients' => ['last_used_at', 'last_pulled_at', 'updated_at'],
+    ];
+
     /** Kolom yang dilewati log perubahan, sebelum dan sesudah migration ini. */
     private const LOG_SKIP_BEFORE = "CONTINUE WHEN field IN ('id', 'tenant_id', 'created_at', 'updated_at', 'created_by_user_id', 'updated_by_user_id');";
 
@@ -60,7 +73,13 @@ return new class extends Migration
         DB::unprepared(<<<'SQL'
             CREATE OR REPLACE FUNCTION coreerp_bump_row_version() RETURNS trigger LANGUAGE plpgsql AS $$
             BEGIN
-                NEW.version := OLD.version + 1;
+                -- Argumen trigger: kolom aktivitas mesin. Yang berubah hanya kolom itu: versi tetap.
+                IF TG_NARGS > 0 AND to_jsonb(NEW) <> to_jsonb(OLD)
+                   AND (to_jsonb(NEW) - TG_ARGV) = (to_jsonb(OLD) - TG_ARGV) THEN
+                    NEW.version := OLD.version;
+                ELSE
+                    NEW.version := OLD.version + 1;
+                END IF;
                 RETURN NEW;
             END
             $$
@@ -71,7 +90,8 @@ return new class extends Migration
                 Schema::table($table, fn (Blueprint $blueprint) => $blueprint->unsignedInteger('version')->default(1));
             }
 
-            DB::statement("CREATE OR REPLACE TRIGGER bump_row_version BEFORE UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_bump_row_version()");
+            $arguments = implode(', ', array_map(fn (string $column): string => "'{$column}'", self::ACTIVITY_COLUMNS[$table] ?? []));
+            DB::statement("CREATE OR REPLACE TRIGGER bump_row_version BEFORE UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_bump_row_version({$arguments})");
         }
 
         $this->replaceInLogFunction(self::LOG_SKIP_BEFORE, self::LOG_SKIP_AFTER);

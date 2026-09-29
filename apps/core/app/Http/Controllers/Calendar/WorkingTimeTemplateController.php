@@ -7,6 +7,7 @@ use App\Models\Organization;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
 use App\Support\CurrentWorkspace;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,6 +50,7 @@ class WorkingTimeTemplateController extends Controller
                     'legal_entity_name' => $t->legalEntity?->name,
                     'company_code' => $t->legalEntity?->legalEntity?->company_code,
                     'is_active' => (bool) $t->is_active,
+                    'version' => $t->version,
                     'lines' => $t->lines->map(fn (WorkingTimeLine $l): array => [
                         'id' => $l->id,
                         'day_of_week' => (int) $l->day_of_week,
@@ -156,7 +158,8 @@ class WorkingTimeTemplateController extends Controller
             'lines.*.hours' => ['nullable', 'numeric'],
         ]);
 
-        DB::transaction(function () use ($template, $membership, $validated): void {
+        DB::transaction(function () use ($request, $template, $membership, $validated): void {
+            RowVersion::claim($template, RowVersion::expected($request));
             $template->update([
                 'code' => strtoupper(trim($validated['code'])),
                 'name' => trim($validated['name']),
@@ -170,7 +173,7 @@ class WorkingTimeTemplateController extends Controller
         });
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $template->load('lines')]);
+            return response()->json(['data' => $template->refresh()->load('lines')]);
         }
 
         return back()->with('success', 'Pola jam kerja berhasil diperbarui.');
@@ -183,7 +186,10 @@ class WorkingTimeTemplateController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($template->tenant_id === $membership->tenant_id, 404);
 
-        $template->delete();
+        DB::transaction(function () use ($request, $template): void {
+            RowVersion::claim($template, RowVersion::expected($request));
+            $template->delete();
+        });
 
         if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => ['archived' => true]]);
@@ -256,12 +262,14 @@ class WorkingTimeTemplateController extends Controller
             'lines.*.hours' => ['nullable', 'numeric'],
         ]);
 
-        DB::transaction(function () use ($template, $membership, $validated): void {
+        // Baris jam milik pola ini; yang diklaim polanya, supaya dua penggantian baris tidak saling menimpa.
+        DB::transaction(function () use ($request, $template, $membership, $validated): void {
+            RowVersion::claim($template, RowVersion::expected($request));
             $this->syncLines($template, $membership->tenant_id, $validated['lines']);
         });
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $template->load('lines')]);
+            return response()->json(['data' => $template->refresh()->load('lines')]);
         }
 
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');

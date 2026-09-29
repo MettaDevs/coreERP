@@ -13,9 +13,14 @@ type Row = { nilai: string };
 export default function TipeAtributNilai({
     tipeAtributId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     tipeAtributId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
@@ -61,17 +66,22 @@ export default function TipeAtributNilai({
         try {
             // Urutan layar menjadi urutan tampil; kirimannya daftar penuh, jadi baris yang
             // dihapus dari layar ikut diarsipkan server.
-            await api(`/tipe-atribut/${tipeAtributId}/nilai`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    rows: rows
-                        .filter((row) => row.nilai.trim() !== '')
-                        .map((row, index) => ({
-                            nilai: row.nilai.trim(),
-                            urutan: index,
-                        })),
-                }),
-            });
+            const result = await api<{ version: number }>(
+                `/tipe-atribut/${tipeAtributId}/nilai`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        rows: rows
+                            .filter((row) => row.nilai.trim() !== '')
+                            .map((row, index) => ({
+                                nilai: row.nilai.trim(),
+                                urutan: index,
+                            })),
+                    }),
+                },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(

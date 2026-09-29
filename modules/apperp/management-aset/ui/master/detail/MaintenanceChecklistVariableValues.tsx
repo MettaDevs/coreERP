@@ -23,9 +23,14 @@ type Value = {
 export default function MaintenanceChecklistVariableValues({
     variableId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     variableId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [values, setValues] = useState<Value[]>([]);
     const [saving, setSaving] = useState(false);
@@ -55,10 +60,11 @@ export default function MaintenanceChecklistVariableValues({
         setError('');
 
         try {
-            await api(`/maintenance-checklist-variables/${variableId}/values`, {
-                method: 'PUT',
-                body: JSON.stringify({ values }),
-            });
+            const result = await api<{ version: number }>(
+                `/maintenance-checklist-variables/${variableId}/values`,
+                { method: 'PUT', body: JSON.stringify({ version, values }) },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(

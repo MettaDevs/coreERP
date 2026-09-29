@@ -12,6 +12,7 @@ use App\Models\TenantMembership;
 use App\Models\Vendor;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -124,16 +125,20 @@ final class SaveVendor
      * dan entitas legal menentukan buku mana yang memegang hutangnya. Nama milik party, jadi
      * mengubahnya di sini mengubah nama party di seluruh buku alamat — sama dengan Dynamics 365.
      *
+     * Yang diklaim versinya akun vendor, record yang dibuka pengguna ({@see RowVersion}); party ikut
+     * terkunci karena ditulis di transaksi yang sama.
+     *
      * @param  array{name: string, tax_number: ?string, status: string}  $data
      */
-    public function update(TenantMembership $actor, Vendor $vendor, array $data): Vendor
+    public function update(TenantMembership $actor, Vendor $vendor, array $data, int $expectedVersion): Vendor
     {
         $this->pastikanAdmin($actor);
         if ($vendor->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
 
-        return DB::transaction(function () use ($vendor, $data): Vendor {
+        return DB::transaction(function () use ($vendor, $data, $expectedVersion): Vendor {
+            RowVersion::claim($vendor, $expectedVersion);
             $vendor->fill(['tax_number' => $data['tax_number'], 'status' => $data['status']])->save();
             $vendor->party->fill(['name' => $data['name'], 'search_name' => Party::searchName($data['name'])])->save();
             // Nama berubah di party, tetapi pembaca yang menyinkronkan vendor menyaring lewat

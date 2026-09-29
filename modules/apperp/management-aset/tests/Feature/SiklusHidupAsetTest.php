@@ -300,7 +300,7 @@ class SiklusHidupAsetTest extends TestCase
         ]);
         $buku = $this->master('buku-penyusutan', ['nama' => 'Buku '.Str::random(6), 'depreciation_profile_id' => $profil]);
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
-            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'), 'rows' => [[
                 'buku_id' => $buku, 'useful_life_periods' => 12, 'convention' => $convention,
             ]]])->assertOk();
         $aset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
@@ -380,7 +380,10 @@ class SiklusHidupAsetTest extends TestCase
     private function correct(string $asetId, array $payload): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
-            ->patchJson('/api/modules/management-aset/v1/aset/'.$asetId, $payload);
+            ->patchJson('/api/modules/management-aset/v1/aset/'.$asetId, [
+                'version' => DB::table('aset_tr_aset')->where('id', $asetId)->value('version'),
+                ...$payload,
+            ]);
     }
 
     /** @return TestResponse<Response> */
@@ -431,7 +434,10 @@ class SiklusHidupAsetTest extends TestCase
     private function attach(string $jenisId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
-            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', [
+                'rows' => $rows,
+                'version' => DB::table('aset_m_jenis_aset')->where('id', $jenisId)->value('version'),
+            ]);
     }
 
     /** @return list<string> */

@@ -43,6 +43,7 @@ export type CalendarItem = {
     legal_entity_id: string | null;
     legal_entity_name: string | null;
     company_code: string | null;
+    version: number;
 };
 
 type Props = {
@@ -162,6 +163,7 @@ export default function WorkingTimeCalendars({
                 description: formDesc.trim() || null,
                 base_calendar_id: formBaseId || null,
                 standard_work_hours: formHours,
+                version: selectedCalendar.version,
             },
             {
                 preserveScroll: true,
@@ -193,6 +195,7 @@ export default function WorkingTimeCalendars({
         router.delete(
             `/settings/working-time-calendars/${selectedCalendar.id}`,
             {
+                data: { version: selectedCalendar.version },
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedCalendarId(null);

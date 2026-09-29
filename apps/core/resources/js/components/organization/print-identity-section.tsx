@@ -12,7 +12,7 @@ import { Textarea } from '@apperp/ui/textarea';
 import { Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
 
 type Logo = {
     id: string;
@@ -23,6 +23,8 @@ type Logo = {
 };
 
 type Identity = {
+    /** 0 selama identitas cetak belum pernah disimpan. */
+    version: number;
     organization_id: string;
     display_name: string;
     display_name_custom: string | null;
@@ -139,16 +141,17 @@ export function PrintIdentitySection({
         try {
             const result = await apiJson<{ data: Identity }>(base, {
                 method: 'PUT',
-                body: JSON.stringify(form),
+                body: JSON.stringify({
+                    ...form,
+                    version: identity?.version ?? 0,
+                }),
             });
             setIdentity(result.data);
             setForm(toForm(result.data));
             setDirty(false);
             toast.success('Identitas cetak disimpan.');
         } catch (caught) {
-            toast.error(
-                errorText(caught, 'Identitas cetak belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Identitas cetak belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -162,6 +165,7 @@ export function PrintIdentitySection({
         const body = new FormData();
         body.append('file', file);
         body.append('position', position);
+        body.append('version', String(identity?.version ?? 0));
 
         try {
             const result = await apiJson<{ data: Identity }>(`${base}/logos`, {
@@ -171,7 +175,7 @@ export function PrintIdentitySection({
             setIdentity(result.data);
             toast.success('Logo ditambahkan.');
         } catch (caught) {
-            toast.error(errorText(caught, 'Logo belum dapat diunggah.'));
+            toastSaveError(caught, 'Logo belum dapat diunggah.');
         } finally {
             if (fileInput.current) {
                 fileInput.current.value = '';
@@ -188,12 +192,15 @@ export function PrintIdentitySection({
                 `${base}/logos/${logo.id}`,
                 {
                     method: 'PATCH',
-                    body: JSON.stringify(patch),
+                    body: JSON.stringify({
+                        ...patch,
+                        version: identity?.version ?? 0,
+                    }),
                 },
             );
             setIdentity(result.data);
         } catch (caught) {
-            toast.error(errorText(caught, 'Logo belum dapat diubah.'));
+            toastSaveError(caught, 'Logo belum dapat diubah.');
         }
     };
 
@@ -201,12 +208,13 @@ export function PrintIdentitySection({
         try {
             const response = await apiRequest(`${base}/logos/${logo.id}`, {
                 method: 'DELETE',
+                headers: { 'If-Match': `W/"${identity?.version ?? 0}"` },
             });
             const result = (await response.json()) as { data: Identity };
             setIdentity(result.data);
             toast.success('Logo dihapus.');
         } catch (caught) {
-            toast.error(errorText(caught, 'Logo belum dapat dihapus.'));
+            toastSaveError(caught, 'Logo belum dapat dihapus.');
         }
     };
 

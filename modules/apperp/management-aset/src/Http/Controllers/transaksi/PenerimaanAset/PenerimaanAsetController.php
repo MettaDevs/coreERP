@@ -5,6 +5,7 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAse
 use App\Support\Modules\Contracts\DaftarVendor;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
@@ -130,7 +131,7 @@ class PenerimaanAsetController extends Controller
             ? app(PenerbitPosting::class)->status($tenant, AcquisitionPosting::postingId($id, (string) $penerimaan->cara_perolehan))
             : null;
 
-        return response()->json(['data' => $penerimaan]);
+        return response()->json(['data' => $penerimaan], 200, ['ETag' => RowVersion::etag((int) $penerimaan->version)]);
     }
 
     public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
@@ -190,7 +191,7 @@ class PenerimaanAsetController extends Controller
         );
 
         $data = $this->validated($request);
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         // Dua jangkauan diperiksa: unit tempat dokumen berada sekarang dan unit tujuan
         // perubahan. Tanpa yang pertama, dokumen dapat dipindahkan keluar dari unit yang
         // tidak boleh disentuh pengguna; tanpa yang kedua, dipindahkan ke unit asing.
@@ -199,24 +200,18 @@ class PenerimaanAsetController extends Controller
         $this->validateLookups($request, $data);
         $this->validateVendor($request, $data);
 
-        $changed = DB::transaction(function () use ($request, $id, $version, $data): int {
+        DB::transaction(function () use ($request, $id, $version, $data): void {
+            RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
             $updated = PenerimaanAset::query()
-                ->where(['id' => $id, 'version' => $version, 'status' => PenerimaanStatus::DRAFT])
+                ->where(['id' => $id, 'status' => PenerimaanStatus::DRAFT])
                 ->update([
                     ...$this->header($request, $data, '', '', false),
-                    'version' => $version + 1,
                     'updated_at' => now(),
                 ]);
-            if ($updated) {
-                PenerimaanAsetDetail::query()->where('penerimaan_aset_id', $id)->delete();
-                $this->gantiBaris($id, $data['details']);
-            }
-
-            return $updated;
+            abort_unless($updated > 0, 422, 'Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor.');
+            PenerimaanAsetDetail::query()->where('penerimaan_aset_id', $id)->delete();
+            $this->gantiBaris($id, $data['details']);
         });
-        if (! $changed) {
-            return $this->staleVersion();
-        }
 
         return $this->show($request, $id);
     }
@@ -230,14 +225,18 @@ class PenerimaanAsetController extends Controller
             422,
             'Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya.',
         );
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $penerimaan->legal_entity_id, $penerimaan->responsible_org_unit_id);
 
-        $updated = PenerimaanAset::query()
-            ->where(['id' => $id, 'version' => $version, 'status' => PenerimaanStatus::DRAFT])
-            ->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
+        DB::transaction(function () use ($id, $version): void {
+            RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
+            $updated = PenerimaanAset::query()
+                ->where(['id' => $id, 'status' => PenerimaanStatus::DRAFT])
+                ->update(['deleted_at' => now(), 'updated_at' => now()]);
+            abort_unless($updated > 0, 422, 'Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya.');
+        });
 
-        return $updated ? response()->json(status: 204) : $this->staleVersion();
+        return response()->json(status: 204);
     }
 
     /**
@@ -534,7 +533,7 @@ class PenerimaanAsetController extends Controller
         $this->guardAset($request, 'create');
         $penerimaan = $this->dokumen($request, $id);
         abort_unless($penerimaan->status === PenerimaanStatus::DRAFT, 422, 'Penerimaan ini sudah diselesaikan.');
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $penerimaan->legal_entity_id, $penerimaan->responsible_org_unit_id);
 
         $lines = PenerimaanAsetDetail::query()->where('penerimaan_aset_id', $id)->orderBy('line_number')->toBase()->get();
@@ -581,17 +580,16 @@ class PenerimaanAsetController extends Controller
         }
 
         try {
-            $changed = DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover): int {
-                // Status dipindahkan lebih dahulu dan dengan `version` sebagai syarat. Dua
-                // penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan tidak
-                // ada cara mengetahui mana yang berlebih. Yang kalah menemukan nol baris
-                // terpengaruh dan berhenti di sini.
+            DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover): void {
+                // Versi diklaim lebih dahulu, lalu status dipindahkan dengan status draf sebagai
+                // syarat. Dua penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan
+                // tidak ada cara mengetahui mana yang berlebih. Yang kalah ditolak klaimnya dan
+                // berhenti di sini.
+                RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
                 $updated = PenerimaanAset::query()
-                    ->where(['id' => $id, 'version' => $version, 'status' => PenerimaanStatus::DRAFT])
-                    ->update(['status' => PenerimaanStatus::SELESAI, 'version' => $version + 1, 'updated_at' => now()]);
-                if (! $updated) {
-                    return 0;
-                }
+                    ->where(['id' => $id, 'status' => PenerimaanStatus::DRAFT])
+                    ->update(['status' => PenerimaanStatus::SELESAI, 'updated_at' => now()]);
+                abort_unless($updated > 0, 422, 'Penerimaan ini sudah diselesaikan.');
 
                 $terbit = [];
                 foreach ($kunci as $satuan) {
@@ -605,14 +603,9 @@ class PenerimaanAsetController extends Controller
                     ];
                 }
                 $perolehan->publish($penerimaan, $lines, $terbit);
-
-                return $updated;
             });
         } catch (AcquisitionPostingFailed $kegagalan) {
             return response()->json(['error' => ['code' => 'posting_failed', 'message' => $kegagalan->getMessage()]], 500);
-        }
-        if (! $changed) {
-            return $this->staleVersion();
         }
 
         return $this->show($request, $id);
@@ -628,7 +621,7 @@ class PenerimaanAsetController extends Controller
     public function asetTerbit(Request $request, string $id): JsonResponse
     {
         $this->guard($request, 'read');
-        $this->dokumen($request, $id);
+        $penerimaan = $this->dokumen($request, $id);
 
         $daftar = Aset::query()
             ->where('penerimaan_aset_id', $id)
@@ -636,7 +629,8 @@ class PenerimaanAsetController extends Controller
             ->toBase()
             ->get(['id', 'kode', 'nama', 'serial_number', 'penerimaan_aset_detail_id']);
 
-        return response()->json(['data' => $daftar]);
+        // `version` milik dokumennya: pengisian nomor seri mengklaim dokumen, bukan tiap aset.
+        return response()->json(['data' => $daftar, 'version' => (int) $penerimaan->version]);
     }
 
     /**
@@ -660,6 +654,7 @@ class PenerimaanAsetController extends Controller
             'serial.*.aset_id' => ['required', 'ulid'],
             'serial.*.serial_number' => ['nullable', 'string', 'max:150'],
         ]);
+        $version = RowVersion::expected($request);
 
         $milikDokumen = Aset::query()
             ->where('penerimaan_aset_id', $id)
@@ -672,7 +667,8 @@ class PenerimaanAsetController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($data): void {
+        DB::transaction(function () use ($id, $version, $data): void {
+            RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
             foreach (array_values($data['serial']) as $baris) {
                 Aset::query()->where('id', $baris['aset_id'])->update([
                     'serial_number' => ($baris['serial_number'] ?? '') === '' ? null : $baris['serial_number'],
@@ -1088,7 +1084,6 @@ class PenerimaanAsetController extends Controller
             'currency_code' => strtoupper((string) $data['currency_code']),
             'cara_perolehan' => $data['cara_perolehan'],
             'status' => $new ? PenerimaanStatus::DRAFT : null,
-            'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null,
             'updated_at' => now(),
         ], static fn ($value) => $value !== null) + [
@@ -1250,14 +1245,6 @@ class PenerimaanAsetController extends Controller
             ->each(static function (stdClass $baris): void {
                 $baris->saldo_awal_buku = $baris->saldo_awal_buku === null ? null : OpeningBalance::overrides($baris->saldo_awal_buku);
             });
-    }
-
-    private function staleVersion(): JsonResponse
-    {
-        return response()->json(['error' => [
-            'code' => 'stale_version',
-            'message' => 'Penerimaan telah berubah. Muat ulang lalu coba lagi.',
-        ]], 409);
     }
 
     private function creationKey(Request $request): string

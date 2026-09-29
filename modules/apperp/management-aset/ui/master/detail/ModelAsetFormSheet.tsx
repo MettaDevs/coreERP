@@ -125,6 +125,7 @@ export default function ModelAsetFormSheet({
                     ? undefined
                     : { 'Idempotency-Key': creationKey.current },
                 body: JSON.stringify({
+                    ...(value ? { version: value.version } : {}),
                     nama,
                     keterangan,
                     aktif,

@@ -41,6 +41,7 @@ class AccessController extends Controller
 
                     return [
                         'id' => $member->id,
+                        'version' => $member->version,
                         'name' => $member->user->name,
                         'email' => $member->user->email,
                         'status' => $member->status,
@@ -270,6 +271,7 @@ class AccessController extends Controller
 
                 return [
                     'id' => $invitation->id,
+                    'version' => $invitation->version,
                     'redeemed_count' => $redeemed->get('invitation:'.$invitation->id, 0),
                     'label' => $invitation->label,
                     'roles' => $invitation->roles->pluck('name')->values(),

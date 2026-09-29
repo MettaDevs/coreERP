@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -130,7 +131,7 @@ class PemeliharaanAsetController extends Controller
             ->orderBy('created_at')
             ->toBase()->get();
 
-        return response()->json(['data' => $workOrder]);
+        return response()->json(['data' => $workOrder], 200, ['ETag' => RowVersion::etag((int) $workOrder->version)]);
     }
 
     public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
@@ -156,12 +157,10 @@ class PemeliharaanAsetController extends Controller
         }
 
         try {
-            $workOrder = DB::transaction(function () use ($request, $data, $key, $kode, $locations): array {
+            DB::transaction(function () use ($request, $data, $key, $kode, $locations): void {
                 $record = $this->header($request, $data, $key, $kode);
                 (new PemeliharaanAset)->forceFill($record)->save();
                 $this->replaceJobLines($record['id'], $data['details'], $locations);
-
-                return $record;
             });
         } catch (QueryException $exception) {
             $existing = $this->replay($key);
@@ -171,6 +170,9 @@ class PemeliharaanAsetController extends Controller
 
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
+
+        // Dibaca ulang supaya `version` yang dipulangkan adalah nilai di database.
+        $workOrder = $this->replay($key);
 
         return response()->json(['data' => $workOrder], 201, [
             // Alamatnya diturunkan dari permintaan yang sedang dilayani, bukan ditulis tangan.
@@ -182,7 +184,7 @@ class PemeliharaanAsetController extends Controller
             //
             // `$request->url()` adalah alamat koleksi yang baru saja dikirimi POST, jadi ia
             // tidak dapat menyimpang dari awalan rutenya — termasuk bila awalannya berubah lagi.
-            'Location' => $request->url().'/'.$workOrder['id'],
+            'Location' => $request->url().'/'.$workOrder->id,
         ]);
     }
 
@@ -200,7 +202,7 @@ class PemeliharaanAsetController extends Controller
         );
 
         $data = $this->validated($request);
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         // Dua-duanya diperiksa: unit tempat dokumen berada sekarang dan unit tujuan
         // perubahan. Tanpa yang pertama, dokumen dapat dipindahkan keluar dari unit yang
         // tidak boleh disentuh pengguna; tanpa yang kedua, dipindahkan ke unit asing.
@@ -208,24 +210,15 @@ class PemeliharaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         $locations = $this->validateLookups($request, $data);
 
-        $changed = DB::transaction(function () use ($request, $id, $version, $data, $locations): int {
-            $updated = PemeliharaanAset::query()->where([
-                'id' => $id, 'version' => $version,
-            ])->update([
+        DB::transaction(function () use ($request, $id, $version, $data, $locations): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
+            PemeliharaanAset::query()->whereKey($id)->update([
                 ...$this->header($request, $data, '', '', false),
-                'version' => $version + 1,
                 'updated_at' => now(),
             ]);
-            if ($updated) {
-                PemeliharaanAsetDetail::query()->where('pemeliharaan_aset_id', $id)->delete();
-                $this->replaceJobLines($id, $data['details'], $locations);
-            }
-
-            return $updated;
+            PemeliharaanAsetDetail::query()->where('pemeliharaan_aset_id', $id)->delete();
+            $this->replaceJobLines($id, $data['details'], $locations);
         });
-        if (! $changed) {
-            return $this->staleVersion();
-        }
 
         return $this->show($request, $id);
     }
@@ -239,14 +232,15 @@ class PemeliharaanAsetController extends Controller
             422,
             'Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan.',
         );
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
 
-        $updated = PemeliharaanAset::query()->where([
-            'id' => $id, 'version' => $version,
-        ])->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
+        DB::transaction(function () use ($id, $version): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
+            PemeliharaanAset::query()->whereKey($id)->update(['deleted_at' => now(), 'updated_at' => now()]);
+        });
 
-        return $updated ? response()->json(status: 204) : $this->staleVersion();
+        return response()->json(status: 204);
     }
 
     /**
@@ -436,7 +430,6 @@ class PemeliharaanAsetController extends Controller
             'dijadwalkan_mulai' => $data['dijadwalkan_mulai'] ?? null,
             'dijadwalkan_selesai' => $data['dijadwalkan_selesai'] ?? null,
             'status' => $new ? WorkOrderStatus::DRAFT : null,
-            'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null,
             'updated_at' => now(),
         ], static fn ($value) => $value !== null);
@@ -551,14 +544,6 @@ class PemeliharaanAsetController extends Controller
         app(OrganizationScope::class)->query($query, $request, self::TABEL.'.legal_entity_id', self::TABEL.'.responsible_org_unit_id');
 
         return $this->withLookups($query)->firstOrFail();
-    }
-
-    private function staleVersion(): JsonResponse
-    {
-        return response()->json(['error' => [
-            'code' => 'stale_version',
-            'message' => 'Work order telah berubah. Muat ulang lalu coba lagi.',
-        ]], 409);
     }
 
     private function creationKey(Request $request): string

@@ -45,7 +45,7 @@ import {
 import { Archive, Pencil, Plus, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
 
 /**
  * Alamat dan informasi kontak satu organisasi, dibaca dari buku alamat party Core
@@ -62,6 +62,7 @@ import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 
 type Location = {
     id: string;
+    version: number;
     location_id: string;
     name: string;
     purposes: string[];
@@ -271,7 +272,11 @@ export function OrganizationAddressesSection({
             } else if (editing) {
                 await apiJson(`${base}/${editing.id}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ ...form, location_id: null }),
+                    body: JSON.stringify({
+                        ...form,
+                        location_id: null,
+                        version: editing.version,
+                    }),
                 });
                 toast.success('Alamat disimpan.');
             }
@@ -287,11 +292,14 @@ export function OrganizationAddressesSection({
 
     const remove = async (location: Location) => {
         try {
-            await apiRequest(`${base}/${location.id}`, { method: 'DELETE' });
+            await apiRequest(`${base}/${location.id}`, {
+                method: 'DELETE',
+                headers: { 'If-Match': `W/"${location.version}"` },
+            });
             toast.success('Alamat diarsipkan.');
             list.reload();
         } catch (caught) {
-            toast.error(errorText(caught, 'Alamat belum dapat diarsipkan.'));
+            toastSaveError(caught, 'Alamat belum dapat diarsipkan.');
         }
     };
 
@@ -303,12 +311,13 @@ export function OrganizationAddressesSection({
                     ...locationToForm(location),
                     location_id: null,
                     is_primary: true,
+                    version: location.version,
                 }),
             });
             toast.success('Alamat utama diganti.');
             list.reload();
         } catch (caught) {
-            toast.error(errorText(caught, 'Alamat utama belum dapat diganti.'));
+            toastSaveError(caught, 'Alamat utama belum dapat diganti.');
         }
     };
 
@@ -711,6 +720,7 @@ export function OrganizationAddressesSection({
 
 type Contact = {
     id: string;
+    version: number;
     type: string;
     value: string;
     purpose: string | null;
@@ -840,7 +850,14 @@ export function OrganizationContactsSection({
                 await apiJson(base, { method: 'POST', body });
                 toast.success('Kontak ditambahkan.');
             } else if (editing) {
-                await apiJson(`${base}/${editing.id}`, { method: 'PUT', body });
+                await apiJson(`${base}/${editing.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        ...form,
+                        address_id: form.address_id || null,
+                        version: editing.version,
+                    }),
+                });
                 toast.success('Kontak disimpan.');
             }
 
@@ -855,11 +872,14 @@ export function OrganizationContactsSection({
 
     const remove = async (contact: Contact) => {
         try {
-            await apiRequest(`${base}/${contact.id}`, { method: 'DELETE' });
+            await apiRequest(`${base}/${contact.id}`, {
+                method: 'DELETE',
+                headers: { 'If-Match': `W/"${contact.version}"` },
+            });
             toast.success('Kontak diarsipkan.');
             list.reload();
         } catch (caught) {
-            toast.error(errorText(caught, 'Kontak belum dapat diarsipkan.'));
+            toastSaveError(caught, 'Kontak belum dapat diarsipkan.');
         }
     };
 
@@ -872,12 +892,13 @@ export function OrganizationContactsSection({
                     value: contact.value,
                     purpose: contact.purpose ?? '',
                     is_primary: true,
+                    version: contact.version,
                 }),
             });
             toast.success('Kontak utama diganti.');
             list.reload();
         } catch (caught) {
-            toast.error(errorText(caught, 'Kontak utama belum dapat diganti.'));
+            toastSaveError(caught, 'Kontak utama belum dapat diganti.');
         }
     };
 

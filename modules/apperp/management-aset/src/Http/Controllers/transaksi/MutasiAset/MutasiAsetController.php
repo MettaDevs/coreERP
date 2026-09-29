@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MutasiAset;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
@@ -97,7 +98,7 @@ class MutasiAsetController extends Controller
         $mutasi = $this->dokumen($request, $id);
         $mutasi->details = $this->baris($id, $this->tenant($request));
 
-        return response()->json(['data' => $mutasi]);
+        return response()->json(['data' => $mutasi], 200, ['ETag' => RowVersion::etag((int) $mutasi->version)]);
     }
 
     public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
@@ -157,7 +158,7 @@ class MutasiAsetController extends Controller
         );
 
         $data = $this->validated($request);
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         // Dua jangkauan diperiksa: unit tempat dokumen berada sekarang dan unit tujuan
         // perubahan. Tanpa yang pertama, dokumen dapat dipindahkan keluar dari unit yang
         // tidak boleh disentuh pengguna; tanpa yang kedua, dipindahkan ke unit asing.
@@ -166,24 +167,18 @@ class MutasiAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['tujuan_org_unit_id']);
         $this->validateLookups($request, $data);
 
-        $changed = DB::transaction(function () use ($request, $id, $version, $data): int {
+        DB::transaction(function () use ($request, $id, $version, $data): void {
+            RowVersion::claim(MutasiAset::query()->whereKey($id), $version);
             $updated = MutasiAset::query()
-                ->where(['id' => $id, 'version' => $version, 'status' => MutasiStatus::DRAFT])
+                ->where(['id' => $id, 'status' => MutasiStatus::DRAFT])
                 ->update([
                     ...$this->header($request, $data, '', '', false),
-                    'version' => $version + 1,
                     'updated_at' => now(),
                 ]);
-            if ($updated) {
-                MutasiAsetDetail::query()->where('mutasi_aset_id', $id)->delete();
-                $this->gantiBaris($id, $data['details']);
-            }
-
-            return $updated;
+            abort_unless($updated > 0, 422, 'Mutasi yang sudah selesai tidak dapat diubah. Buat mutasi balik bila perlu dikoreksi.');
+            MutasiAsetDetail::query()->where('mutasi_aset_id', $id)->delete();
+            $this->gantiBaris($id, $data['details']);
         });
-        if (! $changed) {
-            return $this->staleVersion();
-        }
 
         return $this->show($request, $id);
     }
@@ -197,14 +192,18 @@ class MutasiAsetController extends Controller
             422,
             'Mutasi yang sudah selesai tidak dapat diarsipkan; penempatan aset sudah berpindah karenanya.',
         );
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $mutasi->legal_entity_id, $mutasi->responsible_org_unit_id);
 
-        $updated = MutasiAset::query()
-            ->where(['id' => $id, 'version' => $version, 'status' => MutasiStatus::DRAFT])
-            ->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
+        DB::transaction(function () use ($id, $version): void {
+            RowVersion::claim(MutasiAset::query()->whereKey($id), $version);
+            $updated = MutasiAset::query()
+                ->where(['id' => $id, 'status' => MutasiStatus::DRAFT])
+                ->update(['deleted_at' => now(), 'updated_at' => now()]);
+            abort_unless($updated > 0, 422, 'Mutasi yang sudah selesai tidak dapat diarsipkan; penempatan aset sudah berpindah karenanya.');
+        });
 
-        return $updated ? response()->json(status: 204) : $this->staleVersion();
+        return response()->json(status: 204);
     }
 
     /**
@@ -219,7 +218,7 @@ class MutasiAsetController extends Controller
         $this->guardAset($request, 'mutate');
         $mutasi = $this->dokumen($request, $id);
         abort_unless($mutasi->status === MutasiStatus::DRAFT, 422, 'Mutasi ini sudah diselesaikan.');
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $mutasi->legal_entity_id, $mutasi->responsible_org_unit_id);
         app(OrganizationScope::class)->require($request, $mutasi->legal_entity_id, $mutasi->tujuan_org_unit_id);
 
@@ -233,17 +232,16 @@ class MutasiAsetController extends Controller
         $dimensi = $this->dimensiLokasi($mutasi->tujuan_lokasi_id) ?? $mutasi->tujuan_org_unit_id;
         $tenant = $this->tenant($request);
 
-        $changed = DB::transaction(function () use ($request, $mutasi, $id, $version, $lines, $dimensi, $tenant): int {
-            // Status dipindahkan lebih dahulu dan dengan `version` sebagai syarat. Dua
-            // penyelesaian yang berlomba membuat dua rangkaian penempatan untuk aset yang
-            // sama pada tanggal yang sama, dan tidak ada yang dapat menentukan mana yang
-            // berlaku. Yang kalah menemukan nol baris terpengaruh dan berhenti di sini.
+        DB::transaction(function () use ($request, $mutasi, $id, $version, $lines, $dimensi, $tenant): void {
+            // Versi diklaim lebih dahulu, lalu status dipindahkan dengan status draf sebagai
+            // syarat. Dua penyelesaian yang berlomba membuat dua rangkaian penempatan untuk
+            // aset yang sama pada tanggal yang sama, dan tidak ada yang dapat menentukan mana
+            // yang berlaku. Yang kalah ditolak klaimnya dan berhenti di sini.
+            RowVersion::claim(MutasiAset::query()->whereKey($id), $version);
             $updated = MutasiAset::query()
-                ->where(['id' => $id, 'version' => $version, 'status' => MutasiStatus::DRAFT])
-                ->update(['status' => MutasiStatus::SELESAI, 'version' => $version + 1, 'updated_at' => now()]);
-            if (! $updated) {
-                return 0;
-            }
+                ->where(['id' => $id, 'status' => MutasiStatus::DRAFT])
+                ->update(['status' => MutasiStatus::SELESAI, 'updated_at' => now()]);
+            abort_unless($updated > 0, 422, 'Mutasi ini sudah diselesaikan.');
 
             foreach ($lines as $line) {
                 $aset = $this->asetUntukDipindah($request, (string) $line->aset_id);
@@ -290,12 +288,7 @@ class MutasiAsetController extends Controller
                     ...($line->kondisi_aset_id ? ['kondisi_aset_id' => $line->kondisi_aset_id] : []),
                 ]);
             }
-
-            return $updated;
         });
-        if (! $changed) {
-            return $this->staleVersion();
-        }
 
         return $this->show($request, $id);
     }
@@ -429,7 +422,6 @@ class MutasiAsetController extends Controller
             'tujuan_org_unit_id' => $data['tujuan_org_unit_id'],
             'alasan' => $data['alasan'],
             'status' => $new ? MutasiStatus::DRAFT : null,
-            'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null,
             'updated_at' => now(),
         ], static fn ($value) => $value !== null) + [
@@ -616,14 +608,6 @@ class MutasiAsetController extends Controller
     private function dimensiLokasi(?string $locationId): ?string
     {
         return app(LocationDimension::class)->resolve($locationId);
-    }
-
-    private function staleVersion(): JsonResponse
-    {
-        return response()->json(['error' => [
-            'code' => 'stale_version',
-            'message' => 'Mutasi telah berubah. Muat ulang lalu coba lagi.',
-        ]], 409);
     }
 
     private function creationKey(Request $request): string

@@ -633,6 +633,9 @@ yang jelas. Laporan tetap di server.
 | K-08 | Job latar per tenant | **Diputuskan 28 Sep 2026:** fase 2, bersama notifikasi |
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
 | K-10 | Nilai bawaan zona waktu pengguna | **Diputuskan 28 Sep 2026:** setelan zona waktu entitas legal (nama zona IANA); pengguna yang belum mengisi ikut entitas legal aktif |
+| K-11 | Penaik versi baris | **Diputuskan 29 Sep 2026:** trigger PostgreSQL `coreerp_bump_row_version` pada setiap UPDATE, alasan yang sama dengan K-02: update lewat query builder dan job latar ikut menaikkan versi |
+| K-12 | Tabel yang membawa versi baris | **Diputuskan 29 Sep 2026:** semua tabel tenant, seperti `SystemRowVersion` BC, dijaga test boundary yang sama dengan kolom jejak |
+| K-13 | Luas pewajiban versi | **Diputuskan 29 Sep 2026:** semua endpoint ubah dan arsip di Core dan module beserta form-nya, dalam satu PR |
 
 ## Sumber {#sumber}
 

@@ -409,7 +409,7 @@ class DepreciationEndToEndTest extends TestCase
     private function matrix(string $groupId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
-            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows, 'version' => DB::table('aset_m_group_aset')->where('id', $groupId)->value('version')]);
     }
 
     private function receive(string $group, string $jenis, float $acquisition, float $residual = 0, string $placedInService = '2026-06-15'): string

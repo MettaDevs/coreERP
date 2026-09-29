@@ -4,6 +4,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -184,6 +185,61 @@ class MutasiAsetTest extends TestCase
         $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.archive'])
             ->deleteJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasi, ['version' => $version])
             ->assertStatus(422);
+    }
+
+    public function test_simpan_kedua_dengan_versi_yang_sama_ditolak_dan_baris_simpan_pertama_bertahan(): void
+    {
+        $asetA = $this->receive();
+        $asetB = $this->receive();
+        $tujuan = $this->master('lokasi-aset', ['nama' => 'Gudang versi']);
+        $mutasi = $this->draft([$asetA, $asetB], $tujuan);
+        $alamat = '/api/modules/management-aset/v1/mutasi-aset/'.$mutasi;
+        $pengubah = $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.read', 'management-aset.mutasi-aset.update']);
+
+        $baru = $pengubah->patchJson($alamat, [...$this->payload([$asetA], $tujuan), 'alasan' => 'Simpan pertama', 'version' => 1])
+            ->assertOk()->json('data.version');
+        $this->assertGreaterThan(1, $baru);
+        $pengubah->patchJson($alamat, [...$this->payload([$asetB], $tujuan), 'alasan' => 'Simpan kedua', 'version' => 1])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+
+        $this->assertDatabaseHas('aset_tr_mutasi_aset', ['id' => $mutasi, 'alasan' => 'Simpan pertama', 'status' => 'draft']);
+        $this->assertSame([$asetA], DB::table('aset_tr_mutasi_aset_details')->where('mutasi_aset_id', $mutasi)->pluck('aset_id')->all());
+
+        // Penyelesaian dengan versi basi juga ditolak, dan asetnya tidak berpindah.
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson($alamat.'/selesaikan', ['version' => 1])
+            ->assertConflict()->assertJsonPath('error.code', 'stale_version');
+        $this->assertDatabaseHas('aset_tr_mutasi_aset', ['id' => $mutasi, 'status' => 'draft']);
+        $this->assertDatabaseMissing('aset_tr_penempatan_aset', ['mutasi_aset_id' => $mutasi]);
+    }
+
+    public function test_simpan_selesaikan_dan_arsip_tanpa_versi_ditolak(): void
+    {
+        $aset = $this->receive();
+        $tujuan = $this->master('lokasi-aset', ['nama' => 'Gudang tanpa versi']);
+        $mutasi = $this->draft([$aset], $tujuan);
+        $alamat = '/api/modules/management-aset/v1/mutasi-aset/'.$mutasi;
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.read', 'management-aset.mutasi-aset.update'])
+            ->patchJson($alamat, [...$this->payload([$aset], $tujuan), 'alasan' => 'Tanpa versi'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson($alamat.'/selesaikan')->assertStatus(428);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.archive'])
+            ->deleteJson($alamat)->assertStatus(428);
+
+        $this->assertDatabaseHas('aset_tr_mutasi_aset', [
+            'id' => $mutasi, 'alasan' => 'Pindah penugasan', 'status' => 'draft', 'version' => 1, 'deleted_at' => null,
+        ]);
+    }
+
+    public function test_rincian_memulangkan_versi_dan_etag(): void
+    {
+        $mutasi = $this->draft([$this->receive()], $this->master('lokasi-aset', ['nama' => 'Gudang ETag']));
+
+        $this->show($mutasi)->assertOk()->assertJsonPath('data.version', 1)->assertHeader('ETag', RowVersion::etag(1));
     }
 
     public function test_menyusun_dokumen_bukan_izin_untuk_memindahkan_aset(): void

@@ -130,12 +130,12 @@ class MasterDataAsetTest extends TestCase
 
         $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
 
-        $this->request($resource, 'patch', '/api/modules/management-aset/v1/'.$resource.'/'.$id, ['nama' => 'Data Diubah', 'keterangan' => ''])
+        $this->request($resource, 'patch', '/api/modules/management-aset/v1/'.$resource.'/'.$id, ['nama' => 'Data Diubah', 'keterangan' => '', 'version' => $created->json('data.version')])
             ->assertOk()
             ->assertJsonPath('data.nama', 'Data Diubah')
             ->assertJsonPath('data.keterangan', null);
 
-        $this->request($resource, 'delete', '/api/modules/management-aset/v1/'.$resource.'/'.$id)->assertNoContent();
+        $this->request($resource, 'delete', '/api/modules/management-aset/v1/'.$resource.'/'.$id, ['version' => $this->versi($resource, $id)])->assertNoContent();
         $this->assertSoftDeleted($table, ['id' => $id, 'tenant_id' => $this->tenantId]);
         $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource)->assertOk()->assertJsonPath('meta.total', 0);
     }
@@ -272,7 +272,7 @@ class MasterDataAsetTest extends TestCase
     public function test_induk_yang_sudah_diarsipkan_tidak_dapat_dipilih(): void
     {
         $pabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Arsip'])->assertCreated()->json('data.id');
-        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan)->assertNoContent();
+        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan, ['version' => 1])->assertNoContent();
 
         $this->createRecord('model-aset', ['nama' => 'Model Baru', 'pabrikan_aset_id' => $pabrikan])
             ->assertStatus(422)
@@ -285,13 +285,13 @@ class MasterDataAsetTest extends TestCase
         $pabrikanTujuan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Tujuan'])->assertCreated()->json('data.id');
         $jenisTujuan = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tujuan'])->assertCreated()->json('data.id');
 
-        $this->request('model-aset', 'patch', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'], ['pabrikan_aset_id' => $pabrikanTujuan])
+        $this->request('model-aset', 'patch', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'], ['pabrikan_aset_id' => $pabrikanTujuan, 'version' => $this->versi('model-aset', $classification['model-aset'])])
             ->assertOk()
             ->assertJsonPath('data.pabrikan_aset.nama', 'Pabrikan Tujuan')
             // Memindahkan satu induk tidak boleh menggeser induk lainnya.
             ->assertJsonPath('data.jenis_aset_id', $classification['jenis-aset']);
 
-        $this->request('model-aset', 'patch', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'], ['jenis_aset_id' => $jenisTujuan])
+        $this->request('model-aset', 'patch', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'], ['jenis_aset_id' => $jenisTujuan, 'version' => $this->versi('model-aset', $classification['model-aset'])])
             ->assertOk()
             ->assertJsonPath('data.jenis_aset.nama', 'Jenis Tujuan')
             ->assertJsonPath('data.pabrikan_aset_id', $pabrikanTujuan);
@@ -302,18 +302,19 @@ class MasterDataAsetTest extends TestCase
         $classification = $this->buildClassification();
 
         // Model menggantung pada dua induk sekaligus, jadi keduanya terkunci.
-        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$classification['pabrikan-aset'])
+        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$classification['pabrikan-aset'], ['version' => 1])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
-        $this->request('jenis-aset', 'delete', '/api/modules/management-aset/v1/jenis-aset/'.$classification['jenis-aset'])
+        $this->request('jenis-aset', 'delete', '/api/modules/management-aset/v1/jenis-aset/'.$classification['jenis-aset'], ['version' => 1])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
-        $this->request('model-aset', 'delete', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'])->assertNoContent();
-        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$classification['pabrikan-aset'])->assertNoContent();
-        $this->request('jenis-aset', 'delete', '/api/modules/management-aset/v1/jenis-aset/'.$classification['jenis-aset'])->assertNoContent();
+        // Arsip yang ditolak tidak menaikkan versi, jadi versi yang sama masih berlaku sesudahnya.
+        $this->request('model-aset', 'delete', '/api/modules/management-aset/v1/model-aset/'.$classification['model-aset'], ['version' => 1])->assertNoContent();
+        $this->request('pabrikan-aset', 'delete', '/api/modules/management-aset/v1/pabrikan-aset/'.$classification['pabrikan-aset'], ['version' => 1])->assertNoContent();
+        $this->request('jenis-aset', 'delete', '/api/modules/management-aset/v1/jenis-aset/'.$classification['jenis-aset'], ['version' => 1])->assertNoContent();
         // Group tidak lagi menjadi induk master mana pun, hanya aset, jadi bebas diarsipkan.
-        $this->request('group-aset', 'delete', '/api/modules/management-aset/v1/group-aset/'.$classification['group-aset'])->assertNoContent();
+        $this->request('group-aset', 'delete', '/api/modules/management-aset/v1/group-aset/'.$classification['group-aset'], ['version' => 1])->assertNoContent();
     }
 
     public function test_hak_pada_satu_master_tidak_memberi_hak_pada_master_lain(): void
@@ -398,7 +399,7 @@ class MasterDataAsetTest extends TestCase
         $created->assertJsonPath('data.property_type', 'fixed_aset');
         $created->assertJsonPath('data.capitalization_threshold', '1000.00');
 
-        $this->request('group-aset', 'patch', '/api/modules/management-aset/v1/group-aset/'.$created->json('data.id'), ['capitalization_threshold' => 2500])
+        $this->request('group-aset', 'patch', '/api/modules/management-aset/v1/group-aset/'.$created->json('data.id'), ['capitalization_threshold' => 2500, 'version' => $created->json('data.version')])
             ->assertOk()
             ->assertJsonPath('data.capitalization_threshold', '2500.00')
             // Field lain tidak ikut tergeser saat satu field diubah.
@@ -499,7 +500,7 @@ class MasterDataAsetTest extends TestCase
         // Retry dengan kunci itu harus mengembalikan record yang sama, bukan 500.
         $key = 'kunci-dipakai-ulang';
         $created = $this->postWithKey('kondisi-aset', ['nama' => 'Baik'], $key)->assertCreated();
-        $this->request('kondisi-aset', 'delete', '/api/modules/management-aset/v1/kondisi-aset/'.$created->json('data.id'))->assertNoContent();
+        $this->request('kondisi-aset', 'delete', '/api/modules/management-aset/v1/kondisi-aset/'.$created->json('data.id'), ['version' => $created->json('data.version')])->assertNoContent();
 
         $this->postWithKey('kondisi-aset', ['nama' => 'Baik'], $key)
             ->assertOk()
@@ -586,6 +587,64 @@ class MasterDataAsetTest extends TestCase
         // Arsip adalah soft delete sehingga referensi tidak pernah terputus; hard delete tetap ditahan.
         $this->assertFalse($this->hardDelete('aset_m_pabrikan_aset', $pabrikan), 'hard delete induk yang masih direferensikan harus ditahan');
         $this->assertDatabaseHas('aset_m_pabrikan_aset', ['id' => $pabrikan, 'deleted_at' => null]);
+    }
+
+    /**
+     * Dua penyimpanan dari versi yang sama: yang kedua ditolak dan perubahan yang pertama tetap.
+     * Penyimpanan tanpa versi ditolak tanpa mengubah apa pun, begitu juga arsip dari versi basi.
+     */
+    public function test_penyimpanan_dari_versi_basi_atau_tanpa_versi_ditolak(): void
+    {
+        $created = $this->createRecord('kondisi-aset', ['nama' => 'Baik'])->assertCreated();
+        $alamat = '/api/modules/management-aset/v1/kondisi-aset/'.$created->json('data.id');
+        $versi = $created->json('data.version');
+        $this->assertSame(1, $versi);
+
+        // Versi hanya berarti "berbeda": klaim dan penulisan sesudahnya masing-masing menaikkannya.
+        $versiBaru = $this->request('kondisi-aset', 'patch', $alamat, ['nama' => 'Baik sekali', 'version' => $versi])
+            ->assertOk()
+            ->json('data.version');
+        $this->assertGreaterThan($versi, $versiBaru);
+        $this->request('kondisi-aset', 'patch', $alamat, ['nama' => 'Cukup', 'version' => $versi])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $this->request('kondisi-aset', 'patch', $alamat, ['nama' => 'Cukup'])
+            ->assertStatus(428)
+            ->assertJsonPath('error.code', 'version_required');
+        $this->request('kondisi-aset', 'delete', $alamat, ['version' => $versi])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $this->request('kondisi-aset', 'delete', $alamat)->assertStatus(428);
+
+        $this->assertDatabaseHas('aset_m_kondisi_aset', ['id' => $created->json('data.id'), 'nama' => 'Baik sekali', 'deleted_at' => null]);
+        $this->assertSame($versiBaru, $this->versi('kondisi-aset', $created->json('data.id')));
+    }
+
+    public function test_detail_dan_daftar_membawa_versi_dan_detail_memasang_etag(): void
+    {
+        $created = $this->createRecord('kondisi-aset', ['nama' => 'Baik'])->assertCreated();
+        $alamat = '/api/modules/management-aset/v1/kondisi-aset/'.$created->json('data.id');
+        $versi = $this->request('kondisi-aset', 'patch', $alamat, ['nama' => 'Baik sekali', 'version' => 1])->assertOk()->json('data.version');
+
+        $this->request('kondisi-aset', 'get', $alamat)
+            ->assertOk()
+            ->assertJsonPath('data.version', $versi)
+            ->assertHeader('ETag', 'W/"'.$versi.'"');
+        $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset')
+            ->assertOk()
+            ->assertJsonPath('data.0.version', $versi);
+
+        // Header If-Match setara dengan field version.
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('kondisi-aset'))
+            ->withHeader('If-Match', 'W/"'.$versi.'"')
+            ->deleteJson($alamat)
+            ->assertNoContent();
+    }
+
+    /** Versi record saat ini, dibaca dari jawaban detail seperti layar membacanya. */
+    private function versi(string $resource, string $id): int
+    {
+        return (int) $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource.'/'.$id)->assertOk()->json('data.version');
     }
 
     /**

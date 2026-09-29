@@ -32,7 +32,13 @@ import {
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
+import {
+    apiJson,
+    apiRequest,
+    CoreApiError,
+    errorText,
+    toastSaveError,
+} from '@/lib/core-api';
 
 /**
  * Setelan feed posting finance satu entitas legal: aktif atau tidak, tanggal cutover, dan riwayat
@@ -42,11 +48,14 @@ import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 type Mode = 'direct_payable' | 'clearing';
 type ModeRow = {
     id: string;
+    version: number;
     mode: Mode;
     effective_from: string;
     removable: boolean;
 };
 type Setting = {
+    /** 0 selama setelan belum pernah disimpan. */
+    version: number;
     enabled: boolean;
     cutover_date: string | null;
     current_mode: Mode;
@@ -136,6 +145,7 @@ export function FinancePostingSection({
                 body: JSON.stringify({
                     enabled,
                     cutover_date: cutover || null,
+                    version: setting?.version ?? 0,
                 }),
             });
             apply(result.data);
@@ -145,7 +155,7 @@ export function FinancePostingSection({
                 setSaveErrors(caught.errors);
             }
 
-            toast.error(errorText(caught, 'Setelan posting belum disimpan.'));
+            toastSaveError(caught, 'Setelan posting belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -184,12 +194,13 @@ export function FinancePostingSection({
         try {
             await apiRequest(`${base}/settlement-modes/${row.id}`, {
                 method: 'DELETE',
+                headers: { 'If-Match': `W/"${row.version}"` },
             });
             const result = await apiJson<{ data: Setting }>(base);
             apply(result.data);
             toast.success('Mode penyelesaian dihapus.');
         } catch (caught) {
-            toast.error(errorText(caught, 'Mode belum dapat dihapus.'));
+            toastSaveError(caught, 'Mode belum dapat dihapus.');
         }
     };
 

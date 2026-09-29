@@ -12,8 +12,10 @@ use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\OwnerRoleDuties;
 use App\Support\Access\TenantProducts;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +48,7 @@ class SecurityConfigurationController extends Controller
                     'id' => $role->id,
                     'name' => $role->name,
                     'is_owner' => $role->is_owner,
+                    'version' => $role->version,
                     'duty_codes' => $role->duties->pluck('code')->values(),
                     'child_roles' => $role->children->map(fn (Role $child) => $child->only(['id', 'name']))->values(),
                     'parent_roles' => $role->parents->map(fn (Role $parent) => $parent->only(['id', 'name']))->values(),
@@ -61,6 +64,7 @@ class SecurityConfigurationController extends Controller
                     'app_id' => $duty->app_id,
                     'source' => $duty->source,
                     'status' => $duty->status,
+                    'version' => $duty->version,
                     'privilege_codes' => $duty->privileges->pluck('code')->values(),
                 ])->values(),
             'privileges' => SecurityPrivilege::query()
@@ -74,6 +78,7 @@ class SecurityConfigurationController extends Controller
                     'app_id' => $privilege->app_id,
                     'source' => $privilege->source,
                     'status' => $privilege->status,
+                    'version' => $privilege->version,
                     'permission_codes' => $privilege->permissions->pluck('code')->values(),
                 ])->values(),
             'permissions' => Permission::query()
@@ -122,8 +127,12 @@ class SecurityConfigurationController extends Controller
         $membership = $this->manager($request);
         $item = $this->customPrivilege($privilege, $membership);
         $this->draftOnly($item->status);
-        $item->update(['name' => $request->validate(['name' => ['required', 'string', 'max:120']])['name']]);
-        $item->permissions()->sync($this->permissionCodes($request, $membership));
+        $permissionCodes = $this->permissionCodes($request, $membership);
+        DB::transaction(function () use ($request, $item, $permissionCodes): void {
+            RowVersion::claim($item, RowVersion::expected($request));
+            $item->update(['name' => $request->string('name')->toString()]);
+            $item->permissions()->sync($permissionCodes);
+        });
 
         return back()->with('status', 'Draf tugas akses diperbarui.');
     }
@@ -133,6 +142,7 @@ class SecurityConfigurationController extends Controller
         $item = $this->customPrivilege($privilege, $this->manager($request));
         $this->draftOnly($item->status);
         abort_if($item->permissions()->doesntExist(), 422, 'Pilih sedikitnya satu izin sebelum menerbitkan tugas akses.');
+        RowVersion::claim($item, RowVersion::expected($request));
         $item->update(['status' => 'active', 'published_at' => now()]);
 
         return back()->with('status', 'Tugas akses diterbitkan.');
@@ -178,8 +188,12 @@ class SecurityConfigurationController extends Controller
         $membership = $this->manager($request);
         $item = $this->customDuty($duty, $membership);
         $this->draftOnly($item->status);
-        $item->update(['name' => $request->validate(['name' => ['required', 'string', 'max:120']])['name']]);
-        $item->privileges()->sync($this->privilegeCodes($request, $membership));
+        $privilegeCodes = $this->privilegeCodes($request, $membership);
+        DB::transaction(function () use ($request, $item, $privilegeCodes): void {
+            RowVersion::claim($item, RowVersion::expected($request));
+            $item->update(['name' => $request->string('name')->toString()]);
+            $item->privileges()->sync($privilegeCodes);
+        });
 
         return back()->with('status', 'Draf tanggung jawab diperbarui.');
     }
@@ -191,9 +205,12 @@ class SecurityConfigurationController extends Controller
         $this->draftOnly($item->status);
         $draftPrivilege = $item->privileges()->where('source', 'custom')->where('status', '!=', 'active')->exists();
         abort_if($draftPrivilege, 422, 'Terbitkan seluruh tugas akses di dalam tanggung jawab ini terlebih dahulu.');
-        $item->update(['status' => 'active', 'published_at' => now()]);
-        // Owner memegang semua duty yang sah, termasuk duty buatan tenant yang baru terbit.
-        app(OwnerRoleDuties::class)->syncTenant($membership->tenant_id);
+        DB::transaction(function () use ($request, $item, $membership): void {
+            RowVersion::claim($item, RowVersion::expected($request));
+            $item->update(['status' => 'active', 'published_at' => now()]);
+            // Owner memegang semua duty yang sah, termasuk duty buatan tenant yang baru terbit.
+            app(OwnerRoleDuties::class)->syncTenant($membership->tenant_id);
+        });
 
         return back()->with('status', 'Tanggung jawab diterbitkan dan siap dipakai pada role.');
     }
@@ -203,8 +220,11 @@ class SecurityConfigurationController extends Controller
     {
         $item = $this->customPrivilege($privilege, $this->manager($request));
         $this->draftOnly($item->status);
-        $item->permissions()->detach();
-        $item->delete();
+        DB::transaction(function () use ($request, $item): void {
+            RowVersion::claim($item, RowVersion::expected($request));
+            $item->permissions()->detach();
+            $item->delete();
+        });
 
         return back()->with('status', 'Draf tugas akses dihapus.');
     }

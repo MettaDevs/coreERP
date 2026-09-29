@@ -149,9 +149,11 @@ type Member = {
     roles: string[];
     assignments: Assignment[];
     can_edit_access: boolean;
+    version: number;
 };
 type Invitation = {
     id: string;
+    version: number;
     label: string | null;
     roles: string[];
     assignments: Assignment[];
@@ -941,6 +943,7 @@ type CodeDraft = {
      */
     issued?: {
         id: string;
+        version: number;
         revoked: boolean;
         redeemed: number;
         sso: Invitation['sso'];
@@ -954,6 +957,7 @@ const issuedDraft = (invitation: Invitation): CodeDraft => ({
     assignments: invitation.assignments,
     issued: {
         id: invitation.id,
+        version: invitation.version,
         revoked: Boolean(invitation.revoked_at),
         redeemed: invitation.redeemed_count,
         sso: invitation.sso,
@@ -1203,6 +1207,7 @@ function InviteForm({
                     role_id: assignment.role_id,
                     policy_scopes: assignment.policy_scopes,
                 })),
+                version: code.issued.version,
             },
             {
                 preserveScroll: true,
@@ -1788,6 +1793,10 @@ function MemberAccessDialog({
                         event.preventDefault();
 
                         if (member) {
+                            form.transform((data) => ({
+                                ...data,
+                                version: member.version,
+                            }));
                             form.patch(
                                 `/settings/access/memberships/${member.id}`,
                                 { onSuccess: onClose },
@@ -2097,6 +2106,12 @@ export default function Access({
                                         onClick={() =>
                                             router.delete(
                                                 `/settings/access/invitations/${invitation.id}`,
+                                                {
+                                                    data: {
+                                                        version:
+                                                            invitation.version,
+                                                    },
+                                                },
                                             )
                                         }
                                     >

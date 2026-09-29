@@ -15,9 +15,14 @@ const itemOf = (item: Choice): TransferListItem => ({
 export default function JenisAsetMaintenanceJobTypes({
     jenisAsetId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     jenisAsetId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [remaining, setRemaining] = useState<TransferListItem[]>([]);
     const [selected, setSelected] = useState<TransferListItem[]>([]);
@@ -75,12 +80,17 @@ export default function JenisAsetMaintenanceJobTypes({
         setError('');
 
         try {
-            await api(`/jenis-aset/${jenisAsetId}/maintenance-job-types`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    jenis_aset_ids: selected.map((item) => item.id),
-                }),
-            });
+            const result = await api<{ version: number }>(
+                `/jenis-aset/${jenisAsetId}/maintenance-job-types`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        jenis_aset_ids: selected.map((item) => item.id),
+                    }),
+                },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(

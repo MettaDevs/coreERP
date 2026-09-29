@@ -6,6 +6,7 @@ use App\Models\OperatingUnit;
 use App\Models\Organization;
 use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -18,9 +19,12 @@ class UpdateOrganization
      * Nomor boleh diganti. Posting yang sudah terbit menyimpan nomor pada saat terbit, jadi mengganti
      * nomor tidak menulis ulang jurnal lama; yang berubah hanya posting berikutnya.
      *
+     * `$expectedVersion` adalah versi organisasi yang dibuka penggunanya; entitas legal atau unitnya
+     * ikut terkunci bersamanya.
+     *
      * @param  array{name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string}  $data
      */
-    public function handle(TenantMembership $actor, Organization $organization, array $data): Organization
+    public function handle(TenantMembership $actor, Organization $organization, array $data, int $expectedVersion): Organization
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $organization->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
@@ -36,7 +40,8 @@ class UpdateOrganization
         }
 
         try {
-            return DB::transaction(function () use ($organization, $data, $gantiNomor, $number): Organization {
+            return DB::transaction(function () use ($organization, $data, $gantiNomor, $number, $expectedVersion): Organization {
+                RowVersion::claim($organization, $expectedVersion);
                 $organization->update(['name' => $data['name']]);
 
                 if ($organization->classification === 'legal_entity') {

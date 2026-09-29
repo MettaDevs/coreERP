@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -66,7 +67,9 @@ final class RowVersion
      * Update bersyarat pada versi yang diharapkan. Record yang tidak ditemukan dijawab 404; record yang
      * versinya sudah berbeda dijawab 409. Memulangkan versi sesudah klaim.
      *
-     * @param  Model|EloquentBuilder<Model>|Builder  $target  model, atau query yang menunjuk tepat satu baris
+     * @template TModel of Model
+     *
+     * @param  TModel|EloquentBuilder<TModel>|Builder  $target  model, atau query yang menunjuk tepat satu baris
      */
     public static function claim(Model|EloquentBuilder|Builder $target, int $expected): int
     {
@@ -75,7 +78,11 @@ final class RowVersion
             : clone $target;
         $column = $query instanceof EloquentBuilder ? $query->qualifyColumn(AuditColumns::VERSION) : AuditColumns::VERSION;
 
-        $affected = (clone $query)->where($column, $expected)->update([AuditColumns::VERSION => $expected]);
+        // Lewat query builder dasar (scope tetap berlaku), supaya Eloquent tidak ikut menulis `updated_at`:
+        // klaim tidak mengubah kolom apa pun, dan UPDATE seperti itu selalu dinaikkan versinya, juga pada
+        // tabel yang punya kolom aktivitas mesin.
+        $base = $query instanceof EloquentBuilder ? (clone $query)->toBase() : clone $query;
+        $affected = $base->where($column, $expected)->update([AuditColumns::VERSION => $expected]);
 
         if ($affected > 1) {
             throw new LogicException('RowVersion::claim() menerima query yang menunjuk lebih dari satu baris.');
@@ -90,6 +97,43 @@ final class RowVersion
         }
 
         return $expected + 1;
+    }
+
+    /**
+     * Klaim untuk record yang baru lahir pada penyimpanan pertamanya, seperti setelan per tenant atau per
+     * entitas legal. Selama barisnya belum ada, layar membukanya dengan versi 0; penyimpanan itu yang
+     * membuatnya, dan method ini memulangkan false. Bila tab lain sudah membuatnya lebih dulu, versi 0
+     * tidak pernah cocok (versi dimulai dari 1) dan penyimpanan ini ditolak 409. Sebaliknya, versi di atas 0
+     * untuk baris yang sudah tidak ada berarti penggunanya membuka baris yang kemudian dihapus; itu juga 409.
+     *
+     * Dua penyimpanan pertama yang bersamaan diurutkan kunci advisory transaksi yang dihitung dari
+     * query-nya: yang kedua menunggu, lalu melihat baris buatan yang pertama. Tanpa kunci itu keduanya
+     * sama-sama tidak menemukan baris, dan yang kedua menimpa yang pertama atau jatuh di indeks unik.
+     * Karena itu method ini wajib dipanggil di dalam transaksi yang juga membuat barisnya.
+     *
+     * @template TModel of Model
+     *
+     * @param  EloquentBuilder<TModel>|Builder  $query  query yang menunjuk paling banyak satu baris
+     */
+    public static function claimIfExists(EloquentBuilder|Builder $query, int $expected): bool
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('RowVersion::claimIfExists() harus dipanggil di dalam transaksi.');
+        }
+
+        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$query->toRawSql()]);
+
+        if ((clone $query)->exists()) {
+            self::claim($query, $expected);
+
+            return true;
+        }
+
+        if ($expected !== 0) {
+            self::fail(request(), Response::HTTP_CONFLICT, 'stale_version', self::STALE_MESSAGE);
+        }
+
+        return false;
     }
 
     /** ETag lemah untuk sebuah versi, bentuk yang juga dipakai BC: `W/"12"`. */

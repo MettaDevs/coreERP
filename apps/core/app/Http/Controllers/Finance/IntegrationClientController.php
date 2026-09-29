@@ -10,10 +10,12 @@ use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Finance\IntegrationClientAccounts;
 use App\Support\Integration\PushDestination;
 use App\Support\Integration\SignedPush;
+use App\Support\Modules\Contracts\RowVersion;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -74,7 +76,7 @@ final class IntegrationClientController extends Controller
         $accounts->ensure($client);
 
         return response()->json([
-            'data' => $this->present($client),
+            'data' => $this->present($client->refresh()),
             'token' => $client->id.'.'.$rahasia,
             'signing_secret' => $penanda,
         ], 201);
@@ -92,30 +94,36 @@ final class IntegrationClientController extends Controller
             ? Str::random(48)
             : null;
 
-        $client->fill([
-            'name' => $data['name'],
-            'scopes' => $data['scopes'],
-            'allowed_ips' => $data['allowed_ips'],
-            'posting_type_prefixes' => $data['posting_type_prefixes'],
-            'delivery_mode' => $data['delivery_mode'],
-            'push_url' => $data['push_url'],
-            'signing_secret' => $data['delivery_mode'] === IntegrationClient::PULL
-                ? null
-                : ($penandaBaru ?? $client->signing_secret),
-        ])->save();
+        DB::transaction(function () use ($request, $client, $data, $penandaBaru): void {
+            RowVersion::claim($client, RowVersion::expected($request));
+            $client->fill([
+                'name' => $data['name'],
+                'scopes' => $data['scopes'],
+                'allowed_ips' => $data['allowed_ips'],
+                'posting_type_prefixes' => $data['posting_type_prefixes'],
+                'delivery_mode' => $data['delivery_mode'],
+                'push_url' => $data['push_url'],
+                'signing_secret' => $data['delivery_mode'] === IntegrationClient::PULL
+                    ? null
+                    : ($penandaBaru ?? $client->signing_secret),
+            ])->save();
+        });
         // Nama akun aplikasinya ikut, supaya riwayat menyebut nama klien yang sekarang.
         $accounts->ensure($client);
 
-        return response()->json(['data' => $this->present($client), 'signing_secret' => $penandaBaru]);
+        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $penandaBaru]);
     }
 
     /** Mencabut berlaku pada permintaan berikutnya. Klien yang dicabut tidak dapat dihidupkan lagi. */
     public function revoke(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
         $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
-        $client->fill(['status' => IntegrationClient::REVOKED, 'revoked_at' => now()])->save();
+        DB::transaction(function () use ($request, $client): void {
+            RowVersion::claim($client, RowVersion::expected($request));
+            $client->fill(['status' => IntegrationClient::REVOKED, 'revoked_at' => now()])->save();
+        });
 
-        return response()->json(['data' => $this->present($client)]);
+        return response()->json(['data' => $this->present($client->refresh())]);
     }
 
     public function rotateToken(Request $request, IntegrationClient $integrationClient): JsonResponse
@@ -124,7 +132,7 @@ final class IntegrationClientController extends Controller
         $rahasia = Str::random(48);
         $client->fill(['token_digest' => IntegrationClient::digest($rahasia)])->save();
 
-        return response()->json(['data' => $this->present($client), 'token' => $client->id.'.'.$rahasia]);
+        return response()->json(['data' => $this->present($client->refresh()), 'token' => $client->id.'.'.$rahasia]);
     }
 
     public function rotateSigningSecret(Request $request, IntegrationClient $integrationClient): JsonResponse
@@ -136,7 +144,7 @@ final class IntegrationClientController extends Controller
         $penanda = Str::random(48);
         $client->fill(['signing_secret' => $penanda])->save();
 
-        return response()->json(['data' => $this->present($client), 'signing_secret' => $penanda]);
+        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $penanda]);
     }
 
     /**
@@ -296,6 +304,7 @@ final class IntegrationClientController extends Controller
     {
         return [
             'id' => $client->id,
+            'version' => (int) $client->version,
             'name' => $client->name,
             'delivery_mode' => $client->delivery_mode,
             'push_url' => $client->push_url,

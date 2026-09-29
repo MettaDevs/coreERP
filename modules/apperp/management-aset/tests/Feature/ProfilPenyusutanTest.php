@@ -40,11 +40,12 @@ class ProfilPenyusutanTest extends TestCase
 
         $this->request('get', '/api/modules/management-aset/v1/profil-penyusutan/'.$id)->assertOk()->assertJsonPath('data.id', $id);
 
-        $this->request('patch', '/api/modules/management-aset/v1/profil-penyusutan/'.$id, ['useful_life_periods' => 48])
+        $versi = $this->request('patch', '/api/modules/management-aset/v1/profil-penyusutan/'.$id, ['useful_life_periods' => 48, 'version' => 1])
             ->assertOk()
-            ->assertJsonPath('data.useful_life_periods', 48);
+            ->assertJsonPath('data.useful_life_periods', 48)
+            ->json('data.version');
 
-        $this->request('delete', '/api/modules/management-aset/v1/profil-penyusutan/'.$id)->assertNoContent();
+        $this->request('delete', '/api/modules/management-aset/v1/profil-penyusutan/'.$id, ['version' => $versi])->assertNoContent();
         $this->assertSoftDeleted('aset_m_profil_penyusutan', ['id' => $id, 'tenant_id' => $this->tenantId]);
     }
 

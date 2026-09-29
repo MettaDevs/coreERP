@@ -41,6 +41,7 @@ export type CalendarItem = {
     code: string;
     name: string;
     standard_work_hours: number;
+    version: number;
 };
 
 type Props = {
@@ -216,6 +217,7 @@ export default function ComposeWorkingTimesPage({
                 template_id: templateId,
                 from_date: fromDate,
                 to_date: toDate,
+                version: selectedCalendar?.version,
             },
             {
                 preserveScroll: true,
