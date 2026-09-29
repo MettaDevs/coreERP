@@ -1,8 +1,14 @@
+import { toast } from 'sonner';
+
 /**
  * Klien JSON Shell ke API Core di bawah `/api/v1`, memakai sesi yang sama dengan halaman
  * Inertia. Permintaan yang mengubah data membawa token CSRF dari cookie `XSRF-TOKEN`,
  * seperti yang dilakukan axios. Kegagalan menjadi `CoreApiError` dengan pesan pertama
- * dari validasi Laravel supaya toast dapat menampilkannya apa adanya.
+ * dari validasi Laravel, atau pesan `{ error: { code, message } }`, supaya toast dapat
+ * menampilkannya apa adanya.
+ *
+ * Endpoint yang mengubah record meminta versi yang dibuka pengguna (field `version` atau
+ * header `If-Match`). Versi basi dijawab 409 berkode `stale_version`.
  */
 
 export class CoreApiError extends Error {
@@ -10,6 +16,7 @@ export class CoreApiError extends Error {
         message: string,
         public readonly status: number,
         public readonly errors: Record<string, string[]> = {},
+        public readonly code: string | null = null,
     ) {
         super(message);
         this.name = 'CoreApiError';
@@ -52,6 +59,7 @@ export async function apiRequest(
         const body = (await response.json().catch(() => null)) as {
             message?: unknown;
             errors?: Record<string, string[]>;
+            error?: { code?: unknown; message?: unknown };
         } | null;
         const firstError = body?.errors
             ? Object.values(body.errors)[0]?.[0]
@@ -60,11 +68,14 @@ export async function apiRequest(
         throw new CoreApiError(
             typeof firstError === 'string'
                 ? firstError
-                : typeof body?.message === 'string' && body.message
-                  ? body.message
-                  : 'Permintaan belum berhasil.',
+                : typeof body?.error?.message === 'string'
+                  ? body.error.message
+                  : typeof body?.message === 'string' && body.message
+                    ? body.message
+                    : 'Permintaan belum berhasil.',
             response.status,
             body?.errors ?? {},
+            typeof body?.error?.code === 'string' ? body.error.code : null,
         );
     }
 
@@ -80,4 +91,24 @@ export function errorText(caught: unknown, fallback: string): string {
     return caught instanceof Error && caught.message
         ? caught.message
         : fallback;
+}
+
+/**
+ * Toast untuk kegagalan menyimpan. Versi basi mendapat tombol muat ulang penuh: isian form
+ * harus kembali ke data terbaru supaya pengguna melihat perubahan orang lain lebih dulu.
+ */
+export function toastSaveError(caught: unknown, fallback: string): void {
+    if (caught instanceof CoreApiError && caught.code === 'stale_version') {
+        toast.error(caught.message, {
+            duration: Infinity,
+            action: {
+                label: 'Muat ulang',
+                onClick: () => window.location.reload(),
+            },
+        });
+
+        return;
+    }
+
+    toast.error(errorText(caught, fallback));
 }
