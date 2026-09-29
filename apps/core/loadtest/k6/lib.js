@@ -21,7 +21,7 @@
 // jadi satu sesi yang dipakai empat instance sekaligus adalah persis keadaan yang gagal bila ada
 // identitas, tenant, atau cache izin yang menempel pada memori satu proses.
 
-import { fail } from 'k6';
+import { fail, sleep } from 'k6';
 import http from 'k6/http';
 
 export const BASE = __ENV.BASE_URL || 'http://lb';
@@ -290,17 +290,27 @@ export function sempitkanTenant(tenant, dutyCode = DUTY_SEMPIT) {
     }
 
     const alamat = `load-${FIXTURE}-sempit-${RUN_ID}-${Date.now()}@example.test`;
-    const tukar = http.post(
-        `${BASE}/api/v1/invitation-redemptions`,
-        JSON.stringify({
-            code: undangan.json('data.code'),
-            name: 'Anggota sempit',
-            email: alamat,
-            password: PASSWORD,
-            password_confirmation: PASSWORD,
-        }),
-        { jar, headers: jsonHeaders(csrfDari(jar)) },
-    );
+    const kirimTukar = () =>
+        http.post(
+            `${BASE}/api/v1/invitation-redemptions`,
+            JSON.stringify({
+                code: undangan.json('data.code'),
+                name: 'Anggota sempit',
+                email: alamat,
+                password: PASSWORD,
+                password_confirmation: PASSWORD,
+            }),
+            { jar, headers: jsonHeaders(csrfDari(jar)) },
+        );
+    let tukar = kirimTukar();
+
+    // Penukaran dibatasi lima per menit per alamat, dan hitungannya dipakai bersama rute tamu lain
+    // dari alamat yang sama, termasuk pendaftaran usaha barusan. Seluruh k6 datang dari satu alamat,
+    // jadi setup menunggu batasnya pulih lalu mencoba sekali lagi.
+    if (tukar.status === 429) {
+        sleep(Number(tukar.headers['Retry-After'] || 60) + 1);
+        tukar = kirimTukar();
+    }
 
     if (tukar.status !== 201) {
         fail(`setup penukaran undangan tenant sempit gagal: ${tukar.status} ${String(tukar.body).slice(0, 300)}`);
