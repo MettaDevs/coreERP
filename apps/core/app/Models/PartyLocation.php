@@ -5,24 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Satu lokasi milik party. Kegunaannya dinyatakan `purpose`, dan satu party
- * paling banyak punya satu lokasi utama — dijaga partial unique index.
+ * Tautan satu party ke satu tempat, padanan `DirPartyLocation` Dynamics 365. Kegunaannya disimpan di
+ * {@see PartyLocationPurpose}, dan satu party paling banyak punya satu tautan utama — dijaga partial unique
+ * index di antara tautan yang belum diarsipkan.
  *
  * @property string $id
  * @property string $tenant_id
  * @property string $party_id
+ * @property string $location_id
  * @property bool $is_primary
+ * @property-read Location $location
  */
 class PartyLocation extends Model
 {
-    use HasUlids;
+    use HasUlids, SoftDeletes;
 
-    public const PURPOSES = ['business', 'delivery', 'invoice', 'payment', 'home'];
-
-    protected $fillable = ['tenant_id', 'party_id', 'name', 'purpose', 'is_primary', 'valid_from', 'valid_to'];
+    protected $fillable = ['tenant_id', 'party_id', 'location_id', 'is_primary', 'valid_from', 'valid_to'];
 
     protected function casts(): array
     {
@@ -35,9 +37,15 @@ class PartyLocation extends Model
         return $this->belongsTo(Party::class, 'party_id');
     }
 
-    /** @return HasOne<PostalAddress, $this> */
-    public function postalAddress(): HasOne
+    /** @return BelongsTo<Location, $this> */
+    public function location(): BelongsTo
     {
-        return $this->hasOne(PostalAddress::class, 'location_id');
+        return $this->belongsTo(Location::class, 'location_id');
+    }
+
+    /** @return HasMany<PartyLocationPurpose, $this> */
+    public function purposes(): HasMany
+    {
+        return $this->hasMany(PartyLocationPurpose::class, 'party_location_id');
     }
 }

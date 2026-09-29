@@ -4,8 +4,8 @@ namespace App\Http\Controllers\GlobalAddressBook;
 
 use App\Http\Controllers\Controller;
 use App\Models\CountryRegion;
+use App\Models\LocationPurpose;
 use App\Models\Organization;
-use App\Models\PartyLocation;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\AddressBook\OrganizationAddressBook;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +17,9 @@ use Illuminate\Validation\Rule;
  * Alamat utama dan cabang satu organisasi (padanan Addresses pada legal entity
  * Dynamics 365). Dibaca semua anggota tenant, diubah oleh admin tenant. Alamat utama
  * yang tersimpan di sini adalah yang tampil pada kop dokumen.
+ *
+ * Id alamat adalah id tautan organisasi ke tempat. Satu tempat dapat dipakai beberapa
+ * organisasi: `location_id` pada permintaan simpan menautkan tempat yang sudah ada.
  */
 class OrganizationLocationController extends Controller
 {
@@ -29,7 +32,7 @@ class OrganizationLocationController extends Controller
         return response()->json([
             'data' => $this->addressBook->locations($organization),
             'meta' => [
-                'purposes' => PartyLocation::PURPOSES,
+                'purposes' => LocationPurpose::query()->orderBy('sort_order')->get(['code', 'name']),
                 'countries' => CountryRegion::query()->orderBy('name')->get(['code', 'name']),
             ],
         ]);
@@ -57,17 +60,35 @@ class OrganizationLocationController extends Controller
         return response()->noContent();
     }
 
+    /** Tempat beralamat milik tenant yang dapat ditautkan ke organisasi ini. */
+    public function sharable(Request $request, Organization $organization): JsonResponse
+    {
+        $this->guardOrganization($request, $organization, manage: true);
+        $search = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
+
+        return response()->json(['data' => $this->addressBook->sharableLocations($organization->tenant_id, $search)]);
+    }
+
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
         // Kode negara dinormalkan sebelum diperiksa ke tabel, supaya "id" dan "ID" sama.
-        $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
+        if ($request->filled('country_region_code')) {
+            $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
+        }
+        // Satu kegunaan (`purpose`) tetap diterima; ia kegunaan pertama alamat itu.
+        if (! $request->has('purposes') && $request->filled('purpose')) {
+            $request->merge(['purposes' => [$request->input('purpose')]]);
+        }
+        $linking = $request->filled('location_id');
 
-        return $request->validate([
-            'name' => ['required', 'string', 'max:120'],
-            'purpose' => ['required', Rule::in(PartyLocation::PURPOSES)],
+        $data = $request->validate([
+            'location_id' => ['nullable', 'string', 'size:26'],
+            'name' => [$linking ? 'nullable' : 'required', 'string', 'max:120'],
+            'purposes' => ['required', 'array', 'min:1'],
+            'purposes.*' => ['string', 'distinct', Rule::exists('location_purposes', 'code')],
             'is_primary' => ['sometimes', 'boolean'],
-            'country_region_code' => ['required', 'string', 'size:2', Rule::exists('country_regions', 'code')],
+            'country_region_code' => [$linking ? 'nullable' : 'required', 'string', 'size:2', Rule::exists('country_regions', 'code')],
             'province' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
             'district' => ['nullable', 'string', 'max:100'],
@@ -76,6 +97,9 @@ class OrganizationLocationController extends Controller
             'postbox' => ['nullable', 'string', 'max:60'],
             'postal_code' => ['nullable', 'string', 'max:20'],
         ]);
+        $data['purposes'] = array_values(array_unique($data['purposes']));
+
+        return $data;
     }
 
     private function guardOrganization(Request $request, Organization $organization, bool $manage = false): void

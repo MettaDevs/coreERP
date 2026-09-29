@@ -343,6 +343,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('organizations/{organization}/locations', [OrganizationLocationController::class, 'store'])->name('organizations.locations.store');
         Route::put('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'update'])->name('organizations.locations.update');
         Route::delete('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'destroy'])->name('organizations.locations.destroy');
+        Route::get('organizations/{organization}/sharable-locations', [OrganizationLocationController::class, 'sharable'])->name('organizations.locations.sharable');
         Route::get('organizations/{organization}/contacts', [OrganizationContactController::class, 'index'])->name('organizations.contacts.index');
         Route::post('organizations/{organization}/contacts', [OrganizationContactController::class, 'store'])->name('organizations.contacts.store');
         Route::put('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'update'])->name('organizations.contacts.update');

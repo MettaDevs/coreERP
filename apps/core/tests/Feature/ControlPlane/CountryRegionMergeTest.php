@@ -4,6 +4,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Models\Client;
 use App\Models\CountryRegion;
+use App\Models\Location;
 use App\Models\Party;
 use App\Models\PartyLocation;
 use App\Models\PostalAddress;
@@ -129,11 +130,11 @@ class CountryRegionMergeTest extends TestCase
             'search_name' => Party::searchName('PT Contoh'),
             'status' => 'active',
         ]);
-        $location = PartyLocation::create([
+        $location = Location::create(['tenant_id' => $this->tenant->id, 'name' => 'Kantor Pusat']);
+        PartyLocation::create([
             'tenant_id' => $this->tenant->id,
             'party_id' => $party->id,
-            'name' => 'Kantor Pusat',
-            'purpose' => 'business',
+            'location_id' => $location->id,
             'is_primary' => true,
         ]);
         PostalAddress::create([

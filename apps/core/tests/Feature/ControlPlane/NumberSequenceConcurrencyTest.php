@@ -44,6 +44,7 @@ class NumberSequenceConcurrencyTest extends TestCase
         'change_log_setup_tables',
         'country_regions',
         'hierarchy_purposes',
+        'location_purposes',
         'number_sequence_profiles',
         'party_types',
         // Module migration history, written once per test database by Tests\TestCase. Without it the next
