@@ -11,6 +11,7 @@ use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Registry\RegistryCredentials;
 use ControlPlane\Sites\EnrollmentTokens;
+use ControlPlane\Sites\InstallOptions;
 use ControlPlane\Sites\LicenseTerms;
 use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
@@ -57,10 +58,13 @@ final class SiteActions extends Controller
             throw ValidationException::withMessages(['operation' => 'Server klien ini dipasang dari halaman lingkungannya, lewat "Buat perintah pasang".']);
         }
 
-        $issued = DB::transaction(function () use ($request, $row, $tokens): array {
+        $options = InstallOptions::fromRequest($request);
+
+        $issued = DB::transaction(function () use ($request, $row, $tokens, $options): array {
             $issued = $tokens->issue($row, $request->user()?->getAuthIdentifier());
             OperatorAudit::record($request, 'site.enrollment_token.issued', 'site', $row->id, [
                 'expires_at' => $issued['expires_at']->toIso8601String(),
+                'install_options' => $options->forAudit(),
             ]);
 
             return $issued;
@@ -69,7 +73,7 @@ final class SiteActions extends Controller
         // Perintahnya hanya lewat flash session: tampil sekali, tidak pernah di alamat, tidak pernah
         // di log. Token di dalamnya sekali pakai dan kedaluwarsa dalam satu jam.
         return redirect('/situs/'.$row->id)->with('enrollment', [
-            'command' => EnrollmentTokens::installCommand($issued['token']),
+            'command' => EnrollmentTokens::installCommand($issued['token'], $options),
             'expiresAt' => $issued['expires_at']->toDateTimeString(),
         ]);
     }

@@ -11,6 +11,8 @@ import { InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
 import DnsStatus from '@/components/dns-status';
 import type { DnsInfo } from '@/components/dns-status';
+import InstallOptionsFields from '@/components/install-options';
+import type { InstallOptionValues } from '@/components/install-options';
 import {
     ServerAddressField,
     ServerAdvancedFields,
@@ -301,6 +303,12 @@ export default function ClientServerPanel({
 }) {
     const { progress, site } = serverClient;
     const [issuing, setIssuing] = useState(false);
+    const [options, setOptions] = useState<InstallOptionValues>({
+        kunci_lisensi: false,
+        proxy_luar: false,
+        app_port: '',
+    });
+    const portError = usePage().props.errors.app_port;
 
     /*
      * Galat panel disimpan sendiri, bukan dibaca langsung dari `errors`. Setiap muat ulang parsial
@@ -342,7 +350,7 @@ export default function ClientServerPanel({
         setError(undefined);
         router.post(
             `/lingkungan/${environmentId}/perintah-pasang`,
-            {},
+            { ...options },
             {
                 preserveScroll: true,
                 onStart: () => setIssuing(true),
@@ -475,6 +483,15 @@ export default function ClientServerPanel({
                             </Line>
                         )}
                     </dl>
+
+                    {canIssue && (
+                        <InstallOptionsFields
+                            value={options}
+                            onChange={setOptions}
+                            portError={portError}
+                            disabled={issuing}
+                        />
+                    )}
 
                     {canIssue && (
                         <div className="flex flex-wrap items-center gap-3">

@@ -181,8 +181,10 @@ final class ClientServerSetup
      *
      * @return array{command: string, expires_at: CarbonInterface, email: string, password: string, release: ?string}
      */
-    public function issueInstallCommand(Request $request, Environment $environment): array
+    public function issueInstallCommand(Request $request, Environment $environment, ?InstallOptions $options = null): array
     {
+        $options ??= InstallOptions::none();
+
         $this->assertClientServer($environment);
 
         $site = Site::query()->where('environment_id', $environment->id)->first();
@@ -242,7 +244,7 @@ final class ClientServerSetup
         // menolak biaya yang lebih tinggi dari setelannya sendiri; keduanya memakai bawaan 12.
         $hash = Hash::driver('bcrypt')->make($password);
 
-        return DB::transaction(function () use ($request, $site, $tenant, $owner, $apps, $release, $password, $hash, $appUrl): array {
+        return DB::transaction(function () use ($request, $site, $tenant, $owner, $apps, $release, $password, $hash, $appUrl, $options): array {
             $locked = Site::query()->lockForUpdate()->findOrFail($site->id);
             $this->assertInstallable($locked);
 
@@ -288,10 +290,13 @@ final class ClientServerSetup
                 'app_url' => $appUrl,
                 'token_expires_at' => $issued['expires_at']->toIso8601String(),
                 'cancelled_operations' => $cancelled,
+                // Pilihan pemasangan ikut dicatat: ia menentukan apakah server itu terkunci lisensi dan
+                // siapa yang melayani HTTPS di sana, dan keduanya pertanyaan yang muncul berbulan kemudian.
+                'install_options' => $options->forAudit(),
             ]);
 
             return [
-                'command' => EnrollmentTokens::installCommand($issued['token']),
+                'command' => EnrollmentTokens::installCommand($issued['token'], $options),
                 'expires_at' => $issued['expires_at'],
                 'email' => $owner['email'],
                 'password' => $password,

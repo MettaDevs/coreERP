@@ -8,6 +8,7 @@ use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Sites\ClientServerSetup;
+use ControlPlane\Sites\InstallOptions;
 use ControlPlane\Sites\ServerSettings;
 use ControlPlane\Sites\SiteRejected;
 use Illuminate\Http\RedirectResponse;
@@ -66,7 +67,7 @@ final class ClientServer extends Controller
         $row = $this->environment($environment);
 
         try {
-            $issued = $setup->issueInstallCommand($request, $row);
+            $issued = $setup->issueInstallCommand($request, $row, InstallOptions::fromRequest($request));
         } catch (SiteRejected $e) {
             throw ValidationException::withMessages(['server_client' => $e->getMessage()]);
         }
