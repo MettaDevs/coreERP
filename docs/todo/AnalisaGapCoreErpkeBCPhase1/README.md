@@ -177,6 +177,11 @@ penulisan ke tabel yang dicatat, dan biaya itu hanya terlihat pada beban serenta
   lokasi, kondisi, unit kerja, dan label status aset; akun pengguna yang ditautkan ke pekerja.
 - **Komponen `ChangeHistory` di Shell**, dipakai halaman aset: linimasa per penyimpanan, bernama pelaku,
   dengan nilai lama dan baru.
+- **Load test dengan log aktif lulus**: penjenuhan `receipt-posting.js` 1000 VU dan 128 tenant, 0
+  pelanggaran, 0 error 5xx, dan kedua `verify.sql` bernilai 0. Oracle-nya ditambah pemeriksaan bahwa
+  pelaku entri adalah anggota tenant entrinya dan setiap aset punya entri pembuatan di tenantnya sendiri.
+  Biaya log terhadap latensi tidak terukur di atas selisih antar-run. Rinciannya di
+  `apps/core/loadtest/README.md`.
 
 Yang belum tercakup, dan sengaja ditulis supaya tidak dianggap sudah:
 

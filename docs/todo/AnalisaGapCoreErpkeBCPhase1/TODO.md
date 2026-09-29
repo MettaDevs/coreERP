@@ -67,7 +67,7 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 - [x] 1.4 Migration yang sama untuk tabel module (`management-aset`, `human-resources`).
 - [x] 1.5 Test boundary yang menolak tabel tenant baru tanpa kolom jejak.
 
-### 2. [ ] Log perubahan dan riwayat per record (gap 6)
+### 2. [x] Log perubahan dan riwayat per record (gap 6)
 
 **Tempat:** Core (layanan dan Shell) · **Setelah:** 1, 0.2 · **Selesai bila:** perubahan pada tabel
 dan field yang dipilih tenant tercatat lengkap, riwayat per record tampil di Shell, test B-2 lulus,
@@ -87,6 +87,12 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
       layar pekerja HR belum ada.
 - [x] 2.8 Setelan awal: tabel aset dan pekerja dengan mode sebagian field, bukan semua field. Dikirim
       module lewat `ChangeLogDefaults`; tenant menggantinya di Pengaturan → Riwayat perubahan.
+- [x] 2.9 Tabel akses tanpa `tenant_id` ikut selalu dicatat: penugasan peran, duty per peran,
+      privilege per duty, dan permission per privilege. Tenantnya dibaca trigger dari induk yang dirujuk.
+- [x] 2.10 Load test aset dengan log aktif: penjenuhan `receipt-posting.js` lulus, kedua `verify.sql`
+      bernilai 0 termasuk pemeriksaan log yang baru. Hasilnya di `apps/core/loadtest/README.md`.
+      `master-data.js` dan `work-order.js` belum cocok dengan API aset sejak 18 September; perbaikannya
+      tugas terpisah.
 
 ### 3. [ ] Versi baris dan pengaman edit bersamaan (gap 2)
 
