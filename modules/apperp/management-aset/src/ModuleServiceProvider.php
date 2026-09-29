@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
+use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
 use App\Support\Modules\Contracts\PostingAccountResolvers;
@@ -23,6 +24,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderList;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
+use Modules\Apperp\ManagementAset\Services\AssetChangeLogValues;
 use Modules\Apperp\ManagementAset\Services\PostingGroupAccountResolver;
 
 /**
@@ -99,6 +101,10 @@ final class ModuleServiceProvider extends ServiceProvider
         // berlaku saat itu. Tanpa pendaftaran ini, mengisi kolom posting group yang dulu kosong tidak
         // pernah melepas postingnya lewat Validasi ulang.
         $this->app->make(PostingAccountResolvers::class)->register($this->app->make(PostingGroupAccountResolver::class));
+
+        // Riwayat perubahan aset menampilkan nama lokasi, kondisi, unit kerja, dan label status, bukan ULID
+        // dan kode yang tersimpan di log.
+        $this->app->make(ChangeLogValueResolvers::class)->register($this->app->make(AssetChangeLogValues::class));
 
         // Tidak ada lagi alias `coreerp-event`. Dua panggilan balik HTTP yang memakainya —
         // keputusan workflow dan penyediaan data awal tenant — keduanya sudah menjadi event

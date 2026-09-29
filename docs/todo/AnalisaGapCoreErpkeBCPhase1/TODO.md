@@ -67,7 +67,7 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 - [x] 1.4 Migration yang sama untuk tabel module (`management-aset`, `human-resources`).
 - [x] 1.5 Test boundary yang menolak tabel tenant baru tanpa kolom jejak.
 
-### 2. [ ] Log perubahan dan riwayat per record (gap 6)
+### 2. [x] Log perubahan dan riwayat per record (gap 6)
 
 **Tempat:** Core (layanan dan Shell) · **Setelah:** 1, 0.2 · **Selesai bila:** perubahan pada tabel
 dan field yang dipilih tenant tercatat lengkap, riwayat per record tampil di Shell, test B-2 lulus,
@@ -75,16 +75,24 @@ dan load test module aset tetap lolos dengan log aktif.
 
 Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 
-- [ ] 2.1 Tabel setup per tenant: tabel mana, dan untuk penambahan/perubahan/penghapusan dicatat
+- [x] 2.1 Tabel setup per tenant: tabel mana, dan untuk penambahan/perubahan/penghapusan dicatat
       tidak sama sekali, sebagian field, atau semua field.
-- [ ] 2.2 Tabel setup per field untuk mode sebagian field.
-- [ ] 2.3 Tabel entri: waktu, pelaku, tabel, field, jenis perubahan, nilai lama, nilai baru, ID record.
+- [x] 2.2 Tabel setup per field untuk mode sebagian field.
+- [x] 2.3 Tabel entri: waktu, pelaku, tabel, field, jenis perubahan, nilai lama, nilai baru, ID record.
       Entri tidak bisa diubah.
-- [ ] 2.4 Penangkap sesuai K-02, termasuk pengiriman pelaku per transaksi.
-- [ ] 2.5 Log dimatikan selama migration dan upgrade versi.
-- [ ] 2.6 Endpoint riwayat per record, dengan nama pelaku, bukan ID.
-- [ ] 2.7 Komponen riwayat di Shell, seperti contoh riwayat tugas dari pemilik.
-- [ ] 2.8 Setelan awal: tabel aset dan pekerja dengan mode sebagian field, bukan semua field.
+- [x] 2.4 Penangkap sesuai K-02, termasuk pengiriman pelaku lewat variabel sesi.
+- [x] 2.5 Log dimatikan selama migration dan upgrade versi.
+- [x] 2.6 Endpoint riwayat per record, dengan nama pelaku, bukan ID.
+- [x] 2.7 Komponen riwayat di Shell, seperti contoh riwayat tugas dari pemilik. Dipakai halaman aset;
+      layar pekerja HR belum ada.
+- [x] 2.8 Setelan awal: tabel aset dan pekerja dengan mode sebagian field, bukan semua field. Dikirim
+      module lewat `ChangeLogDefaults`; tenant menggantinya di Pengaturan → Riwayat perubahan.
+- [x] 2.9 Tabel akses tanpa `tenant_id` ikut selalu dicatat: penugasan peran, duty per peran,
+      privilege per duty, dan permission per privilege. Tenantnya dibaca trigger dari induk yang dirujuk.
+- [x] 2.10 Load test aset dengan log aktif: penjenuhan `receipt-posting.js` lulus, kedua `verify.sql`
+      bernilai 0 termasuk pemeriksaan log yang baru. Hasilnya di `apps/core/loadtest/README.md`.
+      `master-data.js` dan `work-order.js` belum cocok dengan API aset sejak 18 September; perbaikannya
+      tugas terpisah.
 
 ### 3. [ ] Versi baris dan pengaman edit bersamaan (gap 2)
 
@@ -203,7 +211,7 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
 - [x] **B-1** (area 1) Tabel tenant tanpa kolom jejak ditolak test boundary. Membuat dan mengubah
       record lewat request mengisi pelaku yang benar; job latar mengisi pengguna pemicunya.
-- [ ] **B-2** (area 2) Update lewat query builder tercatat. Field di luar setup tidak tercatat. Entri
+- [x] **B-2** (area 2) Update lewat query builder tercatat. Field di luar setup tidak tercatat. Entri
       tidak bisa diubah. Riwayat per record urut waktu dan tidak bocor antar tenant.
 - [ ] **B-3** (area 3) Dua penyimpanan dengan versi yang sama: yang kedua ditolak 409. `PATCH` tanpa
       `If-Match` atau dengan ETag basi ditolak.

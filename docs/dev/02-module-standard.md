@@ -365,7 +365,22 @@ yang menulis data atas nama pengguna membungkus pekerjaannya dengan `AuditActor:
 `RunReportExport`.
 
 Kolom ini hanya ringkasan per baris. Riwayat setiap perubahan, field demi field, milik log perubahan
-([analisa gap BC, gap 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)).
+([analisa gap BC, gap 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6)): `AuditColumns::attach` juga
+memasang trigger `log_change`, yang mencatat ke `change_log_entries` hanya untuk tabel dan field yang
+menyala. Log mati selama migration, termasuk migration module. Yang dikerjakan module untuk tabelnya
+sendiri:
+
+- **Bawaan.** Tabel yang riwayatnya berguna bagi pengguna didaftarkan dari migration dengan
+  `ChangeLogDefaults::register('<tabel>', '<nama di layar>', ['<kolom>' => '<nama field>'])`. Migration,
+  bukan seeder, supaya bawaan sampai ke tenant yang sudah memasang module. Tenant menggantinya di
+  Pengaturan → Riwayat perubahan.
+- **Nilai sebagai nama.** Kolom yang menyimpan ULID atau kode diterjemahkan lewat
+  `ChangeLogValueResolver` yang didaftarkan ke `ChangeLogValueResolvers` di penyedia layanan module,
+  seperti `AssetChangeLogValues`.
+- **Rute riwayat.** Riwayat satu record dibuka lewat rute module sendiri, sesudah hak baca dan cakupan
+  organisasi atas record itu diperiksa sama seperti membukanya, lalu dibaca lewat kontrak
+  `ChangeHistory`. Layarnya memakai komponen `ChangeHistory` dari `@/components/change-history`. Rute
+  Core `GET /api/v1/change-log/{tabel}/{id}` hanya untuk admin berizin `core.change-log.read`.
 
 ### Penghapusan lunak
 

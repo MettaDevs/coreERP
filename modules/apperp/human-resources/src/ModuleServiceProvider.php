@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources;
 
+use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\HumanResources\Services\WorkerChangeLogValues;
 
 /**
  * Penyedia layanan module Human Resources.
@@ -23,6 +25,9 @@ final class ModuleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // Riwayat perubahan pekerja menampilkan nama anggota yang ditautkan, bukan id keanggotaannya.
+        $this->app->make(ChangeLogValueResolvers::class)->register($this->app->make(WorkerChangeLogValues::class));
+
         $this->app->booted(function (): void {
             // Grup `web` diperlukan, bukan pilihan gaya: konteks module dibaca dari sesi Core,
             // dan tanpa middleware sesi `Request::session()` melempar "Session store not set on

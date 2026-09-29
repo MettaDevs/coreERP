@@ -1864,3 +1864,71 @@ LaporanDataset:
     file_name:
       type: string
       description: Nama berkas hasil tanpa ekstensi.
+ChangeHistoryPage:
+  type: object
+  required:
+  - data
+  - next_page
+  properties:
+    data:
+      type: array
+      items:
+        type: object
+        required:
+        - id
+        - changed_at
+        - user_id
+        - user_name
+        - field_name
+        - field_caption
+        - change_type
+        - old_value
+        - new_value
+        - old_display
+        - new_display
+        properties:
+          id:
+            type: integer
+          changed_at:
+            type: string
+            description: Waktu perubahan dalam UTC.
+          user_id:
+            type:
+            - integer
+            - 'null'
+          user_name:
+            type:
+            - string
+            - 'null'
+          field_name:
+            type: string
+          field_caption:
+            type:
+            - string
+            - 'null'
+          change_type:
+            type: string
+            enum:
+            - insertion
+            - modification
+            - deletion
+          old_value:
+            type:
+            - string
+            - 'null'
+          new_value:
+            type:
+            - string
+            - 'null'
+          old_display:
+            type:
+            - string
+            - 'null'
+          new_display:
+            type:
+            - string
+            - 'null'
+    next_page:
+      type:
+      - integer
+      - 'null'

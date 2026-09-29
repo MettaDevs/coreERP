@@ -123,6 +123,36 @@
         description: Aset dan histori penempatan
       '404':
         $ref: '#/components/responses/NotFound'
+/api/v1/aset/{id}/riwayat-perubahan:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: asetChangeHistory
+    summary: Membaca riwayat perubahan per field aset dari log perubahan Core, terbaru lebih dulu
+    description: |
+      Hanya field yang dicatat setelan log perubahan tenant (bawaannya status, nama, lokasi, unit penanggung
+      jawab, kondisi, dan arsip). Hak baca dan cakupan unit penanggung jawab sama dengan membuka asetnya.
+      `user_name` kosong berarti perubahan oleh sistem. `*_display` berisi nama lokasi, kondisi, unit kerja,
+      atau label status; kosong berarti nilai mentahnya yang ditampilkan.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+    responses:
+      '200':
+        description: Satu halaman riwayat perubahan
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeHistoryPage'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
 /api/v1/perencanaan-aset:
   get:
     tags:

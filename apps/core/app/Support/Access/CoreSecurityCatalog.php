@@ -55,6 +55,10 @@ final class CoreSecurityCatalog
 
     public const FINANCE_POSTING_PROCESS = 'core.finance-posting.process';
 
+    public const CHANGE_LOG_READ = 'core.change-log.read';
+
+    public const CHANGE_LOG_UPDATE = 'core.change-log.update';
+
     /** Duty *Kelola akses*: pemegangnya memegang `ACCESS_UPDATE`, permission yang dijaga `AccessGuards` anti-terkunci. */
     public const ACCESS_MANAGE_DUTY = 'core.access.manage';
 

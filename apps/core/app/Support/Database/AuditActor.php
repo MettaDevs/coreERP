@@ -28,7 +28,11 @@ final class AuditActor
             return;
         }
 
-        DB::select('select set_config(?, ?, false)', [self::SETTING, $userId === null ? '' : (string) $userId]);
+        // Hanya id angka yang dipasang. Trigger mengubahnya ke bigint, dan nilai lain — misalnya id ULID dari
+        // guard yang kelak ditambahkan — akan menggagalkan setiap penulisan, bukan hanya jejaknya.
+        $value = is_int($userId) || (is_string($userId) && ctype_digit($userId)) ? (string) $userId : '';
+
+        DB::select('select set_config(?, ?, false)', [self::SETTING, $value]);
     }
 
     public static function clear(): void

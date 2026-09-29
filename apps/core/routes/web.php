@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
 use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeCalendarController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
+use App\Http\Controllers\ChangeLogController;
 use App\Http\Controllers\Docs\DocsPortalController;
 use App\Http\Controllers\Finance\CurrencyPrecisionController;
 use App\Http\Controllers\Finance\FinancePostingMonitorController;
@@ -262,6 +263,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
     // Vendor: party berperan vendor per entitas legal, dipakai dokumen penerimaan dan feed posting.
     Route::get('settings/vendors', [VendorController::class, 'index'])->name('vendors.index');
+    // Log perubahan: tabel dan field yang dicatat tenant; riwayat record module dibuka lewat rute module.
+    Route::get('settings/change-log', [ChangeLogController::class, 'index'])->name('change-log.index');
+    Route::put('settings/change-log/{table}', [ChangeLogController::class, 'update'])->name('change-log.update');
     // Pantau posting finance: daftar, detail jurnal, dan tindak lanjut posting yang tertahan.
     Route::get('settings/finance-postings', [FinancePostingMonitorController::class, 'index'])->name('finance-postings.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
@@ -341,6 +345,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('number-sequences/{sequence}/advance', [NumberSequenceController::class, 'advance'])->name('number-sequences.advance');
         Route::get('fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('change-log/{table}/{record}', [ChangeLogController::class, 'history'])->name('change-log.history')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::CHANGE_LOG_READ));
         Route::get('report-exports', [ReportExportController::class, 'index'])->name('report-exports.list');
         Route::get('report-exports/{id}/download', [ReportExportController::class, 'download'])->name('report-exports.download');
         Route::get('report-exports/{id}', [ReportExportController::class, 'show'])->name('report-exports.show');

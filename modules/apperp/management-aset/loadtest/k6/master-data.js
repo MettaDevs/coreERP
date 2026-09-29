@@ -143,7 +143,7 @@ function tahap(label, requests, statusSah = [200, 201]) {
 
 export function setup() {
     const tenants = siapkanTenant(TENANT_COUNT, ['management-aset']);
-    // Tenant tambahan yang role Owner-nya dipersempit ke satu duty. Dipakai membuktikan batas
+    // Tenant tambahan yang sesinya milik anggota berhak satu duty. Dipakai membuktikan batas
     // hak antar master tetap tegak saat sistem jenuh.
     const sempit = sempitkanTenant(siapkanTenant(1, ['management-aset'], 'sempit')[0]);
 

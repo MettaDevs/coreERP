@@ -617,6 +617,71 @@ Seperti area 9–11, tenant uji beban tidak punya pemetaan akun, jadi setiap jur
 `boundary tenant tidak lengkap` (136 dari 136), oracle yang masih menuntut `tenant_deployments`
 (lihat area 8).
 
+### Gate kebenaran log perubahan — LULUS (area 2 analisa gap BC)
+
+Diukur **29 September 2026** pada mesin yang sama, image `erp-core-app:log-perubahan` dari branch
+`feat/log-perubahan`, volume baru. Trigger `log_change` terpasang di 129 tabel. Bawaan modul aset mencatat
+pembuatan dan perubahan aset, dan tabel peran serta hak akses selalu dicatat, termasuk empat tabel akses
+yang tidak punya `tenant_id`.
+
+Skenarionya `receipt-posting.js`, karena setiap penerimaan yang selesai melahirkan aset lewat trigger itu.
+`master-data.js` dan `work-order.js` belum dapat dijalankan: keduanya masih membuat aset lewat `POST /aset`
+yang dipensiunkan 18 September dan membuat group aset tanpa kode yang kini wajib diketik. Penyesuaiannya
+tugas terpisah. Yang sudah diperbaiki di sini adalah `sempitkanTenant` di `lib.js`, yang dipakai semua
+skenario: role Owner kini diatur otomatis dan tidak dapat disunting, jadi tenant sempit dibuat lewat role
+satu duty, undangan, dan anggota baru yang menukarnya.
+
+`RUN_ID=log-rcp-sat-1`: 1000 VU, 128 tenant, 90 detik.
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `correctness_violations` / `server_errors` | 0 / 0 |
+| Penerimaan selesai / saldo awal / impor CSV / koreksi nilai | 718 / 214 / 113 / 211 |
+| Iterasi / request | 983 / 8.495 |
+| Timeout klien (batas 60 detik) | 1.780 — kapasitas, bukan cacat; sebanding dengan 1.694 pada area 12 |
+| `verify.sql` Core | semua 0, 21.484 entri log |
+| `verify.sql` module | semua 0 |
+
+Oracle baru, masing-masing dibuktikan merah dengan kerusakan yang disuntik di dalam transaksi lalu
+di-rollback:
+
+| Pemeriksaan | Kerusakan yang disuntik | Hasil |
+| --- | --- | --- |
+| Core: entri log berpelaku bukan anggota tenantnya | entri bertenant B dengan pelaku anggota tenant A | 1 |
+| Core: entri log peran atau penugasan peran di tenant lain | entri peran dan entri penugasan dengan tenant lain | 2 |
+| Module: riwayat perubahan aset tercatat di tenant lain | entri aset dengan tenant lain | 1 |
+| Module: aset tanpa entri log pembuatan | entri pembuatan satu aset dihapus | 1 |
+
+Pemeriksaan `boundary tenant tidak lengkap` yang merah sejak area 8 ikut diperbaiki: ia masih menuntut
+`tenant_deployments`, padahal sejak registry environment pendaftaran menulis `environments`. Kini ia
+menuntut tepat satu environment produksi yang belum diarsipkan. Pemeriksaan baru itu dibuktikan merah
+dengan mengarsipkan satu environment produksi di dalam transaksi (0 menjadi 1).
+
+**Biaya log terhadap latensi.** Profil saturation `receipt-posting.js` pada 16 VU dan 16 tenant, 60
+detik, dijalankan bergantian dengan seluruh trigger `log_change` menyala dan dimatikan (`ALTER TABLE ...
+DISABLE TRIGGER`):
+
+| Run | Log | rps | write p50 / p95 / p99 | read p50 / p95 | Penerimaan |
+| --- | --- | ---: | --- | --- | ---: |
+| `lat-on-1` | menyala | 42,8 | 334 / 704 / 1.077 ms | 162 / 313 ms | 566 |
+| `lat-off-2` | mati | 51,1 | 323 / 749 / 1.946 ms | 162 / 266 ms | 567 |
+| `lat-on-3` | menyala | 52,5 | 312 / 771 / 1.743 ms | 153 / 262 ms | 584 |
+| `lat-off-4` | mati | 35,1 | 446 / 1.030 / 2.111 ms | 211 / 392 ms | 434 |
+
+Selisih antara menyala dan mati lebih kecil daripada selisih dua run dengan keadaan yang sama (write p50
+323 dan 446 ms pada dua run mati). Biaya log tidak terukur pada concurrency ini di mesin ini; itu bukan
+berarti nol. Ini perbandingan, bukan gate latensi: pada 16 VU kedua keadaan sudah melewati batas write
+p95 400 ms.
+
+Run dengan trigger mati melahirkan 2.002 aset tanpa entri log, sehingga `verify.sql` module sesudah
+pengukuran memerah pada `aset tanpa entri log pembuatan` (2.002). Seluruhnya milik tenant run latensi
+dan lahir pada menit ketika trigger dimatikan; pada menit ketika trigger menyala, setiap aset punya
+entrinya. Gate di atas diambil sebelum pengukuran.
+
+Volume yang perlu diketahui retensi (area 4): setiap tenant baru menulis sekitar 128 entri saat
+didaftarkan, karena duty role Owner dan penugasannya selalu dicatat. Dari 30.432 entri sesudah seluruh
+rangkaian, 17.172 berasal dari `security_role_duties`.
+
 ### Gate latensi work order dan penyusutan (F7-03 sisa)
 
 `PROFILE=latency`, `TENANTS=32`, `DURATION=60s`, `FIXTURE=g1`, ambang sama dengan skenario lain

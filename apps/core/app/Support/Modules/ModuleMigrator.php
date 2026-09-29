@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Support\Database\ChangeLogSwitch;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Filesystem\Filesystem;
@@ -41,7 +42,9 @@ final class ModuleMigrator
         }
 
         $sebelum = $migrator->getRepository()->getRan();
-        $migrator->run([$module->folderMigrasi()]);
+        // Migrator ini dibuat tanpa dispatcher, jadi event migrasi yang mematikan log di migrate Core tidak
+        // menyala di sini; log perubahan dimatikan langsung.
+        ChangeLogSwitch::pausedOn($koneksi, fn () => $migrator->run([$module->folderMigrasi()]));
         $sesudah = $migrator->getRepository()->getRan();
 
         return array_values(array_diff($sesudah, $sebelum));
