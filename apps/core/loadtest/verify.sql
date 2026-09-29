@@ -36,15 +36,16 @@ insert into hasil_core
 select 'user tanpa tepat satu membership', count(*)
 from (select user_id from pengguna_run group by user_id having count(*) <> 1) d;
 
--- Batas sebuah tenant: klien, entitlement, deployment, dan role Owner-nya. Yang hilang salah
--- satunya berarti pendaftaran berhenti di tengah dan meninggalkan tenant setengah jadi.
+-- Batas sebuah tenant: klien, entitlement, environment produksi, dan role Owner-nya. Yang hilang
+-- salah satunya berarti pendaftaran berhenti di tengah dan meninggalkan tenant setengah jadi.
+-- Sejak registry environment, pendaftaran menulis `environments`; `tenant_deployments` tabel yatim.
 insert into hasil_core
 select 'boundary tenant tidak lengkap', count(*)
 from (select distinct tenant_id from pengguna_run) r
 join tenants t on t.id = r.tenant_id
 where (select count(*) from clients c where c.id = t.client_id) <> 1
    or (select count(*) from tenant_app_entitlements e where e.tenant_id = r.tenant_id and e.status = 'active') < 1
-   or (select count(*) from tenant_deployments d where d.tenant_id = r.tenant_id and d.status = 'active') <> 1
+   or (select count(*) from environments en where en.tenant_id = r.tenant_id and en.kind = 'production' and en.deleted_at is null) <> 1
    or (select count(*) from roles ro where ro.tenant_id = r.tenant_id and ro.is_active) < 1;
 
 insert into hasil_core
