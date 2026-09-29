@@ -3,7 +3,7 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\Client;
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
@@ -38,25 +38,10 @@ class AddressHierarchyTest extends TestCase
         );
     }
 
-    public function test_changing_regions_needs_the_manage_reference_data_duty(): void
-    {
-        $reader = User::factory()->create();
-        $this->grantDuties(
-            TenantMembership::create(['tenant_id' => $this->user->activeMembership()->tenant_id, 'user_id' => $reader->id, 'status' => 'active']),
-            ['core.reference-data.inquire'],
-        );
-
-        $this->actingAs($reader)->get(route('address-setup.index'))->assertOk();
-        $this->actingAs($reader)->post(route('address-setup.provinces.store'), [
-            'country_code' => 'SG', 'code' => 'SG-CR', 'name' => 'Central Region', 'active' => true,
-        ])->assertForbidden();
-        $this->assertDatabaseMissing('ref_provinces', ['code' => 'SG-CR']);
-    }
-
     /** Test 1 — Top Down Traversal: Indonesia -> Bali -> Badung -> Kuta Selatan -> Benoa */
     public function test_top_down_hierarchy_traversal(): void
     {
-        $country = Country::where('code', 'ID')->first();
+        $country = CountryRegion::where('code', 'ID')->first();
         $this->assertNotNull($country);
 
         $bali = Province::where('country_code', $country->code)->where('code', '51')->first();
@@ -117,6 +102,8 @@ class AddressHierarchyTest extends TestCase
     /** Test 4 — Duplicate validation rejected under same parent */
     public function test_duplicate_name_under_same_parent_rejected(): void
     {
+        $this->skipWhileRegionMasterIsLocked();
+
         $kutaSelatan = District::where('name', 'like', '%Kuta Selatan%')->first();
         $this->assertNotNull($kutaSelatan);
 
@@ -135,6 +122,8 @@ class AddressHierarchyTest extends TestCase
     /** Test 5 — Same Name under different parent is permitted */
     public function test_same_name_under_different_parent_permitted(): void
     {
+        $this->skipWhileRegionMasterIsLocked();
+
         $gambir = District::where('name', 'like', '%Gambir%')->first();
         $this->assertNotNull($gambir);
 
@@ -157,6 +146,8 @@ class AddressHierarchyTest extends TestCase
     /** Test 6 — Delete protection when child exists */
     public function test_delete_parent_with_children_is_protected(): void
     {
+        $this->skipWhileRegionMasterIsLocked();
+
         $bali = Province::where('name', 'Bali')->first();
         $this->assertNotNull($bali);
 
@@ -170,6 +161,8 @@ class AddressHierarchyTest extends TestCase
     /** Test 7 & 8 — Create and Save new Province */
     public function test_create_and_save_new_province(): void
     {
+        $this->skipWhileRegionMasterIsLocked();
+
         $response = $this->actingAs($this->user)->post(route('address-setup.provinces.store'), [
             'country_code' => 'SG',
             'code' => 'SG-CR',
@@ -183,5 +176,17 @@ class AddressHierarchyTest extends TestCase
             'code' => 'SG-CR',
             'name' => 'Central Region',
         ]);
+    }
+
+    /**
+     * Master wilayah dikunci dari sisi tenant (OWN-05, 29 September 2026): tabel `ref_*` dipakai
+     * bersama seluruh tenant, jadi rute tulisnya tidak ada. Aturan yang diuji test-test ini — nama
+     * ganda per induk, induk berisi anak tidak boleh dihapus — masih hidup di controller untuk
+     * layar admin produk kelak, jadi test-nya disimpan sebagai spesifikasinya. Bahwa pintu tulisnya
+     * memang tertutup dijaga `CountryRegionMergeTest`.
+     */
+    private function skipWhileRegionMasterIsLocked(): void
+    {
+        $this->markTestSkipped('Master wilayah dikunci: tidak ada rute tulis di sisi tenant (OWN-05).');
     }
 }

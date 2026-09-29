@@ -856,8 +856,8 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             'UMI' => ['term' => 'Island Territory', 'desc' => 'Tingkat 4: Teritori pulau terluar AS'],
         ];
 
-        // Also fetch ISO-2 map from ref_countries to support both ISO-3 and ISO-2 lookups
-        $countryMap = DB::table('ref_countries')->select('code', 'iso3')->get();
+        // Also fetch ISO-2 map from country_regions to support both ISO-3 and ISO-2 lookups
+        $countryMap = DB::table('country_regions')->select('code', 'iso3')->get();
         $iso2ByIso3 = [];
         foreach ($countryMap as $cm) {
             if ($cm->iso3) {
@@ -896,8 +896,8 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             }
         }
 
-        // Ensure 100% coverage for every country in ref_countries
-        $allCountries = DB::table('ref_countries')->get();
+        // Ensure 100% coverage for every country in country_regions
+        $allCountries = DB::table('country_regions')->get();
         foreach ($allCountries as $c) {
             $hasLevel = DB::table('ref_country_hierarchy_levels')
                 ->whereIn('country_code', array_filter([$c->code, $c->iso3]))

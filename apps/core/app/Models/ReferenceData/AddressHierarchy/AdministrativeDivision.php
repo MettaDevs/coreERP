@@ -2,6 +2,7 @@
 
 namespace App\Models\ReferenceData\AddressHierarchy;
 
+use App\Models\CountryRegion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $name
  * @property string $status
  * @property array<mixed>|null $lineage
- * @property-read Country|null $country
+ * @property-read CountryRegion|null $country
  * @property-read AdministrativeDivision|null $parent
  * @property-read Collection<int, AdministrativeDivision> $children
  * @property-read AdministrativeDivisionTimezone|null $timezone
@@ -52,10 +53,10 @@ final class AdministrativeDivision extends Model
         'lineage' => 'array',
     ];
 
-    /** @return BelongsTo<Country, $this> */
+    /** @return BelongsTo<CountryRegion, $this> */
     public function country(): BelongsTo
     {
-        return $this->belongsTo(Country::class, 'country_id', 'code');
+        return $this->belongsTo(CountryRegion::class, 'country_id', 'code');
     }
 
     /** @return BelongsTo<AdministrativeDivision, $this> */

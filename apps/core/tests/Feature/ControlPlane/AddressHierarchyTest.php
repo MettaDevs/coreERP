@@ -47,7 +47,7 @@ class AddressHierarchyTest extends TestCase
 
     public function test_indonesia_address_hierarchy_is_seeded(): void
     {
-        $this->assertDatabaseHas('ref_countries', [
+        $this->assertDatabaseHas('country_regions', [
             'code' => 'ID',
             'name' => 'Indonesia',
         ]);

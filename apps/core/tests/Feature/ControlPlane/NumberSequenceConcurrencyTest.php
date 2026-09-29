@@ -39,6 +39,9 @@ class NumberSequenceConcurrencyTest extends TestCase
      *     grep -rho "DB::table('[a-z_]*')->insert" database/migrations/ | sort -u
      */
     protected array $exceptTables = [
+        // Change log defaults registered by module migrations, which also run once per test database.
+        'change_log_setup_fields',
+        'change_log_setup_tables',
         'country_regions',
         'hierarchy_purposes',
         'number_sequence_profiles',

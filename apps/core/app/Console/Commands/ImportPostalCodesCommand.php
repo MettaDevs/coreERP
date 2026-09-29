@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\Village;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -36,9 +36,9 @@ final class ImportPostalCodesCommand extends Command
             $this->warn(' [MODE]: DRY RUN ACTIVE (No database changes will be committed)');
         }
 
-        $country = Country::where('code', $countryCode)->first();
+        $country = CountryRegion::where('code', $countryCode)->first();
         if (! $country) {
-            $this->error("Country with code '{$countryCode}' not found in ref_countries.");
+            $this->error("Country with code '{$countryCode}' not found in country_regions.");
 
             return 1;
         }

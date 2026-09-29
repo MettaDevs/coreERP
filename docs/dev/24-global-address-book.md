@@ -12,6 +12,8 @@ Legal entity dan operating unit ikut menjadi party karena keduanya punya nama da
 
 Skema lengkapnya ada di `apps/core/database/migrations/2026_07_27_020000_create_party_and_address_book_tables.php`; daftar negara ISO 3166-1 diisi `2026_09_05_140000_seed_country_regions.php` sebagai migrasi, bukan seeder, karena tanpa isinya tidak ada alamat yang dapat disimpan.
 
+**Satu tabel negara.** `country_regions` juga negara bagi master wilayah (`ref_provinces`, `ref_postal_codes`, `ref_address_parameters`, `ref_administrative_divisions`, `ref_country_hierarchy_levels`, `time_zones`); `ref_countries` tidak lagi ditunjuk foreign key mana pun dan dibuang pada rilis berikutnya. Master wilayah dipakai bersama seluruh tenant dan **tidak punya pintu tulis di sisi tenant**: isinya dari migrasi, seeder, dan perintah impor, dan halaman Address setup hanya membaca. Alasannya di [buku alamat global](/todo/buku-alamat-global/), OWN-05.
+
 | Tabel | Isi | Aturan yang dijaga database |
 | --- | --- | --- |
 | `parties` | Nama pihak, jenis `person` atau `organization`, `search_name` untuk pencarian | Composite unique `(tenant_id, id)` agar tabel anak menolak induk milik tenant lain |

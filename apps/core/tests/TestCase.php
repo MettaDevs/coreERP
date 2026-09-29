@@ -249,7 +249,10 @@ abstract class TestCase extends BaseTestCase
      *
      * Dua konsekuensi yang wajib diketahui:
      * - Kelas ber-`DatabaseTruncation` harus mengecualikan `core_module_migrations`. Tanpa riwayat
-     *   itu, pemasangan berikutnya mencoba membuat ulang tabel yang masih berdiri.
+     *   itu, pemasangan berikutnya mencoba membuat ulang tabel yang masih berdiri. Begitu pula
+     *   `change_log_setup_tables` dan `change_log_setup_fields`: setelan bawaan log perubahan
+     *   didaftarkan migration module, jadi mengosongkannya membuat test module berikutnya di proses
+     *   yang sama kehilangan riwayat perubahan.
      * - Test yang perlu melihat migration module membuat tabelnya sendiri harus membuang tabel itu
      *   lebih dulu di dalam transaksinya; lihat `ModuleTableBoundaryTest`.
      */

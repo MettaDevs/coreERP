@@ -35,6 +35,9 @@ class NumberSequenceInTransactionTest extends TestCase
 
     /** @var list<string> */
     protected array $exceptTables = [
+        // Setelan bawaan log perubahan, didaftarkan migration module yang juga berjalan sekali per database test.
+        'change_log_setup_fields',
+        'change_log_setup_tables',
         'country_regions',
         'hierarchy_purposes',
         'number_sequence_profiles',

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
@@ -26,7 +26,7 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         $warnings = 0;
 
         // 1. Validate Country Indonesia
-        $country = Country::where('code', 'ID')->first();
+        $country = CountryRegion::where('code', 'ID')->first();
         if (! $country) {
             $this->error(' [FAIL] Country Indonesia (ID) tidak ditemukan!');
             $errors++;
