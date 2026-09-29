@@ -137,6 +137,59 @@ final class ChangeLogTest extends TestCase
         ]);
     }
 
+    public function test_tabel_akses_tanpa_tenant_id_dicatat_pada_tenant_induknya(): void
+    {
+        $tenant = $this->membership->tenant_id;
+        $role = DB::table('roles')->where('tenant_id', $tenant)->value('id');
+        $privilege = DB::table('security_privileges')->whereNull('tenant_id')->value('code');
+        $permission = DB::table('permissions')->value('code');
+        $anggota = TenantMembership::query()->create([
+            'tenant_id' => $tenant, 'user_id' => User::factory()->create()->id, 'status' => 'active',
+        ]);
+        foreach (['contoh.duty.tenant' => $tenant, 'contoh.duty.katalog' => null] as $code => $owner) {
+            DB::table('security_duties')->insert([
+                'code' => $code, 'app_id' => 'core', 'tenant_id' => $owner, 'name' => $code, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('security_privileges')->insert([
+            'code' => 'contoh.privilege.tenant', 'app_id' => 'core', 'tenant_id' => $tenant, 'name' => 'Privilege tenant',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($this->owner);
+
+        $assignment = (string) Str::ulid();
+        DB::table('role_assignments')->insert([
+            'id' => $assignment, 'membership_id' => $anggota->id, 'role_id' => $role, 'source' => 'manual',
+            'status' => 'active', 'valid_from' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('role_assignments')->where('id', $assignment)->update(['status' => 'revoked']);
+        DB::table('security_role_duties')->insert(['role_id' => $role, 'duty_code' => 'contoh.duty.tenant']);
+        DB::table('security_role_duties')->where(['role_id' => $role, 'duty_code' => 'contoh.duty.tenant'])->delete();
+        DB::table('security_duty_privileges')->insert([
+            ['duty_code' => 'contoh.duty.tenant', 'privilege_code' => $privilege],
+            ['duty_code' => 'contoh.duty.katalog', 'privilege_code' => $privilege],
+        ]);
+        DB::table('security_privilege_permissions')->insert(['privilege_code' => 'contoh.privilege.tenant', 'permission_code' => $permission]);
+
+        $entries = DB::table('change_log_entries')
+            ->whereIn('table_name', ['role_assignments', 'security_role_duties', 'security_duty_privileges', 'security_privilege_permissions'])
+            ->where('created_by_user_id', $this->owner->id)->get();
+        $this->assertSame([$tenant], $entries->pluck('tenant_id')->unique()->values()->all());
+
+        $revoked = $entries->where('record_id', $assignment)->firstWhere('change_type', 'modification');
+        $this->assertSame(['status', 'active', 'revoked'], [$revoked->field_name, $revoked->old_value, $revoked->new_value]);
+        $this->assertSame($role, $entries->where('record_id', $assignment)->firstWhere('field_name', 'role_id')->new_value);
+        $this->assertSame(
+            ['insertion', 'deletion'],
+            $entries->where('record_id', "{$role},contoh.duty.tenant")->pluck('change_type')->unique()->values()->all(),
+        );
+        $this->assertSame(
+            ["contoh.duty.tenant,{$privilege}"],
+            $entries->where('table_name', 'security_duty_privileges')->pluck('record_id')->unique()->values()->all(),
+        );
+        $this->assertSame(2, $entries->where('record_id', "contoh.privilege.tenant,{$permission}")->count());
+    }
+
     public function test_baris_katalog_bertenant_kosong_tidak_dicatat_dan_tidak_menggagalkan_penulisan(): void
     {
         DB::table('security_duties')->insert([

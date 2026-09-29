@@ -41,11 +41,12 @@ class CoreScreenPermissionTest extends TestCase
         ]);
     }
 
-    public function test_the_core_catalog_registers_eighteen_duties_down_to_entry_points(): void
+    public function test_the_core_catalog_registers_twenty_duties_down_to_entry_points(): void
     {
         $duties = SecurityDuty::query()->where('app_id', CoreSecurityCatalog::APP_ID)->with('privileges.permissions')->get();
 
-        $this->assertCount(18, $duties);
+        // Delapan belas dari katalog layar Core, dua dari log perubahan (Lihat riwayat, Kelola log).
+        $this->assertCount(20, $duties);
         foreach ($duties as $duty) {
             $this->assertNotEmpty($duty->privileges, $duty->code);
             foreach ($duty->privileges as $privilege) {
@@ -65,6 +66,8 @@ class CoreScreenPermissionTest extends TestCase
             [CoreSecurityCatalog::FINANCE_POSTING_PROCESS, CoreSecurityCatalog::FINANCE_POSTING_READ],
             $this->permissionsOfDuty('core.finance-posting.follow-up'),
         );
+        $this->assertSame([CoreSecurityCatalog::CHANGE_LOG_READ], $this->permissionsOfDuty('core.change-log.inquire'));
+        $this->assertSame([CoreSecurityCatalog::CHANGE_LOG_READ, CoreSecurityCatalog::CHANGE_LOG_UPDATE], $this->permissionsOfDuty('core.change-log.manage'));
     }
 
     public function test_the_owner_role_holds_every_duty_including_ones_registered_later(): void

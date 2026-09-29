@@ -75,7 +75,7 @@ final class ChangeHistoryCore implements ChangeHistory
     /**
      * Nilai tampilan per field, satu panggilan penerjemah per field.
      *
-     * @param  list<object>  $rows
+     * @param  array<int, \stdClass>  $rows
      * @return array<string, array<string, string>>
      */
     private function display(string $tenantId, string $table, array $rows): array

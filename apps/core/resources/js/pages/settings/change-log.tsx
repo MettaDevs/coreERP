@@ -206,10 +206,12 @@ export default function ChangeLogSettings({ canManage, tables }: Props) {
         <>
             <Head title="Riwayat perubahan" />
             <main className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-6 p-6">
-                <Heading
-                    title="Riwayat perubahan"
-                    description="Pilih data dan field yang perubahannya dicatat. Riwayatnya tampil di halaman data itu: siapa mengubah, dari apa menjadi apa, dan kapan. Perubahan peran, hak akses, dan setelan di halaman ini selalu dicatat."
-                />
+                <Heading title="Riwayat perubahan" />
+                <p className="text-sm text-muted-foreground">
+                    Pilih field yang perubahannya dicatat. Riwayatnya tampil di
+                    halaman data itu. Perubahan peran, hak akses, dan setelan di
+                    halaman ini selalu dicatat.
+                </p>
 
                 {tables.length === 0 ? (
                     <Empty className="border">

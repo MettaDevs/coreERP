@@ -29,6 +29,12 @@ use Illuminate\Support\Facades\Schema;
  * mematikannya selama migration. Arsip di aplikasi ini adalah pengisian `deleted_at`, jadi tercatat sebagai
  * perubahan field itu.
  *
+ * Empat tabel akses tidak punya `tenant_id`: penugasan peran, duty per peran, privilege per duty, dan
+ * permission per privilege. Tenantnya dibaca trigger dari induk yang dirujuk (peran, duty, atau privilege),
+ * jadi perubahan hak akses tetap tercatat seperti Access Control dan Tenant Permission di BC. Baris yang ikut
+ * terhapus karena induknya dihapus tidak tercatat sendiri; induknya sudah tidak terbaca, dan penghapusan
+ * induk itulah yang tercatat.
+ *
  * Tanpa kelas `App\`: admin.erp ikut menjalankan migration Core.
  */
 return new class extends Migration
@@ -59,6 +65,16 @@ return new class extends Migration
     ];
 
     private const NEW_TABLES = ['change_log_setup_tables', 'change_log_setup_fields', 'change_log_entries'];
+
+    /**
+     * Tabel akses tanpa `tenant_id`, beserta kolom kuncinya. Tanpa kolom jejak, jadi hanya trigger log yang
+     * dipasang; pelakunya tercatat di entri log itu sendiri.
+     */
+    private const ACCESS_TABLES = [
+        'role_assignments' => [], 'security_role_duties' => ['role_id', 'duty_code'],
+        'security_duty_privileges' => ['duty_code', 'privilege_code'],
+        'security_privilege_permissions' => ['privilege_code', 'permission_code'],
+    ];
 
     public function up(): void
     {
@@ -126,18 +142,36 @@ return new class extends Migration
                 change_kind text;
                 field text;
                 i integer;
+                role_ref roles.id%TYPE;
+                code_ref text;
             BEGIN
                 IF COALESCE(current_setting('coreerp.change_log', true), '') = 'off' OR TG_TABLE_NAME = 'change_log_entries' THEN
                     RETURN NULL;
                 END IF;
 
-                IF TG_OP = 'DELETE' THEN tenant := OLD.tenant_id::text; ELSE tenant := NEW.tenant_id::text; END IF;
+                -- Tabel akses tanpa tenant_id: tenantnya milik peran, duty, atau privilege yang dirujuk.
+                IF TG_TABLE_NAME IN ('role_assignments', 'security_role_duties') THEN
+                    IF TG_OP = 'DELETE' THEN role_ref := OLD.role_id; ELSE role_ref := NEW.role_id; END IF;
+                    SELECT r.tenant_id::text INTO tenant FROM roles r WHERE r.id = role_ref;
+                ELSIF TG_TABLE_NAME = 'security_duty_privileges' THEN
+                    IF TG_OP = 'DELETE' THEN code_ref := OLD.duty_code; ELSE code_ref := NEW.duty_code; END IF;
+                    SELECT d.tenant_id::text INTO tenant FROM security_duties d WHERE d.code = code_ref;
+                ELSIF TG_TABLE_NAME = 'security_privilege_permissions' THEN
+                    IF TG_OP = 'DELETE' THEN code_ref := OLD.privilege_code; ELSE code_ref := NEW.privilege_code; END IF;
+                    SELECT p.tenant_id::text INTO tenant FROM security_privileges p WHERE p.code = code_ref;
+                ELSIF TG_OP = 'DELETE' THEN
+                    tenant := OLD.tenant_id::text;
+                ELSE
+                    tenant := NEW.tenant_id::text;
+                END IF;
                 IF tenant IS NULL THEN
                     RETURN NULL;
                 END IF;
 
-                IF TG_TABLE_NAME IN ('change_log_setup_tables', 'change_log_setup_fields', 'roles', 'security_duties',
-                        'security_role_children', 'role_assignment_data_policy_scopes', 'automatic_role_assignment_rules', 'sod_rules') THEN
+                IF TG_TABLE_NAME IN ('change_log_setup_tables', 'change_log_setup_fields', 'roles', 'role_assignments',
+                        'security_role_duties', 'security_role_children', 'security_duties', 'security_duty_privileges',
+                        'security_privileges', 'security_privilege_permissions', 'role_assignment_data_policy_scopes',
+                        'automatic_role_assignment_rules', 'sod_rules') THEN
                     mode := 'all';
                 ELSE
                     SELECT CASE TG_OP WHEN 'INSERT' THEN log_insertion WHEN 'UPDATE' THEN log_modification ELSE log_deletion END
@@ -204,11 +238,16 @@ return new class extends Migration
             DB::statement("CREATE OR REPLACE TRIGGER stamp_audit_actor BEFORE INSERT OR UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_stamp_audit_actor()");
             DB::statement("CREATE OR REPLACE TRIGGER log_change AFTER INSERT OR UPDATE OR DELETE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_log_change({$arguments})");
         }
+
+        foreach (self::ACCESS_TABLES as $table => $keys) {
+            $arguments = implode(', ', array_map(fn (string $key): string => "'{$key}'", $keys));
+            DB::statement("CREATE OR REPLACE TRIGGER log_change AFTER INSERT OR UPDATE OR DELETE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_log_change({$arguments})");
+        }
     }
 
     public function down(): void
     {
-        foreach (array_keys(self::TABLES) as $table) {
+        foreach ([...array_keys(self::TABLES), ...array_keys(self::ACCESS_TABLES)] as $table) {
             DB::statement("DROP TRIGGER IF EXISTS log_change ON {$table}");
         }
         foreach (array_reverse(self::NEW_TABLES) as $table) {

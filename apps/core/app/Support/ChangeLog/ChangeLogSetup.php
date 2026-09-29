@@ -54,7 +54,7 @@ final class ChangeLogSetup
                 'table_caption' => (string) ($default->table_caption ?? $table),
                 'customized' => $customized,
                 ...$this->flags($source),
-                'fields' => $tableFields->whereNull('tenant_id')->map(function (object $field) use ($customized, $ownFields): array {
+                'fields' => array_values($tableFields->whereNull('tenant_id')->map(function (object $field) use ($customized, $ownFields): array {
                     $source = $customized ? ($ownFields->get($field->field_name) ?? null) : $field;
 
                     return [
@@ -64,7 +64,7 @@ final class ChangeLogSetup
                         'log_modification' => (bool) ($source->log_modification ?? false),
                         'log_deletion' => (bool) ($source->log_deletion ?? false),
                     ];
-                })->values()->all(),
+                })->all()),
             ];
         }
 
@@ -74,8 +74,8 @@ final class ChangeLogSetup
     /** @return list<string> */
     public function registeredFields(string $table): array
     {
-        return DB::table('change_log_setup_fields')->whereNull('tenant_id')->where('table_name', $table)
-            ->pluck('field_name')->map(fn ($field): string => (string) $field)->all();
+        return array_values(DB::table('change_log_setup_fields')->whereNull('tenant_id')->where('table_name', $table)
+            ->pluck('field_name')->map(fn ($field): string => (string) $field)->all());
     }
 
     public function isRegistered(string $table): bool

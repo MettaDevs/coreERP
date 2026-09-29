@@ -43,7 +43,7 @@ final class AssetChangeLogValues implements ChangeLogValueResolver
     }
 
     /**
-     * @param  list<LokasiAset|KondisiAset>  $models
+     * @param  array<int, LokasiAset|KondisiAset>  $models
      * @return array<string, string>
      */
     private function names(array $models): array

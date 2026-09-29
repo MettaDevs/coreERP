@@ -101,6 +101,7 @@ class MutasiAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasi.'/selesaikan', ['version' => $versi])
             ->assertOk();
 
+        /** @var list<array<string, mixed>> $riwayat */
         $riwayat = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])
             ->getJson('/api/modules/management-aset/v1/aset/'.$aset.'/riwayat-perubahan')
             ->assertOk()

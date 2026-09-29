@@ -83,8 +83,10 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 - [x] 2.4 Penangkap sesuai K-02, termasuk pengiriman pelaku lewat variabel sesi.
 - [x] 2.5 Log dimatikan selama migration dan upgrade versi.
 - [x] 2.6 Endpoint riwayat per record, dengan nama pelaku, bukan ID.
-- [ ] 2.7 Komponen riwayat di Shell, seperti contoh riwayat tugas dari pemilik.
-- [ ] 2.8 Setelan awal: tabel aset dan pekerja dengan mode sebagian field, bukan semua field.
+- [x] 2.7 Komponen riwayat di Shell, seperti contoh riwayat tugas dari pemilik. Dipakai halaman aset;
+      layar pekerja HR belum ada.
+- [x] 2.8 Setelan awal: tabel aset dan pekerja dengan mode sebagian field, bukan semua field. Dikirim
+      module lewat `ChangeLogDefaults`; tenant menggantinya di Pengaturan → Riwayat perubahan.
 
 ### 3. [ ] Versi baris dan pengaman edit bersamaan (gap 2)
 
