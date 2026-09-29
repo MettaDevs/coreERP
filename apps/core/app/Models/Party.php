@@ -38,12 +38,6 @@ class Party extends Model
         return $this->hasMany(PartyLocation::class, 'party_id');
     }
 
-    /** @return HasMany<ElectronicAddress, $this> */
-    public function electronicAddresses(): HasMany
-    {
-        return $this->hasMany(ElectronicAddress::class, 'party_id');
-    }
-
     /** @return HasMany<PartyRoleRegistration, $this> */
     public function roleRegistrations(): HasMany
     {

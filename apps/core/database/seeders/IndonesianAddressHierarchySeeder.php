@@ -28,7 +28,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
         ];
 
         foreach ($countries as $c) {
-            DB::table('ref_countries')->updateOrInsert(
+            DB::table('country_regions')->updateOrInsert(
                 ['code' => $c['code']],
                 array_merge($c, ['active' => true, 'created_at' => $now, 'updated_at' => $now])
             );

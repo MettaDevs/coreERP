@@ -14,7 +14,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * Informasi kontak satu organisasi (padanan Contact information Dynamics 365): email,
- * telepon, WhatsApp, faks, dan laman. Kontak utama tiap jenis yang tampil pada kop.
+ * telepon, WhatsApp, faks, dan laman. Kontak menempel ke tempat, jadi `address_id` dapat
+ * memasangnya ke salah satu alamat organisasi; kontak utama tiap jenis yang tampil pada kop.
  */
 class OrganizationContactController extends Controller
 {
@@ -60,6 +61,7 @@ class OrganizationContactController extends Controller
             'value' => ['required', 'string', 'max:250', ...($request->input('type') === 'email' ? ['email'] : [])],
             'purpose' => ['nullable', 'string', 'max:30'],
             'is_primary' => ['sometimes', 'boolean'],
+            'address_id' => ['sometimes', 'nullable', 'string', 'size:26'],
         ]);
     }
 

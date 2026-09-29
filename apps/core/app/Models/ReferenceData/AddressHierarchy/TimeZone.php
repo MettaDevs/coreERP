@@ -2,6 +2,7 @@
 
 namespace App\Models\ReferenceData\AddressHierarchy;
 
+use App\Models\CountryRegion;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $country_code
  * @property bool $is_default
  * @property bool $active
- * @property-read Country|null $country
+ * @property-read CountryRegion|null $country
  */
 class TimeZone extends Model
 {
@@ -37,9 +38,9 @@ class TimeZone extends Model
         'active' => 'boolean',
     ];
 
-    /** @return BelongsTo<Country, $this> */
+    /** @return BelongsTo<CountryRegion, $this> */
     public function country(): BelongsTo
     {
-        return $this->belongsTo(Country::class, 'country_code', 'code');
+        return $this->belongsTo(CountryRegion::class, 'country_code', 'code');
     }
 }

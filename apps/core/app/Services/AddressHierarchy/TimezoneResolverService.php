@@ -2,8 +2,8 @@
 
 namespace App\Services\AddressHierarchy;
 
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\AdministrativeDivisionTimezone;
-use App\Models\ReferenceData\AddressHierarchy\Country;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
@@ -94,7 +94,7 @@ class TimezoneResolverService
                     ->orderByDesc('is_default')
                     ->first();
                 if ($tzRecord) {
-                    $country = Country::where('code', $divisionId)->first();
+                    $country = CountryRegion::where('code', $divisionId)->first();
 
                     return $this->formatTimezoneData($tzRecord->iana_name, $divisionId, 'country', $country ? $country->name : $divisionId);
                 }
@@ -106,11 +106,11 @@ class TimezoneResolverService
                     ->where('is_default', true)
                     ->first();
                 if ($countryMapping) {
-                    $country = Country::where('code', $divisionId)->first();
+                    $country = CountryRegion::where('code', $divisionId)->first();
 
                     return $this->formatTimezoneData($countryMapping->timezone, $divisionId, 'country', $country ? $country->name : $divisionId);
                 }
-                $country = Country::where('code', $divisionId)->first();
+                $country = CountryRegion::where('code', $divisionId)->first();
                 if ($country && ! empty($country->timezone)) {
                     return $this->formatTimezoneData($country->timezone, $divisionId, 'country', $country->name);
                 }
@@ -286,7 +286,7 @@ class TimezoneResolverService
             'district' => District::where('id', $divisionId)->value('name') ?? $divisionId,
             'regency' => Regency::where('id', $divisionId)->value('name') ?? $divisionId,
             'province' => Province::where('id', $divisionId)->value('name') ?? $divisionId,
-            'country' => Country::where('code', $divisionId)->value('name') ?? $divisionId,
+            'country' => CountryRegion::where('code', $divisionId)->value('name') ?? $divisionId,
             default => $divisionId,
         };
     }

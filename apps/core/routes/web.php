@@ -203,38 +203,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
     Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     Route::get('settings/address_setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
-    // Countries
-    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Provinces
-    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Regencies
-    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Districts
-    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Villages
-    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Streets (RT/RW)
-    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Buildings (Gedung/Unit/Lantai)
-    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Postal Codes
-    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Group of houses
-    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Land plots
-    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    // Parameters
-    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     // Hierarchy Lookups (Bottom-Up and Top-Down)
     Route::get('settings/address-setup/lookup/bottom-up', [AddressSetupController::class, 'lookupBottomUp'])->name('address-setup.lookup.bottom-up');
     Route::get('settings/address-setup/lookup/top-down', [AddressSetupController::class, 'lookupTopDown'])->name('address-setup.lookup.top-down');
@@ -243,11 +211,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup/villages-paginated', [AddressSetupController::class, 'getVillagesPaginated'])->name('address-setup.villages.paginated');
     // External Codes & Translations
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
-    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
-    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
-    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_UPDATE));
+
+    // Master wilayah tidak punya pintu tulis di sisi tenant, dan itu disengaja (OWN-05, 29 September 2026).
+    // Tabel `ref_*` dipakai bersama semua tenant: satu baris yang ditambahkan satu tenant langsung menjadi
+    // milik semua tenant. Isinya datang dari migrasi, seeder, dan perintah impor; layar ini hanya membaca.
+    // Lihat docs/todo/buku-alamat-global/.
 
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REPORT_LAYOUT_READ));
@@ -374,6 +343,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('organizations/{organization}/locations', [OrganizationLocationController::class, 'store'])->name('organizations.locations.store');
         Route::put('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'update'])->name('organizations.locations.update');
         Route::delete('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'destroy'])->name('organizations.locations.destroy');
+        Route::get('organizations/{organization}/sharable-locations', [OrganizationLocationController::class, 'sharable'])->name('organizations.locations.sharable');
         Route::get('organizations/{organization}/contacts', [OrganizationContactController::class, 'index'])->name('organizations.contacts.index');
         Route::post('organizations/{organization}/contacts', [OrganizationContactController::class, 'store'])->name('organizations.contacts.store');
         Route::put('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'update'])->name('organizations.contacts.update');
