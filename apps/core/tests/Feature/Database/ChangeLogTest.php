@@ -18,6 +18,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\GrantsCoreRoles;
@@ -293,9 +294,8 @@ final class ChangeLogTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('settings/change-log')
                 ->where('canManage', true)
-                ->where('tables.0.table_name', 'contoh_log')
-                ->where('tables.0.customized', false)
-                ->where('tables.0.log_modification', true));
+                ->where('tables', fn (Collection $tables): bool => self::contohLog($tables)['customized'] === false
+                    && self::contohLog($tables)['log_modification'] === true));
 
         $this->actingAs($this->owner)->put('/settings/change-log/contoh_log', [
             'log_insertion' => false, 'log_modification' => true, 'log_deletion' => false,
@@ -307,7 +307,8 @@ final class ChangeLogTest extends TestCase
         $this->assertSame([['catatan', 'modification']], $this->entries('contoh_log'));
 
         $this->actingAs($this->owner)->get('/settings/change-log')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('tables.0.customized', true)->where('tables.0.log_insertion', false));
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('tables', fn (Collection $tables): bool => self::contohLog($tables)['customized'] === true
+                && self::contohLog($tables)['log_insertion'] === false));
     }
 
     public function test_setelan_menolak_tanpa_izin_ubah_tabel_tak_terdaftar_dan_field_asing(): void
@@ -334,8 +335,20 @@ final class ChangeLogTest extends TestCase
         ChangeLogDefaults::register('contoh_log', 'Contoh baru', ['nama' => 'Nama']);
 
         $this->assertSame(1, DB::table('change_log_setup_tables')->whereNull('tenant_id')->where('table_name', 'contoh_log')->count());
-        $this->assertSame('Contoh baru', DB::table('change_log_setup_tables')->whereNull('tenant_id')->value('table_caption'));
-        $this->assertFalse((bool) DB::table('change_log_setup_fields')->whereNull('tenant_id')->where('field_name', 'catatan')->value('log_modification'));
+        $this->assertSame('Contoh baru', DB::table('change_log_setup_tables')->whereNull('tenant_id')->where('table_name', 'contoh_log')->value('table_caption'));
+        $this->assertFalse((bool) DB::table('change_log_setup_fields')->whereNull('tenant_id')->where('table_name', 'contoh_log')->where('field_name', 'catatan')->value('log_modification'));
+    }
+
+    /**
+     * Setelan tabel contoh di layar. Bawaan module produk (aset, pekerja) ikut tampil karena migration-nya
+     * berjalan sekali per database test, jadi baris contoh dicari namanya, bukan urutannya.
+     *
+     * @param  Collection<int, array<string, mixed>>  $tables
+     * @return array<string, mixed>
+     */
+    private static function contohLog(Collection $tables): array
+    {
+        return (array) $tables->firstWhere('table_name', 'contoh_log');
     }
 
     private function register(string $email, string $business): User
