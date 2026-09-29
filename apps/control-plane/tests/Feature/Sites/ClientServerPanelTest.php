@@ -355,7 +355,8 @@ final class ClientServerPanelTest extends SiteTestCase
         $issued = session('install_command');
         $this->assertIsArray($issued);
         $command = (string) $issued['command'];
-        $this->assertStringEndsWith($this->tokenIn($command), $command);
+        // Berakhir tepat di token: tidak ada tanda lain sesudahnya.
+        $this->assertStringEndsWith(' --token '.$this->tokenIn($command), $command);
         $this->assertStringNotContainsString('--kunci-lisensi', $command);
         $this->assertStringNotContainsString('--proxy-luar', $command);
         $this->assertStringNotContainsString('--app-port', $command);
