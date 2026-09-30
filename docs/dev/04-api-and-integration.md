@@ -187,6 +187,23 @@ Setiap API versioned memakai prefix `/api/v1`. OpenAPI mendefinisikan auth schem
 
 Producer menyimpan payload ke `outbox_events` dalam transaksi yang sama dengan data bisnis. Publisher mengirimkannya setelah commit. Consumer menyimpan message ID pada inbox/processed-events sehingga retry tidak menciptakan efek ganda.
 
+### Mengubah record yang sudah ada wajib membawa versinya
+
+Setiap record tenant membawa `version` ([versi baris](02-module-standard.md#versi-baris-dan-pengaman-edit-bersamaan)).
+Pemanggil API yang mengubah, mengarsipkan, atau mengganti baris anak sebuah record mengirim versi yang
+terakhir ia baca, sebagai header `If-Match: W/"<n>"` atau field `version` di body. Endpoint show memasang
+header `ETag` dengan nilai yang sama, dan jawaban simpan memulangkan versi barunya.
+
+| Keadaan | Jawaban |
+| --- | --- |
+| Tanpa `If-Match` maupun `version` | 428 `version_required` |
+| Versi sudah berbeda: orang lain menyimpan lebih dulu | 409 `stale_version`; baca ulang, lalu putuskan lagi |
+
+Kontrak module menulisnya sekali di komponennya — header `ETag`, jawaban `VersionRequired` dan
+`StaleVersion` di kontrak management-aset — lalu merujuknya dari setiap operasi yang mengubah. Integrasi
+tidak boleh "memperbaiki" 409 dengan membaca ulang lalu mengirim ulang secara otomatis: itu menimpa
+perubahan orang lain tanpa ada yang memutuskannya, persis yang dicegah versi baris.
+
 ### Kontrak dijaga pemeriksa, bukan kedisiplinan
 
 **Tidak ada satu test pun yang gagal ketika sebuah endpoint absen dari kontrak.** Itu sebabnya endpoint tak terdokumentasi bisa bertahan lama sementara seluruh test hijau — dan kenapa setiap app wajib punya pemeriksa cakupan yang jalan di CI, bukan hanya Core.

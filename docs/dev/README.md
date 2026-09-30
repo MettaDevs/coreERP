@@ -6,12 +6,11 @@
 
 Dokumen ini adalah **desain kanonik** untuk CoreERP.
 
-> **Dua bentuk hidup berdampingan.** Module bisnis berjalan di dalam runtime Core dan memakai
-> database tenant yang sama; app yang belum dipindah masih berjalan sebagai container dengan
-> database dan token layanan sendiri. Aturan di bawah berlaku untuk keduanya kecuali disebutkan
-> lain, dan tabel perbandingannya ada di
-> [Grand design](01-grand-design.md#dua-bentuk-yang-hidup-berdampingan). Menilai yang satu dengan
-> aturan yang lain adalah kesalahan yang paling mudah terjadi di repo ini.
+> **Satu bentuk module.** Sejak 10 September 2026 module bisnis hanya satu bentuk: folder di bawah
+> `modules/`, berjalan di runtime Core dan memakai database tenant yang sama. Bentuk lama — app di
+> repo `app-erp-*` dengan container, database, dan token layanan sendiri — sudah dibuang beserta
+> kodenya. Bagian dokumen di bawah yang masih menyebut app terpisah bersifat historis; aturannya ada di
+> [standar module](02-module-standard.md#bentuk-yang-berlaku-untuk-pekerjaan-baru-module-di-dalam-repo-core).
 
 Target yang dikunci:
 
@@ -28,14 +27,14 @@ Target yang dikunci:
 | --- | --- |
 | [01-grand-design.md](01-grand-design.md) | AWS control plane/application plane, deployment profile, dan keputusan inti |
 | [01a-tenant-and-org-hierarchy.md](01a-tenant-and-org-hierarchy.md) | Tenant, organization directory, legal entity, operating unit, dan versioned hierarchy |
-| [02-module-standard.md](02-module-standard.md) | Standar app: repository, release unit, manifest, database ownership, lifecycle, dan bantuan kontekstual per field |
+| [02-module-standard.md](02-module-standard.md) | Standar module: manifest, database ownership, lifecycle, bantuan kontekstual per field, riwayat perubahan, klasifikasi data per kolom, versi baris dan pengaman edit bersamaan, retensi log, lampiran dokumen, dan penghapusan lunak |
 | [03-release-and-on-prem.md](03-release-and-on-prem.md) | Provisioning, Docker Compose edition, update, dan uninstall |
 | [04-api-and-integration.md](04-api-and-integration.md) | REST/OpenAPI, event/AsyncAPI, bridge POS-Booking, dan API governance |
 | [05-customization-and-addons.md](05-customization-and-addons.md) | Urutan jawaban untuk kebutuhan khusus pelanggan: setelan, fitur produk, integrasi, module khusus, tanpa fork |
 | [06-worktree-target.md](06-worktree-target.md) | Kondisi repo sekarang dan target pemisahan repository |
 | [07-reporting-and-replicas.md](07-reporting-and-replicas.md) | Read replica per app, reporting projection lintas app, dan consistency policy |
 | [08-query-scopes-and-schema.md](08-query-scopes-and-schema.md) | Schema organization/hierarchy target dan query tenant/legal-entity/organization scope |
-| [09-identity-and-access.md](09-identity-and-access.md) | Role Owner, katalog layar Core, security role/duty/privilege/permission, workforce, SoD, organization scope, kapan tenant memakai SSO, dan dua jenis undangan |
+| [09-identity-and-access.md](09-identity-and-access.md) | Role Owner, katalog layar Core, security role/duty/privilege/permission, workforce dan tautan pekerja ke akun, SoD, organization scope, kapan tenant memakai SSO, dan dua jenis undangan |
 | [10-core-foundation-gates.md](10-core-foundation-gates.md) | Fondasi Core yang belum tersedia, pemilik kebenaran, dan kondisi kapan implementasinya boleh dimulai |
 | [11-local-docker-development.md](11-local-docker-development.md) | Stack Docker lokal, akses database, dan checklist menambah app |
 | [12-external-module-integration.md](12-external-module-integration.md) | Panduan integrasi sistem eksternal ke modul CoreERP |
@@ -49,7 +48,7 @@ Target yang dikunci:
 | [20-load-and-concurrency-testing.md](20-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, penguncian endpoint pengganti, dan oracle kebenaran |
 | [21-visual-workflow-engine.md](21-visual-workflow-engine.md) | Visual Workflow Engine: tipe workflow manifest, editor visual, resolusi assignee, inbox persetujuan terpusat, dan callback event v2 |
 | [22-ci-cd.md](22-ci-cd.md) | CI/CD polyrepo, runner trust zone, immutable image, promotion, signing, dan bundle on-prem |
-| [23-document-rendering.md](23-document-rendering.md) | Dokumen cetak gaya Business Central: dataset milik app, layout Word/Excel milik tenant, engine render milik Core, ekspor di latar belakang |
+| [23-document-rendering.md](23-document-rendering.md) | Dokumen cetak gaya Business Central: dataset milik module, layout Word/Excel milik tenant, engine render milik Core, ekspor di latar belakang, opsi terakhir dan preset laporan, Excel data saja, dan ekspor daftar di layar |
 | [24-global-address-book.md](24-global-address-book.md) | Buku alamat gaya Global Address Book: party, alamat pos, kontak elektronik; organisasi tenant adalah party, dan kop dokumen membaca alamatnya dari sini |
 | [25-standar-penjaga-dan-pengujian.md](25-standar-penjaga-dan-pengujian.md) | Penjaga batas arsitektur: syarat sebelum sebuah test penjaga boleh dipercaya, termasuk terbukti dapat merah |
 | [26-modul-yang-sedang-dipindah.md](26-modul-yang-sedang-dipindah.md) | Cara Core menampung modul yang baru ditarik lewat subtree dan belum lolos penjaga, tanpa membuka lubang permanen |

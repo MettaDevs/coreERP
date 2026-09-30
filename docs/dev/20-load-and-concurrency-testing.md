@@ -57,6 +57,13 @@ Menyebar pengguna merata ke seluruh tenant dan seluruh record adalah bentuk yang
 
 Skenario balapan memusat — banyak pengguna, sedikit record, menulis nilai yang sengaja bertabrakan — lalu memastikan hasil baca-baliknya sama dengan salah satu nilai yang dikirim, bukan campuran keduanya. Simpan sebagai profil tersendiri di samping saturasi; keduanya menjawab pertanyaan yang berbeda.
 
+**Skenario ikut berubah bersama kontraknya.** Sejak [versi baris](02-module-standard.md#versi-baris-dan-pengaman-edit-bersamaan),
+setiap `PUT`, `PATCH`, atau arsip dalam skenario wajib mengirim versi dari record yang baru dibacanya.
+Skenario yang belum ikut gagal di tahap setup dengan 428 `version_required`, dan kegagalan itu milik
+skenarionya, bukan aplikasinya. Jalankan `smoke.js` lebih dulu setiap kali kontrak berubah; skenario yang
+jarang dipakai paling cepat basi. Di skenario balapan, dua penulis yang membaca versi yang sama berakhir
+satu 2xx dan satu 409 — 409 di sana jawaban yang benar, bukan error aplikasi.
+
 **Permukaan baru butuh skenarionya sendiri.** Modul yang skenarionya mencakup master bawaan tetapi tidak yang ditambahkan kemudian berstatus belum terverifikasi untuk bagian yang berubah. Cocokkan daftar resource di skrip terhadap rute yang ada — nama yang kebetulan terdengar mirip bukan cakupan.
 
 ## Gate latensi

@@ -37,6 +37,8 @@ export default withMermaid({
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
     'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
     'todo/on-prem-dikelola/README.md': 'todo/on-prem-dikelola/index.md',
+    'todo/penyimpanan-berkas-on-prem/README.md':
+      'todo/penyimpanan-berkas-on-prem/index.md',
     'todo/opt-in-image-tunggal/README.md':
       'todo/opt-in-image-tunggal/index.md',
     'todo/registry-harbor/README.md': 'todo/registry-harbor/index.md',
@@ -283,6 +285,10 @@ export default withMermaid({
                 {
                   text: 'On-prem yang dikelola vendor',
                   link: '/todo/on-prem-dikelola/',
+                },
+                {
+                  text: 'Penyimpanan berkas di server on-prem',
+                  link: '/todo/penyimpanan-berkas-on-prem/',
                 },
                 {
                   text: 'Registry image sendiri dengan Harbor',

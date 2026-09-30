@@ -42,6 +42,15 @@ Ada tiga jalur pengambilan nomor, dipilih berdasarkan mode sequence.
 
 Semua preallocation bersifat **durable dan milik Control Plane**. Tidak ada counter atau rentang nomor yang pernah disimpan di memori instance API atau di app. Inilah yang membuat instance Core API bebas ditambah dan dikurangi.
 
+**Urutan kunci: counter, lalu blok.** Setiap penerbit pada jalur blok mengunci baris counter scope-nya
+lebih dulu, baru blok hidup. Dulu blok dikunci lebih dulu dan counter hanya diminta saat blok habis,
+sehingga dua urutan kunci berjalan bersamaan. PostgreSQL tidak melepas kunci baris yang gagal diperiksa
+ulang di `FOR UPDATE`, jadi penerbit yang mengantre di blok lalu mendapatinya habis tetap memegang blok itu
+sambil meminta counter, sementara pemegang counter menunggu blok yang sama: deadlock `40P01`, ditemukan
+load test Monitoring Asset. Antreannya tidak bertambah panjang karena perubahan ini — semua penerbit pada
+satu scope memang sudah berbaris di satu blok hidup. Kode baru yang mengunci lebih dari satu tabel
+penomoran mengikuti urutan yang sama.
+
 Continuous boleh memakai preallocation karena poolnya bukan cache: tiap nomor adalah satu row yang statusnya terlacak (`available`, `reserved`, `reconciliation_pending`, `confirmed`). Nomor yang tidak jadi dipakai kembali menjadi `available`, sehingga tidak ada nomor yang hilang.
 
 ### 3. Periode reset dan kalender fiskal
@@ -251,7 +260,10 @@ psql -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
 - dua instance tidak pernah mengklaim nomor pool yang sama (`SKIP LOCKED`);
 - instance kedua benar-benar diblokir pada row lock counter;
 - unique index idempotency menolak nomor kedua untuk satu key;
-- blok preallocation tidak pernah mengulang nomor.
+- blok preallocation tidak pernah mengulang nomor;
+- delapan proses PHP yang menerbitkan bersamaan melintasi batas blok tidak pernah deadlock
+  (`test_concurrent_processes_crossing_block_boundaries_never_deadlock`). Interleave manual dua
+  koneksi tidak menemukannya; yang menemukannya proses sungguhan yang berlomba.
 
 ### Bahan uji dibaca dari manifest, bukan disalin ke test
 
