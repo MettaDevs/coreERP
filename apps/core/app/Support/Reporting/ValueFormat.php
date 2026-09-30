@@ -9,7 +9,6 @@ use App\Support\UserClock;
 use Carbon\CarbonImmutable;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use Throwable;
 
 /**
  * Cara menampilkan satu nilai dataset laporan yang menyatakan tipenya.
@@ -193,11 +192,14 @@ final class ValueFormat
             return null;
         }
 
-        try {
-            return CarbonImmutable::parse($value, 'UTC')->setTimezone($this->timezone);
-        } catch (Throwable) {
+        // Bentuknya sudah cocok, tetapi isinya bisa mustahil (bulan 13, jam 25). `date_parse` melaporkannya
+        // tanpa melempar; nilai seperti itu ditulis apa adanya, sama seperti teks yang bukan waktu.
+        $parsed = date_parse($value);
+        if ($parsed['error_count'] > 0 || $parsed['warning_count'] > 0) {
             return null;
         }
+
+        return CarbonImmutable::parse($value, 'UTC')->setTimezone($this->timezone);
     }
 
     private function moneyFormatCode(): string

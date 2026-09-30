@@ -111,6 +111,14 @@ class ValueFormatTest extends TestCase
         $this->assertNull((new ValueFormat(ValueFormat::DATETIME, timezone: 'Asia/Jakarta'))->cell('2026-09-28'));
     }
 
+    public function test_datetime_with_an_impossible_value_is_written_as_is(): void
+    {
+        // Bentuknya cocok, isinya mustahil: ditulis apa adanya, tidak digeser, tidak melempar.
+        $format = new ValueFormat(ValueFormat::DATETIME, timezone: 'Asia/Jakarta');
+
+        $this->assertSame('2026-13-40 25:61:00', $format->text('2026-13-40 25:61:00'));
+    }
+
     public function test_excel_cell_falls_back_to_text_for_empty_or_unreadable_values(): void
     {
         $this->assertNull((new ValueFormat(ValueFormat::MONEY, 2, 'Rp'))->cell(''));
