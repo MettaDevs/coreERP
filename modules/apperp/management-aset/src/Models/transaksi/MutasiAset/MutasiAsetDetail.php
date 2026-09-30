@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -29,10 +31,16 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class MutasiAsetDetail extends Model
 {
     use HasUlids;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'asal_custodian_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
 
     protected $table = 'aset_tr_mutasi_aset_details';
 

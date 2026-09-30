@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,9 +19,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $tenant_id
  * @property string $name
  */
+#[DataClassification(DataClass::CustomerContent)]
 class Location extends Model
 {
     use HasUlids, SoftDeletes;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
 
     protected $fillable = ['tenant_id', 'name'];
 

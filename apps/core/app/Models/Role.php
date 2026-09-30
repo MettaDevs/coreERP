@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,9 +17,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property bool $is_owner Role Owner bawaan tenant: selalu memegang semua duty yang sah (`OwnerRoleDuties`).
  * @property int $version
  */
+#[DataClassification(DataClass::CustomerContent)]
 class Role extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
 
     protected $fillable = ['tenant_id', 'name', 'is_active', 'is_owner'];
 

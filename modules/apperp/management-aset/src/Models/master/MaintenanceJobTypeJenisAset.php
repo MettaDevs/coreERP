@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -19,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class MaintenanceJobTypeJenisAset extends Model
 {
     use MilikTenant;

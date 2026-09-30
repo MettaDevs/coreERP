@@ -382,23 +382,51 @@ sendiri:
   `ChangeHistory`. Layarnya memakai komponen `ChangeHistory` dari `@/components/change-history`. Rute
   Core `GET /api/v1/change-log/{tabel}/{id}` hanya untuk admin berizin `core.change-log.read`.
 
-<<<<<<< HEAD
-### Retensi data log
+### Klasifikasi data per kolom
 
-Log dan berkas teknis yang tumbuh terus dihapus berdasarkan umur oleh satu layanan Core,
-`App\Support\Retention\RetentionService` ([analisa gap BC, gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)).
-Penghapusan fisik di sini sah karena yang dihapus log, bukan data bisnis; tabel data bisnis tidak pernah
-didaftarkan dan tetap hanya diarsipkan.
+Setiap tabel ber-`tenant_id`, di Core maupun module, menyatakan jenis data yang disimpannya, padanan
+properti `DataClassification` di Business Central ([analisa gap BC, gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)).
+Nilainya `DataClass` dari `App\Support\Modules\Contracts`, sama dengan BC. Model menulis bawaan tabel
+sebagai atribut, lalu kolom yang berbeda di konstanta `COLUMN_CLASSIFICATION`:
 
-- **Daftar.** Tabel yang boleh diretensi ditulis di `RetentionPolicies`: kode, tabel, kolom tanggal acuan,
-  masa simpan minimum, dan bawaan dari config (kosong berarti mati sampai tenant menyalakannya). Tabel di
-  luar daftar tidak dapat diberi retensi. Module yang menambah log sendiri menambah barisnya di daftar itu.
-- **Setelan.** Admin tenant mengatur masa simpan di Pengaturan → Retensi data (`core.retention.read`,
-  `core.retention.update`), tidak boleh di bawah minimum. Tenant tanpa setelan mendapat bawaan.
-- **Penerapan.** `retention:apply` berjalan harian dan menghapus per tenant dalam kelompok kecil. Hasilnya
-  ditulis ke `retention_policy_log_entries` bila ada baris terhapus atau penghapusan gagal. Perintah lain
-  yang perlu menghapus log berdasarkan umur memanggil layanan yang sama, tidak menulis `DELETE` sendiri.
-=======
+```php
+#[DataClassification(DataClass::CustomerContent)]
+class Worker extends Model
+{
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'personnel_number' => DataClass::EndUserPseudonymousIdentifiers,
+        'name' => DataClass::EndUserIdentifiableInformation,
+        'email' => DataClass::EndUserIdentifiableInformation,
+    ];
+}
+```
+
+- **Bawaan tabel.** `CustomerContent` untuk data bisnis dan setelan tenant, `SystemMetadata` untuk data
+  yang dibuat sistem seperti status antrean dan penanda event yang sudah diproses. `ToBeClassified`
+  ditolak.
+- **Kolom yang wajib ditulis.** Nama orang, email, telepon, NIK, NPWP orang, tanggal lahir, alamat, catatan
+  tentang orang, dan catatan medis: `EndUserIdentifiableInformation`. Nama, alamat, dan nomor pajak
+  organisasi: `OrganizationIdentifiableInformation`. ID pengguna, keanggotaan, atau pekerja:
+  `EndUserPseudonymousIdentifiers`. Hash token, secret, dan kode undangan: `AccountData`. Kolom bernama
+  seperti `name` atau `nama` yang isinya bukan orang, misalnya nama jenis aset, tetap ditulis eksplisit
+  sebagai `CustomerContent`, supaya keputusannya terlihat di kode.
+- **Kolom jejak** `created_by_user_id` dan `updated_by_user_id` sudah diklasifikasi `AuditColumns`; tidak
+  perlu ditulis ulang.
+- **Kelas dasar.** Atribut dan konstanta diwarisi, seperti master aset dari `MasterData`. Model turunan
+  yang menambah kolom pribadi menulis konstantanya sendiri, lengkap dengan isi induknya:
+  `[...parent::COLUMN_CLASSIFICATION, 'email' => DataClass::EndUserIdentifiableInformation]`.
+- **Tabel tanpa model** dinyatakan di satu kelas registry per module di `src/Models`, yang memakai
+  `DataClassificationRegistry`; bentuk isinya sama: bawaan tabel lalu kolom yang berbeda. Registry Core
+  adalah `App\Models\UnmodeledTables`.
+
+`DataClassificationBoundaryTest` menolak tabel tenant tanpa klasifikasi, timpaan untuk kolom yang tidak
+ada, dan kolom bernama seperti nama, email, telepon, NIK, NPWP, tanggal lahir, atau alamat yang ikut
+bawaan `CustomerContent`/`SystemMetadata` tanpa ditulis.
+
+Klasifikasi ini juga yang menjaga telemetri: laporan kesalahan utuh hanya ke SigNoz di server sendiri,
+sedangkan notifikasi Discord hanya membawa data teknis (K-18).
+
 ### Versi baris dan pengaman edit bersamaan
 
 Setiap tabel ber-`tenant_id` membawa kolom `version`, padanan `SystemRowVersion` di Business Central
@@ -434,7 +462,22 @@ RowVersion::claim($record, RowVersion::expected($request));
 Versi baris tidak menggantikan kunci baris: proses berlangkah banyak di dalam satu transaksi tetap
 memakai `lockForUpdate()`. Tabel yang kolom `version`-nya sudah bermakna lain dikecualikan di
 `AuditColumnsBoundaryTest`, dengan alasannya.
->>>>>>> origin/main
+
+### Retensi data log
+
+Log dan berkas teknis yang tumbuh terus dihapus berdasarkan umur oleh satu layanan Core,
+`App\Support\Retention\RetentionService` ([analisa gap BC, gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)).
+Penghapusan fisik di sini sah karena yang dihapus log, bukan data bisnis; tabel data bisnis tidak pernah
+didaftarkan dan tetap hanya diarsipkan.
+
+- **Daftar.** Tabel yang boleh diretensi ditulis di `RetentionPolicies`: kode, tabel, kolom tanggal acuan,
+  masa simpan minimum, dan bawaan dari config (kosong berarti mati sampai tenant menyalakannya). Tabel di
+  luar daftar tidak dapat diberi retensi. Module yang menambah log sendiri menambah barisnya di daftar itu.
+- **Setelan.** Admin tenant mengatur masa simpan di Pengaturan → Retensi data (`core.retention.read`,
+  `core.retention.update`), tidak boleh di bawah minimum. Tenant tanpa setelan mendapat bawaan.
+- **Penerapan.** `retention:apply` berjalan harian dan menghapus per tenant dalam kelompok kecil. Hasilnya
+  ditulis ke `retention_policy_log_entries` bila ada baris terhapus atau penghapusan gagal. Perintah lain
+  yang perlu menghapus log berdasarkan umur memanggil layanan yang sama, tidak menulis `DELETE` sendiri.
 
 ### Penghapusan lunak
 

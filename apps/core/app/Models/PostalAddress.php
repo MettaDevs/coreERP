@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,9 +16,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $formatted
  * @property string $country_region_code
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PostalAddress extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'province' => DataClass::EndUserIdentifiableInformation,
+        'city' => DataClass::EndUserIdentifiableInformation,
+        'district' => DataClass::EndUserIdentifiableInformation,
+        'street' => DataClass::EndUserIdentifiableInformation,
+        'building' => DataClass::EndUserIdentifiableInformation,
+        'postbox' => DataClass::EndUserIdentifiableInformation,
+        'postal_code' => DataClass::EndUserIdentifiableInformation,
+        'formatted' => DataClass::EndUserIdentifiableInformation,
+    ];
 
     protected $fillable = [
         'tenant_id', 'location_id', 'country_region_code', 'province', 'city',

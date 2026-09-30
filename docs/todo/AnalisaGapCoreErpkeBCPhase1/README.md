@@ -540,13 +540,18 @@ Fase 1 mengambil lapis developer dan aturan telemetrinya. Lapis admin (sensitivi
 masking) butuh layar, jadi masuk fase berikutnya.
 
 1. Satu enum dengan nilai yang sama dengan BC.
-2. Setiap model tenant menyatakan klasifikasi bawaan tabelnya, dan kolom yang berbeda menimpanya.
-3. Satu test gagal bila ada model tenant tanpa klasifikasi, sebagai padanan AS0016.
-4. Hanya atribut berklasifikasi `SystemMetadata` yang boleh dikirim ke OpenTelemetry/SigNoz.
+2. Setiap model tenant menyatakan klasifikasi bawaan tabelnya, dan kolom yang berbeda menimpanya. Tabel
+   tenant tanpa model dinyatakan di satu registry per pemilik: satu untuk Core, satu per module (K-19).
+3. Satu test gagal bila ada tabel tenant tanpa klasifikasi, sebagai padanan AS0016.
+4. Telemetri mengikuti K-18: SigNoz tetap menerima laporan kesalahan utuh, sedangkan notifikasi Discord
+   hanya membawa data teknis. Ini menyimpang dari BC, yang hanya mengirim data `SystemMetadata` ke
+   telemetri. Alasannya letak datanya: Application Insights di BC adalah layanan di luar tenant, sedangkan
+   SigNoz berjalan di server kita sendiri dan laporan utuhnya dibutuhkan untuk menelusuri kesalahan.
+   Discord pihak ketiga, jadi aturan BC berlaku di sana.
 5. Semua tabel tenant yang sudah ada diklasifikasikan. Kolom nama, email, telepon, NIK, NPWP, tanggal
    lahir, alamat, dan catatan medis diklasifikasikan eksplisit, bukan mengandalkan bawaan tabel.
 
-Bentuk deklarasinya masih **usulan**, belum ada di kode, dan ditetapkan di K-06:
+Bentuk deklarasinya ditetapkan di K-06:
 
 ```php
 #[DataClassification(DataClass::CustomerContent)]
@@ -559,6 +564,50 @@ final class Worker extends Model
     ];
 }
 ```
+
+### Yang sudah dibangun (area 5)
+
+- **Enum dan deklarasi** di `App\Support\Modules\Contracts`, supaya module dapat memakainya: `DataClass`
+  (tujuh nilai BC), atribut `DataClassification` untuk bawaan tabel, konstanta `COLUMN_CLASSIFICATION` di
+  model untuk kolom yang berbeda, dan antarmuka `DataClassificationRegistry` untuk tabel tanpa model
+  (K-19). Registry Core ada di `App\Models\UnmodeledTables`; module menaruh registry-nya di `src/Models`.
+  Atribut dibaca juga dari kelas induk, jadi 22 master aset mewarisi klasifikasi `MasterData`.
+- **Kolom jejak** `created_by_user_id` dan `updated_by_user_id` diklasifikasi platform sebagai
+  `EndUserPseudonymousIdentifiers` di `AuditColumns::COLUMN_CLASSIFICATION`, seperti kolom sistem BC.
+- **Semua tabel tenant terklasifikasi**: 129 tabel, yaitu 74 milik Core (48 lewat model, 26 lewat
+  registry), 51 milik module aset, dan 4 milik module HR. Tabel sisi pusat (`OwnedByControlPlane`) tidak
+  ikut, sama seperti penjaga kolom jejak. Keputusan kolom yang layak dicatat:
+
+  | Kolom | Klasifikasi | Alasan |
+  | --- | --- | --- |
+  | `hr_workers.name`, `email` | EndUserIdentifiableInformation | Nama dan email pekerja |
+  | `hr_workers.personnel_number`, `core_membership_id`, `hr_worker_position_assignments.worker_id` | EndUserPseudonymousIdentifiers | Menunjuk orang lewat tabel lain |
+  | `parties.name`, `search_name`, `electronic_addresses.value`, bagian alamat `postal_addresses` | EndUserIdentifiableInformation | Party bisa orang, jadi yang lebih ketat dipakai |
+  | `vendors.tax_number` | EndUserIdentifiableInformation | Vendor bisa perorangan; NPWP orang adalah data pribadi |
+  | `organizations.name`, kop cetak `print_identities` | OrganizationIdentifiableInformation | Nama, alamat, dan nomor pajak entitas tenant |
+  | `change_log_entries.old_value`, `new_value`, `outbox_events.payload`, `access_audit_events.payload` | EndUserIdentifiableInformation | Menyalin isi tabel lain, termasuk nama dan email |
+  | `sod_conflicts.mitigation_note` | EndUserIdentifiableInformation | Catatan tentang orang tertentu |
+  | `*_user_id` dan `*_membership_id` di Core dan aset | EndUserPseudonymousIdentifiers | ID pengguna |
+  | `integration_clients.token_digest`, `signing_secret`, `app_service_credentials.secret_hash`, `token_digest`, tabel `invitation_codes` | AccountData | Kredensial dan kode undangan |
+  | `nama`/`name` master, referensi, dan dokumen bisnis | CustomerContent, ditulis eksplisit | Nama barang, jabatan, wilayah; bukan orang |
+
+  Bawaan tabel: `CustomerContent` untuk data bisnis dan setelan tenant, `SystemMetadata` untuk data yang
+  dibuat sistem (`core_module_installations`, `tenant_deployments`, `finance_posting_deliveries`,
+  `app_service_credentials`,
+  `retention_policy_log_entries`, `aset_processed_core_events`, `access_audit_events`),
+  `AccountData` untuk `invitation_codes` dan `tenant_app_entitlements`.
+- **Test B-5** `tests/Feature/Boundary/DataClassificationBoundaryTest.php`: gagal bila tabel tenant Core
+  atau module belum diklasifikasi, bawaannya `ToBeClassified`, timpaan menyebut kolom yang tidak ada, atau
+  kolom bernama seperti `name`, `nama`, `email`, `phone`, `telepon`, `nik`, `npwp`, `birth`, `lahir`,
+  `address`, `alamat` ikut bawaan `CustomerContent`/`SystemMetadata` tanpa ditulis eksplisit. Kolom yang
+  namanya menyesatkan (`table_name`, `field_name`, `report_name`, `layout_name`, `file_name`) dikecualikan
+  di test itu dengan alasannya. Satu test lain membuktikan pemeriksanya menangkap tabel tanpa klasifikasi.
+- **Discord dibersihkan (K-18).** `PengirimDiscord` mengirim daftar izin atribut: kelas exception, sumber,
+  method, nama rute, status, `tenant_id`, id laporan, `trace_id`, dan tautan ke SigNoz. Pesan exception,
+  SQL beserta nilainya, nama tenant, nama pengguna, alamat IP, dan user agent tidak lagi dikirim.
+  `LaporanKesalahan`, berkas log, dan SigNoz tidak berubah. Test di `PengirimDiscordTest` memakai laporan
+  berisi nama orang, email, nama tenant, dan SQL bernilai, lalu memastikan tidak ada yang sampai ke
+  Discord sementara atribut untuk SigNoz tetap utuh.
 
 ## Gap 7: lampiran dokumen (backend) {#gap-7}
 
@@ -703,6 +752,8 @@ yang jelas. Laporan tetap di server.
 | K-15 | Layar setelan retensi | **Diputuskan 30 Sep 2026:** Pengaturan → Retensi data, dengan permission `core.retention.read` dan `core.retention.update` di duty sendiri, `core.retention.inquire` dan `core.retention.manage`, bukan di duty riwayat perubahan: peran yang sudah memegang duty itu tidak diam-diam mendapat hak menghapus log. Owner memegang keduanya |
 | K-16 | Catatan hasil penerapan | **Diputuskan 30 Sep 2026:** tabel tenant `retention_policy_log_entries`, tampil di layar yang sama, dan ikut diretensi |
 | K-17 | Cadangan nomor berurutan di layar retensi | **Diputuskan 30 Sep 2026:** tidak tampil di layar tenant dan tidak dapat diatur tenant; masa simpannya hanya lewat config operator (`COREERP_CONFIRMED_POOL_RETENTION_DAYS`). Isinya pemeliharaan database: nomor yang terbit tetap tercatat di `number_sequence_issues`. Menyimpang dari pola BC yang menampilkan semua tabel terdaftar; BC sendiri tidak punya padanan tabel cadangan ini |
+| K-18 | Klasifikasi dan telemetri | **Diputuskan 30 Sep 2026:** SigNoz (di server sendiri) tetap menerima laporan kesalahan utuh. Hanya notifikasi Discord (pihak ketiga) yang dibersihkan: kelas exception, method dan rute, status, `tenant_id`, jejak dan tautan ke SigNoz; tanpa nama orang, email, nama tenant, user agent, atau pesan exception dan SQL bernilai. Menyimpang dari BC, yang hanya mengirim `SystemMetadata` ke telemetri, karena SigNoz bukan pihak ketiga |
+| K-19 | Tabel tenant tanpa model | **Diputuskan 30 Sep 2026:** dinyatakan di satu kelas registry per pemilik, satu untuk Core dan satu per module, berisi tabel, bawaan, dan timpaan kolom. Test membaca model dan registry |
 
 ## Sumber {#sumber}
 

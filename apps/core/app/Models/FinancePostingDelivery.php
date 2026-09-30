@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $updated_at
  * @property-read FinancePosting $posting
  */
+#[DataClassification(DataClass::SystemMetadata)]
 class FinancePostingDelivery extends Model
 {
     use HasUlids;

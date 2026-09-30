@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -29,10 +31,16 @@ use Illuminate\Support\Carbon;
  * @property ?string $peringatan
  * @property Carbon $created_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PemeliharaanAsetStatusLog extends Model
 {
     use HasUlids;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'oleh_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
 
     public const UPDATED_AT = null;
 

@@ -36,6 +36,17 @@ final class AuditColumns
 
     public const UPDATED_BY = 'updated_by_user_id';
 
+    /**
+     * Klasifikasi kolom jejak di setiap tabel tenant (gap 5). Diberikan platform seperti kolom sistem
+     * BC, jadi model dan registry tidak perlu mengulangnya.
+     *
+     * @var array<string, DataClass>
+     */
+    public const COLUMN_CLASSIFICATION = [
+        self::CREATED_BY => DataClass::EndUserPseudonymousIdentifiers,
+        self::UPDATED_BY => DataClass::EndUserPseudonymousIdentifiers,
+    ];
+
     public const FUNCTION = 'coreerp_stamp_audit_actor';
 
     public const TRIGGER = 'stamp_audit_actor';

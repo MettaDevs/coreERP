@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $party_location_id
  * @property string $purpose_code
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PartyLocationPurpose extends Model
 {
     use HasUlids, SoftDeletes;

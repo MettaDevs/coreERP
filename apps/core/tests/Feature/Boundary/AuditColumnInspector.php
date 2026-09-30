@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
+use App\Support\ControlPlane\OwnedByControlPlane;
 use App\Support\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Membaca skema database untuk mencari tabel ber-`tenant_id` yang tidak membawa kolom jejak (K-01),
@@ -77,5 +79,35 @@ final class AuditColumnInspector
         }
 
         return $missing;
+    }
+
+    /**
+     * Tabel sisi pusat, diturunkan dari model ber-`OwnedByControlPlane`. Tabel ini tidak ikut penjaga
+     * tabel tenant walau membawa `tenant_id`.
+     *
+     * @return list<string>
+     */
+    public static function controlPlaneTables(): array
+    {
+        $tables = [];
+
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Models'), \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if (! $file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $class = 'App\\Models\\'.str_replace(
+                [app_path('Models').DIRECTORY_SEPARATOR, '/', '.php'],
+                ['', '\\', ''],
+                $file->getPathname(),
+            );
+
+            if (class_exists($class) && is_subclass_of($class, Model::class)
+                && in_array(OwnedByControlPlane::class, class_uses_recursive($class), true)) {
+                $tables[] = (new $class)->getTable();
+            }
+        }
+
+        return $tables;
     }
 }

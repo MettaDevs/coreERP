@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -29,9 +31,15 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $updated_at
  * @property int $version
  */
+#[DataClassification(DataClass::CustomerContent)]
 class FinanceReferenceAccount extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
 
     public const BALANCE_SHEET = 'balance_sheet';
 

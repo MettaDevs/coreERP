@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Models\support;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::SystemMetadata)]
 final class ProcessedCoreEvent extends Model
 {
     use HasUlids;
