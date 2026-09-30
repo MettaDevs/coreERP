@@ -29,6 +29,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Perintah artisan tinggal di `Console/` milik fiturnya, bukan di satu folder
+    // `app/Console/Commands`, sejak Core dipecah per lapis (docs/todo/lapis-core). Laravel hanya
+    // menemukan folder bawaan itu sendiri, jadi folder per fitur didaftarkan di sini.
+    ->withCommands(array_merge(
+        glob(__DIR__.'/../app/Platform/*/Console', GLOB_ONLYDIR) ?: [],
+        glob(__DIR__.'/../app/Foundation/*/Console', GLOB_ONLYDIR) ?: [],
+    ))
     ->withMiddleware(function (Middleware $middleware): void {
         // Nama alias-nya didaftarkan di sini bersama alias lain; yang *memasangnya* adalah
         // penyedia layanan tiap module, per grup rute, karena middleware ini butuh id module
