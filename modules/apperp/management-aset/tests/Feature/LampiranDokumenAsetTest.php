@@ -2,9 +2,13 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Models\Role;
+use App\Models\TenantMembership;
+use App\Models\User;
 use App\Support\Modules\Contracts\DataClass;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -126,6 +130,49 @@ class LampiranDokumenAsetTest extends TestCase
     }
 
     /**
+     * K-21: `permintaan-pembelian-aset.update` kini ada di manifest, di duty yang mengelola permintaan. Pemegang
+     * duty itu, lewat rantai katalog sungguhan hasil `app:register-manifest`, dapat mengubah permintaan dan
+     * melampirinya.
+     */
+    public function test_pemegang_duty_kelola_permintaan_dapat_mengubah_dan_melampiri_permintaan(): void
+    {
+        $this->assertSame(0, Artisan::call('app:register-manifest', ['module' => 'management-aset']), Artisan::output());
+        $jenis = $this->jenisAset('Kursi tunggu');
+        $permintaan = $this->permintaanPengadaan($jenis);
+        $this->denganDuty(['management-aset.permintaan-pembelian-aset.manage']);
+
+        $this->patchJson('/api/modules/management-aset/v1/permintaan-pembelian-aset/'.$permintaan, [
+            'legal_entity_id' => $this->legalEntityId, 'requesting_org_unit_id' => $this->unitId,
+            'requested_on' => '2026-06-01', 'description' => 'Diubah pemegang duty', 'version' => 1,
+            'details' => [[
+                'jenis_aset_id' => $jenis, 'satuan_id' => (string) Str::ulid(), 'quantity' => 2, 'specification' => 'Kursi besi',
+            ]],
+        ])->assertOk();
+        $this->assertDatabaseHas('aset_tr_permintaan_pengadaan_aset', ['id' => $permintaan, 'description' => 'Diubah pemegang duty']);
+
+        $this->getJson($this->daftar('aset_tr_permintaan_pengadaan_aset', $permintaan))->assertOk()->assertJsonPath('meta.can_change', true);
+        $this->unggah('aset_tr_permintaan_pengadaan_aset', $permintaan, ['line_number' => 1])
+            ->assertCreated()->assertJsonPath('data.line_number', 1);
+    }
+
+    /** K-20: dokumen siklus tidak punya permission ubah; yang boleh membuat dokumennya yang boleh melampirinya. */
+    public function test_lampiran_dokumen_siklus_memakai_permission_buat_jenis_dokumennya(): void
+    {
+        $dokumen = $this->dokumenSiklus('penjualan-aset');
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penjualan-aset.read']);
+        $this->getJson($this->daftar('aset_tr_dokumen_siklus_aset', $dokumen))->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->unggah('aset_tr_dokumen_siklus_aset', $dokumen)->assertForbidden();
+
+        // Hak atas jenis dokumen lain bukan hak atas dokumen penjualan.
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.pemusnahan-aset.read', 'management-aset.pemusnahan-aset.create']);
+        $this->getJson($this->daftar('aset_tr_dokumen_siklus_aset', $dokumen))->assertNotFound();
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penjualan-aset.read', 'management-aset.penjualan-aset.create']);
+        $this->unggah('aset_tr_dokumen_siklus_aset', $dokumen)->assertCreated();
+    }
+
+    /**
      * @param  array<string, mixed>  $tambahan
      * @return TestResponse<Response>
      */
@@ -154,6 +201,64 @@ class LampiranDokumenAsetTest extends TestCase
             'nama' => 'Laptop', 'legal_entity_id' => $legalEntityId, 'responsible_org_unit_id' => $unitId,
             'group_aset_id' => $group, 'jenis_aset_id' => $jenis, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1,
             'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        return $id;
+    }
+
+    /**
+     * Masuk sebagai anggota tenant yang memegang duty katalog sungguhan, dengan lingkup seluruh organisasi.
+     *
+     * @param  list<string>  $duties
+     */
+    private function denganDuty(array $duties): void
+    {
+        $pengguna = User::factory()->create();
+        $membership = TenantMembership::create(['tenant_id' => $this->tenantId, 'user_id' => $pengguna->id, 'status' => 'active']);
+        $role = Role::create(['tenant_id' => $this->tenantId, 'name' => 'Role '.Str::random(6), 'is_active' => true]);
+        $role->duties()->sync($duties);
+        $penugasan = $membership->roleAssignments()->create(['role_id' => $role->id, 'source' => 'manual', 'status' => 'active', 'valid_from' => now()->subMinute()]);
+        $this->beriLingkupKebijakan($this->tenantId, (string) $penugasan->id, ['policy_code' => self::KEBIJAKAN, 'legal_entity_id' => null, 'organization_id' => null]);
+        $this->actingAs($pengguna);
+    }
+
+    private function jenisAset(string $nama): string
+    {
+        $id = (string) Str::ulid();
+        $now = now();
+        DB::table('aset_m_jenis_aset')->insert(['id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.$id, 'kode' => 'J'.Str::random(6), 'nama' => $nama, 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+
+        return $id;
+    }
+
+    /** Permintaan draf versi 1 dengan satu baris, disusun langsung di tabel. */
+    private function permintaanPengadaan(string $jenis): string
+    {
+        $now = now();
+        $id = (string) Str::ulid();
+        DB::table('aset_tr_permintaan_pengadaan_aset')->insert([
+            'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'pp-'.$id, 'kode' => 'PP'.Str::random(8),
+            'legal_entity_id' => $this->legalEntityId, 'requesting_org_unit_id' => $this->unitId,
+            'requester_user_id' => (string) Str::ulid(), 'requested_on' => '2026-06-01', 'status' => 'draft',
+            'description' => 'Permintaan awal', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('aset_tr_permintaan_pengadaan_aset_details')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'request_id' => $id, 'line_number' => 1,
+            'jenis_aset_id' => $jenis, 'satuan_id' => (string) Str::ulid(), 'nama_aset' => 'Kursi tunggu', 'quantity' => 1,
+            'specification' => 'Permintaan awal', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        return $id;
+    }
+
+    private function dokumenSiklus(string $jenisDokumen): string
+    {
+        $id = (string) Str::ulid();
+        $now = now();
+        DB::table('aset_tr_dokumen_siklus_aset')->insert([
+            'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'ds-'.$id, 'jenis_dokumen' => $jenisDokumen,
+            'kode' => 'DS'.Str::random(8), 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->unitId,
+            'tanggal' => '2026-06-01', 'status' => 'draft', 'created_at' => $now, 'updated_at' => $now,
         ]);
 
         return $id;

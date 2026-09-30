@@ -18,8 +18,8 @@ use Modules\Apperp\HumanResources\Models\Worker;
  * organisasi hanya melihat pekerja yang hari ini memegang posisi di unit kerjanya (kebijakan
  * `human-resources.workforce-responsibility`).
  *
- * Module ini belum punya permission ubah pekerja, jadi belum ada yang dapat melampirkan atau mengarsipkan
- * lampiran pekerja sampai permission itu diputuskan.
+ * Module ini tidak punya permission ubah pekerja; yang boleh menambah pekerja (`human-resources.workers.create`)
+ * yang boleh melampirkan dan mengarsipkan lampirannya, untuk pekerja yang juga boleh ia lihat (K-20).
  */
 final class WorkerAttachments implements AttachmentRecordType
 {
@@ -42,6 +42,23 @@ final class WorkerAttachments implements AttachmentRecordType
 
     public function canRead(string $tenantId, string $recordId): bool
     {
+        return $this->visible($recordId);
+    }
+
+    public function canChange(string $tenantId, string $recordId): bool
+    {
+        return $this->visible($recordId)
+            && app(KonteksPermintaan::class)->punyaIzin('human-resources.workers.create');
+    }
+
+    public function hasLine(string $tenantId, string $recordId, int $lineNumber): bool
+    {
+        return false;
+    }
+
+    /** Pengguna boleh melihat pekerja dan pekerja itu berada di lingkup unit kerjanya. */
+    private function visible(string $recordId): bool
+    {
         $context = app(KonteksPermintaan::class);
         if (! $context->punyaIzin('human-resources.workers.read')) {
             return false;
@@ -60,16 +77,6 @@ final class WorkerAttachments implements AttachmentRecordType
         }
 
         return $query->exists();
-    }
-
-    public function canChange(string $tenantId, string $recordId): bool
-    {
-        return false;
-    }
-
-    public function hasLine(string $tenantId, string $recordId, int $lineNumber): bool
-    {
-        return false;
     }
 
     /** @return list<string> */

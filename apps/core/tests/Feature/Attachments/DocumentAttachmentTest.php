@@ -177,7 +177,7 @@ class DocumentAttachmentTest extends TestCase
         $this->unggah($this->owner, $this->vendorId, new UploadedFile($palsu, 'palsu.pdf', null, null, true))
             ->assertStatus(422)->assertJsonValidationErrors('file');
         unlink($palsu);
-        $this->unggah($this->owner, $this->vendorId, UploadedFile::fake()->create('besar.pdf', 2049, 'application/pdf'))
+        $this->unggah($this->owner, $this->vendorId, UploadedFile::fake()->create('besar.pdf', 10241, 'application/pdf'))
             ->assertStatus(422)->assertJsonValidationErrors('file');
         // Vendor tidak punya baris dokumen.
         $this->unggah($this->owner, $this->vendorId, $this->pdf('baris.pdf'), ['line_number' => 1])

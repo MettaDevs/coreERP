@@ -501,7 +501,7 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
 | `moduleId()` | Id module. Core memasang konteks module ini sebelum bertanya, sama seperti rute module. |
 | `dataClass()` | Klasifikasi isi lampiran, mengikuti induknya. Lampiran pekerja `EndUserIdentifiableInformation`, dokumen aset `CustomerContent`. Disalin ke kolom `data_class` setiap lampiran. |
 | `canRead($tenantId, $recordId)` | Boleh membuka record itu: permission baca **dan** kebijakan organisasinya, persis seperti endpoint detailnya. Record yang tidak ada atau diarsipkan: `false`. |
-| `canChange($tenantId, $recordId)` | Boleh mengubah record itu, yang juga berarti boleh melampirkan dan mengarsipkan lampirannya. |
+| `canChange($tenantId, $recordId)` | Boleh mengubah record itu, yang juga berarti boleh melampirkan dan mengarsipkan lampirannya. Resource tanpa permission ubah memakai permission `create`-nya. |
 | `hasLine($tenantId, $recordId, $lineNumber)` | Dokumen itu punya baris bernomor ini (`line_number` di tabel `_details`). Tabel tanpa baris menjawab `false`. |
 
 - **Hak mengikuti record induk.** Lampiran tidak punya permission sendiri. Jawaban module dibaca lewat
@@ -515,7 +515,9 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
   record yang tidak ada; boleh dibuka tetapi tidak boleh diubah dijawab 403.
 - **Berkas di disk `coreerp.attachments.disk`** (bawaannya `s3`), dengan hash SHA-256 yang diperiksa
   setiap kali diunduh. Isi yang tidak cocok lagi tidak dikirim; kejadiannya dilaporkan. Batas unggah ada
-  di `coreerp.attachments`.
+  di `coreerp.attachments`: 10 MB, PDF, JPG/JPEG, PNG, DOCX, dan XLSX. Image Core menyetel
+  `upload_max_filesize` 10M dan `post_max_size` 12M; batas yang dinaikkan di config wajib dinaikkan juga di
+  sana.
 - **Arsip, bukan hapus.** Lampiran diarsipkan dengan `deleted_at` dan berkasnya tetap di disk. Lampiran
   data bisnis, jadi tidak didaftarkan untuk retensi.
 - **Tabel yang diberi lampiran** mengikuti pola BC: master data dan dokumen, bukan setup, data referensi,

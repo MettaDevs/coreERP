@@ -41,14 +41,14 @@ final class AssetAttachments implements AttachmentRecordType
     /**
      * @param  class-string<Model>  $model
      * @param  string|null  $resource  resource permission; null berarti dibaca dari `jenis_dokumen` barisnya
-     * @param  string|null  $updatePermission  aksi permission untuk mengubah; null berarti belum ada yang berhak
+     * @param  string  $updatePermission  aksi permission yang berarti boleh mengubah record, termasuk melampirinya
      * @param  class-string<Model>|null  $lineModel
      */
     private function __construct(
         private readonly string $table,
         private readonly string $model,
         private readonly ?string $resource,
-        private readonly ?string $updatePermission,
+        private readonly string $updatePermission,
         private readonly string $organizationUnitColumn,
         private readonly ?string $lineModel = null,
         private readonly ?string $lineForeignKey = null,
@@ -64,9 +64,9 @@ final class AssetAttachments implements AttachmentRecordType
             new self('aset_tr_pemeliharaan_aset', PemeliharaanAset::class, 'pemeliharaan-aset', 'update', 'responsible_org_unit_id', PemeliharaanAsetDetail::class, 'pemeliharaan_aset_id'),
             new self('aset_tr_perencanaan_aset', PerencanaanAset::class, 'perencanaan-aset', 'update', 'planning_org_unit_id', PerencanaanAsetDetail::class, 'planning_id'),
             new self('aset_tr_permintaan_pengadaan_aset', PermintaanPengadaanAset::class, 'permintaan-pembelian-aset', 'update', 'requesting_org_unit_id', PermintaanPengadaanAsetDetail::class, 'request_id'),
-            // Dekomisioning, penjualan, dan pemusnahan belum punya permission ubah; sampai ada, tidak ada
-            // yang dapat melampirkan ke dokumennya.
-            new self('aset_tr_dokumen_siklus_aset', DokumenSiklusAset::class, null, null, 'responsible_org_unit_id'),
+            // Dekomisioning, penjualan, dan pemusnahan tidak punya permission ubah; yang boleh membuat dokumennya
+            // yang boleh melampirinya (K-20).
+            new self('aset_tr_dokumen_siklus_aset', DokumenSiklusAset::class, null, 'create', 'responsible_org_unit_id'),
         ];
     }
 
@@ -94,9 +94,6 @@ final class AssetAttachments implements AttachmentRecordType
 
     public function canChange(string $tenantId, string $recordId): bool
     {
-        if ($this->updatePermission === null) {
-            return false;
-        }
         $resource = $this->resourceOf($recordId);
 
         return $resource !== null && $this->allows($resource, $this->updatePermission);

@@ -157,7 +157,7 @@ Rujukan: [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5).
       bernilai. Menyimpang dari BC, yang hanya mengirim `SystemMetadata` ke telemetri.
 - [x] 5.6 Test yang gagal bila ada tabel tenant tanpa klasifikasi (padanan AS0016).
 
-### 6. [~] Layanan lampiran dokumen (gap 7)
+### 6. [x] Layanan lampiran dokumen (gap 7)
 
 **Tempat:** Core, dipakai module · **Setelah:** 5, 0.1, 0.7 · **Selesai bila:** record di daftar fase 1
 dapat diberi lampiran lewat layanan Core, haknya mengikuti record induk, dan test B-6 lulus. Tampilan
@@ -172,9 +172,9 @@ Rujukan: [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 - [x] 6.3 Pemeriksaan hak berdasarkan record induk.
 - [x] 6.4 Klasifikasi lampiran mengikuti induknya.
 - [x] 6.5 Endpoint unggah, daftar, unduh, dan arsip.
-- [~] 6.6 Pendaftaran record fase 1 sesuai tabel di README. Semua terdaftar dan terbaca; pekerja HR,
-      dokumen siklus aset, dan permintaan pengadaan belum dapat dilampiri karena permission ubahnya belum
-      ada. Menunggu keputusan pemilik.
+- [x] 6.6 Pendaftaran record fase 1 sesuai tabel di README. Pekerja HR dan dokumen siklus aset memakai
+      permission `create` sebagai hak ubah (K-20); permission ubah permintaan pembelian aset dideklarasikan
+      di manifest (K-21). Batas unggah 10 MB (K-22).
 
 ### 7. [ ] Zona waktu dan tanggal kerja pengguna (gap 3)
 

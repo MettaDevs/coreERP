@@ -136,7 +136,8 @@ class PenyaringanTenantTest extends TestCase
 
     /**
      * Lampiran pekerja (gap 7) mengikuti hak atas pekerjanya: `workers.read`, lalu hanya pekerja yang hari
-     * ini memegang posisi di unit kerja pengguna. Isinya data pribadi, dan belum ada yang boleh melampirkan.
+     * ini memegang posisi di unit kerja pengguna. Isinya data pribadi. Yang boleh melampirkan adalah yang
+     * boleh menambah pekerja (K-20).
      */
     public function test_lampiran_pekerja_mengikuti_lingkup_pekerjanya(): void
     {
@@ -163,6 +164,19 @@ class PenyaringanTenantTest extends TestCase
         $this->post('/api/v1/records/hr_workers/'.$pekerja.'/attachments', [
             'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
         ], ['Accept' => 'application/json'])->assertForbidden();
+
+        $this->sebagaiPengguna($tenantId, ['human-resources.workers.read', 'human-resources.workers.create'], [
+            ['policy_code' => self::KEBIJAKAN, 'organization_id' => $unitBoleh],
+        ]);
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')->assertOk()->assertJsonPath('meta.can_change', true);
+        $this->post('/api/v1/records/hr_workers/'.$pekerja.'/attachments', [
+            'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.data_class', DataClass::EndUserIdentifiableInformation->value);
+        $this->post('/api/v1/records/hr_workers/'.$pekerjaLain.'/attachments', [
+            'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
+        ], ['Accept' => 'application/json'])->assertNotFound();
 
         $this->getJson('/api/v1/records/hr_workers/'.$pekerjaLain.'/attachments')->assertNotFound();
         $this->get('/api/v1/attachments/'.$lampiranLain.'/download')->assertNotFound();
@@ -428,10 +442,7 @@ class PenyaringanTenantTest extends TestCase
         ]);
     }
 
-    /**
-     * Lampiran pekerja disisipkan langsung: module ini belum punya permission ubah pekerja, jadi belum ada
-     * pengguna yang dapat mengunggahnya lewat endpoint.
-     */
+    /** Lampiran pekerja disisipkan langsung, supaya test baca tidak bergantung pada jalur unggah. */
     private function seedLampiran(string $tenantId, string $pekerjaId): string
     {
         $id = (string) Str::ulid();

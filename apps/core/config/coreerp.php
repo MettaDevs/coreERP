@@ -217,10 +217,10 @@ return [
     /*
      * Lampiran dokumen (gap 7): disk berkasnya dan batas unggah.
      *
-     * Batas ukuran bawaan 2 MB, sama dengan unggahan lain di Core (logo kop, impor akun), karena image Core
-     * memakai `upload_max_filesize` bawaan PHP, yaitu 2 MB. Menaikkannya di sini saja tidak cukup: berkas
-     * yang lebih besar sudah ditolak PHP sebelum sampai ke validasi, dengan pesan yang tidak menyebut
-     * batasnya. Naikkan `upload_max_filesize` dan `post_max_size` image bersamaan.
+     * Batas ukuran bawaan 10 MB (K-22), cukup untuk foto ponsel dan hasil pindai. Image Core menyetel
+     * `upload_max_filesize` 10M dan `post_max_size` 12M (`apps/core/Dockerfile`). Menaikkan batas di sini saja
+     * tidak cukup: berkas di atas batas PHP ditolak sebelum sampai ke validasi, dengan pesan yang tidak
+     * menyebut batasnya. Naikkan setelan PHP image bersamaan.
      *
      * Jenis berkas bawaan hanya yang dibutuhkan record fase 1: PDF untuk berita acara, faktur, dan kontrak;
      * JPG/PNG untuk foto; DOCX/XLSX untuk kajian dan anggaran. Jenisnya diperiksa dari isi berkas, bukan
@@ -228,7 +228,7 @@ return [
      */
     'attachments' => [
         'disk' => env('COREERP_ATTACHMENT_DISK', 's3'),
-        'max_kb' => (int) env('COREERP_ATTACHMENT_MAX_KB', 2048),
+        'max_kb' => (int) env('COREERP_ATTACHMENT_MAX_KB', 10240),
         'extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx'],
     ],
 
