@@ -47,6 +47,8 @@ final class WorkOrderListLayout extends BuiltinLayoutBuilder
         $sheet->setCellValue('B7', '${jumlah_work_order}');
         $sheet->setCellValue('C7', 'Dicetak');
         $sheet->setCellValue('D7', '${dicetak_pada}');
+        $sheet->setCellValue('A8', 'Filter tambahan');
+        $sheet->setCellValue('B8', '${filter_tambahan}');
 
         foreach ($headings as $index => $heading) {
             $sheet->setCellValue([$index + 1, 9], $heading);

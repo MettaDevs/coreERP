@@ -9,13 +9,22 @@ use App\Support\Modules\Contracts\FieldType;
 use App\Support\Modules\Contracts\FilterField;
 use App\Support\Modules\Contracts\InvalidFilterExpression;
 use Illuminate\Contracts\Database\Query\Builder;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\PabrikanAset;
+use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\SebabKerusakan;
+use Modules\Apperp\ManagementAset\Models\master\TindakanPerbaikan;
+use Modules\Apperp\ManagementAset\Models\master\TingkatLayanan;
+use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
+use Modules\Apperp\ManagementAset\Models\master\Trade;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 
@@ -44,6 +53,15 @@ final class AdditionalFilters
         'pabrikan-aset' => [PabrikanAset::class, 'nama'],
         'model-aset' => [ModelAset::class, 'nama'],
         'aset' => [Aset::class, 'nama'],
+        'buku-penyusutan' => [BukuPenyusutan::class, 'nama'],
+        'profil-penyusutan' => [ProfilPenyusutan::class, 'nama'],
+        'tipe-work-order' => [TipeWorkOrder::class, 'nama'],
+        'tingkat-layanan' => [TingkatLayanan::class, 'nama'],
+        'maintenance-job-types' => [MaintenanceJobType::class, 'nama'],
+        'maintenance-job-type-variants' => [MaintenanceJobTypeVariant::class, 'nama'],
+        'trade' => [Trade::class, 'nama'],
+        'sebab-kerusakan' => [SebabKerusakan::class, 'nama'],
+        'tindakan-perbaikan' => [TindakanPerbaikan::class, 'nama'],
     ];
 
     /** @return array<string, list<string>> */
@@ -68,6 +86,20 @@ final class AdditionalFilters
         foreach (self::valuesFor($item, $parameters) as $column => $value) {
             FieldFilterExpression::apply($query, $fields[$column], $value, $context->timezone);
         }
+    }
+
+    /**
+     * Apakah pengguna mengisi filter tambahan pada data item ini. Laporan yang mencetak satu baris per
+     * dokumen memakainya untuk menyaring dokumen lewat barisnya hanya bila baris memang difilter, supaya
+     * dokumen tanpa baris tidak hilang saat filter baris kosong.
+     *
+     * @param  array<string, mixed>  $parameters
+     *
+     * @throws InvalidFilterExpression
+     */
+    public static function active(ReportDataItem $item, array $parameters): bool
+    {
+        return self::valuesFor($item, $parameters) !== [];
     }
 
     /**

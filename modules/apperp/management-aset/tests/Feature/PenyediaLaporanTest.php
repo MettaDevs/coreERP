@@ -500,7 +500,7 @@ class PenyediaLaporanTest extends TestCase
 
         // Definisi menawarkan data item Aset dengan kolom bawaan dan kolom tabel lainnya, beserta tipenya.
         $definisi = $this->penyedia()->definisi('laporan-penyusutan-aset', $konteks);
-        $this->assertSame(['aset'], array_column($definisi['data_items'], 'key'));
+        $this->assertSame(['aset', 'buku'], array_column($definisi['data_items'], 'key'));
         $this->assertSame(['kode'], $definisi['data_items'][0]['default_fields']);
         $fields = array_column($definisi['data_items'][0]['fields'], null, 'key');
         $this->assertSame('number', $fields['acquisition_value']['type']);
@@ -518,6 +518,12 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('Aset — Lokasi: Gudang; Nilai perolehan: >1000000', $laporan['fields']['filter_tambahan']);
         $this->assertSame('Tidak ada', $run([])['fields']['filter_tambahan']);
 
+        // Bagian Buku aset menyaring buku yang dibaca, pada alias `buku` di query laporan.
+        $buku = fn (array $filters): array => $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'filters' => ['buku' => $filters]]);
+        $this->assertSame(['AST-F2', 'AST-F3'], $kode($buku(['acquisition_value' => '>=15000000', 'status' => ['active']])));
+        $this->assertSame([], $kode($buku(['status' => ['closed']])));
+        $this->assertSame('Buku aset — Status buku: Ditutup', $buku(['status' => ['closed']])['fields']['filter_tambahan']);
+
         // Kolom yang tidak ada di katalog dan ekspresi yang salah ditolak dengan pesan siap-baca.
         $this->assertGagalDengan('tidak dapat difilter', fn () => $run(['tenant_id' => 'x']));
         $this->assertGagalDengan('Nilai perolehan', fn () => $run(['acquisition_value' => 'abc']));
@@ -527,6 +533,81 @@ class PenyediaLaporanTest extends TestCase
             ->getJson('/api/modules/management-aset/v1/laporan/laporan-penyusutan-aset?periode=2026-08&filters[aset][acquisition_value]=%3E10000000')
             ->assertOk()
             ->assertJsonCount(2, 'data.tables.baris');
+    }
+
+    public function test_additional_filters_on_the_transfer_document_and_its_lines_both_narrow_rows(): void
+    {
+        $group = $this->master('aset_m_group_aset', 'Elektronik', 'GRPA-MF');
+        $jenis = $this->master('aset_m_jenis_aset', 'Laptop', 'JNSA-MF');
+        $tipe = $this->master('aset_m_tipe_lokasi_aset', 'Ruang', 'TLKA-MF');
+        $ruang = $this->master('aset_m_lokasi_aset', 'Ruang rapat', 'LOCA-MF', ['tipe_lokasi_id' => $tipe]);
+        $baik = $this->master('aset_m_kondisi_aset', 'Baik', 'KDA-MF1');
+        $rusak = $this->master('aset_m_kondisi_aset', 'Rusak', 'KDA-MF2');
+        foreach ([
+            ['MUTA-F1', 'Pindah penugasan', [['AST-MF1', $baik], ['AST-MF2', $rusak]]],
+            ['MUTA-F2', 'Perbaikan', [['AST-MF3', $baik]]],
+        ] as [$kode, $alasan, $lines]) {
+            $mutasiId = (string) Str::ulid();
+            DB::table('aset_tr_mutasi_aset')->insert([
+                'id' => $mutasiId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
+                'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId, 'tanggal' => '2026-09-17',
+                'tujuan_lokasi_id' => $ruang, 'tujuan_org_unit_id' => (string) Str::ulid(), 'alasan' => $alasan, 'status' => 'selesai',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            foreach ($lines as $index => [$asetKode, $kondisi]) {
+                DB::table('aset_tr_mutasi_aset_details')->insert([
+                    'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'mutasi_aset_id' => $mutasiId, 'line_number' => $index + 1,
+                    'aset_id' => $this->insertAsset($asetKode, '2026-01-10', 5000000, $group, $jenis), 'kondisi_aset_id' => $kondisi,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        }
+        $konteks = $this->konteks(['management-aset.mutasi-aset.read']);
+        $run = fn (array $filters): array => $this->penyedia()->dataset('daftar-mutasi-aset', $konteks, ['filters' => $filters]);
+        $aset = fn (array $laporan): array => array_column($laporan['tables']['baris'], 'aset_kode');
+
+        // Definisi menawarkan dokumen lalu barisnya, masing-masing dengan kolom bawaannya.
+        $definisi = $this->penyedia()->definisi('daftar-mutasi-aset', $konteks);
+        $this->assertSame(['mutasi', 'baris'], array_column($definisi['data_items'], 'key'));
+        $this->assertSame([['kode'], []], array_column($definisi['data_items'], 'default_fields'));
+
+        // Filter dokumen meloloskan semua baris dokumen yang cocok; filter baris hanya baris yang cocok.
+        $this->assertSame(['AST-MF1', 'AST-MF2'], $aset($run(['mutasi' => ['alasan' => '@*penugasan*']])));
+        $this->assertSame(['AST-MF1', 'AST-MF3'], $aset($run(['baris' => ['kondisi_aset_id' => [$baik]]])));
+
+        $laporan = $run(['mutasi' => ['alasan' => '@*penugasan*'], 'baris' => ['kondisi_aset_id' => [$baik]]]);
+        $this->assertSame(['AST-MF1'], $aset($laporan));
+        $this->assertSame(1, $laporan['fields']['jumlah_baris']);
+        $this->assertSame('Mutasi — Alasan mutasi: @*penugasan* · Baris mutasi — Kondisi: Baik', $laporan['fields']['filter_tambahan']);
+
+        // Kolom dokumen tidak dapat difilter lewat bagian baris.
+        $this->assertGagalDengan('tidak dapat difilter', fn () => $run(['baris' => ['alasan' => 'x']]));
+
+        // Layar mengirim filter tambahan sebagai `filters[<data item>][kolom]`.
+        $this->headers(['management-aset.mutasi-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/daftar-mutasi-aset?filters[mutasi][kode]=MUTA-F2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.tables.baris')
+            ->assertJsonPath('data.tables.baris.0.aset_kode', 'AST-MF3');
+    }
+
+    public function test_work_order_list_keeps_work_orders_whose_lines_match_and_totals_those_lines(): void
+    {
+        $this->workOrder();
+        $konteks = $this->konteks(['management-aset.pemeliharaan-aset.read']);
+        $run = fn (array $filters): array => $this->penyedia()->dataset('daftar-work-order', $konteks, ['filters' => $filters]);
+        $trade = (string) DB::table('aset_m_trade')->where('kode', 'TRDE-1')->value('id');
+
+        $cocok = $run(['baris' => ['trade_id' => [$trade], 'estimasi_jam' => '1..2']]);
+        $this->assertSame(['PMHA-000001'], array_column($cocok['tables']['baris'], 'kode'));
+        $this->assertSame(1, $cocok['tables']['baris'][0]['jumlah_baris']);
+        $this->assertSame(1.5, $cocok['tables']['baris'][0]['estimasi_jam']);
+        $this->assertSame('Baris pekerjaan — Bidang keahlian: Mekanik; Estimasi jam: 1..2', $cocok['fields']['filter_tambahan']);
+
+        // Work order tanpa baris yang cocok tidak ikut, dan filter work order sendiri tetap berlaku.
+        $this->assertSame([], $run(['baris' => ['estimasi_jam' => '>2']])['tables']['baris']);
+        $this->assertSame([], $run(['work_order' => ['status' => ['ditutup']]])['tables']['baris']);
+        $this->assertCount(1, $run(['work_order' => ['status' => ['draft'], 'kode' => 'PMHA-*']])['tables']['baris']);
     }
 
     public function test_depreciation_report_follows_the_fiscal_year_and_the_chosen_book(): void
@@ -575,6 +656,12 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('7500000.00', $laporan['fields']['total_nilai_buku']);
         $this->assertSame(3, $laporan['fields']['jumlah_dokumen']);
         $this->assertSame(['Semua', 'Semua buku komersial'], [$laporan['fields']['filter_dari'], $laporan['fields']['filter_buku']]);
+
+        // Filter tambahan pada dokumen dan pada asetnya sama-sama menyaring baris.
+        $filtered = fn (array $filters): array => array_column($this->penyedia()->dataset('laporan-pemusnahan-aset', $this->konteks($izin), ['filters' => $filters])['tables']['baris'], 'kode_aset');
+        $this->assertSame(['AST-PMS-1'], $filtered(['dokumen' => ['keterangan' => 'Terbakar']]));
+        $this->assertSame(['AST-PMS-2', 'AST-PMS-3'], $filtered(['aset' => ['kode' => 'AST-PMS-2|AST-PMS-3']]));
+        $this->assertSame(['AST-PMS-3'], $filtered(['dokumen' => ['tanggal' => '>=15/08/2026'], 'aset' => ['acquisition_value' => '<5000000']]));
 
         // Layar memakai format yang sama dengan hasil cetak, dan rentang tanggal sampai ke laporan.
         $this->headers($izin)

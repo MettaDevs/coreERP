@@ -8,11 +8,14 @@ use Brick\Math\BigDecimal;
 use Illuminate\Database\Query\JoinClause;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
@@ -70,9 +73,16 @@ final class AssetDisposalScrapReport implements ReportDefinition
         ];
     }
 
+    /**
+     * Dokumen lalu asetnya. Satu dokumen memuat satu aset, jadi filter pada keduanya sama-sama
+     * menyaring baris laporan.
+     */
     public function dataItems(): array
     {
-        return [];
+        return [
+            new ReportDataItem('dokumen', 'Dokumen pemusnahan', DokumenSiklusAset::class, 'aset_tr_dokumen_siklus_aset', ['kode']),
+            new ReportDataItem('aset', 'Aset', Aset::class, 'aset', ['kode']),
+        ];
     }
 
     public function fields(): array
@@ -127,6 +137,9 @@ final class AssetDisposalScrapReport implements ReportDefinition
 
         app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_dokumen_siklus_aset.legal_entity_id', 'aset_tr_dokumen_siklus_aset.responsible_org_unit_id');
         AssetReportFilters::apply($query, $parameters, 'aset');
+        foreach ($this->dataItems() as $item) {
+            AdditionalFilters::apply($query, $item, $parameters, $context);
+        }
         if (! empty($parameters['dari'])) {
             $query->where('aset_tr_dokumen_siklus_aset.tanggal', '>=', $parameters['dari']);
         }
