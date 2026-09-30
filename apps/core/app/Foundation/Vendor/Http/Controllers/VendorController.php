@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\Finance;
+namespace App\Foundation\Vendor\Http\Controllers;
 
-use App\Actions\Finance\SaveVendor;
+use App\Foundation\Vendor\Actions\SaveVendor;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
 use App\Models\NumberSequenceReference;
 use App\Models\Organization;
 use App\Models\Party;
 use App\Models\TenantMembership;
 use App\Models\TenantNumberSequence;
-use App\Models\Vendor;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
 use App\Support\Modules\Contracts\RowVersion;
@@ -54,7 +54,7 @@ final class VendorController extends Controller
             ->withQueryString()
             ->through(fn (Vendor $vendor): array => $this->present($vendor));
 
-        return Inertia::render('settings/vendors', [
+        return Inertia::render('foundation/vendor/vendors', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
             'filters' => ['q' => $kata, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Finance;
+namespace App\Foundation\Vendor\Actions;
 
 use App\Actions\NumberSequence\NumberSequenceService;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Models\Organization;
 use App\Models\Party;
 use App\Models\PartyRoleRegistration;
 use App\Models\TenantMembership;
-use App\Models\Vendor;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
 use App\Support\Modules\Contracts\RowVersion;

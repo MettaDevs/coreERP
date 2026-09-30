@@ -1,5 +1,6 @@
 <?php
 
+use App\Foundation\Vendor\Http\Controllers\VendorController;
 use App\Http\Controllers\Access\AccessController;
 use App\Http\Controllers\Access\InvitationCodeController;
 use App\Http\Controllers\Access\MembershipController;
@@ -18,7 +19,6 @@ use App\Http\Controllers\Finance\FinancePostingMonitorController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\Finance\IntegrationClientController;
 use App\Http\Controllers\Finance\ReferenceAccountController;
-use App\Http\Controllers\Finance\VendorController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;

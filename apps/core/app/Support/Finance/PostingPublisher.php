@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Finance;
 
+use App\Foundation\Vendor\Models\Vendor;
 use App\Models\FinancePosting;
 use App\Models\FinancePostingEvent;
 use App\Models\FinancePostingLine;
@@ -11,7 +12,6 @@ use App\Models\FinanceReferenceAccount;
 use App\Models\FinanceSettlementMode;
 use App\Models\LegalEntity;
 use App\Models\Organization;
-use App\Models\Vendor;
 use App\Support\BusinessUnitResolver;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PostingAccountResolvers;
