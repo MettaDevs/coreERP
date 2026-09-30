@@ -6,12 +6,15 @@ namespace Modules\Apperp\HumanResources\Tests\Feature;
 
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Modules\Apperp\HumanResources\Models\Worker;
 use RuntimeException;
@@ -129,6 +132,64 @@ class PenyaringanTenantTest extends TestCase
                 'name' => 'Pekerja titipan',
             ]);
         });
+    }
+
+    /**
+     * Lampiran pekerja (gap 7) mengikuti hak atas pekerjanya: `workers.read`, lalu hanya pekerja yang hari
+     * ini memegang posisi di unit kerja pengguna. Isinya data pribadi. Yang boleh melampirkan adalah yang
+     * boleh menambah pekerja (K-20).
+     */
+    public function test_lampiran_pekerja_mengikuti_lingkup_pekerjanya(): void
+    {
+        Storage::fake('s3');
+        $tenantId = $this->buatTenantUji();
+        $unitBoleh = $this->buatUnitKerja($tenantId);
+        $unitLain = $this->buatUnitKerja($tenantId);
+        $pekerja = $this->seedPekerja($tenantId, 'Pekerja unit ini');
+        $pekerjaLain = $this->seedPekerja($tenantId, 'Pekerja kantor lain');
+        $this->seedPenugasan($tenantId, $pekerja, $this->seedPosisi($tenantId, $unitBoleh, 'Perawat'));
+        $this->seedPenugasan($tenantId, $pekerjaLain, $this->seedPosisi($tenantId, $unitLain, 'Perawat'));
+        $lampiran = $this->seedLampiran($tenantId, $pekerja);
+        $lampiranLain = $this->seedLampiran($tenantId, $pekerjaLain);
+
+        $this->sebagaiPengguna($tenantId, ['human-resources.workers.read'], [
+            ['policy_code' => self::KEBIJAKAN, 'organization_id' => $unitBoleh],
+        ]);
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $lampiran)
+            ->assertJsonPath('data.0.data_class', DataClass::EndUserIdentifiableInformation->value)
+            ->assertJsonPath('meta.can_change', false);
+        $this->get('/api/v1/attachments/'.$lampiran.'/download')->assertOk();
+        $this->post('/api/v1/records/hr_workers/'.$pekerja.'/attachments', [
+            'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
+        ], ['Accept' => 'application/json'])->assertForbidden();
+
+        $this->sebagaiPengguna($tenantId, ['human-resources.workers.read', 'human-resources.workers.create'], [
+            ['policy_code' => self::KEBIJAKAN, 'organization_id' => $unitBoleh],
+        ]);
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')->assertOk()->assertJsonPath('meta.can_change', true);
+        $this->post('/api/v1/records/hr_workers/'.$pekerja.'/attachments', [
+            'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.data_class', DataClass::EndUserIdentifiableInformation->value);
+        $this->post('/api/v1/records/hr_workers/'.$pekerjaLain.'/attachments', [
+            'file' => UploadedFile::fake()->createWithContent('ktp.pdf', '%PDF-1.4'),
+        ], ['Accept' => 'application/json'])->assertNotFound();
+
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerjaLain.'/attachments')->assertNotFound();
+        $this->get('/api/v1/attachments/'.$lampiranLain.'/download')->assertNotFound();
+
+        // Tanpa hak baca pekerja, lampirannya juga tertutup.
+        $this->sebagaiPengguna($tenantId, ['human-resources.positions.read']);
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')->assertNotFound();
+        $this->get('/api/v1/attachments/'.$lampiran.'/download')->assertNotFound();
+
+        // Pengguna tenant lain dengan akses seluruh organisasinya sendiri.
+        $this->sebagaiPengguna($this->buatTenantUji(), ['human-resources.workers.read']);
+        $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')->assertNotFound();
+        $this->get('/api/v1/attachments/'.$lampiran.'/download')->assertNotFound();
     }
 
     /**
@@ -333,10 +394,11 @@ class PenyaringanTenantTest extends TestCase
      * kebocoran antar tenant mustahil ditulis, yaitu membuang penjagaan terpenting demi
      * menegakkan aturannya.
      */
-    private function seedPosisi(string $tenantId, string $unitKerjaId, string $nama): void
+    private function seedPosisi(string $tenantId, string $unitKerjaId, string $nama): string
     {
+        $id = (string) Str::ulid();
         DB::table('hr_positions')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $id,
             'tenant_id' => $tenantId,
             'creation_key' => 'position-'.Str::ulid(),
             'code' => 'POSH'.Str::random(5),
@@ -347,12 +409,15 @@ class PenyaringanTenantTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        return $id;
     }
 
-    private function seedPekerja(string $tenantId, string $nama): void
+    private function seedPekerja(string $tenantId, string $nama): string
     {
+        $id = (string) Str::ulid();
         DB::table('hr_workers')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $id,
             'tenant_id' => $tenantId,
             'creation_key' => 'worker-'.Str::ulid(),
             'personnel_number' => 'PEGH-'.Str::random(6),
@@ -360,6 +425,45 @@ class PenyaringanTenantTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        return $id;
+    }
+
+    private function seedPenugasan(string $tenantId, string $pekerjaId, string $posisiId): void
+    {
+        DB::table('hr_worker_position_assignments')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $tenantId,
+            'worker_id' => $pekerjaId,
+            'position_id' => $posisiId,
+            'valid_from' => '2026-01-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** Lampiran pekerja disisipkan langsung, supaya test baca tidak bergantung pada jalur unggah. */
+    private function seedLampiran(string $tenantId, string $pekerjaId): string
+    {
+        $id = (string) Str::ulid();
+        $path = 'attachments/'.$tenantId.'/'.$id;
+        Storage::disk('s3')->put($path, 'kontrak kerja');
+        DB::table('document_attachments')->insert([
+            'id' => $id,
+            'tenant_id' => $tenantId,
+            'record_type' => 'hr_workers',
+            'record_id' => $pekerjaId,
+            'file_name' => 'Kontrak.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen('kontrak kerja'),
+            'storage_path' => $path,
+            'content_hash' => hash('sha256', 'kontrak kerja'),
+            'data_class' => DataClass::EndUserIdentifiableInformation->value,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
     }
 
     /**

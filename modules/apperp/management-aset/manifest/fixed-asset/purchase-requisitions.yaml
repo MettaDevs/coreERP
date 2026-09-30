@@ -15,10 +15,16 @@ security:
       name: Buat permintaan pembelian aset
       entry_point: management-aset.permintaan-pembelian-aset.api
       access: create
+    # K-21 analisa gap BC: endpoint ubah permintaan sudah memeriksa permission ini sejak lahir, tetapi
+    # baru dideklarasikan di sini; tanpa itu tidak ada yang dapat mengubah atau melampiri permintaan.
+    - code: management-aset.permintaan-pembelian-aset.update
+      name: Ubah permintaan pembelian aset
+      entry_point: management-aset.permintaan-pembelian-aset.api
+      access: update
   privileges:
     - code: management-aset.permintaan-pembelian-aset.maintain
       name: Kelola permintaan pembelian aset
-      permissions: [management-aset.permintaan-pembelian-aset.read, management-aset.permintaan-pembelian-aset.create]
+      permissions: [management-aset.permintaan-pembelian-aset.read, management-aset.permintaan-pembelian-aset.create, management-aset.permintaan-pembelian-aset.update]
   duties:
     - code: management-aset.permintaan-pembelian-aset.manage
       name: Kelola permintaan pembelian aset

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
+use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
@@ -24,6 +25,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderList;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
+use Modules\Apperp\ManagementAset\Services\AssetAttachments;
 use Modules\Apperp\ManagementAset\Services\AssetChangeLogValues;
 use Modules\Apperp\ManagementAset\Services\PostingGroupAccountResolver;
 
@@ -105,6 +107,12 @@ final class ModuleServiceProvider extends ServiceProvider
         // Riwayat perubahan aset menampilkan nama lokasi, kondisi, unit kerja, dan label status, bukan ULID
         // dan kode yang tersimpan di log.
         $this->app->make(ChangeLogValueResolvers::class)->register($this->app->make(AssetChangeLogValues::class));
+
+        // Lampiran dokumen di Core (gap 7): register aset dan dokumen transaksinya. Core menanyakan hak atas
+        // record induk ke sini, dan jawabannya memakai permission serta lingkup organisasi yang sama dengan layar.
+        foreach (AssetAttachments::types() as $type) {
+            $this->app->make(AttachmentRecordTypes::class)->register($type);
+        }
 
         // Tidak ada lagi alias `coreerp-event`. Dua panggilan balik HTTP yang memakainya —
         // keputusan workflow dan penyediaan data awal tenant — keduanya sudah menjadi event

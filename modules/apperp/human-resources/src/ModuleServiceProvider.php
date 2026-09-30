@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources;
 
+use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\HumanResources\Services\WorkerAttachments;
 use Modules\Apperp\HumanResources\Services\WorkerChangeLogValues;
 
 /**
@@ -27,6 +29,9 @@ final class ModuleServiceProvider extends ServiceProvider
     {
         // Riwayat perubahan pekerja menampilkan nama anggota yang ditautkan, bukan id keanggotaannya.
         $this->app->make(ChangeLogValueResolvers::class)->register($this->app->make(WorkerChangeLogValues::class));
+
+        // Lampiran dokumen di Core (gap 7): pekerja. Core menanyakan hak atas pekerjanya ke sini.
+        $this->app->make(AttachmentRecordTypes::class)->register(new WorkerAttachments);
 
         $this->app->booted(function (): void {
             // Grup `web` diperlukan, bukan pilihan gaya: konteks module dibaca dari sesi Core,

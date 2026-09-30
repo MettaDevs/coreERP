@@ -27,6 +27,7 @@ security:
         - management-aset.perencanaan-aset.archive
         - management-aset.permintaan-pembelian-aset.read
         - management-aset.permintaan-pembelian-aset.create
+        - management-aset.permintaan-pembelian-aset.update
         - management-aset.pemeliharaan-aset.read
         - management-aset.pemeliharaan-aset.create
         - management-aset.pemeliharaan-aset.update

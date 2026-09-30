@@ -690,6 +690,52 @@ Record yang diberi lampiran pada fase 1, mengikuti pola BC:
 Apakah lampiran penerimaan ikut ke aset yang lahir dari penerimaan itu, mirip *Document Flow* di BC,
 diputuskan di K-07.
 
+### Yang sudah dibangun (area 6)
+
+- **Satu tabel `document_attachments`** (K-09): tenant, jenis record (nama tabel induk), ID record, nomor
+  baris dokumen yang opsional, nama berkas, jenis isi (dibaca dari isi berkas, bukan dari nama), ukuran,
+  lokasi di disk, hash SHA-256, klasifikasi, kolom jejak dan versi, `created_at`, dan `deleted_at`. Pelampir
+  adalah `created_by_user_id` (K-01). Tanpa foreign key ke induk, karena induknya bisa tabel module. Model
+  `App\Models\DocumentAttachment`; bawaan tabel `CustomerContent` seperti BC, dengan `file_name` sebagai
+  data pribadi karena orang menamai berkas dengan nama orang.
+- **Pendaftaran jenis record lewat kontrak** `AttachmentRecordType` dan `AttachmentRecordTypes` di
+  `App\Support\Modules\Contracts`. Pemilik tabel menyatakan klasifikasi lampirannya dan menjawab boleh
+  membuka, boleh mengubah, dan ada-tidaknya baris dokumen. Core memasang konteks module pemiliknya lebih
+  dulu (`ResolveAttachmentContext` memakai `ResolveModuleContext`), jadi jawabannya memakai permission dan
+  kebijakan organisasi yang sama dengan layar record itu. Core tidak membaca tabel module.
+- **Klasifikasi mengikuti induk**: disalin ke kolom `data_class` saat diunggah. `hr_workers` dan `vendors`
+  `EndUserIdentifiableInformation` (vendor bisa perorangan, aturan yang sama dengan `vendors.tax_number`);
+  dokumen aset `CustomerContent`.
+- **Berkas di disk `s3`** lewat `coreerp.attachments.disk`, di `attachments/<tenant>/<id lampiran>` tanpa
+  nama berkas. Setiap unduhan menghitung ulang hash-nya; isi yang berbeda atau berkas yang hilang tidak
+  dikirim, dijawab 500 `attachment_corrupted`, dan dilaporkan sebagai `AttachmentContentMismatch`.
+- **Endpoint** sesi login di bawah `api/v1`, untuk layar Shell (tanpa kontrak `internal/v1`):
+  `GET`/`POST records/{tabel}/{id}/attachments`, `GET attachments/{id}/download`, dan
+  `DELETE attachments/{id}` dengan `If-Match` atau `version`. Record yang tidak boleh dibuka dijawab 404;
+  boleh dibuka tetapi tidak boleh diubah dijawab 403. Daftar memulangkan `meta.can_change`, batas ukuran,
+  dan jenis berkas yang diterima.
+- **Batas unggah bawaan** (K-22): 10 MB (`COREERP_ATTACHMENT_MAX_KB`), jenis PDF, JPG/JPEG, PNG, DOCX, dan
+  XLSX, diperiksa dari ekstensi dan isinya. Image Core menyetel `upload_max_filesize` 10M dan
+  `post_max_size` 12M (`apps/core/Dockerfile`); tanpa itu PHP menolak berkas di atas 2 MB sebelum validasi.
+- **Pendaftaran fase 1**: tujuh tabel aset (`AssetAttachments`), `hr_workers` (`WorkerAttachments`), dan
+  `vendors` (`VendorAttachments`). Hak ubah memakai permission `update` resource-nya; pekerja dan dokumen
+  siklus aset, yang tidak punya permission ubah, memakai `create` (K-20). Permission ubah permintaan pembelian
+  aset kini dideklarasikan di manifest (K-21). Status dokumen tidak menahan lampiran, seperti lampiran pada
+  dokumen terposting di BC. Baris dokumen menempel ke header
+  dengan `line_number` untuk penerimaan, mutasi, work order, perencanaan, dan permintaan pengadaan.
+- **Tidak didaftarkan untuk retensi**: lampiran data bisnis dan hanya diarsipkan.
+- **Test B-6**: `tests/Feature/Attachments/DocumentAttachmentTest.php` (vendor, antar tenant, hash, arsip
+  dan versi, batas unggah, daftar pendaftaran), `LampiranDokumenAsetTest` di module aset (hak baca/ubah,
+  lingkup organisasi, antar tenant, baris dokumen, dokumen siklus dengan `create`, dan pemegang duty kelola
+  permintaan pembelian yang mengubah serta melampiri permintaan lewat katalog hasil `app:register-manifest`),
+  dan `PenyaringanTenantTest` di module HR (lingkup pekerja, data pribadi, pelampir dengan `workers.create`).
+
+Yang belum:
+
+- Tampilan lampiran di layar dibuat di PRD lain.
+- Compose on-prem (`deploy/compose.edition.yaml`) belum menyetel disk S3, jadi lampiran di server on-prem
+  belum punya tempat simpan sampai disk-nya disiapkan di sana.
+
 ## Gap 10: job latar dan ekspor laporan {#gap-10}
 
 ### Pertanyaan pemilik
@@ -770,6 +816,9 @@ yang jelas. Laporan tetap di server.
 | K-17 | Cadangan nomor berurutan di layar retensi | **Diputuskan 30 Sep 2026:** tidak tampil di layar tenant dan tidak dapat diatur tenant; masa simpannya hanya lewat config operator (`COREERP_CONFIRMED_POOL_RETENTION_DAYS`). Isinya pemeliharaan database: nomor yang terbit tetap tercatat di `number_sequence_issues`. Menyimpang dari pola BC yang menampilkan semua tabel terdaftar; BC sendiri tidak punya padanan tabel cadangan ini |
 | K-18 | Klasifikasi dan telemetri | **Diputuskan 30 Sep 2026:** SigNoz (di server sendiri) tetap menerima laporan kesalahan utuh. Hanya notifikasi Discord (pihak ketiga) yang dibersihkan: kelas exception, method dan rute, status, `tenant_id`, jejak dan tautan ke SigNoz; tanpa nama orang, email, nama tenant, user agent, atau pesan exception dan SQL bernilai. Menyimpang dari BC, yang hanya mengirim `SystemMetadata` ke telemetri, karena SigNoz bukan pihak ketiga |
 | K-19 | Tabel tenant tanpa model | **Diputuskan 30 Sep 2026:** dinyatakan di satu kelas registry per pemilik, satu untuk Core dan satu per module, berisi tabel, bawaan, dan timpaan kolom. Test membaca model dan registry |
+| K-20 | Hak melampiri record tanpa permission ubah | **Diputuskan 30 Sep 2026:** `hr_workers` dan `aset_tr_dokumen_siklus_aset` memakai permission `create` resource-nya yang sudah ada (`human-resources.workers.create`, `management-aset.<jenis dokumen>.create`) sebagai hak mengubah, termasuk melampirkan dan mengarsipkan lampiran. Tidak ada kode permission baru |
+| K-21 | Permission ubah permintaan pembelian aset | **Diputuskan 30 Sep 2026:** `management-aset.permintaan-pembelian-aset.update` (akses `update`, entry point API permintaan) dideklarasikan di manifest, masuk privilege `management-aset.permintaan-pembelian-aset.maintain` di duty `management-aset.permintaan-pembelian-aset.manage`. Controller-nya sudah memeriksa permission itu sejak lahir |
+| K-22 | Batas unggah lampiran | **Diputuskan 30 Sep 2026:** 10 MB (`COREERP_ATTACHMENT_MAX_KB` bawaan 10240), jenis PDF, JPG/JPEG, PNG, DOCX, XLSX. Image Core menyetel `upload_max_filesize` 10M dan `post_max_size` 12M |
 
 ## Sumber {#sumber}
 

@@ -174,6 +174,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libp
     && a2enmod rewrite \
     && sed -ri 's!/var/www/html!/var/www/repo/apps/core/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
+# Batas unggah PHP mengikuti batas lampiran dokumen, 10 MB (`coreerp.attachments.max_kb`, K-22 analisa gap
+# BC). Bawaan PHP 2 MB menolak berkas yang lebih besar sebelum validasi Laravel berjalan, dengan pesan yang
+# tidak menyebut batasnya. `post_max_size` sedikit di atasnya untuk isian form lain di permintaan yang sama.
+RUN printf 'upload_max_filesize = 10M\npost_max_size = 12M\n' > "$PHP_INI_DIR/conf.d/coreerp-uploads.ini"
 WORKDIR /repo
 # Ini satu-satunya tahap yang dikirim ke pelanggan, jadi ini satu-satunya tahap yang isinya
 # harus bersih. Tahap `vendor` dan `assets` di atas boleh memuat module apa pun sepanjang

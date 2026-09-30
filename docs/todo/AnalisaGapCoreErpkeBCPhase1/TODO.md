@@ -157,7 +157,7 @@ Rujukan: [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5).
       bernilai. Menyimpang dari BC, yang hanya mengirim `SystemMetadata` ke telemetri.
 - [x] 5.6 Test yang gagal bila ada tabel tenant tanpa klasifikasi (padanan AS0016).
 
-### 6. [ ] Layanan lampiran dokumen (gap 7)
+### 6. [x] Layanan lampiran dokumen (gap 7)
 
 **Tempat:** Core, dipakai module · **Setelah:** 5, 0.1, 0.7 · **Selesai bila:** record di daftar fase 1
 dapat diberi lampiran lewat layanan Core, haknya mengikuti record induk, dan test B-6 lulus. Tampilan
@@ -165,14 +165,16 @@ lampiran dibuat di PRD lain.
 
 Rujukan: [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 
-- [ ] 6.1 Satu tabel lampiran untuk semua record (K-09): tenant, jenis record, ID record, baris dokumen
+- [x] 6.1 Satu tabel lampiran untuk semua record (K-09): tenant, jenis record, ID record, baris dokumen
       (opsional), metadata berkas, lokasi di disk, hash isi, pelaku (nama kolom sesuai K-01), waktu,
       `deleted_at`.
-- [ ] 6.2 Penyimpanan di disk `s3`.
-- [ ] 6.3 Pemeriksaan hak berdasarkan record induk.
-- [ ] 6.4 Klasifikasi lampiran mengikuti induknya.
-- [ ] 6.5 Endpoint unggah, daftar, unduh, dan arsip.
-- [ ] 6.6 Pendaftaran record fase 1 sesuai tabel di README.
+- [x] 6.2 Penyimpanan di disk `s3`, dengan hash yang diperiksa saat diunduh.
+- [x] 6.3 Pemeriksaan hak berdasarkan record induk.
+- [x] 6.4 Klasifikasi lampiran mengikuti induknya.
+- [x] 6.5 Endpoint unggah, daftar, unduh, dan arsip.
+- [x] 6.6 Pendaftaran record fase 1 sesuai tabel di README. Pekerja HR dan dokumen siklus aset memakai
+      permission `create` sebagai hak ubah (K-20); permission ubah permintaan pembelian aset dideklarasikan
+      di manifest (K-21). Batas unggah 10 MB (K-22).
 
 ### 7. [x] Zona waktu dan tanggal kerja pengguna (gap 3)
 
@@ -242,7 +244,7 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       bertimpaan kolom yang tidak ada, atau berkolom nama/email/alamat yang ikut bawaan tanpa ditulis
       eksplisit membuat test gagal. Nama orang, email, nama tenant, dan SQL bernilai di laporan kesalahan
       tidak sampai ke Discord, sementara atribut untuk SigNoz tetap utuh.
-- [ ] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
+- [x] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
       lampirannya. Lampiran tidak bocor antar tenant. Hash yang tidak cocok terdeteksi.
 - [x] **B-7** (area 7) Pukul 00.30 WIB (17.30 UTC hari sebelumnya), "hari ini" bagi pengguna berzona
       `Asia/Jakarta` adalah tanggal WIB, bukan tanggal UTC. Waktu di layar dan cetakan mengikuti zona

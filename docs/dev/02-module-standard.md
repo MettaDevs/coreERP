@@ -479,6 +479,50 @@ didaftarkan dan tetap hanya diarsipkan.
   ditulis ke `retention_policy_log_entries` bila ada baris terhapus atau penghapusan gagal. Perintah lain
   yang perlu menghapus log berdasarkan umur memanggil layanan yang sama, tidak menulis `DELETE` sendiri.
 
+### Lampiran dokumen
+
+Lampiran semua record disimpan Core di satu tabel, `document_attachments`, padanan `Document Attachment`
+di Business Central ([analisa gap BC, gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7)). Module tidak
+menyimpan berkas sendiri. Yang dikerjakan module hanya satu: **mendaftarkan tabel yang boleh diberi
+lampiran, beserta jawaban atas hak record-nya.**
+
+```php
+use App\Support\Modules\Contracts\AttachmentRecordTypes;
+
+// Di boot() penyedia layanan module.
+$this->app->make(AttachmentRecordTypes::class)->register(new WorkerAttachments);
+```
+
+Kelasnya memakai kontrak `AttachmentRecordType`:
+
+| Method | Isinya |
+| --- | --- |
+| `recordType()` | Nama tabel induk, misalnya `hr_workers`. Hanya tabel milik module itu sendiri. |
+| `moduleId()` | Id module. Core memasang konteks module ini sebelum bertanya, sama seperti rute module. |
+| `dataClass()` | Klasifikasi isi lampiran, mengikuti induknya. Lampiran pekerja `EndUserIdentifiableInformation`, dokumen aset `CustomerContent`. Disalin ke kolom `data_class` setiap lampiran. |
+| `canRead($tenantId, $recordId)` | Boleh membuka record itu: permission baca **dan** kebijakan organisasinya, persis seperti endpoint detailnya. Record yang tidak ada atau diarsipkan: `false`. |
+| `canChange($tenantId, $recordId)` | Boleh mengubah record itu, yang juga berarti boleh melampirkan dan mengarsipkan lampirannya. Resource tanpa permission ubah memakai permission `create`-nya. |
+| `hasLine($tenantId, $recordId, $lineNumber)` | Dokumen itu punya baris bernomor ini (`line_number` di tabel `_details`). Tabel tanpa baris menjawab `false`. |
+
+- **Hak mengikuti record induk.** Lampiran tidak punya permission sendiri. Jawaban module dibaca lewat
+  `KonteksPermintaan` dan model module yang memakai `MilikTenant`, jadi `tenantId` tidak perlu ditulis
+  ulang di query. Core tidak pernah membaca tabel module.
+- **Baris dokumen menempel ke dokumennya.** Lampiran pada baris dokumen didaftarkan pada tabel header
+  dengan nomor baris, seperti `Line No.` di BC; tabel `_details` tidak didaftarkan sendiri.
+- **Rute milik Core**, dipanggil layar dengan sesi login: `GET` dan `POST
+  /api/v1/records/{tabel}/{id}/attachments`, `GET /api/v1/attachments/{id}/download`, dan `DELETE
+  /api/v1/attachments/{id}` dengan versi baris. Record yang tidak boleh dibuka dijawab 404, sama dengan
+  record yang tidak ada; boleh dibuka tetapi tidak boleh diubah dijawab 403.
+- **Berkas di disk `coreerp.attachments.disk`** (bawaannya `s3`), dengan hash SHA-256 yang diperiksa
+  setiap kali diunduh. Isi yang tidak cocok lagi tidak dikirim; kejadiannya dilaporkan. Batas unggah ada
+  di `coreerp.attachments`: 10 MB, PDF, JPG/JPEG, PNG, DOCX, dan XLSX. Image Core menyetel
+  `upload_max_filesize` 10M dan `post_max_size` 12M; batas yang dinaikkan di config wajib dinaikkan juga di
+  sana.
+- **Arsip, bukan hapus.** Lampiran diarsipkan dengan `deleted_at` dan berkasnya tetap di disk. Lampiran
+  data bisnis, jadi tidak didaftarkan untuk retensi.
+- **Tabel yang diberi lampiran** mengikuti pola BC: master data dan dokumen, bukan setup, data referensi,
+  atau entry hasil hitungan. Daftar fase 1 ada di [gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
+
 ### Penghapusan lunak
 
 Tidak ada baris yang dihapus fisik. Menghapus berarti mengisi `deleted_at`; baris itu tetap ada di
