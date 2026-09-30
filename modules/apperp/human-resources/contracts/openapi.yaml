@@ -18,7 +18,7 @@ paths:
       summary: Mencari anggota Core untuk ditautkan ke pekerja
       description: |
         `q` mencari nama atau email (paling banyak 20 hasil). `email` mencocokkan email persis tanpa
-        membedakan huruf besar, untuk usulan tautan di form pekerja. Hanya anggota tenant aktif yang
+        membedakan huruf besar, untuk usulan tautan pekerja. Hanya anggota tenant aktif yang
         dipulangkan. Setiap anggota membawa `linked_worker_id`, pekerja yang sudah memegang akun itu.
       parameters:
         - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }

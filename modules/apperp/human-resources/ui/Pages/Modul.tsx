@@ -12,15 +12,11 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import WorkersPage from '../workers/WorkersPage';
 
 /**
  * Satu halaman Inertia untuk seluruh menu module Human Resources.
  *
- * Menu Pekerja sudah punya layar (`../workers/WorkersPage.tsx`, untuk tautan akun pengguna). Menu
- * lain belum.
- *
- * **Layar lainnya memang belum ada, dan halaman ini tidak berpura-pura sebaliknya.** Yang dipindah
+ * **Layarnya memang belum ada, dan halaman ini tidak berpura-pura sebaliknya.** Yang dipindah
  * pada fase ini adalah jalur masuknya, bukan isinya: dulu tiap menu dibuka perutean hash di
  * dalam aplikasi Vite tersendiri (`#/workers`), sekarang ia dibuka rute shell
  * `/human-resources/{view}/{sisa?}` dan propertinya sudah ada sejak halaman pertama tampil.
@@ -51,15 +47,6 @@ export type PropsModul = {
 };
 
 export default function Modul({ view, segments, permissions }: PropsModul) {
-    if (view === 'workers') {
-        return (
-            <>
-                <Head title="Pekerja" />
-                <WorkersPage permissions={permissions} />
-            </>
-        );
-    }
-
     /*
      * Yang disebut di layar adalah id entri menunya, bukan labelnya.
      *

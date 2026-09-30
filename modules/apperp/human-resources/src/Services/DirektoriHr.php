@@ -81,7 +81,7 @@ final class DirektoriHr
 
     /**
      * Anggota aktif tenant yang emailnya sama persis dengan email pekerja, tanpa membedakan huruf besar
-     * (TODO analisa gap BC 9.1). Dipakai sebagai usulan tautan di form pekerja; yang memutuskan tetap
+     * (TODO analisa gap BC 9.1). Dipakai sebagai usulan tautan pekerja; yang memutuskan tetap
      * pengguna. Hanya anggota tenant itu yang bisa muncul, karena kontrak Core menyaring per tenant.
      *
      * @return list<array{membership_id: string, name: string, email: string}>

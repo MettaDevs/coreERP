@@ -443,14 +443,13 @@ tabel pengguna Core.
 
 ### Yang sudah dibangun (area 9)
 
-- **Form akun pengguna pekerja di module HR** (Tenaga kerja → Pekerja, `/human-resources/workers`). Module
-  HR belum punya layar sama sekali, jadi menu Pekerja kini berisi layar sekecil yang dibutuhkan tautan ini:
-  daftar pekerja dengan akun yang tertaut (nama dan email, bukan id) dan aksi baris **Atur akun pengguna**.
-  Menambah dan mengubah pekerja tetap lewat API.
-- **Usulan tautan dari email.** Bila email pekerja sama persis dengan email akun di tenant yang sama (tanpa
-  membedakan huruf besar), form menampilkan usulan dengan tombol **Pakai akun ini**; tautannya baru
-  tersimpan setelah Simpan. Akun yang sudah dipegang pekerja lain tidak diusulkan dan ditandai di daftar
-  pilihan.
+- **Tautan lewat API saja (K-23).** Module HR belum punya layar; menu Pekerja tetap halaman pengganti
+  "Layar ini belum dipindah". Usulan dan penyimpanan tautan tersedia untuk layar yang kelak dibangun dan
+  untuk pemanggil API.
+- **Usulan tautan dari email.** `GET /api/modules/human-resources/v1/core-members?email=` memulangkan akun
+  tenant yang sama yang emailnya sama persis dengan email pekerja (tanpa membedakan huruf besar). Setiap akun
+  membawa `linked_worker_id`, sehingga akun yang sudah dipegang pekerja lain bisa dilewatkan. Yang
+  memutuskan tetap pengguna. `GET workers` kini ikut membawa nama dan email akun yang tertaut (`account`).
 - **Satu akun, satu pekerja.** `hr_workers_core_membership_active_unique` menggantikan indeks unik lama,
   kini parsial untuk pekerja yang belum diarsipkan. Controller menolaknya lebih dulu dengan 422, dan
   penyimpanan bersamaan yang lolos pemeriksaan tertahan indeks yang sama, juga dijawab 422.
@@ -845,6 +844,7 @@ yang jelas. Laporan tetap di server.
 | K-20 | Hak melampiri record tanpa permission ubah | **Diputuskan 30 Sep 2026:** `hr_workers` dan `aset_tr_dokumen_siklus_aset` memakai permission `create` resource-nya yang sudah ada (`human-resources.workers.create`, `management-aset.<jenis dokumen>.create`) sebagai hak mengubah, termasuk melampirkan dan mengarsipkan lampiran. Tidak ada kode permission baru |
 | K-21 | Permission ubah permintaan pembelian aset | **Diputuskan 30 Sep 2026:** `management-aset.permintaan-pembelian-aset.update` (akses `update`, entry point API permintaan) dideklarasikan di manifest, masuk privilege `management-aset.permintaan-pembelian-aset.maintain` di duty `management-aset.permintaan-pembelian-aset.manage`. Controller-nya sudah memeriksa permission itu sejak lahir |
 | K-22 | Batas unggah lampiran | **Diputuskan 30 Sep 2026:** 10 MB (`COREERP_ATTACHMENT_MAX_KB` bawaan 10240), jenis PDF, JPG/JPEG, PNG, DOCX, XLSX. Image Core menyetel `upload_max_filesize` 10M dan `post_max_size` 12M |
+| K-23 | Layar tautan pekerja HR | **Diputuskan 30 Sep 2026:** module HR belum punya layar; tautan pekerja lewat API saja, fokus module aset. Menu Pekerja tetap halaman pengganti; kolom Pekerja di layar anggota Core tetap ada |
 
 ## Sumber {#sumber}
 

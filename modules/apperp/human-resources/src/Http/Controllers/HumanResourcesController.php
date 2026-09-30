@@ -45,7 +45,7 @@ final class HumanResourcesController extends Controller
 
     /**
      * Anggota tenant untuk ditautkan ke pekerja: dicari lewat `q`, atau dicocokkan persis lewat `email` untuk
-     * usulan tautan di form pekerja (TODO analisa gap BC 9.1). Setiap anggota membawa `linked_worker_id`,
+     * usulan tautan (TODO analisa gap BC 9.1; lewat API saja, K-23). Setiap anggota membawa `linked_worker_id`,
      * pekerja yang sudah memegang akun itu, supaya layar bisa melewatkannya tanpa menampilkan pekerja yang
      * mungkin di luar lingkup pengguna.
      */

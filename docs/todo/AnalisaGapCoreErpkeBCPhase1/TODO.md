@@ -218,12 +218,14 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 
 ### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 
-**Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** form pekerja HR
-mengusulkan keanggotaan yang cocok, pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
+**Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** API pekerja HR
+mengusulkan keanggotaan yang cocok (tanpa layar HR, K-23), pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
 
 Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
-- [x] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
+- [x] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email, lewat API saja
+      (`GET core-members?email=`, `PATCH workers/{worker}/core-membership`); module HR belum punya layar
+      (K-23).
 - [x] 9.2 Pekerja yang tertaut tampil di layar pengguna.
 
 ---
