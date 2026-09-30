@@ -57,6 +57,7 @@ export default withMermaid({
       'todo/AnalisaGapCoreErpkeBCPhase1/index.md',
     'todo/buku-alamat-global/README.md':
       'todo/buku-alamat-global/index.md',
+    'todo/lapis-core/README.md': 'todo/lapis-core/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -365,6 +366,16 @@ export default withMermaid({
                 {
                   text: 'Bentuk lokasi, peran, dan relasi',
                   link: '/todo/buku-alamat-global/',
+                },
+              ],
+            },
+            {
+              text: 'Lapis Platform dan Foundation',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Memecah Core per lapis',
+                  link: '/todo/lapis-core/',
                 },
               ],
             },
