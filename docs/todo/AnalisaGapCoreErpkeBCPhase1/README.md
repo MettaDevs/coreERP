@@ -805,8 +805,17 @@ Yang belum setara:
    [gap 8](#di-luar-fase-1) (K-08).
 4. **Batas baris tidak bisa dinaikkan per laporan** di bawah batas maksimum. Ini opsional.
 
-Ekspor baris yang sedang tampil di tabel boleh dibuat di frontend sebagai tambahan, dengan batas baris
-yang jelas. Laporan tetap di server.
+~~Ekspor baris yang sedang tampil di tabel boleh dibuat di frontend sebagai tambahan, dengan batas baris
+yang jelas.~~ Diputuskan lain pada 1 Oktober 2026 (K-27): ekspor daftar juga lewat antrean ekspor server,
+untuk semua baris yang cocok, bukan hanya yang dimuat layar. Laporan tetap di server.
+
+Keputusan 1 Oktober 2026 (K-24 sampai K-29) menambah padanan BC berikut. Yang ditiru: request page
+berisi opsi dan filter per data item, "Last used options and filters" dan preset bernama per pengguna
+atau bersama (tabel *Object Options*, page 1560 *Report Settings*), Send to Excel (data only), dan Open
+in Excel pada list page — baris dan kolom yang tampil dengan filter halaman itu, tanpa layout. Yang
+sengaja tidak ditiru: RDLC, sintaks filter tekstual penuh untuk pengguna awam, filter pada field tabel
+mana pun (dataset adalah kontrak, dan kebijakan data berlaku), Edit in Excel yang menulis balik, format
+parameter XML, dan penjadwalan (ditunda, K-08).
 
 ### Yang sudah dibangun (area 8)
 
@@ -838,9 +847,37 @@ yang jelas. Laporan tetap di server.
   disentuh selama sewanya belum habis lalu diambil alih; pesan saat antrean menyerah. Test masa simpan:
   `test_masa_simpan_ekspor_mengikuti_setelan_tenant_dan_dihapus_layanan_retensi`.
 
+### Yang sudah dibangun (opsi laporan, 1 Oktober 2026)
+
+Rinciannya di [Dokumen cetak, layout, dan ekspor](/dev/23-document-rendering#opsi-terakhir-dan-preset-laporan).
+
+- **Opsi terakhir (K-24).** `report_last_used_options`, satu baris per pengguna per laporan. Halaman
+  laporan module membuka filternya dengan pilihan terakhir dan mencatat setiap pratinjau yang berhasil;
+  permintaan ekspor mencatat filter, format, dan layout. Dialog cetak memilih layout dan format terakhir.
+- **Preset (K-25).** `report_presets`: preset pribadi dibuat, dipilih, dan diarsipkan dari baris filter
+  laporan, dengan versi baris dan pilihan tanggal relatif (hari ini, bulan ini, bulan lalu, tahun ini,
+  tahun lalu) yang diterjemahkan Core menurut zona pengguna. Preset bersama terlihat oleh semua yang
+  boleh menjalankan laporannya, dengan nama pembuatnya; membuat dan mengubahnya menunggu keputusan
+  permission (lihat usulan di bawah).
+- **Excel (data saja) (K-26).** Pilihan di dialog cetak untuk setiap laporan; `report_exports.kind = data`,
+  ditulis OpenSpout per baris dengan sel bertipe.
+- **Ekspor daftar di layar (K-27, 8.4).** Kontrak `ListExportSource`/`ListExportSources`, rute
+  `POST /api/v1/list-exports`, event `coreerp:list-export`, dan `DataTable` yang memberi tahu urutannya.
+  Pilot: tombol Ekspor ke Excel di Inventarisasi aset. Test: 50.000 aset diekspor utuh dengan memori
+  puncak yang tidak bertambah dibanding 5.000.
+- **Filter master pilihan banyak (K-28)** di laporan penyusutan, penjualan, dan pemusnahan aset, termasuk
+  filter lokasi dan kondisi yang baru, dengan nama pilihan di kepala laporan dan layout bawaannya.
+
+Usulan permission preset bersama (belum dibuat, menunggu keputusan): entry point `core.report-preset.form`,
+permission `core.report-preset.create`, `core.report-preset.update`, dan `core.report-preset.delete` pada
+preset bersama, satu privilege `core.report-preset.maintain`, duty `core.report-preset.manage`, dipegang
+Owner. Membaca preset bersama tetap mengikuti hak menjalankan laporannya. Alternatif yang lebih kecil:
+memakai `core.report-layout.update` (pengelola layout laporan), dengan akibat hak mengganti kop surat
+dan hak membagi preset tidak dapat diberikan terpisah.
+
 Yang tidak dibangun:
 
-- 8.3 (batas baris per laporan) dan 8.4 (ekspor baris tabel dari frontend) opsional dan belum dibuat.
+- 8.3 (batas baris per laporan) tetap ditunda (K-29).
 - Catatan percobaan ulang tersimpan di baris tetapi belum tampil di tray ekspor; tray hanya menampilkan
   `failure_message` pada ekspor yang gagal.
 - Gangguan penyimpanan (disk atau object storage) dan database saat ekspor belum dibedakan; keduanya
@@ -882,6 +919,12 @@ Yang tidak dibangun:
 | K-21 | Permission ubah permintaan pembelian aset | **Diputuskan 30 Sep 2026:** `management-aset.permintaan-pembelian-aset.update` (akses `update`, entry point API permintaan) dideklarasikan di manifest, masuk privilege `management-aset.permintaan-pembelian-aset.maintain` di duty `management-aset.permintaan-pembelian-aset.manage`. Controller-nya sudah memeriksa permission itu sejak lahir |
 | K-22 | Batas unggah lampiran | **Diputuskan 30 Sep 2026:** 10 MB (`COREERP_ATTACHMENT_MAX_KB` bawaan 10240), jenis PDF, JPG/JPEG, PNG, DOCX, XLSX. Image Core menyetel `upload_max_filesize` 10M dan `post_max_size` 12M |
 | K-23 | Layar tautan pekerja HR | **Diputuskan 30 Sep 2026:** module HR belum punya layar; tautan pekerja lewat API saja, fokus module aset. Menu Pekerja tetap halaman pengganti; kolom Pekerja di layar anggota Core tetap ada |
+| K-24 | Opsi terakhir per pengguna per laporan | **Diputuskan 1 Okt 2026:** filter dan opsi terakhir tiap pengguna untuk tiap laporan disimpan Core (`report_last_used_options`, dibatasi tenant) dan menjadi isian awal halaman filter dan dialog cetak, seperti "Last used options and filters" BC |
+| K-25 | Preset laporan bernama | **Diputuskan 1 Okt 2026:** preset opsi dan filter bernama per laporan, pribadi atau dibagi ke tenant, dengan token tanggal relatif (bulan ini, bulan lalu, tahun ini, dan sejenisnya) yang diterjemahkan menurut zona pengguna saat dipakai; simpan memakai versi baris. Preset pribadi tidak butuh permission selain hak menjalankan laporan. **Siapa yang boleh membuat dan mengubah preset bersama menunggu keputusan permission**; sampai itu, preset bersama hanya dapat dibaca |
+| K-26 | Excel (data saja) | **Diputuskan 1 Okt 2026:** setiap laporan dapat diekspor sebagai dataset mentah ke xlsx bertipe lewat `ValueFormat`, tanpa layout atau template, melalui antrean ekspor latar yang sama |
+| K-27 | Ekspor daftar di layar (8.4) | **Diputuskan 1 Okt 2026:** daftar yang tampil (kolom, urutan, judul, filter, dan urutan baris; semua baris yang cocok) diekspor lewat antrean ekspor server yang sama, tampil di tray dan ikut masa simpan, dibaca bertahap dengan penulis xlsx streaming; xlsx bertipe sampai batas lembar Excel, CSV sesudahnya. Tanpa template. Pilot register aset lewat mekanisme bersama: module pemilik daftar memenuhinya lewat kontrak Core. Hak ekspor sama dengan hak melihat, dan kebijakan data organisasi berlaku persis seperti daftarnya |
+| K-28 | Filter master pilihan banyak | **Diputuskan 1 Okt 2026:** filter master laporan (lokasi, kondisi, group, dan sejenisnya) boleh banyak pilihan dengan arti *atau*, dari ujung ke ujung: penerapan di module, layar, dan kepala laporan yang menyebut nama |
+| K-29 | Batas baris ekspor | **Diputuskan 1 Okt 2026:** 8.3 (batas per laporan) tetap ditunda. Gagasan batas tetap 5.000 baris untuk ekspor dari layar dibuang; batas ekspor daftar adalah batas lembar Excel untuk xlsx dan config untuk CSV. Ekspor laporan, termasuk data saja, tetap dijaga `reporting.max_rows` karena datasetnya disusun di memori |
 
 ## Sumber {#sumber}
 

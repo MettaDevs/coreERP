@@ -1,11 +1,14 @@
+import { FileSpreadsheet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
+    DataTableSort,
 } from '@apperp/ui/data-table';
 import {
     Empty,
@@ -16,6 +19,7 @@ import {
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { api, errorMessage } from '../../api';
+import { requestListExport } from '../../listExport';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import type { Aset } from './aset';
 import { LIFECYCLE, bukaAset, bukaAsetUbah, money } from './aset';
@@ -38,6 +42,8 @@ export default function AsetListPage({
     const [aset, setAset] = useState<Aset[]>([]);
     const [search, setSearch] = useState('');
     const [memuat, setMemuat] = useState(true);
+    // Urutan yang sedang tampil, supaya berkas ekspor berurutan sama dengan layar.
+    const [sort, setSort] = useState<DataTableSort | null>(null);
 
     const { options: groupOptions } = useMasterOptions('group-aset');
     const { options: typeOptions } = useMasterOptions('jenis-aset');
@@ -177,6 +183,23 @@ export default function AsetListPage({
         },
     ];
 
+    /**
+     * Ekspor daftar yang sedang tampil (K-27): kolom dan judulnya, urutan, dan pencarian yang sama, untuk
+     * semua aset yang cocok. Dikerjakan antrean ekspor Core; hasilnya muncul di ikon Ekspor pada header.
+     */
+    const exportList = () =>
+        requestListExport({
+            list: 'aset',
+            columns: columns.map((column) => ({
+                key: column.id,
+                header: column.header,
+            })),
+            sort: sort
+                ? { column: sort.columnId, direction: sort.direction }
+                : null,
+            filters: search.trim() ? { q: search.trim() } : {},
+        });
+
     const rowActions: DataTableRowAction[] = [
         { id: 'detail', label: 'Buka rincian' },
     ];
@@ -188,6 +211,16 @@ export default function AsetListPage({
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <RecordActionBar title="Inventarisasi aset">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={exportList}
+                    disabled={memuat}
+                    title="Ekspor semua aset yang cocok dengan pencarian, dengan kolom dan urutan seperti di layar"
+                >
+                    <FileSpreadsheet />
+                    Ekspor ke Excel
+                </Button>
                 {/*
                  * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
                  * 2026 — juga yang datang satuan, yang menjadi dokumen berbaris satu.
@@ -240,6 +273,8 @@ export default function AsetListPage({
                         data={visible}
                         getRowKey={(aset) => aset.id}
                         getRowLabel={(aset) => aset.kode}
+                        sort={sort}
+                        onSortChange={setSort}
                         actions={rowActions}
                         onRowClick={(aset) => bukaAset(aset.id)}
                         onRowAction={(action, aset) => {

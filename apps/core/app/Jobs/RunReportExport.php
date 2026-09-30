@@ -4,14 +4,18 @@ namespace App\Jobs;
 
 use App\Models\TenantMembership;
 use App\Support\Database\AuditActor;
+use App\Support\Reporting\ExportQueue;
 use App\Support\Reporting\ExportStatus;
 use App\Support\Reporting\LayoutStore;
+use App\Support\Reporting\ListExporter;
 use App\Support\Reporting\PrintIdentityStore;
+use App\Support\Reporting\Rendering\DataOnlyWorkbook;
 use App\Support\Reporting\Rendering\RenderException;
 use App\Support\Reporting\Rendering\RenderPipeline;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\SumberLaporan;
 use App\Support\Retention\RetentionService;
+use App\Support\UserClock;
 use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -97,7 +101,7 @@ final class RunReportExport implements ShouldQueue
         return array_values(array_map(intval(...), (array) config('reporting.export_retry_seconds')));
     }
 
-    public function handle(ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities): void
+    public function handle(ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
     {
         $export = $this->row();
         if ($export === null || ! ExportStatus::isActive($export->status)) {
@@ -116,7 +120,7 @@ final class RunReportExport implements ShouldQueue
         }
 
         // Worker hidup lama: pelaku dipasang untuk job ini saja, supaya tidak terbawa ke job berikutnya.
-        AuditActor::runAs($export->user_id, fn () => $this->export($export, $catalog, $client, $layouts, $pipeline, $identities));
+        AuditActor::runAs($export->user_id, fn () => $this->export($export, $catalog, $client, $layouts, $pipeline, $identities, $dataOnly, $lists));
     }
 
     /**
@@ -145,47 +149,80 @@ final class RunReportExport implements ShouldQueue
         $this->markFailed($message, $exception);
     }
 
-    private function export(stdClass $export, ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities): void
+    private function export(stdClass $export, ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
     {
         $layout = null;
         $rendered = null;
         $identityFiles = [];
         try {
-            $report = $catalog->find($export->report_code)
-                ?? throw new RenderException('Laporan ini sudah tidak tersedia pada aplikasi yang terpasang.');
             $membership = TenantMembership::query()->whereKey($export->membership_id)->where('status', 'active')->first()
                 ?? throw new RenderException('Keanggotaan Anda tidak lagi aktif; ekspor dibatalkan.');
-            if (! $catalog->canRun($membership, $report)) {
-                throw new RenderException('Anda tidak lagi berhak menjalankan laporan ini.');
-            }
-            $parameters = json_decode($export->parameters, true, flags: JSON_THROW_ON_ERROR) ?: [];
 
-            $data = $client->dataset($report, $membership, $export->legal_entity_id, $export->org_unit_id, $parameters);
-            $limit = (int) config('reporting.max_rows');
-            if ($data->rowCount() > $limit) {
-                throw new RenderException("Data terlalu besar untuk satu ekspor ({$data->rowCount()} baris; batas {$limit}). Persempit filternya.");
-            }
-            // Kop dan footer datang dari identitas cetak organisasi, bukan dari app, supaya
-            // semua dokumen satu legal entity berkop sama tanpa layout perlu menyimpannya.
-            $identity = $identities->placeholders($identities->resolve($this->tenantId, $export->legal_entity_id, $export->org_unit_id));
-            $identityFiles = array_column($identity['images'], 'path');
-            $data = $data->withIdentity($identity['fields'], $identity['images']);
-            $this->update(['progress' => 40, 'row_count' => $data->rowCount()]);
+            if (($export->kind ?? ExportQueue::KIND_LAYOUT) === ExportQueue::KIND_LIST) {
+                // Daftar di layar: baris dibaca bertahap dari module dan langsung ditulis ke berkas (K-27).
+                $this->update(['progress' => 10]);
+                $result = $lists->render($export, $membership, fn (int $written, int $total) => $this->update([
+                    'progress' => $total > 0 ? min(95, 10 + intdiv(85 * $written, $total)) : 95,
+                ]));
+                $rendered = $result['file'];
+                $rowCount = $result['rows'];
+                $fileName = $result['name'].'-'.now(app(UserClock::class)->timezoneFor($membership->user, $export->legal_entity_id))->format('Ymd-His');
+            } else {
+                $report = $catalog->find($export->report_code)
+                    ?? throw new RenderException('Laporan ini sudah tidak tersedia pada aplikasi yang terpasang.');
+                if (! $catalog->canRun($membership, $report)) {
+                    throw new RenderException('Anda tidak lagi berhak menjalankan laporan ini.');
+                }
+                $parameters = json_decode($export->parameters, true, flags: JSON_THROW_ON_ERROR) ?: [];
 
-            $layout = $layouts->resolve($report, $this->tenantId, $export->legal_entity_id, $export->layout_ref, $membership, $export->org_unit_id);
-            $rendered = $pipeline->render($layout, $data, $export->format);
-            $this->update(['progress' => 85]);
+                // Dataset laporan disusun module di memori, apa pun keluarannya, jadi batas barisnya tetap berlaku.
+                $data = $client->dataset($report, $membership, $export->legal_entity_id, $export->org_unit_id, $parameters);
+                $limit = (int) config('reporting.max_rows');
+                if ($data->rowCount() > $limit) {
+                    throw new RenderException("Data terlalu besar untuk satu ekspor ({$data->rowCount()} baris; batas {$limit}). Persempit filternya.");
+                }
+                $rowCount = $data->rowCount();
+                $fileName = $data->fileName;
+                $this->update(['progress' => 40, 'row_count' => $rowCount]);
+
+                if (($export->kind ?? ExportQueue::KIND_LAYOUT) === ExportQueue::KIND_DATA) {
+                    // "Excel (data saja)": tanpa layout dan tanpa kop (K-26).
+                    $rendered = $dataOnly->render($data, $data->definitions);
+                } else {
+                    // Kop dan footer datang dari identitas cetak organisasi, bukan dari app, supaya
+                    // semua dokumen satu legal entity berkop sama tanpa layout perlu menyimpannya.
+                    $identity = $identities->placeholders($identities->resolve($this->tenantId, $export->legal_entity_id, $export->org_unit_id));
+                    $identityFiles = array_column($identity['images'], 'path');
+                    $data = $data->withIdentity($identity['fields'], $identity['images']);
+
+                    $layout = $layouts->resolve($report, $this->tenantId, $export->legal_entity_id, $export->layout_ref, $membership, $export->org_unit_id);
+                    $rendered = $pipeline->render($layout, $data, $export->format);
+                }
+            }
+            $this->update(['progress' => 95, 'row_count' => $rowCount]);
 
             $path = "reporting/exports/{$this->tenantId}/{$this->exportId}.{$rendered->format}";
             $disk = Storage::disk((string) config('reporting.disk'));
-            $disk->put($path, file_get_contents($rendered->localPath));
+            // Aliran, bukan isi berkas utuh di memori: ekspor daftar bisa ratusan MB.
+            $stream = fopen($rendered->localPath, 'rb');
+            if ($stream === false) {
+                throw new RenderException('Berkas hasil ekspor tidak dapat dibaca.');
+            }
+            try {
+                $disk->writeStream($path, $stream);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
 
             $this->update([
                 'status' => ExportStatus::DONE,
                 'progress' => 100,
                 'failure_message' => null,
+                'format' => $rendered->format,
                 'file_path' => $path,
-                'file_name' => $this->safeName($data->fileName).'.'.$rendered->format,
+                'file_name' => $this->safeName($fileName).'.'.$rendered->format,
                 'file_mime' => $rendered->mime(),
                 'file_size' => $disk->size($path),
                 'finished_at' => now(),

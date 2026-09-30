@@ -65,14 +65,13 @@ final class AssetMonitoringReport implements ReportDefinition
     public function parameterRules(): array
     {
         return [
-            // Buku penyusutan tidak dipilih di sini: nilainya sudah dibekukan dari buku komersial.
-            ...array_diff_key(AssetReportFilters::rules(), ['buku_id' => true]),
+            // Buku penyusutan tidak dipilih di sini: nilainya sudah dibekukan dari buku komersial. Lokasi dan
+            // kondisi di laporan ini berarti lokasi yang diperiksa dan kondisi temuan, bukan register hari ini,
+            // jadi keduanya disaring di sini sendiri, bukan lewat AssetReportFilters.
+            ...array_diff_key(AssetReportFilters::rules(), array_flip(['buku_id', ...self::OWN_LIST_KEYS])),
             'dari' => ['nullable', 'date_format:Y-m-d'],
             'sampai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:dari'],
-            'kondisi_aset_id' => ['nullable', 'ulid'],
-            'lokasi_aset_id' => ['nullable', 'ulid'],
-            'penanggung_jawab_user_id' => ['nullable', 'string', 'max:64'],
-            'org_unit_id' => ['nullable', 'ulid'],
+            ...self::ownListRules(),
         ];
     }
 
@@ -130,17 +129,22 @@ final class AssetMonitoringReport implements ReportDefinition
             ->whereNull('monitoring.deleted_at');
 
         app(OrganizationScope::class)->query($query, $context->request(), 'monitoring.legal_entity_id', 'monitoring.responsible_org_unit_id');
-        AssetReportFilters::apply($query, $parameters, 'aset');
-        foreach ([
-            'dari' => ['monitoring.tanggal', '>='],
-            'sampai' => ['monitoring.tanggal', '<='],
-            'kondisi_aset_id' => ["{$lines}.kondisi_aset_id", '='],
-            'lokasi_aset_id' => ['monitoring.lokasi_aset_id', '='],
-            'penanggung_jawab_user_id' => ["{$lines}.sistem_custodian_user_id", '='],
-            'org_unit_id' => ["{$lines}.sistem_org_unit_id", '='],
-        ] as $parameter => [$column, $operator]) {
+        AssetReportFilters::apply($query, array_diff_key($parameters, array_flip(['lokasi_aset_id', 'kondisi_aset_id'])), 'aset');
+        foreach (['dari' => '>=', 'sampai' => '<='] as $parameter => $operator) {
             if (! empty($parameters[$parameter])) {
-                $query->where($column, $operator, $parameters[$parameter]);
+                $query->where('monitoring.tanggal', $operator, $parameters[$parameter]);
+            }
+        }
+        // Pilih banyak: beberapa pilihan dalam satu filter berarti salah satunya (atau).
+        foreach ([
+            'kondisi_aset_id' => "{$lines}.kondisi_aset_id",
+            'lokasi_aset_id' => 'monitoring.lokasi_aset_id',
+            'penanggung_jawab_user_id' => "{$lines}.sistem_custodian_user_id",
+            'org_unit_id' => "{$lines}.sistem_org_unit_id",
+        ] as $parameter => $column) {
+            $ids = self::ids($parameters[$parameter] ?? null);
+            if ($ids !== []) {
+                $query->whereIn($column, $ids);
             }
         }
 
@@ -199,10 +203,10 @@ final class AssetMonitoringReport implements ReportDefinition
                 ...$filters,
                 'filter_dari' => $parameters['dari'] ?? 'Semua',
                 'filter_sampai' => $parameters['sampai'] ?? 'Semua',
-                'filter_kondisi' => $this->filterName($parameters['kondisi_aset_id'] ?? null, static fn (string $id): mixed => KondisiAset::withTrashed()->whereKey($id)->value('nama')),
-                'filter_lokasi' => $this->filterName($parameters['lokasi_aset_id'] ?? null, static fn (string $id): mixed => LokasiAset::withTrashed()->whereKey($id)->value('nama')),
-                'filter_penanggung_jawab' => $this->filterName($parameters['penanggung_jawab_user_id'] ?? null, static fn (string $id): ?string => $directory->namaOrang($context->tenantId, $id)),
-                'filter_unit' => $this->filterName($parameters['org_unit_id'] ?? null, static fn (string $id): ?string => $directory->namaUnit($context->tenantId, $id)),
+                'filter_kondisi' => $this->filterNames($parameters['kondisi_aset_id'] ?? null, static fn (string $id): mixed => KondisiAset::withTrashed()->whereKey($id)->value('nama')),
+                'filter_lokasi' => $this->filterNames($parameters['lokasi_aset_id'] ?? null, static fn (string $id): mixed => LokasiAset::withTrashed()->whereKey($id)->value('nama')),
+                'filter_penanggung_jawab' => $this->filterNames($parameters['penanggung_jawab_user_id'] ?? null, static fn (string $id): ?string => $directory->namaOrang($context->tenantId, $id)),
+                'filter_unit' => $this->filterNames($parameters['org_unit_id'] ?? null, static fn (string $id): ?string => $directory->namaUnit($context->tenantId, $id)),
                 'jumlah_aset' => count($table),
                 'jumlah_tidak_sesuai' => $mismatches,
                 'total_nilai_perolehan' => (string) $totalAcquisition,
@@ -214,14 +218,45 @@ final class AssetMonitoringReport implements ReportDefinition
         );
     }
 
-    /** @param callable(string): mixed $lookup */
-    private function filterName(mixed $id, callable $lookup): string
+    /** Filter pilih banyak milik laporan ini sendiri; lihat parameterRules(). */
+    private const OWN_LIST_KEYS = ['kondisi_aset_id', 'lokasi_aset_id', 'penanggung_jawab_user_id', 'org_unit_id'];
+
+    /** @return array<string, list<string>> */
+    private static function ownListRules(): array
     {
-        if (! is_string($id) || $id === '') {
+        $rules = [];
+        foreach (self::OWN_LIST_KEYS as $key) {
+            $rules[$key] = ['nullable', 'array', 'max:50'];
+            $rules[$key.'.*'] = $key === 'penanggung_jawab_user_id' ? ['string', 'max:64'] : ['ulid'];
+        }
+
+        return $rules;
+    }
+
+    /** @return list<string> */
+    private static function ids(mixed $value): array
+    {
+        $values = is_array($value) ? $value : [$value];
+
+        return array_values(array_unique(array_filter($values, static fn (mixed $id): bool => is_string($id) && $id !== '')));
+    }
+
+    /**
+     * Nama pilihan untuk kepala laporan, dipisah koma, dalam urutan pilihannya.
+     *
+     * @param  callable(string): mixed  $lookup
+     */
+    private function filterNames(mixed $value, callable $lookup): string
+    {
+        $ids = self::ids($value);
+        if ($ids === []) {
             return 'Semua';
         }
-        $name = $lookup($id);
 
-        return is_string($name) && $name !== '' ? $name : 'Tidak ditemukan';
+        return implode(', ', array_map(static function (string $id) use ($lookup): string {
+            $name = $lookup($id);
+
+            return is_string($name) && $name !== '' ? $name : 'Tidak ditemukan';
+        }, $ids));
     }
 }

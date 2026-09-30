@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { MultiSelect } from '@apperp/ui/multi-select';
 import { Select } from '@apperp/ui/select';
 import { api } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
@@ -16,6 +17,12 @@ export type FilterProps = {
     onChange: (value: string) => void;
 };
 
+/** Filter pilihan banyak: beberapa pilihan pada satu filter berarti "atau" (K-28). */
+export type MultiFilterProps = {
+    value: string[];
+    onChange: (value: string[]) => void;
+};
+
 /**
  * Nilai pilihan "semua". `Select` baru menampilkan label pilihan terpilih bila nilainya
  * tidak kosong, jadi "semua" tidak boleh bernilai string kosong; di luar komponen ini ia
@@ -23,43 +30,41 @@ export type FilterProps = {
  */
 const ALL = '__all__';
 
-type MasterFilterProps = FilterProps & {
+type MasterFilterProps = MultiFilterProps & {
     resource: string;
     label: string;
-    allLabel: string;
     /** Kalimat untuk pengguna bila pilihannya tidak dapat dimuat, biasanya karena belum punya akses lihat. */
     unavailable: string;
 };
 
+/**
+ * Filter master pilihan banyak. Tanpa pilihan berarti semua; beberapa pilihan berarti aset yang cocok
+ * dengan salah satunya, dan kepala laporan menyebut nama setiap pilihan.
+ */
 function MasterFilter({
     resource,
     label,
-    allLabel,
     unavailable,
     value,
     onChange,
 }: MasterFilterProps) {
     const master = useMasterOptions(resource);
     const items = useMemo(
-        () => [
-            { value: ALL, label: allLabel },
-            ...master.options.map((option) => ({
+        () =>
+            master.options.map((option) => ({
                 value: option.id,
                 label: optionLabel(option),
             })),
-        ],
-        [allLabel, master.options],
+        [master.options],
     );
 
     return (
-        <Field className="w-full sm:w-52">
-            <Select
+        <Field className="w-full sm:w-56">
+            <MultiSelect
                 label={label}
                 items={items}
-                value={value || ALL}
-                onValueChange={(next) =>
-                    onChange(next === null || next === ALL ? '' : next)
-                }
+                value={value}
+                onValueChange={onChange}
                 searchPlaceholder={`Cari ${label.toLowerCase()}`}
                 emptyMessage={`${label} tidak ditemukan.`}
             />
@@ -68,38 +73,57 @@ function MasterFilter({
     );
 }
 
-export function AssetGroupFilter(props: FilterProps) {
+export function AssetGroupFilter(props: MultiFilterProps) {
     return (
         <MasterFilter
             {...props}
             resource="group-aset"
             label="Group aset"
-            allLabel="Semua group aset"
             unavailable="Pilihan group aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat group aset."
         />
     );
 }
 
-export function AssetTypeFilter(props: FilterProps) {
+export function AssetTypeFilter(props: MultiFilterProps) {
     return (
         <MasterFilter
             {...props}
             resource="jenis-aset"
             label="Jenis aset"
-            allLabel="Semua jenis aset"
             unavailable="Pilihan jenis aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat jenis aset."
         />
     );
 }
 
-export function FiscalClassificationFilter(props: FilterProps) {
+export function FiscalClassificationFilter(props: MultiFilterProps) {
     return (
         <MasterFilter
             {...props}
             resource="reference-data/kelompok-harta-fiskal"
             label="Kelompok harta fiskal"
-            allLabel="Semua kelompok harta fiskal"
             unavailable="Pilihan kelompok harta fiskal tidak dapat dimuat. Minta administrator memberi Anda akses lihat group aset."
+        />
+    );
+}
+
+export function LocationFilter(props: MultiFilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="lokasi-aset"
+            label="Lokasi"
+            unavailable="Pilihan lokasi tidak dapat dimuat. Minta administrator memberi Anda akses lihat lokasi aset."
+        />
+    );
+}
+
+export function ConditionFilter(props: MultiFilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="kondisi-aset"
+            label="Kondisi"
+            unavailable="Pilihan kondisi tidak dapat dimuat. Minta administrator memberi Anda akses lihat kondisi aset."
         />
     );
 }
@@ -108,61 +132,58 @@ export function FiscalClassificationFilter(props: FilterProps) {
  * Filter buku penyusutan. Tanpa pilihan, laporan memakai buku komersial saja: buku fiskal
  * menyusutkan aset yang sama, jadi menjumlahkan semua buku membuat totalnya dobel.
  */
-export function DepreciationBookFilter(props: FilterProps) {
+export function DepreciationBookFilter({ value, onChange }: FilterProps) {
+    const master = useMasterOptions('buku-penyusutan');
+    const items = useMemo(
+        () => [
+            { value: ALL, label: 'Semua buku komersial' },
+            ...master.options.map((option) => ({
+                value: option.id,
+                label: optionLabel(option),
+            })),
+        ],
+        [master.options],
+    );
+
     return (
-        <MasterFilter
-            {...props}
-            resource="buku-penyusutan"
-            label="Buku penyusutan"
-            allLabel="Semua buku komersial"
-            unavailable="Pilihan buku penyusutan tidak dapat dimuat. Minta administrator memberi Anda akses lihat buku penyusutan."
-        />
+        <Field className="w-full sm:w-52">
+            <Select
+                label="Buku penyusutan"
+                items={items}
+                value={value || ALL}
+                onValueChange={(next) =>
+                    onChange(next === null || next === ALL ? '' : next)
+                }
+                searchPlaceholder="Cari buku penyusutan"
+                emptyMessage="Buku penyusutan tidak ditemukan."
+            />
+            {master.error && (
+                <FieldDescription>
+                    Pilihan buku penyusutan tidak dapat dimuat. Minta
+                    administrator memberi Anda akses lihat buku penyusutan.
+                </FieldDescription>
+            )}
+        </Field>
     );
 }
 
-export function AssetConditionFilter(props: FilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="kondisi-aset"
-            label="Kondisi aset"
-            allLabel="Semua kondisi aset"
-            unavailable="Pilihan kondisi aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat kondisi aset."
-        />
-    );
-}
-
-export function AssetLocationFilter(props: FilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="lokasi-aset"
-            label="Lokasi aset"
-            allLabel="Semua lokasi aset"
-            unavailable="Pilihan lokasi aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat lokasi aset."
-        />
-    );
-}
-
-export function OrganizationUnitFilter(props: FilterProps) {
+export function OrganizationUnitFilter(props: MultiFilterProps) {
     return (
         <MasterFilter
             {...props}
             resource="reference-data/unit-kerja"
             label="Unit organisasi"
-            allLabel="Semua unit organisasi"
             unavailable="Pilihan unit organisasi tidak dapat dimuat."
         />
     );
 }
 
-export function PersonFilter(props: FilterProps) {
+export function PersonFilter(props: MultiFilterProps) {
     return (
         <MasterFilter
             {...props}
             resource="reference-data/anggota"
             label="Penanggung jawab"
-            allLabel="Semua penanggung jawab"
             unavailable="Pilihan penanggung jawab tidak dapat dimuat."
         />
     );

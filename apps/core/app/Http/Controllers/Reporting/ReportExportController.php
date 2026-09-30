@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Support\CurrentWorkspace;
 use App\Support\Reporting\ExportQueue;
 use App\Support\Reporting\ExportStatus;
+use App\Support\Reporting\RelativeDates;
 use App\Support\Reporting\ReportCatalog;
+use App\Support\Reporting\ReportOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +27,7 @@ class ReportExportController extends Controller
         private readonly ReportCatalog $catalog,
         private readonly ExportQueue $exports,
         private readonly CurrentWorkspace $workspace,
+        private readonly ReportOptions $options,
     ) {}
 
     public function page(Request $request): Response
@@ -54,20 +57,29 @@ class ReportExportController extends Controller
         abort_unless($this->catalog->canRun($membership, $report), 403);
 
         $data = $request->validate([
-            'format' => ['required', 'in:pdf,docx,xlsx'],
+            // "Excel (data saja)" (K-26): dataset apa adanya ke xlsx, tanpa layout, untuk laporan mana pun.
+            'data_only' => ['sometimes', 'boolean'],
+            'format' => ['required_unless:data_only,true', 'nullable', 'in:pdf,docx,xlsx'],
             'layout_ref' => ['nullable', 'string', 'max:60'],
             'parameters' => ['nullable', 'array'],
         ]);
-        $parameters = array_intersect_key($data['parameters'] ?? [], array_flip($report->parameters));
+        $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
+        // Parameter yang dikenal laporan; tanggal relatif dari preset diterjemahkan sekarang, menurut zona
+        // pengguna, supaya ekspor yang menunggu di antrean tidak bergeser hari.
+        $parameters = RelativeDates::resolve(
+            ReportOptions::clean($report, $data['parameters'] ?? [], allowTokens: true),
+            $this->options->now($membership, $legalEntityId),
+        );
 
         $export = $this->exports->enqueue(
             $report,
             $membership,
-            $this->workspace->legalEntity($request, $membership)?->id,
+            $legalEntityId,
             $this->workspace->operatingUnit($request, $membership)?->id,
-            $data['format'],
+            (string) ($data['format'] ?? 'xlsx'),
             $data['layout_ref'] ?? null,
             $parameters,
+            (bool) ($data['data_only'] ?? false),
         );
 
         return response()->json(['data' => $export], 202, ['Location' => url('/api/v1/report-exports/'.$export['id'])]);

@@ -34,9 +34,11 @@ use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
 use App\Http\Controllers\ReferenceData\AddressHierarchy\AddressSetupController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
+use App\Http\Controllers\Reporting\ListExportController;
 use App\Http\Controllers\Reporting\ReportController;
 use App\Http\Controllers\Reporting\ReportExportController;
 use App\Http\Controllers\Reporting\ReportLayoutController;
+use App\Http\Controllers\Reporting\ReportOptionController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
@@ -340,6 +342,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('reports/{code}/layouts/{id}', [ReportLayoutController::class, 'update'])->name('reports.layouts.update');
         Route::delete('reports/{code}/layouts/{id}', [ReportLayoutController::class, 'destroy'])->name('reports.layouts.destroy');
         Route::post('reports/{code}/exports', [ReportExportController::class, 'store'])->name('reports.exports.store');
+        // Opsi terakhir dan preset laporan milik pengguna (K-24, K-25).
+        Route::get('reports/{code}/options', [ReportOptionController::class, 'index'])->name('reports.options.index');
+        Route::put('reports/{code}/options/last-used', [ReportOptionController::class, 'rememberLastUsed'])->name('reports.options.last-used');
+        Route::post('reports/{code}/presets', [ReportOptionController::class, 'storePreset'])->name('reports.presets.store');
+        Route::patch('reports/{code}/presets/{id}', [ReportOptionController::class, 'updatePreset'])->name('reports.presets.update');
+        Route::delete('reports/{code}/presets/{id}', [ReportOptionController::class, 'destroyPreset'])->name('reports.presets.destroy');
+        // Ekspor daftar di layar module lewat antrean ekspor yang sama (K-27).
+        Route::post('list-exports', [ListExportController::class, 'store'])->name('list-exports.store');
         Route::get('units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
         Route::post('units-of-measure/classes', [UnitOfMeasureController::class, 'storeClass'])->name('units-of-measure.classes.store');
         Route::post('units-of-measure/systems', [UnitOfMeasureController::class, 'storeSystem'])->name('units-of-measure.systems.store');

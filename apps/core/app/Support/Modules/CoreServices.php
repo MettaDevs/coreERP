@@ -33,6 +33,7 @@ use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\KonteksPermintaan;
 use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\LinkedWorkerResolvers;
+use App\Support\Modules\Contracts\ListExportSources;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
@@ -42,6 +43,7 @@ use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\ReportFormatter;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
+use App\Support\Reporting\ListExportRegistry;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
@@ -123,6 +125,9 @@ final class CoreServices
         AttachmentRecordTypes::class => AttachmentRecordTypeRegistry::class,
         // Layar anggota: module pemilik data pekerja menjawab pekerja yang tertaut ke keanggotaan tenant.
         LinkedWorkerResolvers::class => LinkedWorkerResolverRegistry::class,
+        // Ekspor daftar di layar (K-27): module pemilik daftar membaca barisnya dengan hak dan kebijakan
+        // data yang sama dengan layarnya; Core hanya mengantrekan dan menulis berkasnya.
+        ListExportSources::class => ListExportRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void

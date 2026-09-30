@@ -94,7 +94,10 @@ function announce(item: ReportExport): void {
             appName: item.report_name,
             level: 'success',
             title: `${item.report_name} siap diunduh`,
-            body: `${item.file_name ?? item.format.toUpperCase()} · layout ${item.layout_name}`,
+            body:
+                item.kind === 'layout'
+                    ? `${item.file_name ?? item.format.toUpperCase()} · layout ${item.layout_name}`
+                    : `${item.file_name ?? item.format.toUpperCase()} · ${item.layout_name}`,
             href: '/reports/exports',
         });
     } else if (item.status === 'failed') {

@@ -7,6 +7,12 @@ import { apiJson, apiRequest } from '@/lib/core-api';
  */
 
 export type ReportFormat = 'pdf' | 'docx' | 'xlsx';
+/** Format berkas hasil ekspor; CSV hanya untuk daftar yang melewati batas satu lembar Excel. */
+export type ExportFileFormat = ReportFormat | 'csv';
+/**
+ * Jenis ekspor: ber-layout, "Excel (data saja)" tanpa layout (K-26), atau daftar di layar module (K-27).
+ */
+export type ExportKind = 'layout' | 'data' | 'list';
 export type LayoutFormat = 'docx' | 'xlsx';
 export type ExportStatus = 'queued' | 'running' | 'done' | 'failed';
 
@@ -63,12 +69,13 @@ type LayoutListing = {
 
 export type ReportExport = {
     id: string;
+    kind: ExportKind;
     app_id: string;
     report_code: string;
     report_name: string;
     layout_ref: string;
     layout_name: string;
-    format: ReportFormat;
+    format: ExportFileFormat;
     parameters: Record<string, unknown>;
     status: ExportStatus;
     progress: number;
@@ -82,10 +89,40 @@ export type ReportExport = {
     created_at: string;
 };
 
-export const FORMAT_LABEL: Record<ReportFormat, string> = {
+export const FORMAT_LABEL: Record<ExportFileFormat, string> = {
     pdf: 'PDF',
     docx: 'Word',
     xlsx: 'Excel',
+    csv: 'CSV',
+};
+
+/**
+ * Nilai parameter laporan: satu nilai, atau daftar untuk filter pilihan banyak. Token tanggal relatif
+ * (`@this_month.start`) hanya ada pada preset.
+ */
+export type ReportParameterValue = string | string[];
+
+export type ReportPreset = {
+    id: string;
+    name: string;
+    shared: boolean;
+    mine: boolean;
+    owner_name: string | null;
+    parameters: Record<string, ReportParameterValue>;
+    /** Parameter dengan tanggal relatif yang sudah diterjemahkan menurut zona pengguna. */
+    resolved_parameters: Record<string, ReportParameterValue>;
+    version: number;
+};
+
+export type ReportOptions = {
+    last_used: {
+        parameters: Record<string, ReportParameterValue>;
+        /** `data` berarti "Excel (data saja)". */
+        format: ReportFormat | 'data' | null;
+        layout_ref: string | null;
+        updated_at: string | null;
+    } | null;
+    presets: ReportPreset[];
 };
 
 export const STATUS_LABEL: Record<ExportStatus, string> = {
@@ -176,12 +213,19 @@ export const setDefaultLayout = (
         },
     );
 
+export const getReportOptions = (code: string) =>
+    json<{ data: ReportOptions }>(
+        `/api/v1/reports/${encodeURIComponent(code)}/options`,
+    ).then((r) => r.data);
+
 export const requestExport = (
     code: string,
     input: {
         format: ReportFormat;
         layout_ref: string | null;
         parameters: Record<string, unknown>;
+        /** "Excel (data saja)": dataset apa adanya, tanpa layout. */
+        data_only?: boolean;
     },
 ) =>
     json<{ data: ReportExport }>(
@@ -191,6 +235,19 @@ export const requestExport = (
             body: JSON.stringify(input),
         },
     ).then((r) => r.data);
+
+/** Ekspor daftar di layar module lewat antrean ekspor Core (K-27). */
+export const requestListExport = (input: {
+    app_id: string;
+    list: string;
+    columns: { key: string; header: string }[];
+    sort: { column: string; direction: 'asc' | 'desc' } | null;
+    filters: Record<string, unknown>;
+}) =>
+    json<{ data: ReportExport }>('/api/v1/list-exports', {
+        method: 'POST',
+        body: JSON.stringify(input),
+    }).then((r) => r.data);
 
 export const listExports = () =>
     json<{ data: ReportExport[] }>('/api/v1/report-exports').then(

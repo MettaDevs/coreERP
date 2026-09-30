@@ -1,0 +1,268 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Reporting;
+
+use App\Models\ReportLastUsedOption;
+use App\Models\ReportPreset;
+use App\Models\TenantMembership;
+use App\Support\Modules\Contracts\RowVersion;
+use App\Support\UserClock;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use stdClass;
+
+/**
+ * Opsi dan filter laporan per pengguna: yang terakhir dipakai (K-24) dan preset bernama (K-25), padanan
+ * tabel `Object Options` Business Central.
+ *
+ * Semuanya dibatasi tenant dan kode laporan. Yang terakhir dipakai milik satu pengguna. Preset pribadi hanya
+ * terlihat oleh pemiliknya; preset bersama terlihat oleh setiap pengguna tenant yang boleh menjalankan
+ * laporannya — hak menjalankan itu diperiksa pemanggil sebelum kelas ini dipakai.
+ *
+ * Nilai yang disimpan hanya parameter yang dikenal laporan, berupa teks atau daftar teks (filter pilihan
+ * banyak). Isinya tidak divalidasi di sini: aturannya milik module, dan module memeriksanya setiap kali
+ * laporan dijalankan, jadi nilai yang sudah tidak berlaku ditolak di sana dengan pesan yang sama seperti
+ * isian tangan.
+ */
+final class ReportOptions
+{
+    private const MAX_VALUE_LENGTH = 200;
+
+    private const MAX_LIST_ITEMS = 200;
+
+    public function __construct(private readonly UserClock $clock) {}
+
+    /**
+     * Isian awal halaman filter dan dialog cetak: opsi terakhir pengguna ini, dan preset yang boleh ia lihat
+     * dengan tanggal relatifnya sudah diterjemahkan menurut zonanya.
+     *
+     * @return array{last_used: array<string, mixed>|null, presets: list<array<string, mixed>>}
+     */
+    public function forMembership(TenantMembership $membership, stdClass $report, ?string $legalEntityId): array
+    {
+        $now = $this->now($membership, $legalEntityId);
+        $last = ReportLastUsedOption::query()
+            ->where(['tenant_id' => $membership->tenant_id, 'user_id' => $membership->user_id, 'report_code' => $report->code])
+            ->first();
+
+        $presets = $this->visiblePresets($membership, $report)
+            ->with('user:id,name')
+            ->orderByDesc('shared')
+            ->orderBy('name')
+            ->get();
+
+        return [
+            'last_used' => $last === null ? null : [
+                'parameters' => self::clean($report, $last->parameters, allowTokens: false),
+                'format' => $last->format,
+                'layout_ref' => $last->layout_ref,
+                'updated_at' => $last->updated_at?->toIso8601String(),
+            ],
+            'presets' => array_values($presets->map(fn (ReportPreset $preset): array => $this->present($preset, $membership, $now))->all()),
+        ];
+    }
+
+    /**
+     * Mencatat opsi yang baru saja dipakai. Dipanggil saat laporan dijalankan — pratinjau di layar dan
+     * permintaan ekspor — jadi yang terakhir menang, tanpa versi: ini jejak kebiasaan pengguna, bukan data
+     * yang diedit bersama. `null` untuk format atau layout berarti yang tersimpan dipertahankan.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    public function rememberLastUsed(TenantMembership $membership, stdClass $report, array $parameters, ?string $format = null, ?string $layoutRef = null): void
+    {
+        $now = now();
+        // Satu pernyataan, supaya dua tab yang menjalankan laporan yang sama bersamaan tidak jatuh di indeks unik.
+        DB::statement(
+            'INSERT INTO report_last_used_options (id, tenant_id, user_id, report_code, parameters, format, layout_ref, created_at, updated_at) '
+            .'VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?) '
+            .'ON CONFLICT (tenant_id, user_id, report_code) WHERE deleted_at IS NULL DO UPDATE SET '
+            .'parameters = EXCLUDED.parameters, '
+            .'format = COALESCE(EXCLUDED.format, report_last_used_options.format), '
+            .'layout_ref = COALESCE(EXCLUDED.layout_ref, report_last_used_options.layout_ref), '
+            .'updated_at = EXCLUDED.updated_at',
+            [
+                (string) Str::ulid(), $membership->tenant_id, $membership->user_id, $report->code,
+                json_encode((object) self::clean($report, $parameters, allowTokens: false), JSON_THROW_ON_ERROR),
+                $format, $layoutRef, $now, $now,
+            ],
+        );
+    }
+
+    /** @param array<string, mixed> $parameters */
+    public function createPreset(TenantMembership $membership, stdClass $report, string $name, array $parameters): ReportPreset
+    {
+        $name = $this->name($name);
+        $this->assertNameFree($membership, $report, $name, null);
+
+        try {
+            // Savepoint: pelanggaran indeks unik membatalkan seluruh transaksi PostgreSQL bila tidak dibatasi.
+            return DB::transaction(fn (): ReportPreset => ReportPreset::query()->create([
+                'tenant_id' => $membership->tenant_id,
+                'user_id' => $membership->user_id,
+                'report_code' => $report->code,
+                'name' => $name,
+                'shared' => false,
+                'parameters' => self::clean($report, $parameters, allowTokens: true),
+            ])->refresh());
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+        }
+    }
+
+    /**
+     * Mengganti nama atau isi preset pribadi milik pengguna itu sendiri, dengan versi baris.
+     *
+     * @param  array<string, mixed>|null  $parameters
+     */
+    public function updatePreset(ReportPreset $preset, stdClass $report, TenantMembership $membership, int $expectedVersion, ?string $name, ?array $parameters): ReportPreset
+    {
+        $values = [];
+        if ($name !== null) {
+            $values['name'] = $this->name($name);
+            $this->assertNameFree($membership, $report, $values['name'], $preset->id);
+        }
+        if ($parameters !== null) {
+            $values['parameters'] = self::clean($report, $parameters, allowTokens: true);
+        }
+
+        try {
+            DB::transaction(function () use ($preset, $expectedVersion, $values): void {
+                RowVersion::claim($preset, $expectedVersion);
+                if ($values !== []) {
+                    $preset->forceFill($values)->save();
+                }
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+        }
+
+        return $preset->refresh();
+    }
+
+    /** Mengarsipkan preset pribadi milik pengguna itu sendiri, dengan versi baris. */
+    public function archivePreset(ReportPreset $preset, int $expectedVersion): void
+    {
+        DB::transaction(function () use ($preset, $expectedVersion): void {
+            RowVersion::claim($preset, $expectedVersion);
+            $preset->delete();
+        });
+    }
+
+    /** Preset pribadi milik pengguna ini; preset orang lain dan preset bersama dijawab tidak ada. */
+    public function ownPrivatePreset(TenantMembership $membership, stdClass $report, string $id): ?ReportPreset
+    {
+        return ReportPreset::query()
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'user_id' => $membership->user_id, 'shared' => false])
+            ->whereKey($id)
+            ->first();
+    }
+
+    /** @return array<string, mixed> */
+    public function present(ReportPreset $preset, TenantMembership $membership, CarbonImmutable $now): array
+    {
+        return [
+            'id' => $preset->id,
+            'name' => $preset->name,
+            'shared' => $preset->shared,
+            'mine' => $preset->user_id === (int) $membership->user_id,
+            // Nama, bukan id: layar menulis "Dibuat oleh Rina" pada preset bersama.
+            'owner_name' => $preset->user?->name,
+            'parameters' => $preset->parameters,
+            'resolved_parameters' => RelativeDates::resolve($preset->parameters, $now),
+            'version' => $preset->version,
+        ];
+    }
+
+    /** Saat ini menurut zona pengguna, untuk menerjemahkan tanggal relatif. */
+    public function now(TenantMembership $membership, ?string $legalEntityId): CarbonImmutable
+    {
+        return CarbonImmutable::now($this->clock->timezoneFor($membership->user, $legalEntityId));
+    }
+
+    /**
+     * Parameter yang dikenal laporan, berupa teks atau daftar teks; nilai kosong dibuang. Token tanggal
+     * relatif hanya boleh ada di preset, dan harus salah satu yang dikenal.
+     *
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, string|list<string>>
+     */
+    public static function clean(stdClass $report, array $parameters, bool $allowTokens): array
+    {
+        // Urut seperti parameter laporannya, supaya isian yang sama selalu tersimpan dan terbaca sama.
+        $clean = [];
+        foreach (array_map('strval', (array) $report->parameters) as $key) {
+            if (! array_key_exists($key, $parameters)) {
+                continue;
+            }
+            $value = $parameters[$key];
+            if (is_int($value) || is_float($value)) {
+                $value = (string) $value;
+            }
+            if (is_string($value)) {
+                $value = trim($value);
+                if ($value === '') {
+                    continue;
+                }
+                if (RelativeDates::isToken($value) && (! $allowTokens || ! RelativeDates::known($value))) {
+                    throw ValidationException::withMessages(["parameters.{$key}" => ['Pilihan tanggal relatif ini tidak dikenal.']]);
+                }
+                $clean[$key] = mb_substr($value, 0, self::MAX_VALUE_LENGTH);
+
+                continue;
+            }
+            if (is_array($value) && array_is_list($value)) {
+                $items = array_values(array_unique(array_filter(
+                    array_map(fn (mixed $item): string => is_scalar($item) ? mb_substr(trim((string) $item), 0, self::MAX_VALUE_LENGTH) : '', $value),
+                    fn (string $item): bool => $item !== '' && ! RelativeDates::isToken($item),
+                )));
+                if ($items !== []) {
+                    $clean[$key] = array_slice($items, 0, self::MAX_LIST_ITEMS);
+                }
+            }
+        }
+
+        return $clean;
+    }
+
+    /** @return Builder<ReportPreset> */
+    private function visiblePresets(TenantMembership $membership, stdClass $report): Builder
+    {
+        return ReportPreset::query()
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code])
+            ->where(fn (Builder $query) => $query->where('user_id', $membership->user_id)->orWhere('shared', true));
+    }
+
+    private function name(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '' || mb_strlen($name) > 80) {
+            throw ValidationException::withMessages(['name' => ['Nama preset wajib diisi, paling panjang 80 karakter.']]);
+        }
+
+        return $name;
+    }
+
+    private function assertNameFree(TenantMembership $membership, stdClass $report, string $name, ?string $exceptId): void
+    {
+        $taken = ReportPreset::query()
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'user_id' => $membership->user_id])
+            ->whereRaw('lower(name) = ?', [mb_strtolower($name)])
+            ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
+            ->exists();
+        if ($taken) {
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+        }
+    }
+
+    private static function duplicateMessage(): string
+    {
+        return 'Anda sudah punya preset dengan nama ini untuk laporan ini. Pilih nama lain.';
+    }
+}

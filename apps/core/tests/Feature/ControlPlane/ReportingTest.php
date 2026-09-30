@@ -230,6 +230,59 @@ class ReportingTest extends TestCase
         $this->actingAs($this->memberWithoutRoles())->getJson('/api/v1/report-exports/'.$response['id'])->assertNotFound();
     }
 
+    /**
+     * "Excel (data saja)" (K-26): dataset laporan apa adanya ke xlsx lewat antrean yang sama, tanpa layout,
+     * tanpa kop, dan tanpa layanan PDF. Judul kolom dari label placeholder, nilai bertipe menjadi sel bertipe.
+     */
+    public function test_excel_data_only_writes_the_dataset_with_typed_cells_and_no_layout(): void
+    {
+        $response = $this->actingAs($this->owner)
+            ->postJson('/api/v1/reports/management-aset.daftar-work-order/exports', ['data_only' => true, 'parameters' => ['status' => 'draft']])
+            ->assertStatus(202)
+            ->assertJsonPath('data.kind', 'data')
+            ->assertJsonPath('data.format', 'xlsx')
+            ->json('data');
+
+        $export = DB::table('report_exports')->where('id', $response['id'])->first();
+        $this->assertNotNull($export);
+        $this->assertSame('done', $export->status, (string) $export->failure_message);
+        $this->assertSame('', $export->layout_ref);
+        $this->assertSame(0, $this->jumlahPanggilanRenderer(), 'Data saja tidak pernah melewati layanan PDF.');
+
+        $path = tempnam(sys_get_temp_dir(), 'data-only-');
+        file_put_contents($path, Storage::disk('reporting-test')->get($export->file_path));
+        $book = SpreadsheetFactory::load($path);
+        @unlink($path);
+        $this->assertSame(['Data', 'Keterangan'], $book->getSheetNames());
+
+        $data = $book->getSheetByName('Data');
+        $this->assertNotNull($data);
+        $header = $data->rangeToArray('A1:N1')[0];
+        $this->assertSame(['Nomor work order', 'Status', 'Tipe work order'], array_slice($header, 0, 3));
+        $this->assertSame($this->kodeWorkOrder, (string) $data->getCell('A2')->getValue());
+        $expected = array_search('Dibuat pada', $header, true);
+        $this->assertIsInt($expected);
+        $cell = $data->getCell([$expected + 1, 2]);
+        $this->assertIsNumeric($cell->getValue(), 'Waktu ditulis sebagai tanggal Excel, bukan teks.');
+        $this->assertStringContainsString('dd/mm/yyyy hh:mm', $cell->getStyle()->getNumberFormat()->getFormatCode());
+        $this->assertSame(2, $data->getHighestRow(), 'Satu judul dan satu work order draf.');
+
+        $info = $book->getSheetByName('Keterangan');
+        $this->assertNotNull($info);
+        $labels = array_column($info->rangeToArray('A1:B10'), 1, 0);
+        $this->assertSame('1', (string) $labels['Jumlah work order']);
+        $this->assertArrayNotHasKey('Nama pada kop', $labels, 'Kop bukan bagian data.');
+
+        // Opsi terakhir mencatat pilihan "data saja", supaya dialog cetak membukanya lagi.
+        $this->actingAs($this->owner)->getJson('/api/v1/reports/management-aset.daftar-work-order/options')
+            ->assertJsonPath('data.last_used.format', 'data');
+
+        // Hak menjalankan laporan tetap syaratnya.
+        $this->actingAs($this->memberWithoutRoles())
+            ->postJson('/api/v1/reports/management-aset.daftar-work-order/exports', ['data_only' => true])
+            ->assertForbidden();
+    }
+
     public function test_ekspor_word_mengisi_field_dan_menggandakan_baris_pekerjaan(): void
     {
         $response = $this->actingAs($this->owner)

@@ -3,13 +3,13 @@ import { Badge } from '@apperp/ui/badge';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { ReportFilterBar } from './_shared/ReportFilterBar';
 import {
-    AssetConditionFilter,
     AssetFilter,
     AssetGroupFilter,
-    AssetLocationFilter,
     AssetTypeFilter,
+    ConditionFilter,
     DateFilter,
     FiscalClassificationFilter,
+    LocationFilter,
     OrganizationUnitFilter,
     PersonFilter,
 } from './_shared/ReportFilters';
@@ -44,6 +44,7 @@ export default function LaporanMonitoringAsetPage() {
     const {
         filters,
         bindFilter,
+        bindMultiFilter,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -176,16 +177,20 @@ export default function LaporanMonitoringAsetPage() {
                         label="Sampai tanggal"
                         {...bindFilter('sampai')}
                     />
-                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
                     <FiscalClassificationFilter
-                        {...bindFilter('kelompok_harta_fiskal_id')}
+                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
                     />
-                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
-                    <AssetConditionFilter {...bindFilter('kondisi_aset_id')} />
-                    <AssetLocationFilter {...bindFilter('lokasi_aset_id')} />
-                    <PersonFilter {...bindFilter('penanggung_jawab_user_id')} />
-                    <OrganizationUnitFilter {...bindFilter('org_unit_id')} />
+                    <ConditionFilter {...bindMultiFilter('kondisi_aset_id')} />
+                    <LocationFilter {...bindMultiFilter('lokasi_aset_id')} />
+                    <PersonFilter
+                        {...bindMultiFilter('penanggung_jawab_user_id')}
+                    />
+                    <OrganizationUnitFilter
+                        {...bindMultiFilter('org_unit_id')}
+                    />
                 </ReportFilterBar>
             }
             columns={columns}

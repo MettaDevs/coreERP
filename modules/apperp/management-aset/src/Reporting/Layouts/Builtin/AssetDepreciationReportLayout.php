@@ -70,11 +70,12 @@ final class AssetDepreciationReportLayout extends BuiltinLayoutBuilder
             'A6' => 'Periode', 'B6' => '${filter_periode}', 'C6' => 'Buku', 'D6' => '${filter_buku}', 'E6' => 'Dicetak', 'F6' => '${dicetak_pada}',
             'A7' => 'Group aset', 'B7' => '${filter_group}', 'C7' => 'Kelompok harta fiskal', 'D7' => '${filter_golongan}', 'E7' => 'Jenis aset', 'F7' => '${filter_jenis}',
             'A8' => 'Aset', 'B8' => '${filter_aset}', 'C8' => 'Jumlah buku aset', 'D8' => '${jumlah_aset}',
+            'A9' => 'Lokasi', 'B9' => '${filter_lokasi}', 'C9' => 'Kondisi', 'D9' => '${filter_kondisi}',
         ] as $cell => $value) {
             $sheet->setCellValue($cell, $value);
         }
-        $sheet->getStyle('B6:B8')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-        $sheet->getStyle('D6:D8')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $sheet->getStyle('B6:B9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $sheet->getStyle('D6:D9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
         foreach (self::COLUMNS as $index => [$heading, $macro, $width]) {
             $sheet->setCellValue([$index + 1, 10], $heading);

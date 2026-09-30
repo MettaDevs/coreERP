@@ -34,6 +34,7 @@
         "open-telemetry/opentelemetry-auto-laravel": "^1.9",
         "open-telemetry/opentelemetry-auto-psr3": "^0.3.0",
         "open-telemetry/sdk": "^1.15",
+        "openspout/openspout": "5.12",
         "php-http/guzzle7-adapter": "^1.1",
         "phpoffice/phpspreadsheet": "4.0",
         "phpoffice/phpword": "1.3",

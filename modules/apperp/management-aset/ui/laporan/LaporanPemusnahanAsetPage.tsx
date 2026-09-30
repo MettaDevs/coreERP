@@ -5,9 +5,11 @@ import {
     AssetFilter,
     AssetGroupFilter,
     AssetTypeFilter,
+    ConditionFilter,
     DateFilter,
     DepreciationBookFilter,
     FiscalClassificationFilter,
+    LocationFilter,
 } from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
@@ -37,6 +39,8 @@ export default function LaporanPemusnahanAsetPage() {
     const {
         filters,
         bindFilter,
+        bindMultiFilter,
+        presets,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -125,6 +129,8 @@ export default function LaporanPemusnahanAsetPage() {
                 <ReportFilterBar
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
+                    presets={presets}
+                    dates={{ from: 'dari', to: 'sampai' }}
                 >
                     <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
                     <DateFilter
@@ -132,11 +138,13 @@ export default function LaporanPemusnahanAsetPage() {
                         {...bindFilter('sampai')}
                     />
                     <DepreciationBookFilter {...bindFilter('buku_id')} />
-                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
                     <FiscalClassificationFilter
-                        {...bindFilter('kelompok_harta_fiskal_id')}
+                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
                     />
-                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
+                    <LocationFilter {...bindMultiFilter('lokasi_aset_id')} />
+                    <ConditionFilter {...bindMultiFilter('kondisi_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
                 </ReportFilterBar>
             }

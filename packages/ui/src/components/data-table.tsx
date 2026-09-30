@@ -29,6 +29,7 @@ import {
 
 type SortValue = string | number
 type SortDirection = "asc" | "desc"
+type DataTableSort = { columnId: string; direction: SortDirection }
 
 type DataTableColumn<T> = {
   id: string
@@ -75,6 +76,13 @@ type DataTableProps<T> = {
   /** Baris kosong di bawah untuk menambah data, seperti Edit List BC. */
   onAddRow?: () => void
   addRowLabel?: string
+  /**
+   * Urutan yang dipegang layar, bila layar perlu mengetahuinya, misalnya untuk mengekspor daftar dengan
+   * urutan yang sama dengan yang tampil. Tanpa `sort`, tabel memegang urutannya sendiri.
+   */
+  sort?: DataTableSort | null
+  /** Dipanggil setiap kali pengguna mengganti urutan kolom. */
+  onSortChange?: (sort: DataTableSort | null) => void
 }
 
 function DataTable<T>({
@@ -93,11 +101,11 @@ function DataTable<T>({
   onRowClick,
   onAddRow,
   addRowLabel = "Tambah baris",
+  sort: controlledSort,
+  onSortChange,
 }: DataTableProps<T>) {
-  const [sort, setSort] = React.useState<{
-    columnId: string
-    direction: SortDirection
-  } | null>(null)
+  const [internalSort, setSort] = React.useState<DataTableSort | null>(null)
+  const sort = controlledSort === undefined ? internalSort : controlledSort
   const [widths, setWidths] = React.useState<Record<string, number>>(() =>
     Object.fromEntries(
       columns.map((column) => [
@@ -185,13 +193,16 @@ return data
   }, [columns, data, sort])
 
   const toggleSort = (columnId: string) => {
-    setSort((current) => ({
+    const next: DataTableSort = {
       columnId,
       direction:
-        current?.columnId === columnId && current.direction === "asc"
+        sort?.columnId === columnId && sort.direction === "asc"
           ? "desc"
           : "asc",
-    }))
+    }
+
+    setSort(next)
+    onSortChange?.(next)
   }
 
   const allRowsSelected = data.length > 0 && data.every((row) => selectedKeys.has(getRowKey(row)))
@@ -537,4 +548,4 @@ return
 }
 
 export { DataTable }
-export type { DataTableColumn, DataTableRowAction }
+export type { DataTableColumn, DataTableRowAction, DataTableSort }

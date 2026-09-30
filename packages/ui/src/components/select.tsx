@@ -86,7 +86,11 @@ setInternalValue(nextValue);
                         className,
                     )}
                 >
-                    <ComboboxValue placeholder={label ? '' : placeholder} />
+                    {/* Nilai tidak merender elemen sendiri; pembungkus ini yang memotong label panjang
+                        dengan elipsis alih-alih membiarkannya turun baris keluar dari field. */}
+                    <span className="min-w-0 flex-1 truncate">
+                        <ComboboxValue placeholder={label ? '' : placeholder} />
+                    </span>
                 </ComboboxTrigger>
                 {label && (
                     <label

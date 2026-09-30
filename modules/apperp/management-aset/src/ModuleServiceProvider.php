@@ -8,6 +8,7 @@ use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Support\Modules\Contracts\ListExportSources;
 use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Support\Facades\Event;
@@ -24,6 +25,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderList;
+use Modules\Apperp\ManagementAset\Reporting\Lists\AssetRegisterList;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Modules\Apperp\ManagementAset\Services\AssetAttachments;
@@ -100,6 +102,10 @@ final class ModuleServiceProvider extends ServiceProvider
         // pendaftaran ini Core tidak tahu module punya laporan, dan ia jatuh ke jalur HTTP
         // lama — alamat yang sudah tidak ada.
         $this->app->make(DaftarLaporan::class)->daftarkan($this->app->make(PenyediaLaporan::class));
+
+        // Ekspor daftar di layar lewat antrean ekspor Core (K-27): register aset sebagai pilot. Core meminta
+        // barisnya ke sini dengan hak dan kebijakan data yang sama dengan layar Inventarisasi aset.
+        $this->app->make(ListExportSources::class)->register($this->app->make(AssetRegisterList::class));
 
         // Posting finance modul ini yang tertahan dibentuk ulang Core dengan akun posting group yang
         // berlaku saat itu. Tanpa pendaftaran ini, mengisi kolom posting group yang dulu kosong tidak

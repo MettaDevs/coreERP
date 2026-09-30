@@ -48,7 +48,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
             'description' => $definition->description(),
             'permission' => $definition->permission(),
             // Sama dengan yang dipulangkan `definisi()`: nama parameter adalah kunci aturannya.
-            'parameters' => array_map('strval', array_keys($definition->parameterRules())),
+            'parameters' => $this->parameterNames($definition),
             'builtin_layouts' => array_map(static fn (BuiltinLayout $layout): array => [
                 'key' => $layout->key,
                 'name' => $layout->name,
@@ -68,7 +68,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
 
         return [
             'fields' => $definition->fields(),
-            'parameters' => array_map('strval', array_keys($definition->parameterRules())),
+            'parameters' => $this->parameterNames($definition),
         ];
     }
 
@@ -99,7 +99,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
 
         try {
             /** @var array<string, mixed> $tervalidasi */
-            $tervalidasi = validator($parameter, $definition->parameterRules())->validate();
+            $tervalidasi = validator($this->asLists($parameter, $definition), $definition->parameterRules())->validate();
         } catch (ValidationException $exception) {
             throw new RuntimeException(
                 'Parameter laporan tidak diterima: '.implode(' ', $exception->validator->errors()->all()),
@@ -120,6 +120,42 @@ final class PenyediaLaporan implements PenyediaLaporanModul
             'tables' => $data->tables,
             'file_name' => $data->fileName,
         ];
+    }
+
+    /**
+     * Nama parameter laporan: kunci aturannya, tanpa aturan per butir daftar (`group_aset_id.*`).
+     *
+     * @return list<string>
+     */
+    private function parameterNames(ReportDefinition $definition): array
+    {
+        return array_values(array_filter(
+            array_map('strval', array_keys($definition->parameterRules())),
+            static fn (string $name): bool => ! str_contains($name, '.'),
+        ));
+    }
+
+    /**
+     * Filter pilihan banyak menerima satu nilai juga. Opsi yang tersimpan sebelum filternya menjadi daftar,
+     * dan tautan lama yang menulis `?group_aset_id=...`, tetap berlaku sebagai daftar berisi satu nilai.
+     *
+     * @param  array<string, mixed>  $parameter
+     * @return array<string, mixed>
+     */
+    private function asLists(array $parameter, ReportDefinition $definition): array
+    {
+        foreach ($definition->parameterRules() as $name => $rules) {
+            if (! in_array('array', $rules, true) || ! is_string($parameter[$name] ?? null)) {
+                continue;
+            }
+            if ($parameter[$name] === '') {
+                unset($parameter[$name]);
+            } else {
+                $parameter[$name] = [$parameter[$name]];
+            }
+        }
+
+        return $parameter;
     }
 
     /** @param array<string, mixed> $konteks */
