@@ -8,12 +8,15 @@ use Brick\Math\BigDecimal;
 use Illuminate\Database\Query\JoinClause;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoringLine;
+use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Support\AssetMonitoringStatus;
@@ -75,6 +78,18 @@ final class AssetMonitoringReport implements ReportDefinition
         ];
     }
 
+    /**
+     * Dokumen monitoring lalu barisnya. Laporannya satu baris per aset yang diperiksa, jadi filter pada
+     * dokumen menyaring semua barisnya, dan filter pada baris hanya meloloskan baris yang cocok.
+     */
+    public function dataItems(): array
+    {
+        return [
+            new ReportDataItem('monitoring', 'Monitoring', AssetMonitoring::class, 'monitoring', ['kode']),
+            new ReportDataItem('baris', 'Baris monitoring', AssetMonitoringLine::class, 'aset_tr_monitoring_aset_details'),
+        ];
+    }
+
     public function fields(): array
     {
         return [
@@ -130,6 +145,9 @@ final class AssetMonitoringReport implements ReportDefinition
 
         app(OrganizationScope::class)->query($query, $context->request(), 'monitoring.legal_entity_id', 'monitoring.responsible_org_unit_id');
         AssetReportFilters::apply($query, array_diff_key($parameters, array_flip(['lokasi_aset_id', 'kondisi_aset_id'])), 'aset');
+        foreach ($this->dataItems() as $item) {
+            AdditionalFilters::apply($query, $item, $parameters, $context);
+        }
         foreach (['dari' => '>=', 'sampai' => '<='] as $parameter => $operator) {
             if (! empty($parameters[$parameter])) {
                 $query->where('monitoring.tanggal', $operator, $parameters[$parameter]);

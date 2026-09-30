@@ -60,15 +60,21 @@ final class PenyediaLaporan implements PenyediaLaporanModul
 
     /**
      * @param  array<string, mixed>  $konteks
-     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
     public function definisi(string $kodeLaporan, array $konteks): array
     {
         $definition = $this->terizinkan($kodeLaporan, $konteks);
 
+        $items = $definition->dataItems();
+
         return [
-            'fields' => $definition->fields(),
+            'fields' => $items === [] ? $definition->fields() : [
+                ...$definition->fields(),
+                ['key' => AdditionalFilters::HEADER_FIELD, 'label' => 'Filter tambahan', 'table' => null],
+            ],
             'parameters' => $this->parameterNames($definition),
+            'data_items' => AdditionalFilters::catalog($items),
         ];
     }
 
@@ -99,7 +105,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
 
         try {
             /** @var array<string, mixed> $tervalidasi */
-            $tervalidasi = validator($this->asLists($parameter, $definition), $definition->parameterRules())->validate();
+            $tervalidasi = validator($this->asLists($parameter, $definition), $this->rules($definition))->validate();
         } catch (ValidationException $exception) {
             throw new RuntimeException(
                 'Parameter laporan tidak diterima: '.implode(' ', $exception->validator->errors()->all()),
@@ -107,8 +113,14 @@ final class PenyediaLaporan implements PenyediaLaporanModul
             );
         }
 
+        $context = ReportContext::fromArray($konteks);
+        $items = $definition->dataItems();
+        // Kolom yang tidak dikenal ditolak sebelum data dibaca; ekspresi yang salah ditolak saat diterapkan.
+        // Keduanya `RuntimeException` dengan pesan siap-baca, seperti parameter yang tidak diterima.
+        AdditionalFilters::assertKnown($items, $tervalidasi);
+
         try {
-            $data = $definition->data(ReportContext::fromArray($konteks), $tervalidasi);
+            $data = $definition->data($context, $tervalidasi);
         } catch (ReportDataException $exception) {
             // Data di luar scope atau tidak ada. Pesannya sama persis dengan yang dilihat
             // pengguna di layar, dan Core meneruskannya apa adanya ke baris ekspor.
@@ -116,7 +128,10 @@ final class PenyediaLaporan implements PenyediaLaporanModul
         }
 
         return [
-            'fields' => $data->fields,
+            'fields' => $items === [] ? $data->fields : [
+                ...$data->fields,
+                AdditionalFilters::HEADER_FIELD => AdditionalFilters::describe($items, $tervalidasi, $context),
+            ],
             'tables' => $data->tables,
             'file_name' => $data->fileName,
         ];
@@ -130,9 +145,21 @@ final class PenyediaLaporan implements PenyediaLaporanModul
     private function parameterNames(ReportDefinition $definition): array
     {
         return array_values(array_filter(
-            array_map('strval', array_keys($definition->parameterRules())),
+            array_map('strval', array_keys($this->rules($definition))),
             static fn (string $name): bool => ! str_contains($name, '.'),
         ));
+    }
+
+    /**
+     * Aturan parameter laporan, ditambah `filters` untuk laporan yang punya data item.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function rules(ReportDefinition $definition): array
+    {
+        return $definition->dataItems() === []
+            ? $definition->parameterRules()
+            : [...$definition->parameterRules(), ...AdditionalFilters::rules()];
     }
 
     /**

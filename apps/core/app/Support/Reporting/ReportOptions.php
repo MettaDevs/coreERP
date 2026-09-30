@@ -39,6 +39,11 @@ final class ReportOptions
 
     private const MAX_LIST_ITEMS = 200;
 
+    /** Parameter filter tambahan pengguna (K-30), sama dengan `AdditionalFilters::PARAMETER` di module. */
+    private const ADDITIONAL_FILTERS = 'filters';
+
+    private const MAX_FILTER_EXPRESSION_LENGTH = 250;
+
     public function __construct(private readonly UserClock $clock) {}
 
     /**
@@ -216,7 +221,7 @@ final class ReportOptions
      * relatif hanya boleh ada di preset, dan harus salah satu yang dikenal.
      *
      * @param  array<string, mixed>  $parameters
-     * @return array<string, string|list<string>>
+     * @return array<string, string|list<string>|array<string, array<string, string|list<string>>>>
      */
     public static function clean(stdClass $report, array $parameters, bool $allowTokens): array
     {
@@ -227,6 +232,14 @@ final class ReportOptions
                 continue;
             }
             $value = $parameters[$key];
+            if ($key === self::ADDITIONAL_FILTERS) {
+                $filters = is_array($value) ? self::cleanAdditionalFilters($value) : [];
+                if ($filters !== []) {
+                    $clean[$key] = $filters;
+                }
+
+                continue;
+            }
             if (is_int($value) || is_float($value)) {
                 $value = (string) $value;
             }
@@ -249,6 +262,42 @@ final class ReportOptions
                 )));
                 if ($items !== []) {
                     $clean[$key] = array_slice($items, 0, self::MAX_LIST_ITEMS);
+                }
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Filter tambahan pengguna (K-30): `filters[<data item>][<kolom>]` berisi ekspresi filter BC atau daftar
+     * nilai. Di sini hanya bentuknya yang dirapikan; kolom dan ekspresinya diperiksa module saat laporan
+     * dijalankan. Awalan `@` di sini berarti "tidak peka huruf besar" milik sintaks BC, bukan token tanggal.
+     *
+     * @param  array<array-key, mixed>  $filters
+     * @return array<string, array<string, string|list<string>>>
+     */
+    private static function cleanAdditionalFilters(array $filters): array
+    {
+        $clean = [];
+        foreach (array_slice($filters, 0, 10, true) as $item => $columns) {
+            if (! is_string($item) || preg_match('/^[a-z0-9_]{1,64}$/', $item) !== 1 || ! is_array($columns)) {
+                continue;
+            }
+            foreach (array_slice($columns, 0, 50, true) as $column => $value) {
+                if (! is_string($column) || preg_match('/^[a-z0-9_]{1,64}$/', $column) !== 1) {
+                    continue;
+                }
+                if (is_scalar($value) && trim((string) $value) !== '') {
+                    $clean[$item][$column] = mb_substr(trim((string) $value), 0, self::MAX_FILTER_EXPRESSION_LENGTH);
+                } elseif (is_array($value) && array_is_list($value)) {
+                    $items = array_values(array_unique(array_filter(
+                        array_map(fn (mixed $entry): string => is_scalar($entry) ? mb_substr(trim((string) $entry), 0, self::MAX_VALUE_LENGTH) : '', $value),
+                        fn (string $entry): bool => $entry !== '',
+                    )));
+                    if ($items !== []) {
+                        $clean[$item][$column] = array_slice($items, 0, self::MAX_LIST_ITEMS);
+                    }
                 }
             }
         }

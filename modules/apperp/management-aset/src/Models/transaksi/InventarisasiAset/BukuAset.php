@@ -5,6 +5,7 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
+use App\Support\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -44,6 +45,60 @@ class BukuAset extends Model
 {
     use HasUlids;
     use MilikTenant;
+
+    /**
+     * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
+     * dari database. Lihat {@see TableFields}.
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'buku_id' => 'Buku penyusutan',
+        'book_code' => 'Kode buku',
+        'depreciation_profile_id' => 'Profil penyusutan',
+        'alternative_profile_id' => 'Profil pengganti',
+        'useful_life_periods' => 'Masa manfaat (jumlah periode)',
+        'convention' => 'Perlakuan periode pertama',
+        'depreciation_start_on' => 'Tanggal mulai penyusutan',
+        'depreciate' => 'Disusutkan',
+        'round_off_depreciation' => 'Kelipatan pembulatan penyusutan',
+        'acquisition_value' => 'Nilai perolehan',
+        'residual_value' => 'Nilai sisa',
+        'opening_accumulated_depreciation' => 'Akumulasi penyusutan saldo awal',
+        'status' => 'Status buku',
+        'closed_on' => 'Tanggal buku ditutup',
+    ];
+
+    /** @var array<string, array<string, string>> */
+    public const FIELD_OPTIONS = [
+        'status' => ['active' => 'Aktif', 'closed' => 'Ditutup'],
+        // Label sama dengan pilihan di matriks group x buku.
+        'convention' => [
+            'none' => 'Tanpa penyesuaian',
+            'full_month' => 'Bulan perolehan penuh',
+            'mid_month_1st' => 'Tengah bulan (awal bulan)',
+            'mid_month_15th' => 'Tengah bulan (tanggal 15)',
+            'mid_quarter' => 'Tengah kuartal',
+            'half_year' => 'Setengah tahun',
+            'half_year_start_of_year' => 'Setengah tahun (mulai awal tahun)',
+            'half_year_next_year' => 'Setengah tahun (mulai tahun depan)',
+        ],
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'buku_id' => 'buku-penyusutan',
+        'depreciation_profile_id' => 'profil-penyusutan',
+        'alternative_profile_id' => 'profil-penyusutan',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'aset_id' => 'Kunci aset pemilik buku; saring lewat bagian Aset.',
+        'accumulated_depreciation' => 'Nilai hari ini; laporan penyusutan menghitung akumulasi per periode dari riwayat penyusutan.',
+        'net_book_value' => 'Nilai hari ini; laporan penyusutan menghitung nilai buku per periode dari riwayat penyusutan.',
+        'elapsed_periods_offset' => 'Angka koreksi internal penghitung umur untuk saldo awal, tidak bermakna sebagai filter.',
+    ];
 
     protected $table = 'aset_tr_buku_aset';
 

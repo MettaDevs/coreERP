@@ -31,6 +31,7 @@ export default function LaporanMutasiAsetPage() {
         filters,
         bindFilter,
         bindMultiFilter,
+        additional,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -127,6 +128,7 @@ export default function LaporanMutasiAsetPage() {
                 <ReportFilterBar
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
+                    additional={additional}
                 >
                     <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
                     <FiscalClassificationFilter

@@ -6,9 +6,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
+use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
@@ -65,6 +67,19 @@ final class WorkOrderList implements ReportDefinition
         ];
     }
 
+    /**
+     * Work order lalu baris pekerjaannya. Laporannya satu baris per work order, jadi filter pada baris
+     * menyaring work order yang punya baris cocok, dan jumlah baris serta jam dihitung dari baris yang
+     * cocok saja. Tanpa filter baris, work order yang belum punya baris tetap tampil.
+     */
+    public function dataItems(): array
+    {
+        return [
+            new ReportDataItem('work_order', 'Work order', PemeliharaanAset::class, 'aset_tr_pemeliharaan_aset', ['kode']),
+            new ReportDataItem('baris', 'Baris pekerjaan', PemeliharaanAsetDetail::class, 'aset_tr_pemeliharaan_aset_details'),
+        ];
+    }
+
     public function fields(): array
     {
         $header = [
@@ -109,6 +124,11 @@ final class WorkOrderList implements ReportDefinition
         if (! empty($parameters['status'])) {
             $query->where('aset_tr_pemeliharaan_aset.status', $parameters['status']);
         }
+        [$workOrders, $lines] = $this->dataItems();
+        AdditionalFilters::apply($query, $workOrders, $parameters, $context);
+        if (AdditionalFilters::active($lines, $parameters)) {
+            $query->whereExists($this->lines($parameters, $context));
+        }
         // `created_at` tersimpan dalam UTC, sedangkan tanggal filter adalah tanggal pengguna. Batas harinya
         // dihitung di zona pengguna lalu dijadikan UTC: work order yang dibuat pukul 00.30 WIB tanggal 2
         // (17.30 UTC tanggal 1) ikut filter "dari tanggal 2".
@@ -124,9 +144,9 @@ final class WorkOrderList implements ReportDefinition
         // yang diinginkan: dataset laporan membaca nilai apa adanya, sedangkan cast model akan
         // mengubah kolom tanggal menjadi objek yang tidak diterima pemformatnya di bawah.
         $rows = $query
-            ->selectSub($this->ringkasan('count(*)'), 'jumlah_baris')
-            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.estimasi_jam), 0)'), 'estimasi_jam')
-            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.aktual_jam), 0)'), 'aktual_jam')
+            ->selectSub($this->ringkasan('count(*)', $parameters, $context), 'jumlah_baris')
+            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.estimasi_jam), 0)', $parameters, $context), 'estimasi_jam')
+            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.aktual_jam), 0)', $parameters, $context), 'aktual_jam')
             ->addSelect(['aset_tr_pemeliharaan_aset.*', 'tipe.nama as tipe_nama', 'layanan.nama as layanan_nama'])
             ->orderBy('aset_tr_pemeliharaan_aset.kode')
             ->toBase()
@@ -163,22 +183,37 @@ final class WorkOrderList implements ReportDefinition
     }
 
     /**
-     * Subquery ringkasan baris pekerjaan untuk work order yang sedang dibaca.
+     * Subquery ringkasan baris pekerjaan untuk work order yang sedang dibaca, atas baris yang lolos
+     * filter tambahan baris.
      *
      * `literal-string`: ekspresinya hanya boleh teks yang tertulis di berkas ini. Ia masuk ke
      * SQL apa adanya, jadi tipe itulah yang menahan rakitan dari masukan pengguna.
      *
+     * @param  literal-string  $ekspresi
+     * @param  array<string, mixed>  $parameters
+     * @return Builder<PemeliharaanAsetDetail>
+     */
+    private function ringkasan(string $ekspresi, array $parameters, ReportContext $context): Builder
+    {
+        return $this->lines($parameters, $context)->selectRaw($ekspresi);
+    }
+
+    /**
+     * Baris pekerjaan work order yang sedang dibaca, setelah filter tambahan baris.
+     *
      * Penyaringan tenant pada subquery ini datang dari scope model detailnya, bukan dari
      * `where` yang ditulis tangan seperti sebelumnya.
      *
-     * @param  literal-string  $ekspresi
+     * @param  array<string, mixed>  $parameters
      * @return Builder<PemeliharaanAsetDetail>
      */
-    private function ringkasan(string $ekspresi): Builder
+    private function lines(array $parameters, ReportContext $context): Builder
     {
-        return PemeliharaanAsetDetail::query()
-            ->selectRaw($ekspresi)
+        $query = PemeliharaanAsetDetail::query()
             ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'aset_tr_pemeliharaan_aset.id');
+        AdditionalFilters::apply($query, $this->dataItems()[1], $parameters, $context);
+
+        return $query;
     }
 
     /** @return array{key: string, label: string, table: ?string, type?: string} */

@@ -490,6 +490,15 @@ class AssetMonitoringTest extends TestCase
         $this->assertCount(1, $filtered['tables']['baris']);
         $this->assertSame('Baik', $filtered['fields']['filter_kondisi']);
 
+        // Filter tambahan: dokumen menyaring semua barisnya, baris hanya meloloskan baris yang cocok.
+        $kode = (string) DB::table('aset_tr_monitoring_aset')->where('id', $selesai)->value('kode');
+        $additional = fn (array $filters): array => app(PenyediaLaporan::class)->dataset('laporan-monitoring-aset', $context, ['filters' => $filters]);
+        $this->assertCount(2, $additional(['monitoring' => ['kode' => $kode]])['tables']['baris']);
+        $this->assertCount(0, $additional(['monitoring' => ['kode' => '<>'.$kode]])['tables']['baris']);
+        $mismatch = $additional(['monitoring' => ['kode' => $kode], 'baris' => ['hasil' => ['tidak_sesuai'], 'ada' => ['0']]]);
+        $this->assertSame(['Tidak sesuai'], array_column($mismatch['tables']['baris'], 'status_monitoring'));
+        $this->assertSame("Monitoring — No. bukti: {$kode} · Baris monitoring — Hasil: Tidak sesuai; Ada secara fisik: Tidak", $mismatch['fields']['filter_tambahan']);
+
         // Layar pratinjau membaca dataset yang sama, dengan izin baca monitoring.
         $this->sebagaiPengguna($this->tenantId, ['management-aset.monitoring-aset.read'])
             ->getJson('/api/modules/management-aset/v1/laporan/laporan-monitoring-aset?dari=2026-08-01')

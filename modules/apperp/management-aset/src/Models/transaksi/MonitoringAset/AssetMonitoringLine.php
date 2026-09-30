@@ -5,12 +5,15 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
+use App\Support\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Support\AssetMonitoringStatus;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Satu aset pada satu pemeriksaan fisik, beserta temuan pemeriksanya.
@@ -49,6 +52,48 @@ class AssetMonitoringLine extends Model
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [
         'sistem_custodian_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
+
+    /**
+     * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
+     * dari database. Lihat {@see TableFields}.
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'line_number' => 'No. baris',
+        'aset_id' => 'Aset',
+        'ada' => 'Ada secara fisik',
+        'kondisi_aset_id' => 'Kondisi fisik',
+        'keterangan' => 'Keterangan',
+        'sistem_lifecycle_state' => 'Status di sistem',
+        'sistem_lokasi_id' => 'Lokasi tercatat',
+        'sistem_org_unit_id' => 'Unit organisasi tercatat',
+        'sistem_custodian_user_id' => 'Penanggung jawab tercatat',
+        'nilai_perolehan' => 'Nilai perolehan',
+        'akumulasi_penyusutan' => 'Akumulasi penyusutan',
+        'nilai_buku' => 'Nilai buku',
+        'hasil' => 'Hasil',
+    ];
+
+    /** @var array<string, array<string, string>> */
+    public const FIELD_OPTIONS = [
+        'sistem_lifecycle_state' => StatusAset::LABELS,
+        'hasil' => [AssetMonitoringStatus::MATCH => 'Sesuai', AssetMonitoringStatus::MISMATCH => 'Tidak sesuai'],
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'aset_id' => 'aset',
+        'kondisi_aset_id' => 'kondisi-aset',
+        'sistem_lokasi_id' => 'lokasi-aset',
+        'sistem_org_unit_id' => 'reference-data/unit-kerja',
+        'sistem_custodian_user_id' => 'reference-data/anggota',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'monitoring_aset_id' => 'Kunci dokumen induk; saring lewat bagian Monitoring.',
     ];
 
     protected $table = 'aset_tr_monitoring_aset_details';

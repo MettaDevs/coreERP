@@ -3,11 +3,12 @@ import { api, errorMessage } from '../../api';
 import type { FilterProps, MultiFilterProps } from './ReportFilters';
 import {
     archivePreset,
-    cleanFilters,
     createPreset,
     filled,
+    fromParameters,
     getReportOptions,
     rememberLastUsed,
+    toParameters,
 } from './reportOptions';
 import type { FilterValue, Filters, ReportPreset } from './reportOptions';
 
@@ -33,15 +34,38 @@ export type ReportPresetState = {
     archive: (preset: ReportPreset) => Promise<void>;
 };
 
-/** Pilihan filter dibawa ke pratinjau sebagai `kunci=nilai`, dan pilihan banyak sebagai `kunci[]=nilai`. */
+/** Filter tambahan laporan (K-30) untuk `ReportFilterBar`. */
+export type AdditionalFilterState = {
+    reportCode: string;
+    filters: Filters;
+    update: (key: string, value: FilterValue) => void;
+};
+
+/**
+ * Pilihan filter dibawa ke pratinjau sebagai `kunci=nilai`, pilihan banyak sebagai `kunci[]=nilai`, dan
+ * filter tambahan sebagai `filters[data item][kolom]=nilai`.
+ */
 function queryString(filters: Filters): string {
     const params = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(cleanFilters(filters))) {
+    const append = (key: string, value: FilterValue) => {
         if (Array.isArray(value)) {
             value.forEach((item) => params.append(`${key}[]`, item));
         } else {
             params.append(key, value);
+        }
+    };
+
+    for (const [key, value] of Object.entries(toParameters(filters))) {
+        if (typeof value === 'string' || Array.isArray(value)) {
+            append(key, value);
+
+            continue;
+        }
+
+        for (const [item, columns] of Object.entries(value)) {
+            for (const [column, entry] of Object.entries(columns)) {
+                append(`${key}[${item}][${column}]`, entry);
+            }
         }
     }
 
@@ -95,13 +119,14 @@ export function useReportData<T = Record<string, unknown>>(
                 setCanShare(options.can_share);
 
                 if (options.last_used) {
-                    lastRemembered.current = JSON.stringify(
-                        cleanFilters(options.last_used.parameters),
+                    const remembered = fromParameters(
+                        options.last_used.parameters,
                     );
-                    setFilters({
-                        ...initial.current,
-                        ...options.last_used.parameters,
-                    });
+
+                    lastRemembered.current = JSON.stringify(
+                        toParameters(remembered),
+                    );
+                    setFilters({ ...initial.current, ...remembered });
                 }
             })
             .catch(() => undefined)
@@ -137,14 +162,14 @@ export function useReportData<T = Record<string, unknown>>(
                     setFields(res.data?.fields ?? {});
 
                     // Hanya pilihan yang benar-benar diterima laporan yang dicatat sebagai pilihan terakhir.
-                    const remembered = JSON.stringify(cleanFilters(filters));
+                    const parameters = toParameters(filters);
+                    const remembered = JSON.stringify(parameters);
 
                     if (remembered !== lastRemembered.current) {
                         lastRemembered.current = remembered;
-                        rememberLastUsed(
-                            reportCode,
-                            cleanFilters(filters),
-                        ).catch(() => undefined);
+                        rememberLastUsed(reportCode, parameters).catch(
+                            () => undefined,
+                        );
                     }
                 }
             } catch (err) {
@@ -214,7 +239,7 @@ export function useReportData<T = Record<string, unknown>>(
             if (preset) {
                 setFilters({
                     ...initial.current,
-                    ...preset.resolved_parameters,
+                    ...fromParameters(preset.resolved_parameters),
                 });
             }
         },
@@ -222,14 +247,17 @@ export function useReportData<T = Record<string, unknown>>(
             const preset = await createPreset(
                 reportCode,
                 name,
-                parameters,
+                toParameters(parameters),
                 shared,
             );
 
             setPresets((prev) => [...prev, preset]);
             setSelectedPresetId(preset.id);
             // Layar langsung memakai arti preset itu: "bulan ini" menjadi bulan berjalan, bukan bulan filter tadi.
-            setFilters({ ...initial.current, ...preset.resolved_parameters });
+            setFilters({
+                ...initial.current,
+                ...fromParameters(preset.resolved_parameters),
+            });
         },
         archive: async (preset) => {
             await archivePreset(reportCode, preset);
@@ -247,6 +275,11 @@ export function useReportData<T = Record<string, unknown>>(
         bindMultiFilter,
         hasActiveFilters: Object.values(filters).some(filled),
         presets: presetState,
+        additional: {
+            reportCode,
+            filters,
+            update: updateFilter,
+        } satisfies AdditionalFilterState,
         rows,
         fields,
         loading: loading || !ready,

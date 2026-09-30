@@ -48,7 +48,8 @@ class ReportController extends Controller
         // placeholder milik app supaya pembuat layout melihat keduanya di satu daftar.
         return response()->json([
             'data' => [...$definition['fields'], ...$this->identities->catalog()],
-            'meta' => ['parameters' => $definition['parameters']],
+            // Data item dan katalog kolomnya untuk "+ Tambah filter" di halaman laporan (K-30).
+            'meta' => ['parameters' => $definition['parameters'], 'data_items' => $definition['data_items']],
         ]);
     }
 }

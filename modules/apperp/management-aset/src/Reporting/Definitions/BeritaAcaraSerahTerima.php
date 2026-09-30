@@ -61,6 +61,11 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
         return ['id' => ['required', 'ulid']];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         $header = [
