@@ -39,6 +39,8 @@ usaha yang sungguhan di dalam `setup()` — lihat `apps/core/loadtest/k6/lib.js`
 database sendiri. Query oracle yang masih menyebut `m_group_aset` tidak error — ia hanya tidak
 menemukan tabel, dan gate-nya lolos secara palsu. Itu sebabnya seluruh `verify.sql` ditulis ulang.
 
+**Versi baris dibaca dan dikirim.** Setiap penyimpanan atas record yang sudah ada membawa versi yang terakhir dibaca skenario (field `version` atau header `If-Match`), diambil dari jawaban pembuatan atau dari pembacaan ulang, tidak pernah ditebak atau ditambah satu. Pada profil balapan beberapa VU menyimpan record yang sama, jadi 409 `stale_version` adalah hasil yang sah: ia masuk `http.expectedStatuses` dan tidak dihitung sebagai pelanggaran. Yang tetap dihitung pelanggaran adalah 5xx, himpunan campuran, dan tulis lintas tenant.
+
 ## Menjalankan skenario modul
 
 Dari `apps/core/loadtest/`, dengan stack sudah menyala:
@@ -109,7 +111,8 @@ docker run --rm -i --network core-loadtest_default `
   grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js
 
 docker run --rm -i --network core-loadtest_default `
-  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWDesults:/results" `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD
+esults:/results" `
   -e BASE_URL=http://lb -e PROFILE=adjust-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
   -e RUN_ID=gate-adj-race-1 -e FIXTURE=ar1 `
   grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js

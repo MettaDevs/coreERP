@@ -96,20 +96,28 @@ Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 - [x] 2.11 Penulisan klien integrasi tercatat atas nama akun aplikasinya, bukan sistem (keputusan
       pemilik 29 September 2026, opsi A). Akun itu tidak pernah dapat masuk.
 
-### 3. [ ] Versi baris dan pengaman edit bersamaan (gap 2)
+### 3. [~] Versi baris dan pengaman edit bersamaan (gap 2)
 
 **Tempat:** Core, lalu setiap module · **Setelah:** 0.3 · **Selesai bila:** penyimpanan dengan versi
 basi ditolak dengan pesan yang jelas, baik dari layar maupun API, dan test B-3 lulus.
 
 Rujukan: [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2).
 
-- [ ] 3.1 Kolom versi baris di tabel tenant yang belum punya, naik setiap kali baris berubah. Kolom
-      `version` di dokumen aset menjadi acuannya, bukan diganti.
-- [ ] 3.2 Endpoint baca memulangkan versi; API memulangkannya sebagai ETag.
-- [ ] 3.3 Endpoint tulis mewajibkan versi (form) atau `If-Match` (API), lalu update bersyarat lewat satu
+- [x] 3.1 Kolom versi baris di tabel tenant yang belum punya, naik setiap kali baris berubah. Kolom
+      `version` di dokumen aset menjadi acuannya, bukan diganti. Dinaikkan trigger
+      `coreerp_bump_row_version` (K-11) di semua tabel tenant Core dan module (K-12), dijaga test boundary
+      kolom jejak. Kolom aktivitas mesin klien integrasi tidak menaikkan versi (keputusan 29 September 2026).
+- [x] 3.2 Endpoint baca memulangkan versi; API memulangkannya sebagai ETag.
+- [x] 3.3 Endpoint tulis mewajibkan versi (form) atau `If-Match` (API), lalu update bersyarat lewat satu
       helper Core. Controller aset yang sekarang menulis penolakannya sendiri beralih ke helper itu.
-- [ ] 3.4 Jawaban 409 dengan pesan yang menjelaskan dampaknya bagi pengguna.
-- [ ] 3.5 Form di Shell membawa versi dan menampilkan pesan muat ulang saat ditolak.
+      Helpernya `RowVersion` (`claim`, dan `claimIfExists` untuk setelan yang lahir saat pertama disimpan).
+      Semua endpoint ubah dan arsip Core dan aset (K-13); yang sengaja tidak ikut: baris milik pengguna
+      sendiri, rute sesi, pembuatan, impor kumpulan, transisi status yang sudah dijaga status, dan
+      `internal/v1` mesin.
+- [x] 3.4 Jawaban 409 dengan pesan yang menjelaskan dampaknya bagi pengguna. Tanpa versi dijawab 428.
+- [x] 3.5 Form di Shell membawa versi dan menampilkan pesan muat ulang saat ditolak.
+- [ ] 3.6 Suite Core dan Module penuh hijau, dan load test aset (skenario sudah mengirim versi) lulus
+      dengan `verify.sql` bernilai 0.
 
 ### 4. [ ] Retensi data log (gap 4)
 
@@ -216,7 +224,7 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       record lewat request mengisi pelaku yang benar; job latar mengisi pengguna pemicunya.
 - [x] **B-2** (area 2) Update lewat query builder tercatat. Field di luar setup tidak tercatat. Entri
       tidak bisa diubah. Riwayat per record urut waktu dan tidak bocor antar tenant.
-- [ ] **B-3** (area 3) Dua penyimpanan dengan versi yang sama: yang kedua ditolak 409. `PATCH` tanpa
+- [~] **B-3** (area 3) Dua penyimpanan dengan versi yang sama: yang kedua ditolak 409. `PATCH` tanpa
       `If-Match` atau dengan ETag basi ditolak.
 - [ ] **B-4** (area 4) Tanpa setelan tenant, hasilnya sama dengan perilaku hari ini. Masa simpan di
       bawah minimum ditolak. Tabel di luar daftar tidak pernah tersentuh.

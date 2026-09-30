@@ -2,6 +2,27 @@
 Ulid:
   type: string
   pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
+RecordVersion:
+  description: |
+    Versi baris ini, integer yang hanya dibaca. Setiap penyimpanan menaikkannya (biasanya dua, bukan
+    satu), sehingga angkanya tidak berarti apa-apa selain "berbeda". Kirim nilai dari jawaban terakhir
+    sebagai header `If-Match` atau field `version` saat mengubah baris ini.
+  type: integer
+  minimum: 1
+  readOnly: true
+VersionField:
+  description: |
+    Versi baris yang sedang diubah, dari `version` pada jawaban baca terakhir. Boleh diganti header
+    `If-Match`; salah satunya wajib. Untuk baris yang belum ada pada penyimpanan pertamanya (posting
+    group), kirim 0.
+  type: integer
+  minimum: 0
+VersionInput:
+  description: Body yang hanya membawa versi, untuk DELETE dan aksi atas dokumen yang sudah ada.
+  type: object
+  properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
 AsetPlanningDetailWrite:
   type: object
   required:
@@ -387,11 +408,14 @@ MasterRecord:
   - nama
   - keterangan
   - aktif
+  - version
   - created_at
   - updated_at
   properties:
     id:
       $ref: '#/components/schemas/Ulid'
+    version:
+      $ref: '#/components/schemas/RecordVersion'
     kode:
       type: string
       maxLength: 50
@@ -435,6 +459,8 @@ MasterCreate:
 MasterPatch:
   type: object
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     nama:
       type: string
       minLength: 1
@@ -498,6 +524,7 @@ ModelAset:
     model_number: PK-100
     aset_count: 3
     aktif: true
+    version: 1
     created_at: '2026-07-26T02:00:00.000000Z'
     updated_at: '2026-07-26T02:00:00.000000Z'
 ModelAsetCreate:
@@ -910,6 +937,8 @@ MaintenanceChecklistVariableValueReplace:
   type: object
   required: [values]
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     values:
       type: array
       maxItems: 100
@@ -922,8 +951,11 @@ MaintenanceChecklistVariableValueReplace:
           result_code: {type: string, enum: [pass, fail, none]}
 MaintenanceChecklistVariableValueList:
   type: object
-  required: [data]
+  required: [data, version]
   properties:
+    version:
+      description: Versi variabel checklist pemilik nilai; kirim sebagai `version` saat menyimpannya.
+      $ref: '#/components/schemas/RecordVersion'
     data:
       type: array
       items: {$ref: '#/components/schemas/MaintenanceChecklistVariableValue'}
@@ -958,12 +990,14 @@ MaintenanceChecklistTemplateLine:
     max_value: {type: [number, 'null']}
 MaintenanceChecklistTemplateLineList:
   type: object
-  required: [data]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLine'}}}
+  required: [data, version]
+  properties: {version: {$ref: '#/components/schemas/RecordVersion'}, data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLine'}}}
 MaintenanceChecklistTemplateLineReplace:
   type: object
   required: [lines]
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     lines:
       type: array
       maxItems: 100
@@ -1055,8 +1089,13 @@ TindakanPerbaikanList:
   properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
 MaintenanceTransferResponse:
   type: object
-  required: [data]
+  required: [data, version]
   properties:
+    version:
+      description: |
+        Versi pemilik yang disebut alamat (job type pada `/maintenance-job-types/{id}/jenis-aset`,
+        jenis aset pada `/jenis-aset/{id}/maintenance-job-types`); kirim sebagai `version` saat menyimpan.
+      $ref: '#/components/schemas/RecordVersion'
     data:
       type: object
       required: [remaining, selected]
@@ -1392,14 +1431,19 @@ GroupBukuPenyusutanReplace:
   type: object
   required: [rows]
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     rows:
       type: array
       items:
         $ref: '#/components/schemas/GroupBukuPenyusutanRow'
 GroupBukuPenyusutanList:
   type: object
-  required: [data]
+  required: [data, version]
   properties:
+    version:
+      description: Versi group aset pemilik matriks; kirim sebagai `version` saat menyimpan matriksnya.
+      $ref: '#/components/schemas/RecordVersion'
     data:
       type: array
       items:
@@ -1415,8 +1459,14 @@ PostingGroupAsetAccounts:
   description: |
     Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
     bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
+
+    Pada permintaan PUT body juga membawa `version` (atau kirim header `If-Match`): versi baris yang
+    dibuka pengguna, dan 0 bila barisnya untuk tanggal berlaku yang belum ada. Pada jawaban `version`
+    berisi versi baris sesudah disimpan.
   additionalProperties: false
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     acquisition_account_id:
       description: Harga perolehan. Wajib.
       oneOf:
@@ -1460,10 +1510,12 @@ PostingGroupAsetAccounts:
 PostingGroupAsetRow:
   allOf:
   - type: object
-    required: [group_aset_id, effective_from, missing]
+    required: [group_aset_id, effective_from, missing, version]
     properties:
       group_aset_id:
         $ref: '#/components/schemas/Ulid'
+      version:
+        $ref: '#/components/schemas/RecordVersion'
       effective_from:
         type: string
         format: date
@@ -1668,6 +1720,8 @@ TipeAtributNilaiReplace:
   type: object
   required: [rows]
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     rows:
       type: array
       items:
@@ -1683,8 +1737,11 @@ TipeAtributNilaiReplace:
             default: 0
 TipeAtributNilaiList:
   type: object
-  required: [data]
+  required: [data, version]
   properties:
+    version:
+      description: Versi tipe atribut pemilik pilihan nilai; kirim sebagai `version` saat menyimpannya.
+      $ref: '#/components/schemas/RecordVersion'
     data:
       type: array
       items:
@@ -1702,6 +1759,8 @@ JenisAsetAtributReplace:
   type: object
   required: [rows]
   properties:
+    version:
+      $ref: '#/components/schemas/VersionField'
     rows:
       type: array
       items:
@@ -1719,8 +1778,11 @@ JenisAsetAtributReplace:
             default: 0
 JenisAsetAtributList:
   type: object
-  required: [data]
+  required: [data, version]
   properties:
+    version:
+      description: Versi jenis aset pemilik atribut; kirim sebagai `version` saat menyimpannya.
+      $ref: '#/components/schemas/RecordVersion'
     data:
       type: array
       items:
@@ -1745,8 +1807,13 @@ JenisAsetDetail:
   properties:
     data:
       type: object
-      required: [atribut_count, model_count, aset_count]
+      required: [version, atribut_count, model_count, aset_count]
       properties:
+        version:
+          description: |
+            Versi jenis aset. Daftar model pada panel ini disimpan lewat `PUT /api/v1/jenis-aset/{id}/models`
+            dengan versi ini.
+          $ref: '#/components/schemas/RecordVersion'
         atribut_count:
           description: Tipe atribut yang terpasang pada jenis aset ini.
           type: integer

@@ -207,9 +207,15 @@ export function setup() {
 
     // 2. Pengiriman posting diaktifkan dengan cutover, supaya penerbit menilai pemetaan sungguhan dan
     //    saldo awal punya tanggal jurnal.
+    //    Tenant fixture dipakai ulang antar-run, jadi versi setelannya dibaca dulu (0 bila belum pernah disimpan).
+    const setelan = wajibBatch(
+        'baca setelan feed',
+        jars.map((tenant) => ['GET', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, null, paramsUntuk(tenant)]),
+        [200],
+    );
     wajibBatch(
         'setelan feed',
-        jars.map((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01' }), paramsUntuk(tenant)]),
+        jars.map((tenant, index) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01', version: Number(setelan[index].json('data.version')) }), paramsUntuk(tenant)]),
         [200],
     );
 
@@ -255,7 +261,7 @@ export function setup() {
         jars.map((tenant, index) => [
             'PUT',
             `${ASET('group-aset')}/${groups[index].json('data.id')}/buku-penyusutan`,
-            JSON.stringify({ rows: [{ buku_id: buku[index].json('data.id'), depreciation_profile_id: profil[index].json('data.id'), depreciate: false }] }),
+            JSON.stringify({ rows: [{ buku_id: buku[index].json('data.id'), depreciation_profile_id: profil[index].json('data.id'), depreciate: false }], version: Number(groups[index].json('data.version')) }),
             paramsUntuk(tenant),
         ]),
         [200],
@@ -317,7 +323,7 @@ export function setup() {
                     fail(`setup draf arena ${tenant.index} nomor ${urut}: ${draf.status} ${String(draf.body).slice(0, 400)}`);
                 }
 
-                drafts.push({ id: String(draf.json('data.id')), saldoAwal });
+                drafts.push({ id: String(draf.json('data.id')), saldoAwal, version: Number(draf.json('data.version')) });
             }
 
             arenas.push({ tenantIndex: tenant.index, drafts });
@@ -341,7 +347,7 @@ export function setup() {
                 }
 
                 const id = String(draf.json('data.id'));
-                const selesai = http.post(`${ASET('penerimaan-aset')}/${id}/selesaikan`, JSON.stringify({ version: 1 }), paramsUntuk(jar));
+                const selesai = http.post(`${ASET('penerimaan-aset')}/${id}/selesaikan`, JSON.stringify({ version: Number(draf.json('data.version')) }), paramsUntuk(jar));
 
                 if (selesai.status !== 200) {
                     fail(`setup penyelesaian koreksi ${tenant.index} nomor ${urut}: ${selesai.status} ${String(selesai.body).slice(0, 400)}`);
@@ -366,9 +372,11 @@ export function setup() {
 
 // ---------------------------------------------------------------- workload
 
-function selesaikan(tenant, id, op) {
+// `version` adalah versi dokumen yang terakhir dibaca pemanggil. Pada balapan, VU yang kalah memakai
+// versi yang sudah basi dan dijawab 409, yang sah.
+function selesaikan(tenant, id, op, version) {
     return record(
-        http.post(`${ASET('penerimaan-aset')}/${id}/selesaikan`, JSON.stringify({ version: 1 }), paramsUntuk(tenant, {
+        http.post(`${ASET('penerimaan-aset')}/${id}/selesaikan`, JSON.stringify({ version }), paramsUntuk(tenant, {
             tags: { op, resource: 'penerimaan-aset' },
             responseCallback: http.expectedStatuses(200, 409, 422),
         })),
@@ -434,16 +442,24 @@ function hariIni() {
  * dan — kecuali nilainya kebetulan sama dengan nilai sekarang — menerbitkan `AST-ADJ-<id aset>-<n>`.
  */
 function koreksi(tenant, asetId, nilai, op) {
+    // Versi baris aset dibaca lebih dulu, seperti layar (area 3). Dua koreksi serentak atas aset yang
+    // sama membaca versi yang sama; yang kalah sah dijawab 409 dan tidak dihitung pelanggaran.
+    const versi = http.get(`${ASET('aset')}/${asetId}`, paramsUntuk(tenant, { tags: { op: `${op}_read`, resource: 'aset' } }))
+        .json('data.version');
     const jawab = record(
         http.patch(
             `${ASET('aset')}/${asetId}`,
-            JSON.stringify({ acquisition_value: nilai, reason: ALASAN_KOREKSI, adjustment_date: hariIni() }),
-            paramsUntuk(tenant, { tags: { op, resource: 'aset' }, responseCallback: http.expectedStatuses(200) }),
+            JSON.stringify({ acquisition_value: nilai, reason: ALASAN_KOREKSI, adjustment_date: hariIni(), version: versi }),
+            paramsUntuk(tenant, { tags: { op, resource: 'aset' }, responseCallback: http.expectedStatuses(200, 409) }),
         ),
         writeLatency,
         op,
     );
-    check(jawab, { 'koreksi nilai diterima': (response) => response.status === 200 });
+    check(jawab, { 'koreksi nilai diterima atau basi': (response) => response.status === 200 || response.status === 409 });
+
+    if (jawab.status === 409) {
+        return;
+    }
 
     if (jawab.status !== 200) {
         if (jawab.status !== 0 && jawab.status < 500) {
@@ -559,7 +575,7 @@ function race(data) {
     const tenant = tenantVu(data.tenants, arena.tenantIndex);
     const draf = arena.drafts[Math.floor(Date.now() / 1000) % arena.drafts.length];
 
-    const jawab = selesaikan(tenant, draf.id, 'complete_race');
+    const jawab = selesaikan(tenant, draf.id, 'complete_race', draf.version);
     check(jawab, { 'selesaikan dijawab 200, 409, atau 422': (response) => [200, 409, 422].includes(response.status) });
 
     if (jawab.status === 200) {
@@ -607,10 +623,14 @@ function probeKoreksi(tenant, data) {
         console.error('correctness violation: cross_tenant_adjustment_preview');
     }
 
+    // Versi asetnya dibaca dulu: milik tenant lain dijawab 404 (versi cadangan 1 tidak dipakai), sedangkan
+    // pada SELFTEST asetnya terbaca dan koreksi harus lolos supaya pelanggarannya terhitung.
+    const bukaAset = http.get(`${ASET('aset')}/${sasaran}`, paramsUntuk(tenant, { tags: { op: 'probe', resource: 'aset' }, responseCallback: http.expectedStatuses(200, 404) }));
+    const versiSasaran = bukaAset.status === 200 ? bukaAset.json('data.version') : 1;
     const tulis = record(
         http.patch(
             `${ASET('aset')}/${sasaran}`,
-            JSON.stringify({ acquisition_value: '1000.00', reason: ALASAN_KOREKSI, adjustment_date: hariIni() }),
+            JSON.stringify({ acquisition_value: '1000.00', reason: ALASAN_KOREKSI, adjustment_date: hariIni(), version: versiSasaran }),
             paramsUntuk(tenant, { tags: { op: 'probe', resource: 'aset' }, responseCallback: http.expectedStatuses(404) }),
         ),
         writeLatency,
@@ -645,7 +665,7 @@ function saturation(data) {
 
     if (draf.status === 200 || draf.status === 201) {
         const id = String(draf.json('data.id'));
-        const jawab = selesaikan(tenant, id, 'complete');
+        const jawab = selesaikan(tenant, id, 'complete', Number(draf.json('data.version')));
         check(jawab, { 'penerimaan diselesaikan': (response) => response.status === 200 });
 
         if (jawab.status === 200) {

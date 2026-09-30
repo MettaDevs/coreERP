@@ -130,7 +130,7 @@ export const options =
 
 // ---------------------------------------------------------------- setup
 
-function tahap(label, requests, statusSah = [200, 201]) {
+function tahapRespons(label, requests, statusSah = [200, 201]) {
     const responses = http.batch(requests);
     responses.forEach((response, index) => {
         if (!statusSah.includes(response.status)) {
@@ -138,7 +138,17 @@ function tahap(label, requests, statusSah = [200, 201]) {
         }
     });
 
-    return responses.map((response) => response.json('data.id'));
+    return responses;
+}
+
+function tahap(label, requests, statusSah) {
+    return tahapRespons(label, requests, statusSah).map((response) => response.json('data.id'));
+}
+
+// Versi baris yang baru dibuat, dibaca dari jawaban pembuatannya (atau jawaban ulang kunci idempoten,
+// yang membawa versi terkini). Dipakai tahap setup yang menulis record itu satu kali lagi.
+function versiDari(responses) {
+    return responses.map((response) => Number(response.json('data.version')));
 }
 
 export function setup() {
@@ -162,16 +172,23 @@ export function setup() {
 
     // Kunci seed stabil per RUN_ID: menjalankan ulang pada database yang sama memakai kembali
     // record yang sama, bukan menumbuhkan data seed.
-    const groupIds = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
-    const jenisIds = tahap('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Jenis seed ${index}` }), params(tenant, `seed-${RUN_ID}-jenis-${index}`)]));
+    const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
+    const groupIds = groupResponses.map((response) => response.json('data.id'));
+    const jenisResponses = tahapRespons('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Jenis seed ${index}` }), params(tenant, `seed-${RUN_ID}-jenis-${index}`)]));
+    const jenisIds = jenisResponses.map((response) => response.json('data.id'));
     const pabrikanIds = tahap('pabrikan-aset', semua((tenant, index) => ['POST', ASET('pabrikan-aset'), JSON.stringify({ nama: `Pabrikan seed ${index}` }), params(tenant, `seed-${RUN_ID}-pabrikan-${index}`)]));
     const modelIds = tahap('model-aset', semua((tenant, index) => ['POST', ASET('model-aset'), JSON.stringify({ nama: `Model seed ${index}`, pabrikan_aset_id: pabrikanIds[index], jenis_aset_id: jenisIds[index] }), params(tenant, `seed-${RUN_ID}-model-${index}`)]));
     const profilIds = tahap('profil-penyusutan', semua((tenant, index) => ['POST', ASET('profil-penyusutan'), JSON.stringify({ nama: `Profil seed ${index}`, method: 'straight_line', frequency: 'monthly', year_basis: 'calendar', useful_life_periods: 60 }), params(tenant, `seed-${RUN_ID}-profil-${index}`)]));
     const bukuIds = tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ nama: `Buku seed ${index}`, posting_layer: 'current', depreciation_profile_id: profilIds[index] }), params(tenant, `seed-${RUN_ID}-buku-${index}`)]));
-    const tipeAtributIds = tahap('tipe-atribut', semua((tenant, index) => ['POST', ASET('tipe-atribut'), JSON.stringify({ nama: `Warna load test ${index}`, data_type: 'string' }), params(tenant, `seed-${RUN_ID}-tipe-atribut-${index}`)]));
+    const tipeAtributResponses = tahapRespons('tipe-atribut', semua((tenant, index) => ['POST', ASET('tipe-atribut'), JSON.stringify({ nama: `Warna load test ${index}`, data_type: 'string' }), params(tenant, `seed-${RUN_ID}-tipe-atribut-${index}`)]));
+    const tipeAtributIds = tipeAtributResponses.map((response) => response.json('data.id'));
 
-    tahap('values tipe-atribut', semua((tenant, index) => ['PUT', `${ASET('tipe-atribut')}/${tipeAtributIds[index]}/nilai`, JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }, { nilai: 'B', urutan: 1 }] }), params(tenant)]));
-    tahap('atribut jenis-aset', semua((tenant, index) => ['PUT', `${ASET('jenis-aset')}/${jenisIds[index]}/atribut`, JSON.stringify({ rows: [{ tipe_atribut_id: tipeAtributIds[index], urutan: 0 }] }), params(tenant)]));
+    // Penyimpanan set anak membawa versi pemiliknya (tipe atribut, jenis aset, group aset).
+    const versiTipeAtribut = versiDari(tipeAtributResponses);
+    const versiJenis = versiDari(jenisResponses);
+    const versiGroup = versiDari(groupResponses);
+    tahap('values tipe-atribut', semua((tenant, index) => ['PUT', `${ASET('tipe-atribut')}/${tipeAtributIds[index]}/nilai`, JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }, { nilai: 'B', urutan: 1 }], version: versiTipeAtribut[index] }), params(tenant)]));
+    tahap('atribut jenis-aset', semua((tenant, index) => ['PUT', `${ASET('jenis-aset')}/${jenisIds[index]}/atribut`, JSON.stringify({ rows: [{ tipe_atribut_id: tipeAtributIds[index], urutan: 0 }], version: versiJenis[index] }), params(tenant)]));
     // Matriks group x buku wajib terisi sebelum aset dapat ditempatkan; tanpa baris ini
     // seluruh mutasi dijawab 422 dan skenario diam-diam berhenti menguji penempatan.
     tahap(
@@ -179,7 +196,7 @@ export function setup() {
         semua((tenant, index) => [
             'PUT',
             `${ASET('group-aset')}/${groupIds[index]}/buku-penyusutan`,
-            JSON.stringify({ rows: [{ buku_id: bukuIds[index], depreciation_profile_id: profilIds[index], useful_life_periods: 60, convention: 'full_month', depreciate: true }] }),
+            JSON.stringify({ rows: [{ buku_id: bukuIds[index], depreciation_profile_id: profilIds[index], useful_life_periods: 60, convention: 'full_month', depreciate: true }], version: versiGroup[index] }),
             params(tenant),
         ]),
     );
@@ -238,7 +255,7 @@ function record(response, latency, expected, label) {
     latency.add(response.timings.duration);
     recordFailure(response, label);
 
-    return check(response, { [label]: (r) => r.status === expected });
+    return check(response, { [label]: (r) => [].concat(expected).includes(r.status) });
 }
 
 function violation(kind, tags = {}) {
@@ -312,6 +329,14 @@ function createMaster(tenant) {
  * beradu.
  */
 function replaceMatrix(tenant) {
+    // Versi group dibaca dulu. Beberapa VU berbagi group yang sama, jadi 409 (kalah cepat menyimpan) sah.
+    const buka = http.get(`${ASET('group-aset')}/${tenant.groupAsetId}/buku-penyusutan`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'group-buku-penyusutan' } }));
+    record(buka, readLatency, 200, 'matrix read 200');
+
+    if (buka.status !== 200) {
+        return;
+    }
+
     const response = http.put(
         `${ASET('group-aset')}/${tenant.groupAsetId}/buku-penyusutan`,
         JSON.stringify({
@@ -322,10 +347,11 @@ function replaceMatrix(tenant) {
                 convention: 'full_month',
                 depreciate: true,
             }],
+            version: buka.json('version'),
         }),
-        paramsUntuk(tenant, { tags: { op: 'replace_link', resource: 'group-buku-penyusutan' } }),
+        paramsUntuk(tenant, { tags: { op: 'replace_link', resource: 'group-buku-penyusutan' }, responseCallback: http.expectedStatuses(200, 409) }),
     );
-    record(response, writeLatency, 200, 'replace matrix 200');
+    record(response, writeLatency, [200, 409], 'replace matrix 200/409');
 
     if (response.status >= 500 && response.status !== 502 && response.status !== 504) {
         violation('link_replace_conflict', { status: response.status });
@@ -333,12 +359,20 @@ function replaceMatrix(tenant) {
 }
 
 function updateMaster(tenant) {
+    // Model yang sama disunting banyak VU; 409 (versi basi) sah, yang salah hanya 5xx.
+    const buka = http.get(`${ASET('model-aset')}/${tenant.modelAsetId}`, paramsUntuk(tenant, { tags: { op: 'show', resource: 'model-aset' } }));
+    record(buka, readLatency, 200, 'show 200');
+
+    if (buka.status !== 200) {
+        return;
+    }
+
     const response = http.patch(
         `${ASET('model-aset')}/${tenant.modelAsetId}`,
-        JSON.stringify({ keterangan: `disentuh vu${exec.vu.idInTest}` }),
-        paramsUntuk(tenant, { tags: { op: 'update', resource: 'model-aset' } }),
+        JSON.stringify({ keterangan: `disentuh vu${exec.vu.idInTest}`, version: buka.json('data.version') }),
+        paramsUntuk(tenant, { tags: { op: 'update', resource: 'model-aset' }, responseCallback: http.expectedStatuses(200, 409) }),
     );
-    record(response, writeLatency, 200, 'update 200');
+    record(response, writeLatency, [200, 409], 'update 200/409');
 }
 
 /** Dua permintaan identik berbarengan harus menghasilkan tepat satu record. */
@@ -503,8 +537,17 @@ function mutateAset(tenant) {
  * lock gagal dan database dapat menyimpan B di luar Values aktif.
  */
 function attributeConstraintRace(tenant) {
-    const valuesBody = JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }] });
-    const asetBody = JSON.stringify({ atribut: [{ tipe_atribut_id: tenant.tipeAtributId, nilai: 'B' }] });
+    // Versi baris kedua pemilik dibaca lebih dulu (area 3). Values mengklaim tipe atribut dan aset
+    // mengklaim asetnya sendiri, jadi perlombaan batasan atributnya tetap terjadi. VU lain di tenant yang
+    // sama dapat menyimpan lebih dulu; penyimpanan yang kalah karena itu dijawab 409 dan sah.
+    const versiValues = http.get(`${ASET('tipe-atribut')}/${tenant.tipeAtributId}/nilai`, paramsUntuk(tenant, {
+        tags: { op: 'attribute_race_read', resource: 'tipe-atribut' },
+    })).json('version');
+    const valuesBody = JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }], version: versiValues });
+    const versiAset = http.get(`${ASET('aset')}/${tenant.asetId}`, paramsUntuk(tenant, {
+        tags: { op: 'attribute_race_read', resource: 'aset' },
+    })).json('data.version');
+    const asetBody = JSON.stringify({ atribut: [{ tipe_atribut_id: tenant.tipeAtributId, nilai: 'B' }], version: versiAset });
     const [values, aset] = http.batch([
         ['PUT', `${ASET('tipe-atribut')}/${tenant.tipeAtributId}/nilai`, valuesBody, paramsUntuk(tenant, {
             tags: { op: 'attribute_race_values', resource: 'tipe-atribut' },
@@ -512,7 +555,7 @@ function attributeConstraintRace(tenant) {
         })],
         ['PATCH', `${ASET('aset')}/${tenant.asetId}`, asetBody, paramsUntuk(tenant, {
             tags: { op: 'attribute_race_aset', resource: 'aset' },
-            responseCallback: http.expectedStatuses(200, 422),
+            responseCallback: http.expectedStatuses(200, 409, 422),
         })],
     ]);
 
@@ -521,7 +564,11 @@ function attributeConstraintRace(tenant) {
         recordFailure(response, 'attribute-race');
     });
     const tidakTersedia = [values, aset].some((response) => response.status === 0 || response.status === 502 || response.status === 504);
-    const sah = (values.status === 200 && aset.status === 422) || (values.status === 409 && aset.status === 200);
+    // Keduanya 200 berarti B tersimpan di luar Values aktif. Selain itu hanya status yang dikenal yang sah:
+    // 409 (kalah versi atau batasan) dan 422 (nilai di luar Values).
+    const dikenal = [200, 409, 422];
+    const sah = !(values.status === 200 && aset.status === 200)
+        && dikenal.includes(values.status) && dikenal.includes(aset.status);
 
     if (!tidakTersedia && !sah) {
         violation('attribute_values_race', { values: values.status, aset: aset.status });

@@ -90,6 +90,9 @@
     responses:
       '200':
         description: Mutasi beserta barisnya
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
       '404':
         $ref: '#/components/responses/NotFound'
   patch:
@@ -99,6 +102,7 @@
     summary: Mengubah draf berita acara; seluruh baris diganti
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -106,21 +110,18 @@
           schema:
             allOf:
             - $ref: '#/components/schemas/AsetTransferWrite'
-            - type: object
-              required: [version]
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+            - $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Mutasi setelah diubah
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Mutasi yang sudah selesai tidak dapat diubah
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Mutasi aset
@@ -128,26 +129,24 @@
     summary: Mengarsipkan draf berita acara
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
-      required: true
+      required: false
       content:
         application/json:
           schema:
-            type: object
-            required: [version]
-            properties:
-              version:
-                type: integer
-                minimum: 1
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Draf diarsipkan
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Mutasi yang sudah selesai tidak dapat diarsipkan
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/mutasi-aset/{id}/selesaikan:
   post:
     tags:
@@ -165,17 +164,13 @@
       lifecycle state juga dua tindakan terpisah.
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
-      required: true
+      required: false
       content:
         application/json:
           schema:
-            type: object
-            required: [version]
-            properties:
-              version:
-                type: integer
-                minimum: 1
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Mutasi setelah diselesaikan, beserta barisnya
@@ -184,6 +179,8 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Dokumen tanpa baris, sudah selesai, atau salah satu asetnya sudah dilepas
+      '428':
+        $ref: '#/components/responses/VersionRequired'

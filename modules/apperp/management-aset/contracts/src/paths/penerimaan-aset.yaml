@@ -229,6 +229,9 @@
     responses:
       '200':
         description: Penerimaan beserta barisnya
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
       '404':
         $ref: '#/components/responses/NotFound'
   patch:
@@ -238,15 +241,25 @@
     summary: Mengubah draf penerimaan; seluruh baris diganti
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      description: Field dokumen dan baris yang diubah, ditambah `version` bila header `If-Match` tidak dikirim.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Penerimaan setelah diubah
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Penerimaan aset
@@ -254,15 +267,24 @@
     summary: Mengarsipkan draf penerimaan
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Draf diarsipkan
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/penerimaan-aset/{id}/ringkasan:
   get:
     tags:
@@ -323,6 +345,13 @@
       berjalan + 1).
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Penerimaan setelah diselesaikan, beserta barisnya
@@ -331,7 +360,7 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: |
           Dokumen tanpa baris, sudah selesai, melebihi sisa permintaan pembelian yang
@@ -341,6 +370,8 @@
           finance (`details.<n>.group_aset_id`) — seperti D365, yang menghentikan posting faktur
           aset tanpa buku ber-lapisan Current. Saldo awal ditolak (`tanggal`) bila entitas
           legalnya belum punya cutover atau tanggal perolehannya sesudah cutover.
+      '428':
+        $ref: '#/components/responses/VersionRequired'
       '500':
         description: |
           Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
@@ -386,7 +417,9 @@
     - $ref: '#/components/parameters/RecordId'
     responses:
       '200':
-        description: Aset dokumen ini, terurut kode
+        description: |
+          Aset dokumen ini, terurut kode. Jawabannya `{data, version}`; `version` adalah versi
+          dokumen penerimaan, bukan versi tiap aset.
       '404':
         $ref: '#/components/responses/NotFound'
   put:
@@ -404,12 +437,46 @@
       nomor seri yang sudah ada.
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - serial
+            properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
+              serial:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - aset_id
+                  properties:
+                    aset_id:
+                      $ref: '#/components/schemas/Ulid'
+                    serial_number:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 150
     responses:
       '200':
-        description: Aset dokumen ini setelah nomor serinya disimpan
+        description: |
+          Aset dokumen ini setelah nomor serinya disimpan. Jawabannya `{data, version}`; `version`
+          adalah versi dokumen penerimaan sesudah disimpan (pengisian nomor seri mengklaim dokumen,
+          bukan tiap aset).
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Ada aset yang bukan berasal dari penerimaan ini
+      '428':
+        $ref: '#/components/responses/VersionRequired'

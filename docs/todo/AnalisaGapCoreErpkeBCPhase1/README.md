@@ -239,6 +239,31 @@ Yang belum:
 4. Proses berlangkah banyak di dalam satu transaksi tetap memakai kunci baris (`SELECT ... FOR UPDATE`);
    versi baris tidak menggantikannya.
 
+### Yang sudah dibangun (area 3)
+
+- **Kolom `version` di setiap tabel tenant**, Core dan module, dinaikkan trigger `coreerp_bump_row_version`
+  pada setiap UPDATE (K-11, K-12). Nilai yang ditulis kode diabaikan. Pengecualiannya
+  `core_module_installations`, yang kolom `version`-nya nomor rilis module.
+- **Kolom aktivitas mesin tidak menaikkan versi** (keputusan pemilik 29 September 2026): `last_pulled_at`
+  dan `last_used_at` klien integrasi serta `last_used_at` kredensial app, diteruskan sebagai argumen
+  trigger. Tanpa itu admin tidak pernah bisa menyimpan klien yang sedang aktif pull.
+- **Satu helper `RowVersion`.** `claim()` adalah update bersyarat yang juga memegang kunci baris, jadi
+  endpoint yang hanya mengganti baris anak tetap aman. `claimIfExists()` untuk setelan yang baru lahir saat
+  pertama disimpan: layar mengirim versi 0, dan kunci advisory transaksi mengurutkan dua penyimpanan pertama
+  yang bersamaan. Jawabannya 409 `stale_version`, atau 428 `version_required` tanpa versi. Form Inertia
+  menerimanya sebagai galat field `version`, ditampilkan sebagai toast dengan tombol **Muat ulang**.
+- **Semua endpoint ubah dan arsip** di Core dan module aset (K-13), termasuk pengganti baris anak dan
+  relasi yang disunting dari dua arah (jenis aset ↔ jenis pekerjaan: sisi seberang ikut dinaikkan versinya).
+  Kontrol dokumen aset yang dulu menulis penolakannya sendiri beralih ke helper ini.
+- **Skenario load test aset** membaca dan mengirim versi; di profil perlombaan 409 adalah hasil sah.
+
+Yang belum tercakup:
+
+- Satu penyimpanan biasanya menaikkan versi dua kali (klaim, lalu penulisan sesungguhnya). Angkanya tidak
+  bermakna selain "berbeda"; klien memakai versi dari jawaban terakhir.
+- `PUT validasi-status-work-order` dan parameter workflow tidak punya baris induk untuk diklaim.
+- Suite penuh dan load test belum dijalankan ulang sesudah seluruh perubahan (butir 3.6).
+
 ## Gap 3: zona waktu, tanggal kerja, dan pengguna ke pekerja HR {#gap-3}
 
 Dua hal berbeda yang sempat tertukar dalam pembahasan: **tanggal kerja** bukan **jadwal kerja**. Zona

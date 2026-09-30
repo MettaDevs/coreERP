@@ -23,6 +23,22 @@ info:
     Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`induk_aset_id`)
     menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
     app ini, bukan organization hierarchy CoreERP.
+
+    **Versi baris (edit bersamaan).** Setiap data yang sudah ada membawa `version` (integer, hanya
+    dibaca), dan jawaban GET detailnya mengirim header `ETag` berbentuk `W/"<n>"` dengan angka yang
+    sama. Setiap PATCH, PUT, dan DELETE atas data yang sudah ada, serta aksi atas dokumen yang sudah
+    ada (`/selesaikan`, `/batal`, `/status`, `/checklist/dari-template`), wajib membawa versi itu:
+    header `If-Match: W/"<n>"` atau field `version` pada body (bila keduanya ada, header yang dipakai).
+    Tanpa versi permintaan ditolak 428 `version_required`; versi yang sudah tertinggal ditolak 409
+    `stale_version` dan tidak ada yang tersimpan. Himpunan anak yang diganti utuh (atribut jenis aset,
+    nilai tipe atribut, matriks group x buku, model per jenis aset, baris checklist, dan sejenisnya)
+    memakai versi pemiliknya, yang dikirim GET-nya sebagai `version` di samping `data` (atau `data.version`
+    pada panel jenis aset dan jawaban `PUT /jenis-aset/{id}/models`). Baris posting group yang belum ada
+    dikirim dengan versi 0.
+
+    Setiap penyimpanan menaikkan versi, biasanya dua sekaligus dan bukan satu, jadi angkanya tidak
+    berarti apa-apa selain "berbeda". Klien wajib memakai `version` dari jawaban terakhir, bukan
+    menghitung sendiri dari versi sebelumnya.
 servers:
 - url: /
 security:
@@ -58,5 +74,6 @@ x-bundle:
     parameters: components/parameters.yaml
     schemas: components/schemas.yaml
     responses: components/responses.yaml
+    headers: components/headers.yaml
 paths: {}
 components: {}
