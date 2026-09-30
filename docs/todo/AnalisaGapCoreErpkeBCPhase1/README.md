@@ -797,9 +797,8 @@ batas waktu job ditulis di `RunReportExport`.
 
 Yang belum setara:
 
-1. **Semua kegagalan diperlakukan sama.** Job sengaja tidak diulang karena kegagalan layout atau data
-   terlalu besar akan terulang dengan cara yang sama. Tetapi gangguan sesaat, misalnya renderer
-   terlambat menjawab, juga ikut tidak diulang. BC membedakannya lewat jumlah percobaan maksimum.
+1. ~~Semua kegagalan diperlakukan sama~~ Sudah: gangguan sesaat diulang sampai batas percobaan, kegagalan
+   tetap tidak; lihat *Yang sudah dibangun (area 8)* di bawah.
 2. ~~Masa simpan hasil ekspor belum lewat layanan retensi~~ Sudah: `RunReportExport` mengisi `expires_at` dari masa simpan tenant, dan penghapusannya lewat layanan retensi ([Gap 4](#gap-4)).
 3. **Tidak ada penjadwalan ekspor berulang**, dan tidak ada job latar per tenant yang terlihat oleh admin
    tenant (`PLAT-08`). Bagian ini butuh notifikasi ketika job gagal, jadi ditunda bersama
@@ -808,6 +807,44 @@ Yang belum setara:
 
 Ekspor baris yang sedang tampil di tabel boleh dibuat di frontend sebagai tambahan, dengan batas baris
 yang jelas. Laporan tetap di server.
+
+### Yang sudah dibangun (area 8)
+
+- **Gangguan sesaat dibedakan dari kegagalan tetap** di `RunReportExport`. Yang diulang hanya dua:
+  layanan PDF yang terlambat menjawab, menolak sambungan, atau menjawab 5xx/408/429 (ditandai
+  `RenderException::transient()` di `PdfConverter`), dan worker yang mati di tengah ekspor. Semua yang lain
+  langsung gagal tanpa diulang, seperti sebelumnya: layout atau dokumen yang ditolak layanan PDF (4xx
+  lainnya), data melewati batas baris, hak atau keanggotaan yang dicabut, parameter yang ditolak module,
+  dan kesalahan tak terduga (hampir selalu cacat kode).
+- **Batas percobaan** `reporting.export_attempts`, bawaan 3 (`COREERP_REPORTING_EXPORT_ATTEMPTS`), dengan
+  jeda `reporting.export_retry_seconds` 15 lalu 60 detik, padanan *Maximum No. of Attempts to Run* BC.
+  Selama menunggu, baris kembali `queued` dan `failure_message` berbunyi "Gangguan sesaat saat membuat
+  dokumen. Ekspor dicoba lagi otomatis (percobaan 2 dari 3)."; catatan itu dihapus bila ekspornya lalu
+  berhasil. Percobaan terakhir yang gagal menulis pesan layanan PDF ditambah "Sudah dicoba 3 kali."
+- **Worker yang mati di tengah ekspor.** Sebelumnya baris tertinggal `running` selamanya. Sekarang baris
+  `running` punya masa sewa, `started_at` + batas waktu job (600 detik) + 30 detik. Percobaan yang datang
+  sebelum sewa habis mengembalikan job ke antrean sampai sewa habis, karena `retry_after` antrean (90
+  detik) lebih pendek dari batas waktu job dan worker pertama mungkin masih bekerja. Setelah sewa habis,
+  percobaan berikutnya mengambil alih barisnya lewat satu UPDATE bersyarat. Bila antrean menyerah
+  (`failed()`), baris ditandai gagal dengan pesan: melewati batas waktu 10 menit (tidak diulang,
+  `failOnTimeout`), atau proses di server terputus berulang kali.
+- **Masa simpan lewat layanan retensi** (8.2): sudah tersambung sejak area 4, kini dibuktikan dengan job
+  yang benar-benar berjalan: `expires_at` mengikuti setelan tenant, dan `reporting:purge-exports`
+  menghapus baris beserta berkasnya yang lebih tua dari setelan itu.
+- **Test B-8** di `tests/Feature/ControlPlane/ReportingTest.php`, memakai antrean database dan
+  `queue:work --once` sungguhan karena antrean sync tidak menjalankan ulang job yang dikembalikan:
+  gangguan sesaat diulang sampai tiga percobaan lalu gagal; gangguan sesaat yang pulih berakhir selesai;
+  penolakan layout (400) dan data terlalu besar tidak diulang; baris yang ditinggal worker mati tidak
+  disentuh selama sewanya belum habis lalu diambil alih; pesan saat antrean menyerah. Test masa simpan:
+  `test_masa_simpan_ekspor_mengikuti_setelan_tenant_dan_dihapus_layanan_retensi`.
+
+Yang tidak dibangun:
+
+- 8.3 (batas baris per laporan) dan 8.4 (ekspor baris tabel dari frontend) opsional dan belum dibuat.
+- Catatan percobaan ulang tersimpan di baris tetapi belum tampil di tray ekspor; tray hanya menampilkan
+  `failure_message` pada ekspor yang gagal.
+- Gangguan penyimpanan (disk atau object storage) dan database saat ekspor belum dibedakan; keduanya
+  masih diperlakukan sebagai kesalahan tak terduga.
 
 ## Di luar fase 1 {#di-luar-fase-1}
 

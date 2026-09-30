@@ -202,19 +202,24 @@ pengguna.
 - [x] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
       untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat.
 
-### 8. [ ] Penyempurnaan ekspor laporan (gap 10)
+### 8. [x] Penyempurnaan ekspor laporan (gap 10)
 
 **Tempat:** Core (reporting) · **Setelah:** 4, 0.8 · **Selesai bila:** gangguan sesaat diulang terbatas,
 kegagalan tetap tidak diulang, masa simpan lewat layanan retensi, dan test B-8 lulus.
 
 Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 
-- [ ] 8.1 Bedakan gangguan sesaat (misalnya renderer terlambat) dari kegagalan tetap; ulangi yang
-      pertama dengan batas percobaan.
-- [ ] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4). Layanan dan pemakaiannya di
-      `RunReportExport` sudah ada; menunggu test yang menjalankan job-nya.
-- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum.
-- [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris.
+- [x] 8.1 Bedakan gangguan sesaat (misalnya renderer terlambat) dari kegagalan tetap; ulangi yang
+      pertama dengan batas percobaan. Gangguan sesaat: layanan PDF terlambat, menolak sambungan, atau
+      menjawab 5xx/408/429, dan worker yang mati di tengah ekspor. Batas `reporting.export_attempts` (3),
+      jeda 15 lalu 60 detik; baris `running` punya masa sewa supaya tidak dikerjakan dua worker.
+- [x] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4). Layanan dan pemakaiannya di
+      `RunReportExport` sudah ada sejak area 4; test yang menjalankan job-nya kini membuktikan `expires_at`
+      mengikuti setelan tenant dan penghapusan membuang baris beserta berkasnya.
+- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum. Tidak dibangun di
+      area ini.
+- [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris. Tidak
+      dibangun di area ini.
 
 ### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 
@@ -253,7 +258,10 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       hari ini; setelah ditutup, ia tidak muncul lagi di sesi itu dan tanggal kerja tetap terlihat.
       Pemformat jam di layar (TypeScript) belum punya test otomatis karena repo belum memasang runner test
       frontend; ia diperiksa di browser, sedangkan zona yang dipakainya (`clock.timezone`) diuji di PHPUnit.
-- [ ] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
-      terlalu besar tetap tidak diulang.
+- [x] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
+      terlalu besar tetap tidak diulang. Di `ReportingTest` dengan antrean database dan `queue:work`
+      sungguhan: gangguan sesaat tiga kali berakhir gagal tanpa percobaan keempat, gangguan yang pulih
+      berakhir selesai, penolakan layout dan data terlalu besar gagal pada percobaan pertama, dan baris
+      yang ditinggal worker mati diambil alih setelah sewanya habis.
 - [x] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
       tidak bisa tertaut ke dua pekerja.
