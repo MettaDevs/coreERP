@@ -33,6 +33,17 @@ final class StatusAset
     /** Sudah dijual atau dimusnahkan; akhir masa hidupnya di subledger ini. */
     public const DILEPAS = 'disposed';
 
+    /**
+     * Label status yang sama dengan layar register aset, untuk riwayat perubahan dan ekspor daftar.
+     * `in_use` tidak ditulis lagi sejak 17 September 2026; labelnya dipertahankan untuk baris lama.
+     */
+    public const LABELS = [
+        self::DITERIMA => 'Diterima',
+        'in_use' => 'Digunakan',
+        self::DIHENTIKAN => 'Didekomisioning',
+        self::DILEPAS => 'Dilepas',
+    ];
+
     /** @return list<string> */
     public static function semua(): array
     {

@@ -5,8 +5,10 @@ import {
     AssetFilter,
     AssetGroupFilter,
     AssetTypeFilter,
+    ConditionFilter,
     DepreciationBookFilter,
     FiscalClassificationFilter,
+    LocationFilter,
     PeriodFilter,
 } from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
@@ -56,6 +58,8 @@ export default function LaporanPenyusutanAsetPage() {
     const {
         filters,
         bindFilter,
+        bindMultiFilter,
+        presets,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -142,14 +146,18 @@ export default function LaporanPenyusutanAsetPage() {
                 <ReportFilterBar
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
+                    presets={presets}
+                    dates={{ month: 'periode' }}
                 >
                     <PeriodFilter {...bindFilter('periode')} />
                     <DepreciationBookFilter {...bindFilter('buku_id')} />
-                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
                     <FiscalClassificationFilter
-                        {...bindFilter('kelompok_harta_fiskal_id')}
+                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
                     />
-                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
+                    <LocationFilter {...bindMultiFilter('lokasi_aset_id')} />
+                    <ConditionFilter {...bindMultiFilter('kondisi_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
                 </ReportFilterBar>
             }

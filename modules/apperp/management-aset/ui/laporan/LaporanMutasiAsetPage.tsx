@@ -30,6 +30,7 @@ export default function LaporanMutasiAsetPage() {
     const {
         filters,
         bindFilter,
+        bindMultiFilter,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -127,11 +128,11 @@ export default function LaporanMutasiAsetPage() {
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
                 >
-                    <AssetGroupFilter {...bindFilter('group_aset_id')} />
+                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
                     <FiscalClassificationFilter
-                        {...bindFilter('kelompok_harta_fiskal_id')}
+                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
                     />
-                    <AssetTypeFilter {...bindFilter('jenis_aset_id')} />
+                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
                     <AssetFilter {...bindFilter('asset_id')} />
                     <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
                     <DateFilter

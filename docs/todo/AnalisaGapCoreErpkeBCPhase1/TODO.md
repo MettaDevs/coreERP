@@ -202,7 +202,7 @@ pengguna.
 - [x] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
       untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat.
 
-### 8. [x] Penyempurnaan ekspor laporan (gap 10)
+### 8. [ ] Penyempurnaan ekspor laporan (gap 10)
 
 **Tempat:** Core (reporting) · **Setelah:** 4, 0.8 · **Selesai bila:** gangguan sesaat diulang terbatas,
 kegagalan tetap tidak diulang, masa simpan lewat layanan retensi, dan test B-8 lulus.
@@ -216,10 +216,16 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 - [x] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4). Layanan dan pemakaiannya di
       `RunReportExport` sudah ada sejak area 4; test yang menjalankan job-nya kini membuktikan `expires_at`
       mengikuti setelan tenant dan penghapusan membuang baris beserta berkasnya.
-- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum. Tidak dibangun di
-      area ini.
-- [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris. Tidak
-      dibangun di area ini.
+- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum. Tetap ditunda (K-29).
+- [x] 8.4 Ekspor daftar yang sedang tampil (K-27): lewat antrean ekspor server, bukan frontend, untuk semua
+      baris yang cocok dengan filter dan urutan layar; xlsx bertipe sampai batas lembar Excel, CSV
+      sesudahnya sampai `reporting.list_export_max_csv_rows`. Pilot register aset.
+- [x] 8.5 Opsi terakhir per pengguna per laporan menjadi isian awal halaman filter dan dialog cetak (K-24).
+- [ ] 8.6 Preset laporan bernama dengan tanggal relatif (K-25). Sudah: preset pribadi, tanggal relatif
+      menurut zona pengguna, dan pembacaan preset bersama. Belum: membuat dan mengubah preset bersama,
+      menunggu keputusan permission (usulan di README, Gap 10).
+- [x] 8.7 Excel (data saja) untuk setiap laporan (K-26).
+- [x] 8.8 Filter master laporan pilihan banyak dengan nama di kepala laporan (K-28).
 
 ### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 
@@ -263,5 +269,13 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       sungguhan: gangguan sesaat tiga kali berakhir gagal tanpa percobaan keempat, gangguan yang pulih
       berakhir selesai, penolakan layout dan data terlalu besar gagal pada percobaan pertama, dan baris
       yang ditinggal worker mati diambil alih setelah sewanya habis.
+- [x] **B-8b** (area 8, opsi laporan) Preset pribadi hanya terlihat pemiliknya, preset bersama terlihat
+      yang boleh menjalankan laporannya, dan tidak menyeberang tenant (`ReportOptionsTest`). Opsi terakhir
+      mengisi kunjungan berikutnya hanya untuk pengguna itu. Tanggal relatif pukul 00.30 WIB tanggal 1
+      memakai bulan WIB. Filter pilihan banyak berarti "atau" dengan nama di kepala laporan
+      (`PenyediaLaporanTest`). Excel (data saja) menulis sel bertipe (`ReportingTest`,
+      `DataOnlyWorkbookTest`). Ekspor daftar menulis semua baris yang cocok sesuai filter, urutan, hak
+      baca, dan kebijakan organisasi, dan 50.000 baris selesai dengan memori datar (`ListExportTest`,
+      `AssetRegisterListTest`).
 - [x] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
       tidak bisa tertaut ke dua pekerja.

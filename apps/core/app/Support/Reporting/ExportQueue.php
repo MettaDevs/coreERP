@@ -17,21 +17,45 @@ use stdClass;
  */
 final class ExportQueue
 {
-    public function __construct(private readonly LayoutStore $layouts, private readonly RetentionService $retention) {}
+    /** Ekspor ber-layout: Word, Excel, atau PDF dari layout laporan. */
+    public const KIND_LAYOUT = 'layout';
+
+    /** "Excel (data saja)": dataset laporan apa adanya, tanpa layout (K-26). */
+    public const KIND_DATA = 'data';
+
+    /** Daftar di layar module: kolom, urutan, dan filter yang tampil, tanpa layout (K-27). */
+    public const KIND_LIST = 'list';
+
+    public function __construct(
+        private readonly LayoutStore $layouts,
+        private readonly RetentionService $retention,
+        private readonly ReportOptions $options,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $parameters
      * @return array<string, mixed>
      */
-    public function enqueue(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, string $format, ?string $layoutRef, array $parameters): array
+    public function enqueue(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, string $format, ?string $layoutRef, array $parameters, bool $dataOnly = false): array
     {
         $tenantId = $membership->tenant_id;
-        $active = DB::table('report_exports')
-            ->where(['tenant_id' => $tenantId, 'user_id' => $membership->user_id])
-            ->whereIn('status', [ExportStatus::QUEUED, ExportStatus::RUNNING])
-            ->count();
-        if ($active >= (int) config('reporting.max_active_per_user')) {
-            throw ValidationException::withMessages(['format' => ['Masih ada '.$active.' ekspor Anda yang sedang dikerjakan. Tunggu sampai selesai sebelum meminta lagi.']]);
+        $this->assertCapacity($membership);
+
+        if ($dataOnly) {
+            $id = $this->insert($membership, $legalEntityId, $orgUnitId, [
+                'kind' => self::KIND_DATA,
+                'app_id' => $report->app_id,
+                'report_code' => $report->code,
+                'report_name' => $report->name,
+                'layout_ref' => '',
+                'layout_name' => 'Data saja, tanpa layout',
+                'format' => 'xlsx',
+                'parameters' => $parameters,
+            ]);
+            // Opsi terakhir dicatat saat laporan dijalankan, seperti "Last used options and filters" BC.
+            $this->options->rememberLastUsed($membership, $report, $parameters, self::KIND_DATA);
+
+            return $this->present($this->find($tenantId, $membership->user_id, $id));
         }
 
         $ref = $layoutRef ?: $this->layouts->defaultRef($report, $tenantId, $legalEntityId);
@@ -45,29 +69,78 @@ final class ExportQueue
             ]]);
         }
 
-        $id = (string) Str::ulid();
-        DB::table('report_exports')->insert([
-            'id' => $id,
-            'tenant_id' => $tenantId,
-            'membership_id' => $membership->id,
-            'user_id' => $membership->user_id,
-            'legal_entity_id' => $legalEntityId,
-            'org_unit_id' => $orgUnitId,
+        $id = $this->insert($membership, $legalEntityId, $orgUnitId, [
+            'kind' => self::KIND_LAYOUT,
             'app_id' => $report->app_id,
             'report_code' => $report->code,
             'report_name' => $report->name,
             'layout_ref' => $ref,
             'layout_name' => $this->layouts->name($report, $tenantId, $legalEntityId, $ref),
             'format' => $format,
-            'parameters' => json_encode((object) $parameters, JSON_THROW_ON_ERROR),
+            'parameters' => $parameters,
+        ]);
+        $this->options->rememberLastUsed($membership, $report, $parameters, $format, $ref);
+
+        return $this->present($this->find($tenantId, $membership->user_id, $id));
+    }
+
+    /**
+     * Ekspor daftar di layar (K-27). `$request` memuat kolom yang tampil beserta judulnya, urutan, dan filter
+     * daftar; semuanya sudah diperiksa pemanggil terhadap daftar milik module.
+     *
+     * @param  array{columns: list<array{key: string, header: string}>, sort: array{column: string, direction: string}|null, filters: array<string, mixed>}  $request
+     * @return array<string, mixed>
+     */
+    public function enqueueList(string $appId, string $listCode, string $listName, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $request): array
+    {
+        $this->assertCapacity($membership);
+        $id = $this->insert($membership, $legalEntityId, $orgUnitId, [
+            'kind' => self::KIND_LIST,
+            'app_id' => $appId,
+            'report_code' => ListExportRegistry::code($appId, $listCode),
+            'report_name' => $listName,
+            'layout_ref' => '',
+            'layout_name' => 'Tampilan daftar',
+            // xlsx sampai batas satu lembar Excel; worker menggantinya CSV bila barisnya lebih banyak.
+            'format' => 'xlsx',
+            'parameters' => $request,
+        ]);
+
+        return $this->present($this->find($membership->tenant_id, $membership->user_id, $id));
+    }
+
+    private function assertCapacity(TenantMembership $membership): void
+    {
+        $active = DB::table('report_exports')
+            ->where(['tenant_id' => $membership->tenant_id, 'user_id' => $membership->user_id])
+            ->whereIn('status', [ExportStatus::QUEUED, ExportStatus::RUNNING])
+            ->count();
+        if ($active >= (int) config('reporting.max_active_per_user')) {
+            throw ValidationException::withMessages(['format' => ['Masih ada '.$active.' ekspor Anda yang sedang dikerjakan. Tunggu sampai selesai sebelum meminta lagi.']]);
+        }
+    }
+
+    /** @param array<string, mixed> $values */
+    private function insert(TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $values): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('report_exports')->insert([
+            ...$values,
+            'id' => $id,
+            'tenant_id' => $membership->tenant_id,
+            'membership_id' => $membership->id,
+            'user_id' => $membership->user_id,
+            'legal_entity_id' => $legalEntityId,
+            'org_unit_id' => $orgUnitId,
+            'parameters' => json_encode((object) $values['parameters'], JSON_THROW_ON_ERROR),
             'status' => ExportStatus::QUEUED,
             'progress' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        RunReportExport::dispatch($tenantId, $id);
+        RunReportExport::dispatch($membership->tenant_id, $id);
 
-        return $this->present($this->find($tenantId, $membership->user_id, $id));
+        return $id;
     }
 
     /** @return list<array<string, mixed>> */
@@ -108,6 +181,7 @@ final class ExportQueue
     {
         return [
             'id' => $row->id,
+            'kind' => $row->kind ?? self::KIND_LAYOUT,
             'app_id' => $row->app_id,
             'report_code' => $row->report_code,
             'report_name' => $row->report_name,

@@ -24,6 +24,8 @@ final class ReportData
      * @param  array<string, list<array<string, string|int|float|null>>>  $tables
      * @param  array<string, array{path: string, width_mm: int}>  $images
      * @param  array<string, ValueFormat>  $formats  Per placeholder: `total`, `baris.nilai`.
+     * @param  list<array<string, mixed>>  $definitions  `fields` dari definisi laporan: label dan tabel tiap
+     *                                                   placeholder, dipakai "Excel (data saja)" sebagai judul kolom.
      */
     public function __construct(
         public readonly array $fields,
@@ -31,13 +33,15 @@ final class ReportData
         public readonly string $fileName,
         public readonly array $images = [],
         public readonly array $formats = [],
+        public readonly array $definitions = [],
     ) {}
 
     /**
      * @param  array<string, mixed>  $payload  Isi `data` dari jawaban endpoint dataset app.
      * @param  array<string, ValueFormat>  $formats
+     * @param  list<array<string, mixed>>  $definitions
      */
-    public static function fromArray(array $payload, array $formats = []): self
+    public static function fromArray(array $payload, array $formats = [], array $definitions = []): self
     {
         $fields = $payload['fields'] ?? null;
         $tables = $payload['tables'] ?? null;
@@ -69,7 +73,7 @@ final class ReportData
             }, $rows));
         }
 
-        return new self($cleanFields, $cleanTables, $fileName, [], $formats);
+        return new self($cleanFields, $cleanTables, $fileName, [], $formats, $definitions);
     }
 
     /**
@@ -81,7 +85,7 @@ final class ReportData
      */
     public function withIdentity(array $fields, array $images): self
     {
-        return new self([...$fields, ...$this->fields], $this->tables, $this->fileName, [...$images, ...$this->images], $this->formats);
+        return new self([...$fields, ...$this->fields], $this->tables, $this->fileName, [...$images, ...$this->images], $this->formats, $this->definitions);
     }
 
     public function rowCount(): int

@@ -391,6 +391,77 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('Elektronik', $denganGroup['fields']['filter_group']);
     }
 
+    /**
+     * Filter master pilihan banyak (K-28): beberapa pilihan pada satu filter berarti "atau", filter yang
+     * berbeda tetap "dan", dan kepala laporan menyebut nama setiap pilihan, bukan id-nya.
+     */
+    public function test_master_filters_take_several_choices_as_or_and_name_them_in_the_header(): void
+    {
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $elektronik = $this->master('aset_m_group_aset', 'Elektronik', 'GRPA-C1');
+        $kendaraan = $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-C2');
+        $mebel = $this->master('aset_m_group_aset', 'Mebel', 'GRPA-C3');
+        $jenis = $this->master('aset_m_jenis_aset', 'Umum', 'JNSA-C1');
+        $tipe = $this->master('aset_m_tipe_lokasi_aset', 'Ruang', 'TLKA-C1');
+        $gudang = $this->master('aset_m_lokasi_aset', 'Gudang', 'LOCA-C1', ['tipe_lokasi_id' => $tipe]);
+        $kantor = $this->master('aset_m_lokasi_aset', 'Kantor', 'LOCA-C2', ['tipe_lokasi_id' => $tipe]);
+        $baik = $this->master('aset_m_kondisi_aset', 'Baik', 'KDSA-C1');
+        $komersial = $this->master('aset_m_buku_penyusutan', 'Komersial', 'KOM-C1', ['posting_layer' => 'current']);
+        $profil = $this->master('aset_m_profil_penyusutan', 'Garis lurus', 'PRF-C1', [
+            'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 48,
+        ]);
+        foreach ([
+            ['AST-C1', $elektronik, $gudang, $baik],
+            ['AST-C2', $kendaraan, $kantor, null],
+            ['AST-C3', $mebel, $gudang, $baik],
+        ] as [$kode, $group, $lokasi, $kondisi]) {
+            $asetId = $this->insertAsset($kode, '2026-01-10', 10000000, $group, $jenis);
+            DB::table('aset_tr_aset')->where('id', $asetId)->update(['lokasi_aset_id' => $lokasi, 'kondisi_aset_id' => $kondisi]);
+            DB::table('aset_tr_buku_aset')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $asetId, 'buku_id' => $komersial,
+                'depreciation_profile_id' => $profil, 'book_code' => $komersial, 'useful_life_periods' => 48,
+                'acquisition_value' => 10000000, 'accumulated_depreciation' => 0, 'net_book_value' => 10000000,
+                'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $konteks = $this->konteks(['management-aset.penyusutan.read']);
+        $kode = fn (array $laporan): array => array_column($laporan['tables']['baris'], 'kode');
+
+        $duaGroup = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'group_aset_id' => [$elektronik, $kendaraan]]);
+        $this->assertSame(['AST-C1', 'AST-C2'], $kode($duaGroup));
+        $this->assertSame('Elektronik, Kendaraan', $duaGroup['fields']['filter_group']);
+        $this->assertSame('Semua', $duaGroup['fields']['filter_lokasi']);
+
+        // Filter yang berbeda tetap "dan": group Elektronik atau Mebel, di Gudang, berkondisi Baik.
+        $gabungan = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, [
+            'periode' => '2026-08', 'group_aset_id' => [$elektronik, $mebel, $kendaraan], 'lokasi_aset_id' => [$gudang], 'kondisi_aset_id' => [$baik],
+        ]);
+        $this->assertSame(['AST-C1', 'AST-C3'], $kode($gabungan));
+        $this->assertSame('Gudang', $gabungan['fields']['filter_lokasi']);
+        $this->assertSame('Baik', $gabungan['fields']['filter_kondisi']);
+
+        // Satu nilai tanpa daftar tetap berlaku, supaya opsi dan tautan lama tidak rusak.
+        $satu = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'lokasi_aset_id' => $kantor]);
+        $this->assertSame(['AST-C2'], $kode($satu));
+
+        // Id yang tidak ada pada tenant ini disebut "Tidak ditemukan", bukan id-nya.
+        $asing = (string) Str::ulid();
+        $tidakAda = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'group_aset_id' => [$kendaraan, $asing]]);
+        $this->assertSame('Kendaraan, Tidak ditemukan', $tidakAda['fields']['filter_group']);
+
+        $this->assertGagalDengan(
+            'Parameter laporan tidak diterima',
+            fn () => $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'group_aset_id' => ['bukan-ulid']]),
+        );
+
+        // Layar mengirim pilihan banyak sebagai `group_aset_id[]=...`, dan kepala laporannya sama dengan cetakan.
+        $this->headers(['management-aset.penyusutan.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-penyusutan-aset?periode=2026-08&group_aset_id[]='.$elektronik.'&group_aset_id[]='.$kendaraan)
+            ->assertOk()
+            ->assertJsonPath('data.fields.filter_group', 'Elektronik, Kendaraan')
+            ->assertJsonCount(2, 'data.tables.baris');
+    }
+
     public function test_depreciation_report_follows_the_fiscal_year_and_the_chosen_book(): void
     {
         $data = $this->depreciationBooks();
@@ -568,7 +639,12 @@ class PenyediaLaporanTest extends TestCase
             $row = $catalog->get($code);
             $this->assertNotNull($row, "Laporan `{$code}` tidak sampai ke katalog Core.");
             $this->assertSame($definition->permission(), $row->permission, $code);
-            $this->assertSame(array_keys($definition->parameterRules()), json_decode($row->parameters, true), $code);
+            // Nama parameter adalah kunci aturannya, tanpa aturan per butir filter pilihan banyak (`group_aset_id.*`).
+            $this->assertSame(
+                array_values(array_filter(array_keys($definition->parameterRules()), static fn (string $key): bool => ! str_contains($key, '.'))),
+                json_decode($row->parameters, true),
+                $code,
+            );
             $layouts = json_decode($row->builtin_layouts, true);
             $this->assertIsArray($layouts);
             $this->assertSame(

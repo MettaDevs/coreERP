@@ -103,14 +103,32 @@ function tokenCsrf(): string {
     return cookie ? decodeURIComponent(cookie.slice(awalan.length)) : '';
 }
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+export function api<T>(path: string, init?: RequestInit): Promise<T> {
+    return request<T>(AWALAN_API, path, init);
+}
+
+/**
+ * Layanan milik Core untuk pengguna yang sedang masuk, dengan sesi yang sama: opsi terakhir dan preset
+ * laporan (K-24, K-25). Laporan dijalankan mesin Core, jadi pilihan yang disimpan untuknya juga milik Core;
+ * module tidak menyimpan salinannya sendiri. Hanya untuk rute `/api/v1/reports/...` yang disebut di
+ * `laporan/_shared/reportOptions.ts`.
+ */
+export function coreApi<T>(path: string, init?: RequestInit): Promise<T> {
+    return request<T>('/api/v1', path, init);
+}
+
+async function request<T>(
+    awalan: string,
+    path: string,
+    init?: RequestInit,
+): Promise<T> {
     const metode = (init?.method ?? 'GET').toUpperCase();
     // Unggahan berkas memasang Content-Type multipart beserta batasnya sendiri; menimpanya
     // dengan JSON membuat server tidak dapat membaca berkasnya.
     const unggahan = init?.body instanceof FormData;
     // Permintaan memakai sesi Core, bukan token pembawa: tidak ada lagi header
     // `Authorization`, dan cookie sesi ikut karena permintaannya same-origin.
-    const response = await fetch(`${AWALAN_API}${path}`, {
+    const response = await fetch(`${awalan}${path}`, {
         ...init,
         credentials: 'same-origin',
         headers: {

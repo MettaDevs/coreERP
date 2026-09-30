@@ -58,6 +58,12 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 
 **Parameter divalidasi di app.** Manifest hanya menyebut nama parameter; aturannya (`ulid`, `date_format`, `in:`) ada di `parameterRules()` tiap definisi, karena app yang tahu artinya.
 
+**Filter master aset boleh banyak pilihan (K-28).** `AssetReportFilters` menerima daftar id untuk group, kelompok harta fiskal, jenis, lokasi, dan kondisi (`group_aset_id[]=...`). Beberapa pilihan pada satu filter berarti *atau*, filter yang berbeda tetap *dan*, seperti `A|B` pada satu field di BC. Kepala laporan (`filter_group`, `filter_lokasi`, `filter_kondisi`, dan seterusnya) menulis nama setiap pilihan dipisah koma, dan "Tidak ditemukan" untuk id yang tidak ada pada tenant itu. Satu nilai tanpa daftar tetap diterima sebagai daftar berisi satu (`PenyediaLaporan` membungkusnya sebelum validasi), supaya opsi terakhir dan tautan lama tidak rusak. Nama parameter di katalog Core adalah kunci aturannya tanpa aturan per butir (`group_aset_id.*`). Aset dan buku penyusutan tetap satu pilihan: dua buku sekaligus menjumlahkan aset yang sama dua kali.
+
+**Filter terakhir dan preset milik Core.** Halaman laporan membuka filternya dengan pilihan terakhir pengguna dan mencatat pilihan setiap kali pratinjau berhasil; preset bernama dipilih dan disimpan di baris filter (`ui/laporan/_shared/ReportPresets.tsx`), dengan pilihan tanggal relatif seperti "Bulan ini". Keduanya disimpan Core lewat `coreApi()`; module tidak punya tabelnya. Aturannya di [Dokumen cetak, layout, dan ekspor](/dev/23-document-rendering#opsi-terakhir-dan-preset-laporan).
+
+**Register aset dapat diekspor utuh dari layarnya (K-27).** Tombol **Ekspor ke Excel** di Inventarisasi aset mengirim kolom yang tampil, urutan tabel, dan pencarian ke Core; Core meminta barisnya ke `src/Reporting/Lists/AssetRegisterList.php`, yang memakai permission `management-aset.aset.read` dan `OrganizationScope` sama seperti `GET /aset`, dan membaca per seribu baris. Kolomnya menulis nama group, jenis, dan lokasi serta label status, dan nilai perolehan sebagai angka uang.
+
 **Kop dan footer datang dari Core, bukan dari dataset.** Kedua layout bawaan memakai blok kop tiga kolom dengan placeholder `${kop.*}` yang diisi Core dari Identitas cetak legal entity (atau operating unit) yang mencetak, dengan alamat dan kontak dari buku alamat organisasi. Dataset app tidak memuat nama perusahaan, alamat, atau logo; menambahkannya akan menggandakan sumber kebenaran.
 
 **Layout bawaan dibangkitkan dari kode.** `php artisan management-aset:build-builtin-layouts` menulis ulang berkas di `resources/laporan/` dari pembangunnya di `src/Reporting/Layouts/Builtin/`, satu berkas per laporan. Perintah itu didaftarkan penyedia layanan modul; tanpa pendaftaran itu ia tidak ada sama sekali, karena kerangka lama yang menemukannya dengan memindai foldernya sendiri sudah dibuang. Perubahan template terbaca di review sebagai perubahan kode, dan hasilnya sama di mesin siapa pun; berkas hasilnya tetap di-commit karena runtime membaca berkas.
@@ -86,7 +92,12 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 | `src/Console/Commands/BuildBuiltinLayouts.php` | Perintah yang menjalankan semua pembangun |
 | `resources/laporan/` | Layout bawaan per kode laporan |
 | `tests/Feature/PenyediaLaporanTest.php` | Definisi, layout bawaan, dataset dengan permission dan scope, filter daftar |
+| `src/Reporting/AssetReportFilters.php` | Filter aset bersama: aturan, penerapan pada query, dan nama di kepala laporan |
+| `src/Reporting/Lists/AssetRegisterList.php` | Register aset sebagai daftar yang dapat diekspor Core |
+| `tests/Feature/AssetRegisterListTest.php` | Baris ekspor register aset mengikuti hak, cakupan unit kerja, dan pencarian |
 | `ui/print.ts` | `requestPrint()` mengirim `CustomEvent('coreerp:print')` ke shell |
+| `ui/listExport.ts` | `requestListExport()` mengirim `CustomEvent('coreerp:list-export')` ke shell |
+| `ui/laporan/_shared/` | Baris filter, filter bersama, preset, dan data pratinjau halaman laporan |
 
 Semuanya relatif terhadap `modules/apperp/management-aset/`.
 

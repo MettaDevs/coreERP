@@ -74,12 +74,15 @@ Bahayanya justru karena melanggarnya berhasil: impor `@/lib/...` dari folder mod
 
 Karena itu jalan ke shell adalah event peramban. Layar module melempar `CustomEvent('coreerp:print')` pada `window`; komponen shell `apps/core/resources/js/components/jembatan-cetak-module.tsx`, yang dipasang pada `app-layout.tsx`, menampungnya dan meneruskannya ke dialog cetak. Isi `detail` datang dari kode module dan ikut berubah tanpa perubahan di sisi shell, jadi **pemeriksa bentuk pesan** di `apps/core/resources/js/lib/print-requests.ts` tetap dipakai apa adanya: ia yang menahan bentuk yang menyimpang supaya tidak sampai ke dialog cetak sebagai parameter yang setengah benar. Penanda jenis disisipkan sisi shell, bukan dituntut dari module — sebuah event bernama `coreerp:print` sudah menyebutkan jenisnya pada namanya.
 
+Ekspor daftar di layar memakai jalan yang sama: `CustomEvent('coreerp:list-export')` dari `ui/listExport.ts` module, berisi kode daftar, kolom yang tampil beserta judulnya, urutan, dan filter. Komponen yang sama menampungnya, pemeriksa bentuknya ada di `apps/core/resources/js/lib/list-exports.ts`, lalu Shell mengantrekannya ke Core dan tray Ekspor memantaunya. Aturannya di [Dokumen cetak, layout, dan ekspor](23-document-rendering.md#ekspor-daftar-di-layar).
+
 ## Panggilan API dari layar module
 
 Layar module memanggil endpoint module-nya dengan sesi Core, bukan token pembawa. Bentuknya ada di `modules/apperp/management-aset/ui/api.ts`:
 
 - Tidak ada header `Authorization`. Permintaannya same-origin, jadi cookie sesi ikut sendiri.
 - Metode yang tidak dilewati pemeriksa CSRF membawa `X-XSRF-TOKEN` berisi isi cookie `XSRF-TOKEN` **apa adanya**, hanya dikembalikan dari bentuk ter-encode. `PreventRequestForgery` mendekripsi sendiri nilai header itu, karena cookie tersebut terenkripsi seperti cookie lain. `X-CSRF-TOKEN` bukan padanannya: header itu menunggu token sesi mentah, yang tidak pernah sampai ke sisi peramban.
+- Layanan yang dimiliki Core untuk pengguna yang sedang masuk dipanggil langsung dengan sesi yang sama lewat `coreApi()` di berkas yang sama, bukan lewat rute module. Hari ini hanya opsi terakhir dan preset laporan (`/api/v1/reports/{kode}/options` dan `.../presets`, K-24 dan K-25): laporan dijalankan mesin Core, jadi pilihan yang disimpan untuknya juga milik Core, dan module tidak menyimpan salinannya. Ini panggilan ke API Core, bukan impor kode Core, jadi batas impor di atas tetap utuh. Yang harus dipantau Shell — cetak dan ekspor daftar — tetap lewat event, karena tray Ekspor milik Shell yang harus mulai memantaunya.
 - Izin datang sebagai properti halaman Inertia dari controller module, bukan dari sebuah endpoint konteks. Layar karena itu tidak menunggu perjalanan jaringan kedua sebelum tahu tombol mana yang boleh tampil, dan tidak ada daftar izin kedua yang bisa berbeda dari yang dipakai rutenya.
 
 ## Yang tidak dimiliki halaman module
@@ -124,7 +127,7 @@ Akar repo menjadi akar workspace npm, dan itu yang membuat pencarian `node_modul
 | `apps/core/app/Support/LaunchableAppCatalog.php` | Menu dari manifest, penyaringan permission, aturan tautan `/<id module>/<id entri menu>` |
 | `apps/core/routes/web.php` | Rute `apps/{app}`: peluncur produk untuk kedua bentuk |
 | `apps/core/app/Http/Middleware/ResolveModuleContext.php` | Konteks module per permintaan, dipasang lewat alias `konteks-module` |
-| `apps/core/resources/js/components/jembatan-cetak-module.tsx` | Penampung `CustomEvent('coreerp:print')` dari layar module |
+| `apps/core/resources/js/components/jembatan-cetak-module.tsx` | Penampung `CustomEvent('coreerp:print')` dan `CustomEvent('coreerp:list-export')` dari layar module |
 | `apps/core/scripts/periksa-bundel.mjs` | Pemeriksa React tunggal, dijalankan `npm run bundle:check` |
 | `apps/core/vite.config.ts` | `resolve.dedupe`, alias `@modules`, `server.fs.allow` |
 | `apps/core/resources/css/app.css` | Sumber pemindaian Tailwind, termasuk pola satu baris untuk seluruh module |

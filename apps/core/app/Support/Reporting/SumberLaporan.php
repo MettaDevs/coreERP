@@ -80,12 +80,14 @@ final class SumberLaporan
         $penyedia = $this->penyedia($report);
         $kode = $this->kodeLokal($report, $penyedia);
 
-        [$isi, $formats] = $this->jalankan($report, $membership, fn (array $konteks): array => [
-            $penyedia->dataset($kode, $konteks, $parameters),
-            $this->formats->forFields((string) $konteks['tenant_id'], $penyedia->definisi($kode, $konteks)['fields'], (string) $konteks['timezone']),
-        ], $legalEntityId, $orgUnitId);
+        [$isi, $definisi, $formats] = $this->jalankan($report, $membership, function (array $konteks) use ($penyedia, $kode, $parameters): array {
+            $isi = $penyedia->dataset($kode, $konteks, $parameters);
+            $definisi = $penyedia->definisi($kode, $konteks)['fields'];
 
-        return ReportData::fromArray($isi, $formats);
+            return [$isi, $definisi, $this->formats->forFields((string) $konteks['tenant_id'], $definisi, (string) $konteks['timezone'])];
+        }, $legalEntityId, $orgUnitId);
+
+        return ReportData::fromArray($isi, $formats, $definisi);
     }
 
     private function penyedia(stdClass $report): PenyediaLaporanModul
@@ -131,12 +133,27 @@ final class SumberLaporan
      */
     private function jalankan(stdClass $report, TenantMembership $membership, callable $panggilan, ?string $legalEntityId, ?string $orgUnitId): mixed
     {
+        return $this->forModule((string) $report->app_id, (string) $report->app_name, $membership, $legalEntityId, $orgUnitId, $panggilan);
+    }
+
+    /**
+     * Menjalankan satu panggilan ke module `$appId` atas nama pengguna, dengan tenant aktif terikat dan
+     * konteks laporan terisi. Dipakai laporan dan ekspor daftar di layar (K-27), yang menempuh aturan sama:
+     * konteks dari keanggotaan, bukan dari permintaan, dan kegagalan module menjadi pesan ekspor.
+     *
+     * @template T
+     *
+     * @param  callable(array<string, mixed>): T  $panggilan
+     * @return T
+     */
+    public function forModule(string $appId, string $appName, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, callable $panggilan): mixed
+    {
         $konteks = [
             'tenant_id' => (string) $membership->tenant_id,
             'legal_entity_id' => $legalEntityId,
             'org_unit_id' => $orgUnitId,
             'user_id' => (string) $membership->user_id,
-            'permissions' => $this->apps->permissionsFor($membership, (string) $report->app_id),
+            'permissions' => $this->apps->permissionsFor($membership, $appId),
             'data_policies' => $this->kebijakan->resolve($membership),
             // Zona waktu pengguna yang meminta, untuk "hari ini" di module (periode bawaan, nama berkas)
             // dan untuk waktu di cetakan. Dihitung di sini karena ekspor berjalan di worker tanpa sesi.
@@ -157,7 +174,7 @@ final class SumberLaporan
             throw new RenderException($e->getMessage(), previous: $e);
         } catch (Throwable $e) {
             throw new RenderException(
-                "{$report->app_name} tidak dapat menyiapkan laporan ini: {$e->getMessage()}",
+                "{$appName} tidak dapat menyiapkan data ini: {$e->getMessage()}",
                 previous: $e,
             );
         }

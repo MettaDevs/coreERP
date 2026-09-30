@@ -36,6 +36,13 @@ return [
     // Dataset dibaca dari module di proses yang sama; batas ini menjaga satu ekspor tidak
     // menguasai worker dan memori.
     'max_rows' => (int) env('COREERP_REPORTING_MAX_ROWS', 50000),
+    // Ekspor daftar di layar (K-27) tidak menyusun data di memori: barisnya dibaca bertahap dan ditulis
+    // langsung ke berkas. Sampai batas satu lembar Excel (1.048.575 baris) hasilnya xlsx; lebih dari itu
+    // CSV, sampai batas ini. Batas waktu job (10 menit) tetap berlaku.
+    'list_export_max_csv_rows' => (int) env('COREERP_REPORTING_LIST_EXPORT_MAX_CSV_ROWS', 2000000),
+    // Baris xlsx paling banyak; tidak dapat melebihi batas satu lembar Excel. Lebih kecil hanya berguna untuk
+    // menguji peralihan ke CSV.
+    'list_export_max_xlsx_rows' => (int) env('COREERP_REPORTING_LIST_EXPORT_MAX_XLSX_ROWS', 1048575),
     'max_layout_kb' => (int) env('COREERP_REPORTING_MAX_LAYOUT_KB', 5120),
     // Ekspor yang masih menunggu atau berjalan per pengguna. Satu orang yang menekan
     // Cetak berkali-kali tidak boleh membuat pengguna lain menunggu.

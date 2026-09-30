@@ -7,6 +7,7 @@ use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Nilai log perubahan register aset dalam bentuk yang dibaca orang: nama lokasi, kondisi, dan unit kerja
@@ -15,14 +16,6 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
  */
 final class AssetChangeLogValues implements ChangeLogValueResolver
 {
-    /** Label status yang sama dengan layar register aset. */
-    private const STATUS = [
-        'received' => 'Diterima',
-        'in_use' => 'Digunakan',
-        'decommissioned' => 'Didekomisioning',
-        'disposed' => 'Dilepas',
-    ];
-
     public function __construct(private readonly DirektoriOrganisasi $organisasi) {}
 
     public function table(): string
@@ -33,7 +26,7 @@ final class AssetChangeLogValues implements ChangeLogValueResolver
     public function display(string $tenantId, string $field, array $values): array
     {
         return match ($field) {
-            'lifecycle_state' => array_intersect_key(self::STATUS, array_flip($values)),
+            'lifecycle_state' => array_intersect_key(StatusAset::LABELS, array_flip($values)),
             'lokasi_aset_id' => $this->names(LokasiAset::withTrashed()->whereIn('id', $values)->get(['id', 'nama'])->all()),
             'kondisi_aset_id' => $this->names(KondisiAset::withTrashed()->whereIn('id', $values)->get(['id', 'nama'])->all()),
             'responsible_org_unit_id' => collect($this->organisasi->unitOperasi($tenantId))

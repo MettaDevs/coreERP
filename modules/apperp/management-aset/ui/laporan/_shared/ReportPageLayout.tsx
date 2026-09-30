@@ -22,12 +22,14 @@ import {
 } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
 import { requestPrint } from '../../print';
+import { cleanFilters } from './reportOptions';
+import type { Filters } from './reportOptions';
 
 export type ReportPageLayoutProps<T> = {
     title: string;
     description?: string;
     reportCode: string;
-    filters: Record<string, string>;
+    filters: Filters;
     filterBar: ReactNode;
     columns: DataTableColumn<T>[];
     rows: T[];
@@ -59,19 +61,11 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
     );
 
     const handlePrint = () => {
-        // Bersihkan parameter filter kosong sebelum dikirim ke Core
-        const cleanParams: Record<string, unknown> = {};
-
-        for (const [key, value] of Object.entries(filters)) {
-            if (value !== '' && value !== undefined && value !== null) {
-                cleanParams[key] = value;
-            }
-        }
-
+        // Hanya filter yang terisi; pilihan banyak dikirim sebagai daftar.
         requestPrint({
             report: reportCode,
             title: `Cetak ${title.toLowerCase()}`,
-            parameters: cleanParams,
+            parameters: cleanFilters(filters),
         });
     };
 
