@@ -70,6 +70,11 @@ final class AssetDisposalScrapReport implements ReportDefinition
         ];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         return [

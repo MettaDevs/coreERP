@@ -207,6 +207,13 @@ class PenyediaLaporanTest extends TestCase
                 return [];
             }
 
+            public function dataItems(): array
+            {
+
+                return [];
+
+            }
+
             public function fields(): array
             {
                 return [
@@ -462,6 +469,66 @@ class PenyediaLaporanTest extends TestCase
             ->assertJsonCount(2, 'data.tables.baris');
     }
 
+    public function test_additional_filters_narrow_rows_on_any_asset_column_and_are_named_in_the_header(): void
+    {
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $group = $this->master('aset_m_group_aset', 'Elektronik', 'GRPA-F1');
+        $jenis = $this->master('aset_m_jenis_aset', 'Umum', 'JNSA-F1');
+        $tipe = $this->master('aset_m_tipe_lokasi_aset', 'Ruang', 'TLKA-F1');
+        $gudang = $this->master('aset_m_lokasi_aset', 'Gudang', 'LOCA-F1', ['tipe_lokasi_id' => $tipe]);
+        $komersial = $this->master('aset_m_buku_penyusutan', 'Komersial', 'KOM-F1', ['posting_layer' => 'current']);
+        $profil = $this->master('aset_m_profil_penyusutan', 'Garis lurus', 'PRF-F1', [
+            'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 48,
+        ]);
+        foreach ([
+            ['AST-F1', 5000000, 'SN-ASUS-01', $gudang],
+            ['AST-F2', 15000000, 'SN-LENOVO-02', null],
+            ['AST-F3', 25000000, null, $gudang],
+        ] as [$kode, $nilai, $seri, $lokasi]) {
+            $asetId = $this->insertAsset($kode, '2026-01-10', $nilai, $group, $jenis);
+            DB::table('aset_tr_aset')->where('id', $asetId)->update(['serial_number' => $seri, 'lokasi_aset_id' => $lokasi]);
+            DB::table('aset_tr_buku_aset')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $asetId, 'buku_id' => $komersial,
+                'depreciation_profile_id' => $profil, 'book_code' => $komersial, 'useful_life_periods' => 48,
+                'acquisition_value' => $nilai, 'accumulated_depreciation' => 0, 'net_book_value' => $nilai,
+                'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $konteks = $this->konteks(['management-aset.penyusutan.read']);
+        $kode = fn (array $laporan): array => array_column($laporan['tables']['baris'], 'kode');
+        $run = fn (array $filters): array => $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'filters' => ['aset' => $filters]]);
+
+        // Definisi menawarkan data item Aset dengan kolom bawaan dan kolom tabel lainnya, beserta tipenya.
+        $definisi = $this->penyedia()->definisi('laporan-penyusutan-aset', $konteks);
+        $this->assertSame(['aset'], array_column($definisi['data_items'], 'key'));
+        $this->assertSame(['kode'], $definisi['data_items'][0]['default_fields']);
+        $fields = array_column($definisi['data_items'][0]['fields'], null, 'key');
+        $this->assertSame('number', $fields['acquisition_value']['type']);
+        $this->assertSame('lokasi-aset', $fields['lokasi_aset_id']['lookup'] ?? null);
+        $this->assertArrayNotHasKey('tenant_id', $fields);
+        $this->assertContains('filters', $definisi['parameters']);
+
+        // Sintaks BC pada kolom angka dan teks, pilihan pada kolom rujukan; filter berbeda berarti "dan".
+        $this->assertSame(['AST-F2', 'AST-F3'], $kode($run(['acquisition_value' => '>10000000'])));
+        $this->assertSame(['AST-F1', 'AST-F2'], $kode($run(['serial_number' => '@*asus*|@*lenovo*'])));
+        $this->assertSame(['AST-F3'], $kode($run(['lokasi_aset_id' => [$gudang], 'acquisition_value' => '20000000..30000000'])));
+        $this->assertSame(['AST-F3'], $kode($run(['serial_number' => "''"])));
+
+        $laporan = $run(['lokasi_aset_id' => [$gudang], 'acquisition_value' => '>1000000']);
+        $this->assertSame('Aset — Lokasi: Gudang; Nilai perolehan: >1000000', $laporan['fields']['filter_tambahan']);
+        $this->assertSame('Tidak ada', $run([])['fields']['filter_tambahan']);
+
+        // Kolom yang tidak ada di katalog dan ekspresi yang salah ditolak dengan pesan siap-baca.
+        $this->assertGagalDengan('tidak dapat difilter', fn () => $run(['tenant_id' => 'x']));
+        $this->assertGagalDengan('Nilai perolehan', fn () => $run(['acquisition_value' => 'abc']));
+
+        // Layar mengirim filter tambahan sebagai `filters[aset][kolom]`.
+        $this->headers(['management-aset.penyusutan.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-penyusutan-aset?periode=2026-08&filters[aset][acquisition_value]=%3E10000000')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.tables.baris');
+    }
+
     public function test_depreciation_report_follows_the_fiscal_year_and_the_chosen_book(): void
     {
         $data = $this->depreciationBooks();
@@ -639,9 +706,13 @@ class PenyediaLaporanTest extends TestCase
             $row = $catalog->get($code);
             $this->assertNotNull($row, "Laporan `{$code}` tidak sampai ke katalog Core.");
             $this->assertSame($definition->permission(), $row->permission, $code);
-            // Nama parameter adalah kunci aturannya, tanpa aturan per butir filter pilihan banyak (`group_aset_id.*`).
+            // Nama parameter adalah kunci aturannya, tanpa aturan per butir filter pilihan banyak (`group_aset_id.*`),
+            // ditambah `filters` untuk laporan yang menawarkan filter tambahan (K-30).
             $this->assertSame(
-                array_values(array_filter(array_keys($definition->parameterRules()), static fn (string $key): bool => ! str_contains($key, '.'))),
+                [
+                    ...array_values(array_filter(array_keys($definition->parameterRules()), static fn (string $key): bool => ! str_contains($key, '.'))),
+                    ...($definition->dataItems() === [] ? [] : ['filters']),
+                ],
                 json_decode($row->parameters, true),
                 $code,
             );
@@ -1054,7 +1125,7 @@ final class PenyediaLaporanTerikat
 
     /**
      * @param  array<string, mixed>  $konteks
-     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
     public function definisi(string $kode, array $konteks): array
     {

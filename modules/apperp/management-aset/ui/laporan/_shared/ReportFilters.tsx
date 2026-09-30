@@ -41,7 +41,7 @@ type MasterFilterProps = MultiFilterProps & {
  * Filter master pilihan banyak. Tanpa pilihan berarti semua; beberapa pilihan berarti aset yang cocok
  * dengan salah satunya, dan kepala laporan menyebut nama setiap pilihan.
  */
-function MasterFilter({
+export function MasterFilter({
     resource,
     label,
     unavailable,

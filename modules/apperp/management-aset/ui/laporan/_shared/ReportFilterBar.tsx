@@ -1,9 +1,10 @@
 import { RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@apperp/ui/button';
+import { AdditionalFilters } from './AdditionalFilters';
 import { ReportPresets } from './ReportPresets';
 import type { ReportDateParameters } from './ReportPresets';
-import type { ReportPresetState } from './useReportData';
+import type { AdditionalFilterState, ReportPresetState } from './useReportData';
 
 export type ReportFilterBarProps = {
     /** Filter milik laporan, disusun halamannya dari komponen di `ReportFilters`. */
@@ -15,6 +16,8 @@ export type ReportFilterBarProps = {
     presets?: ReportPresetState;
     /** Parameter tanggal laporan, supaya preset dapat menyimpan "bulan ini" alih-alih tanggal tetap. */
     dates?: ReportDateParameters;
+    /** Filter tambahan pada kolom data item laporan (K-30); tampil di bawah filter laporan. */
+    additional?: AdditionalFilterState;
 };
 
 /**
@@ -30,6 +33,7 @@ export function ReportFilterBar({
     onReset,
     presets,
     dates,
+    additional,
 }: ReportFilterBarProps) {
     return (
         <div className="flex flex-col gap-3 border-b px-5 py-3">
@@ -52,6 +56,7 @@ export function ReportFilterBar({
                     </Button>
                 )}
             </div>
+            {additional && <AdditionalFilters state={additional} />}
         </div>
     );
 }

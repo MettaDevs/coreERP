@@ -75,6 +75,11 @@ final class AssetMonitoringReport implements ReportDefinition
         ];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         return [

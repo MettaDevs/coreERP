@@ -44,6 +44,16 @@ interface ReportDefinition
      */
     public function fields(): array;
 
+    /**
+     * Data item laporan, padanan `dataitem` BC (K-30): tabel yang boleh diberi filter tambahan oleh pengguna,
+     * masing-masing dengan bagian filternya sendiri di layar. Kosong berarti laporan ini belum menawarkan
+     * filter tambahan. Definisi yang mengisinya wajib memanggil {@see AdditionalFilters::apply()} pada query
+     * setiap data item-nya.
+     *
+     * @return list<ReportDataItem>
+     */
+    public function dataItems(): array;
+
     /** @param array<string, mixed> $parameters Parameter yang sudah lolos {@see parameterRules()}. */
     public function data(ReportContext $context, array $parameters): ReportData;
 }

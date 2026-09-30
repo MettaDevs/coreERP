@@ -41,6 +41,7 @@ export default function LaporanPemusnahanAsetPage() {
         bindFilter,
         bindMultiFilter,
         presets,
+        additional,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -130,6 +131,7 @@ export default function LaporanPemusnahanAsetPage() {
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
                     presets={presets}
+                    additional={additional}
                     dates={{ from: 'dari', to: 'sampai' }}
                 >
                     <DateFilter label="Dari tanggal" {...bindFilter('dari')} />

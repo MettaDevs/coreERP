@@ -142,6 +142,13 @@ class PerkakasModuleTest extends TestCase
                 return [];
             }
 
+            public function dataItems(): array
+            {
+
+                return [];
+
+            }
+
             public function fields(): array
             {
                 return [];

@@ -10,11 +10,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
+use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\KalenderFiskalAset;
@@ -82,6 +84,11 @@ final class AssetDepreciationReport implements ReportDefinition
             ...AssetReportFilters::rules(),
             'periode' => ['nullable', 'date_format:Y-m'],
         ];
+    }
+
+    public function dataItems(): array
+    {
+        return [new ReportDataItem('aset', 'Aset', Aset::class, 'aset_tr_aset', ['kode'])];
     }
 
     public function fields(): array
@@ -228,6 +235,7 @@ final class AssetDepreciationReport implements ReportDefinition
         app(OrganizationScope::class)->asetQuery($query, $context->request());
 
         AssetReportFilters::apply($query, $parameters, 'aset_tr_aset');
+        AdditionalFilters::apply($query, $this->dataItems()[0], $parameters, $context);
 
         if (! empty($parameters['buku_id'])) {
             $query->where('buku.buku_id', $parameters['buku_id']);

@@ -22,7 +22,7 @@ import {
 } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
 import { requestPrint } from '../../print';
-import { cleanFilters } from './reportOptions';
+import { toParameters } from './reportOptions';
 import type { Filters } from './reportOptions';
 
 export type ReportPageLayoutProps<T> = {
@@ -65,7 +65,7 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
         requestPrint({
             report: reportCode,
             title: `Cetak ${title.toLowerCase()}`,
-            parameters: cleanFilters(filters),
+            parameters: toParameters(filters),
         });
     };
 

@@ -138,6 +138,27 @@ Padanan "Last used options and filters" dan setelan laporan bernama (page 1560 *
 
 Rutenya sesi login, dijaga hak menjalankan laporan (laporan yang tidak boleh dijalankan dijawab 404): `GET /api/v1/reports/{kode}/options`, `PUT .../options/last-used`, `POST .../presets` (dengan `shared: true` untuk preset bersama; tanpa permission-nya dijawab 403), `PATCH` dan `DELETE .../presets/{id}` (preset yang tidak boleh diubah dijawab 404, sama dengan yang tidak ada).
 
+## Filter tambahan pada kolom data item
+
+Padanan "+ Filter" di request page Business Central (K-30). Setiap laporan punya filter tetap dari developer atau konsultan — periode, buku, group, dan sejenisnya — dan pengguna boleh menambah filter pada **kolom mana pun di tabel data item laporan**, tanpa rilis baru. Kebutuhan "tambah A, B, C" dari klien saat handover dijawab di sini.
+
+| BC | CoreERP |
+| --- | --- |
+| `dataitem` laporan, satu bagian filter per data item | `ReportDefinition::dataItems()` di module: data item (misalnya Aset, atau Dokumen lalu Baris) dengan model tabelnya dan alias tabel itu di query laporan |
+| Field tabel beserta Caption | Katalog field per model: konstanta `FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, dan `FIELD_HIDDEN` dibaca `App\Support\Modules\Contracts\TableFields`; tipe kolom dibaca dari database |
+| `RequestFilterFields` | Kolom bawaan data item (`defaultFields`), langsung tampil tanpa ditambahkan |
+| `DataItemTableView` | Batasan di query laporan dan kebijakan data organisasi; filter tambahan hanya mempersempit |
+| Sintaks filter | `App\Support\Modules\Contracts\FieldFilterExpression`: `..`, `\|`, `&`, `<>`, `<`, `<=`, `>`, `>=`, `*`, `?`, `@`, `''`, dan `t` untuk hari ini |
+| Field Option dan TableRelation | Kolom pilihan dan rujukan dipilih dari daftar; beberapa pilihan berarti *atau* |
+
+- **Semua kolom.** Kolom teknis (`id`, `tenant_id`, `version`, `deleted_at`, `creation_key`, jejak pengguna) dan kolom berkelas `AccountData` tidak pernah ditawarkan. Kolom lain wajib diberi nama tampilan atau disembunyikan dengan alasannya; penjaganya `ReportFieldCatalogTest` di module aset, sehingga kolom baru di tabel data item tidak diam-diam hilang dari "+ Tambah filter".
+- **Parameter `filters[<data item>][<kolom>]`**: teks ekspresi untuk teks, angka, tanggal, dan waktu; daftar nilai untuk pilihan, ya/tidak, dan rujukan. Ikut disimpan di opsi terakhir dan preset, dan ditulis di kepala laporan lewat placeholder `filter_tambahan` ("Aset — Lokasi: Gudang; Nilai perolehan: >1000000").
+- **Tanggal dan waktu** dibaca menurut zona pengguna: `01/09/2026` pada kolom waktu berarti satu hari penuh di zona itu.
+- **Keamanan.** Nama kolom hanya dari katalog, nilai selalu lewat binding. Ekspresi dibatasi 250 karakter dan 50 istilah. Kolom yang tidak dikenal dan ekspresi yang salah ditolak dengan pesan siap-baca, sama seperti parameter yang tidak diterima.
+- **Yang dikerjakan module untuk satu laporan:** isi katalog field model data item-nya, kembalikan data item dari `dataItems()`, dan panggil `AdditionalFilters::apply()` pada query setiap data item. Halaman laporan menampilkan bagiannya lewat `ReportFilterBar` (`additional`).
+
+Batas saat ini: kolom rujukan hanya dipilih dari daftar, belum diketik dengan pola kode seperti `GDG*`; filter total (*Filter totals by*, FlowFilter BC) belum ada.
+
 ## Excel (data saja)
 
 Padanan *Microsoft Excel Document (data only)* pada Send to BC (K-26): setiap laporan dapat diekspor sebagai dataset apa adanya, tanpa layout, tanpa kop, dan tanpa layanan PDF, lewat antrean ekspor yang sama. Dialog cetak menawarkannya di samping format layout. Barisnya `report_exports.kind = data`.

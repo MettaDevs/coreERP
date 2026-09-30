@@ -5,10 +5,12 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
+use App\Support\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Aset tercatat: satu baris per aset, termasuk komponen yang menjadi anak aset lain.
@@ -55,6 +57,61 @@ class Aset extends Model
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [
         'nama' => DataClass::CustomerContent,
+    ];
+
+    /**
+     * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
+     * dari database. Lihat {@see TableFields}.
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'kode' => 'Kode aset',
+        'nama' => 'Nama aset',
+        'group_aset_id' => 'Group aset',
+        'kelompok_harta_fiskal_id' => 'Kelompok harta fiskal',
+        'jenis_aset_id' => 'Jenis aset',
+        'kondisi_aset_id' => 'Kondisi',
+        'lokasi_aset_id' => 'Lokasi',
+        'pabrikan_aset_id' => 'Pabrikan',
+        'model_aset_id' => 'Model',
+        'induk_aset_id' => 'Aset induk',
+        'responsible_org_unit_id' => 'Unit penanggung jawab',
+        'financial_dimension_org_unit_id' => 'Unit dimensi keuangan',
+        'serial_number' => 'Nomor seri',
+        'model_number' => 'Nomor model',
+        'acquired_on' => 'Tanggal perolehan',
+        'placed_in_service_on' => 'Tanggal mulai dipakai',
+        'acquisition_value' => 'Nilai perolehan',
+        'currency_code' => 'Mata uang',
+        'lifecycle_state' => 'Status aset',
+        'keterangan' => 'Keterangan',
+    ];
+
+    /** @var array<string, array<string, string>> */
+    public const FIELD_OPTIONS = [
+        'lifecycle_state' => StatusAset::LABELS,
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'group_aset_id' => 'group-aset',
+        'kelompok_harta_fiskal_id' => 'reference-data/kelompok-harta-fiskal',
+        'jenis_aset_id' => 'jenis-aset',
+        'kondisi_aset_id' => 'kondisi-aset',
+        'lokasi_aset_id' => 'lokasi-aset',
+        'pabrikan_aset_id' => 'pabrikan-aset',
+        'model_aset_id' => 'model-aset',
+        'induk_aset_id' => 'aset',
+        'responsible_org_unit_id' => 'reference-data/unit-kerja',
+        'financial_dimension_org_unit_id' => 'reference-data/unit-kerja',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
+        'penerimaan_aset_id' => 'Rujukan dokumen asal; saring dari laporan penerimaan.',
+        'penerimaan_aset_detail_id' => 'Rujukan baris dokumen asal; saring dari laporan penerimaan.',
     ];
 
     protected $table = 'aset_tr_aset';

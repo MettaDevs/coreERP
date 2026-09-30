@@ -123,7 +123,7 @@ class ReportValueFormatsTest extends TestCase
 
             public function definisi(string $kodeLaporan, array $konteks): array
             {
-                return ['fields' => $this->fields, 'parameters' => []];
+                return ['fields' => $this->fields, 'parameters' => [], 'data_items' => []];
             }
 
             public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string
@@ -312,7 +312,7 @@ class ReportValueFormatsTest extends TestCase
                     ['key' => 'dicetak_pada', 'label' => 'Dicetak', 'table' => null, 'type' => 'datetime'],
                     ['key' => 'baris.dibuat', 'label' => 'Dibuat', 'table' => 'baris', 'type' => 'datetime'],
                     ['key' => 'baris.tanggal', 'label' => 'Tanggal', 'table' => 'baris', 'type' => 'date'],
-                ], 'parameters' => []];
+                ], 'parameters' => [], 'data_items' => []];
             }
 
             public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string

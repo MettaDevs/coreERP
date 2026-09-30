@@ -225,6 +225,8 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
       zona pengguna, dan preset bersama yang dikelola pemegang duty `core.report-preset.manage`.
 - [x] 8.7 Excel (data saja) untuk setiap laporan (K-26).
 - [x] 8.8 Filter master laporan pilihan banyak dengan nama di kepala laporan (K-28).
+- [~] 8.9 Filter tambahan pada kolom data item laporan, sintaks BC, dokumen dan baris (K-30). Pilot: laporan
+      penyusutan aset; laporan aset lainnya menyusul.
 
 ### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 

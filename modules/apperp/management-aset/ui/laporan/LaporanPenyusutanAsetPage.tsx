@@ -60,6 +60,7 @@ export default function LaporanPenyusutanAsetPage() {
         bindFilter,
         bindMultiFilter,
         presets,
+        additional,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -147,6 +148,7 @@ export default function LaporanPenyusutanAsetPage() {
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
                     presets={presets}
+                    additional={additional}
                     dates={{ month: 'periode' }}
                 >
                     <PeriodFilter {...bindFilter('periode')} />

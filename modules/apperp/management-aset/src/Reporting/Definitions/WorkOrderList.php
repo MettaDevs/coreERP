@@ -65,6 +65,11 @@ final class WorkOrderList implements ReportDefinition
         ];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         $header = [

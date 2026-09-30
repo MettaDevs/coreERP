@@ -62,6 +62,11 @@ final class DaftarMutasiAset implements ReportDefinition
         ];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         $header = [

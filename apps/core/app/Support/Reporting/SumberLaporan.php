@@ -42,7 +42,7 @@ final class SumberLaporan
     ) {}
 
     /**
-     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
     public function definition(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): array
     {

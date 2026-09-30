@@ -77,8 +77,14 @@ interface PenyediaLaporanModul
      * (`Y-m-d H:i:s` atau ISO 8601). Core yang memformatnya per keluaran; waktu ditulis menurut zona
      * pengguna beserta nama zonanya. Placeholder tanpa `type` dianggap sudah siap tampil.
      *
+     * `data_items` padanan `dataitem` BC (K-30): tabel yang boleh diberi filter tambahan pengguna, dengan
+     * katalog kolomnya dari {@see TableFields} dan kolom bawaan yang langsung tampil (`RequestFilterFields`).
+     * Filter tambahan dikirim kembali ke `dataset()` sebagai parameter `filters[<data item>][<kolom>]`, dan
+     * module yang menerapkannya lewat {@see FieldFilterExpression}. Laporan tanpa data item memulangkan
+     * daftar kosong.
+     *
      * @param  array<string, mixed>  $konteks
-     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
     public function definisi(string $kodeLaporan, array $konteks): array;
 

@@ -69,6 +69,11 @@ final class AssetDisposalSaleReport implements ReportDefinition
         ];
     }
 
+    public function dataItems(): array
+    {
+        return [];
+    }
+
     public function fields(): array
     {
         return [
