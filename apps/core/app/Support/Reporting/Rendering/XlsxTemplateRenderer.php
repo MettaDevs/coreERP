@@ -18,7 +18,7 @@ use Throwable;
  *
  * Aturannya sejalan dengan layout Word: `${kode}` untuk nilai tunggal, dan satu baris
  * lembar yang memuat `${baris.asset_kode}` menjadi baris template yang digandakan per
- * baris dataset. Gaya sel baris template disalin ke setiap baris hasil, dan rumus di
+ * baris dataset. Gaya sel dan rumus baris template disalin ke setiap baris hasil, dan rumus di
  * bawahnya (misalnya `=SUM`) bergeser mengikuti sisipan baris — PhpSpreadsheet yang
  * menggeser referensinya, seperti Excel sendiri saat baris disisipkan.
  *
@@ -97,8 +97,27 @@ final class XlsxTemplateRenderer
                 $this->writeRow($sheet, $target, $cells, $table, $values, $data->formats);
             }
             if ($count > 1) {
+                $this->copyRowFormulas($sheet, $row, $row + $count - 1, $cells);
                 $this->extendRangesEndingAt($sheet, $row, $row + $count - 1);
             }
+        }
+    }
+
+    /**
+     * Rumus di baris template yang tidak memuat placeholder, misalnya `=D5*E5`, disalin ke
+     * setiap baris hasil seperti fill handle Excel: referensi relatif bergeser, yang absolut
+     * tetap.
+     *
+     * @param  array<int, mixed>  $cells
+     */
+    private function copyRowFormulas(Worksheet $sheet, int $templateRow, int $lastRow, array $cells): void
+    {
+        foreach ($cells as $column => $template) {
+            if (! is_string($template) || ! str_starts_with($template, '=') || str_contains($template, '${')) {
+                continue;
+            }
+            $letter = Coordinate::stringFromColumnIndex($column);
+            $sheet->copyCells($letter.$templateRow, $letter.($templateRow + 1).':'.$letter.$lastRow, false);
         }
     }
 
@@ -106,11 +125,16 @@ final class XlsxTemplateRenderer
      * Rumus seperti `=SUM(B3:B3)` yang ditulis pembuat template pada satu baris template
      * harus mencakup semua baris hasil. PhpSpreadsheet (dan Excel) tidak memperluas
      * rentang yang berakhir tepat di baris tempat penyisipan dimulai, jadi rentang yang
-     * berakhir di baris template diperpanjang sampai baris hasil terakhir di sini.
+     * berakhir di baris template diperpanjang sampai baris hasil terakhir di sini. Rumus
+     * di baris hasil sendiri, misalnya `=SUM(D5:E5)`, adalah rumus per baris dan tidak
+     * diperpanjang.
      */
     private function extendRangesEndingAt(Worksheet $sheet, int $templateRow, int $lastRow): void
     {
         foreach ($sheet->getRowIterator() as $rowIterator) {
+            if ($rowIterator->getRowIndex() >= $templateRow && $rowIterator->getRowIndex() <= $lastRow) {
+                continue;
+            }
             $iterator = $rowIterator->getCellIterator();
             $iterator->setIterateOnlyExistingCells(true);
             foreach ($iterator as $cell) {

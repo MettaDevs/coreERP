@@ -106,6 +106,7 @@ Aturan yang dijaga engine di Core, dan alasannya:
 - **Nilai tanpa tipe sudah siap tampil saat keluar dari dataset.** Label status dan teks lain diformat di kelas definisi app, bukan di layout, supaya semua layout satu laporan menampilkannya dengan cara yang sama.
 - **Placeholder tak dikenal dikosongkan, bukan dibiarkan.** Dokumen yang sampai ke vendor tidak boleh memuat `${...}`. Saat unggah, placeholder yang tidak ada di dataset dilaporkan sebagai peringatan tanpa menolak unggahan; salah ketik ketahuan sebelum dicetak.
 - **Dokumen bermakro ditolak saat unggah.** Berkas dibuka engine bersama semua tenant; tidak ada alasan sebuah layout menjalankan kode. Yang diperiksa isi zip-nya, bukan ekstensinya.
+- **Rumus di baris template Excel ikut digandakan.** Formula Excel tanpa placeholder pada baris template, misalnya `=D5*E5`, disalin ke setiap baris hasil seperti fill handle Excel: referensi relatif bergeser (`=D6*E6`, `=D7*E7`), referensi absolut seperti `$H$2` tetap, dan rentang di dalam baris itu sendiri (`=SUM(D5:E5)`) tidak ikut diperluas.
 - **Rumus di bawah baris template Excel diperluas.** `=SUM(B3:B3)` pada satu baris template menjadi `=SUM(B3:B7)` setelah lima baris hasil, karena Excel sendiri tidak memperluas rentang yang berakhir tepat di baris penyisipan.
 
 ## Ekspor dikerjakan di latar belakang
