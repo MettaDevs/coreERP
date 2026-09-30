@@ -2,7 +2,7 @@
 
 namespace App\Support\AddressBook;
 
-use App\Models\CountryRegion;
+use App\Foundation\Geography\Models\CountryRegion;
 
 /**
  * Bentuk tercetak alamat pos, disusun sekali saat disimpan ke kolom `formatted`.

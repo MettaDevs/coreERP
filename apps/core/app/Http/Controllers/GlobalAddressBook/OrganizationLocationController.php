@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\GlobalAddressBook;
 
+use App\Foundation\Geography\Models\CountryRegion;
 use App\Http\Controllers\Controller;
-use App\Models\CountryRegion;
 use App\Models\LocationPurpose;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;

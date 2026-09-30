@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\CountryRegion;
-use App\Models\ReferenceData\AddressHierarchy\TimeZone;
+use App\Foundation\Geography\Models\AddressHierarchy\TimeZone;
+use App\Foundation\Geography\Models\CountryRegion;
 use DateTime;
 use DateTimeZone;
 use Illuminate\Database\Seeder;

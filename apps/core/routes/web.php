@@ -1,5 +1,6 @@
 <?php
 
+use App\Foundation\Geography\Http\Controllers\AddressSetupController;
 use App\Foundation\Vendor\Http\Controllers\VendorController;
 use App\Http\Controllers\Access\AccessController;
 use App\Http\Controllers\Access\InvitationCodeController;
@@ -32,7 +33,6 @@ use App\Http\Controllers\Organization\WorkspaceContextController;
 use App\Http\Controllers\Provider\AppCatalogController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
-use App\Http\Controllers\ReferenceData\AddressHierarchy\AddressSetupController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
 use App\Http\Controllers\Reporting\ListExportController;
 use App\Http\Controllers\Reporting\ReportController;
