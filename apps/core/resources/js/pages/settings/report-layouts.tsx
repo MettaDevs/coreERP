@@ -100,7 +100,7 @@ export default function ReportLayouts({
     const [layouts, setLayouts] = useState<Layout[]>([]);
     const [defaultRef, setDefaultRef] = useState('');
     const [defaultVersions, setDefaultVersions] = useState<DefaultVersions>({
-        tenant: null,
+        tenant: 0,
         legal_entity: null,
     });
     const [fields, setFields] = useState<ReportField[]>([]);
