@@ -340,7 +340,8 @@ class ReportingTest extends TestCase
         $path = DB::table('report_exports')->where('id', $response['id'])->value('file_path');
         Storage::disk('reporting-test')->assertExists($path);
 
-        DB::table('report_exports')->where('id', $response['id'])->update(['expires_at' => now()->subMinute()]);
+        // Retensi ekspor dihitung dari waktu dibuat (area 4); bawaannya config reporting.retention_days.
+        DB::table('report_exports')->where('id', $response['id'])->update(['created_at' => now()->subDays((int) config('reporting.retention_days') + 1)]);
         $this->actingAs($this->owner)->getJson('/api/v1/report-exports')->assertOk()->assertJsonCount(0, 'data');
         Storage::disk('reporting-test')->assertMissing($path);
     }

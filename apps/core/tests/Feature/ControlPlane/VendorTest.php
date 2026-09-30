@@ -288,7 +288,11 @@ class VendorTest extends TestCase
         $this->vendors($token)->assertOk()->assertJsonCount(2, 'data');
         $this->vendors($token, ['legal_entity' => 'TIDAK-ADA'])->assertOk()->assertJsonCount(0, 'data');
         $this->vendors($token, ['legal_entity' => 'META'])->assertOk()->assertJsonCount(2, 'data');
-        $this->vendors($token, ['legal_entity' => $this->le])->assertOk()->assertJsonPath('data.1.id', $baru['id']);
+        // Urutannya mengikuti waktu berubah; yang diuji di sini hanya saringan entitas legalnya.
+        $this->assertEqualsCanonicalizing(
+            [$lama['id'], $baru['id']],
+            collect($this->vendors($token, ['legal_entity' => $this->le])->assertOk()->json('data'))->pluck('id')->all(),
+        );
     }
 
     public function test_sinkron_per_halaman_lewat_kursor_tidak_melewatkan_vendor_yang_berubah_di_tengah(): void

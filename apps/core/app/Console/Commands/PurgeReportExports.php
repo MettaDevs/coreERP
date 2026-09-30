@@ -2,13 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Reporting\ExportQueue;
+use App\Support\Retention\RetentionService;
 use Illuminate\Console\Command;
 
 /**
- * Menghapus hasil ekspor yang lewat masa simpan. Dijadwalkan tiap jam; daftar ekspor
- * juga membersihkan milik tenantnya sendiri saat dibaca, jadi tanpa scheduler pun
- * penyimpanan tidak tumbuh tanpa batas — hanya lebih lambat susutnya.
+ * Menghapus hasil ekspor yang lewat masa simpan lewat layanan retensi, khusus kebijakan `report_exports`.
+ * Dijadwalkan tiap jam, lebih sering daripada `retention:apply`; daftar ekspor juga membersihkan milik
+ * tenantnya sendiri saat dibaca, jadi tanpa scheduler pun penyimpanan tidak tumbuh tanpa batas — hanya
+ * lebih lambat susutnya.
  */
 class PurgeReportExports extends Command
 {
@@ -16,13 +17,9 @@ class PurgeReportExports extends Command
 
     protected $description = 'Hapus hasil ekspor laporan yang sudah lewat masa simpan.';
 
-    public function handle(ExportQueue $exports): int
+    public function handle(RetentionService $retention): int
     {
-        $total = 0;
-        do {
-            $removed = $exports->purgeExpired();
-            $total += $removed;
-        } while ($removed > 0);
+        $total = $retention->apply('report_exports');
         $this->info("{$total} ekspor kedaluwarsa dihapus.");
 
         return self::SUCCESS;

@@ -291,6 +291,12 @@ export function AppSidebar() {
                         permission: 'core.change-log.read',
                     },
                     {
+                        label: 'Retensi data',
+                        icon: History,
+                        href: '/settings/retention',
+                        permission: 'core.retention.read',
+                    },
+                    {
                         label: 'Workflow',
                         icon: ShieldCheck,
                         href: '/settings/workflows',

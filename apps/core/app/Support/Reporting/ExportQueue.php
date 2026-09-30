@@ -4,6 +4,7 @@ namespace App\Support\Reporting;
 
 use App\Jobs\RunReportExport;
 use App\Models\TenantMembership;
+use App\Support\Retention\RetentionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,7 +17,7 @@ use stdClass;
  */
 final class ExportQueue
 {
-    public function __construct(private readonly LayoutStore $layouts) {}
+    public function __construct(private readonly LayoutStore $layouts, private readonly RetentionService $retention) {}
 
     /**
      * @param  array<string, mixed>  $parameters
@@ -96,23 +97,10 @@ final class ExportQueue
         }
     }
 
-    /** Menghapus hasil yang lewat masa simpan; dipanggil command terjadwal dan saat daftar dibaca. */
-    public function purgeExpired(?string $tenantId = null): int
+    /** Menghapus hasil tenant yang lewat masa simpan lewat layanan retensi; dipanggil saat daftar dibaca. */
+    public function purgeExpired(string $tenantId): int
     {
-        $query = DB::table('report_exports')->where('expires_at', '<', now());
-        if ($tenantId !== null) {
-            $query->where('tenant_id', $tenantId);
-        }
-        $expired = $query->limit(200)->get(['tenant_id', 'id', 'file_path']);
-        $disk = Storage::disk((string) config('reporting.disk'));
-        foreach ($expired as $row) {
-            DB::table('report_exports')->where(['tenant_id' => $row->tenant_id, 'id' => $row->id])->delete();
-            if ($row->file_path) {
-                $disk->delete($row->file_path);
-            }
-        }
-
-        return $expired->count();
+        return $this->retention->apply('report_exports', $tenantId);
     }
 
     /** @return array<string, mixed> */

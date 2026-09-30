@@ -36,6 +36,7 @@ use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
 use App\Http\Controllers\Reporting\ReportController;
 use App\Http\Controllers\Reporting\ReportExportController;
 use App\Http\Controllers\Reporting\ReportLayoutController;
+use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
@@ -235,6 +236,9 @@ Route::middleware(['auth'])->group(function () {
     // Log perubahan: tabel dan field yang dicatat tenant; riwayat record module dibuka lewat rute module.
     Route::get('settings/change-log', [ChangeLogController::class, 'index'])->name('change-log.index');
     Route::put('settings/change-log/{table}', [ChangeLogController::class, 'update'])->name('change-log.update');
+    // Retensi data: masa simpan log per kebijakan dan hasil penerapan terakhir.
+    Route::get('settings/retention', [RetentionController::class, 'index'])->name('retention.index');
+    Route::put('settings/retention/{policy}', [RetentionController::class, 'update'])->name('retention.update');
     // Pantau posting finance: daftar, detail jurnal, dan tindak lanjut posting yang tertahan.
     Route::get('settings/finance-postings', [FinancePostingMonitorController::class, 'index'])->name('finance-postings.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');

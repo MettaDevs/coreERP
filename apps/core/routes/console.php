@@ -14,6 +14,12 @@ Schedule::command('number-sequences:recover')
     ->onOneServer()
     ->withoutOverlapping();
 
+// Retensi data log per tenant (K-14); bawaannya sama dengan perilaku sebelum ada layanan ini.
+Schedule::command('retention:apply')
+    ->dailyAt('02:30')
+    ->onOneServer()
+    ->withoutOverlapping();
+
 Schedule::command('workflow-events:publish')
     ->everyMinute()
     ->onOneServer()

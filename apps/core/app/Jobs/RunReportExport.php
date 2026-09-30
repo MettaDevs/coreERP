@@ -11,6 +11,7 @@ use App\Support\Reporting\Rendering\RenderException;
 use App\Support\Reporting\Rendering\RenderPipeline;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\SumberLaporan;
+use App\Support\Retention\RetentionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -101,7 +102,7 @@ final class RunReportExport implements ShouldQueue
                 'file_mime' => $rendered->mime(),
                 'file_size' => $disk->size($path),
                 'finished_at' => now(),
-                'expires_at' => now()->addDays((int) config('reporting.retention_days')),
+                'expires_at' => now()->addDays((int) app(RetentionService::class)->daysFor('report_exports', $this->tenantId)),
             ]);
         } catch (RenderException $exception) {
             $this->markFailed($exception->getMessage(), $exception);
@@ -125,7 +126,7 @@ final class RunReportExport implements ShouldQueue
             'status' => ExportStatus::FAILED,
             'failure_message' => $message,
             'finished_at' => now(),
-            'expires_at' => now()->addDays((int) config('reporting.retention_days')),
+            'expires_at' => now()->addDays((int) app(RetentionService::class)->daysFor('report_exports', $this->tenantId)),
         ]);
     }
 

@@ -119,20 +119,24 @@ Rujukan: [README: Gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2).
 - [x] 3.6 Suite Core dan Module penuh hijau, dan load test aset (skenario sudah mengirim versi) lulus
       dengan `verify.sql` bernilai 0. Hasilnya di `apps/core/loadtest/README.md`.
 
-### 4. [ ] Retensi data log (gap 4)
+### 4. [x] Retensi data log (gap 4)
 
 **Tempat:** Core · **Setelah:** 2, 0.5 · **Selesai bila:** semua penghapusan log berjalan lewat satu
 layanan, nilai bawaannya sama dengan config hari ini, dan test B-4 lulus.
 
 Rujukan: [README: Gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4).
 
-- [ ] 4.1 Daftar tabel yang boleh diretensi di kode: tabel, kolom tanggal, minimum, bawaan.
-- [ ] 4.2 Bawaan diambil dari `coreerp.audit_retention_days`, `coreerp.confirmed_pool_retention_days`,
+- [x] 4.1 Daftar tabel yang boleh diretensi di kode: tabel, kolom tanggal, minimum, bawaan.
+- [x] 4.2 Bawaan diambil dari `coreerp.audit_retention_days`, `coreerp.confirmed_pool_retention_days`,
       dan `reporting.retention_days`.
-- [ ] 4.3 Setelan masa simpan per tenant yang tidak boleh di bawah minimum.
-- [ ] 4.4 Satu job terjadwal yang menerapkan kebijakan dan mencatat hasilnya.
-- [ ] 4.5 `RecoverNumberSequenceReservations` dan `PurgeReportExports` beralih memakai layanan ini.
-- [ ] 4.6 Entri log perubahan (area 2) didaftarkan dengan waktu buat sebagai tanggal acuan.
+- [x] 4.3 Setelan masa simpan per tenant yang tidak boleh di bawah minimum.
+- [x] 4.4 Satu job terjadwal yang menerapkan kebijakan dan mencatat hasilnya.
+- [x] 4.5 `RecoverNumberSequenceReservations` dan `PurgeReportExports` beralih memakai layanan ini.
+- [x] 4.6 Entri log perubahan (area 2) didaftarkan dengan `changed_at` (waktu perubahan) sebagai tanggal
+      acuan, dua kebijakan: tabel yang selalu dicatat min. 365 hari, lainnya min. 28 hari, mati bawaannya.
+- [x] 4.7 Layar Pengaturan → Retensi data dengan `core.retention.read`/`core.retention.update` (K-15).
+- [x] 4.8 Hasil tiap penerapan per tenant di `retention_policy_log_entries`, tampil di layar dan ikut
+      diretensi (K-16).
 
 ### 5. [ ] Klasifikasi data per kolom (gap 5)
 
@@ -200,7 +204,8 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 
 - [ ] 8.1 Bedakan gangguan sesaat (misalnya renderer terlambat) dari kegagalan tetap; ulangi yang
       pertama dengan batas percobaan.
-- [ ] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4).
+- [ ] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4). Layanan dan pemakaiannya di
+      `RunReportExport` sudah ada; menunggu test yang menjalankan job-nya.
 - [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum.
 - [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris.
 
@@ -226,7 +231,7 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       tidak bisa diubah. Riwayat per record urut waktu dan tidak bocor antar tenant.
 - [x] **B-3** (area 3) Dua penyimpanan dengan versi yang sama: yang kedua ditolak 409. `PATCH` tanpa
       `If-Match` atau dengan ETag basi ditolak.
-- [ ] **B-4** (area 4) Tanpa setelan tenant, hasilnya sama dengan perilaku hari ini. Masa simpan di
+- [x] **B-4** (area 4) Tanpa setelan tenant, hasilnya sama dengan perilaku hari ini. Masa simpan di
       bawah minimum ditolak. Tabel di luar daftar tidak pernah tersentuh.
 - [ ] **B-5** (area 5) Model tanpa klasifikasi membuat test gagal. Atribut selain `SystemMetadata` tidak
       sampai ke exporter telemetri.
