@@ -8,17 +8,22 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use Closure;
 use Database\Seeders\NumberSequenceProfileSeeder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Apperp\HumanResources\Models\Worker;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -52,11 +57,16 @@ use Tests\TestCase;
  */
 class PenyaringanTenantTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private const KEBIJAKAN = 'human-resources.workforce-responsibility';
 
     private const ENTRY_POINT = 'human-resources.uji';
+
+    private const WORKER_WRITE = 'human-resources.workers.create';
+
+    private const ACCOUNT_LINK = 'human-resources.core-account-link.invoke';
 
     public function test_daftar_posisi_hanya_memulangkan_unit_kerja_yang_dilingkupi_kebijakan(): void
     {
@@ -190,6 +200,206 @@ class PenyaringanTenantTest extends TestCase
         $this->sebagaiPengguna($this->buatTenantUji(), ['human-resources.workers.read']);
         $this->getJson('/api/v1/records/hr_workers/'.$pekerja.'/attachments')->assertNotFound();
         $this->get('/api/v1/attachments/'.$lampiran.'/download')->assertNotFound();
+    }
+
+    /*
+     * Tautan pekerja ke akun pengguna (TODO analisa gap BC area 9, B-9). Akun pengguna di sini adalah
+     * keanggotaan tenant milik Core; pengguna yang sama bisa menjadi anggota lebih dari satu tenant.
+     */
+
+    public function test_account_suggestion_offers_only_members_of_the_same_tenant(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $otherTenant = $this->buatTenantUji();
+        $user = User::factory()->create(['email' => 'rina@contoh.test']);
+        $this->seedMembership($otherTenant, $user);
+        $admin = [self::WORKER_WRITE, self::ACCOUNT_LINK];
+
+        // Pemilik email hanya anggota tenant lain: tidak ada usulan.
+        $this->sebagaiPengguna($tenantId, $admin)
+            ->getJson('/api/modules/human-resources/v1/core-members?email=rina@contoh.test')
+            ->assertOk()
+            ->assertExactJson(['data' => []]);
+
+        // Setelah ia juga menjadi anggota tenant ini, yang diusulkan hanya keanggotaan tenant ini, dan email
+        // dicocokkan tanpa membedakan huruf besar.
+        $membershipId = $this->seedMembership($tenantId, $user);
+        $data = $this->getJson('/api/modules/human-resources/v1/core-members?email='.urlencode(' RINA@contoh.test '))
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame([$membershipId], array_column($data, 'membership_id'));
+        $this->assertNull($data[0]['linked_worker_id']);
+
+        // Email yang hanya mirip tidak diusulkan.
+        $this->getJson('/api/modules/human-resources/v1/core-members?email=rina@contoh.tes')
+            ->assertOk()
+            ->assertExactJson(['data' => []]);
+    }
+
+    public function test_one_account_is_linked_to_at_most_one_active_worker(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $membershipId = $this->seedMembership($tenantId, User::factory()->create(['email' => 'budi@contoh.test']));
+        $first = $this->seedPekerja($tenantId, 'Pekerja pertama');
+        $second = $this->seedPekerja($tenantId, 'Pekerja kedua');
+        $this->sebagaiPengguna($tenantId, [self::WORKER_WRITE, self::ACCOUNT_LINK]);
+
+        $linked = $this->patchJson($this->linkUrl($first), ['core_membership_id' => $membershipId, 'version' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.core_membership_id', $membershipId)
+            ->json('data');
+        $this->assertGreaterThan(1, $linked['version'], 'Menautkan akun tidak menaikkan versi baris pekerja.');
+
+        $this->getJson('/api/modules/human-resources/v1/core-members?email=budi@contoh.test')
+            ->assertOk()
+            ->assertJsonPath('data.0.linked_worker_id', $first);
+
+        // Pekerja kedua tidak bisa memegang akun yang sama, lewat ubah tautan maupun saat dibuat.
+        $this->patchJson($this->linkUrl($second), ['core_membership_id' => $membershipId, 'version' => 1])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('core_membership_id');
+        $this->postJson('/api/modules/human-resources/v1/workers', [
+            'name' => 'Pekerja ketiga',
+            'core_membership_id' => $membershipId,
+            'idempotency_key' => 'pekerja-ketiga',
+        ])->assertUnprocessable()->assertJsonValidationErrors('core_membership_id');
+
+        // Database ikut menahan, bukan hanya validasi.
+        $this->assertUniqueViolation(fn () => DB::table('hr_workers')->where('id', $second)->update(['core_membership_id' => $membershipId]));
+
+        // Pekerja yang diarsipkan melepas akunnya untuk pekerja lain.
+        DB::table('hr_workers')->where('id', $first)->update(['deleted_at' => now()]);
+        $this->patchJson($this->linkUrl($second), ['core_membership_id' => $membershipId, 'version' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.core_membership_id', $membershipId);
+    }
+
+    public function test_linking_an_account_of_another_tenant_is_rejected(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $foreignMembership = $this->seedMembership($this->buatTenantUji(), User::factory()->create());
+        $worker = $this->seedPekerja($tenantId, 'Pekerja tenant ini');
+        $this->sebagaiPengguna($tenantId, [self::WORKER_WRITE, self::ACCOUNT_LINK]);
+
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => $foreignMembership, 'version' => 1])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('core_membership_id');
+        $this->postJson('/api/modules/human-resources/v1/workers', [
+            'name' => 'Pekerja titipan',
+            'core_membership_id' => $foreignMembership,
+            'idempotency_key' => 'pekerja-titipan',
+        ])->assertUnprocessable()->assertJsonValidationErrors('core_membership_id');
+
+        $this->assertNull(DB::table('hr_workers')->where('id', $worker)->value('core_membership_id'));
+    }
+
+    public function test_link_changes_follow_row_version_and_existing_rights(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $membershipId = $this->seedMembership($tenantId, User::factory()->create());
+        $worker = $this->seedPekerja($tenantId, 'Pekerja');
+
+        // Tanpa hak menautkan akun, atau tanpa hak menambah pekerja, tautan tidak bisa diubah.
+        $this->sebagaiPengguna($tenantId, [self::WORKER_WRITE]);
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => $membershipId, 'version' => 1])->assertForbidden();
+        $this->sebagaiPengguna($tenantId, [self::ACCOUNT_LINK]);
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => $membershipId, 'version' => 1])->assertForbidden();
+
+        $this->sebagaiPengguna($tenantId, [self::WORKER_WRITE, self::ACCOUNT_LINK]);
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => $membershipId])->assertStatus(428);
+        $version = $this->patchJson($this->linkUrl($worker), ['core_membership_id' => $membershipId, 'version' => 1])
+            ->assertOk()
+            ->json('data.version');
+
+        // Versi yang sudah basi ditolak; versi terbaru boleh melepas tautannya.
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => null, 'version' => 1])->assertConflict();
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => null, 'version' => $version])
+            ->assertOk()
+            ->assertJsonPath('data.core_membership_id', null);
+
+        // Pekerja tenant lain tidak ditemukan.
+        $this->sebagaiPengguna($this->buatTenantUji(), [self::WORKER_WRITE, self::ACCOUNT_LINK]);
+        $this->patchJson($this->linkUrl($worker), ['core_membership_id' => null, 'version' => 1])->assertNotFound();
+    }
+
+    public function test_member_screen_shows_the_linked_worker_name_when_the_module_is_installed(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $user = User::factory()->create(['name' => 'Rina Akun']);
+        $membershipId = $this->seedMembership($tenantId, $user);
+        $admin = User::factory()->create();
+        $this->makeOwner(TenantMembership::create(['tenant_id' => $tenantId, 'user_id' => $admin->id, 'status' => 'active']));
+        DB::table('organizations')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $tenantId,
+            'name' => 'Badan hukum uji',
+            'classification' => 'legal_entity',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $worker = $this->seedPekerja($tenantId, 'Rina Pekerja');
+        DB::table('hr_workers')->where('id', $worker)->update(['core_membership_id' => $membershipId]);
+        // Pekerja tenant lain yang kebetulan menunjuk keanggotaan yang sama tidak pernah ikut terbaca.
+        $otherTenant = $this->buatTenantUji();
+        DB::table('hr_workers')->where('id', $this->seedPekerja($otherTenant, 'Pekerja tenant lain'))->update(['core_membership_id' => $membershipId]);
+
+        $member = fn (Assert $page) => $page->component('settings/access')->etc();
+
+        // Module belum terpasang untuk tenant ini: layar tidak menanyakan pekerja sama sekali.
+        $this->actingAs($admin)->get('/settings/access?section=members')->assertInertia(fn (Assert $page) => $member($page)
+            ->where('workersAvailable', false)
+            ->where('members', fn (Collection $members) => $members->every(fn (array $row): bool => $row['worker'] === null)));
+
+        DB::table('core_module_installations')->insert([
+            'tenant_id' => $tenantId,
+            'module_id' => 'human-resources',
+            'version' => '0.1.0',
+            'status' => 'installed',
+            'installed_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->get('/settings/access?section=members')->assertInertia(fn (Assert $page) => $member($page)
+            ->where('workersAvailable', true)
+            ->where('members', function (Collection $members) use ($membershipId): bool {
+                $rows = $members->keyBy('id');
+                $this->assertSame('Rina Pekerja', $rows[$membershipId]['worker']['name']);
+                $this->assertNull($rows->except($membershipId)->first()['worker']);
+
+                return true;
+            }));
+
+        // Pekerja yang diarsipkan tidak lagi tampil.
+        DB::table('hr_workers')->where('id', $worker)->update(['deleted_at' => now()]);
+        $this->actingAs($admin)->get('/settings/access?section=members')->assertInertia(fn (Assert $page) => $member($page)
+            ->where('members', fn (Collection $members) => $members->every(fn (array $row): bool => $row['worker'] === null)));
+    }
+
+    private function linkUrl(string $workerId): string
+    {
+        return '/api/modules/human-resources/v1/workers/'.$workerId.'/core-membership';
+    }
+
+    private function seedMembership(string $tenantId, User $user): string
+    {
+        return (string) TenantMembership::create(['tenant_id' => $tenantId, 'user_id' => $user->id, 'status' => 'active'])->id;
+    }
+
+    /** @param  Closure(): mixed  $write */
+    private function assertUniqueViolation(Closure $write): void
+    {
+        try {
+            DB::transaction($write);
+        } catch (UniqueConstraintViolationException) {
+            $this->addToAssertionCount(1);
+
+            return;
+        }
+
+        $this->fail('Indeks unik tidak menahan satu akun pengguna yang tertaut ke dua pekerja aktif.');
     }
 
     /**

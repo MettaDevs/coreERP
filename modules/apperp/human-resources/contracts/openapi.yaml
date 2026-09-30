@@ -14,10 +14,35 @@ paths:
       summary: Memeriksa kesiapan API
       responses: { '200': { description: API siap menerima request } }
   /api/v1/core-members:
-    get: { summary: Mencari anggota Core untuk ditautkan ke pekerja, responses: { '200': { description: Daftar anggota Core aktif } } }
+    get:
+      summary: Mencari anggota Core untuk ditautkan ke pekerja
+      description: |
+        `q` mencari nama atau email (paling banyak 20 hasil). `email` mencocokkan email persis tanpa
+        membedakan huruf besar, untuk usulan tautan di form pekerja. Hanya anggota tenant aktif yang
+        dipulangkan. Setiap anggota membawa `linked_worker_id`, pekerja yang sudah memegang akun itu.
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: email, in: query, required: false, schema: { type: string, maxLength: 255 } }
+      responses: { '200': { description: Daftar anggota Core aktif } }
   /api/v1/workers:
-    get: { summary: Menampilkan pekerja yang dapat diakses, responses: { '200': { description: Daftar pekerja } } }
-    post: { summary: Menambah pekerja, responses: { '201': { description: Pekerja dibuat } } }
+    get: { summary: Menampilkan pekerja yang dapat diakses beserta nama akun yang tertaut (`account`), responses: { '200': { description: Daftar pekerja } } }
+    post: { summary: Menambah pekerja, responses: { '201': { description: Pekerja dibuat }, '422': { description: Akun pengguna bukan milik tenant ini atau sudah tertaut ke pekerja lain } } }
+  /api/v1/workers/{worker}/core-membership:
+    patch:
+      summary: Menautkan atau melepas akun pengguna pekerja
+      description: |
+        Body `core_membership_id` (ULID atau `null`) dan versi baris (`version` atau header `If-Match`).
+        Butuh `human-resources.workers.create` dan `human-resources.core-account-link.invoke`, untuk
+        pekerja yang boleh dilihat pengguna. Satu akun hanya boleh dipegang satu pekerja yang belum
+        diarsipkan.
+      parameters:
+        - { name: worker, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Tautan tersimpan; pekerja dengan versi baru dan `account` }
+        '404': { description: Pekerja tidak ada atau di luar lingkup pengguna }
+        '409': { description: Pekerja sudah diubah sejak form dibuka }
+        '422': { description: Akun pengguna bukan milik tenant ini atau sudah tertaut ke pekerja lain }
+        '428': { description: Versi baris tidak dikirim }
   /api/v1/jobs:
     get: { summary: Menampilkan jabatan, responses: { '200': { description: Daftar jabatan } } }
     post: { summary: Menambah jabatan, responses: { '201': { description: Jabatan dibuat } } }

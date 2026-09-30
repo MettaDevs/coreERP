@@ -16,6 +16,7 @@ Route::prefix('v1')->middleware('konteks-module:human-resources')->group(functio
     Route::get('core-members', [HumanResourcesController::class, 'coreMembers']);
     Route::get('workers', [HumanResourcesController::class, 'workers']);
     Route::post('workers', [HumanResourcesController::class, 'storeWorker']);
+    Route::patch('workers/{worker}/core-membership', [HumanResourcesController::class, 'linkWorkerAccount']);
     Route::get('jobs', [HumanResourcesController::class, 'jobs']);
     Route::post('jobs', [HumanResourcesController::class, 'storeJob']);
     Route::get('positions', [HumanResourcesController::class, 'positions']);

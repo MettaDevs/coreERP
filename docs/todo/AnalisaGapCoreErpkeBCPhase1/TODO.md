@@ -216,17 +216,15 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 - [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum.
 - [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris.
 
-### 9. [ ] Tautan pengguna ke pekerja HR (gap 3)
+### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 
 **Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** form pekerja HR
 mengusulkan keanggotaan yang cocok, pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
 
 Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
-- [ ] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
-- [ ] 9.2 Pekerja yang tertaut tampil di layar pengguna.
-- [ ] 9.3 Catatan di backlog HR: tautan pekerja ke template jam kerja dibuat saat absensi atau
-      timesheet dibangun.
+- [x] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
+- [x] 9.2 Pekerja yang tertaut tampil di layar pengguna.
 
 ---
 
@@ -255,5 +253,5 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       frontend; ia diperiksa di browser, sedangkan zona yang dipakainya (`clock.timezone`) diuji di PHPUnit.
 - [ ] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
       terlalu besar tetap tidak diulang.
-- [ ] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
+- [x] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
       tidak bisa tertaut ke dua pekerja.

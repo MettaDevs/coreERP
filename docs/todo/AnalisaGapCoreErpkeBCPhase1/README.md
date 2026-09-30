@@ -425,7 +425,7 @@ Bagaimana setiap pengguna punya entri di HR, padahal akunnya datang dari SSO?
 bila perlu. Akunnya dari identitas luar, dan tautannya ke orang dibuat terpisah.
 
 **CoreERP sudah memakai bentuk itu.** `hr_workers.core_membership_id` menunjuk keanggotaan tenant
-(pengguna SSO di tenant itu), boleh kosong, dan unik per tenant. Alasannya tertulis di
+(pengguna SSO di tenant itu), boleh kosong, dan unik per tenant di antara pekerja yang belum diarsipkan. Alasannya tertulis di
 `modules/apperp/human-resources/src/Models/Worker.php`: pekerja yang tidak pernah membuka aplikasi tetap
 harus tercatat, dan menuntut akun untuk setiap orang akan menyamakan daftar pekerja dengan daftar
 pengguna. Tautannya dipilih admin HR di form pekerja dan divalidasi ke Core
@@ -440,6 +440,32 @@ legal entity, tetapi belum ditautkan ke siapa pun. Di BC, kalender dasar ditautk
 lokasi, sedangkan kapasitas orang diatur di resource, oleh bagian yang membutuhkannya. Tautan pekerja →
 template jam kerja karena itu milik module HR, dibuat saat absensi atau timesheet dibangun, bukan di
 tabel pengguna Core.
+
+### Yang sudah dibangun (area 9)
+
+- **Form akun pengguna pekerja di module HR** (Tenaga kerja → Pekerja, `/human-resources/workers`). Module
+  HR belum punya layar sama sekali, jadi menu Pekerja kini berisi layar sekecil yang dibutuhkan tautan ini:
+  daftar pekerja dengan akun yang tertaut (nama dan email, bukan id) dan aksi baris **Atur akun pengguna**.
+  Menambah dan mengubah pekerja tetap lewat API.
+- **Usulan tautan dari email.** Bila email pekerja sama persis dengan email akun di tenant yang sama (tanpa
+  membedakan huruf besar), form menampilkan usulan dengan tombol **Pakai akun ini**; tautannya baru
+  tersimpan setelah Simpan. Akun yang sudah dipegang pekerja lain tidak diusulkan dan ditandai di daftar
+  pilihan.
+- **Satu akun, satu pekerja.** `hr_workers_core_membership_active_unique` menggantikan indeks unik lama,
+  kini parsial untuk pekerja yang belum diarsipkan. Controller menolaknya lebih dulu dengan 422, dan
+  penyimpanan bersamaan yang lolos pemeriksaan tertahan indeks yang sama, juga dijawab 422.
+- **Menautkan dan melepas** lewat `PATCH /api/modules/human-resources/v1/workers/{worker}/core-membership`
+  dengan versi baris (area 3), memakai hak yang sudah ada: `human-resources.workers.create` dan
+  `human-resources.core-account-link.invoke`, untuk pekerja yang boleh dilihat pengguna. Akun tenant lain
+  ditolak 422; sebelumnya akun yang tidak ditemukan saat menambah pekerja berakhir 500.
+- **Pekerja di layar anggota Core.** Kolom **Pekerja** di Identity & access → Anggota menampilkan nama dan
+  nomor pegawai. Core bertanya lewat kontrak baru `LinkedWorkerResolvers`
+  (`apps/core/app/Support/Modules/Contracts/`), yang diisi module HR; hanya module yang terpasang untuk
+  tenant itu yang ditanya, dan kolomnya tidak tampil bila tidak ada.
+
+Tidak ada kolom baru, jadi klasifikasi data (area 5) tidak berubah: `core_membership_id` sudah
+diklasifikasi `EndUserPseudonymousIdentifiers`. Test-nya di
+`modules/apperp/human-resources/tests/Feature/PenyaringanTenantTest.php`.
 
 ## Gap 4: retensi data log {#gap-4}
 
