@@ -3,7 +3,7 @@
 namespace App\Actions\Onboarding;
 
 use App\Actions\Modules\InstallModule;
-use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
 use App\Models\AppDataPolicy;
 use App\Models\Role;

@@ -25,16 +25,16 @@ parameters:
 			path: app/Foundation/FiscalCalendar/Actions/FiscalCalendarService.php
 
 		-
-			message: '#^Parameter \#2 \$scope of method App\\Actions\\NumberSequence\\NumberSequenceService\:\:format\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
+			message: '#^Parameter \#2 \$scope of method App\\Foundation\\NumberSequence\\Actions\\NumberSequenceService\:\:format\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
 			identifier: argument.type
 			count: 3
-			path: app/Actions/NumberSequence/NumberSequenceService.php
+			path: app/Foundation/NumberSequence/Actions/NumberSequenceService.php
 
 		-
-			message: '#^Parameter \#2 \$scope of method App\\Actions\\NumberSequence\\NumberSequenceService\:\:matchesFormat\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
+			message: '#^Parameter \#2 \$scope of method App\\Foundation\\NumberSequence\\Actions\\NumberSequenceService\:\:matchesFormat\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Actions/NumberSequence/NumberSequenceService.php
+			path: app/Foundation/NumberSequence/Actions/NumberSequenceService.php
 
 		-
 			message: '#^Method App\\Actions\\Provider\\RegisterAppCatalog\:\:handle\(\) has parameter \$reports with no value type specified in iterable type array\.$#'
