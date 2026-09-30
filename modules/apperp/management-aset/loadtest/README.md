@@ -17,8 +17,23 @@ dijelaskan di sini hanya yang khas modul ini.
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
 | `k6/posting-group.js` | Posting group aset: perlombaan pembuatan dan arsip tanggal berlaku, akun dan group tenant lain | dijalankan pada runtime baru |
 | `k6/receipt-posting.js` | Penyelesaian penerimaan dan jurnalnya — perolehan untuk pembelian, saldo awal untuk aset lama: perlombaan menyelesaikan dokumen yang sama, beban serentak dengan impor saldo awal dari CSV, perlombaan koreksi nilai perolehan aset yang sama, pratinjau dan penyelesaian dokumen tenant lain | dijalankan pada runtime baru |
+| `k6/seed-aset.js` | Data awal bersama: kode diketik untuk group dan buku, dan aset yang lahir dari penerimaan saldo awal | dipakai `master-data.js` dan `work-order.js` |
 | `verify.sql` | Oracle kebenaran modul, dibaca langsung dari database | dipakai sebagai gate |
 | `check-manifest.py` | Pemeriksa `app.yaml`; tidak ada hubungannya dengan beban | — |
+
+## Skenario yang sempat basi
+
+`master-data.js` dan `work-order.js` berhenti di `setup()` dari 18 sampai 29 September 2026 tanpa ada
+yang tahu, karena tiga perubahan produk tidak ikut sampai ke skenarionya: `POST /aset` dipensiunkan
+(aset hanya lahir dari penerimaan yang diselesaikan), `POST /aset/{id}/penempatan` dibuang (pemindahan
+lewat berita acara mutasi), dan kode group aset serta buku penyusutan menjadi diketik (K-24). Ketiganya
+kini ditangani `seed-aset.js` dan operasi mutasi di `master-data.js`.
+
+Dua pelajaran yang berlaku untuk skenario lain. Sebelum mengandalkan skenario sebagai gate, jalankan
+dulu dalam ukuran kecil (`TENANTS=4 VUS=20 DURATION=20s`) dan pastikan setiap check punya kelulusan,
+bukan sekadar exit 0: operasi yang selalu gagal tidak menaikkan `correctness_violations`. Dan setiap
+kunci idempotency atau kode yang dibentuk dari nomor VU dan iterasi wajib memuat `RUN_ID`, karena run
+berbeda pada `FIXTURE` yang sama berbagi tenant.
 
 ## Yang berubah ketika modul masuk ke runtime Core
 

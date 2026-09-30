@@ -34,6 +34,7 @@ import exec from 'k6/execution';
 import http from 'k6/http';
 import { Counter, Trend } from 'k6/metrics';
 import { FIXTURE, RUN_ID, bangunJar, paramsUntuk, sempitkanTenant, siapkanTenant, tenantVu, urlModule } from '../lib.js';
+import { kodeManual, lahirkanAset } from './seed-aset.js';
 
 const PROFILE = __ENV.PROFILE || 'saturation';
 const VUS = Number(__ENV.VUS || 1000);
@@ -179,7 +180,7 @@ export function setup() {
     // memakai kembali aset dan master yang sama, bukan menumbuhkan data seed tiap run.
     const kunci = (nama, index) => `wo-${FIXTURE}-${nama}-${index}`;
 
-    const groupIds = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `WO group ${index}` }), params(tenant, kunci('group', index))]));
+    const groupIds = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeManual('WO', FIXTURE, 'G', index), nama: `WO group ${index}` }), params(tenant, kunci('group', index))]));
     const jenisIds = tahap('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `WO jenis ${index}` }), params(tenant, kunci('jenis', index))]));
     // Tipe work order dibiarkan tanpa `satu_pekerja`: aturan satu pelaksana menolak penjadwalan
     // dokumen yang barisnya belum ditugaskan, dan skenario ini menguji mesin status, bukan
@@ -190,24 +191,21 @@ export function setup() {
     // bukan yang diukur di sini.
     const jobTypeIds = tahap('maintenance-job-types', semua((tenant, index) => ['POST', ASET('maintenance-job-types'), JSON.stringify({ nama: `WO job type ${index}` }), params(tenant, kunci('job', index))]));
 
-    const asetIds = tahap(
-        'aset',
+    // Aset lahir dari penerimaan yang diselesaikan; `POST /aset` dipensiunkan 18 September 2026.
+    // Penerimaan bergroup hanya dapat diselesaikan bila group itu punya buku yang di-post (K-26),
+    // jadi setiap group seed diberi satu buku di matriksnya, dengan penyusutan dimatikan.
+    const profilIds = tahap('profil-penyusutan', semua((tenant, index) => ['POST', ASET('profil-penyusutan'), JSON.stringify({ nama: `WO profil ${index}`, method: 'straight_line', frequency: 'monthly', year_basis: 'calendar', useful_life_periods: 48, convention: 'full_month' }), params(tenant, kunci('profil', index))]));
+    const bukuIds = tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ kode: kodeManual('WO', FIXTURE, 'B', index), nama: `WO buku ${index}`, posting_layer: 'current' }), params(tenant, kunci('buku', index))]));
+    tahap(
+        'matriks group x buku',
         semua((tenant, index) => [
-            'POST',
-            ASET('aset'),
-            JSON.stringify({
-                nama: `Aset WO ${index}`,
-                legal_entity_id: tenant.legalEntityId,
-                usage_org_unit_id: tenant.orgUnitId,
-                group_aset_id: groupIds[index],
-                jenis_aset_id: jenisIds[index],
-                acquired_on: '2026-01-01',
-                acquisition_value: 1000000,
-                currency_code: 'IDR',
-            }),
-            params(tenant, kunci('aset', index)),
+            'PUT',
+            `${ASET('group-aset')}/${groupIds[index]}/buku-penyusutan`,
+            JSON.stringify({ rows: [{ buku_id: bukuIds[index], depreciation_profile_id: profilIds[index], depreciate: false }] }),
+            params(tenant),
         ]),
     );
+    const asetIds = lahirkanAset(tenants.map((tenant) => bangunJar(tenant)), { groupIds, jenisIds }, (index) => kunci('penerimaan', index));
 
     const lengkap = tenants.map((tenant, index) => ({
         ...tenant,
