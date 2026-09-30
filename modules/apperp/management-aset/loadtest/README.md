@@ -17,6 +17,7 @@ dijelaskan di sini hanya yang khas modul ini.
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
 | `k6/posting-group.js` | Posting group aset: perlombaan pembuatan dan arsip tanggal berlaku, akun dan group tenant lain | dijalankan pada runtime baru |
 | `k6/receipt-posting.js` | Penyelesaian penerimaan dan jurnalnya — perolehan untuk pembelian, saldo awal untuk aset lama: perlombaan menyelesaikan dokumen yang sama, beban serentak dengan impor saldo awal dari CSV, perlombaan koreksi nilai perolehan aset yang sama, pratinjau dan penyelesaian dokumen tenant lain | dijalankan pada runtime baru |
+| `k6/monitoring.js` | Monitoring aset (pemeriksaan fisik): siklus buat–isi otomatis–temuan–selesai, dokumen terkunci, lintas tenant, eskalasi hak, idempotency; profil `race` membalapkan PATCH dua himpunan baris, isi otomatis, dan penyelesaian pada dokumen yang sama | ditulis 30 September 2026, belum dijalankan |
 | `k6/seed-aset.js` | Data awal bersama: kode diketik untuk group dan buku, dan aset yang lahir dari penerimaan saldo awal | dipakai `master-data.js` dan `work-order.js` |
 | `verify.sql` | Oracle kebenaran modul, dibaca langsung dari database | dipakai sebagai gate |
 | `check-manifest.py` | Pemeriksa `app.yaml`; tidak ada hubungannya dengan beban | — |
@@ -137,6 +138,18 @@ docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
   -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
   -e RUN_ID=gate-rcp-sat-1 -e FIXTURE=g1 `
   grafana/k6:0.55.0 run /scripts/aset/receipt-posting.js
+
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
+  -e RUN_ID=gate-mon-sat-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/monitoring.js
+
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=race -e VUS=64 -e DURATION=90s -e RACE_TENANTS=4 -e RACE_DOCS=64 `
+  -e RUN_ID=gate-mon-race-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/monitoring.js
 
 docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\apperp\management-aset\loadtest\verify.sql
 ```

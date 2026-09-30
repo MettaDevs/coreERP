@@ -120,6 +120,54 @@ export function DepreciationBookFilter(props: FilterProps) {
     );
 }
 
+export function AssetConditionFilter(props: FilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="kondisi-aset"
+            label="Kondisi aset"
+            allLabel="Semua kondisi aset"
+            unavailable="Pilihan kondisi aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat kondisi aset."
+        />
+    );
+}
+
+export function AssetLocationFilter(props: FilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="lokasi-aset"
+            label="Lokasi aset"
+            allLabel="Semua lokasi aset"
+            unavailable="Pilihan lokasi aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat lokasi aset."
+        />
+    );
+}
+
+export function OrganizationUnitFilter(props: FilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="reference-data/unit-kerja"
+            label="Unit organisasi"
+            allLabel="Semua unit organisasi"
+            unavailable="Pilihan unit organisasi tidak dapat dimuat."
+        />
+    );
+}
+
+export function PersonFilter(props: FilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="reference-data/anggota"
+            label="Penanggung jawab"
+            allLabel="Semua penanggung jawab"
+            unavailable="Pilihan penanggung jawab tidak dapat dimuat."
+        />
+    );
+}
+
 type AssetOption = {
     id: string;
     kode: string;

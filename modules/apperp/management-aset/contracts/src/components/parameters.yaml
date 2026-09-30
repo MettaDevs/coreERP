@@ -18,6 +18,17 @@ IdempotencyKey:
     type: string
     maxLength: 133
     pattern: ^[A-Za-z0-9._:-]+$
+IdempotencyKeyMonitoring:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: |
+    Sama seperti `IdempotencyKey`, untuk monitoring aset: kunci diteruskan ke Core diawali
+    `monitoring-aset:`, sehingga batasnya 143 karakter.
+  schema:
+    type: string
+    maxLength: 143
+    pattern: ^[A-Za-z0-9._:-]+$
 IdempotencyKeyTransaksi:
   name: Idempotency-Key
   in: header

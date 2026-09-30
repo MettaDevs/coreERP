@@ -17,6 +17,11 @@ security:
         - management-aset.mutasi-aset.create
         - management-aset.mutasi-aset.update
         - management-aset.mutasi-aset.archive
+        - management-aset.monitoring-aset.read
+        - management-aset.monitoring-aset.create
+        - management-aset.monitoring-aset.update
+        - management-aset.monitoring-aset.archive
+        - management-aset.monitoring-aset.complete
         - management-aset.penerimaan-aset.read
         - management-aset.penerimaan-aset.create
         - management-aset.penerimaan-aset.update

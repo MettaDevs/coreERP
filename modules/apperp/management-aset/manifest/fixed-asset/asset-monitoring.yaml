@@ -1,18 +1,67 @@
+# Monitoring aset: pemeriksaan fisik (stock opname) aset tetap di satu lokasi. Menyelesaikannya
+# hanya membekukan temuan; register aset tidak berubah. Keputusan pemilik produk 30 September 2026:
+# duty "Pantau aset" yang sudah ada diperluas, tanpa workflow dan tanpa pemisahan tugas.
 security:
   entry_points:
     - code: management-aset.monitoring-aset.form
       name: Layar monitoring aset
       type: form
+    - code: management-aset.monitoring-aset.api
+      name: API monitoring aset
+      type: api
   permissions:
     - code: management-aset.monitoring-aset.read
       name: Lihat monitoring aset
       entry_point: management-aset.monitoring-aset.form
       access: read
+    - code: management-aset.monitoring-aset.create
+      name: Buat monitoring aset
+      entry_point: management-aset.monitoring-aset.api
+      access: create
+    - code: management-aset.monitoring-aset.update
+      name: Ubah monitoring aset
+      entry_point: management-aset.monitoring-aset.api
+      access: update
+    - code: management-aset.monitoring-aset.archive
+      name: Arsipkan monitoring aset
+      entry_point: management-aset.monitoring-aset.api
+      access: delete
+    - code: management-aset.monitoring-aset.complete
+      name: Selesaikan monitoring aset
+      entry_point: management-aset.monitoring-aset.api
+      access: invoke
   privileges:
     - code: management-aset.monitoring-aset.view
       name: Pantau aset
       permissions: [management-aset.monitoring-aset.read]
+    # Menyusun pemeriksaan dan mencatat temuannya.
+    - code: management-aset.monitoring-aset.maintain
+      name: Susun monitoring aset
+      permissions:
+        - management-aset.monitoring-aset.read
+        - management-aset.monitoring-aset.create
+        - management-aset.monitoring-aset.update
+    - code: management-aset.monitoring-aset.retire
+      name: Arsipkan draf monitoring aset
+      permissions:
+        - management-aset.monitoring-aset.archive
+    # Membekukan temuan menjadi dasar laporan. Tidak mengubah register aset.
+    - code: management-aset.monitoring-aset.complete-check
+      name: Selesaikan monitoring aset
+      permissions:
+        - management-aset.monitoring-aset.complete
   duties:
     - code: management-aset.monitoring-aset.manage
       name: Pantau aset
-      privileges: [management-aset.monitoring-aset.view]
+      privileges:
+        - management-aset.monitoring-aset.view
+        - management-aset.monitoring-aset.maintain
+        - management-aset.monitoring-aset.retire
+        - management-aset.monitoring-aset.complete-check
+number_sequences:
+  references:
+    - code: management-aset.monitoring-aset
+      name: Nomor monitoring aset
+      default_prefix: MONA
+      allowed_scopes:
+        - legal_entity

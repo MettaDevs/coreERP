@@ -53,6 +53,7 @@ final class ReferenceDataController extends Controller
         'management-aset.mutasi-aset.read',
         'management-aset.aset.read',
         'management-aset.pemeliharaan-aset.read',
+        'management-aset.monitoring-aset.read',
     ];
 
     public function operatingUnits(Request $request, DirektoriAset $direktori): JsonResponse

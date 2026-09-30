@@ -549,6 +549,112 @@ where not exists (
       and e.record_id = a.id::text and e.change_type = 'insertion'
 );
 
+-- Monitoring aset (pemeriksaan fisik). Nomor terbit per entitas legal, jadi kodenya unik per
+-- (tenant, entitas legal) di antara dokumen yang tidak diarsipkan.
+insert into hasil_aset
+select 'kode monitoring ganda dalam satu entitas legal', count(*) from (
+    select tenant_id, legal_entity_id, kode from aset_tr_monitoring_aset
+    where deleted_at is null group by 1, 2, 3 having count(*) > 1
+) d;
+
+insert into hasil_aset
+select 'creation_key monitoring ganda dalam satu tenant', count(*) from (
+    select tenant_id, creation_key from aset_tr_monitoring_aset group by 1, 2 having count(*) > 1
+) d;
+
+insert into hasil_aset
+select 'kode monitoring tanpa baris terbitan Number Sequence', count(*)
+from aset_tr_monitoring_aset t
+where not exists (
+    select 1 from terbitan i
+    where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.monitoring-aset' and i.formatted_value = t.kode
+);
+
+-- Baris menunjuk dokumen dan aset di tenant yang sama, dan dokumennya ada.
+insert into hasil_aset
+select 'baris monitoring lintas tenant atau yatim', count(*)
+from aset_tr_monitoring_aset_details l
+left join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id
+left join aset_tr_aset a on a.id = l.aset_id
+where m.id is null or a.id is null or m.tenant_id <> l.tenant_id or a.tenant_id <> l.tenant_id;
+
+-- Satu aset paling banyak sekali per dokumen, dan nomor baris tidak ganda. Yang pertama ditahan indeks
+-- unik parsial; yang dijaga kode adalah jawabannya — balapan yang lolos klaim versi muncul di sini
+-- sebagai 500 di k6, bukan sebagai baris ganda.
+insert into hasil_aset
+select 'aset ganda pada satu monitoring', count(*) from (
+    select monitoring_aset_id, aset_id from aset_tr_monitoring_aset_details
+    where deleted_at is null group by 1, 2 having count(*) > 1
+) d;
+
+insert into hasil_aset
+select 'nomor baris monitoring ganda', count(*) from (
+    select monitoring_aset_id, line_number from aset_tr_monitoring_aset_details group by 1, 2 having count(*) > 1
+) d;
+
+-- Dokumen selesai: setiap baris hidup sudah diperiksa dan dibekukan, dan hasilnya sesuai aturan —
+-- aset yang didekomisioning atau dilepas diharapkan tidak ada, aset lain diharapkan ada. Dokumen
+-- draf tidak boleh punya hasil beku.
+insert into hasil_aset
+select 'baris monitoring selesai tanpa temuan atau snapshot', count(*)
+from aset_tr_monitoring_aset_details l
+join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id
+where m.status = 'selesai' and l.deleted_at is null
+  and (l.ada is null or l.hasil is null or l.sistem_lifecycle_state is null);
+
+insert into hasil_aset
+select 'hasil monitoring menyimpang dari aturan', count(*)
+from aset_tr_monitoring_aset_details l
+where l.hasil is not null
+  and l.hasil <> case when l.ada = (l.sistem_lifecycle_state in ('decommissioned', 'disposed')) then 'tidak_sesuai' else 'sesuai' end;
+
+insert into hasil_aset
+select 'monitoring draf dengan hasil beku', count(*)
+from aset_tr_monitoring_aset_details l
+join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id
+where m.status = 'draft' and l.hasil is not null;
+
+-- Satu dokumen diselesaikan tepat sekali. Log perubahan bawaan mencatat `status` header, jadi dua
+-- penyelesaian yang sama-sama lolos meninggalkan dua entri perpindahan status.
+insert into hasil_aset
+select 'monitoring diselesaikan lebih dari sekali', count(*) from (
+    select e.record_id from change_log_entries e
+    where e.table_name = 'aset_tr_monitoring_aset' and e.field_name = 'status' and e.change_type = 'modification'
+      and e.new_value = 'selesai'
+    group by e.tenant_id, e.record_id having count(*) > 1
+) d;
+
+-- Monitoring tidak pernah mengubah register. Aset `LT-MON …` hanya disentuh skenario monitoring.js,
+-- jadi register mereka wajib tetap seperti saat lahir: tanpa entri log perubahan sesudah pembuatan,
+-- satu penempatan (dari penerimaan), dan sama dengan keadaan yang dibekukan setiap monitoring selesai.
+insert into hasil_aset
+select 'register aset monitoring berubah (log perubahan)', count(*)
+from change_log_entries e
+join aset_tr_aset a on a.id::text = e.record_id and a.tenant_id::text = e.tenant_id::text
+-- Perubahan di dalam transaksi penerimaan yang melahirkannya bertanggal sama dengan entri
+-- pembuatannya (`now()` PostgreSQL adalah awal transaksi); yang dihitung hanya yang sesudahnya.
+join change_log_entries lahir on lahir.tenant_id = e.tenant_id and lahir.table_name = e.table_name
+    and lahir.record_id = e.record_id and lahir.change_type = 'insertion'
+where e.table_name = 'aset_tr_aset' and e.change_type <> 'insertion' and a.nama like 'LT-MON %'
+  and e.changed_at > lahir.changed_at;
+
+insert into hasil_aset
+select 'register aset monitoring berubah (penempatan)', count(*) from (
+    select p.aset_id from aset_tr_penempatan_aset p
+    join aset_tr_aset a on a.id = p.aset_id
+    where a.nama like 'LT-MON %' group by p.aset_id having count(*) <> 1
+) d;
+
+insert into hasil_aset
+select 'register aset monitoring tidak sama dengan snapshot', count(*)
+from aset_tr_monitoring_aset_details l
+join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id and m.status = 'selesai'
+join aset_tr_aset a on a.id = l.aset_id
+where a.nama like 'LT-MON %' and l.deleted_at is null
+  and (l.sistem_lifecycle_state is distinct from a.lifecycle_state
+       or l.sistem_lokasi_id is distinct from a.lokasi_aset_id
+       or l.sistem_org_unit_id is distinct from a.responsible_org_unit_id);
+
 select pemeriksaan, pelanggaran from hasil_aset order by pemeriksaan;
 
 \echo
@@ -584,6 +690,9 @@ union all select 'aset_tr_pemeliharaan_aset_status_log', count(*), count(distinc
 union all select 'aset_tr_buku_aset', count(*), count(distinct tenant_id) from aset_tr_buku_aset
 union all select 'aset_tr_penyusutan_aset', count(*), count(distinct tenant_id) from aset_tr_penyusutan_aset
 union all select 'aset_tr_export_penyusutan', count(*), count(distinct tenant_id) from aset_tr_export_penyusutan
+union all select 'aset_tr_monitoring_aset', count(*), count(distinct tenant_id) from aset_tr_monitoring_aset
+union all select 'aset_tr_monitoring_aset selesai', count(*), count(distinct tenant_id) from aset_tr_monitoring_aset where status = 'selesai'
+union all select 'aset_tr_monitoring_aset_details', count(*), count(distinct tenant_id) from aset_tr_monitoring_aset_details
 order by 1;
 
 \echo

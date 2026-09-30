@@ -247,8 +247,15 @@ export default function App({
         permissions.includes('management-aset.monitoring-aset.read')
     ) {
         return (
-            <main>
-                <MonitoringPage />
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <MonitoringPage
+                    context={konteks}
+                    permissions={permissions}
+                    segments={segments}
+                />
             </main>
         );
     }
