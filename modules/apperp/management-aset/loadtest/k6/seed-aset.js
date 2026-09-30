@@ -67,9 +67,13 @@ function wajib(label, responses, statusSah) {
 export function lahirkanAset(jars, ids, kunci, opsi = {}) {
     // Jurnal saldo awal bertanggal cutover, jadi entitas legal wajib punya tanggalnya. Pengiriman
     // posting sendiri dibiarkan mati: skenario pemanggilnya tidak mengukur feed finance.
+    // Setelan membawa versi barisnya (area 3); 0 selama setelannya belum pernah disimpan.
+    const versiSetelan = http
+        .batch(jars.map((tenant) => ['GET', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, null, paramsUntuk(tenant)]))
+        .map((response) => response.json('data.version'));
     wajib(
         'tanggal cutover',
-        http.batch(jars.map((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: false, cutover_date: '2026-01-01' }), paramsUntuk(tenant)])),
+        http.batch(jars.map((tenant, index) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: false, cutover_date: '2026-01-01', version: versiSetelan[index] }), paramsUntuk(tenant)])),
         [200],
     );
 
