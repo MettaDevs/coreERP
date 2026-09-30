@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Internal;
+namespace App\Foundation\UnitOfMeasure\Http\Controllers\Internal;
 
+use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
+use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReferenceData\ConvertUnitsRequest;
 use App\Http\Requests\ReferenceData\ResolveUnitsRequest;
-use App\Models\UnitOfMeasure;
-use App\Services\UnitOfMeasureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

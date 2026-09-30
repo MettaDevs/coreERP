@@ -4,7 +4,7 @@ namespace App\Actions\Onboarding;
 
 use App\Actions\Modules\InstallModule;
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
-use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
+use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
 use App\Models\AppDataPolicy;
 use App\Models\Role;
 use App\Models\RoleAssignment;

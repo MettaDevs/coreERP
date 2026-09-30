@@ -1,8 +1,8 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\UnitOfMeasure;
 
-use App\Models\UnitOfMeasure;
+use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

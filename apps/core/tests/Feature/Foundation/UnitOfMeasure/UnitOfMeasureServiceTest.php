@@ -1,8 +1,8 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\UnitOfMeasure;
 
-use App\Services\UnitOfMeasureService;
+use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Services;
+namespace App\Foundation\UnitOfMeasure\Support;
 
-use App\Models\UnitOfMeasure;
+use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 

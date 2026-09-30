@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\ReferenceData;
+namespace App\Foundation\UnitOfMeasure\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

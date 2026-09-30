@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Modules;
+namespace App\Foundation\UnitOfMeasure\ModuleServices;
 
-use App\Models\UnitOfMeasure;
-use App\Services\UnitOfMeasureService;
+use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
+use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
 use App\Support\Modules\Contracts\DaftarSatuan;
 
 /**

@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\ReferenceData;
+namespace App\Foundation\UnitOfMeasure\Http\Controllers;
 
+use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use App\Http\Controllers\Controller;
-use App\Models\UnitOfMeasure;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +29,7 @@ final class UnitOfMeasureController extends Controller
             return response()->json(['data' => $data]);
         }
 
-        return Inertia::render('settings/units-of-measure', ['canManage' => $request->user()?->can('manage-reference-data') ?? false, ...$data]);
+        return Inertia::render('foundation/unit-of-measure/units-of-measure', ['canManage' => $request->user()?->can('manage-reference-data') ?? false, ...$data]);
     }
 
     public function storeClass(Request $request): JsonResponse|RedirectResponse
