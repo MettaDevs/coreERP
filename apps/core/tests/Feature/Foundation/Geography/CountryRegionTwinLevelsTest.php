@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\Geography;
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -3,12 +3,6 @@ import { Button } from '@apperp/ui/button';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { AddressSection } from './components/address-section';
-import { ContactInformationSection } from './components/contact-information-section';
-import { OrganizationForm } from './components/organization-form';
-import { PersonForm } from './components/person-form';
-import { RelationshipSection } from './components/relationship-section';
-import { RolesSection } from './components/roles-section';
 import type {
     PartyType,
     AddressItem,
@@ -16,6 +10,12 @@ import type {
     ContactItem,
     PartyRoleItem,
 } from '@/types/global-address-book';
+import { AddressSection } from './components/address-section';
+import { ContactInformationSection } from './components/contact-information-section';
+import { OrganizationForm } from './components/organization-form';
+import { PersonForm } from './components/person-form';
+import { RelationshipSection } from './components/relationship-section';
+import { RolesSection } from './components/roles-section';
 
 interface PartyTypeItem {
     code: string;
