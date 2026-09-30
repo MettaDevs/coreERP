@@ -5,6 +5,7 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
+use App\Support\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +41,36 @@ class MutasiAsetDetail extends Model
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [
         'asal_custodian_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
+
+    /**
+     * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
+     * dari database. Lihat {@see TableFields}.
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'line_number' => 'No. baris',
+        'aset_id' => 'Aset',
+        'kondisi_aset_id' => 'Kondisi',
+        'asal_lokasi_id' => 'Lokasi asal',
+        'asal_org_unit_id' => 'Unit asal',
+        'asal_custodian_user_id' => 'Penanggung jawab asal',
+        'catatan' => 'Catatan',
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'aset_id' => 'aset',
+        'kondisi_aset_id' => 'kondisi-aset',
+        'asal_lokasi_id' => 'lokasi-aset',
+        'asal_org_unit_id' => 'reference-data/unit-kerja',
+        'asal_custodian_user_id' => 'reference-data/anggota',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'mutasi_aset_id' => 'Kunci dokumen induk; saring lewat bagian Mutasi.',
     ];
 
     protected $table = 'aset_tr_mutasi_aset_details';

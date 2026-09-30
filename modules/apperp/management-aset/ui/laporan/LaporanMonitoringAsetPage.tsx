@@ -45,6 +45,7 @@ export default function LaporanMonitoringAsetPage() {
         filters,
         bindFilter,
         bindMultiFilter,
+        additional,
         hasActiveFilters,
         resetFilters,
         rows,
@@ -171,6 +172,7 @@ export default function LaporanMonitoringAsetPage() {
                 <ReportFilterBar
                     canReset={hasActiveFilters}
                     onReset={resetFilters}
+                    additional={additional}
                 >
                     <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
                     <DateFilter

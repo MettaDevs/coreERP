@@ -2,10 +2,13 @@
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
+use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
+use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
+use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
@@ -62,9 +65,17 @@ final class DaftarMutasiAset implements ReportDefinition
         ];
     }
 
+    /**
+     * Dokumen mutasi lalu barisnya, seperti dokumen dan baris di BC. Laporannya satu baris per aset yang
+     * berpindah, jadi filter pada dokumen menyaring semua barisnya, dan filter pada baris hanya meloloskan
+     * baris yang cocok.
+     */
     public function dataItems(): array
     {
-        return [];
+        return [
+            new ReportDataItem('mutasi', 'Mutasi', MutasiAset::class, 'mutasi', ['kode']),
+            new ReportDataItem('baris', 'Baris mutasi', MutasiAsetDetail::class, 'aset_tr_mutasi_aset_details'),
+        ];
     }
 
     public function fields(): array
@@ -137,6 +148,9 @@ final class DaftarMutasiAset implements ReportDefinition
         app(OrganizationScope::class)->query($query, $context->request(), 'mutasi.legal_entity_id', 'mutasi.responsible_org_unit_id');
 
         $query->where('mutasi.status', $parameters['status'] ?? MutasiStatus::SELESAI);
+        foreach ($this->dataItems() as $item) {
+            AdditionalFilters::apply($query, $item, $parameters, $context);
+        }
         if (! empty($parameters['dari'])) {
             $query->whereDate('mutasi.tanggal', '>=', $parameters['dari']);
         }

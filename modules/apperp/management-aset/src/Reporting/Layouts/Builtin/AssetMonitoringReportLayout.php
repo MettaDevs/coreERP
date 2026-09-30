@@ -62,10 +62,11 @@ final class AssetMonitoringReportLayout extends BuiltinLayoutBuilder
             'A7' => 'Group aset', 'B7' => '${filter_group}', 'C7' => 'Kelompok harta fiskal', 'D7' => '${filter_golongan}', 'E7' => 'Jenis aset', 'F7' => '${filter_jenis}',
             'A8' => 'Aset', 'B8' => '${filter_aset}', 'C8' => 'Kondisi fisik', 'D8' => '${filter_kondisi}', 'E8' => 'Lokasi', 'F8' => '${filter_lokasi}',
             'A9' => 'Penanggung jawab', 'B9' => '${filter_penanggung_jawab}', 'C9' => 'Unit organisasi', 'D9' => '${filter_unit}', 'E9' => 'Aset diperiksa / tidak sesuai', 'F9' => '${jumlah_aset} / ${jumlah_tidak_sesuai}',
+            'A10' => 'Filter tambahan', 'B10' => '${filter_tambahan}',
         ] as $cell => $value) {
             $sheet->setCellValue($cell, $value);
         }
-        foreach (['B6:B9', 'D6:D9', 'F6:F9'] as $range) {
+        foreach (['B6:B10', 'D6:D9', 'F6:F9'] as $range) {
             $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
         }
 

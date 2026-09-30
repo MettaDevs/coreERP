@@ -5,6 +5,7 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
+use App\Support\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,6 +52,39 @@ class MutasiAset extends Model
     public const COLUMN_CLASSIFICATION = [
         'diserahkan_oleh_user_id' => DataClass::EndUserPseudonymousIdentifiers,
         'diterima_oleh_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
+
+    /**
+     * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
+     * dari database. Lihat {@see TableFields}.
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'kode' => 'No. bukti',
+        'responsible_org_unit_id' => 'Unit asal',
+        'tanggal' => 'Tanggal serah terima',
+        'tujuan_lokasi_id' => 'Lokasi tujuan',
+        'tujuan_org_unit_id' => 'Unit kerja tujuan',
+        'diserahkan_oleh_user_id' => 'Diserahkan oleh',
+        'diterima_oleh_user_id' => 'Diterima oleh',
+        'alasan' => 'Alasan mutasi',
+        'keterangan' => 'Keterangan',
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'responsible_org_unit_id' => 'reference-data/unit-kerja',
+        'tujuan_lokasi_id' => 'lokasi-aset',
+        'tujuan_org_unit_id' => 'reference-data/unit-kerja',
+        'diserahkan_oleh_user_id' => 'reference-data/anggota',
+        'diterima_oleh_user_id' => 'reference-data/anggota',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
+        'status' => 'Sudah menjadi filter Status laporan mutasi, yang bawaannya Selesai.',
     ];
 
     protected $table = 'aset_tr_mutasi_aset';
