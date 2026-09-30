@@ -382,6 +382,51 @@ sendiri:
   `ChangeHistory`. Layarnya memakai komponen `ChangeHistory` dari `@/components/change-history`. Rute
   Core `GET /api/v1/change-log/{tabel}/{id}` hanya untuk admin berizin `core.change-log.read`.
 
+### Klasifikasi data per kolom
+
+Setiap tabel ber-`tenant_id`, di Core maupun module, menyatakan jenis data yang disimpannya, padanan
+properti `DataClassification` di Business Central ([analisa gap BC, gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)).
+Nilainya `DataClass` dari `App\Support\Modules\Contracts`, sama dengan BC. Model menulis bawaan tabel
+sebagai atribut, lalu kolom yang berbeda di konstanta `COLUMN_CLASSIFICATION`:
+
+```php
+#[DataClassification(DataClass::CustomerContent)]
+class Worker extends Model
+{
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'personnel_number' => DataClass::EndUserPseudonymousIdentifiers,
+        'name' => DataClass::EndUserIdentifiableInformation,
+        'email' => DataClass::EndUserIdentifiableInformation,
+    ];
+}
+```
+
+- **Bawaan tabel.** `CustomerContent` untuk data bisnis dan setelan tenant, `SystemMetadata` untuk data
+  yang dibuat sistem seperti status antrean dan penanda event yang sudah diproses. `ToBeClassified`
+  ditolak.
+- **Kolom yang wajib ditulis.** Nama orang, email, telepon, NIK, NPWP orang, tanggal lahir, alamat, catatan
+  tentang orang, dan catatan medis: `EndUserIdentifiableInformation`. Nama, alamat, dan nomor pajak
+  organisasi: `OrganizationIdentifiableInformation`. ID pengguna, keanggotaan, atau pekerja:
+  `EndUserPseudonymousIdentifiers`. Hash token, secret, dan kode undangan: `AccountData`. Kolom bernama
+  seperti `name` atau `nama` yang isinya bukan orang, misalnya nama jenis aset, tetap ditulis eksplisit
+  sebagai `CustomerContent`, supaya keputusannya terlihat di kode.
+- **Kolom jejak** `created_by_user_id` dan `updated_by_user_id` sudah diklasifikasi `AuditColumns`; tidak
+  perlu ditulis ulang.
+- **Kelas dasar.** Atribut dan konstanta diwarisi, seperti master aset dari `MasterData`. Model turunan
+  yang menambah kolom pribadi menulis konstantanya sendiri, lengkap dengan isi induknya:
+  `[...parent::COLUMN_CLASSIFICATION, 'email' => DataClass::EndUserIdentifiableInformation]`.
+- **Tabel tanpa model** dinyatakan di satu kelas registry per module di `src/Models`, yang memakai
+  `DataClassificationRegistry`; bentuk isinya sama: bawaan tabel lalu kolom yang berbeda. Registry Core
+  adalah `App\Models\UnmodeledTables`.
+
+`DataClassificationBoundaryTest` menolak tabel tenant tanpa klasifikasi, timpaan untuk kolom yang tidak
+ada, dan kolom bernama seperti nama, email, telepon, NIK, NPWP, tanggal lahir, atau alamat yang ikut
+bawaan `CustomerContent`/`SystemMetadata` tanpa ditulis.
+
+Klasifikasi ini juga yang menjaga telemetri: laporan kesalahan utuh hanya ke SigNoz di server sendiri,
+sedangkan notifikasi Discord hanya membawa data teknis (K-18).
+
 ### Versi baris dan pengaman edit bersamaan
 
 Setiap tabel ber-`tenant_id` membawa kolom `version`, padanan `SystemRowVersion` di Business Central

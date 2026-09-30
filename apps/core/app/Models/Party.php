@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,9 +20,16 @@ use Illuminate\Support\Str;
  * @property string $type
  * @property string $name
  */
+#[DataClassification(DataClass::CustomerContent)]
 class Party extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::EndUserIdentifiableInformation,
+        'search_name' => DataClass::EndUserIdentifiableInformation,
+    ];
 
     public const TYPES = ['person', 'organization'];
 

@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -39,10 +41,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?array<int, array<string, mixed>> $atribut
  * @property ?string $keterangan
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PenerimaanAsetDetail extends Model
 {
     use HasUlids;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama' => DataClass::CustomerContent,
+    ];
 
     protected $table = 'aset_tr_penerimaan_aset_details';
 

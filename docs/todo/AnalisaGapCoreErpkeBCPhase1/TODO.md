@@ -138,19 +138,24 @@ Rujukan: [README: Gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4).
 - [x] 4.8 Hasil tiap penerapan per tenant di `retention_policy_log_entries`, tampil di layar dan ikut
       diretensi (K-16).
 
-### 5. [ ] Klasifikasi data per kolom (gap 5)
+### 5. [x] Klasifikasi data per kolom (gap 5)
 
-**Tempat:** Core, lalu setiap module · **Setelah:** 0.6 · **Selesai bila:** setiap model tenant punya
-klasifikasi, telemetri hanya membawa data `SystemMetadata`, dan test B-5 lulus.
+**Tempat:** Core, lalu setiap module · **Setelah:** 0.6 · **Selesai bila:** setiap tabel tenant punya
+klasifikasi, notifikasi Discord hanya membawa data teknis (K-18), dan test B-5 lulus.
 
 Rujukan: [README: Gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5).
 
-- [ ] 5.1 Enum klasifikasi dengan nilai yang sama dengan BC.
-- [ ] 5.2 Deklarasi klasifikasi bawaan tabel dan timpaan per kolom, sesuai K-06.
-- [ ] 5.3 Klasifikasi semua model tenant Core yang sudah ada.
-- [ ] 5.4 Klasifikasi model module aset dan HR, dengan kolom identitas ditandai eksplisit.
-- [ ] 5.5 Penyaring telemetri: hanya atribut `SystemMetadata` yang dikirim ke OpenTelemetry/SigNoz.
-- [ ] 5.6 Test yang gagal bila ada model tenant tanpa klasifikasi (padanan AS0016).
+- [x] 5.1 Enum klasifikasi dengan nilai yang sama dengan BC (`DataClass`).
+- [x] 5.2 Deklarasi klasifikasi bawaan tabel dan timpaan per kolom, sesuai K-06; tabel tanpa model di
+      registry per pemilik (K-19).
+- [x] 5.3 Klasifikasi semua tabel tenant Core yang sudah ada: 48 lewat model, 26 lewat registry.
+- [x] 5.4 Klasifikasi model module aset (51 tabel) dan HR (4 tabel), dengan kolom identitas ditandai
+      eksplisit.
+- [x] 5.5 Laporan kesalahan (K-18): SigNoz, di server sendiri, tetap menerima laporan utuh. Notifikasi
+      Discord, pihak ketiga, hanya membawa kelas exception, method dan rute, status, `tenant_id`, jejak,
+      dan tautan ke SigNoz; tanpa nama orang, email, nama tenant, user agent, atau pesan exception dan SQL
+      bernilai. Menyimpang dari BC, yang hanya mengirim `SystemMetadata` ke telemetri.
+- [x] 5.6 Test yang gagal bila ada tabel tenant tanpa klasifikasi (padanan AS0016).
 
 ### 6. [ ] Layanan lampiran dokumen (gap 7)
 
@@ -233,8 +238,10 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       `If-Match` atau dengan ETag basi ditolak.
 - [x] **B-4** (area 4) Tanpa setelan tenant, hasilnya sama dengan perilaku hari ini. Masa simpan di
       bawah minimum ditolak. Tabel di luar daftar tidak pernah tersentuh.
-- [ ] **B-5** (area 5) Model tanpa klasifikasi membuat test gagal. Atribut selain `SystemMetadata` tidak
-      sampai ke exporter telemetri.
+- [x] **B-5** (area 5) Tabel tenant Core atau module tanpa klasifikasi, berbawaan `ToBeClassified`,
+      bertimpaan kolom yang tidak ada, atau berkolom nama/email/alamat yang ikut bawaan tanpa ditulis
+      eksplisit membuat test gagal. Nama orang, email, nama tenant, dan SQL bernilai di laporan kesalahan
+      tidak sampai ke Discord, sementara atribut untuk SigNoz tetap utuh.
 - [ ] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
       lampirannya. Lampiran tidak bocor antar tenant. Hash yang tidak cocok terdeteksi.
 - [x] **B-7** (area 7) Pukul 00.30 WIB (17.30 UTC hari sebelumnya), "hari ini" bagi pengguna berzona

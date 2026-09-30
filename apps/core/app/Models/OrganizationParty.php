@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -9,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Jembatan organisasi ke party. Legal entity dan operating unit ikut menjadi
  * party karena keduanya punya nama dan alamat yang tercetak pada dokumen resmi.
  */
+#[DataClassification(DataClass::CustomerContent)]
 class OrganizationParty extends Model
 {
     protected $primaryKey = 'organization_id';

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -13,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property bool $enabled
  * @property ?Carbon $cutover_date
  */
+#[DataClassification(DataClass::CustomerContent)]
 class FinancePostingSetting extends Model
 {
     protected $primaryKey = 'legal_entity_id';

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  * dijalankan dan module-nya benar-benar ada untuk tenant itu. Layar berlabel "terpasang"
  * wajib membaca tabel ini, tidak boleh menyimpulkannya dari entitlement.
  */
+#[DataClassification(DataClass::SystemMetadata)]
 final class ModuleInstallation extends Model
 {
     public const STATUS_INSTALLED = 'installed';

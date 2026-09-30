@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\ControlPlane\OwnedByControlPlane;
 use App\Support\Modules\Contracts\AuditColumns;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +29,7 @@ final class AuditColumnsBoundaryTest extends TestCase
     public function test_setiap_tabel_tenant_core_membawa_kolom_jejak_dan_triggernya(): void
     {
         $inspector = new AuditColumnInspector(DB::connection());
-        $tables = array_values(array_diff($inspector->tenantTables(), $this->controlPlaneTables()));
+        $tables = array_values(array_diff($inspector->tenantTables(), AuditColumnInspector::controlPlaneTables()));
 
         $this->assertContains('vendors', $tables, 'Daftar tabel tenant tidak memuat vendors; penjaga ini membaca skema yang salah.');
 
@@ -58,30 +56,5 @@ final class AuditColumnsBoundaryTest extends TestCase
 
         $this->assertSame(['contoh_tanpa_jejak'], array_keys($missing));
         $this->assertStringContainsString('trigger', $missing['contoh_tanpa_jejak']);
-    }
-
-    /** @return list<string> */
-    private function controlPlaneTables(): array
-    {
-        $tables = [];
-
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Models'), \FilesystemIterator::SKIP_DOTS)) as $file) {
-            if (! $file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $class = 'App\\Models\\'.str_replace(
-                [app_path('Models').DIRECTORY_SEPARATOR, '/', '.php'],
-                ['', '\\', ''],
-                $file->getPathname(),
-            );
-
-            if (class_exists($class) && is_subclass_of($class, Model::class)
-                && in_array(OwnedByControlPlane::class, class_uses_recursive($class), true)) {
-                $tables[] = (new $class)->getTable();
-            }
-        }
-
-        return $tables;
     }
 }

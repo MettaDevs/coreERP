@@ -2,14 +2,22 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * @property int $version
  */
+#[DataClassification(DataClass::CustomerContent)]
 class SecurityPrivilege extends Model
 {
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
+
     protected $primaryKey = 'code';
 
     public $incrementing = false;

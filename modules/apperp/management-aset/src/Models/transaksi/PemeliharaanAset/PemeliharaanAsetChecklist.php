@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -45,10 +47,17 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PemeliharaanAsetChecklist extends Model
 {
     use HasUlids;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama' => DataClass::CustomerContent,
+        'diperiksa_oleh_user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
 
     protected $table = 'aset_tr_pemeliharaan_aset_checklist';
 

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -20,9 +22,15 @@ use Illuminate\Support\Carbon;
  * @property ?array<string, mixed> $data
  * @property ?Carbon $created_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class FinancePostingEvent extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'user_id' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
 
     public const UPDATED_AT = null;
 
