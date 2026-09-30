@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string $legal_entity_id
  * @property string $mode
  * @property Carbon $effective_from
+ * @property int $version
  */
 class FinanceSettlementMode extends Model
 {

@@ -11,6 +11,7 @@ use App\Models\Party;
 use App\Models\PartyLocation;
 use App\Models\PartyLocationPurpose;
 use App\Models\PostalAddress;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -108,19 +109,23 @@ final class OrganizationAddressBook
      * yang baru; alamat posnya tidak diubah dari sini. Mengubah alamat pos tempat bersama mengubahnya bagi
      * setiap pihak yang memakainya.
      *
+     * Mengubah alamat yang ada wajib membawa versi tautan yang dibuka pengguna ({@see RowVersion}); tautan itu
+     * yang diklaim, sesudah kunci party supaya urutan kuncinya sama dengan permintaan yang mengganti alamat utama.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function saveLocation(Organization $organization, array $data, ?string $linkId = null): array
+    public function saveLocation(Organization $organization, array $data, ?string $linkId = null, int $expectedVersion = 0): array
     {
         $party = $this->party($organization);
 
-        return DB::transaction(function () use ($party, $data, $linkId): array {
+        return DB::transaction(function () use ($party, $data, $linkId, $expectedVersion): array {
             // Dua permintaan yang sama-sama menandai "utama" diantrikan di sini, bukan diserahkan ke index.
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             if ($linkId !== null) {
                 $link = $this->addressLinks($party->id)->whereKey($linkId)->firstOrFail();
+                RowVersion::claim($link, $expectedVersion);
                 $location = $link->location;
             } elseif (($data['location_id'] ?? null) !== null) {
                 $location = Location::query()->where('tenant_id', $party->tenant_id)->whereHas('postalAddress')->whereKey($data['location_id'])->firstOrFail();
@@ -156,13 +161,14 @@ final class OrganizationAddressBook
      * Melepas alamat dari organisasi: tautannya diarsipkan, tempatnya tidak. Pihak lain yang memakai tempat
      * yang sama tidak kehilangan apa pun.
      */
-    public function deleteLocation(Organization $organization, string $linkId): void
+    public function deleteLocation(Organization $organization, string $linkId, int $expectedVersion): void
     {
         $party = $this->party($organization);
-        DB::transaction(function () use ($party, $linkId): void {
+        DB::transaction(function () use ($party, $linkId, $expectedVersion): void {
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $link = $this->addressLinks($party->id)->whereKey($linkId)->firstOrFail();
+            RowVersion::claim($link, $expectedVersion);
             $wasPrimary = $link->is_primary;
             $link->fill(['is_primary' => false])->save();
             $link->delete();
@@ -193,17 +199,22 @@ final class OrganizationAddressBook
      * organisasi punya alamat utama, kontak itu menempel ke sana, supaya kop tetap membacanya; bila belum,
      * ke tempat "Informasi kontak".
      *
+     * Mengubah kontak yang ada wajib membawa versi kontak yang dibuka pengguna ({@see RowVersion}).
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function saveContact(Organization $organization, array $data, ?string $contactId = null): array
+    public function saveContact(Organization $organization, array $data, ?string $contactId = null, int $expectedVersion = 0): array
     {
         $party = $this->party($organization);
 
-        return DB::transaction(function () use ($party, $data, $contactId): array {
+        return DB::transaction(function () use ($party, $data, $contactId, $expectedVersion): array {
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $contact = $contactId === null ? null : $this->partyContacts($party->id)->whereKey($contactId)->firstOrFail();
+            if ($contact !== null) {
+                RowVersion::claim($contact, $expectedVersion);
+            }
             $locationId = match (true) {
                 ($data['address_id'] ?? null) !== null => $this->addressLinks($party->id)->whereKey($data['address_id'])->firstOrFail()->location_id,
                 $contact !== null && ! array_key_exists('address_id', $data) => $contact->location_id,
@@ -233,13 +244,14 @@ final class OrganizationAddressBook
         });
     }
 
-    public function deleteContact(Organization $organization, string $contactId): void
+    public function deleteContact(Organization $organization, string $contactId, int $expectedVersion): void
     {
         $party = $this->party($organization);
-        DB::transaction(function () use ($party, $contactId): void {
+        DB::transaction(function () use ($party, $contactId, $expectedVersion): void {
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $contact = $this->partyContacts($party->id)->whereKey($contactId)->firstOrFail();
+            RowVersion::claim($contact, $expectedVersion);
             $wasPrimary = $contact->is_primary;
             $contact->fill(['is_primary' => false])->save();
             $contact->delete();
@@ -359,6 +371,7 @@ final class OrganizationAddressBook
 
         return [
             'id' => $link->id,
+            'version' => (int) $link->version,
             'location_id' => $link->location_id,
             'name' => $link->location->name,
             'purposes' => array_values(array_intersect($this->purposeOrder(), $link->purposes->pluck('purpose_code')->all())),
@@ -385,6 +398,7 @@ final class OrganizationAddressBook
 
         return [
             'id' => $contact->id,
+            'version' => (int) $contact->version,
             'type' => $contact->type,
             'value' => $contact->value,
             'purpose' => $contact->purpose,

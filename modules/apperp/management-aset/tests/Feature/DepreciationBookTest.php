@@ -146,6 +146,34 @@ class DepreciationBookTest extends TestCase
         $this->assertSame(1, DB::table('aset_m_group_buku_penyusutan')->whereNotNull('deleted_at')->count());
     }
 
+    /**
+     * Matriks disimpan dengan mengklaim versi group-nya. Kiriman kedua dari versi yang sama
+     * ditolak dan baris kiriman pertama bertahan; kiriman tanpa versi tidak mengubah apa pun.
+     */
+    public function test_matriks_dari_versi_basi_atau_tanpa_versi_ditolak(): void
+    {
+        $group = $this->master('group-aset', ['nama' => 'Kendaraan']);
+        $profil = $this->profil('Garis lurus', 'straight_line', 60);
+        $satu = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'depreciation_profile_id' => $profil]);
+        $dua = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'depreciation_profile_id' => $profil]);
+        $pengguna = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'));
+        $alamat = '/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan';
+
+        $pengguna->getJson($alamat)->assertOk()->assertJsonPath('version', 1);
+        $pengguna->putJson($alamat, ['rows' => [['buku_id' => $satu]], 'version' => 1])->assertOk()->assertJsonPath('version', 2);
+        $pengguna->putJson($alamat, ['rows' => [['buku_id' => $dua]], 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $pengguna->putJson($alamat, ['rows' => []])
+            ->assertStatus(428)
+            ->assertJsonPath('error.code', 'version_required');
+
+        $this->assertSame(
+            [$satu],
+            DB::table('aset_m_group_buku_penyusutan')->where('group_aset_id', $group)->whereNull('deleted_at')->pluck('buku_id')->all(),
+        );
+    }
+
     public function test_matriks_menolak_buku_tanpa_profil_efektif(): void
     {
         $group = $this->master('group-aset', ['nama' => 'Group tanpa profil']);
@@ -168,7 +196,10 @@ class DepreciationBookTest extends TestCase
         $this->receive($group, $jenis);
 
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('profil-penyusutan'))
-            ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profil, ['useful_life_periods' => 24])
+            ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profil, [
+                'useful_life_periods' => 24,
+                'version' => DB::table('aset_m_profil_penyusutan')->where('id', $profil)->value('version'),
+            ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('method');
     }
@@ -242,7 +273,7 @@ class DepreciationBookTest extends TestCase
     private function matrix(string $groupId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
-            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows, 'version' => DB::table('aset_m_group_aset')->where('id', $groupId)->value('version')]);
     }
 
     /** @param array<string, mixed> $overrides */

@@ -87,3 +87,19 @@ KodeLaporan:
   schema:
     type: string
     pattern: ^[a-z0-9-]+$
+IfMatch:
+  name: If-Match
+  in: header
+  required: false
+  description: |
+    Versi data yang sedang diubah, dalam bentuk ETag lemah seperti yang dikirim `ETag` pada
+    jawaban baca, misalnya `W/"12"`. Wajib pada setiap PATCH, PUT, dan DELETE atas data yang
+    sudah ada, serta pada aksi atas dokumen yang sudah ada (`/selesaikan`, `/batal`, `/status`,
+    `/checklist/dari-template`). Nilainya boleh dikirim lewat body sebagai field `version`
+    (integer) sebagai gantinya; bila keduanya ada, header yang dipakai. Tanpa keduanya
+    permintaan ditolak 428, dan bila versinya sudah tertinggal ditolak 409.
+  schema:
+    type: string
+    pattern: ^\s*(W/)?"\d+"\s*$
+    examples:
+    - W/"12"

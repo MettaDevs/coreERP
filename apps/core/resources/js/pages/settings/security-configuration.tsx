@@ -73,6 +73,7 @@ type Role = {
     name: string;
     /** Role Owner: selalu memegang semua duty yang sah, diatur otomatis oleh server. */
     is_owner: boolean;
+    version: number;
     duty_codes: string[];
     child_roles: RoleRef[];
     parent_roles: RoleRef[];
@@ -84,6 +85,7 @@ type Duty = {
     app_id: string | null;
     source: Source;
     status: Status;
+    version: number;
     privilege_codes: string[];
 };
 type Privilege = {
@@ -93,6 +95,7 @@ type Privilege = {
     app_id: string | null;
     source: Source;
     status: Status;
+    version: number;
     permission_codes: string[];
 };
 type Permission = {
@@ -606,6 +609,12 @@ function PrivilegeDialog({
                         };
 
                         if (privilege) {
+                            // Versi diambil dari props saat ini, bukan data awal form,
+                            // supaya simpan kedua tidak ditolak sebagai data basi.
+                            form.transform((data) => ({
+                                ...data,
+                                version: privilege.version,
+                            }));
                             form.put(
                                 `/settings/security-configuration/privileges/${privilege.code}`,
                                 done,
@@ -751,6 +760,10 @@ function DutyDialog({
                         };
 
                         if (duty) {
+                            form.transform((data) => ({
+                                ...data,
+                                version: duty.version,
+                            }));
                             form.put(
                                 `/settings/security-configuration/duties/${duty.code}`,
                                 done,
@@ -941,6 +954,10 @@ function RoleDialog({
                         const done = { onSuccess: () => setOpen(false) };
 
                         if (role) {
+                            form.transform((data) => ({
+                                ...data,
+                                version: role.version,
+                            }));
                             form.put(`/settings/access/roles/${role.id}`, done);
 
                             return;
@@ -1078,11 +1095,12 @@ function DeleteRoleButton({
                     <AlertDialogAction
                         disabled={form.processing}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() =>
+                        onClick={() => {
+                            form.transform(() => ({ version: role.version }));
                             form.delete(`/settings/access/roles/${role.id}`, {
                                 onSuccess: onDeleted,
-                            })
-                        }
+                            });
+                        }}
                     >
                         Hapus
                     </AlertDialogAction>
@@ -1092,7 +1110,7 @@ function DeleteRoleButton({
     );
 }
 
-function PublishButton({ path }: { path: string }) {
+function PublishButton({ path, version }: { path: string; version: number }) {
     const form = useForm({});
 
     return (
@@ -1100,7 +1118,10 @@ function PublishButton({ path }: { path: string }) {
             size="sm"
             variant="default"
             disabled={form.processing}
-            onClick={() => form.post(path)}
+            onClick={() => {
+                form.transform(() => ({ version }));
+                form.post(path);
+            }}
         >
             <Check className="mr-1 size-3.5" />
             Terbitkan
@@ -1108,7 +1129,15 @@ function PublishButton({ path }: { path: string }) {
     );
 }
 
-function DeleteDraftButton({ path, name }: { path: string; name: string }) {
+function DeleteDraftButton({
+    path,
+    name,
+    version,
+}: {
+    path: string;
+    name: string;
+    version: number;
+}) {
     const form = useForm({});
 
     return (
@@ -1133,7 +1162,10 @@ function DeleteDraftButton({ path, name }: { path: string; name: string }) {
                     <AlertDialogAction
                         disabled={form.processing}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => form.delete(path)}
+                        onClick={() => {
+                            form.transform(() => ({ version }));
+                            form.delete(path);
+                        }}
                     >
                         Hapus
                     </AlertDialogAction>
@@ -1208,9 +1240,11 @@ function DraftPanel({
                             />
                             <DeleteDraftButton
                                 name={item.name}
+                                version={item.version}
                                 path={`/settings/security-configuration/privileges/${item.code}`}
                             />
                             <PublishButton
+                                version={item.version}
                                 path={`/settings/security-configuration/privileges/${item.code}/publish`}
                             />
                         </div>
@@ -1257,9 +1291,11 @@ function DraftPanel({
                             />
                             <DeleteDraftButton
                                 name={item.name}
+                                version={item.version}
                                 path={`/settings/security-configuration/duties/${item.code}`}
                             />
                             <PublishButton
+                                version={item.version}
                                 path={`/settings/security-configuration/duties/${item.code}/publish`}
                             />
                         </div>

@@ -33,6 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->unsignedBigInteger('updated_by_user_id')->nullable();
+            $table->unsignedInteger('version')->default(1);
 
             $table->unique(['tenant_id', 'policy_code']);
         });
@@ -48,6 +49,7 @@ return new class extends Migration
             $table->timestamps();
             $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->unsignedBigInteger('updated_by_user_id')->nullable();
+            $table->unsignedInteger('version')->default(1);
 
             $table->index(['tenant_id', 'created_at']);
         });
@@ -57,6 +59,7 @@ return new class extends Migration
 
         foreach (self::TABLES as $table) {
             DB::statement("CREATE OR REPLACE TRIGGER stamp_audit_actor BEFORE INSERT OR UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_stamp_audit_actor()");
+            DB::statement("CREATE OR REPLACE TRIGGER bump_row_version BEFORE UPDATE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_bump_row_version()");
             DB::statement("CREATE OR REPLACE TRIGGER log_change AFTER INSERT OR UPDATE OR DELETE ON {$table} FOR EACH ROW EXECUTE FUNCTION coreerp_log_change()");
         }
     }

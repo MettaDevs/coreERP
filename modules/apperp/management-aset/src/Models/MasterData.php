@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string $nama
  * @property ?string $keterangan
  * @property bool $aktif
+ * @property int $version
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property ?Carbon $deleted_at

@@ -97,6 +97,7 @@
       memakai execute, penutupan memakai close.
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -105,7 +106,6 @@
             type: object
             required:
             - ke_status
-            - version
             properties:
               ke_status:
                 type: string
@@ -122,22 +122,23 @@
                 description: Wajib diisi ketika tujuannya adalah dibatalkan.
                 nullable: true
               version:
-                type: integer
-                minimum: 1
+                $ref: '#/components/schemas/VersionField'
     responses:
       '200':
-        description: Status berpindah
+        description: Status berpindah; jawabannya work order dengan `version` terbaru
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Version sudah berubah
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: >-
           Transisi tidak sah, atau syarat isi data belum terpenuhi — misalnya masih ada
           pemeriksaan wajib yang kosong, atau sebab dan tindakan belum diisi pada tipe work
           order yang mewajibkannya.
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -166,6 +167,8 @@
       Menyimpan hasil pemeriksaan sekaligus. Hanya nilai, penanda tidak berlaku, dan catatan
       teknisi yang dapat diubah; nama, tipe, satuan, dan penanda wajib adalah salinan
       prosedur dan tidak dapat disunting dari lapangan.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -175,6 +178,8 @@
             required:
             - baris
             properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
               baris:
                 type: array
                 maxItems: 200
@@ -197,15 +202,21 @@
                       nullable: true
     responses:
       '200':
-        description: Hasil pemeriksaan tersimpan
+        description: |
+          Hasil pemeriksaan tersimpan. Jawabannya `{data, version}`: `data` daftar baris checklist, dan
+          `version` versi work order pemiliknya sesudah disimpan (bukan versi tiap baris).
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: >-
           Pekerjaan belum berstatus dikerjakan, ada baris yang bukan milik pekerjaan ini,
           atau nilai di luar pilihan yang ditetapkan variabelnya.
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -219,6 +230,8 @@
     - Pemeliharaan aset
     operationId: saveWorkOrderJobExecution
     summary: Menyimpan jam aktual, sebab kerusakan, dan tindakan perbaikan pada baris pekerjaan
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -226,6 +239,8 @@
           schema:
             type: object
             properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
               aktual_jam:
                 type: number
                 minimum: 0
@@ -251,13 +266,17 @@
                 description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
     responses:
       '200':
-        description: Hasil pelaksanaan tersimpan
+        description: Hasil pelaksanaan tersimpan; jawabannya work order dengan `version` terbaru
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Pekerjaan belum dapat menerima hasil pelaksanaan atau referensi tidak valid
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -275,6 +294,8 @@
       dimekarkan menjadi isinya dan dinomori ulang berurutan, sehingga teknisi melihat satu
       daftar datar. Salinan bersifat snapshot; perubahan template setelahnya tidak mengubah
       pemeriksaan yang sudah dikerjakan.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -284,17 +305,25 @@
             required:
             - template_id
             properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
               template_id:
                 $ref: '#/components/schemas/Ulid'
     responses:
       '201':
-        description: Baris checklist tersalin; baris sebelumnya pada pekerjaan ini digantikan
+        description: |
+          Baris checklist tersalin; baris sebelumnya pada pekerjaan ini digantikan. Jawabannya `{data, version}`:
+          `version` adalah versi work order pemiliknya sesudah disalin.
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Pekerjaan sudah dimulai, atau template belum memiliki baris pemeriksaan
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/pemeliharaan-aset/{id}:
   get:
     tags:
@@ -306,6 +335,9 @@
     responses:
       '200':
         description: Work order, baris pekerjaan, dan status log
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
       '401':
         $ref: '#/components/responses/Unauthenticated'
       '403':
@@ -321,6 +353,7 @@
       dan itulah sebabnya perubahan hanya sah selama status masih draf.
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -328,13 +361,7 @@
           schema:
             allOf:
             - $ref: '#/components/schemas/WorkOrderWrite'
-            - type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+            - $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Work order diperbarui
@@ -343,9 +370,11 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Version sudah berubah
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Work order tidak lagi berstatus draf, atau payload tidak lolos validasi
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Pemeliharaan aset
@@ -353,18 +382,13 @@
     summary: Mengarsipkan work order draf atau yang sudah dibatalkan tanpa menghapus data fisik
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
-      required: true
+      required: false
       content:
         application/json:
           schema:
-            type: object
-            required:
-            - version
-            properties:
-              version:
-                type: integer
-                minimum: 1
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Work order diarsipkan
@@ -373,6 +397,8 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Version sudah berubah
+        $ref: '#/components/responses/StaleVersion'
       '422':
         description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
+      '428':
+        $ref: '#/components/responses/VersionRequired'

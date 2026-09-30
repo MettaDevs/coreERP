@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\InvitationRequest;
 use App\Models\InvitationCode;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Sso\SsoInvitationMailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -56,11 +57,12 @@ class InvitationCodeController extends Controller
     public function update(InvitationRequest $request, InvitationCode $invitationCode, UpdateInvitation $action): JsonResponse|RedirectResponse
     {
         $membership = $this->currentMembership($request);
-        $invitation = $action->handle($membership, $invitationCode, $request->payload());
+        $invitation = $action->handle($membership, $invitationCode, $request->payload(), RowVersion::expected($request));
 
         if ($request->is('api/*')) {
             return response()->json(['data' => [
                 'id' => $invitation->id,
+                'version' => $invitation->version,
                 'label' => $invitation->label,
                 'roles' => $invitation->roles->pluck('name')->values(),
             ]]);
@@ -102,6 +104,7 @@ class InvitationCodeController extends Controller
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) && $invitationCode->tenant_id === $membership->tenant_id, 403);
+        RowVersion::claim($invitationCode, RowVersion::expected($request));
         $invitationCode->update(['revoked_at' => now()]);
 
         return $request->is('api/*') ? response()->json(null, 204) : back();

@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PermintaanPengadaanAset;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,7 @@ class PermintaanPengadaanAsetController extends Controller
         $record = $this->record($request, $id);
         $record->details = PermintaanPengadaanAsetDetail::query()->where('request_id', $id)->orderBy('line_number')->toBase()->get();
 
-        return response()->json(['data' => $record]);
+        return response()->json(['data' => $record], 200, ['ETag' => RowVersion::etag((int) $record->version)]);
     }
 
     public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
@@ -56,15 +57,14 @@ class PermintaanPengadaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['requesting_org_unit_id']);
         $this->validateTypes($data['details']);
         $kode = $numbers->issue('management-aset.permintaan-pembelian-aset', $tenant, self::RESOURCE.':'.$key, $data['legal_entity_id']);
-        $record = DB::transaction(function () use ($request, $data, $key, $kode, $tenant): array {
-            $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requester_user_id' => (string) $request->attributes->get('coreerp.user_id'), 'requested_on' => $data['requested_on'], 'status' => 'draft', 'description' => $data['description'] ?? null, 'version' => 1, 'created_at' => now(), 'updated_at' => now()];
+        DB::transaction(function () use ($request, $data, $key, $kode, $tenant): void {
+            $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requester_user_id' => (string) $request->attributes->get('coreerp.user_id'), 'requested_on' => $data['requested_on'], 'status' => 'draft', 'description' => $data['description'] ?? null, 'created_at' => now(), 'updated_at' => now()];
             (new PermintaanPengadaanAset)->forceFill($record)->save();
             $this->replaceDetails($record['id'], $data['details']);
-
-            return $record;
         });
 
-        return response()->json(['data' => $record], 201);
+        // Dibaca ulang supaya `version` yang dipulangkan adalah nilai di database.
+        return response()->json(['data' => PermintaanPengadaanAset::query()->where('creation_key', $key)->toBase()->first()], 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -73,19 +73,16 @@ class PermintaanPengadaanAsetController extends Controller
         $record = $this->record($request, $id);
         abort_unless($record->status === 'draft', 422, 'Hanya permintaan draf yang dapat diubah.');
         $data = $this->data($request);
-        $version = (int) $request->validate(['version' => ['required', 'integer']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['requesting_org_unit_id']);
         $this->validateTypes($data['details']);
-        $changed = DB::transaction(function () use ($id, $data, $version) {
-            $changed = PermintaanPengadaanAset::query()->where(['id' => $id, 'version' => $version, 'status' => 'draft'])->update(['legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requested_on' => $data['requested_on'], 'description' => $data['description'] ?? null, 'version' => $version + 1, 'updated_at' => now()]);
-            if ($changed) {
-                PermintaanPengadaanAsetDetail::query()->where('request_id', $id)->delete();
-                $this->replaceDetails($id, $data['details']);
-            }
-
-            return $changed;
+        DB::transaction(function () use ($id, $data, $version): void {
+            RowVersion::claim(PermintaanPengadaanAset::query()->whereKey($id), $version);
+            $changed = PermintaanPengadaanAset::query()->where(['id' => $id, 'status' => 'draft'])->update(['legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requested_on' => $data['requested_on'], 'description' => $data['description'] ?? null, 'updated_at' => now()]);
+            abort_unless($changed > 0, 422, 'Hanya permintaan draf yang dapat diubah.');
+            PermintaanPengadaanAsetDetail::query()->where('request_id', $id)->delete();
+            $this->replaceDetails($id, $data['details']);
         });
-        abort_unless($changed > 0, 409, 'Permintaan telah berubah.');
 
         return $this->show($request, $id);
     }
@@ -95,7 +92,12 @@ class PermintaanPengadaanAsetController extends Controller
         $this->guard($request, 'cancel');
         $record = $this->record($request, $id);
         abort_unless(in_array($record->status, ['draft', 'submitted'], true), 422, 'Permintaan ini tidak dapat dibatalkan.');
-        PermintaanPengadaanAset::query()->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
+        $version = RowVersion::expected($request);
+        DB::transaction(function () use ($id, $version): void {
+            RowVersion::claim(PermintaanPengadaanAset::query()->whereKey($id), $version);
+            $changed = PermintaanPengadaanAset::query()->where('id', $id)->whereIn('status', ['draft', 'submitted'])->update(['status' => 'cancelled', 'updated_at' => now()]);
+            abort_unless($changed > 0, 422, 'Permintaan ini tidak dapat dibatalkan.');
+        });
 
         return $this->show($request, $id);
     }

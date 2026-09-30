@@ -15,7 +15,8 @@ use Tests\TestCase;
 
 /**
  * Setiap tabel tenant milik Core membawa kolom jejak pembuat dan pengubah beserta trigger pengisinya
- * (K-01, area 1 TODO analisa gap BC fase 1), seperti `tenant_id` yang juga wajib ada.
+ * (K-01, area 1 TODO analisa gap BC fase 1), dan versi baris beserta trigger penaiknya (K-03, area 3),
+ * seperti `tenant_id` yang juga wajib ada.
  *
  * Tabel sisi pusat tidak ikut; daftarnya diturunkan dari model ber-`OwnedByControlPlane`, bukan
  * ditulis ulang di sini. Tabel module dijaga `ModuleTableBoundaryTest`.
@@ -24,6 +25,9 @@ final class AuditColumnsBoundaryTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Kolom `version` di sini nomor rilis module yang terpasang, bukan versi baris; tidak ada form yang mengubahnya. */
+    private const WITHOUT_ROW_VERSION = ['core_module_installations'];
+
     public function test_setiap_tabel_tenant_core_membawa_kolom_jejak_dan_triggernya(): void
     {
         $inspector = new AuditColumnInspector(DB::connection());
@@ -31,7 +35,7 @@ final class AuditColumnsBoundaryTest extends TestCase
 
         $this->assertContains('vendors', $tables, 'Daftar tabel tenant tidak memuat vendors; penjaga ini membaca skema yang salah.');
 
-        $missing = $inspector->missing($tables);
+        $missing = $inspector->missing($tables, self::WITHOUT_ROW_VERSION);
         $this->assertSame([], $missing, "Tabel tenant berikut belum membawa kolom jejak:\n"
             .implode("\n", array_map(fn ($table, $problem) => "  - {$table}: {$problem}", array_keys($missing), $missing))
             ."\n\nDi Schema::create panggil AuditColumns::add(\$table), lalu AuditColumns::attach('<tabel>') sesudahnya.");

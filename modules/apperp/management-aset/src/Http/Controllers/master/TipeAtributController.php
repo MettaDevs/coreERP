@@ -208,11 +208,6 @@ class TipeAtributController extends MasterDataController
         ]);
     }
 
-    protected function updateUnderLock(): bool
-    {
-        return true;
-    }
-
     private function isWholeNumber(mixed $value): bool
     {
         return is_numeric($value) && floor((float) $value) === (float) $value;

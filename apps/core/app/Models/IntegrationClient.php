@@ -28,6 +28,7 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * @property ?int $user_id Akun aplikasi klien ini, lihat `IntegrationClientAccounts`.
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
+ * @property int $version
  */
 class IntegrationClient extends Model
 {

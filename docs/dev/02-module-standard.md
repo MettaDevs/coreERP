@@ -382,6 +382,7 @@ sendiri:
   `ChangeHistory`. Layarnya memakai komponen `ChangeHistory` dari `@/components/change-history`. Rute
   Core `GET /api/v1/change-log/{tabel}/{id}` hanya untuk admin berizin `core.change-log.read`.
 
+<<<<<<< HEAD
 ### Retensi data log
 
 Log dan berkas teknis yang tumbuh terus dihapus berdasarkan umur oleh satu layanan Core,
@@ -397,6 +398,43 @@ didaftarkan dan tetap hanya diarsipkan.
 - **Penerapan.** `retention:apply` berjalan harian dan menghapus per tenant dalam kelompok kecil. Hasilnya
   ditulis ke `retention_policy_log_entries` bila ada baris terhapus atau penghapusan gagal. Perintah lain
   yang perlu menghapus log berdasarkan umur memanggil layanan yang sama, tidak menulis `DELETE` sendiri.
+=======
+### Versi baris dan pengaman edit bersamaan
+
+Setiap tabel ber-`tenant_id` membawa kolom `version`, padanan `SystemRowVersion` di Business Central
+([analisa gap BC, gap 2](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-2)). Trigger `coreerp_bump_row_version`
+menaikkannya pada setiap UPDATE, apa pun jalurnya: form, query builder, job latar, atau perintah artisan.
+Nilai yang ditulis kode untuk kolom itu diabaikan. `AuditColumns::add` menambah kolomnya dan
+`AuditColumns::attach` memasang triggernya, jadi tabel baru tidak perlu langkah tambahan; test penjaga
+kolom jejak juga menolak tabel tanpa versi.
+
+Tanpa versi, dua orang yang membuka record yang sama lalu menyimpan bergantian saling menimpa: perubahan
+orang pertama hilang tanpa pesan. Karena itu setiap endpoint yang mengubah, mengarsipkan, atau mengganti
+baris anak sebuah record yang sudah ada memanggil, sebelum menulis apa pun:
+
+```php
+RowVersion::claim($record, RowVersion::expected($request));
+```
+
+- `expected()` membaca header `If-Match` (ETag `W/"12"`) atau field `version` dari form. Tanpa keduanya
+  jawabannya 428 `version_required`.
+- `claim()` adalah update bersyarat pada versi itu. Versi yang sudah berbeda dijawab 409 `stale_version`
+  dengan pesan untuk pengguna; record yang tidak ada dijawab 404. Permintaan Inertia menerima galat yang
+  sama sebagai galat validasi pada field `version`, yang ditampilkan Shell sebagai toast dengan tombol
+  **Muat ulang**.
+- `claim()` sendiri menaikkan versi dan memegang kunci baris sampai transaksi selesai. Endpoint yang
+  hanya mengganti baris anak tetap mengklaim induknya, sehingga dua penggantian dengan versi yang sama
+  tidak mungkin sama-sama lolos.
+- Endpoint baca memulangkan `version` bersama record-nya; endpoint show JSON juga memasang header `ETag`.
+  Jawaban simpan JSON memulangkan versi baru, supaya layar dapat menyimpan lagi tanpa memuat ulang.
+- Layar mengirim versi dari data yang terakhir dimuat. Form Inertia mengambilnya dari props saat
+  dikirim, bukan dari isian awal `useForm`, karena isian awal tidak ikut diperbarui setelah simpan.
+  Kegagalan simpan ditampilkan dengan `toastSaveError`.
+
+Versi baris tidak menggantikan kunci baris: proses berlangkah banyak di dalam satu transaksi tetap
+memakai `lockForUpdate()`. Tabel yang kolom `version`-nya sudah bermakna lain dikecualikan di
+`AuditColumnsBoundaryTest`, dengan alasannya.
+>>>>>>> origin/main
 
 ### Penghapusan lunak
 

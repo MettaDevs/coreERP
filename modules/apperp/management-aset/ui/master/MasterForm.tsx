@@ -138,6 +138,9 @@ export default function MasterForm({
                         ? undefined
                         : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify({
+                        // Versi dibaca dari `value` saat menyimpan, bukan disalin ke state form:
+                        // rincian di bawah form dapat menaikkannya lebih dahulu.
+                        ...(value ? { version: value.version } : {}),
                         ...(manualCode ? { kode } : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,

@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use App\Support\Modules\Contracts\DaftarAkun;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -131,11 +132,17 @@ class AssetPostingGroupController extends Controller
             $existing = $this->find($groupAsetId, $effectiveFrom);
             $this->requirePermission($request, $existing ? 'update' : 'create');
             $this->rejectInvalidAccounts($tenantId, $accounts, $existing);
+            // Baris baru tidak punya versi untuk dibandingkan; baris yang sudah ada hanya boleh
+            // diubah dari versi yang dibuka pengguna.
+            if ($existing) {
+                RowVersion::claim($existing, RowVersion::expected($request));
+            }
 
             $row = $existing ?? new AssetPostingGroup(['group_aset_id' => $groupAsetId, 'effective_from' => $effectiveFrom]);
             $row->fill($accounts)->save();
 
-            return [$row, $existing === null];
+            // Dibaca ulang supaya respons membawa versi yang dinaikkan trigger.
+            return [$row->refresh(), $existing === null];
         });
 
         return response()->json(['data' => $this->present($row)], $created ? 201 : 200);
@@ -144,10 +151,12 @@ class AssetPostingGroupController extends Controller
     public function archive(Request $request, string $groupAsetId, string $effectiveFrom): Response
     {
         $this->requirePermission($request, 'archive');
-        DB::transaction(function () use ($groupAsetId, $effectiveFrom): void {
+        $expected = RowVersion::expected($request);
+        DB::transaction(function () use ($groupAsetId, $effectiveFrom, $expected): void {
             abort_unless(GroupAset::query()->whereKey($groupAsetId)->lockForUpdate()->exists(), 404);
             $row = $this->find($groupAsetId, $effectiveFrom);
             abort_if($row === null, 404);
+            RowVersion::claim($row, $expected);
             $row->delete();
         });
 
@@ -233,6 +242,7 @@ class AssetPostingGroupController extends Controller
             'effective_from' => $row->effective_from->toDateString(),
             ...$accounts,
             'missing' => $row->missingRequiredAccounts(),
+            'version' => $row->version,
         ];
     }
 

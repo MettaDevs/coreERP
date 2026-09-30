@@ -19,7 +19,7 @@ class CreateOrganizationHierarchyDraft
             throw new AuthorizationException;
         }
         if ($source->status !== 'published') {
-            throw ValidationException::withMessages(['version' => 'Draft baru hanya dapat dibuat dari versi yang sudah dipublikasikan.']);
+            throw ValidationException::withMessages(['hierarchy_version' => 'Draft baru hanya dapat dibuat dari versi yang sudah dipublikasikan.']);
         }
 
         return DB::transaction(function () use ($source, $effectiveFrom): OrganizationHierarchyVersion {

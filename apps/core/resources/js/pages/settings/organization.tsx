@@ -108,6 +108,7 @@ type Organization = {
     name: string;
     classification: 'legal_entity' | 'operating_unit';
     status: string;
+    version: number;
     legal_entity: {
         company_code: string;
         country_code: string;
@@ -142,6 +143,8 @@ type Hierarchy = {
     id: string;
     name: string;
     status: string;
+    /** Versi baris hierarchy; setiap perubahan pada versi mana pun mengirimnya. */
+    version: number;
     purposes: Purpose[];
     versions: Version[];
 };
@@ -774,6 +777,10 @@ function OrganizationDetailPage({
                     id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
                         event.preventDefault();
+                        form.transform((data) => ({
+                            ...data,
+                            version: organization.version,
+                        }));
                         form.patch(
                             `/settings/organization/organizations/${organization.id}`,
                             { onSuccess: () => setEditing(false) },
@@ -1186,9 +1193,11 @@ function CreateHierarchyDialog({
 
 function DraftActions({
     version,
+    rowVersion,
     organizations,
 }: {
     version: Version;
+    rowVersion: number;
     organizations: Organization[];
 }) {
     const placedIds = new Set(
@@ -1207,6 +1216,7 @@ function DraftActions({
             className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs"
             onSubmit={(event) => {
                 event.preventDefault();
+                form.transform((data) => ({ ...data, version: rowVersion }));
                 form.post(
                     `/settings/organization/hierarchy-versions/${version.id}/placements`,
                     {
@@ -1285,12 +1295,13 @@ function DraftActions({
                         size="sm"
                         className="text-xs font-medium shadow-xs"
                         disabled={form.processing}
-                        onClick={() =>
+                        onClick={() => {
+                            form.transform(() => ({ version: rowVersion }));
                             form.post(
                                 `/settings/organization/hierarchy-versions/${version.id}/publish`,
                                 { preserveScroll: true },
-                            )
-                        }
+                            );
+                        }}
                     >
                         <Check className="mr-1.5 size-3.5" /> Publikasikan
                     </Button>
@@ -1536,9 +1547,11 @@ function HierarchyCanvas({
 
 function RemovePlacementAction({
     version,
+    rowVersion,
     node,
 }: {
     version: Version;
+    rowVersion: number;
     node: HierarchyNode;
 }) {
     const [open, setOpen] = useState(false);
@@ -1569,15 +1582,16 @@ function RemovePlacementAction({
                         type="button"
                         variant="destructive"
                         disabled={form.processing}
-                        onClick={() =>
+                        onClick={() => {
+                            form.transform(() => ({ version: rowVersion }));
                             form.delete(
                                 `/settings/organization/hierarchy-versions/${version.id}/placements/${node.id}`,
                                 {
                                     preserveScroll: true,
                                     onSuccess: () => setOpen(false),
                                 },
-                            )
-                        }
+                            );
+                        }}
                     >
                         Batalkan Penempatan
                     </Button>
@@ -1587,7 +1601,13 @@ function RemovePlacementAction({
     );
 }
 
-function CreateVersionDraftAction({ version }: { version: Version }) {
+function CreateVersionDraftAction({
+    version,
+    rowVersion,
+}: {
+    version: Version;
+    rowVersion: number;
+}) {
     const today = useToday();
     const form = useForm({
         effective_from: today,
@@ -1616,6 +1636,10 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
+                        form.transform((data) => ({
+                            ...data,
+                            version: rowVersion,
+                        }));
                         form.post(
                             `/settings/organization/hierarchy-versions/${version.id}/drafts`,
                             { onSuccess: () => setOpen(false) },
@@ -2087,6 +2111,9 @@ export default function OrganizationPage({
                                                                             version={
                                                                                 version
                                                                             }
+                                                                            rowVersion={
+                                                                                hierarchy.version
+                                                                            }
                                                                             node={
                                                                                 node
                                                                             }
@@ -2102,6 +2129,9 @@ export default function OrganizationPage({
                                                 version.status === 'draft' && (
                                                     <DraftActions
                                                         version={version}
+                                                        rowVersion={
+                                                            hierarchy.version
+                                                        }
                                                         organizations={
                                                             organizations
                                                         }
@@ -2113,6 +2143,9 @@ export default function OrganizationPage({
                                                     <div className="flex justify-end pt-2">
                                                         <CreateVersionDraftAction
                                                             version={version}
+                                                            rowVersion={
+                                                                hierarchy.version
+                                                            }
                                                         />
                                                     </div>
                                                 )}

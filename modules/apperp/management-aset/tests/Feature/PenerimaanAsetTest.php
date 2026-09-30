@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -210,7 +211,7 @@ class PenerimaanAsetTest extends TestCase
         $aset = DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->orderBy('kode')->pluck('id')->all();
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.update'])
-            ->putJson($this->alamat($dokumen).'/aset', ['serial' => [
+            ->putJson($this->alamat($dokumen).'/aset', ['version' => $this->versiDokumen($dokumen), 'serial' => [
                 ['aset_id' => $aset[0], 'serial_number' => 'SN-001'],
                 ['aset_id' => $aset[1], 'serial_number' => 'SN-002'],
                 // Dikosongkan dengan sengaja: stikernya belum ketemu.
@@ -223,6 +224,71 @@ class PenerimaanAsetTest extends TestCase
         $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset[2], 'serial_number' => null]);
     }
 
+    public function test_simpan_kedua_dengan_versi_yang_sama_ditolak_dan_baris_simpan_pertama_bertahan(): void
+    {
+        $dokumen = $this->draf([$this->baris(jumlah: 1)]);
+        $pengubah = $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update']);
+
+        $pengubah->patchJson($this->alamat($dokumen), ['version' => 1, ...$this->payload([$this->baris(jumlah: 2, nama: 'Simpan pertama')])])
+            ->assertOk()->assertJsonPath('data.version', $this->versiDokumen($dokumen));
+        $pengubah->patchJson($this->alamat($dokumen), ['version' => 1, ...$this->payload([$this->baris(jumlah: 3, nama: 'Simpan kedua')])])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+
+        $baris = DB::table('aset_tr_penerimaan_aset_details')->where('penerimaan_aset_id', $dokumen)->get(['nama', 'jumlah']);
+        $this->assertCount(1, $baris);
+        $this->assertSame('Simpan pertama', $baris[0]->nama);
+        $this->assertSame(2, (int) $baris[0]->jumlah);
+    }
+
+    public function test_simpan_selesaikan_arsip_dan_nomor_seri_tanpa_versi_ditolak(): void
+    {
+        $dokumen = $this->draf([$this->baris(jumlah: 1)]);
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update'])
+            ->patchJson($this->alamat($dokumen), $this->payload([$this->baris(jumlah: 2)]))
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.create'])
+            ->postJson($this->alamat($dokumen).'/selesaikan')->assertStatus(428);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.archive'])
+            ->deleteJson($this->alamat($dokumen))->assertStatus(428);
+        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $dokumen, 'status' => 'draft', 'version' => 1, 'deleted_at' => null]);
+        $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->count());
+
+        $this->selesaikan($dokumen)->assertOk();
+        $aset = (string) DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->value('id');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.update'])
+            ->putJson($this->alamat($dokumen).'/aset', ['serial' => [['aset_id' => $aset, 'serial_number' => 'SN-TANPA-VERSI']]])
+            ->assertStatus(428);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'serial_number' => null]);
+    }
+
+    public function test_nomor_seri_dengan_versi_basi_ditolak_dan_isian_pertama_bertahan(): void
+    {
+        $dokumen = $this->draf([$this->baris(jumlah: 1)]);
+        $this->selesaikan($dokumen)->assertOk();
+        $aset = (string) DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->value('id');
+        $versi = $this->versiDokumen($dokumen);
+        $pengisi = $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.update']);
+
+        $pengisi->putJson($this->alamat($dokumen).'/aset', ['version' => $versi, 'serial' => [['aset_id' => $aset, 'serial_number' => 'SN-PERTAMA']]])
+            ->assertOk()->assertJsonPath('version', $this->versiDokumen($dokumen));
+        $pengisi->putJson($this->alamat($dokumen).'/aset', ['version' => $versi, 'serial' => [['aset_id' => $aset, 'serial_number' => 'SN-KEDUA']]])
+            ->assertConflict()->assertJsonPath('error.code', 'stale_version');
+
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'serial_number' => 'SN-PERTAMA']);
+    }
+
+    public function test_rincian_memulangkan_versi_dan_etag(): void
+    {
+        $dokumen = $this->draf([$this->baris(jumlah: 1)]);
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read'])
+            ->getJson($this->alamat($dokumen))
+            ->assertOk()->assertJsonPath('data.version', 1)->assertHeader('ETag', RowVersion::etag(1));
+    }
+
     /** Grid satu dokumen tidak boleh menyentuh aset dari dokumen lain. */
     public function test_nomor_seri_menolak_aset_dari_dokumen_lain(): void
     {
@@ -233,7 +299,7 @@ class PenerimaanAsetTest extends TestCase
         $asing = (string) DB::table('aset_tr_aset')->where('penerimaan_aset_id', $kedua)->value('id');
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.update'])
-            ->putJson($this->alamat($pertama).'/aset', ['serial' => [
+            ->putJson($this->alamat($pertama).'/aset', ['version' => $this->versiDokumen($pertama), 'serial' => [
                 ['aset_id' => $asing, 'serial_number' => 'SN-NAKAL'],
             ]])
             ->assertStatus(422)
@@ -271,6 +337,12 @@ class PenerimaanAsetTest extends TestCase
     private function alamat(string $id): string
     {
         return '/api/modules/management-aset/v1/penerimaan-aset/'.$id;
+    }
+
+    /** Versi dokumen saat ini, yang dikirim balik oleh penyimpanan berikutnya. */
+    private function versiDokumen(string $id): int
+    {
+        return (int) DB::table('aset_tr_penerimaan_aset')->where('id', $id)->value('version');
     }
 
     /**

@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property int $version
+ */
 class SecurityPrivilege extends Model
 {
     protected $primaryKey = 'code';

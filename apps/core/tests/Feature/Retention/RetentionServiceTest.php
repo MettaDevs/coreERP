@@ -139,6 +139,17 @@ final class RetentionServiceTest extends TestCase
         $this->assertSame(0, DB::table('retention_policy_setups')->count());
     }
 
+    public function test_penyimpanan_dengan_versi_basi_ditolak(): void
+    {
+        $url = '/settings/retention/report_exports';
+        $this->actingAs($this->owner)->put($url, ['retention_days' => 3, 'version' => 0])->assertSessionHasNoErrors();
+        // Tab kedua masih membuka nilai bawaan (versi 0), padahal setelannya sudah disimpan.
+        $this->actingAs($this->owner)->put($url, ['retention_days' => 5, 'version' => 0])->assertSessionHasErrors('version');
+        $this->actingAs($this->owner)->put($url, ['retention_days' => 5])->assertSessionHasErrors('version');
+
+        $this->assertSame(3, $this->retention->daysFor('report_exports', $this->membership->tenant_id));
+    }
+
     public function test_kebijakan_tidak_dikenal_ditolak(): void
     {
         $this->actingAs($this->owner)->put('/settings/retention/parties', ['retention_days' => 400])->assertNotFound();
@@ -151,7 +162,7 @@ final class RetentionServiceTest extends TestCase
         $oneAudit = $this->audit($one, 370);
         $twoAudit = $this->audit($two, 370);
 
-        $this->actingAs($this->owner)->put('/settings/retention/number_sequence_audit', ['retention_days' => 365])->assertRedirect();
+        $this->actingAs($this->owner)->put('/settings/retention/number_sequence_audit', ['retention_days' => 365, 'version' => 0])->assertRedirect()->assertSessionHasNoErrors();
         $this->retention->apply();
 
         $this->assertNull(DB::table('number_sequence_audit_events')->find($oneAudit));
@@ -169,11 +180,11 @@ final class RetentionServiceTest extends TestCase
         $this->retention->apply(tenantId: $tenant);
         $this->assertSame(4, $this->changeLogCount($tenant), 'Bawaannya mati: tidak ada yang dihapus.');
 
-        $this->actingAs($this->owner)->put('/settings/retention/change_log_other', ['enabled' => true, 'retention_days' => 30])->assertRedirect();
+        $this->actingAs($this->owner)->put('/settings/retention/change_log_other', ['enabled' => true, 'retention_days' => 30, 'version' => 0])->assertRedirect()->assertSessionHasNoErrors();
         $this->retention->apply(tenantId: $tenant);
         $this->assertSame(['baru-biasa', 'lama-akses', 'sangat-lama-akses'], $this->changeLogRecords($tenant), 'Tabel akses tidak ikut kebijakan biasa.');
 
-        $this->actingAs($this->owner)->put('/settings/retention/change_log_access', ['enabled' => true, 'retention_days' => 365])->assertRedirect();
+        $this->actingAs($this->owner)->put('/settings/retention/change_log_access', ['enabled' => true, 'retention_days' => 365, 'version' => 0])->assertRedirect()->assertSessionHasNoErrors();
         $this->retention->apply(tenantId: $tenant);
         $this->assertSame(['baru-biasa', 'lama-akses'], $this->changeLogRecords($tenant));
     }
@@ -270,7 +281,7 @@ final class RetentionServiceTest extends TestCase
         $tenant = $this->membership->tenant_id;
         $this->assertSame(7, $this->retention->daysFor('report_exports', $tenant));
 
-        $this->actingAs($this->owner)->put('/settings/retention/report_exports', ['retention_days' => 3])->assertRedirect();
+        $this->actingAs($this->owner)->put('/settings/retention/report_exports', ['retention_days' => 3, 'version' => 0])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(3, $this->retention->daysFor('report_exports', $tenant));
         $this->assertSame(7, $this->retention->daysFor('report_exports', $this->otherMembership->tenant_id));

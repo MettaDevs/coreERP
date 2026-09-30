@@ -60,7 +60,7 @@ class WorkflowConfigurationTest extends TestCase
         $this->assertFalse((bool) $workflow->enabled);
         $this->assertDatabaseHas('workflow_elements', ['version_id' => DB::table('workflow_configuration_versions')->value('id'), 'kind' => 'approval']);
 
-        $this->actingAs($this->owner)->postJson("/settings/workflows/{$workflow->id}/publish")
+        $this->actingAs($this->owner)->postJson("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)])
             ->assertRedirect();
 
         $this->assertDatabaseHas('workflow_configurations', ['id' => $workflow->id, 'enabled' => true]);
@@ -78,7 +78,7 @@ class WorkflowConfigurationTest extends TestCase
             'name' => 'Persetujuan pemusnahan aset', 'assignee_type' => 'role', 'assignee_id' => $role->id,
         ]);
         $workflow = DB::table('workflow_configurations')->first();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish");
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)]);
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
 
@@ -102,7 +102,7 @@ class WorkflowConfigurationTest extends TestCase
         $role = Role::create(['tenant_id' => $membership->tenant_id, 'name' => 'Pemeriksa bertingkat', 'is_active' => true]);
         RoleAssignment::create(['membership_id' => $membership->id, 'role_id' => $role->id, 'source' => 'manual', 'status' => 'active', 'valid_from' => now()]);
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'level-1', 'type' => 'approval', 'data' => ['label' => 'Level 1', 'config' => ['assignee' => ['type' => 'role', 'id' => $role->id]]], 'position' => ['x' => 200, 'y' => 0]],
             ['id' => 'level-2', 'type' => 'approval', 'data' => ['label' => 'Level 2', 'config' => ['assignee' => ['type' => 'role', 'id' => $role->id]]], 'position' => ['x' => 400, 'y' => 0]],
@@ -110,7 +110,7 @@ class WorkflowConfigurationTest extends TestCase
         ], 'edges' => [
             ['source' => 'start', 'target' => 'level-1'], ['source' => 'level-1', 'target' => 'level-2', 'outcome' => 'approve'], ['source' => 'level-2', 'target' => 'end', 'outcome' => 'approve'],
         ]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish");
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)]);
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
         $instance = app(WorkflowRuntime::class)->submit($membership->tenant_id, $type, $version, 'multi:1', ['source_document_type' => 'asset', 'source_document_id' => (string) Str::ulid(), 'decision_context' => ['document_id' => (string) Str::ulid(), 'asset_id' => (string) Str::ulid()]]);
@@ -129,7 +129,7 @@ class WorkflowConfigurationTest extends TestCase
         $secondUser = User::factory()->create(['name' => 'Second approver', 'email' => 'second@workflow.test']);
         $secondMembership = TenantMembership::create(['tenant_id' => $membership->tenant_id, 'user_id' => $secondUser->id, 'status' => 'active']);
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'approval', 'type' => 'approval', 'data' => ['label' => 'Persetujuan bersama', 'config' => [
                 'assignees' => [['type' => 'member', 'id' => $membership->id], ['type' => 'member', 'id' => $secondMembership->id]],
@@ -139,7 +139,7 @@ class WorkflowConfigurationTest extends TestCase
         ], 'edges' => [
             ['source' => 'start', 'target' => 'approval'], ['source' => 'approval', 'target' => 'end', 'outcome' => 'approve'],
         ]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish")->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)])->assertRedirect();
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
         $instance = app(WorkflowRuntime::class)->submit($membership->tenant_id, $type, $version, 'selected:1', ['source_document_type' => 'asset', 'source_document_id' => (string) Str::ulid(), 'decision_context' => ['document_id' => (string) Str::ulid(), 'asset_id' => (string) Str::ulid()]]);
@@ -155,14 +155,14 @@ class WorkflowConfigurationTest extends TestCase
     {
         DB::table('workflow_types')->where('id', $this->workflowTypeId)->update(['decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id'], 'properties' => ['estimated_value' => ['type' => 'number']]], JSON_THROW_ON_ERROR)]);
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'condition', 'type' => 'condition', 'data' => ['label' => 'Nilai tinggi?', 'config' => ['field' => 'estimated_value', 'operator' => 'greater_than', 'value' => 10]], 'position' => ['x' => 200, 'y' => 0]],
             ['id' => 'end', 'type' => 'end', 'data' => ['label' => 'Selesai', 'config' => []], 'position' => ['x' => 400, 'y' => 0]],
         ], 'edges' => [
             ['source' => 'start', 'target' => 'condition'], ['source' => 'condition', 'target' => 'end', 'outcome' => 'true'], ['source' => 'condition', 'target' => 'end', 'outcome' => 'false'],
         ]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish");
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)]);
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
         $instance = app(WorkflowRuntime::class)->submit($this->owner->activeMembership()->tenant_id, $type, $version, 'condition:1', ['source_document_type' => 'asset', 'source_document_id' => (string) Str::ulid(), 'decision_context' => ['document_id' => (string) Str::ulid(), 'asset_id' => (string) Str::ulid(), 'estimated_value' => 20]]);
@@ -176,7 +176,7 @@ class WorkflowConfigurationTest extends TestCase
         $role = Role::create(['tenant_id' => $membership->tenant_id, 'name' => 'Tim paralel', 'is_active' => true]);
         RoleAssignment::create(['membership_id' => $membership->id, 'role_id' => $role->id, 'source' => 'manual', 'status' => 'active', 'valid_from' => now()]);
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'parallel', 'type' => 'parallel', 'data' => ['label' => 'Pemeriksaan paralel', 'config' => []], 'position' => ['x' => 200, 'y' => 0]],
             ['id' => 'left', 'type' => 'approval', 'data' => ['label' => 'Pemeriksaan A', 'config' => ['assignee' => ['type' => 'role', 'id' => $role->id]]], 'position' => ['x' => 400, 'y' => 10]],
@@ -185,7 +185,7 @@ class WorkflowConfigurationTest extends TestCase
         ], 'edges' => [
             ['source' => 'start', 'target' => 'parallel'], ['source' => 'parallel', 'target' => 'left'], ['source' => 'parallel', 'target' => 'right'], ['source' => 'left', 'target' => 'end', 'outcome' => 'approve'], ['source' => 'right', 'target' => 'end', 'outcome' => 'approve'],
         ]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish");
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)]);
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
         $instance = app(WorkflowRuntime::class)->submit($membership->tenant_id, $type, $version, 'parallel:1', ['source_document_type' => 'asset', 'source_document_id' => (string) Str::ulid(), 'decision_context' => ['document_id' => (string) Str::ulid(), 'asset_id' => (string) Str::ulid()]]);
@@ -200,12 +200,17 @@ class WorkflowConfigurationTest extends TestCase
     public function test_publish_rejects_disconnected_nodes(): void
     {
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'end', 'type' => 'end', 'data' => ['label' => 'Selesai', 'config' => []], 'position' => ['x' => 200, 'y' => 0]],
             ['id' => 'orphan', 'type' => 'manual_task', 'data' => ['label' => 'Tidak terhubung', 'config' => []], 'position' => ['x' => 400, 'y' => 0]],
         ], 'edges' => [['source' => 'start', 'target' => 'end']]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish")->assertSessionHasErrors('node.orphan');
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)])->assertSessionHasErrors('node.orphan');
+    }
+
+    private function rowVersion(object $workflow): int
+    {
+        return (int) DB::table('workflow_configurations')->where('id', $workflow->id)->value('version');
     }
 
     private function createWorkflow(): object
@@ -573,7 +578,7 @@ class WorkflowConfigurationTest extends TestCase
     private function submitOwnDocument(TenantMembership $membership, ?array $penerima = null): object
     {
         $workflow = $this->createWorkflow();
-        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['version' => $this->rowVersion($workflow), 'nodes' => [
             ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
             ['id' => 'periksa', 'type' => 'approval', 'data' => ['label' => 'Pemeriksaan', 'config' => [
                 'assignees' => array_map(
@@ -587,7 +592,7 @@ class WorkflowConfigurationTest extends TestCase
             ['source' => 'start', 'target' => 'periksa'],
             ['source' => 'periksa', 'target' => 'end', 'outcome' => 'approve'],
         ]])->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish")->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish", ['version' => $this->rowVersion($workflow)])->assertRedirect();
 
         $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
         $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();

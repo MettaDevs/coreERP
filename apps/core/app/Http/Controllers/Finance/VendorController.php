@@ -12,6 +12,7 @@ use App\Models\TenantNumberSequence;
 use App\Models\Vendor;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -108,7 +109,7 @@ final class VendorController extends Controller
             'status' => $data['status'] ?? Vendor::ACTIVE,
         ], $kunci);
 
-        return response()->json(['data' => $this->present($vendor->load('party'))], $vendor->wasRecentlyCreated ? 201 : 200);
+        return response()->json(['data' => $this->present($vendor->refresh()->load('party'))], $vendor->wasRecentlyCreated ? 201 : 200);
     }
 
     public function update(Request $request, Vendor $vendor, SaveVendor $simpan): JsonResponse
@@ -125,7 +126,7 @@ final class VendorController extends Controller
             'name' => trim((string) $data['name']),
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => (string) $data['status'],
-        ]);
+        ], RowVersion::expected($request));
 
         return response()->json(['data' => $this->present($vendor->load('party'))]);
     }
@@ -188,6 +189,7 @@ final class VendorController extends Controller
     {
         return [
             'id' => $vendor->id,
+            'version' => (int) $vendor->version,
             'number' => $vendor->number,
             'name' => (string) $vendor->party->name,
             'party_id' => $vendor->party_id,

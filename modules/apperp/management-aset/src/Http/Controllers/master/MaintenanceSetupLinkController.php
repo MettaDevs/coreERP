@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ final class MaintenanceSetupLinkController extends Controller
 
         return response()->json(['data' => MaintenanceJobTypeVariant::query()
             ->where('maintenance_job_type_id', $jobTypeId)
-            ->orderBy('kode')->get(['id', 'kode', 'nama', 'keterangan', 'aktif'])]);
+            ->orderBy('kode')->get(['id', 'kode', 'nama', 'keterangan', 'aktif', 'version'])]);
     }
 
     // Persyaratan skill dan sertifikat job type dihapus. Keduanya adalah kompetensi milik
@@ -41,7 +42,7 @@ final class MaintenanceSetupLinkController extends Controller
         $this->jobType($jobTypeId);
         $this->permission($request, 'maintenance-job-types', 'read');
 
-        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id'));
+        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id', MaintenanceJobType::class));
     }
 
     public function replaceJobTypeAsetTypes(Request $request, string $jobTypeId): JsonResponse
@@ -51,9 +52,9 @@ final class MaintenanceSetupLinkController extends Controller
         $this->permission($request, 'maintenance-job-types', 'update');
 
         $data = $request->validate($this->asetTypeIdsRules($tenant));
-        $this->replaceAsetTypeLink($jobTypeId, $data['jenis_aset_ids']);
+        $this->replaceAsetTypeLink($jobTypeId, $data['jenis_aset_ids'], RowVersion::expected($request));
 
-        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id'));
+        return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id', MaintenanceJobType::class));
     }
 
     public function jenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
@@ -61,7 +62,7 @@ final class MaintenanceSetupLinkController extends Controller
         $this->jenisAset($jenisAsetId);
         $this->permission($request, 'jenis-aset', 'read');
 
-        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
+        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id', JenisAset::class));
     }
 
     public function replaceJenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
@@ -71,13 +72,18 @@ final class MaintenanceSetupLinkController extends Controller
         $this->permission($request, 'jenis-aset', 'update');
 
         $data = $request->validate($this->jobTypeIdsRules($tenant));
-        DB::transaction(function () use ($jenisAsetId, $data): void {
-            // Dikunci dari sisi job type, bukan sisi jenis aset, karena arah yang
-            // satunya juga mengunci job type. Lihat lockJobTypes().
+        $expected = RowVersion::expected($request);
+        DB::transaction(function () use ($jenisAsetId, $data, $expected): void {
+            // Kunci job type diambil lebih dulu, baru versi jenis aset diklaim: arah yang satunya
+            // mengunci job type lalu jenis aset, jadi urutan kuncinya sama dan tidak saling menunggu.
+            // Kaitan yang berubah menaikkan versi job type di seberangnya, supaya layar job type yang
+            // dibuka sebelum penyimpanan ini tidak menimpanya tanpa pesan. Lihat lockJobTypes().
             $current = MaintenanceJobTypeJenisAset::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->pluck('job_type_id')->all();
             $this->lockJobTypes([...$current, ...$data['jenis_aset_ids']]);
+            RowVersion::claim(JenisAset::query()->findOrFail($jenisAsetId), $expected);
+            $this->bumpCounterparts(MaintenanceJobType::class, $current, $data['jenis_aset_ids']);
 
             MaintenanceJobTypeJenisAset::query()->where('jenis_aset_id', $jenisAsetId)->delete();
             foreach ($data['jenis_aset_ids'] as $jobTypeId) {
@@ -89,7 +95,7 @@ final class MaintenanceSetupLinkController extends Controller
             }
         });
 
-        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id'));
+        return response()->json($this->asetTypeTransfer($jenisAsetId, 'jenis_aset_id', JenisAset::class));
     }
 
     public function variableValues(Request $request, string $variableId): JsonResponse
@@ -99,7 +105,7 @@ final class MaintenanceSetupLinkController extends Controller
 
         return response()->json(['data' => MaintenanceChecklistVariableValue::query()
             ->where('variable_id', $variableId)->orderBy('line_number')->get()
-            ->map($this->baris(...))]);
+            ->map($this->baris(...)), 'version' => $this->version(MaintenanceChecklistVariable::class, $variableId)]);
     }
 
     public function replaceVariableValues(Request $request, string $variableId): JsonResponse
@@ -112,8 +118,9 @@ final class MaintenanceSetupLinkController extends Controller
             'values.*.value' => ['required', 'string', 'max:255'],
             'values.*.result_code' => ['required', Rule::in(['pass', 'fail', 'none'])],
         ]);
-        DB::transaction(function () use ($variableId, $data): void {
-            $this->lockRecord(MaintenanceChecklistVariable::class, $variableId);
+        $expected = RowVersion::expected($request);
+        DB::transaction(function () use ($variableId, $data, $expected): void {
+            RowVersion::claim(MaintenanceChecklistVariable::query()->findOrFail($variableId), $expected);
             MaintenanceChecklistVariableValue::query()->where('variable_id', $variableId)->delete();
             foreach ($data['values'] as $value) {
                 MaintenanceChecklistVariableValue::query()->create([
@@ -135,7 +142,7 @@ final class MaintenanceSetupLinkController extends Controller
 
         return response()->json(['data' => MaintenanceChecklistTemplateLine::query()
             ->where('template_id', $templateId)->orderBy('line_number')->get()
-            ->map($this->baris(...))]);
+            ->map($this->baris(...)), 'version' => $this->version(MaintenanceChecklistTemplate::class, $templateId)]);
     }
 
     public function replaceTemplateLines(Request $request, string $templateId): JsonResponse
@@ -159,9 +166,10 @@ final class MaintenanceSetupLinkController extends Controller
             'lines.*.nama.required' => 'Nama baris wajib diisi.',
         ]);
         $unitCodes = $this->measurementUnitCodes($tenant, $data['lines']);
+        $expected = RowVersion::expected($request);
 
-        DB::transaction(function () use ($templateId, $data, $unitCodes): void {
-            $this->lockRecord(MaintenanceChecklistTemplate::class, $templateId);
+        DB::transaction(function () use ($templateId, $data, $unitCodes, $expected): void {
+            RowVersion::claim(MaintenanceChecklistTemplate::query()->findOrFail($templateId), $expected);
             MaintenanceChecklistTemplateLine::query()->where('template_id', $templateId)->delete();
             foreach ($data['lines'] as $line) {
                 $min = $line['min_value'] ?? null;
@@ -233,8 +241,11 @@ final class MaintenanceSetupLinkController extends Controller
         return $row->getAttributes();
     }
 
-    /** @return array<string, mixed> */
-    private function asetTypeTransfer(string $id, string $column): array
+    /**
+     * @param  class-string<Model>  $owner  pemilik yang disebut alamat, pemegang versi himpunan ini
+     * @return array<string, mixed>
+     */
+    private function asetTypeTransfer(string $id, string $column, string $owner): array
     {
         $selectedIds = MaintenanceJobTypeJenisAset::query()->where($column, $id)
             ->pluck($column === 'job_type_id' ? 'jenis_aset_id' : 'job_type_id')->all();
@@ -245,14 +256,21 @@ final class MaintenanceSetupLinkController extends Controller
         return ['data' => [
             'remaining' => $all->reject(fn ($item) => in_array((string) $item->id, $selectedIds, true))->values(),
             'selected' => $all->filter(fn ($item) => in_array((string) $item->id, $selectedIds, true))->values(),
-        ]];
+        ], 'version' => $this->version($owner, $id)];
     }
 
     /** @param  list<string>  $jenisAsetIds */
-    private function replaceAsetTypeLink(string $jobTypeId, array $jenisAsetIds): void
+    private function replaceAsetTypeLink(string $jobTypeId, array $jenisAsetIds, int $expected): void
     {
-        DB::transaction(function () use ($jobTypeId, $jenisAsetIds): void {
-            $this->lockJobTypes([$jobTypeId]);
+        DB::transaction(function () use ($jobTypeId, $jenisAsetIds, $expected): void {
+            // Klaim versi juga mengunci baris job type ini, kunci yang sama dengan yang
+            // diambil lockJobTypes() pada arah yang satunya. Jenis aset yang kaitannya berubah
+            // dinaikkan versinya sesudahnya, dengan alasan yang sama seperti di arah itu.
+            RowVersion::claim(MaintenanceJobType::query()->findOrFail($jobTypeId), $expected);
+            $current = MaintenanceJobTypeJenisAset::query()
+                ->where('job_type_id', $jobTypeId)
+                ->pluck('jenis_aset_id')->all();
+            $this->bumpCounterparts(JenisAset::class, $current, $jenisAsetIds);
             MaintenanceJobTypeJenisAset::query()->where('job_type_id', $jobTypeId)->delete();
             foreach ($jenisAsetIds as $jenisAsetId) {
                 MaintenanceJobTypeJenisAset::query()->create([
@@ -282,21 +300,21 @@ final class MaintenanceSetupLinkController extends Controller
     }
 
     /**
-     * Menahan baris pemilik selama transaksi penggantian berjalan.
+     * Versi pemilik sebuah himpunan baris, yang dikirim balik layar saat menyimpan himpunan itu.
      *
-     * Setiap endpoint "replace" di sini menghapus lalu menyisipkan ulang. Tanpa
-     * kunci, dua permintaan atas pemilik yang sama bisa saling menyela: yang satu
-     * menghapus, yang lain menghapus dan menyisipkan, lalu yang pertama menyisipkan
-     * di atasnya. Hasilnya gabungan dua himpunan — bukan kehendak salah satu
-     * pengguna, dan tidak ada batasan basis data yang menolaknya karena tiap baris
-     * masing-masing sah. Feature test tidak akan pernah melihat ini: ia menjalankan
-     * satu permintaan pada satu proses.
+     * Setiap endpoint "replace" di sini menghapus lalu menyisipkan ulang, dan lebih dahulu
+     * mengklaim versi pemiliknya. Klaim itu menolak himpunan yang disusun dari data basi, dan
+     * memegang kunci baris pemilik sampai transaksi selesai. Tanpa kunci, dua permintaan atas
+     * pemilik yang sama bisa saling menyela: yang satu menghapus, yang lain menghapus dan
+     * menyisipkan, lalu yang pertama menyisipkan di atasnya. Hasilnya gabungan dua himpunan —
+     * bukan kehendak salah satu pengguna, dan tidak ada batasan basis data yang menolaknya
+     * karena tiap baris masing-masing sah.
      *
      * @param  class-string<Model>  $model
      */
-    private function lockRecord(string $model, string $id): void
+    private function version(string $model, string $id): int
     {
-        $model::query()->whereKey($id)->lockForUpdate()->first();
+        return (int) $model::query()->whereKey($id)->value('version');
     }
 
     /**
@@ -328,6 +346,27 @@ final class MaintenanceSetupLinkController extends Controller
         MaintenanceJobType::query()->withTrashed()
             ->whereKey($ids)
             ->orderBy('id')->lockForUpdate()->get(['id']);
+    }
+
+    /**
+     * Menaikkan versi pemilik di seberang kaitan yang ditambah atau dilepas, terurut menurut id.
+     * Klaim `RowVersion` tidak mengubah kolom apa pun, dan UPDATE seperti itu selalu menaikkan versi.
+     *
+     * @param  class-string<JenisAset|MaintenanceJobType>  $model
+     * @param  array<int, mixed>  $before
+     * @param  array<int, mixed>  $after
+     */
+    private function bumpCounterparts(string $model, array $before, array $after): void
+    {
+        $before = array_map('strval', $before);
+        $after = array_map('strval', $after);
+        $changed = array_values(array_unique([...array_diff($before, $after), ...array_diff($after, $before)]));
+        if ($changed === []) {
+            return;
+        }
+
+        $model::query()->withTrashed()->whereKey($changed)->orderBy('id')->lockForUpdate()->get(['id']);
+        $model::query()->withTrashed()->whereKey($changed)->toBase()->update(['version' => DB::raw('version')]);
     }
 
     private function tenant(Request $request): string

@@ -36,6 +36,8 @@ type Policy = {
     days: number;
     customized: boolean;
     optional: boolean;
+    /** Versi baris setelan tenant; 0 selama masih memakai bawaan. */
+    version: number;
 };
 
 type Entry = {
@@ -73,6 +75,11 @@ function PolicyRow({
             className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between"
             onSubmit={(event) => {
                 event.preventDefault();
+                // Versi dari props saat dikirim: isian useForm tidak ikut diperbarui sesudah simpan.
+                form.transform((data) => ({
+                    ...data,
+                    version: policy.version,
+                }));
                 form.put(`/settings/retention/${policy.code}`, {
                     preserveScroll: true,
                 });

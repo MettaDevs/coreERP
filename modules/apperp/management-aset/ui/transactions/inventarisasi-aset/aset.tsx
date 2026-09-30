@@ -40,6 +40,7 @@ export type Aset = {
 export type RincianAset = Aset &
     Record<string, unknown> & {
         atribut: { tipe_atribut_id: string; nama: string; nilai: FieldValue }[];
+        version: number;
     };
 
 export type Placement = {

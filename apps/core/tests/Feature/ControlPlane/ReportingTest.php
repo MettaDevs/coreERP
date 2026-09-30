@@ -247,7 +247,7 @@ class ReportingTest extends TestCase
             ->json('data');
 
         $this->actingAs($this->owner)
-            ->putJson('/api/v1/reports/'.self::KODE_LAPORAN.'/layout-default', ['layout_ref' => $layout['id'], 'scope' => 'tenant'])
+            ->putJson('/api/v1/reports/'.self::KODE_LAPORAN.'/layout-default', ['layout_ref' => $layout['id'], 'scope' => 'tenant', 'version' => 0])
             ->assertOk()
             ->assertJsonPath('meta.default_ref', $layout['id']);
 
@@ -270,6 +270,45 @@ class ReportingTest extends TestCase
         $this->actingAs($this->memberWithoutRoles())
             ->post('/api/v1/reports/'.self::KODE_LAPORAN.'/layouts', ['file' => $upload, 'name' => 'X', 'scope' => 'tenant'])
             ->assertForbidden();
+    }
+
+    public function test_layout_unggahan_dan_pilihan_default_menolak_versi_basi_dan_versi_kosong(): void
+    {
+        $base = '/api/v1/reports/'.self::KODE_LAPORAN;
+        $upload = UploadedFile::fake()->createWithContent('daftar.xlsx', $this->spreadsheetTemplate());
+        $id = $this->actingAs($this->owner)
+            ->post("{$base}/layouts", ['file' => $upload, 'name' => 'Ringkas', 'scope' => 'tenant'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $listing = $this->getJson("{$base}/layouts")->assertOk();
+        $this->assertSame(1, collect($listing->json('data'))->firstWhere('ref', $id)['version']);
+        $this->assertSame(0, $listing->json('meta.default_versions.tenant'));
+
+        $this->postJson("{$base}/layouts/{$id}", ['name' => 'Pertama', 'version' => 1])->assertOk()->assertJsonPath('data.version', 3);
+        $this->postJson("{$base}/layouts/{$id}", ['name' => 'Kedua', 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $this->postJson("{$base}/layouts/{$id}", ['name' => 'Kedua'])->assertStatus(428);
+        $this->deleteJson("{$base}/layouts/{$id}", [], ['If-Match' => 'W/"1"'])->assertStatus(409);
+        $this->assertSame('Pertama', DB::table('report_layouts')->where('id', $id)->value('name'));
+
+        // Pilihan default lingkup tenant belum punya baris: versi 0 wajib dikirim, dan 0 yang dikirim
+        // lagi sesudah barisnya ada berarti basi. Mengosongkan pilihan menghapus barisnya, jadi versi
+        // lama yang dikirim sesudahnya juga basi.
+        $this->putJson("{$base}/layout-default", ['layout_ref' => $id, 'scope' => 'tenant'])->assertStatus(428);
+        $this->putJson("{$base}/layout-default", ['layout_ref' => $id, 'scope' => 'tenant', 'version' => 0])
+            ->assertOk()
+            ->assertJsonPath('meta.default_versions.tenant', 1);
+        $this->putJson("{$base}/layout-default", ['layout_ref' => null, 'scope' => 'tenant', 'version' => 0])->assertStatus(409);
+        $this->assertSame($id, $this->getJson("{$base}/layouts")->json('meta.default_ref'));
+        $this->putJson("{$base}/layout-default", ['layout_ref' => null, 'scope' => 'tenant', 'version' => 1])
+            ->assertOk()
+            ->assertJsonPath('meta.default_versions.tenant', 0);
+        $this->putJson("{$base}/layout-default", ['layout_ref' => $id, 'scope' => 'tenant', 'version' => 1])->assertStatus(409);
+
+        $this->deleteJson("{$base}/layouts/{$id}", [], ['If-Match' => 'W/"3"'])->assertNoContent();
+        $this->assertFalse(DB::table('report_layouts')->where('id', $id)->exists());
     }
 
     public function test_layout_bermakro_ditolak_dan_penolakan_module_menjadi_ekspor_gagal(): void
@@ -334,6 +373,7 @@ class ReportingTest extends TestCase
                 'address_lines' => ['Alamat yang seharusnya diabaikan'],
                 'phone' => '000',
                 'footer_text' => 'Dokumen ini sah tanpa tanda tangan basah.',
+                'version' => 0,
             ])
             ->assertOk()
             ->assertJsonPath('data.parent_lines.1', 'DINAS KESEHATAN')
@@ -344,11 +384,11 @@ class ReportingTest extends TestCase
 
         $logo = UploadedFile::fake()->image('lambang.png', 120, 120);
         $this->actingAs($this->owner)
-            ->post("/api/v1/organizations/{$legalEntity}/print-identity/logos", ['file' => $logo, 'position' => 'kiri'])
+            ->post("/api/v1/organizations/{$legalEntity}/print-identity/logos", ['file' => $logo, 'position' => 'kiri', 'version' => $this->versiIdentitas($legalEntity)])
             ->assertCreated()
             ->assertJsonPath('data.logos.0.position', 'kiri');
         $this->actingAs($this->owner)
-            ->post("/api/v1/organizations/{$legalEntity}/print-identity/logos", ['file' => UploadedFile::fake()->image('instansi.png', 80, 80), 'position' => 'kanan'])
+            ->post("/api/v1/organizations/{$legalEntity}/print-identity/logos", ['file' => UploadedFile::fake()->image('instansi.png', 80, 80), 'position' => 'kanan', 'version' => $this->versiIdentitas($legalEntity)])
             ->assertCreated()
             ->assertJsonCount(2, 'data.logos');
 
@@ -640,6 +680,12 @@ class ReportingTest extends TestCase
         $zip->close();
 
         return $count;
+    }
+
+    /** Versi identitas cetak yang tersimpan; 0 bila belum pernah disimpan. */
+    private function versiIdentitas(string $organizationId): int
+    {
+        return (int) DB::table('print_identities')->where('organization_id', $organizationId)->value('version');
     }
 
     private function documentXml(string $docx): string

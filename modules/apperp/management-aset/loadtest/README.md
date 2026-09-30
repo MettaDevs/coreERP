@@ -54,6 +54,8 @@ usaha yang sungguhan di dalam `setup()` — lihat `apps/core/loadtest/k6/lib.js`
 database sendiri. Query oracle yang masih menyebut `m_group_aset` tidak error — ia hanya tidak
 menemukan tabel, dan gate-nya lolos secara palsu. Itu sebabnya seluruh `verify.sql` ditulis ulang.
 
+**Versi baris dibaca dan dikirim.** Setiap penyimpanan atas record yang sudah ada membawa versi yang terakhir dibaca skenario (field `version` atau header `If-Match`), diambil dari jawaban pembuatan atau dari pembacaan ulang, tidak pernah ditebak atau ditambah satu. Pada profil balapan beberapa VU menyimpan record yang sama, jadi 409 `stale_version` adalah hasil yang sah: ia masuk `http.expectedStatuses` dan tidak dihitung sebagai pelanggaran. Yang tetap dihitung pelanggaran adalah 5xx, himpunan campuran, dan tulis lintas tenant.
+
 ## Menjalankan skenario modul
 
 Dari `apps/core/loadtest/`, dengan stack sudah menyala:

@@ -9,6 +9,7 @@ export type PabrikanModelRecord = {
     nama: string;
     keterangan: string | null;
     aktif: boolean;
+    version: number;
     pabrikan_aset_id: string;
     jenis_aset_id: string | null;
     jenis_aset: { id: string; kode: string; nama: string } | null;

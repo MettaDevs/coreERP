@@ -7,6 +7,7 @@ use App\Models\ElectronicAddress;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\AddressBook\OrganizationAddressBook;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -42,13 +43,15 @@ class OrganizationContactController extends Controller
     {
         $this->guardOrganization($request, $organization, manage: true);
 
-        return response()->json(['data' => $this->addressBook->saveContact($organization, $this->validated($request), $contact)]);
+        $data = $this->validated($request);
+
+        return response()->json(['data' => $this->addressBook->saveContact($organization, $data, $contact, RowVersion::expected($request))]);
     }
 
     public function destroy(Request $request, Organization $organization, string $contact): Response
     {
         $this->guardOrganization($request, $organization, manage: true);
-        $this->addressBook->deleteContact($organization, $contact);
+        $this->addressBook->deleteContact($organization, $contact, RowVersion::expected($request));
 
         return response()->noContent();
     }

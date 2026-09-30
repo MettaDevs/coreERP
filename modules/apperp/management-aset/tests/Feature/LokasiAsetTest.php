@@ -39,8 +39,8 @@ class LokasiAsetTest extends TestCase
             ->assertJsonPath('data.parent.id', $root['id'])
             ->json('data');
 
-        $this->request('lokasi-aset', 'patch', '/api/modules/management-aset/v1/lokasi-aset/'.$root['id'], ['parent_id' => $child['id']])->assertStatus(422);
-        $this->request('lokasi-aset', 'delete', '/api/modules/management-aset/v1/lokasi-aset/'.$root['id'])->assertConflict();
+        $this->request('lokasi-aset', 'patch', '/api/modules/management-aset/v1/lokasi-aset/'.$root['id'], ['parent_id' => $child['id'], 'version' => $root['version']])->assertStatus(422);
+        $this->request('lokasi-aset', 'delete', '/api/modules/management-aset/v1/lokasi-aset/'.$root['id'], ['version' => $root['version']])->assertConflict();
     }
 
     public function test_tipe_lokasi_adalah_induk_kedua_yang_lepas_dari_induk_lokasi(): void
@@ -56,17 +56,18 @@ class LokasiAsetTest extends TestCase
             ->json('data.id');
 
         // Tipe yang masih dipakai tidak boleh diarsipkan.
-        $this->request('tipe-lokasi-aset', 'delete', '/api/modules/management-aset/v1/tipe-lokasi-aset/'.$tipe)
+        $this->request('tipe-lokasi-aset', 'delete', '/api/modules/management-aset/v1/tipe-lokasi-aset/'.$tipe, ['version' => 1])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
         // Menghapus tipe dari lokasi tidak menggeser induk lokasinya.
-        $this->request('lokasi-aset', 'patch', '/api/modules/management-aset/v1/lokasi-aset/'.$lokasi, ['tipe_lokasi_id' => null])
+        $this->request('lokasi-aset', 'patch', '/api/modules/management-aset/v1/lokasi-aset/'.$lokasi, ['tipe_lokasi_id' => null, 'version' => 1])
             ->assertOk()
             ->assertJsonPath('data.tipe_lokasi', null)
             ->assertJsonPath('data.parent.id', $root);
 
-        $this->request('tipe-lokasi-aset', 'delete', '/api/modules/management-aset/v1/tipe-lokasi-aset/'.$tipe)->assertNoContent();
+        // Arsip yang ditolak di atas tidak menaikkan versi tipe lokasi.
+        $this->request('tipe-lokasi-aset', 'delete', '/api/modules/management-aset/v1/tipe-lokasi-aset/'.$tipe, ['version' => 1])->assertNoContent();
     }
 
     public function test_daftar_lokasi_dapat_disaring_menurut_tipe(): void

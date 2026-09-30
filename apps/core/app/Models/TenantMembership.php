@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $status
  * @property-read Tenant $tenant
  * @property-read User $user
+ * @property int $version
  */
 class TenantMembership extends Model
 {

@@ -25,7 +25,18 @@ export default function FlashToasts() {
 
         lastMessage.current = message;
 
-        if (flash?.error || validationError) {
+        // Galat pada `version` berarti data sudah diubah sejak halaman dibuka. Muat ulang
+        // penuh, bukan `router.reload()`: isian form harus kembali ke data terbaru supaya
+        // pengguna melihat perubahan orang lain sebelum mengulang perubahannya sendiri.
+        if (errors?.version) {
+            toast.error(message, {
+                duration: Infinity,
+                action: {
+                    label: 'Muat ulang',
+                    onClick: () => window.location.reload(),
+                },
+            });
+        } else if (flash?.error || validationError) {
             toast.error(message);
         } else {
             toast.success(message);

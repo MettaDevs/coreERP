@@ -32,7 +32,13 @@ import {
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    ApiError,
+    api,
+    errorMessage,
+    newIdempotencyKey,
+    toastSaveError,
+} from '../../api';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import {
@@ -399,7 +405,7 @@ export default function PenerimaanDetailPage({
                 return;
             }
 
-            await api<{ data: Penerimaan }>(
+            const hasil = await api<{ data: Penerimaan }>(
                 `/penerimaan-aset/${penerimaanId}`,
                 {
                     method: 'PATCH',
@@ -409,6 +415,7 @@ export default function PenerimaanDetailPage({
                     }),
                 },
             );
+            setTersimpan(hasil.data);
             toast.success('Perubahan penerimaan disimpan.');
             bukaPenerimaan(String(penerimaanId));
         } catch (caught) {
@@ -416,9 +423,7 @@ export default function PenerimaanDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toast.error(
-                errorMessage(caught, 'Penerimaan belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Penerimaan belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -429,10 +434,14 @@ export default function PenerimaanDetailPage({
         setMenyimpan(true);
 
         try {
-            await api(`/penerimaan-aset/${penerimaanId}/selesaikan`, {
-                method: 'POST',
-                body: JSON.stringify({ version: tersimpan?.version }),
-            });
+            const hasil = await api<{ data: Penerimaan }>(
+                `/penerimaan-aset/${penerimaanId}/selesaikan`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ version: tersimpan?.version }),
+                },
+            );
+            setTersimpan(hasil.data);
             toast.success(
                 `Penerimaan diselesaikan. ${totalAset} aset terdaftar dengan kodenya masing-masing.`,
             );
@@ -442,9 +451,7 @@ export default function PenerimaanDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toast.error(
-                errorMessage(caught, 'Penerimaan belum dapat diselesaikan.'),
-            );
+            toastSaveError(caught, 'Penerimaan belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
         }
@@ -460,11 +467,14 @@ export default function PenerimaanDetailPage({
         setMenyimpan(true);
 
         try {
-            const hasil = await api<{ data: AsetTerbit[] }>(
+            // Nomor seri mengklaim dokumennya, jadi versi dokumen yang dikirim dan
+            // versi barunya disimpan untuk pengisian berikutnya.
+            const hasil = await api<{ data: AsetTerbit[]; version: number }>(
                 `/penerimaan-aset/${penerimaanId}/aset`,
                 {
                     method: 'PUT',
                     body: JSON.stringify({
+                        version: tersimpan?.version,
                         serial: terbit.map((aset) => ({
                             aset_id: aset.id,
                             serial_number: aset.serial_number || null,
@@ -473,11 +483,14 @@ export default function PenerimaanDetailPage({
                 },
             );
             setTerbit(hasil.data);
+            setTersimpan((sebelumnya) =>
+                sebelumnya
+                    ? { ...sebelumnya, version: hasil.version }
+                    : sebelumnya,
+            );
             toast.success('Nomor seri disimpan.');
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Nomor seri belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Nomor seri belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -494,9 +507,7 @@ export default function PenerimaanDetailPage({
             toast.success('Draf penerimaan diarsipkan.');
             bukaPenerimaanDaftar();
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Penerimaan belum dapat diarsipkan.'),
-            );
+            toastSaveError(caught, 'Penerimaan belum dapat diarsipkan.');
         }
     }
 

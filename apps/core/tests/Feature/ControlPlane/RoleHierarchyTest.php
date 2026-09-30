@@ -66,6 +66,7 @@ class RoleHierarchyTest extends TestCase
         $membership = $this->subject->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id]],
         ])->assertOk();
     }
@@ -153,6 +154,7 @@ class RoleHierarchyTest extends TestCase
         $parent = $this->createRole('Manajer aset', [self::ENTITAS], [$child->id]);
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$child->id}", [
+            'version' => $child->fresh()->version,
             'name' => 'Pengelola group aset',
             'duty_codes' => [self::GROUP],
             'child_role_ids' => [$parent->id],
@@ -169,6 +171,7 @@ class RoleHierarchyTest extends TestCase
         $role = $this->createRole('Manajer aset', [self::ENTITAS]);
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$role->id}", [
+            'version' => $role->fresh()->version,
             'name' => 'Manajer aset',
             'duty_codes' => [self::ENTITAS],
             'child_role_ids' => [$role->id],
@@ -192,6 +195,7 @@ class RoleHierarchyTest extends TestCase
         $role = $this->createRole('Manajer aset', [self::ENTITAS]);
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$role->id}", [
+            'version' => $role->fresh()->version,
             'name' => 'Manajer aset',
             'duty_codes' => [self::ENTITAS],
             'child_role_ids' => [$foreignId],
@@ -224,6 +228,7 @@ class RoleHierarchyTest extends TestCase
         $this->assertContains('app-uji.group.read', $this->effectivePermissions());
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$parent->id}", [
+            'version' => $parent->fresh()->version,
             'name' => 'Manajer aset',
             'duty_codes' => [self::ENTITAS],
             'child_role_ids' => [],

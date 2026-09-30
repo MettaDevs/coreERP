@@ -43,6 +43,22 @@ export type Layout = {
     file_size: number | null;
     created_at: string | null;
     is_default: boolean;
+    /** Versi baris layout unggahan; null untuk layout bawaan. */
+    version: number | null;
+};
+
+/**
+ * Versi pilihan default per lingkup; 0 selama lingkup itu belum pernah dipilih. `legal_entity`
+ * null bila konteks aktif tidak punya entitas legal.
+ */
+export type DefaultVersions = {
+    tenant: number;
+    legal_entity: number | null;
+};
+
+type LayoutListing = {
+    data: Layout[];
+    meta: { default_ref: string; default_versions: DefaultVersions };
 };
 
 export type ReportExport = {
@@ -94,9 +110,7 @@ export const listFields = (code: string) =>
     );
 
 export const listLayouts = (code: string) =>
-    json<{ data: Layout[]; meta: { default_ref: string } }>(
-        `/api/v1/reports/${encodeURIComponent(code)}/layouts`,
-    );
+    json<LayoutListing>(`/api/v1/reports/${encodeURIComponent(code)}/layouts`);
 
 export function uploadLayout(
     code: string,
@@ -126,9 +140,15 @@ export function uploadLayout(
     });
 }
 
-export function replaceLayoutFile(code: string, id: string, file: File) {
+export function replaceLayoutFile(
+    code: string,
+    id: string,
+    file: File,
+    version: number,
+) {
     const body = new FormData();
     body.append('file', file);
+    body.append('version', String(version));
 
     return json<{ meta: { unknown_placeholders: string[] } }>(
         `/api/v1/reports/${encodeURIComponent(code)}/layouts/${id}`,
@@ -136,21 +156,23 @@ export function replaceLayoutFile(code: string, id: string, file: File) {
     );
 }
 
-export const deleteLayout = (code: string, id: string) =>
+export const deleteLayout = (code: string, id: string, version: number) =>
     request(`/api/v1/reports/${encodeURIComponent(code)}/layouts/${id}`, {
         method: 'DELETE',
+        headers: { 'If-Match': `W/"${version}"` },
     });
 
 export const setDefaultLayout = (
     code: string,
     layoutRef: string | null,
     scope: 'tenant' | 'legal_entity',
+    version: number | null,
 ) =>
-    json<{ data: Layout[]; meta: { default_ref: string } }>(
+    json<LayoutListing>(
         `/api/v1/reports/${encodeURIComponent(code)}/layout-default`,
         {
             method: 'PUT',
-            body: JSON.stringify({ layout_ref: layoutRef, scope }),
+            body: JSON.stringify({ layout_ref: layoutRef, scope, version }),
         },
     );
 

@@ -6,9 +6,11 @@ use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ChangeLog\ChangeLogSetup;
 use App\Support\Modules\Contracts\ChangeHistory;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,10 +28,15 @@ final class ChangeLogController extends Controller
     public function index(Request $request): Response
     {
         $membership = $this->membershipWith($request, CoreSecurityCatalog::CHANGE_LOG_READ);
+        $versions = DB::table('change_log_setup_tables')->where('tenant_id', $membership->tenant_id)->pluck('version', 'table_name');
 
         return Inertia::render('settings/change-log', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::CHANGE_LOG_UPDATE),
-            'tables' => $this->setup->forTenant($membership->tenant_id),
+            // Versi baris setelan milik tenant; 0 selama tabel itu masih memakai bawaan.
+            'tables' => array_map(
+                fn (array $table): array => [...$table, 'version' => $versions[$table['table_name']] ?? 0],
+                $this->setup->forTenant($membership->tenant_id),
+            ),
         ]);
     }
 
@@ -50,16 +57,25 @@ final class ChangeLogController extends Controller
         $unknown = array_diff(array_keys($data['fields'] ?? []), $fields);
         abort_if($unknown !== [], 422, 'Ada field yang tidak dapat dicatat untuk tabel ini.');
 
-        $this->setup->save(
-            $membership->tenant_id,
-            $table,
-            ['log_insertion' => (bool) $data['log_insertion'], 'log_modification' => (bool) $data['log_modification'], 'log_deletion' => (bool) $data['log_deletion']],
-            array_map(fn (array $flags): array => [
-                'log_insertion' => (bool) ($flags['log_insertion'] ?? false),
-                'log_modification' => (bool) ($flags['log_modification'] ?? false),
-                'log_deletion' => (bool) ($flags['log_deletion'] ?? false),
-            ], $data['fields'] ?? []),
-        );
+        DB::transaction(function () use ($request, $membership, $table, $data): void {
+            // Baris setelan tabel milik tenant menjadi induk field-fieldnya; yang diklaim baris itu. Sebelum
+            // tenant pernah menyimpan, barisnya belum ada dan halamannya mengirim versi 0.
+            RowVersion::claimIfExists(
+                DB::table('change_log_setup_tables')->where('tenant_id', $membership->tenant_id)->where('table_name', $table),
+                RowVersion::expected($request),
+            );
+
+            $this->setup->save(
+                $membership->tenant_id,
+                $table,
+                ['log_insertion' => (bool) $data['log_insertion'], 'log_modification' => (bool) $data['log_modification'], 'log_deletion' => (bool) $data['log_deletion']],
+                array_map(fn (array $flags): array => [
+                    'log_insertion' => (bool) ($flags['log_insertion'] ?? false),
+                    'log_modification' => (bool) ($flags['log_modification'] ?? false),
+                    'log_deletion' => (bool) ($flags['log_deletion'] ?? false),
+                ], $data['fields'] ?? []),
+            );
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Setelan riwayat perubahan disimpan.']);
 

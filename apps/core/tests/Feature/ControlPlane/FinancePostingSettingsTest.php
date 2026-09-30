@@ -109,7 +109,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->actingAs($this->owner)
             ->deleteJson("/api/v1/organizations/{$le}/finance-posting/settlement-modes/{$lampau}")
             ->assertStatus(422);
-        $this->deleteJson("/api/v1/organizations/{$le}/finance-posting/settlement-modes/{$nanti}")
+        $this->deleteJson("/api/v1/organizations/{$le}/finance-posting/settlement-modes/{$nanti}", [], ['If-Match' => 'W/"1"'])
             ->assertNoContent();
 
         $this->assertDatabaseHas('finance_settlement_modes', ['id' => $lampau]);
@@ -125,7 +125,7 @@ class FinancePostingSettingsTest extends TestCase
             ->assertJsonValidationErrors('cutover_date');
 
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$le}/finance-posting", [
-            'enabled' => true, 'cutover_date' => '2026-10-01',
+            'enabled' => true, 'cutover_date' => '2026-10-01', 'version' => 0,
         ])->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.cutover_date', '2026-10-01');
 
         $this->assertSame('2026-10-01', $this->app->make(SetelanPostingFinance::class)->cutover($le));
@@ -133,6 +133,46 @@ class FinancePostingSettingsTest extends TestCase
         // Database menjaga aturan yang sama untuk jalur yang tidak lewat layar.
         $this->expectException(QueryException::class);
         DB::table('finance_posting_settings')->where('legal_entity_id', $le)->update(['cutover_date' => null]);
+    }
+
+    public function test_setelan_membawa_versi_dan_penyimpanan_basi_ditolak(): void
+    {
+        $le = $this->legalEntity('PT Metta Sehat', 'META');
+        $url = "/api/v1/organizations/{$le}/finance-posting";
+
+        // Sebelum pernah disimpan versinya 0, dan penyimpanan pertama membuat setelannya.
+        $this->actingAs($this->owner)->getJson($url)->assertOk()->assertJsonPath('data.version', 0)->assertHeader('ETag', 'W/"0"');
+        $versi = $this->putJson($url, ['enabled' => true, 'cutover_date' => '2026-10-01', 'version' => 0])
+            ->assertOk()->json('data.version');
+        $this->getJson($url)->assertJsonPath('data.version', $versi)->assertHeader('ETag', 'W/"'.$versi.'"');
+
+        // Tab kedua yang juga membuka setelan kosong tidak boleh menimpa penyimpanan pertama.
+        $this->putJson($url, ['enabled' => false, 'cutover_date' => '2027-01-01', 'version' => 0])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+
+        $this->putJson($url, ['enabled' => false, 'cutover_date' => '2027-01-01', 'version' => $versi])->assertOk();
+        $this->putJson($url, ['enabled' => true, 'cutover_date' => '2027-02-01', 'version' => $versi])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->putJson($url, ['enabled' => true, 'cutover_date' => '2027-02-01'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+
+        $this->assertSame('2027-01-01', $this->app->make(SetelanPostingFinance::class)->cutover($le));
+    }
+
+    public function test_menghapus_mode_membutuhkan_versi_yang_dibuka(): void
+    {
+        $le = $this->legalEntity('PT Metta Sehat', 'META');
+        $this->tambahMode($le, 'clearing', today()->addMonth()->toDateString())->assertCreated();
+        $mode = FinanceSettlementMode::query()->where('legal_entity_id', $le)->firstOrFail();
+        $url = "/api/v1/organizations/{$le}/finance-posting/settlement-modes/{$mode->id}";
+
+        $this->actingAs($this->owner)->getJson("/api/v1/organizations/{$le}/finance-posting")
+            ->assertJsonPath('data.modes.0.version', 1);
+        $this->deleteJson($url)->assertStatus(428);
+        DB::table('finance_settlement_modes')->where('id', $mode->id)->update(['mode' => 'direct_payable']);
+        $this->deleteJson($url, [], ['If-Match' => 'W/"1"'])->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+
+        $this->assertDatabaseHas('finance_settlement_modes', ['id' => $mode->id, 'mode' => 'direct_payable']);
     }
 
     public function test_reading_needs_the_inquire_duty_and_changing_needs_the_manage_duty(): void
@@ -223,7 +263,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->assertSame(3, $presisi->hargaSatuan($tenant, 'idr'));
 
         $this->actingAs($this->owner)->put('/settings/currencies/IDR', [
-            'amount_decimals' => 0, 'unit_amount_decimals' => 3,
+            'amount_decimals' => 0, 'unit_amount_decimals' => 3, 'version' => 0,
         ])->assertSessionHasNoErrors();
 
         $presisi = $this->app->make(PresisiMataUang::class);

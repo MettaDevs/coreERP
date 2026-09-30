@@ -78,16 +78,16 @@ class WorkingTimeCalendarTest extends TestCase
         $this->calendar($tenant, $org, 'CAL-2');
 
         $this->actingAs($user)
-            ->putJson("/settings/working-time-calendars/{$calendar->id}", ['code' => 'cal-1', 'name' => 'Nama baru'])
+            ->putJson("/settings/working-time-calendars/{$calendar->id}", ['code' => 'cal-1', 'name' => 'Nama baru', 'version' => $this->version($calendar)])
             ->assertOk();
         $this->assertSame('Nama baru', $calendar->refresh()->name);
 
         $this->actingAs($user)
-            ->putJson("/settings/working-time-calendars/{$calendar->id}", ['code' => 'cal-2', 'name' => 'Bentrok'])
+            ->putJson("/settings/working-time-calendars/{$calendar->id}", ['code' => 'cal-2', 'name' => 'Bentrok', 'version' => $this->version($calendar)])
             ->assertStatus(422)
             ->assertJsonValidationErrors('code');
 
-        $this->actingAs($user)->deleteJson("/settings/working-time-calendars/{$calendar->id}")->assertOk();
+        $this->actingAs($user)->deleteJson("/settings/working-time-calendars/{$calendar->id}", ['version' => $this->version($calendar)])->assertOk();
         $this->assertSoftDeleted($calendar);
     }
 
@@ -109,7 +109,7 @@ class WorkingTimeCalendarTest extends TestCase
 
         // Hari yang diubah tangan ditimpa kembali oleh pola, dan tidak ada hari atau baris ganda.
         $this->actingAs($user)
-            ->putJson("/settings/working-time-calendars/{$calendar->id}/days/{$days[0]->id}", ['control' => 'closed'])
+            ->putJson("/settings/working-time-calendars/{$calendar->id}/days/{$days[0]->id}", ['control' => 'closed', 'version' => $this->version($calendar)])
             ->assertOk();
         $this->compose($user, $calendar, $template)->assertOk();
 
@@ -148,13 +148,13 @@ class WorkingTimeCalendarTest extends TestCase
         $day = $calendar->days()->firstOrFail();
         $url = "/settings/working-time-calendars/{$calendar->id}/days/{$day->id}";
 
-        $this->actingAs($user)->putJson($url, ['control' => 'closed'])->assertOk();
+        $this->actingAs($user)->putJson($url, ['control' => 'closed', 'version' => $this->version($calendar)])->assertOk();
         $this->assertEquals(0.0, $day->refresh()->hours);
         $this->assertSame(1, $day->lines()->count(), 'Menutup hari tidak membuang jam kerjanya.');
 
         // Sebelumnya hari yang dibuka kembali tetap 0 jam karena jumlah jamnya diambil dari
         // nilai tersimpan, yang baru saja dinolkan saat ditutup.
-        $this->actingAs($user)->putJson($url, ['control' => 'open'])->assertOk();
+        $this->actingAs($user)->putJson($url, ['control' => 'open', 'version' => $this->version($calendar)])->assertOk();
         $day->refresh();
         $this->assertSame('open', $day->control);
         $this->assertEquals(8.0, $day->hours);
@@ -171,7 +171,7 @@ class WorkingTimeCalendarTest extends TestCase
 
         // Jumlah jam kiriman pengguna diabaikan; yang dipakai selisih jam mulai dan selesai.
         // `24:00` diterima karena pola jam kerja memang menyimpannya.
-        $this->actingAs($user)->putJson($url, ['control' => 'open', 'lines' => [
+        $this->actingAs($user)->putJson($url, ['control' => 'open', 'version' => $this->version($calendar), 'lines' => [
             ['from_time' => '08:00', 'to_time' => '12:00', 'hours' => 24],
             ['from_time' => '16:00', 'to_time' => '24:00', 'hours' => 24],
         ]])->assertOk();
@@ -412,8 +412,14 @@ class WorkingTimeCalendarTest extends TestCase
     private function compose(User $user, WorkingTimeCalendar $calendar, WorkingTimeTemplate $template, string $from = '2026-09-07', string $to = '2026-09-13'): TestResponse
     {
         return $this->actingAs($user)->postJson("/settings/working-time-calendars/{$calendar->id}/compose", [
-            'template_id' => $template->id, 'from_date' => $from, 'to_date' => $to,
+            'template_id' => $template->id, 'from_date' => $from, 'to_date' => $to, 'version' => $this->version($calendar),
         ]);
+    }
+
+    /** Versi kalender yang sedang tersimpan, seperti yang dibawa halaman sesudah dimuat ulang. */
+    private function version(WorkingTimeCalendar $calendar): int
+    {
+        return (int) DB::table('working_time_calendars')->where('id', $calendar->id)->value('version');
     }
 
     /** @return Builder<WorkingTimeCalendarLine> */

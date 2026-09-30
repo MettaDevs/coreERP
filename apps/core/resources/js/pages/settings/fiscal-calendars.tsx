@@ -19,12 +19,19 @@ type Year = {
     ends_on: string;
     periods: Period[];
 };
-type Calendar = { id: string; code: string; name: string; years: Year[] };
+type Calendar = {
+    id: string;
+    code: string;
+    name: string;
+    version: number;
+    years: Year[];
+};
 type LegalEntity = {
     id: string;
     name: string;
     company_code: string | null;
     fiscal_calendar_id: string | null;
+    version: number | null;
 };
 type Props = {
     canManage: boolean;
@@ -86,6 +93,10 @@ function AddYear({
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
                 event.preventDefault();
+                form.transform((data) => ({
+                    ...data,
+                    version: calendar.version,
+                }));
                 form.post(`/settings/fiscal-calendars/${calendar.id}/years`, {
                     preserveScroll: true,
                     onSuccess: () => form.reset(),
@@ -178,11 +189,15 @@ function AssignEntity({
                 type="button"
                 variant="secondary"
                 disabled={!canManage || selected === '' || form.processing}
-                onClick={() =>
+                onClick={() => {
+                    form.transform((data) => ({
+                        ...data,
+                        version: entity.version,
+                    }));
                     form.post(`/settings/fiscal-calendars/${selected}/assign`, {
                         preserveScroll: true,
-                    })
-                }
+                    });
+                }}
             >
                 Tetapkan
             </Button>

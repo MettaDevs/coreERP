@@ -18,7 +18,7 @@ class UnplaceOrganizationFromHierarchy
             throw new AuthorizationException;
         }
         if ($version->status !== 'draft') {
-            throw ValidationException::withMessages(['version' => 'Hierarchy yang sudah dipublikasikan tidak dapat diubah.']);
+            throw ValidationException::withMessages(['hierarchy_version' => 'Hierarchy yang sudah dipublikasikan tidak dapat diubah.']);
         }
         if ($node->parent_node_id === null) {
             throw ValidationException::withMessages(['node' => 'Organisasi paling atas tidak dapat dilepas dari draft ini.']);

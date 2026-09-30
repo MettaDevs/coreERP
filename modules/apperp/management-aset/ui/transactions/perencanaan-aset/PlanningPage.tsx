@@ -28,7 +28,12 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    api,
+    errorMessage,
+    newIdempotencyKey,
+    toastSaveError,
+} from '../../api';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
@@ -323,9 +328,7 @@ export default function PlanningPage({
             });
             muatUlang();
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Rencana aset belum dapat diarsipkan.'),
-            );
+            toastSaveError(caught, 'Rencana aset belum dapat diarsipkan.');
         }
     };
 
@@ -399,9 +402,7 @@ export default function PlanningPage({
             muatUlang();
             toast.success('Rencana aset disimpan.');
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Rencana aset belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Rencana aset belum dapat disimpan.');
         } finally {
             setSaving(false);
         }

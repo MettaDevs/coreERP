@@ -18,7 +18,12 @@ import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    api,
+    errorMessage,
+    newIdempotencyKey,
+    toastSaveError,
+} from '../../api';
 import { requestPrint } from '../../print';
 import type {
     ChecklistRow,
@@ -783,17 +788,15 @@ export default function WorkOrderDetailPage({
             muatUlang();
             toast.success(`${record.kode} — ${label.toLowerCase()} berhasil.`);
         } catch (caught) {
-            toast.error(
-                errorMessage(
-                    caught,
-                    `${record.kode} belum dapat dipindahkan statusnya.`,
-                ),
+            toastSaveError(
+                caught,
+                `${record.kode} belum dapat dipindahkan statusnya.`,
             );
         }
     };
 
     const simpanChecklist = async () => {
-        if (!checklist || !workOrderId || !checklistJobId) {
+        if (!checklist || !workOrderId || !checklistJobId || !record) {
             return;
         }
 
@@ -805,6 +808,7 @@ export default function WorkOrderDetailPage({
                 {
                     method: 'PUT',
                     body: JSON.stringify({
+                        version: record.version,
                         baris: checklist.map((row) => ({
                             id: row.id,
                             nilai: row.nilai,
@@ -817,9 +821,7 @@ export default function WorkOrderDetailPage({
             toast.success('Hasil pemeriksaan tersimpan.');
             bukaWorkOrder(workOrderId);
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Hasil pemeriksaan belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Hasil pemeriksaan belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -838,6 +840,7 @@ export default function WorkOrderDetailPage({
                 {
                     method: 'PATCH',
                     body: JSON.stringify({
+                        version: record.version,
                         aktual_jam: job.aktual_jam ?? null,
                         sebab_kerusakan_id: job.sebab_kerusakan_id || null,
                         tindakan_perbaikan_id:
@@ -852,9 +855,7 @@ export default function WorkOrderDetailPage({
             toast.success('Hasil pekerjaan tersimpan.');
             muatUlang();
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Hasil pekerjaan belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Hasil pekerjaan belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -932,9 +933,7 @@ export default function WorkOrderDetailPage({
                 bukaWorkOrder(dibuat.data.id);
             }
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Work order belum dapat disimpan.'),
-            );
+            toastSaveError(caught, 'Work order belum dapat disimpan.');
         } finally {
             setSaving(false);
         }

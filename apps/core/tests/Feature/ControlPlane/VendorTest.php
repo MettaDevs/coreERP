@@ -133,6 +133,7 @@ class VendorTest extends TestCase
             'preallocation_enabled' => true, 'preallocation_quantity' => 20,
             'minimum_number' => 1, 'maximum_number' => 99999,
             'segments' => [['type' => 'constant', 'value' => 'SUP'], ['type' => 'number', 'length' => 5]],
+            'version' => $urutan->version,
         ])->assertOk();
 
         $this->buat(['party_name' => 'PT Sarana Medika', 'number' => 'SUP00042'])
@@ -157,12 +158,33 @@ class VendorTest extends TestCase
         $this->assertSame(2, DB::table('party_role_registrations')->where('party_id', $party)->where('role_code', 'vendor')->count());
     }
 
+    public function test_penyimpanan_vendor_dengan_versi_basi_ditolak(): void
+    {
+        $vendor = $this->buat(['party_name' => 'PT Sarana Medika'])->assertCreated()->json('data');
+        $this->assertSame(Vendor::query()->findOrFail($vendor['id'])->version, $vendor['version']);
+        $url = "/api/v1/vendors/{$vendor['id']}";
+
+        $this->actingAs($this->owner)->get('/settings/vendors')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('vendors.data.0.version', $vendor['version']));
+
+        $simpan = $this->patchJson($url, ['name' => 'PT Sarana Satu', 'status' => 'active', 'version' => $vendor['version']])->assertOk();
+        $this->assertSame(Vendor::query()->findOrFail($vendor['id'])->version, $simpan->json('data.version'));
+        $this->patchJson($url, ['name' => 'PT Sarana Dua', 'status' => 'inactive', 'version' => $vendor['version']])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->patchJson($url, ['name' => 'PT Sarana Tiga', 'status' => 'inactive'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+
+        $this->assertDatabaseHas('parties', ['id' => $vendor['party_id'], 'name' => 'PT Sarana Satu']);
+        $this->assertDatabaseHas('vendors', ['id' => $vendor['id'], 'status' => 'active']);
+    }
+
     public function test_mengubah_nama_mengubah_party_dan_nomor_tidak_ikut_berubah(): void
     {
         $vendor = $this->buat(['party_name' => 'PT Sarana Medika'])->assertCreated()->json('data');
 
         $this->actingAs($this->owner)->patchJson("/api/v1/vendors/{$vendor['id']}", [
             'name' => 'PT Sarana Medika Utama', 'tax_number' => '', 'status' => 'inactive', 'number' => 'VND-999999',
+            'version' => $vendor['version'],
         ])->assertOk()
             ->assertJsonPath('data.name', 'PT Sarana Medika Utama')
             ->assertJsonPath('data.number', 'VND-000001')
@@ -287,6 +309,8 @@ class VendorTest extends TestCase
         // PT Tiga akan bergeser ke halaman pertama dan tidak pernah terbaca.
         $this->actingAs($this->owner)->patchJson("/api/v1/vendors/{$vendors[0]['id']}", [
             'name' => 'PT Satu Baru', 'status' => 'active',
+            // Dimundurkan di atas, jadi versinya sudah bukan versi saat dibuat.
+            'version' => Vendor::query()->findOrFail($vendors[0]['id'])->version,
         ])->assertOk();
 
         $kedua = $this->vendors($token, ['limit' => 2, 'cursor' => $kursor])->assertOk();

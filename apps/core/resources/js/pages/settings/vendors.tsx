@@ -48,13 +48,19 @@ import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
-import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
+import {
+    apiJson,
+    CoreApiError,
+    errorText,
+    toastSaveError,
+} from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type PartyType = 'organization' | 'person';
 type Status = 'active' | 'inactive';
 type Vendor = {
     id: string;
+    version: number;
     number: string;
     name: string;
     party_id: string;
@@ -273,6 +279,7 @@ function VendorSheet({
                               name: form.name,
                               tax_number: form.tax_number || null,
                               status: form.active ? 'active' : 'inactive',
+                              version: vendor.version,
                           }),
                       }
                     : {
@@ -310,7 +317,7 @@ function VendorSheet({
                 setErrors(caught.errors);
             }
 
-            toast.error(errorText(caught, 'Vendor belum disimpan.'));
+            toastSaveError(caught, 'Vendor belum disimpan.');
         } finally {
             setSaving(false);
         }

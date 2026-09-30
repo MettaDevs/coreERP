@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,7 +62,7 @@ class PerencanaanAsetController extends Controller
                 self::TABEL_BARIS.'.*', 'jenis.kode as jenis_aset_kode', 'jenis.nama as jenis_aset_nama',
             ]);
 
-        return response()->json(['data' => $plan]);
+        return response()->json(['data' => $plan], 200, ['ETag' => RowVersion::etag((int) $plan->version)]);
     }
 
     public function store(Request $request, PenerbitNomorAset $numbers, DaftarSatuanAset $units): JsonResponse
@@ -83,12 +84,10 @@ class PerencanaanAsetController extends Controller
         }
 
         try {
-            $plan = DB::transaction(function () use ($request, $data, $key, $kode, $unitMap): array {
+            DB::transaction(function () use ($request, $data, $key, $kode, $unitMap): void {
                 $record = $this->header($request, $data, $key, $kode);
                 (new PerencanaanAset)->forceFill($record)->save();
                 $this->replaceDetails($record['id'], $data['details'], $unitMap);
-
-                return $record;
             });
         } catch (QueryException $exception) {
             $existing = $this->replay($key);
@@ -99,7 +98,8 @@ class PerencanaanAsetController extends Controller
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
-        return response()->json(['data' => $plan], 201);
+        // Dibaca ulang supaya `version` yang dipulangkan adalah nilai di database.
+        return response()->json(['data' => $this->replay($key)], 201);
     }
 
     public function update(Request $request, string $id, DaftarSatuanAset $units): JsonResponse
@@ -111,28 +111,19 @@ class PerencanaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['planning_org_unit_id']);
         $unitMap = $this->validateLookupMasters($this->tenant($request), $data['details'], $units);
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
 
-        $changed = DB::transaction(function () use ($request, $id, $version, $data, $unitMap): int {
+        DB::transaction(function () use ($request, $id, $version, $data, $unitMap): void {
+            RowVersion::claim(PerencanaanAset::query()->whereKey($id), $version);
             $changes = $this->header($request, $data, '', '', false);
             unset($changes['responsible_user_id']);
-            $updated = PerencanaanAset::query()->where([
-                'id' => $id, 'version' => $version,
-            ])->update([
+            PerencanaanAset::query()->whereKey($id)->update([
                 ...$changes,
-                'version' => $version + 1,
                 'updated_at' => now(),
             ]);
-            if ($updated) {
-                PerencanaanAsetDetail::query()->where('planning_id', $id)->delete();
-                $this->replaceDetails($id, $data['details'], $unitMap);
-            }
-
-            return $updated;
+            PerencanaanAsetDetail::query()->where('planning_id', $id)->delete();
+            $this->replaceDetails($id, $data['details'], $unitMap);
         });
-        if (! $changed) {
-            return response()->json(['error' => ['code' => 'stale_version', 'message' => 'Rencana telah berubah. Muat ulang lalu coba lagi.']], 409);
-        }
 
         return $this->show($request, $id);
     }
@@ -142,14 +133,12 @@ class PerencanaanAsetController extends Controller
         $this->guard($request, 'archive');
         $plan = $this->plan($request, $id);
         abort_unless($plan->status === 'draft', 422, 'Hanya rencana draf yang dapat diarsipkan.');
-        $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
+        $version = RowVersion::expected($request);
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
-        $updated = PerencanaanAset::query()->where([
-            'id' => $id, 'version' => $version,
-        ])->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
-        if (! $updated) {
-            return response()->json(['error' => ['code' => 'stale_version', 'message' => 'Rencana telah berubah. Muat ulang lalu coba lagi.']], 409);
-        }
+        DB::transaction(function () use ($id, $version): void {
+            RowVersion::claim(PerencanaanAset::query()->whereKey($id), $version);
+            PerencanaanAset::query()->whereKey($id)->update(['deleted_at' => now(), 'updated_at' => now()]);
+        });
 
         return response()->json(status: 204);
     }
@@ -223,7 +212,7 @@ class PerencanaanAsetController extends Controller
             'planned_on' => $data['planned_on'], 'planning_year' => $data['planning_year'], 'planning_type' => $data['planning_type'],
             'funding_source' => $data['funding_source'] ?? null, 'responsible_user_id' => (string) $request->attributes->get('coreerp.user_id'),
             'total_estimated_value' => $this->totalEstimasi($data['details']), 'description' => $data['description'] ?? null,
-            'status' => $new ? 'draft' : null, 'version' => $new ? 1 : null,
+            'status' => $new ? 'draft' : null,
             'created_at' => $new ? now() : null, 'updated_at' => now(),
         ], static fn ($value) => $value !== null);
     }

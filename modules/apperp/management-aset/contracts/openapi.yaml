@@ -24,6 +24,22 @@ info:
     Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`induk_aset_id`)
     menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
     app ini, bukan organization hierarchy CoreERP.
+
+    **Versi baris (edit bersamaan).** Setiap data yang sudah ada membawa `version` (integer, hanya
+    dibaca), dan jawaban GET detailnya mengirim header `ETag` berbentuk `W/"<n>"` dengan angka yang
+    sama. Setiap PATCH, PUT, dan DELETE atas data yang sudah ada, serta aksi atas dokumen yang sudah
+    ada (`/selesaikan`, `/batal`, `/status`, `/checklist/dari-template`), wajib membawa versi itu:
+    header `If-Match: W/"<n>"` atau field `version` pada body (bila keduanya ada, header yang dipakai).
+    Tanpa versi permintaan ditolak 428 `version_required`; versi yang sudah tertinggal ditolak 409
+    `stale_version` dan tidak ada yang tersimpan. Himpunan anak yang diganti utuh (atribut jenis aset,
+    nilai tipe atribut, matriks group x buku, model per jenis aset, baris checklist, dan sejenisnya)
+    memakai versi pemiliknya, yang dikirim GET-nya sebagai `version` di samping `data` (atau `data.version`
+    pada panel jenis aset dan jawaban `PUT /jenis-aset/{id}/models`). Baris posting group yang belum ada
+    dikirim dengan versi 0.
+
+    Setiap penyimpanan menaikkan versi, biasanya dua sekaligus dan bukan satu, jadi angkanya tidak
+    berarti apa-apa selain "berbeda". Klien wajib memakai `version` dari jawaban terakhir, bukan
+    menghitung sendiri dari versi sebelumnya.
 servers:
 - url: /
 security:
@@ -226,6 +242,9 @@ paths:
       responses:
         '200':
           description: Analisa maintenance ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -241,6 +260,8 @@ paths:
       - Master data
       operationId: updateAnalisaMaintenance
       summary: Mengubah nama, keterangan, atau status analisa maintenance
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -260,13 +281,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveAnalisaMaintenance
       summary: Mengarsipkan analisa maintenance
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Analisa maintenance diarsipkan
@@ -276,6 +309,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/group-aset:
     get:
       tags:
@@ -355,6 +392,9 @@ paths:
       responses:
         '200':
           description: Group aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -370,6 +410,8 @@ paths:
       - Master data
       operationId: updateGroupAset
       summary: Mengubah nama, keterangan, atau status group aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -389,13 +431,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveGroupAset
       summary: Mengarsipkan group aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Group aset diarsipkan
@@ -406,7 +460,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/group-aset/{id}/buku-penyusutan:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -440,6 +496,8 @@ paths:
         Saat disimpan, daftar yang dikirim menggantikan seluruh baris lama. Baris yang
         tidak disertakan diarsipkan. Karena itu permintaan yang sama dapat diulang tanpa
         efek tambahan dan tidak memerlukan `Idempotency-Key`.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -459,8 +517,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/posting-group-aset:
     get:
       tags:
@@ -540,6 +602,12 @@ paths:
         Setiap akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif.
         Akun yang dinonaktifkan sesudah dipetakan boleh tetap di kolom yang tidak diubah, supaya
         baris lama masih dapat disimpan untuk memperbaiki kolom lain.
+
+        Baris yang sudah ada hanya boleh diubah dari versi yang dibuka pengguna (`version` pada body
+        atau header `If-Match`). Baris untuk tanggal berlaku yang belum ada dikirim dengan versi 0; bila
+        tab lain sudah membuatnya lebih dulu, versi 0 itu ditolak 409 `stale_version`.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -565,8 +633,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
@@ -576,6 +648,14 @@ paths:
         Permission `management-aset.fixed-asset-posting-profiles.archive`. Posting yang tanggalnya
         jatuh di masa berlaku baris ini lalu memakai baris sebelumnya, atau tertahan bila tidak ada.
         Tanggal yang sama boleh dipakai lagi untuk baris baru.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Baris diarsipkan
@@ -585,6 +665,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-aset/{id}/atribut:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -616,6 +700,8 @@ paths:
         permission tersendiri. Saat disimpan, daftar yang dikirim menggantikan seluruh
         baris lama. Baris yang tidak disertakan diarsipkan. Permintaan yang sama dapat
         diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -635,8 +721,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-aset/{id}/atribut-definisi:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -710,6 +800,8 @@ paths:
         karena tindakannya mengubah jenis aset tetapi membaca isi resource model. Satu model
         hanya boleh dimiliki satu jenis aset; mengaitkan model yang sudah dipegang jenis aset
         lain ditolak sebagai galat validasi, bukan dipindahkan diam-diam.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -719,6 +811,8 @@ paths:
               required:
               - model_ids
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 model_ids:
                   type: array
                   maxItems: 100
@@ -739,7 +833,11 @@ paths:
                     type: object
                     required:
                     - model_ids
+                    - version
                     properties:
+                      version:
+                        description: Versi jenis aset sesudah disimpan; kirim pada penyimpanan berikutnya.
+                        $ref: '#/components/schemas/RecordVersion'
                       model_ids:
                         type: array
                         items:
@@ -750,8 +848,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tipe-atribut/{id}/nilai:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -784,6 +886,8 @@ paths:
         pilihan lama. Pilihan yang tidak disertakan diarsipkan. Daftar kosong membuat
         atribut kembali menjadi teks bebas. Daftar nonkosong ditolak bila tidak mencakup
         seluruh nilai aset yang masih tersimpan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -804,9 +908,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/AttributeValuesInUse'
+          $ref: '#/components/responses/StaleVersionOrAttributeValuesInUse'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/item-checklist-maintenance:
     get:
       tags:
@@ -886,6 +992,9 @@ paths:
       responses:
         '200':
           description: Item checklist maintenance ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -901,6 +1010,8 @@ paths:
       - Master data
       operationId: updateItemChecklistMaintenance
       summary: Mengubah nama, keterangan, atau status item checklist maintenance
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -920,13 +1031,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveItemChecklistMaintenance
       summary: Mengarsipkan item checklist maintenance
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Item checklist maintenance diarsipkan
@@ -936,6 +1059,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-aset:
     get:
       tags:
@@ -1015,6 +1142,9 @@ paths:
       responses:
         '200':
           description: Jenis aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1030,6 +1160,8 @@ paths:
       - Master data
       operationId: updateJenisAset
       summary: Mengubah nama, keterangan, atau status jenis aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1049,13 +1181,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveJenisAset
       summary: Mengarsipkan jenis aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Jenis aset diarsipkan
@@ -1065,6 +1209,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/kondisi-aset:
     get:
       tags:
@@ -1144,6 +1292,9 @@ paths:
       responses:
         '200':
           description: Kondisi aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1159,6 +1310,8 @@ paths:
       - Master data
       operationId: updateKondisiAset
       summary: Mengubah nama, keterangan, atau status kondisi aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1178,13 +1331,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveKondisiAset
       summary: Mengarsipkan kondisi aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Kondisi aset diarsipkan
@@ -1194,6 +1359,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/lokasi-aset:
     get:
       tags:
@@ -1275,6 +1444,9 @@ paths:
       responses:
         '200':
           description: Lokasi aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1290,6 +1462,8 @@ paths:
       - Master data
       operationId: updateLokasiAset
       summary: Mengubah lokasi aset, termasuk induk, tipe, dan pemetaan unit organisasinya
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1309,13 +1483,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveLokasiAset
       summary: Mengarsipkan lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Lokasi aset diarsipkan
@@ -1326,7 +1512,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/model-aset:
     get:
       tags:
@@ -1411,6 +1599,9 @@ paths:
       responses:
         '200':
           description: Model aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1426,6 +1617,8 @@ paths:
       - Master data
       operationId: updateModelAset
       summary: Mengubah model aset, termasuk memindahkannya ke pabrikan atau jenis lain
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1445,13 +1638,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveModelAset
       summary: Mengarsipkan model aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Model aset diarsipkan
@@ -1462,7 +1667,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/profil-penyusutan:
     get:
       tags:
@@ -1542,6 +1749,9 @@ paths:
       responses:
         '200':
           description: Profil penyusutan ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1557,6 +1767,8 @@ paths:
       - Master data
       operationId: updateProfilPenyusutan
       summary: Mengubah aturan, nama, keterangan, atau status profil penyusutan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1576,13 +1788,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveProfilPenyusutan
       summary: Mengarsipkan profil penyusutan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Profil penyusutan diarsipkan
@@ -1592,6 +1816,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tipe-lokasi-aset:
     get:
       tags:
@@ -1671,6 +1899,9 @@ paths:
       responses:
         '200':
           description: Tipe lokasi aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1686,6 +1917,8 @@ paths:
       - Master data
       operationId: updateTipeLokasiAset
       summary: Mengubah nama, keterangan, atau status tipe lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1705,13 +1938,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTipeLokasiAset
       summary: Mengarsipkan tipe lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Tipe lokasi aset diarsipkan
@@ -1722,7 +1967,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/buku-penyusutan:
     get:
       tags:
@@ -1802,6 +2049,9 @@ paths:
       responses:
         '200':
           description: Buku penyusutan ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1817,6 +2067,8 @@ paths:
       - Master data
       operationId: updateBukuPenyusutan
       summary: Mengubah buku penyusutan, termasuk profil, lapisan, dan pembulatan nominalnya
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1836,13 +2088,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveBukuPenyusutan
       summary: Mengarsipkan buku penyusutan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Buku penyusutan diarsipkan
@@ -1853,7 +2117,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tipe-atribut:
     get:
       tags:
@@ -1933,6 +2199,9 @@ paths:
       responses:
         '200':
           description: Tipe atribut ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -1948,6 +2217,8 @@ paths:
       - Master data
       operationId: updateTipeAtribut
       summary: Mengubah tipe atribut, termasuk tipe dasar dan batas angka opsional
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1968,18 +2239,24 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Tipe dasar terkunci (`data_type_locked`) atau Values harus dikosongkan dahulu (`attribute_type_has_values`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/StaleVersionOrTypeLocked'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTipeAtribut
       summary: Mengarsipkan tipe atribut
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Tipe atribut diarsipkan
@@ -1990,7 +2267,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/ReferencedByChildren'
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pabrikan-aset:
     get:
       tags:
@@ -2096,6 +2375,9 @@ paths:
       responses:
         '200':
           description: Pabrikan aset ditemukan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2111,6 +2393,8 @@ paths:
       - Master data
       operationId: updatePabrikanAset
       summary: Mengubah nama, keterangan, atau status pabrikan aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2130,13 +2414,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archivePabrikanAset
       summary: Mengarsipkan pabrikan aset
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Pabrikan aset diarsipkan
@@ -2146,6 +2442,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-types:
     get:
       tags:
@@ -2192,6 +2492,9 @@ paths:
       responses:
         '200':
           description: Jenis pekerjaan maintenance
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2200,6 +2503,8 @@ paths:
       tags:
       - Master data
       operationId: updateMaintenanceJobType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2213,13 +2518,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceJobTypeResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveMaintenanceJobType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Jenis pekerjaan maintenance diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-type-variants:
     get:
       tags:
@@ -2266,6 +2587,9 @@ paths:
       responses:
         '200':
           description: Varian
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2274,6 +2598,8 @@ paths:
       tags:
       - Master data
       operationId: updateMaintenanceJobTypeVariant
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2287,13 +2613,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceJobTypeVariantResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveMaintenanceJobTypeVariant
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Varian diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-type-defaults:
     get:
       tags:
@@ -2340,6 +2682,9 @@ paths:
       responses:
         '200':
           description: Default
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2348,6 +2693,8 @@ paths:
       tags:
       - Master data
       operationId: updateMaintenanceJobTypeDefault
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2361,13 +2708,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceJobTypeDefaultResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveMaintenanceJobTypeDefault
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Default diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-type-defaults/{id}/copy:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2441,6 +2804,9 @@ paths:
       responses:
         '200':
           description: Variabel
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2449,6 +2815,8 @@ paths:
       tags:
       - Master data
       operationId: updateMaintenanceChecklistVariable
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2462,13 +2830,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceChecklistVariableResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveMaintenanceChecklistVariable
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Variabel diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-checklist-templates:
     get:
       tags:
@@ -2515,6 +2899,9 @@ paths:
       responses:
         '200':
           description: Template
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2523,6 +2910,8 @@ paths:
       tags:
       - Master data
       operationId: updateMaintenanceChecklistTemplate
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2536,13 +2925,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceChecklistTemplateResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveMaintenanceChecklistTemplate
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Template diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tipe-work-order:
     get:
       tags:
@@ -2589,6 +2994,9 @@ paths:
       responses:
         '200':
           description: Tipe work order
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2597,6 +3005,8 @@ paths:
       tags:
       - Master data
       operationId: updateTipeWorkOrder
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2610,13 +3020,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TipeWorkOrderResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTipeWorkOrder
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Tipe work order diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tingkat-layanan:
     get:
       tags:
@@ -2663,6 +3089,9 @@ paths:
       responses:
         '200':
           description: Tingkat layanan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2671,6 +3100,8 @@ paths:
       tags:
       - Master data
       operationId: updateTingkatLayanan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2684,13 +3115,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TingkatLayananResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTingkatLayanan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Tingkat layanan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/trade:
     get:
       tags:
@@ -2737,6 +3184,9 @@ paths:
       responses:
         '200':
           description: Bidang keahlian
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2745,6 +3195,8 @@ paths:
       tags:
       - Master data
       operationId: updateTrade
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2758,13 +3210,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TradeResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTrade
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Bidang keahlian diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/sebab-kerusakan:
     get:
       tags:
@@ -2811,6 +3279,9 @@ paths:
       responses:
         '200':
           description: Sebab kerusakan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2819,6 +3290,8 @@ paths:
       tags:
       - Master data
       operationId: updateSebabKerusakan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2832,13 +3305,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SebabKerusakanResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveSebabKerusakan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Sebab kerusakan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/tindakan-perbaikan:
     get:
       tags:
@@ -2885,6 +3374,9 @@ paths:
       responses:
         '200':
           description: Tindakan perbaikan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -2893,6 +3385,8 @@ paths:
       tags:
       - Master data
       operationId: updateTindakanPerbaikan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2906,13 +3400,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TindakanPerbaikanResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Master data
       operationId: archiveTindakanPerbaikan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Tindakan perbaikan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-types/{id}/variants:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2945,6 +3455,8 @@ paths:
       tags:
       - Master data
       operationId: replaceJobTypeAsetTypes
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2954,6 +3466,8 @@ paths:
               required:
               - jenis_aset_ids
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 jenis_aset_ids:
                   type: array
                   items:
@@ -2965,6 +3479,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceTransferResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-aset/{id}/maintenance-job-types:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2983,6 +3501,8 @@ paths:
       tags:
       - Master data
       operationId: replaceJenisAsetMaintenanceJobTypes
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2992,6 +3512,8 @@ paths:
               required:
               - jenis_aset_ids
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 jenis_aset_ids:
                   type: array
                   items:
@@ -3003,6 +3525,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceTransferResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-checklist-variables/{id}/values:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -3021,6 +3547,8 @@ paths:
       tags:
       - Master data
       operationId: replaceChecklistVariableValues
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -3034,6 +3562,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceChecklistVariableValueList'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-checklist-templates/{id}/lines:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -3052,6 +3584,8 @@ paths:
       tags:
       - Master data
       operationId: replaceChecklistTemplateLines
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -3065,6 +3599,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MaintenanceChecklistTemplateLineList'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/validasi-status-work-order:
     get:
       tags:
@@ -3151,6 +3689,9 @@ paths:
       responses:
         '200':
           description: Aset beserta atributnya
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -3180,17 +3721,27 @@ paths:
         berubah.
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        description: Field aset yang dikoreksi, ditambah `version` bila header `If-Match` tidak dikirim.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
-          description: Aset diperbarui
+          description: Aset diperbarui; `data.version` berisi versi terbaru
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Aset sudah dilepas, atau nilainya terkunci oleh periode penyusutan
+          $ref: '#/components/responses/StaleVersionOrAsetLocked'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
         '500':
           description: Jurnal koreksi gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); tidak ada
             yang berubah
@@ -3332,6 +3883,9 @@ paths:
       responses:
         '200':
           description: Rencana aset
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -3345,6 +3899,7 @@ paths:
       summary: Mengubah rencana draf dengan version saat ini
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -3352,22 +3907,18 @@ paths:
             schema:
               allOf:
               - $ref: '#/components/schemas/AsetPlanningWrite'
-              - type: object
-                required:
-                - version
-                properties:
-                  version:
-                    type: integer
-                    minimum: 1
+              - $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Rencana diperbarui
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Version sudah berubah
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Perencanaan aset
@@ -3375,27 +3926,24 @@ paths:
       summary: Mengarsipkan rencana draf tanpa menghapus data fisik
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Rencana diarsipkan
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Version sudah berubah
+          $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/{lifecycleDocument}:
     get:
       tags:
@@ -3655,6 +4203,9 @@ paths:
       responses:
         '200':
           description: Penerimaan beserta barisnya
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -3664,15 +4215,25 @@ paths:
       summary: Mengubah draf penerimaan; seluruh baris diganti
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        description: Field dokumen dan baris yang diubah, ditambah `version` bila header `If-Match` tidak dikirim.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Penerimaan setelah diubah
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Penerimaan aset
@@ -3680,15 +4241,24 @@ paths:
       summary: Mengarsipkan draf penerimaan
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Draf diarsipkan
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/penerimaan-aset/{id}/ringkasan:
     get:
       tags:
@@ -3749,6 +4319,13 @@ paths:
         berjalan + 1).
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Penerimaan setelah diselesaikan, beserta barisnya
@@ -3757,7 +4334,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: |
             Dokumen tanpa baris, sudah selesai, melebihi sisa permintaan pembelian yang
@@ -3767,6 +4344,8 @@ paths:
             finance (`details.<n>.group_aset_id`) — seperti D365, yang menghentikan posting faktur
             aset tanpa buku ber-lapisan Current. Saldo awal ditolak (`tanggal`) bila entitas
             legalnya belum punya cutover atau tanggal perolehannya sesudah cutover.
+        '428':
+          $ref: '#/components/responses/VersionRequired'
         '500':
           description: |
             Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
@@ -3812,7 +4391,9 @@ paths:
       - $ref: '#/components/parameters/RecordId'
       responses:
         '200':
-          description: Aset dokumen ini, terurut kode
+          description: |
+            Aset dokumen ini, terurut kode. Jawabannya `{data, version}`; `version` adalah versi
+            dokumen penerimaan, bukan versi tiap aset.
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -3830,15 +4411,49 @@ paths:
         nomor seri yang sudah ada.
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - serial
+              properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
+                serial:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                    - aset_id
+                    properties:
+                      aset_id:
+                        $ref: '#/components/schemas/Ulid'
+                      serial_number:
+                        type:
+                        - string
+                        - 'null'
+                        maxLength: 150
       responses:
         '200':
-          description: Aset dokumen ini setelah nomor serinya disimpan
+          description: |
+            Aset dokumen ini setelah nomor serinya disimpan. Jawabannya `{data, version}`; `version`
+            adalah versi dokumen penerimaan sesudah disimpan (pengisian nomor seri mengklaim dokumen,
+            bukan tiap aset).
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Ada aset yang bukan berasal dari penerimaan ini
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/mutasi-aset:
     get:
       tags:
@@ -3925,6 +4540,9 @@ paths:
       responses:
         '200':
           description: Mutasi beserta barisnya
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -3934,6 +4552,7 @@ paths:
       summary: Mengubah draf berita acara; seluruh baris diganti
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -3941,22 +4560,18 @@ paths:
             schema:
               allOf:
               - $ref: '#/components/schemas/AsetTransferWrite'
-              - type: object
-                required:
-                - version
-                properties:
-                  version:
-                    type: integer
-                    minimum: 1
+              - $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Mutasi setelah diubah
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Mutasi yang sudah selesai tidak dapat diubah
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Mutasi aset
@@ -3964,27 +4579,24 @@ paths:
       summary: Mengarsipkan draf berita acara
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Draf diarsipkan
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Mutasi yang sudah selesai tidak dapat diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/mutasi-aset/{id}/selesaikan:
     post:
       tags:
@@ -4002,18 +4614,13 @@ paths:
         lifecycle state juga dua tindakan terpisah.
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Mutasi setelah diselesaikan, beserta barisnya
@@ -4022,9 +4629,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Dokumen tanpa baris, sudah selesai, atau salah satu asetnya sudah dilepas
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -4118,6 +4727,7 @@ paths:
         penjadwalan dan pembatalan memakai schedule, mulai dan selesai memakai execute, penutupan memakai close.'
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -4126,7 +4736,6 @@ paths:
               type: object
               required:
               - ke_status
-              - version
               properties:
                 ke_status:
                   type: string
@@ -4143,20 +4752,21 @@ paths:
                   description: Wajib diisi ketika tujuannya adalah dibatalkan.
                   nullable: true
                 version:
-                  type: integer
-                  minimum: 1
+                  $ref: '#/components/schemas/VersionField'
       responses:
         '200':
-          description: Status berpindah
+          description: Status berpindah; jawabannya work order dengan `version` terbaru
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Version sudah berubah
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Transisi tidak sah, atau syarat isi data belum terpenuhi — misalnya masih ada pemeriksaan wajib yang
             kosong, atau sebab dan tindakan belum diisi pada tipe work order yang mewajibkannya.
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -4183,6 +4793,8 @@ paths:
       operationId: saveWorkOrderChecklist
       summary: Menyimpan hasil pemeriksaan sekaligus. Hanya nilai, penanda tidak berlaku, dan catatan teknisi yang dapat diubah;
         nama, tipe, satuan, dan penanda wajib adalah salinan prosedur dan tidak dapat disunting dari lapangan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -4192,6 +4804,8 @@ paths:
               required:
               - baris
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 baris:
                   type: array
                   maxItems: 200
@@ -4214,14 +4828,20 @@ paths:
                         nullable: true
       responses:
         '200':
-          description: Hasil pemeriksaan tersimpan
+          description: |
+            Hasil pemeriksaan tersimpan. Jawabannya `{data, version}`: `data` daftar baris checklist, dan
+            `version` versi work order pemiliknya sesudah disimpan (bukan versi tiap baris).
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Pekerjaan belum berstatus dikerjakan, ada baris yang bukan milik pekerjaan ini, atau nilai di luar
             pilihan yang ditetapkan variabelnya.
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -4235,6 +4855,8 @@ paths:
       - Pemeliharaan aset
       operationId: saveWorkOrderJobExecution
       summary: Menyimpan jam aktual, sebab kerusakan, dan tindakan perbaikan pada baris pekerjaan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -4242,6 +4864,8 @@ paths:
             schema:
               type: object
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 aktual_jam:
                   type: number
                   minimum: 0
@@ -4267,13 +4891,17 @@ paths:
                   description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
       responses:
         '200':
-          description: Hasil pelaksanaan tersimpan
+          description: Hasil pelaksanaan tersimpan; jawabannya work order dengan `version` terbaru
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Pekerjaan belum dapat menerima hasil pelaksanaan atau referensi tidak valid
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -4289,6 +4917,8 @@ paths:
       summary: Menyalin baris template checklist ke baris pekerjaan. Baris bertipe template dimekarkan menjadi isinya dan
         dinomori ulang berurutan, sehingga teknisi melihat satu daftar datar. Salinan bersifat snapshot; perubahan template
         setelahnya tidak mengubah pemeriksaan yang sudah dikerjakan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -4298,17 +4928,25 @@ paths:
               required:
               - template_id
               properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
                 template_id:
                   $ref: '#/components/schemas/Ulid'
       responses:
         '201':
-          description: Baris checklist tersalin; baris sebelumnya pada pekerjaan ini digantikan
+          description: |
+            Baris checklist tersalin; baris sebelumnya pada pekerjaan ini digantikan. Jawabannya `{data, version}`:
+            `version` adalah versi work order pemiliknya sesudah disalin.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Pekerjaan sudah dimulai, atau template belum memiliki baris pemeriksaan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/pemeliharaan-aset/{id}:
     get:
       tags:
@@ -4320,6 +4958,9 @@ paths:
       responses:
         '200':
           description: Work order, baris pekerjaan, dan status log
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -4334,6 +4975,7 @@ paths:
         hanya sah selama status masih draf.
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -4341,13 +4983,7 @@ paths:
             schema:
               allOf:
               - $ref: '#/components/schemas/WorkOrderWrite'
-              - type: object
-                required:
-                - version
-                properties:
-                  version:
-                    type: integer
-                    minimum: 1
+              - $ref: '#/components/schemas/VersionInput'
       responses:
         '200':
           description: Work order diperbarui
@@ -4356,9 +4992,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Version sudah berubah
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Work order tidak lagi berstatus draf, atau payload tidak lolos validasi
+        '428':
+          $ref: '#/components/responses/VersionRequired'
     delete:
       tags:
       - Pemeliharaan aset
@@ -4366,18 +5004,13 @@ paths:
       summary: Mengarsipkan work order draf atau yang sudah dibatalkan tanpa menghapus data fisik
       parameters:
       - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+              $ref: '#/components/schemas/VersionInput'
       responses:
         '204':
           description: Work order diarsipkan
@@ -4386,9 +5019,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Version sudah berubah
+          $ref: '#/components/responses/StaleVersion'
         '422':
           description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/penyusutan/proposal:
     post:
       tags:
@@ -4791,10 +5426,47 @@ components:
       schema:
         type: string
         pattern: ^[a-z0-9-]+$
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: |
+        Versi data yang sedang diubah, dalam bentuk ETag lemah seperti yang dikirim `ETag` pada
+        jawaban baca, misalnya `W/"12"`. Wajib pada setiap PATCH, PUT, dan DELETE atas data yang
+        sudah ada, serta pada aksi atas dokumen yang sudah ada (`/selesaikan`, `/batal`, `/status`,
+        `/checklist/dari-template`). Nilainya boleh dikirim lewat body sebagai field `version`
+        (integer) sebagai gantinya; bila keduanya ada, header yang dipakai. Tanpa keduanya
+        permintaan ditolak 428, dan bila versinya sudah tertinggal ditolak 409.
+      schema:
+        type: string
+        pattern: ^\s*(W/)?"\d+"\s*$
+        examples:
+        - W/"12"
   schemas:
     Ulid:
       type: string
       pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
+    RecordVersion:
+      description: |
+        Versi baris ini, integer yang hanya dibaca. Setiap penyimpanan menaikkannya (biasanya dua, bukan
+        satu), sehingga angkanya tidak berarti apa-apa selain "berbeda". Kirim nilai dari jawaban terakhir
+        sebagai header `If-Match` atau field `version` saat mengubah baris ini.
+      type: integer
+      minimum: 1
+      readOnly: true
+    VersionField:
+      description: |
+        Versi baris yang sedang diubah, dari `version` pada jawaban baca terakhir. Boleh diganti header
+        `If-Match`; salah satunya wajib. Untuk baris yang belum ada pada penyimpanan pertamanya (posting
+        group), kirim 0.
+      type: integer
+      minimum: 0
+    VersionInput:
+      description: Body yang hanya membawa versi, untuk DELETE dan aksi atas dokumen yang sudah ada.
+      type: object
+      properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
     AsetPlanningDetailWrite:
       type: object
       required:
@@ -5183,11 +5855,14 @@ components:
       - nama
       - keterangan
       - aktif
+      - version
       - created_at
       - updated_at
       properties:
         id:
           $ref: '#/components/schemas/Ulid'
+        version:
+          $ref: '#/components/schemas/RecordVersion'
         kode:
           type: string
           maxLength: 50
@@ -5231,6 +5906,8 @@ components:
     MasterPatch:
       type: object
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         nama:
           type: string
           minLength: 1
@@ -5294,6 +5971,7 @@ components:
         model_number: PK-100
         aset_count: 3
         aktif: true
+        version: 1
         created_at: '2026-07-26T02:00:00.000000Z'
         updated_at: '2026-07-26T02:00:00.000000Z'
     ModelAsetCreate:
@@ -5824,6 +6502,8 @@ components:
       required:
       - values
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         values:
           type: array
           maxItems: 100
@@ -5850,7 +6530,11 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          description: Versi variabel checklist pemilik nilai; kirim sebagai `version` saat menyimpannya.
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: array
           items:
@@ -5943,7 +6627,10 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: array
           items:
@@ -5953,6 +6640,8 @@ components:
       required:
       - lines
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         lines:
           type: array
           maxItems: 100
@@ -6146,7 +6835,13 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          description: |
+            Versi pemilik yang disebut alamat (job type pada `/maintenance-job-types/{id}/jenis-aset`,
+            jenis aset pada `/jenis-aset/{id}/maintenance-job-types`); kirim sebagai `version` saat menyimpan.
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: object
           required:
@@ -6500,6 +7195,8 @@ components:
       required:
       - rows
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         rows:
           type: array
           items:
@@ -6508,7 +7205,11 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          description: Versi group aset pemilik matriks; kirim sebagai `version` saat menyimpan matriksnya.
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: array
           items:
@@ -6525,8 +7226,14 @@ components:
       description: |
         Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
         bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
+
+        Pada permintaan PUT body juga membawa `version` (atau kirim header `If-Match`): versi baris yang
+        dibuka pengguna, dan 0 bila barisnya untuk tanggal berlaku yang belum ada. Pada jawaban `version`
+        berisi versi baris sesudah disimpan.
       additionalProperties: false
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         acquisition_account_id:
           description: Harga perolehan. Wajib.
           oneOf:
@@ -6574,9 +7281,12 @@ components:
         - group_aset_id
         - effective_from
         - missing
+        - version
         properties:
           group_aset_id:
             $ref: '#/components/schemas/Ulid'
+          version:
+            $ref: '#/components/schemas/RecordVersion'
           effective_from:
             type: string
             format: date
@@ -6833,6 +7543,8 @@ components:
       required:
       - rows
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         rows:
           type: array
           items:
@@ -6851,7 +7563,11 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          description: Versi tipe atribut pemilik pilihan nilai; kirim sebagai `version` saat menyimpannya.
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: array
           items:
@@ -6873,6 +7589,8 @@ components:
       required:
       - rows
       properties:
+        version:
+          $ref: '#/components/schemas/VersionField'
         rows:
           type: array
           items:
@@ -6893,7 +7611,11 @@ components:
       type: object
       required:
       - data
+      - version
       properties:
+        version:
+          description: Versi jenis aset pemilik atribut; kirim sebagai `version` saat menyimpannya.
+          $ref: '#/components/schemas/RecordVersion'
         data:
           type: array
           items:
@@ -6924,10 +7646,16 @@ components:
         data:
           type: object
           required:
+          - version
           - atribut_count
           - model_count
           - aset_count
           properties:
+            version:
+              description: |
+                Versi jenis aset. Daftar model pada panel ini disimpan lewat `PUT /api/v1/jenis-aset/{id}/models`
+                dengan versi ini.
+              $ref: '#/components/schemas/RecordVersion'
             atribut_count:
               description: Tipe atribut yang terpasang pada jenis aset ini.
               type: integer
@@ -7222,3 +7950,93 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    VersionRequired:
+      description: |
+        Versi data yang diubah tidak dikirim (`error.code` = `version_required`). Kirim header `If-Match`
+        berisi ETag dari jawaban baca, atau field `version` pada body. Header `If-Match` yang bentuknya
+        bukan ETag angka juga dijawab begini. Tidak ada yang berubah.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: version_required
+              message: 'Versi data yang sedang diubah wajib dikirim: header If-Match berisi ETag, atau field version.'
+    StaleVersion:
+      description: |
+        Data sudah diubah sejak pengguna membukanya (`error.code` = `stale_version`). Perubahan tidak
+        disimpan; muat ulang untuk mendapat `version` terbaru, lalu ulangi perubahannya.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: stale_version
+              message: Perubahanmu belum disimpan karena data ini sudah diubah sejak kamu membukanya. Muat ulang untuk melihat
+                data terbaru, lalu ulangi perubahanmu.
+    StaleVersionOrReferencedByChildren:
+      description: |
+        Dua kemungkinan, dibedakan `error.code`:
+
+        | `error.code` | Arti |
+        | --- | --- |
+        | `stale_version` | Data sudah diubah sejak dibuka; muat ulang lalu ulangi |
+        | `referenced_by_children` | Data masih dipakai master turunan yang aktif; arsipkan turunannya lebih dulu |
+
+        Versi diperiksa lebih dulu. Penolakan `referenced_by_children` membatalkan transaksinya, jadi
+        `version` data tidak bertambah karenanya.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    StaleVersionOrAttributeValuesInUse:
+      description: |
+        Dua kemungkinan, dibedakan `error.code`:
+
+        | `error.code` | Arti |
+        | --- | --- |
+        | `stale_version` | Tipe atribut sudah diubah sejak dibuka; muat ulang lalu ulangi |
+        | `attribute_values_in_use` | Values baru tidak mencakup seluruh nilai aset yang tersimpan; bentuknya `AttributeValuesConflictResponse` |
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - $ref: '#/components/schemas/ErrorResponse'
+            - $ref: '#/components/schemas/AttributeValuesConflictResponse'
+    StaleVersionOrTypeLocked:
+      description: |
+        Tiga kemungkinan, dibedakan `error.code`:
+
+        | `error.code` | Arti |
+        | --- | --- |
+        | `stale_version` | Tipe atribut sudah diubah sejak dibuka; muat ulang lalu ulangi |
+        | `data_type_locked` | Tipe data sudah pernah dipakai dan tidak dapat diubah |
+        | `attribute_type_has_values` | Tipe teks masih memiliki Values aktif |
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    StaleVersionOrAsetLocked:
+      description: |
+        Beberapa kemungkinan; hanya versi yang membawa `error.code` = `stale_version`:
+
+        - `stale_version`: aset sudah diubah sejak dibuka; muat ulang lalu ulangi.
+        - Aset sudah dilepas, sehingga tidak dapat diubah.
+        - Nilai perolehan atau residu diubah padahal sudah ada periode penyusutan; balikkan periodenya lebih dulu.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  headers:
+    ETag:
+      description: |
+        Versi data yang dibaca, dalam bentuk ETag lemah `W/"<n>"` dengan `<n>` sama dengan field
+        `version` pada `data`. Kirim kembali sebagai header `If-Match` (atau sebagai field `version`)
+        saat mengubah data ini.
+      schema:
+        type: string
+        pattern: ^W/"\d+"$
+        examples:
+        - W/"12"

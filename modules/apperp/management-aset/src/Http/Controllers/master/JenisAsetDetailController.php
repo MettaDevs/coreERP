@@ -39,12 +39,15 @@ class JenisAsetDetailController extends Controller
         abort_unless(in_array('management-aset.jenis-aset.read', $permissions, true), 403);
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
-        abort_unless(JenisAset::query()->whereKey($jenisAsetId)->exists(), 404);
+        // Versi jenis aset ikut disajikan: daftar model di panel ini disimpan dengan mengklaimnya.
+        $version = JenisAset::query()->whereKey($jenisAsetId)->value('version');
+        abort_if($version === null, 404);
 
         $mayReadModels = in_array('management-aset.model-aset.read', $permissions, true);
         $mayReadAset = in_array('management-aset.aset.read', $permissions, true);
 
         return response()->json(['data' => [
+            'version' => (int) $version,
             'atribut_count' => JenisAsetAtribut::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),

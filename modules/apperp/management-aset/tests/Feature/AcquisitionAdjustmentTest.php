@@ -181,7 +181,7 @@ class AcquisitionAdjustmentTest extends TestCase
         // Nilai yang sama, atau koreksi field lain, tidak menuntut alasan dan tidak menerbitkan apa pun.
         $this->koreksi($aset, 500000, alasan: '', tanggal: null)->assertOk()->assertJsonPath('data.adjustment', null);
         $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
-            ->patchJson(self::API.'aset/'.$aset, ['serial_number' => 'SN-01'])
+            ->patchJson(self::API.'aset/'.$aset, ['version' => DB::table('aset_tr_aset')->where('id', $aset)->value('version'), 'serial_number' => 'SN-01'])
             ->assertOk()->assertJsonPath('data.adjustment', null);
         $this->assertSame(0, FinancePosting::query()->where('posting_type', 'asset.acquisition_adjustment')->count());
     }
@@ -308,10 +308,10 @@ class AcquisitionAdjustmentTest extends TestCase
         $id = $this->organisasi(['classification' => 'operating_unit', 'name' => $nama, 'operating_unit_type' => 'business_unit', 'operating_unit_number' => $nomor]);
         $terbit = OrganizationHierarchyVersion::query()->where('status', 'published')
             ->whereHas('hierarchy', fn ($query) => $query->where('name', 'Struktur manajemen'))->firstOrFail();
-        $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$terbit->id}/drafts", ['effective_from' => '2026-06-01'])->assertSessionHasNoErrors();
+        $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$terbit->id}/drafts", ['version' => $terbit->hierarchy()->value('version'), 'effective_from' => '2026-06-01'])->assertSessionHasNoErrors();
         $draf = OrganizationHierarchyVersion::query()->where('status', 'draft')->where('hierarchy_id', $terbit->hierarchy_id)->firstOrFail();
-        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/placements", ['organization_id' => $id, 'parent_organization_id' => $this->le])->assertSessionHasNoErrors();
-        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/placements", ['version' => $draf->hierarchy()->value('version'), 'organization_id' => $id, 'parent_organization_id' => $this->le])->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish", ['version' => $draf->hierarchy()->value('version')])->assertSessionHasNoErrors();
 
         return $id;
     }
@@ -339,6 +339,7 @@ class AcquisitionAdjustmentTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
             ->patchJson(self::API.'aset/'.$aset, array_filter([
+                'version' => DB::table('aset_tr_aset')->where('id', $aset)->value('version'),
                 'acquisition_value' => $nilai,
                 'reason' => $alasan,
                 'adjustment_date' => $tanggal === 'hari-ini' ? $this->hariIni() : $tanggal,

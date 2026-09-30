@@ -196,14 +196,23 @@ export function setup() {
     // Pengiriman posting diaktifkan dengan cutover, seperti `receipt-posting.js`. Tanpanya setiap
     // jurnal tercatat `manual` karena feed-nya mati, dan penerbit tidak pernah menilai pemetaan
     // akun maupun unit bisnis yang dibawa baris jurnal penyusutan.
+    // Tenant fixture dipakai ulang antar-run, jadi versi setelannya dibaca dulu (0 bila belum pernah disimpan).
+    const setelan = http.batch(semua((tenant) => ['GET', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, null, params(tenant)]));
     tahap(
         'setelan feed',
-        semua((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01' }), params(tenant)]),
+        semua((tenant, index) => {
+            if (setelan[index].status !== 200) {
+                fail(`setup baca setelan feed gagal pada tenant ${index}: ${setelan[index].status} ${String(setelan[index].body).slice(0, 400)}`);
+            }
+
+            return ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: true, cutover_date: '2026-01-01', version: Number(setelan[index].json('data.version')) }), params(tenant)];
+        }),
         [200],
     );
 
     const jenisIds = idDari(tahap('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Susut jenis ${index}` }), params(tenant, kunci('jenis', index))])));
-    const groupIds = idDari(tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeDiketik('SUSUT'), nama: `Susut group ${index}` }), params(tenant, kunci('group', index))])));
+    const groupResponses = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeDiketik('SUSUT'), nama: `Susut group ${index}` }), params(tenant, kunci('group', index))]));
+    const groupIds = idDari(groupResponses);
     const profilIds = idDari(tahap(
         'profil-penyusutan',
         semua((tenant, index) => [
@@ -254,6 +263,8 @@ export function setup() {
                     depreciate: true,
                     round_off_depreciation: 100,
                 }],
+                // Versi group dari jawaban pembuatannya (atau jawaban ulang kunci, yang membawa versi terkini).
+                version: Number(groupResponses[index].json('data.version')),
             }),
             params(tenant),
         ]),
@@ -296,7 +307,7 @@ export function setup() {
         semua((tenant, index) => [
             'POST',
             `${ASET('penerimaan-aset')}/${penerimaanIds[index]}/selesaikan`,
-            JSON.stringify({ version: 1 }),
+            JSON.stringify({ version: Number(penerimaan[index].json('data.version')) }),
             params(tenant),
         ]),
         [200],

@@ -69,7 +69,7 @@ class IntegrationClientTest extends TestCase
         $this->unitsDengan('bukan-token')->assertUnauthorized();
         $this->withHeaders(['Accept' => 'application/json'])->getJson('/api/internal/v1/operating-units')->assertUnauthorized();
 
-        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/revoke")->assertOk()
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/revoke", ['version' => IntegrationClient::query()->findOrFail($id)->version])->assertOk()
             ->assertJsonPath('data.status', 'revoked');
         $this->unitsDengan($token)->assertUnauthorized();
     }
@@ -287,16 +287,56 @@ class IntegrationClientTest extends TestCase
         $this->assertArrayNotHasKey('curl', $opsi[1]);
     }
 
+    public function test_penyimpanan_dan_pencabutan_dengan_versi_basi_ditolak(): void
+    {
+        $buat = $this->buat();
+        $id = (string) $buat->json('data.id');
+        $url = "/api/v1/integration-clients/{$id}";
+        $versi = IntegrationClient::query()->findOrFail($id)->version;
+        $this->assertSame($versi, $buat->json('data.version'));
+
+        $this->actingAs($this->owner)->get('/settings/integration-clients')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('clients.0.version', $versi));
+        $simpan = $this->patchJson($url, [...$this->bentuk(), 'name' => 'Finance pertama', 'version' => $versi])->assertOk();
+        $this->assertSame(IntegrationClient::query()->findOrFail($id)->version, $simpan->json('data.version'));
+
+        $this->patchJson($url, [...$this->bentuk(), 'name' => 'Finance kedua', 'version' => $versi])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->patchJson($url, [...$this->bentuk(), 'name' => 'Finance ketiga'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->postJson("{$url}/revoke", ['version' => $versi])->assertStatus(409);
+        $this->postJson("{$url}/revoke")->assertStatus(428);
+
+        $client = IntegrationClient::query()->findOrFail($id);
+        $this->assertSame(['Finance pertama', IntegrationClient::ACTIVE], [$client->name, $client->status]);
+    }
+
+    public function test_klien_yang_sedang_dipakai_tidak_membuat_form_admin_basi(): void
+    {
+        $buat = $this->buat();
+        $id = (string) $buat->json('data.id');
+        $versi = IntegrationClient::query()->findOrFail($id)->version;
+
+        // Klien memakai tokennya sementara admin membuka form: `last_used_at` berubah, versinya tidak.
+        $this->unitsDengan((string) $buat->json('token'))->assertOk();
+        $this->assertNotNull(IntegrationClient::query()->findOrFail($id)->last_used_at);
+        $this->assertSame($versi, IntegrationClient::query()->findOrFail($id)->version);
+
+        $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", [...$this->bentuk(), 'name' => 'Diubah admin', 'version' => $versi])
+            ->assertOk();
+    }
+
     public function test_pindah_mode_mengatur_rahasia_penanda_tangan(): void
     {
         $id = (string) $this->buat()->json('data.id');
 
         $keDorong = $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", [
             ...$this->bentuk(), 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook',
+            'version' => IntegrationClient::query()->findOrFail($id)->version,
         ])->assertOk();
         $this->assertSame(48, strlen((string) $keDorong->json('signing_secret')));
 
-        $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", $this->bentuk())
+        $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", [...$this->bentuk(), 'version' => $keDorong->json('data.version')])
             ->assertOk()->assertJsonPath('data.has_signing_secret', false)->assertJsonPath('data.push_url', null);
         $this->assertNull(IntegrationClient::query()->findOrFail($id)->signing_secret);
     }

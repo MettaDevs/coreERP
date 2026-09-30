@@ -138,6 +138,7 @@ class WorkingTimeTemplateTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->putJson("/settings/working-time-templates/{$template->id}/lines", [
+                'version' => 1,
                 'lines' => [
                     [
                         'day_of_week' => 1, // Tuesday
@@ -222,7 +223,7 @@ class WorkingTimeTemplateTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->deleteJson("/settings/working-time-templates/{$template->id}");
+            ->deleteJson("/settings/working-time-templates/{$template->id}", ['version' => 1]);
 
         $response->assertOk();
 

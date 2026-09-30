@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Reporting;
 use App\Http\Controllers\Controller;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Reporting\LayoutRef;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\SumberLaporan;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use stdClass;
@@ -89,17 +93,25 @@ class ReportLayoutController extends Controller
             'name' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
-        $result = $this->layouts->update(
-            $report,
-            $membership->tenant_id,
-            $this->workspace->legalEntity($request, $membership)?->id,
-            $id,
-            $data['name'] ?? null,
-            $data['description'] ?? null,
-            $request->has('description'),
-            $request->file('file'),
-            $request->file('file') ? $this->knownKeys($request, $membership, $report) : [],
-        );
+        $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
+        $file = $request->file('file');
+        $file = $file instanceof UploadedFile ? $file : null;
+        $knownKeys = $file ? $this->knownKeys($request, $membership, $report) : [];
+        $result = DB::transaction(function () use ($request, $membership, $report, $legalEntityId, $id, $data, $file, $knownKeys): array {
+            RowVersion::claim($this->uploadedLayout($membership, $report, $legalEntityId, $id), RowVersion::expected($request));
+
+            return $this->layouts->update(
+                $report,
+                $membership->tenant_id,
+                $legalEntityId,
+                $id,
+                $data['name'] ?? null,
+                $data['description'] ?? null,
+                $request->has('description'),
+                $file,
+                $knownKeys,
+            );
+        });
 
         return response()->json(['data' => $result['layout'], 'meta' => ['unknown_placeholders' => $result['unknown_placeholders']]]);
     }
@@ -108,7 +120,11 @@ class ReportLayoutController extends Controller
     {
         abort_unless($request->user()->can('manage-report-layouts'), 403);
         [$membership, $report] = $this->report($request, $code);
-        $this->layouts->delete($report, $membership->tenant_id, $this->workspace->legalEntity($request, $membership)?->id, $id);
+        $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
+        DB::transaction(function () use ($request, $membership, $report, $legalEntityId, $id): void {
+            RowVersion::claim($this->uploadedLayout($membership, $report, $legalEntityId, $id), RowVersion::expected($request));
+            $this->layouts->delete($report, $membership->tenant_id, $legalEntityId, $id);
+        });
 
         return response()->json(null, 204);
     }
@@ -140,7 +156,16 @@ class ReportLayoutController extends Controller
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
         abort_if($data['scope'] === 'legal_entity' && $legalEntityId === null, 422, 'Konteks aktif tidak memiliki legal entity.');
 
-        $this->layouts->setDefault($report, $membership->tenant_id, $legalEntityId, $data['layout_ref'] ?? null, $data['scope'] === 'legal_entity' ? $legalEntityId : null);
+        $scopeLegalEntityId = $data['scope'] === 'legal_entity' ? $legalEntityId : null;
+        DB::transaction(function () use ($request, $membership, $report, $legalEntityId, $scopeLegalEntityId, $data): void {
+            // Pilihan default satu lingkup adalah satu baris. Selama lingkup itu belum pernah dipilih barisnya
+            // belum ada, dan halamannya mengirim versi 0.
+            RowVersion::claimIfExists(DB::table('report_layout_defaults')->where([
+                'tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'scope_key' => $scopeLegalEntityId ?? 'tenant',
+            ]), RowVersion::expected($request));
+
+            $this->layouts->setDefault($report, $membership->tenant_id, $legalEntityId, $data['layout_ref'] ?? null, $scopeLegalEntityId);
+        });
 
         return $this->listing($request, $membership, $report);
     }
@@ -160,11 +185,32 @@ class ReportLayoutController extends Controller
     private function listing(Request $request, TenantMembership $membership, stdClass $report): JsonResponse
     {
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
+        $layouts = $this->layouts->list($report, $membership->tenant_id, $legalEntityId);
+        // Versi baris layout unggahan dan pilihan default per lingkup, untuk dikirim balik saat mengubahnya.
+        // Layout bawaan tidak punya baris, jadi versinya null.
+        $versions = DB::table('report_layouts')->where('tenant_id', $membership->tenant_id)
+            ->whereIn('id', array_column($layouts, 'ref'))->pluck('version', 'id');
+        $defaults = DB::table('report_layout_defaults')
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code])->pluck('version', 'scope_key');
 
         return response()->json([
-            'data' => $this->layouts->list($report, $membership->tenant_id, $legalEntityId),
-            'meta' => ['default_ref' => $this->layouts->defaultRef($report, $membership->tenant_id, $legalEntityId)],
+            'data' => array_map(fn (array $layout): array => [...$layout, 'version' => $versions[$layout['ref']] ?? null], $layouts),
+            'meta' => [
+                'default_ref' => $this->layouts->defaultRef($report, $membership->tenant_id, $legalEntityId),
+                'default_versions' => [
+                    'tenant' => $defaults['tenant'] ?? 0,
+                    'legal_entity' => $legalEntityId !== null ? ($defaults[$legalEntityId] ?? 0) : null,
+                ],
+            ],
         ]);
+    }
+
+    /** Satu layout unggahan yang terlihat dari konteks ini, dengan aturan lingkup yang sama seperti daftar. */
+    private function uploadedLayout(TenantMembership $membership, stdClass $report, ?string $legalEntityId, string $id): Builder
+    {
+        return DB::table('report_layouts')
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'id' => $id])
+            ->where(fn ($query) => $query->whereNull('legal_entity_id')->when($legalEntityId !== null, fn ($query) => $query->orWhere('legal_entity_id', $legalEntityId)));
     }
 
     /** @return list<string> */

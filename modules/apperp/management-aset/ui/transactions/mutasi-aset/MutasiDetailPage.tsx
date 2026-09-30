@@ -28,7 +28,13 @@ import {
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    ApiError,
+    api,
+    errorMessage,
+    newIdempotencyKey,
+    toastSaveError,
+} from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
 import type { Context, EditableMutasi, Mutasi, MutasiLine } from './mutasi';
@@ -229,13 +235,17 @@ export default function MutasiDetailPage({
                 return;
             }
 
-            await api<{ data: Mutasi }>(`/mutasi-aset/${mutasiId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    ...payload,
-                    version: tersimpan?.version,
-                }),
-            });
+            const hasil = await api<{ data: Mutasi }>(
+                `/mutasi-aset/${mutasiId}`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        ...payload,
+                        version: tersimpan?.version,
+                    }),
+                },
+            );
+            setTersimpan(hasil.data);
             toast.success('Perubahan mutasi disimpan.');
             bukaMutasi(String(mutasiId));
         } catch (caught) {
@@ -243,7 +253,7 @@ export default function MutasiDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toast.error(errorMessage(caught, 'Mutasi belum dapat disimpan.'));
+            toastSaveError(caught, 'Mutasi belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -254,10 +264,14 @@ export default function MutasiDetailPage({
         setMenyimpan(true);
 
         try {
-            await api(`/mutasi-aset/${mutasiId}/selesaikan`, {
-                method: 'POST',
-                body: JSON.stringify({ version: tersimpan?.version }),
-            });
+            const hasil = await api<{ data: Mutasi }>(
+                `/mutasi-aset/${mutasiId}/selesaikan`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ version: tersimpan?.version }),
+                },
+            );
+            setTersimpan(hasil.data);
             toast.success(
                 'Serah terima diselesaikan. Penempatan aset sudah berpindah.',
             );
@@ -267,9 +281,7 @@ export default function MutasiDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toast.error(
-                errorMessage(caught, 'Mutasi belum dapat diselesaikan.'),
-            );
+            toastSaveError(caught, 'Mutasi belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
         }
@@ -286,7 +298,7 @@ export default function MutasiDetailPage({
             toast.success('Draf mutasi diarsipkan.');
             bukaDaftar();
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Mutasi belum dapat diarsipkan.'));
+            toastSaveError(caught, 'Mutasi belum dapat diarsipkan.');
         }
     }
 

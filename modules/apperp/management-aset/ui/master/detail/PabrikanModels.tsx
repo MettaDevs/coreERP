@@ -133,7 +133,10 @@ export default function PabrikanModels({
         }
 
         try {
-            await api(`/model-aset/${archiving.id}`, { method: 'DELETE' });
+            await api(`/model-aset/${archiving.id}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ version: archiving.version }),
+            });
             setArchiving(null);
             muatUlang();
             onChanged();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Retention\RetentionPolicies;
 use App\Support\Retention\RetentionService;
 use Illuminate\Http\RedirectResponse;
@@ -80,12 +81,19 @@ final class RetentionController extends Controller
             'retention_days.max' => 'Masa simpan terlalu lama. Isi paling banyak 36.500 hari.',
         ]);
 
-        $this->retention->save(
-            $membership->tenant_id,
-            $registered,
-            $optional ? (bool) $data['enabled'] : true,
-            isset($data['retention_days']) ? (int) $data['retention_days'] : null,
-        );
+        DB::transaction(function () use ($request, $membership, $registered, $optional, $data): void {
+            // Setelan tenant baru lahir saat pertama disimpan; layar mengirim versi 0 selama masih bawaan.
+            RowVersion::claimIfExists(
+                DB::table('retention_policy_setups')->where(['tenant_id' => $membership->tenant_id, 'policy_code' => $registered->code]),
+                RowVersion::expected($request),
+            );
+            $this->retention->save(
+                $membership->tenant_id,
+                $registered,
+                $optional ? (bool) $data['enabled'] : true,
+                isset($data['retention_days']) ? (int) $data['retention_days'] : null,
+            );
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Masa simpan data disimpan.']);
 

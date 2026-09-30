@@ -48,6 +48,7 @@ type Sequence = {
     minimum_number: number;
     maximum_number: number | null;
     segments: Segment[];
+    version: number;
 };
 type Props = {
     canManage: boolean;
@@ -308,6 +309,7 @@ function SequenceForm({
                         data.maximum_number === ''
                             ? null
                             : Number(data.maximum_number),
+                    version: sequence.version,
                 }));
                 form.patch(`/settings/number-sequences/${sequence.id}`);
             }}

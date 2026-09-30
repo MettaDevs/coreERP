@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -80,13 +81,69 @@ class PerencanaanAsetTest extends TestCase
 
         $this->headers(['management-aset.perencanaan-aset.read'])
             ->patchJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], $payload)->assertForbidden();
-        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update'])
-            ->patchJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
+        $versi = $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], $payload)->assertOk()->json('data.version');
         $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive'])
             ->deleteJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], ['version' => 1])->assertConflict();
         $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive'])
-            ->deleteJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], ['version' => 2])->assertNoContent();
+            ->deleteJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], ['version' => $versi])->assertNoContent();
         $this->assertSoftDeleted('aset_tr_perencanaan_aset', ['id' => $plan['id']]);
+    }
+
+    public function test_simpan_kedua_dengan_versi_yang_sama_ditolak_dan_rincian_simpan_pertama_bertahan(): void
+    {
+        $jenis = $this->jenis($this->tenantId);
+        $plan = $this->create($jenis)->assertCreated()->assertJsonPath('data.version', 1)->json('data');
+        $alamat = '/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'];
+        $pengubah = $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update']);
+
+        $pertama = $this->payload($jenis);
+        $pertama['description'] = 'Simpan pertama';
+        $pertama['details'][0]['requested_specification'] = 'Spesifikasi simpan pertama';
+        $pengubah->patchJson($alamat, [...$pertama, 'version' => 1])->assertOk();
+
+        $kedua = $this->payload($jenis);
+        $kedua['description'] = 'Simpan kedua';
+        $kedua['details'][0]['requested_specification'] = 'Spesifikasi simpan kedua';
+        $pengubah->patchJson($alamat, [...$kedua, 'version' => 1])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset', ['id' => $plan['id'], 'description' => 'Simpan pertama']);
+        $this->assertSame(
+            ['Spesifikasi simpan pertama'],
+            DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $plan['id'])->pluck('requested_specification')->all(),
+        );
+    }
+
+    public function test_simpan_dan_arsip_tanpa_versi_ditolak_dan_tidak_mengubah_apa_pun(): void
+    {
+        $jenis = $this->jenis($this->tenantId);
+        $plan = $this->create($jenis)->assertCreated()->json('data');
+        $alamat = '/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'];
+        $payload = $this->payload($jenis);
+        $payload['description'] = 'Tanpa versi';
+
+        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update'])
+            ->patchJson($alamat, $payload)->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive'])
+            ->deleteJson($alamat)->assertStatus(428);
+
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset', [
+            'id' => $plan['id'], 'description' => 'Perangkat tim pengembangan', 'version' => 1, 'deleted_at' => null,
+        ]);
+    }
+
+    public function test_rincian_memulangkan_versi_dan_etag(): void
+    {
+        $plan = $this->create($this->jenis($this->tenantId))->assertCreated()->json('data');
+
+        $this->headers(['management-aset.perencanaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'])
+            ->assertOk()
+            ->assertJsonPath('data.version', 1)
+            ->assertHeader('ETag', RowVersion::etag(1));
     }
 
     /** @return TestResponse<Response> */

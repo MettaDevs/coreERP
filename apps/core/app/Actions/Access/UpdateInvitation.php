@@ -8,6 +8,7 @@ use App\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,8 +29,12 @@ class UpdateInvitation
 {
     public function __construct(private readonly DataPolicyScopeResolver $scopeResolver) {}
 
-    /** @param  array{label:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data */
-    public function handle(TenantMembership $actor, InvitationCode $invitation, array $data): InvitationCode
+    /**
+     * `$expectedVersion` adalah versi undangan yang dibuka penggunanya.
+     *
+     * @param  array{label:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}  $data
+     */
+    public function handle(TenantMembership $actor, InvitationCode $invitation, array $data, int $expectedVersion): InvitationCode
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || $invitation->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
@@ -74,7 +79,8 @@ class UpdateInvitation
 
         $before = $this->snapshot($invitation);
 
-        return DB::transaction(function () use ($actor, $invitation, $data, $roleIds, $scopes, $before): InvitationCode {
+        return DB::transaction(function () use ($actor, $invitation, $data, $roleIds, $scopes, $before, $expectedVersion): InvitationCode {
+            RowVersion::claim($invitation, $expectedVersion);
             $invitation->update([
                 'label' => $data['label'] ?? null,
             ]);

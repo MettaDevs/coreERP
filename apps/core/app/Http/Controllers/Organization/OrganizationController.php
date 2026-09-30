@@ -19,10 +19,13 @@ use App\Models\OrganizationHierarchy;
 use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\UserClock;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -82,7 +85,7 @@ class OrganizationController extends Controller
 
     public function update(UpdateOrganizationRequest $request, Organization $organization, UpdateOrganization $action): JsonResponse|RedirectResponse
     {
-        $organization = $action->handle($this->currentMembership($request), $organization, $request->payload());
+        $organization = $action->handle($this->currentMembership($request), $organization, $request->payload(), RowVersion::expected($request));
 
         return $request->is('api/*')
             ? response()->json(['data' => $organization])
@@ -102,19 +105,25 @@ class OrganizationController extends Controller
             'organization_id' => ['required', 'string'],
             'parent_organization_id' => ['required', 'string'],
         ]);
-        $action->handle(
-            $this->currentMembership($request),
-            $version,
-            $data['organization_id'],
-            $data['parent_organization_id'],
-        );
+        DB::transaction(function () use ($request, $version, $action, $data): void {
+            $this->claimHierarchy($request, $version);
+            $action->handle(
+                $this->currentMembership($request),
+                $version,
+                $data['organization_id'],
+                $data['parent_organization_id'],
+            );
+        });
 
         return back()->with('status', 'Organisasi ditempatkan pada draft hierarchy.');
     }
 
     public function unplace(Request $request, OrganizationHierarchyVersion $version, OrganizationHierarchyNode $node, UnplaceOrganizationFromHierarchy $action): RedirectResponse
     {
-        $action->handle($this->currentMembership($request), $version, $node);
+        DB::transaction(function () use ($request, $version, $node, $action): void {
+            $this->claimHierarchy($request, $version);
+            $action->handle($this->currentMembership($request), $version, $node);
+        });
 
         return back()->with('status', 'Penempatan organisasi dibatalkan.');
     }
@@ -122,15 +131,37 @@ class OrganizationController extends Controller
     public function createDraft(Request $request, OrganizationHierarchyVersion $version, CreateOrganizationHierarchyDraft $action): RedirectResponse
     {
         $data = $request->validate(['effective_from' => ['required', 'date']]);
-        $action->handle($this->currentMembership($request), $version, $data['effective_from']);
+        DB::transaction(function () use ($request, $version, $action, $data): void {
+            $this->claimHierarchy($request, $version);
+            $action->handle($this->currentMembership($request), $version, $data['effective_from']);
+        });
 
         return back()->with('status', 'Draft versi baru dibuat. Susun perubahan lalu publikasikan.');
     }
 
     public function publish(Request $request, OrganizationHierarchyVersion $version, PublishOrganizationHierarchy $action): RedirectResponse
     {
-        $action->handle($this->currentMembership($request), $version);
+        DB::transaction(function () use ($request, $version, $action): void {
+            $this->claimHierarchy($request, $version);
+            $action->handle($this->currentMembership($request), $version);
+        });
 
         return back()->with('status', 'Hierarchy dipublikasikan.');
+    }
+
+    /**
+     * Versi hierarchy tidak membawa kolom versi baris, jadi penyimpanan pada versi mana pun mengunci
+     * hierarchy induknya: dua perubahan dari layar yang dibuka bersamaan tidak sama-sama lolos.
+     * Hak diperiksa lebih dulu supaya pengguna tanpa hak tidak dapat menaikkan versinya; action tetap
+     * memeriksa ulang.
+     */
+    private function claimHierarchy(Request $request, OrganizationHierarchyVersion $version): void
+    {
+        $membership = $this->currentMembership($request);
+        if (! $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $version->hierarchy->tenant_id !== $membership->tenant_id) {
+            throw new AuthorizationException;
+        }
+
+        RowVersion::claim($version->hierarchy, RowVersion::expected($request));
     }
 }

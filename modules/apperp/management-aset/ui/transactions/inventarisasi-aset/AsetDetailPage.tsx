@@ -16,7 +16,7 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import { api, errorMessage } from '../../api';
+import { api, errorMessage, toastSaveError } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
@@ -282,40 +282,44 @@ export default function AsetDetailPage({
         setMenyimpan(true);
 
         try {
-            const jawab = await api<{ data: { adjustment: HasilKoreksi } }>(
-                `/aset/${asetId}`,
-                {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        ...Object.fromEntries(
-                            EDITABLE.map((field) => [
-                                field.name,
-                                payloadValue(field, references[field.name]),
-                            ]),
-                        ),
-                        nama: values.nama,
-                        induk_aset_id: parentAsetId || null,
-                        serial_number: values.serial_number || null,
-                        model_number: values.model_number || null,
-                        placed_in_service_on:
-                            values.placed_in_service_on || null,
-                        keterangan: values.keterangan || null,
-                        atribut: attributePayload(),
-                        // Hanya dikirim bila berubah: nilai yang sama tidak menerbitkan apa pun.
-                        ...(nilaiBerubah
-                            ? {
-                                  acquisition_value: values.acquisition_value,
-                                  reason: alasanKoreksi,
-                                  adjustment_date: hariIni,
-                              }
-                            : {}),
-                    }),
-                },
+            const jawab = await api<{
+                data: { adjustment: HasilKoreksi; version: number };
+            }>(`/aset/${asetId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    version: detail?.version,
+                    ...Object.fromEntries(
+                        EDITABLE.map((field) => [
+                            field.name,
+                            payloadValue(field, references[field.name]),
+                        ]),
+                    ),
+                    nama: values.nama,
+                    induk_aset_id: parentAsetId || null,
+                    serial_number: values.serial_number || null,
+                    model_number: values.model_number || null,
+                    placed_in_service_on: values.placed_in_service_on || null,
+                    keterangan: values.keterangan || null,
+                    atribut: attributePayload(),
+                    // Hanya dikirim bila berubah: nilai yang sama tidak menerbitkan apa pun.
+                    ...(nilaiBerubah
+                        ? {
+                              acquisition_value: values.acquisition_value,
+                              reason: alasanKoreksi,
+                              adjustment_date: hariIni,
+                          }
+                        : {}),
+                }),
+            });
+            setDetail((sebelumnya) =>
+                sebelumnya
+                    ? { ...sebelumnya, version: jawab.data.version }
+                    : sebelumnya,
             );
             toast.success(pesanKoreksi(jawab.data.adjustment));
             bukaAset(String(asetId));
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Koreksi belum dapat disimpan.'));
+            toastSaveError(caught, 'Koreksi belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }

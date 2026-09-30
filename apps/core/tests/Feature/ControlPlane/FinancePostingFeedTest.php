@@ -316,7 +316,7 @@ class FinancePostingFeedTest extends TestCase
 
         // Feed diaktifkan lagi dengan cutover lebih awal: keduanya kini sesudah cutover.
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
-            'enabled' => true, 'cutover_date' => '2026-08-01',
+            'enabled' => true, 'cutover_date' => '2026-08-01', 'version' => $this->versiSetelan(),
         ])->assertOk()->assertJsonPath('meta.reevaluated_postings', 2);
 
         $this->assertSame(['pending', 'pending'], FinancePosting::query()->orderBy('posting_id')->pluck('status')->all());
@@ -329,7 +329,7 @@ class FinancePostingFeedTest extends TestCase
         $this->assertSame('manual', $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-LAMA', 'tanggal' => '2026-08-20']))['status']);
 
         // Konsultan memutuskan IDR tanpa desimal (TODO 0.7) sesudah kedua posting terbit.
-        $this->actingAs($this->owner)->put('/settings/currencies/IDR', ['amount_decimals' => 0, 'unit_amount_decimals' => 3])
+        $this->actingAs($this->owner)->put('/settings/currencies/IDR', ['amount_decimals' => 0, 'unit_amount_decimals' => 3, 'version' => 0])
             ->assertSessionHasNoErrors();
 
         FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['active' => true]);
@@ -340,7 +340,7 @@ class FinancePostingFeedTest extends TestCase
 
         // Menyimpan setelan entitas menilai ulang posting lama sampai selesai, tidak berhenti dengan 500.
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
-            'enabled' => true, 'cutover_date' => '2026-08-01',
+            'enabled' => true, 'cutover_date' => '2026-08-01', 'version' => $this->versiSetelan(),
         ])->assertOk()->assertJsonPath('meta.reevaluated_postings', 1);
         $lama = FinancePosting::query()->where('posting_id', 'AST-ACQ-LAMA')->firstOrFail();
         $this->assertSame(['pending', 2], [$lama->status, $lama->currency_decimals]);
@@ -383,11 +383,11 @@ class FinancePostingFeedTest extends TestCase
         });
         $sasaran = 'AST-ACQ-0002';
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
-            'enabled' => true, 'cutover_date' => '2026-08-15',
+            'enabled' => true, 'cutover_date' => '2026-08-15', 'version' => $this->versiSetelan(),
         ])->assertOk();
         $sasaran = 'AST-ACQ-0003';
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
-            'enabled' => false, 'cutover_date' => '2026-08-15',
+            'enabled' => false, 'cutover_date' => '2026-08-15', 'version' => $this->versiSetelan(),
         ])->assertOk();
 
         $this->assertSame(
@@ -750,6 +750,12 @@ class FinancePostingFeedTest extends TestCase
      * @param  array{posting_id?: string, tanggal?: string, nilai?: string, tenant?: string, description_ignored?: bool}  $ubah
      * @return array<string, mixed>
      */
+    /** Versi setelan feed yang sedang tersimpan; 0 bila belum pernah disimpan. */
+    private function versiSetelan(): int
+    {
+        return (int) FinancePostingSetting::query()->whereKey($this->le->id)->value('version');
+    }
+
     private function perolehan(array $ubah = []): array
     {
         $nilai = $ubah['nilai'] ?? '500000000.00';
@@ -884,10 +890,11 @@ class FinancePostingFeedTest extends TestCase
             ->firstOrFail();
         foreach ($penempatan as [$anak, $induk]) {
             $this->post("/settings/organization/hierarchy-versions/{$versi->id}/placements", [
+                'version' => $versi->hierarchy()->value('version'),
                 'organization_id' => $anak->id, 'parent_organization_id' => $induk->id,
             ])->assertSessionHasNoErrors();
         }
-        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish", ['version' => $versi->hierarchy()->value('version')])->assertSessionHasNoErrors();
     }
 
     /** Menempatkan unit baru di versi baru hierarki manajemen yang sudah terbit. */
@@ -898,6 +905,7 @@ class FinancePostingFeedTest extends TestCase
             ->where('status', 'published')
             ->firstOrFail();
         $this->actingAs($this->owner)->post("/settings/organization/hierarchy-versions/{$terbit->id}/drafts", [
+            'version' => $terbit->hierarchy()->value('version'),
             'effective_from' => '2026-02-01',
         ])->assertSessionHasNoErrors();
         $draf = OrganizationHierarchyVersion::query()
@@ -905,8 +913,9 @@ class FinancePostingFeedTest extends TestCase
             ->where('status', 'draft')
             ->firstOrFail();
         $this->post("/settings/organization/hierarchy-versions/{$draf->id}/placements", [
+            'version' => $draf->hierarchy()->value('version'),
             'organization_id' => $unit->id, 'parent_organization_id' => $induk->id,
         ])->assertSessionHasNoErrors();
-        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$draf->id}/publish", ['version' => $draf->hierarchy()->value('version')])->assertSessionHasNoErrors();
     }
 }

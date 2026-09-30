@@ -974,3 +974,29 @@ docker run --rm -i -v "$PWD\k6:/scripts" -v "$PWD\results:/results" `
 
 Lebih dari lima VU sekaligus menabrak limiter registrasi tenant pada stack lokal
 (`COREERP_REGISTRATION_RATE_LIMIT`, default 5 per menit per IP).
+
+## Versi baris (area 3 analisa gap BC, 30 September 2026)
+
+Image dari cabang `feat/versi-baris`, stack terpisah (`COMPOSE_PROJECT_NAME=core-loadtest-versi`,
+`CORE_IMAGE=erp-core-app:versi-baris`). Seluruh skenario aset membaca versi baris lalu mengirimnya kembali.
+
+| Run | Hasil |
+| --- | --- |
+| Penjenuhan `receipt-posting.js`, 1000 VU, 128 tenant | 0 pelanggaran, 0 5xx aplikasi; 1.588 timeout klien — kapasitas, sebanding dengan 1.541–1.780 pada run sebelumnya |
+| `adjust-race`, 32 VU, 4 tenant | 0 pelanggaran, checks 100%, 315 koreksi terbit; koreksi yang kalah versi dijawab 409 |
+| `verify.sql` Core dan aset | semua pemeriksaan 0 |
+
+**Biaya versi baris terhadap latensi.** Profil saturation 16 VU dan 16 tenant, 60 detik, bergantian dengan
+trigger `bump_row_version` menyala dan dimatikan:
+
+| Run | Versi | rps | write p50 / p95 / p99 | read p50 / p95 | Penerimaan |
+| --- | --- | ---: | --- | --- | ---: |
+| `ver-on-1` | menyala | 27,1 | 444 / 1.678 / 2.909 ms | 223 / 655 ms | 349 |
+| `ver-off-2` | mati | 39,7 | 374 / 869 / 1.258 ms | 181 / 284 ms | 493 |
+| `ver-on-3` | menyala | 39,7 | 387 / 862 / 1.323 ms | 189 / 303 ms | 477 |
+| `ver-off-4` | mati | 41,6 | 360 / 796 / 1.146 ms | 173 / 264 ms | 504 |
+
+`ver-on-1` adalah run pertama pada stack yang baru menyala (cache dingin). Di antara run lainnya selisih
+menyala dan mati sekitar 3–5%, sebesar selisih dua run dengan keadaan yang sama. Seperti biaya log, biaya
+versi tidak terukur di atas selisih antar-run pada mesin ini; itu bukan berarti nol.
+

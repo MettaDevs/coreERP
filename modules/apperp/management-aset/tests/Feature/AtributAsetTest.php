@@ -176,13 +176,79 @@ class AtributAsetTest extends TestCase
         $permissions = [...$this->permissionsFor('jenis-aset'), 'management-aset.model-aset.read'];
 
         $this->sebagaiPengguna($this->tenantId, $permissions)
-            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/models', ['model_ids' => [$modelA, $modelB]])
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/models', ['model_ids' => [$modelA, $modelB], 'version' => 1])
             ->assertOk()
             ->assertJsonPath('data.model_ids.0', $modelA)
-            ->assertJsonPath('data.model_ids.1', $modelB);
+            ->assertJsonPath('data.model_ids.1', $modelB)
+            ->assertJsonPath('data.version', 2);
 
         $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelA, 'jenis_aset_id' => $jenis]);
         $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelB, 'jenis_aset_id' => $jenis]);
+    }
+
+    /**
+     * Daftar model disimpan dengan mengklaim versi jenis asetnya: kiriman kedua dari versi yang
+     * sama ditolak dan kaitan dari kiriman pertama tetap, kiriman tanpa versi tidak mengubah apa pun.
+     */
+    public function test_model_jenis_aset_dari_versi_basi_atau_tanpa_versi_ditolak(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
+        $pabrikan = $this->master('pabrikan-aset', ['nama' => 'Komatsu']);
+        $modelA = $this->master('model-aset', ['nama' => 'PC200-8', 'pabrikan_aset_id' => $pabrikan]);
+        $modelB = $this->master('model-aset', ['nama' => 'PC210-10', 'pabrikan_aset_id' => $pabrikan]);
+        $this->detail($jenis, $this->permissionsFor('jenis-aset'))->assertOk()->assertJsonPath('data.version', 1);
+        $pengguna = $this->sebagaiPengguna($this->tenantId, [...$this->permissionsFor('jenis-aset'), 'management-aset.model-aset.read']);
+        $alamat = '/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/models';
+        $pengguna->putJson($alamat, ['model_ids' => [$modelA], 'version' => 1])->assertOk();
+        $pengguna->putJson($alamat, ['model_ids' => [$modelB], 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $pengguna->putJson($alamat, ['model_ids' => [$modelB]])
+            ->assertStatus(428)
+            ->assertJsonPath('error.code', 'version_required');
+
+        $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelA, 'jenis_aset_id' => $jenis]);
+        $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelB, 'jenis_aset_id' => null]);
+    }
+
+    /**
+     * Atribut dan pilihan nilai disimpan dengan mengklaim versi pemiliknya. Himpunan dari
+     * kiriman pertama bertahan saat kiriman kedua dari versi yang sama ditolak.
+     */
+    public function test_himpunan_atribut_dan_nilai_dari_versi_basi_atau_tanpa_versi_ditolak(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Pompa']);
+        $tekanan = $this->master('tipe-atribut', ['nama' => 'Tekanan', 'data_type' => 'decimal']);
+        $debit = $this->master('tipe-atribut', ['nama' => 'Debit', 'data_type' => 'decimal']);
+        $warna = $this->master('tipe-atribut', ['nama' => 'Warna', 'data_type' => 'string']);
+        $pemilikJenis = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'));
+        $alamatAtribut = '/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/atribut';
+
+        $pemilikJenis->getJson($alamatAtribut)->assertOk()->assertJsonPath('version', 1);
+        $pemilikJenis->putJson($alamatAtribut, ['rows' => [['tipe_atribut_id' => $tekanan]], 'version' => 1])
+            ->assertOk()
+            ->assertJsonPath('version', 2);
+        $pemilikJenis->putJson($alamatAtribut, ['rows' => [['tipe_atribut_id' => $debit]], 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $pemilikJenis->putJson($alamatAtribut, ['rows' => [['tipe_atribut_id' => $debit]]])->assertStatus(428);
+        $this->assertSame(
+            [$tekanan],
+            DB::table('aset_m_jenis_aset_atribut')->where('jenis_aset_id', $jenis)->whereNull('deleted_at')->pluck('tipe_atribut_id')->all(),
+        );
+
+        $pemilikTipe = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
+        $alamatNilai = '/api/modules/management-aset/v1/tipe-atribut/'.$warna.'/nilai';
+        $pemilikTipe->putJson($alamatNilai, ['rows' => [['nilai' => 'Merah']], 'version' => 1])->assertOk();
+        $pemilikTipe->putJson($alamatNilai, ['rows' => [['nilai' => 'Biru']], 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $pemilikTipe->putJson($alamatNilai, ['rows' => [['nilai' => 'Biru']]])->assertStatus(428);
+        $pemilikTipe->getJson($alamatNilai)
+            ->assertOk()
+            ->assertJsonPath('data.0.nilai', 'Merah')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('version', 2);
     }
 
     /**
@@ -348,7 +414,7 @@ class AtributAsetTest extends TestCase
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
 
         $this
-            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'decimal'])
+            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'decimal', 'version' => 1])
             ->assertOk()
             ->assertJsonPath('data.data_type', 'decimal')
             ->assertJsonPath('data.data_type_locked', false);
@@ -362,7 +428,7 @@ class AtributAsetTest extends TestCase
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
 
         $this
-            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer'])
+            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer', 'version' => $this->versiTipeAtribut($atribut)])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'data_type_locked');
         $this->assertDatabaseHas('aset_m_tipe_atribut', [
@@ -417,7 +483,7 @@ class AtributAsetTest extends TestCase
         $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
 
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
-            ->deleteJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut)
+            ->deleteJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['version' => $this->versiTipeAtribut($atribut)])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
     }
@@ -474,8 +540,11 @@ class AtributAsetTest extends TestCase
      */
     private function attach(string $jenisId, array $rows): TestResponse
     {
-        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
-            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
+        $alamat = '/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut';
+        // Versi pemilik dibaca dari daftar atributnya, seperti layar membacanya.
+        $pengguna = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'));
+
+        return $pengguna->putJson($alamat, ['rows' => $rows, 'version' => $pengguna->getJson($alamat)->json('version')]);
     }
 
     /**
@@ -484,8 +553,18 @@ class AtributAsetTest extends TestCase
      */
     private function values(string $atributId, array $rows): TestResponse
     {
-        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
-            ->putJson('/api/modules/management-aset/v1/tipe-atribut/'.$atributId.'/nilai', ['rows' => $rows]);
+        $alamat = '/api/modules/management-aset/v1/tipe-atribut/'.$atributId.'/nilai';
+        $pengguna = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
+
+        return $pengguna->putJson($alamat, ['rows' => $rows, 'version' => $pengguna->getJson($alamat)->json('version')]);
+    }
+
+    /** Versi tipe atribut saat ini; menerima aset mengunci tipe datanya, dan itu menaikkan versinya. */
+    private function versiTipeAtribut(string $atributId): int
+    {
+        return (int) $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
+            ->getJson('/api/modules/management-aset/v1/tipe-atribut/'.$atributId)
+            ->json('data.version');
     }
 
     /** @param list<array<string, mixed>> $atribut */

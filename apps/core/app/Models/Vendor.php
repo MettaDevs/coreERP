@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property-read Party $party
+ * @property int $version
  */
 class Vendor extends Model
 {

@@ -2,7 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -97,7 +99,6 @@ class PelaksanaanController extends Controller
         $input = $request->validate([
             'ke_status' => ['required', Rule::in(WorkOrderStatus::ALL)],
             'alasan' => ['nullable', 'string', 'max:2000'],
-            'version' => ['required', 'integer', 'min:1'],
         ]);
         $target = $input['ke_status'];
 
@@ -116,23 +117,27 @@ class PelaksanaanController extends Controller
         if (WorkOrderStatus::butuhAlasan($target) && trim((string) ($input['alasan'] ?? '')) === '') {
             throw ValidationException::withMessages(['alasan' => 'Pembatalan harus menyertakan alasan.']);
         }
+        $version = RowVersion::expected($request);
 
-        $result = DB::transaction(function () use ($request, $id, $target, $input, $current): array {
-            // Dikunci ulang di dalam transaksi: antara pembacaan di atas dan penulisan di
-            // sini, orang lain dapat memindahkan status yang sama.
+        DB::transaction(function () use ($request, $id, $target, $input, $current, $version): void {
+            // Versi diklaim dan baris dikunci ulang di dalam transaksi: antara pembacaan di
+            // atas dan penulisan di sini, orang lain dapat memindahkan status yang sama.
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
             $locked = PemeliharaanAset::query()
                 ->where('id', $id)
                 ->lockForUpdate()
                 ->toBase()->first();
-            if (! $locked || $locked->status !== $current->status || (int) $locked->version !== (int) $input['version']) {
-                return ['stale' => true];
+            if ($locked->status !== $current->status) {
+                throw new HttpResponseException(response()->json(['error' => [
+                    'code' => 'stale_version',
+                    'message' => RowVersion::STALE_MESSAGE,
+                ]], 409));
             }
             $peringatan = $this->pastikanSyaratTerpenuhi($locked, $target);
 
-            $updated = PemeliharaanAset::query()->where('id', $id)->update([
+            PemeliharaanAset::query()->where('id', $id)->update([
                 'status' => $target,
                 ...$this->capWaktu($locked, $target),
-                'version' => (int) $locked->version + 1,
                 'updated_at' => now(),
             ]);
             if ($target === WorkOrderStatus::SELESAI) {
@@ -147,16 +152,7 @@ class PelaksanaanController extends Controller
                 // peringatan" tidak dapat dibedakan dari "semuanya lengkap".
                 'peringatan' => $peringatan === [] ? null : implode("\n", $peringatan),
             ]);
-
-            return ['stale' => $updated === 0];
         });
-
-        if ($result['stale']) {
-            return response()->json(['error' => [
-                'code' => 'stale_version',
-                'message' => 'Work order telah berubah. Muat ulang lalu coba lagi.',
-            ]], 409);
-        }
 
         return response()->json(['data' => $this->workOrder($request, $id)]);
     }
@@ -193,13 +189,16 @@ class PelaksanaanController extends Controller
             'template_id' => ['required', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')
                 ->where('tenant_id', $tenant)->whereNull('deleted_at')],
         ])['template_id'];
+        $version = RowVersion::expected($request);
 
-        $snapshot = app(MaintenanceChecklistSnapshot::class);
-        if ($snapshot->copyTemplate($jobId, $templateId) === 0) {
-            throw ValidationException::withMessages(['template_id' => 'Template checklist ini belum memiliki baris pemeriksaan.']);
-        }
+        DB::transaction(function () use ($id, $jobId, $templateId, $version): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
+            if (app(MaintenanceChecklistSnapshot::class)->copyTemplate($jobId, $templateId) === 0) {
+                throw ValidationException::withMessages(['template_id' => 'Template checklist ini belum memiliki baris pemeriksaan.']);
+            }
+        });
 
-        return response()->json(['data' => $this->barisChecklist($jobId)], 201);
+        return response()->json(['data' => $this->barisChecklist($jobId), 'version' => $this->versionOf($id)], 201);
     }
 
     /**
@@ -228,11 +227,13 @@ class PelaksanaanController extends Controller
             'baris.*.tidak_berlaku' => ['sometimes', 'boolean'],
             'baris.*.catatan_teknisi' => ['nullable', 'string', 'max:2000'],
         ]);
+        $version = RowVersion::expected($request);
 
         $existing = $this->barisChecklist($jobId)->keyBy('id');
         $userId = (string) $request->attributes->get('coreerp.user_id');
 
-        DB::transaction(function () use ($data, $existing, $userId): void {
+        DB::transaction(function () use ($id, $version, $data, $existing, $userId): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
             foreach ($data['baris'] as $baris) {
                 $row = $existing->get($baris['id']);
                 if (! $row) {
@@ -260,7 +261,7 @@ class PelaksanaanController extends Controller
             }
         });
 
-        return response()->json(['data' => $this->barisChecklist($jobId)]);
+        return response()->json(['data' => $this->barisChecklist($jobId), 'version' => $this->versionOf($id)]);
     }
 
     public function simpanPelaksanaan(Request $request, string $id, string $jobId): JsonResponse
@@ -286,18 +287,22 @@ class PelaksanaanController extends Controller
 
         $sebabKeterangan = $this->keteranganPilihan(SebabKerusakan::class, $data['sebab_kerusakan_id'] ?? null, $data['sebab_kerusakan_keterangan'] ?? null, 'sebab_kerusakan_keterangan');
         $tindakanKeterangan = $this->keteranganPilihan(TindakanPerbaikan::class, $data['tindakan_perbaikan_id'] ?? null, $data['tindakan_perbaikan_keterangan'] ?? null, 'tindakan_perbaikan_keterangan');
+        $version = RowVersion::expected($request);
 
-        PemeliharaanAsetDetail::query()->where([
-            'id' => $jobId,
-            'pemeliharaan_aset_id' => $id,
-        ])->update([
-            'aktual_jam' => $data['aktual_jam'] ?? null,
-            'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
-            'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
-            'sebab_kerusakan_keterangan' => $sebabKeterangan,
-            'tindakan_perbaikan_keterangan' => $tindakanKeterangan,
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($id, $jobId, $version, $data, $sebabKeterangan, $tindakanKeterangan): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
+            PemeliharaanAsetDetail::query()->where([
+                'id' => $jobId,
+                'pemeliharaan_aset_id' => $id,
+            ])->update([
+                'aktual_jam' => $data['aktual_jam'] ?? null,
+                'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
+                'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
+                'sebab_kerusakan_keterangan' => $sebabKeterangan,
+                'tindakan_perbaikan_keterangan' => $tindakanKeterangan,
+                'updated_at' => now(),
+            ]);
+        });
 
         return response()->json(['data' => $this->workOrder($request, $id)]);
     }
@@ -545,6 +550,12 @@ class PelaksanaanController extends Controller
         return PemeliharaanAsetDetail::query()->where([
             'id' => $jobId, 'pemeliharaan_aset_id' => $workOrderId,
         ])->toBase()->firstOrFail();
+    }
+
+    /** Versi header work order sesudah penyimpanan baris anaknya, untuk penyimpanan berikutnya. */
+    private function versionOf(string $id): int
+    {
+        return (int) PemeliharaanAset::query()->whereKey($id)->value('version');
     }
 
     private function workOrder(Request $request, string $id): stdClass

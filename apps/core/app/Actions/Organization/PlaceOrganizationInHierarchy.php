@@ -19,7 +19,7 @@ class PlaceOrganizationInHierarchy
             throw new AuthorizationException;
         }
         if ($version->status !== 'draft') {
-            throw ValidationException::withMessages(['version' => 'Hierarchy yang sudah dipublikasikan tidak dapat diubah.']);
+            throw ValidationException::withMessages(['hierarchy_version' => 'Hierarchy yang sudah dipublikasikan tidak dapat diubah.']);
         }
 
         $organization = Organization::query()->where('tenant_id', $actor->tenant_id)->find($organizationId);

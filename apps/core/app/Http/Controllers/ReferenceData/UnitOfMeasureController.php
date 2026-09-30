@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ReferenceData;
 use App\Http\Controllers\Controller;
 use App\Models\UnitOfMeasure;
 use App\Support\CurrentWorkspace;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,7 +67,15 @@ final class UnitOfMeasureController extends Controller
         $tenant = $this->tenant($request);
         abort_unless($unit->tenant_id === $tenant, 404);
         $data = $request->validate(['name' => ['sometimes', 'string', 'max:150'], 'symbol' => ['nullable', 'string', 'max:30'], 'decimal_places' => ['sometimes', 'integer', 'between:0,12'], 'active' => ['sometimes', 'boolean']]);
-        $this->write($request, 'unit.updated', fn () => $unit->update($data));
+        $this->write($request, 'unit.updated', function () use ($request, $unit, $data): void {
+            RowVersion::claim($unit, RowVersion::expected($request));
+            $unit->update($data);
+        });
+
+        if ($request->is('api/*')) {
+            // Versi terbaru ikut dikembalikan supaya penyimpanan berikutnya tidak perlu membaca ulang.
+            return response()->json(['data' => ['message' => 'Satuan diperbarui.', 'version' => $unit->refresh()->version]], 201);
+        }
 
         return $this->respond($request, 'Satuan diperbarui.');
     }

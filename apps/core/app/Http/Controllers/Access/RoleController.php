@@ -8,6 +8,7 @@ use App\Http\Requests\Access\RoleRequest;
 use App\Models\Role;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,12 +42,13 @@ class RoleController extends Controller
         abort_unless($role->tenant_id === $membership->tenant_id, 404);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
 
-        return response()->json(['data' => $role->load('duties', 'children:id,name')]);
+        return response()->json(['data' => $role->load('duties', 'children:id,name')])
+            ->header('ETag', RowVersion::etag($role->version));
     }
 
     public function update(RoleRequest $request, Role $role, UpsertRole $action): JsonResponse|RedirectResponse
     {
-        return $this->response($request, $action->handle($this->currentMembership($request), $request->payload(), $role));
+        return $this->response($request, $action->handle($this->currentMembership($request), $request->payload(), $role, RowVersion::expected($request)));
     }
 
     public function destroy(Request $request, Role $role): JsonResponse|RedirectResponse
@@ -56,7 +58,8 @@ class RoleController extends Controller
         if ($role->is_owner) {
             throw ValidationException::withMessages(['role' => 'Role Owner tidak dapat dihapus.']);
         }
-        DB::transaction(function () use ($role, $membership): void {
+        DB::transaction(function () use ($request, $role, $membership): void {
+            RowVersion::claim($role, RowVersion::expected($request));
             $role->delete();
             AccessGuards::assertNotLockedOut($membership->tenant_id);
         });

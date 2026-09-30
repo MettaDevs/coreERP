@@ -55,7 +55,7 @@ final class RetentionService
      * Setelan efektif tenant untuk semua kebijakan. `days` tidak pernah di bawah minimum, walau config bawaan
      * diisi lebih kecil.
      *
-     * @return array<string, array{enabled: bool, days: int, customized: bool, optional: bool}>
+     * @return array<string, array{enabled: bool, days: int, customized: bool, optional: bool, version: int}>
      */
     public function settingsFor(string $tenantId): array
     {
@@ -72,6 +72,7 @@ final class RetentionService
                 'days' => max($policy->minimumDays, (int) ($row->retention_days ?? $default ?? $policy->minimumDays)),
                 'customized' => $row !== null,
                 'optional' => $optional,
+                'version' => (int) ($row->version ?? 0),
             ];
         }
 
