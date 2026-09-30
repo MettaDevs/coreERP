@@ -8,6 +8,7 @@ use App\Support\Modules\Contracts\AuditColumns;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -177,7 +178,7 @@ final class RowVersionTest extends TestCase
         try {
             DB::transaction($claim);
             $this->fail('Klaim seharusnya ditolak sebagai data basi.');
-        } catch (\Illuminate\Http\Exceptions\HttpResponseException $rejected) {
+        } catch (HttpResponseException $rejected) {
             $this->assertSame(409, $rejected->getResponse()->getStatusCode());
         }
     }

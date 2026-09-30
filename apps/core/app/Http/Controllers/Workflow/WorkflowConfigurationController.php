@@ -128,7 +128,7 @@ class WorkflowConfigurationController extends Controller
         $version = $this->latestVersion($configuration->id);
         $payload = [
             'canManage' => true,
-            'workflow' => ['id' => $configuration->id, 'name' => $configuration->name, 'enabled' => (bool) $configuration->enabled, 'legal_entity_id' => $configuration->legal_entity_id, 'version' => (int) $configuration->version],
+            'workflow' => ['id' => $configuration->id, 'name' => $configuration->name, 'enabled' => (bool) $configuration->enabled, 'legal_entity_id' => $configuration->legal_entity_id, 'version' => $this->rowVersion($workflow)],
             'workflowType' => $type,
             'version' => ['id' => $version?->id, 'status' => $version?->status, 'version' => $version?->version],
             'graph' => $version ? $this->presentGraph($version->id) : ['nodes' => [], 'edges' => []],
@@ -153,7 +153,7 @@ class WorkflowConfigurationController extends Controller
             'version' => $version?->version,
             'status' => $version?->status,
             'graph' => $version ? $this->presentGraph($version->id) : ['nodes' => [], 'edges' => []],
-        ]])->header('ETag', RowVersion::etag((int) $configuration->version));
+        ]])->header('ETag', RowVersion::etag($this->rowVersion($workflow)));
     }
 
     public function store(Request $request): JsonResponse|RedirectResponse
@@ -218,8 +218,8 @@ class WorkflowConfigurationController extends Controller
             $published = DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'published')->orderByDesc('version')->first();
             abort_unless($published, 422, 'Workflow belum memiliki versi yang dapat disalin.');
             $draftId = (string) Str::ulid();
-            DB::transaction(function () use ($request, $published, $configuration, $draftId): void {
-                $this->claim($request, $configuration);
+            DB::transaction(function () use ($request, $workflow, $published, $configuration, $draftId): void {
+                $this->claim($request, $workflow);
                 DB::table('workflow_configuration_versions')->insert(['id' => $draftId, 'configuration_id' => $configuration->id, 'version' => ((int) $published->version) + 1, 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
                 $this->copyGraph($published->id, $draftId);
             });
@@ -251,8 +251,8 @@ class WorkflowConfigurationController extends Controller
             'edges.*.outcome' => ['nullable', 'string', 'max:40'],
             'edges.*.condition' => ['nullable', 'array'],
         ]);
-        DB::transaction(function () use ($request, $configuration, $version, $data): void {
-            $this->claim($request, $configuration);
+        DB::transaction(function () use ($request, $workflow, $version, $data): void {
+            $this->claim($request, $workflow);
             $this->replaceGraph($version->id, $data);
         });
 
@@ -264,8 +264,8 @@ class WorkflowConfigurationController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
-        DB::transaction(function () use ($request, $configuration, $membership): void {
-            $this->claim($request, $configuration);
+        DB::transaction(function () use ($request, $workflow, $configuration, $membership): void {
+            $this->claim($request, $workflow);
             $version = DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'draft')->orderByDesc('version')->lockForUpdate()->first();
             abort_unless($version, 422, 'Tidak ada draf workflow yang dapat diaktifkan.');
             $elements = DB::table('workflow_elements')->where('version_id', $version->id)->get();
@@ -325,8 +325,8 @@ class WorkflowConfigurationController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
-        DB::transaction(function () use ($request, $configuration, $membership): void {
-            $this->claim($request, $configuration);
+        DB::transaction(function () use ($request, $workflow, $configuration, $membership): void {
+            $this->claim($request, $workflow);
             DB::table('workflow_configuration_versions')->where('configuration_id', $configuration->id)->where('status', 'published')->exists() || abort(422, 'Workflow belum memiliki versi aktif.');
             DB::table('workflow_configurations')->where('tenant_id', $membership->tenant_id)->where('workflow_type_id', $configuration->workflow_type_id)->where('legal_entity_id', $configuration->legal_entity_id)->where('id', '!=', $configuration->id)->update(['enabled' => false, 'updated_at' => now()]);
             DB::table('workflow_configurations')->where('id', $configuration->id)->update(['enabled' => true, 'updated_at' => now()]);
@@ -340,9 +340,9 @@ class WorkflowConfigurationController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
         $configuration = $this->configuration($membership->tenant_id, $workflow);
-        DB::transaction(function () use ($request, $configuration): void {
-            $this->claim($request, $configuration);
-            DB::table('workflow_configurations')->where('id', $configuration->id)->update(['enabled' => false, 'updated_at' => now()]);
+        DB::transaction(function () use ($request, $workflow): void {
+            $this->claim($request, $workflow);
+            DB::table('workflow_configurations')->where('id', $workflow)->update(['enabled' => false, 'updated_at' => now()]);
         });
 
         return $request->is('api/*') ? $this->respondWithVersion($configuration->id) : back()->with('status', 'Workflow dinonaktifkan.');
@@ -360,9 +360,10 @@ class WorkflowConfigurationController extends Controller
      * Versi konfigurasi (`workflow_configuration_versions`) tidak membawa `tenant_id` maupun versi baris,
      * jadi setiap perubahan pada graf, draf, atau statusnya mengunci baris konfigurasi induknya.
      */
-    private function claim(Request $request, object $configuration): void
+    private function claim(Request $request, string $configurationId): void
     {
-        RowVersion::claim(DB::table('workflow_configurations')->where('tenant_id', $configuration->tenant_id)->where('id', $configuration->id), RowVersion::expected($request));
+        // Tenant-nya sudah diperiksa configuration() sebelum klaim; id berupa ULID, unik lintas tenant.
+        RowVersion::claim(DB::table('workflow_configurations')->where('id', $configurationId), RowVersion::expected($request));
     }
 
     /**
@@ -371,9 +372,12 @@ class WorkflowConfigurationController extends Controller
      */
     private function respondWithVersion(string $configurationId): JsonResponse
     {
-        $version = (int) DB::table('workflow_configurations')->where('id', $configurationId)->value('version');
+        return response()->json(['data' => ['id' => $configurationId]])->header('ETag', RowVersion::etag($this->rowVersion($configurationId)));
+    }
 
-        return response()->json(['data' => ['id' => $configurationId]])->header('ETag', RowVersion::etag($version));
+    private function rowVersion(string $configurationId): int
+    {
+        return (int) DB::table('workflow_configurations')->where('id', $configurationId)->value('version');
     }
 
     private function latestVersion(string $configurationId): ?object

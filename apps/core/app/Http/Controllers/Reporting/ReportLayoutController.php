@@ -14,6 +14,7 @@ use App\Support\Reporting\SumberLaporan;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -93,8 +94,10 @@ class ReportLayoutController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
-        $knownKeys = $request->file('file') ? $this->knownKeys($request, $membership, $report) : [];
-        $result = DB::transaction(function () use ($request, $membership, $report, $legalEntityId, $id, $data, $knownKeys): array {
+        $file = $request->file('file');
+        $file = $file instanceof UploadedFile ? $file : null;
+        $knownKeys = $file ? $this->knownKeys($request, $membership, $report) : [];
+        $result = DB::transaction(function () use ($request, $membership, $report, $legalEntityId, $id, $data, $file, $knownKeys): array {
             RowVersion::claim($this->uploadedLayout($membership, $report, $legalEntityId, $id), RowVersion::expected($request));
 
             return $this->layouts->update(
@@ -105,7 +108,7 @@ class ReportLayoutController extends Controller
                 $data['name'] ?? null,
                 $data['description'] ?? null,
                 $request->has('description'),
-                $request->file('file'),
+                $file,
                 $knownKeys,
             );
         });

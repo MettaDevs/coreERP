@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $type
  * @property string $value
  * @property bool $is_primary
+ * @property int $version
  */
 class ElectronicAddress extends Model
 {

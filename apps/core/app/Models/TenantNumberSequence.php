@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** @property list<array<string, mixed>> $segments */
+/**
+ * @property list<array<string, mixed>> $segments
+ * @property int $version
+ */
 class TenantNumberSequence extends Model
 {
     use HasUlids;

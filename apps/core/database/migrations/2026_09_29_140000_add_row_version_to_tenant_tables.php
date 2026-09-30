@@ -122,6 +122,6 @@ return new class extends Migration
             throw new RuntimeException('Badan coreerp_log_change tidak memuat baris pengecualian kolom yang diharapkan.');
         }
 
-        DB::unprepared(str_replace($search, $replace, $definition));
+        DB::getPdo()->exec(str_replace($search, $replace, $definition));
     }
 };

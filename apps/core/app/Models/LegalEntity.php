@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $company_code
  * @property string $country_code
  * @property string $timezone Zona IANA bawaan pengguna di entitas legal ini yang belum memilih zonanya sendiri (K-10).
+ * @property int $version
  */
 class LegalEntity extends Model
 {

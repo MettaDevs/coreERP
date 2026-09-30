@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $name
  * @property bool $is_active
  * @property bool $is_owner Role Owner bawaan tenant: selalu memegang semua duty yang sah (`OwnerRoleDuties`).
+ * @property int $version
  */
 class Role extends Model
 {
