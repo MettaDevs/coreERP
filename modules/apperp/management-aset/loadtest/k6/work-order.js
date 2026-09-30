@@ -196,12 +196,16 @@ export function setup() {
     // jadi setiap group seed diberi satu buku di matriksnya, dengan penyusutan dimatikan.
     const profilIds = tahap('profil-penyusutan', semua((tenant, index) => ['POST', ASET('profil-penyusutan'), JSON.stringify({ nama: `WO profil ${index}`, method: 'straight_line', frequency: 'monthly', year_basis: 'calendar', useful_life_periods: 48, convention: 'full_month' }), params(tenant, kunci('profil', index))]));
     const bukuIds = tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ kode: kodeManual('WO', FIXTURE, 'B', index), nama: `WO buku ${index}`, posting_layer: 'current' }), params(tenant, kunci('buku', index))]));
+    // Matriks milik group: versi group dibaca dulu, lalu dikirim kembali (area 3).
+    const versiGroup = http
+        .batch(semua((tenant, index) => ['GET', `${ASET('group-aset')}/${groupIds[index]}/buku-penyusutan`, null, params(tenant)]))
+        .map((response) => response.json('version'));
     tahap(
         'matriks group x buku',
         semua((tenant, index) => [
             'PUT',
             `${ASET('group-aset')}/${groupIds[index]}/buku-penyusutan`,
-            JSON.stringify({ rows: [{ buku_id: bukuIds[index], depreciation_profile_id: profilIds[index], depreciate: false }] }),
+            JSON.stringify({ rows: [{ buku_id: bukuIds[index], depreciation_profile_id: profilIds[index], depreciate: false }], version: versiGroup[index] }),
             params(tenant),
         ]),
     );

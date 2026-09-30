@@ -1,0 +1,255 @@
+# Dokumen monitoring aset — pemeriksaan fisik (stock opname) aset tetap di satu lokasi.
+#
+# Menyelesaikannya hanya membekukan temuan; register aset tidak pernah berubah karenanya.
+# Perubahan register yang sungguhan tetap lewat mutasi atau dekomisioning. Hasil tiap baris
+# (`sesuai`/`tidak_sesuai`) dihitung server dari status siklus hidup aset, lokasi tercatatnya, dan
+# temuan `ada`, tidak pernah dikirim klien.
+/api/v1/monitoring-aset:
+  get:
+    tags:
+    - Monitoring aset
+    operationId: listAssetMonitoring
+    summary: Menampilkan monitoring aset dalam jangkauan organisasi pengguna
+    description: |
+      Monitoring tanpa unit organisasi hanya terlihat oleh pengguna yang menjangkau seluruh
+      organisasi pada kebijakan `management-aset.asset-responsibility`.
+    parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, selesai]
+    - name: dari
+      in: query
+      required: false
+      description: Batas bawah tanggal monitoring, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    - name: sampai
+      in: query
+      required: false
+      description: Batas atas tanggal monitoring, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    - name: lokasi_aset_id
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    responses:
+      '200':
+        description: Daftar monitoring beserta nama lokasi, jumlah baris, jumlah yang belum diperiksa, dan jumlah yang tidak sesuai
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetMonitoring'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Monitoring aset
+    operationId: createAssetMonitoring
+    summary: Membuat draf monitoring; nomor diterbitkan Number Sequence Core per entitas legal
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyMonitoring'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetMonitoringWrite'
+    responses:
+      '200':
+        description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+      '201':
+        description: Draf monitoring dibuat beserta barisnya
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMonitoringResponse'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        description: |
+          Lokasi tidak ada; unit organisasi kosong padahal pengguna tidak menjangkau seluruh
+          organisasi; aset di luar jangkauan, milik entitas legal lain, atau muncul dua kali.
+/api/v1/monitoring-aset/{id}:
+  get:
+    tags:
+    - Monitoring aset
+    operationId: showAssetMonitoring
+    summary: Membaca satu monitoring beserta barisnya dan keadaan register tiap aset
+    description: |
+      Kolom `sistem_*`, nilai, dan `hasil` pada baris adalah nilai beku bila monitoring sudah
+      selesai, dan keadaan aset **sekarang** selama masih draf. Klien tidak mengirimkannya
+      kembali saat menyimpan. Nama unit dan orang dibaca dari Core saat permintaan dilayani.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Monitoring beserta barisnya
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMonitoringResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Monitoring aset
+    operationId: updateAssetMonitoring
+    summary: Mengubah draf monitoring dan menyamakan barisnya dengan daftar yang dikirim
+    description: |
+      `details` wajib dikirim, walau kosong. Baris dicocokkan menurut `aset_id`: yang masih
+      dikirim dipertahankan beserta nomornya, yang tidak dikirim diarsipkan, dan aset baru
+      mendapat nomor baris berikutnya. Nomor baris tidak dipakai ulang. `legal_entity_id`
+      wajib sama dengan milik dokumen.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/AssetMonitoringWrite'
+            - $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Monitoring setelah diubah
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMonitoringResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Monitoring sudah selesai, atau isian tidak sah
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+  delete:
+    tags:
+    - Monitoring aset
+    operationId: archiveAssetMonitoring
+    summary: Mengarsipkan draf monitoring
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '204':
+        description: Draf diarsipkan
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Monitoring yang sudah selesai tidak dapat diarsipkan
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+/api/v1/monitoring-aset/{id}/isi-otomatis:
+  post:
+    tags:
+    - Monitoring aset
+    operationId: fillAssetMonitoring
+    summary: Menambahkan semua aset yang tercatat di lokasi dokumen
+    description: |
+      Termasuk aset yang sudah didekomisioning atau dilepas. Hanya aset milik entitas legal
+      dokumen dan dalam jangkauan organisasi pengguna; bila header menyebut unit organisasi
+      atau penanggung jawab, hanya aset milik unit itu atau yang penempatan terakhirnya
+      dipegang orang itu. Aset yang sudah ada di dokumen dilewati. `meta.ditambahkan` berisi
+      jumlah baris baru.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Monitoring beserta barisnya, dan `meta.ditambahkan`
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetMonitoringResponse'
+              - type: object
+                properties:
+                  meta:
+                    type: object
+                    properties:
+                      ditambahkan:
+                        type: integer
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Monitoring sudah selesai
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+/api/v1/monitoring-aset/{id}/selesaikan:
+  post:
+    tags:
+    - Monitoring aset
+    operationId: completeAssetMonitoring
+    summary: Menyelesaikan monitoring; temuan dan keadaan register dibekukan, register tidak diubah
+    description: |
+      Memerlukan permission `management-aset.monitoring-aset.complete`. Setiap baris wajib sudah
+      berisi `ada`. Untuk setiap baris dibekukan status siklus hidup, lokasi, unit, dan penanggung
+      jawab aset menurut register, nilai perolehan, akumulasi penyusutan, dan nilai buku dari buku
+      komersial (buku tanpa master atau berlapisan `current`, yang kodenya paling awal), serta
+      `hasil`. Register aset dan riwayat penempatannya tidak disentuh.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Monitoring setelah diselesaikan, beserta barisnya
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetMonitoringResponse'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Monitoring tanpa baris, ada baris yang belum diperiksa, atau sudah selesai
+      '428':
+        $ref: '#/components/responses/VersionRequired'

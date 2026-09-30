@@ -59,14 +59,21 @@ function wajib(label, responses, statusSah) {
  * @param {Array<object>} jars tenant yang sudah membawa cookie jar (`bangunJar`)
  * @param {{groupIds: string[], jenisIds: string[]}} ids
  * @param {(index: number) => string} kunci
- * @returns {string[]} id aset per tenant
+ * @param {{lokasiIds?: string[], nama?: (index: number) => string, jumlah?: number, semua?: boolean}} [opsi]
+ *   Lokasi penerimaan per tenant, nama aset, dan jumlah unit pada satu baris. `semua` memulangkan
+ *   seluruh id aset per tenant, bukan hanya yang pertama; dipakai skenario monitoring.
+ * @returns {string[]|string[][]} id aset per tenant
  */
-export function lahirkanAset(jars, ids, kunci) {
+export function lahirkanAset(jars, ids, kunci, opsi = {}) {
     // Jurnal saldo awal bertanggal cutover, jadi entitas legal wajib punya tanggalnya. Pengiriman
     // posting sendiri dibiarkan mati: skenario pemanggilnya tidak mengukur feed finance.
+    // Setelan membawa versi barisnya (area 3); 0 selama setelannya belum pernah disimpan.
+    const versiSetelan = http
+        .batch(jars.map((tenant) => ['GET', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, null, paramsUntuk(tenant)]))
+        .map((response) => response.json('data.version'));
     wajib(
         'tanggal cutover',
-        http.batch(jars.map((tenant) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: false, cutover_date: '2026-01-01' }), paramsUntuk(tenant)])),
+        http.batch(jars.map((tenant, index) => ['PUT', `${BASE}/api/v1/organizations/${tenant.legalEntityId}/finance-posting`, JSON.stringify({ enabled: false, cutover_date: '2026-01-01', version: versiSetelan[index] }), paramsUntuk(tenant)])),
         [200],
     );
 
@@ -82,11 +89,12 @@ export function lahirkanAset(jars, ids, kunci) {
                     cara_perolehan: 'saldo_awal',
                     tanggal: '2025-06-01',
                     currency_code: 'IDR',
+                    lokasi_aset_id: opsi.lokasiIds ? opsi.lokasiIds[index] : null,
                     details: [{
-                        nama: `Aset uji beban ${index}`,
+                        nama: opsi.nama ? opsi.nama(index) : `Aset uji beban ${index}`,
                         group_aset_id: ids.groupIds[index],
                         jenis_aset_id: ids.jenisIds[index],
-                        jumlah: 1,
+                        jumlah: opsi.jumlah || 1,
                         nilai_per_unit: '1000000',
                         ppn_per_unit: '0',
                         akumulasi_per_unit: '0',
@@ -120,6 +128,16 @@ export function lahirkanAset(jars, ids, kunci) {
     );
 
     return aset.map((response, index) => {
+        if (opsi.semua) {
+            const semua = (response.json('data') || []).map((baris) => String(baris.id));
+
+            if (semua.length !== (opsi.jumlah || 1)) {
+                fail(`setup aset tenant ${index}: ${semua.length} aset, diharapkan ${opsi.jumlah || 1}`);
+            }
+
+            return semua;
+        }
+
         const id = response.json('data.0.id');
 
         if (!id) {

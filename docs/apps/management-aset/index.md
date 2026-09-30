@@ -60,7 +60,8 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 | [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/) | Work order dan mesin statusnya |
 | [Laporan dan ekspor](/apps/management-aset/transaction/laporan/) | Dataset dan layout bawaan yang diminta Core untuk dicetak |
 | [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
-| [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) | Ringkasan aset, dan dua layar setup yang sengaja belum berisi |
+| [Monitoring aset](/apps/management-aset/transaction/monitoring-aset/) | Pemeriksaan fisik aset di satu lokasi; mencatat temuan tanpa mengubah register |
+| [Layar setup yang belum berisi](/apps/management-aset/transaction/monitoring/) | Layar setup yang sengaja belum berisi |
 
 Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
