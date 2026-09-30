@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Finance;
+namespace App\Foundation\Currency\Http\Controllers;
 
+use App\Foundation\Currency\Models\CurrencyPrecision;
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Http\Controllers\Controller;
-use App\Models\CurrencyPrecision;
-use App\Support\Finance\MoneyPrecision;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +31,7 @@ final class CurrencyPrecisionController extends Controller
         $tenant = $this->currentMembership($request)->tenant_id;
         $versions = CurrencyPrecision::query()->where('tenant_id', $tenant)->pluck('version', 'currency_code');
 
-        return Inertia::render('settings/currencies', [
+        return Inertia::render('foundation/currency/currencies', [
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,
             'limits' => [
                 'amount_decimals' => MoneyPrecision::MAX_AMOUNT_DECIMALS,

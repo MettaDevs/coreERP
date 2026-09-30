@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace App\Support\Modules;
 
 use App\Foundation\Vendor\ModuleServices\DaftarVendorCore;
+use App\Foundation\Currency\ModuleServices\PresisiMataUangCore;
+use App\Foundation\UnitOfMeasure\ModuleServices\DaftarSatuanCore;
 use App\Services\Modules\ChangeHistoryCore;
 use App\Services\Modules\DaftarAkunCore;
-use App\Foundation\UnitOfMeasure\ModuleServices\DaftarSatuanCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
 use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
 use App\Services\Modules\PenerbitPostingCore;
-use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\ReportFormatterCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
 use App\Support\Access\LinkedWorkerResolverRegistry;

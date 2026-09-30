@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Finance;
+namespace App\Foundation\Currency\Support;
 
-use App\Models\CurrencyPrecision;
+use App\Foundation\Currency\Models\CurrencyPrecision;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use InvalidArgumentException;

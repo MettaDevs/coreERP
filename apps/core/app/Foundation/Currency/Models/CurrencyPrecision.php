@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Foundation\Currency\Models;
 
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Presisi uang satu mata uang pada satu tenant.
  *
- * Mata uang yang belum punya baris memakai bawaan di `App\Support\Finance\MoneyPrecision`. Master
+ * Mata uang yang belum punya baris memakai bawaan di `App\Foundation\Currency\Support\MoneyPrecision`. Master
  * mata uang penuh — kurs, simbol, akun selisih kurs — sengaja belum dibangun (FIN-20).
  *
  * @property string $id

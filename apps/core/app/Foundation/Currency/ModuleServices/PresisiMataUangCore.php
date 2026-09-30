@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Modules;
+namespace App\Foundation\Currency\ModuleServices;
 
-use App\Support\Finance\MoneyPrecision;
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Support\Modules\Contracts\PresisiMataUang;
 
 /**

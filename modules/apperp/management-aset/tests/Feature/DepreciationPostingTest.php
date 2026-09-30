@@ -2,11 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Models\CurrencyPrecision;
+use App\Foundation\Currency\Models\CurrencyPrecision;
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Models\FinancePosting;
 use App\Models\FinanceReferenceAccount;
 use App\Models\OrganizationHierarchyVersion;
-use App\Support\Finance\MoneyPrecision;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;

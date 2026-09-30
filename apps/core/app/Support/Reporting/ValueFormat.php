@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Reporting;
 
-use App\Support\Finance\MoneyPrecision;
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Support\UserClock;
 use Carbon\CarbonImmutable;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
