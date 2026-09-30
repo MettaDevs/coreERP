@@ -744,6 +744,16 @@ Zona pengguna adalah pilihannya di My Profile. Bila kosong, yang dipakai zona en
 (`legal_entities.timezone`), lalu zona aplikasi. Penghitungnya `App\Support\UserClock`, dan hasilnya ikut
 setiap halaman Inertia sebagai `clock` dan `workDate`.
 
+Waktu dari server (misalnya kapan record dibuat) ditampilkan lewat `useDateTimeFormat()` dari
+`apps/core/resources/js/hooks/use-date-time.ts`, yang memformatnya menurut `clock.timezone`. Jangan memakai
+`toLocaleString()` atau `Intl.DateTimeFormat` tanpa `timeZone`: keduanya memakai zona perangkat. Tanggal
+tanpa jam tidak lewat pemformat ini, karena tanggal tidak punya zona.
+
+Di server, module membaca zona yang sama lewat `KonteksPermintaan::timezone()` untuk "hari ini" dan batas
+hari menurut pengguna, bukan `now()` atau `today()` yang berjalan dalam UTC. Laporan membacanya dari konteks
+laporan (`timezone`), dan waktu di dataset dikirim dalam UTC bertipe `datetime`; lihat
+[perenderan dokumen](23-document-rendering.md#cara-layout-membaca-dataset).
+
 ## Bantuan kontekstual pada halaman dan field
 
 UI app mengikuti pola **field description** Dynamics 365: setiap field dapat memiliki help text opsional, tetapi bantuan hanya ditulis untuk field yang rumit atau pemakaiannya tidak langsung jelas. Dynamics 365 juga menampilkan deskripsi saat pengguna mengarahkan pointer ke field dan tidak mengisi deskripsi pada semua halaman. Lihat [View and export field descriptions](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/get-started/view-export-field-descriptions).

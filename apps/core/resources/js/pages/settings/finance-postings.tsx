@@ -65,6 +65,7 @@ import type {
     PostingCheckProblem,
 } from '@/components/finance/posting-check';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -243,10 +244,6 @@ const DELIVERY = new Map<string, { label: string; variant: BadgeVariant }>([
 ]);
 
 const DATE = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' });
-const DATE_TIME = new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
 const COUNT = new Intl.NumberFormat('id-ID');
 const AMOUNT = /^(-?)(\d+)(?:\.(\d+))?$/;
 
@@ -279,10 +276,6 @@ function deliveryStatus(value: string): {
 
 function formatDate(value: string): string {
     return DATE.format(new Date(`${value}T00:00:00`));
-}
-
-function formatDateTime(value: string | null): string {
-    return value ? DATE_TIME.format(new Date(value)) : '—';
 }
 
 /**
@@ -750,6 +743,8 @@ function DetailItem({
 }
 
 function PostingSummary({ posting, now }: { posting: Posting; now: number }) {
+    const formatDateTime = useDateTimeFormat();
+
     return (
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label="Status">
@@ -979,7 +974,10 @@ function eventNote(event: PostingEvent): string {
         .join(' · ');
 }
 
-function servedSummary(posting: Posting): string {
+function servedSummary(
+    posting: Posting,
+    formatDateTime: ReturnType<typeof useDateTimeFormat>,
+): string {
     const served =
         posting.served_count > 0
             ? `Di-pull aplikasi finance ${COUNT.format(posting.served_count)} kali, terakhir ${formatDateTime(posting.last_served_at)}.`
@@ -991,6 +989,8 @@ function servedSummary(posting: Posting): string {
 }
 
 function DeliveryTable({ deliveries }: { deliveries: Delivery[] }) {
+    const formatDateTime = useDateTimeFormat();
+
     return (
         <div className="overflow-x-auto rounded-lg border">
             <Table>
@@ -1058,6 +1058,8 @@ function DeliveryTable({ deliveries }: { deliveries: Delivery[] }) {
 }
 
 function EventTable({ events }: { events: PostingEvent[] }) {
+    const formatDateTime = useDateTimeFormat();
+
     return (
         <div className="overflow-x-auto rounded-lg border">
             <Table>
@@ -1093,12 +1095,14 @@ function EventTable({ events }: { events: PostingEvent[] }) {
 }
 
 function PostingHistory({ detail }: { detail: PostingDetail }) {
+    const formatDateTime = useDateTimeFormat();
+
     return (
         <section className="space-y-4">
             <div className="space-y-1">
                 <h3 className="text-sm font-semibold">Riwayat</h3>
                 <p className="text-sm text-muted-foreground">
-                    {servedSummary(detail)}
+                    {servedSummary(detail, formatDateTime)}
                 </p>
             </div>
             {detail.deliveries.length > 0 && (
@@ -1271,6 +1275,7 @@ function MarkManualDialog({
     onDone: (updated: Posting) => void;
     onConflict: () => void;
 }) {
+    const formatDateTime = useDateTimeFormat();
     const [reason, setReason] = useState('');
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);

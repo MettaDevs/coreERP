@@ -174,7 +174,7 @@ Rujukan: [README: Gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 - [ ] 6.5 Endpoint unggah, daftar, unduh, dan arsip.
 - [ ] 6.6 Pendaftaran record fase 1 sesuai tabel di README.
 
-### 7. [ ] Zona waktu dan tanggal kerja pengguna (gap 3)
+### 7. [x] Zona waktu dan tanggal kerja pengguna (gap 3)
 
 **Tempat:** Core (My Profile, Shell, reporting) dan module yang mencetak atau mengisi tanggal ·
 **Setelah:** 0.4, 0.10 · **Selesai bila:** zona waktu dan tanggal kerja bisa diisi di My Profile, layar
@@ -188,11 +188,11 @@ pengguna.
 - [x] 7.1 Setelan zona waktu per pengguna di My Profile, dengan nilai bawaan sesuai K-10.
 - [x] 7.2 "Hari ini" dihitung dari jam server menurut zona pengguna, tidak pernah dari jam perangkat.
       Form yang sekarang mengisi tanggal dengan `toISOString()` beralih ke nilai ini.
-- [ ] 7.3 Layar dan cetakan memformat waktu dengan zona pengguna; cetakan menuliskan zonanya, misalnya
-      "28/09/2026 14:05 WITA".
-- [ ] 7.4 Module mengirim waktu UTC bertipe `datetime`, dan Core yang memformatnya lewat `ValueFormat`.
+- [x] 7.3 Layar dan cetakan memformat waktu dengan zona pengguna; cetakan menuliskan zonanya, misalnya
+      "28/09/2026 14:05 WITA". Zona di luar Indonesia ditulis selisihnya, misalnya "UTC+09:00".
+- [x] 7.4 Module mengirim waktu UTC bertipe `datetime`, dan Core yang memformatnya lewat `ValueFormat`.
       Konteks laporan dan permintaan membawa zona pengguna untuk "hari ini" di module, misalnya periode
-      bawaan dan nama berkas.
+      bawaan dan nama berkas. Jadwal work order yang diketik pengguna belum berzona; lihat README.
 - [x] 7.5 Tanggal kerja per pengguna per sesi, bawaannya hari ini, diisi di My Profile.
 - [x] 7.6 Tanggal kerja kembali ke hari ini saat login ulang atau pindah tenant/legal entity.
 - [x] 7.7 Form transaksi memakai tanggal kerja sebagai tanggal bawaan. Sudah: penerimaan, mutasi, dan
@@ -244,11 +244,13 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       tidak sampai ke Discord, sementara atribut untuk SigNoz tetap utuh.
 - [ ] **B-6** (area 6) Pengguna tanpa hak atas record induk tidak bisa melihat atau mengunduh
       lampirannya. Lampiran tidak bocor antar tenant. Hash yang tidak cocok terdeteksi.
-- [ ] **B-7** (area 7) Pukul 00.30 WIB (17.30 UTC hari sebelumnya), "hari ini" bagi pengguna berzona
+- [x] **B-7** (area 7) Pukul 00.30 WIB (17.30 UTC hari sebelumnya), "hari ini" bagi pengguna berzona
       `Asia/Jakarta` adalah tanggal WIB, bukan tanggal UTC. Waktu di layar dan cetakan mengikuti zona
       pengguna, dan cetakan menuliskan zonanya. Tanggal kerja yang diisi dipakai form, dan kembali ke hari
       ini setelah login ulang atau pindah tenant/legal entity. Pengingat muncul selama tanggal kerja bukan
       hari ini; setelah ditutup, ia tidak muncul lagi di sesi itu dan tanggal kerja tetap terlihat.
+      Pemformat jam di layar (TypeScript) belum punya test otomatis karena repo belum memasang runner test
+      frontend; ia diperiksa di browser, sedangkan zona yang dipakainya (`clock.timezone`) diuji di PHPUnit.
 - [ ] **B-8** (area 8) Gangguan sesaat diulang sampai batas percobaan. Kegagalan layout dan data
       terlalu besar tetap tidak diulang.
 - [ ] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan

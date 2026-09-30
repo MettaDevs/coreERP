@@ -74,6 +74,7 @@ import { Copy, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
     apiJson,
     CoreApiError,
@@ -122,15 +123,6 @@ const MODE_LABEL: Record<Mode, string> = {
     pull: 'Pull',
     push: 'Push',
 };
-
-function waktu(value: string | null): string {
-    return value
-        ? new Intl.DateTimeFormat('id-ID', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-          }).format(new Date(value))
-        : 'Belum pernah';
-}
 
 function toForm(client: Client | null): Form {
     return {
@@ -479,6 +471,7 @@ export default function IntegrationClients({
     scopes,
     endpoint,
 }: Props) {
+    const formatDateTime = useDateTimeFormat();
     const [editing, setEditing] = useState<Client | 'new' | null>(null);
     const [secrets, setSecrets] = useState<Secrets | null>(null);
     const [revoking, setRevoking] = useState<Client | null>(null);
@@ -621,7 +614,11 @@ export default function IntegrationClients({
                                                         : 'Semua'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {waktu(client.last_used_at)}
+                                                    {client.last_used_at
+                                                        ? formatDateTime(
+                                                              client.last_used_at,
+                                                          )
+                                                        : 'Belum pernah'}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge

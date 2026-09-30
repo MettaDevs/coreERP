@@ -95,7 +95,7 @@ final class AssetDepreciationReport implements ReportDefinition
             $this->field('total_akumulasi_penyusutan', 'Total akumulasi penyusutan', type: 'money'),
             $this->field('total_nilai_buku_akhir', 'Total nilai buku akhir', type: 'money'),
             $this->field('jumlah_aset', 'Jumlah buku aset'),
-            $this->field('dicetak_pada', 'Tanggal cetak'),
+            $this->field('dicetak_pada', 'Tanggal cetak', type: 'datetime'),
             $this->field('baris.nomor', 'No.', 'baris'),
             $this->field('baris.kode', 'Kode aset', 'baris'),
             $this->field('baris.nama', 'Nama aset', 'baris'),
@@ -121,7 +121,8 @@ final class AssetDepreciationReport implements ReportDefinition
     public function data(ReportContext $context, array $parameters): ReportData
     {
         // `periode` sudah lolos `date_format:Y-m`, jadi tanggal satunya selalu sah.
-        $month = Carbon::parse(($parameters['periode'] ?? now()->format('Y-m')).'-01')->startOfDay();
+        // Periode bawaan bulan ini menurut zona pengguna, bukan menurut jam server yang berjalan dalam UTC.
+        $month = Carbon::parse(($parameters['periode'] ?? $context->now()->format('Y-m')).'-01')->startOfDay();
         $monthStart = $month->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
 
@@ -198,7 +199,7 @@ final class AssetDepreciationReport implements ReportDefinition
                     array_map(static fn (BigDecimal $total): string => (string) $total, $totals),
                 ),
                 'jumlah_aset' => count($lines),
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: ['baris' => $lines],
             fileName: 'laporan-penyusutan-aset-'.$month->format('Y-m'),

@@ -8,6 +8,7 @@ use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Modules\Contracts\KonteksPermintaan;
+use Carbon\CarbonImmutable;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
@@ -198,6 +199,30 @@ class ModuleRequestContextTest extends TestCase
         $this->assertTrue($respons->json('dipegang'));
         $this->assertFalse($respons->json('tidak_dipegang'));
         $this->assertSame((string) $this->pemilik->id, $respons->json('pengguna'));
+    }
+
+    public function test_konteks_membawa_zona_waktu_pengguna_untuk_hari_ini_di_module(): void
+    {
+        // Area 7: "hari ini" di module dihitung menurut zona pengguna, bukan jam server dalam UTC.
+        // Pukul 17.30 UTC sudah esok hari bagi pengguna berzona WIB. Jamnya dimajukan, bukan dimundurkan:
+        // peran pemilik baru berlaku sejak pendaftaran di setUp.
+        $utc = CarbonImmutable::now('UTC')->addDay()->setTime(17, 30);
+        $this->travelTo($utc);
+        $this->pemilik->forceFill(['timezone' => 'Asia/Jakarta'])->save();
+        Route::middleware(['web', 'auth', 'konteks-module:contoh-a'])
+            ->get('/uji/zona', fn (KonteksPermintaan $akses): JsonResponse => new JsonResponse([
+                'zona' => $akses->timezone(),
+                'hari_ini' => CarbonImmutable::now($akses->timezone())->toDateString(),
+            ]));
+
+        $this->actingAs($this->pemilik)->getJson('/uji/zona')
+            ->assertOk()
+            ->assertJsonPath('zona', 'Asia/Jakarta')
+            ->assertJsonPath('hari_ini', $utc->addDay()->toDateString());
+
+        // Pengguna yang belum memilih zona dan entitas legalnya tanpa zona mengikuti zona aplikasi.
+        $this->pemilik->forceFill(['timezone' => null])->save();
+        $this->actingAs($this->pemilik)->getJson('/uji/zona')->assertOk()->assertJsonPath('zona', 'UTC');
     }
 
     public function test_tanpa_middleware_konteks_jawabannya_tidak_punya_izin(): void

@@ -79,7 +79,7 @@ final class AssetDisposalScrapReport implements ReportDefinition
             ['key' => 'total_nilai_perolehan', 'label' => 'Total nilai perolehan', 'table' => null, 'type' => 'money'],
             ['key' => 'total_nilai_buku', 'label' => 'Total nilai buku akhir', 'table' => null, 'type' => 'money'],
             ['key' => 'jumlah_dokumen', 'label' => 'Jumlah pemusnahan', 'table' => null],
-            ['key' => 'dicetak_pada', 'label' => 'Tanggal cetak', 'table' => null],
+            ['key' => 'dicetak_pada', 'label' => 'Tanggal cetak', 'table' => null, 'type' => 'datetime'],
             ['key' => 'baris.nomor', 'label' => 'No.', 'table' => 'baris'],
             ['key' => 'baris.no_bukti', 'label' => 'No. bukti', 'table' => 'baris'],
             ['key' => 'baris.tanggal', 'label' => 'Tanggal pemusnahan', 'table' => 'baris', 'type' => 'date'],
@@ -175,10 +175,10 @@ final class AssetDisposalScrapReport implements ReportDefinition
                 'total_nilai_perolehan' => (string) $totalAcquisition,
                 'total_nilai_buku' => (string) $totalBookValue,
                 'jumlah_dokumen' => count(array_unique($rows->pluck('id')->all())),
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: ['baris' => $lines],
-            fileName: 'laporan-pemusnahan-aset-'.now()->format('Ymd-Hi'),
+            fileName: 'laporan-pemusnahan-aset-'.$context->now()->format('Ymd-Hi'),
         );
     }
 }

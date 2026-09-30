@@ -45,4 +45,11 @@ interface KonteksPermintaan
      * @return array<string, mixed>
      */
     public function kebijakanData(): array;
+
+    /**
+     * Zona waktu pengguna, nama IANA seperti `Asia/Makassar`: pilihannya di My Profile, atau zona
+     * entitas legal aktif bila ia belum memilih. Pakai untuk "hari ini" dan batas hari menurut
+     * pengguna, bukan jam server yang berjalan dalam UTC. Tanpa pengguna yang masuk, jawabannya zona aplikasi.
+     */
+    public function timezone(): string;
 }

@@ -3,6 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Support\Modules\Contracts\ReportFormatter;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -131,7 +133,12 @@ class PenyediaLaporanTest extends TestCase
             ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order')
             ->assertOk()
             ->json('data');
-        $cetak = $this->penyedia()->dataset('daftar-work-order', $this->konteks($izin), []);
+        $cetak = app(ReportFormatter::class)->display(
+            $this->tenantId,
+            $this->penyedia()->definisi('daftar-work-order', $this->konteks($izin))['fields'],
+            $this->penyedia()->dataset('daftar-work-order', $this->konteks($izin), []),
+            'UTC',
+        );
 
         $this->assertNotEmpty($layar['tables']['baris']);
         $this->assertEquals(json_decode((string) json_encode($cetak['tables']), true), $layar['tables']);
@@ -225,6 +232,48 @@ class PenyediaLaporanTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.fields.total', 'Rp 1.500,50')
             ->assertJsonPath('data.tables.baris.0', ['nama' => 'Kursi', 'nilai' => 'Rp 1.000,00', 'tanggal' => '23/07/2026']);
+    }
+
+    /**
+     * B-7 (area 7): module mengirim waktu dalam UTC dan Core menulisnya menurut zona pengguna. "Hari ini"
+     * milik module — nama berkas, periode bawaan, batas tanggal filter — dihitung di zona pengguna.
+     */
+    public function test_work_order_times_are_sent_in_utc_and_days_follow_the_user_zone(): void
+    {
+        // 17.30 UTC tanggal 31 Agustus adalah 00.30 WIB tanggal 1 September.
+        $this->travelTo(CarbonImmutable::parse('2026-08-31 17:30:00', 'UTC'));
+        $this->workOrder();
+        $izin = ['management-aset.pemeliharaan-aset.read'];
+        $wib = $this->konteks($izin, zona: 'Asia/Jakarta');
+
+        $data = $this->penyedia()->dataset('daftar-work-order', $wib, []);
+
+        // Dikirim mentah dalam UTC; jadwal yang diketik pengguna tetap dikirim apa adanya.
+        $this->assertSame('2026-08-31T17:30:00Z', $data['fields']['dicetak_pada']);
+        $this->assertSame('2026-08-31 17:30:00', $data['tables']['baris'][0]['dibuat_pada']);
+        $this->assertSame('15/08/2026 08:00', $data['tables']['baris'][0]['diharapkan_mulai']);
+        $this->assertSame('daftar-work-order-20260901-0030', $data['file_name']);
+
+        $cetak = app(ReportFormatter::class)->display(
+            $this->tenantId,
+            $this->penyedia()->definisi('daftar-work-order', $wib)['fields'],
+            $data,
+            'Asia/Jakarta',
+        );
+        $this->assertSame('01/09/2026 00:30 WIB', $cetak['fields']['dicetak_pada']);
+        $this->assertSame('01/09/2026 00:30 WIB', $cetak['tables']['baris'][0]['dibuat_pada']);
+
+        // Work order yang dibuat 00.30 WIB tanggal 1 termasuk "dari tanggal 1" bagi pengguna WIB,
+        // walau dalam UTC ia tercatat tanggal 31.
+        $this->assertSame(1, $this->penyedia()->dataset('daftar-work-order', $wib, ['dari' => '2026-09-01'])['fields']['jumlah_work_order']);
+        $this->assertSame(0, $this->penyedia()->dataset('daftar-work-order', $wib, ['sampai' => '2026-08-31'])['fields']['jumlah_work_order']);
+        $utc = $this->konteks($izin);
+        $this->assertSame(0, $this->penyedia()->dataset('daftar-work-order', $utc, ['dari' => '2026-09-01'])['fields']['jumlah_work_order']);
+
+        // Periode bawaan laporan penyusutan juga bulan pengguna, bukan bulan menurut UTC.
+        $penyusutan = $this->penyedia()->dataset('laporan-penyusutan-aset', $this->konteks(['management-aset.penyusutan.read'], zona: 'Asia/Jakarta'), []);
+        $this->assertSame('2026-09', $penyusutan['fields']['filter_periode']);
+        $this->assertSame('laporan-penyusutan-aset-2026-09', $penyusutan['file_name']);
     }
 
     public function test_berita_acara_hanya_dapat_dicetak_setelah_mutasi_diselesaikan(): void
@@ -813,7 +862,7 @@ class PenyediaLaporanTest extends TestCase
      * @param  list<string>  $izin
      * @return array<string, mixed>
      */
-    private function konteks(array $izin, bool $lingkupLain = false): array
+    private function konteks(array $izin, bool $lingkupLain = false, string $zona = 'UTC'): array
     {
         $kebijakan = $lingkupLain
             ? ['all' => false, 'scope_grants' => [[
@@ -829,6 +878,7 @@ class PenyediaLaporanTest extends TestCase
             'user_id' => (string) Str::ulid(),
             'permissions' => $izin,
             'data_policies' => ['management-aset.asset-responsibility' => $kebijakan],
+            'timezone' => $zona,
         ];
     }
 
@@ -928,7 +978,7 @@ final class PenyediaLaporanTerikat
 
     /**
      * @param  array<string, mixed>  $konteks
-     * @return array<string, mixed>
+     * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>}
      */
     public function definisi(string $kode, array $konteks): array
     {
@@ -944,7 +994,7 @@ final class PenyediaLaporanTerikat
     /**
      * @param  array<string, mixed>  $konteks
      * @param  array<string, mixed>  $parameter
-     * @return array<string, mixed>
+     * @return array{fields: array<string, mixed>, tables: array<string, mixed>, file_name: string}
      */
     public function dataset(string $kode, array $konteks, array $parameter): array
     {

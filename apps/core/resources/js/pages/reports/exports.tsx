@@ -21,6 +21,7 @@ import { Download, Trash2 } from 'lucide-react';
 import { useEffect, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
     getExports,
     refreshExports,
@@ -32,7 +33,6 @@ import {
     downloadExport,
     FORMAT_LABEL,
     formatBytes,
-    formatTime,
     isActive,
     STATUS_LABEL,
 } from '@/lib/reports';
@@ -46,6 +46,7 @@ type Props = { exports: ReportExport[] };
  * dibagikan dengan tray di header, jadi keduanya selalu menunjukkan hal yang sama.
  */
 export default function ReportExports({ exports: initial }: Props) {
+    const formatTime = useDateTimeFormat();
     const live = useSyncExternalStore(subscribeExports, getExports, () => []);
     const exports = live.length > 0 ? live : initial;
 

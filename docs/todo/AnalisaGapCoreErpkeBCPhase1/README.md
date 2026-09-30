@@ -391,8 +391,24 @@ Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
 - **Pengingat di Shell** selama tanggal kerja bukan hari ini, dengan tautan ke My Profile dan tombol
   "Pakai hari ini". Setelah ditutup, tanggal kerja tetap terlihat di header.
 
-Yang belum: layar dan cetakan belum memformat jam dengan zona pengguna, dan module belum menerima zona
-itu di konteks laporan (7.3 dan 7.4).
+- **Jam di layar menurut zona pengguna.** Layar Core dan Shell (tray ekspor, lonceng notifikasi, riwayat
+  perubahan, daftar ekspor, layout laporan, retensi, akun dan pantau posting finance, klien integrasi,
+  identitas operator) memformat waktu lewat `useDateTimeFormat()`, yang membaca `clock.timezone`. Zona
+  perangkat tidak dipakai lagi, dan waktu tanpa offset dari server dibaca sebagai UTC.
+- **Jam di cetakan menurut zona pengguna, beserta zonanya.** Tipe `datetime` di `ValueFormat`: module
+  mengirim waktu UTC, Core menulisnya "28/09/2026 00:30 WIB" di Word, PDF, dan pratinjau, dan sebagai
+  tanggal-jam Excel dengan nama zona di format selnya. Zona Indonesia ditulis WIB, WITA, atau WIT; zona
+  lain ditulis selisihnya dari UTC pada saat itu, misalnya "UTC+09:00", karena singkatan seperti IST atau
+  CST dipakai lebih dari satu zona. Tanggal tanpa jam (`date`) tidak digeser.
+- **Zona di konteks module.** Konteks laporan membawa `timezone`, dihitung dari pengguna dan entitas legal
+  catatan ekspor (worker tidak punya sesi); `KonteksPermintaan::timezone()` menjawab hal yang sama di rute
+  module. Laporan aset memakainya untuk periode bawaan, nama berkas, dan batas hari filter tanggal, dan
+  mengirim waktu cetak, waktu dibuat, serta waktu mulai dan selesai aktual work order sebagai `datetime`.
+
+Yang belum: jadwal work order (`diharapkan_*`, `dijadwalkan_*`) diketik pengguna lewat isian tanggal-jam
+dan disimpan persis seperti diketik, tanpa zona. Jam itu ditampilkan dan dicetak apa adanya, tanpa nama
+zona. Menjadikannya waktu UTC berarti mengubah isian dan penyimpanannya di module aset; keputusan itu
+belum diambil.
 
 ### Pengguna, pekerja HR, dan jadwal kerja
 

@@ -79,7 +79,7 @@ final class AssetDisposalSaleReport implements ReportDefinition
             ['key' => 'total_nilai_penjualan', 'label' => 'Total nilai penjualan', 'table' => null, 'type' => 'money'],
             ['key' => 'total_nilai_buku', 'label' => 'Total nilai buku saat dijual', 'table' => null, 'type' => 'money'],
             ['key' => 'total_laba_rugi', 'label' => 'Total laba/rugi', 'table' => null, 'type' => 'money'],
-            ['key' => 'dicetak_pada', 'label' => 'Tanggal cetak', 'table' => null],
+            ['key' => 'dicetak_pada', 'label' => 'Tanggal cetak', 'table' => null, 'type' => 'datetime'],
             ['key' => 'baris.nomor', 'label' => 'No.', 'table' => 'baris'],
             ['key' => 'baris.no_bukti', 'label' => 'No. bukti', 'table' => 'baris'],
             ['key' => 'baris.tanggal_penjualan', 'label' => 'Tanggal penjualan', 'table' => 'baris', 'type' => 'date'],
@@ -181,10 +181,10 @@ final class AssetDisposalSaleReport implements ReportDefinition
                 'total_nilai_penjualan' => (string) $totals['nilai_penjualan'],
                 'total_nilai_buku' => (string) $totals['nilai_buku'],
                 'total_laba_rugi' => (string) $totals['laba_rugi'],
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: ['baris' => $lines],
-            fileName: 'laporan-penjualan-aset-'.now()->format('Ymd-Hi'),
+            fileName: 'laporan-penjualan-aset-'.$context->now()->format('Ymd-Hi'),
         );
     }
 }
