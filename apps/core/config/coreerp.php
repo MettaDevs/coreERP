@@ -101,6 +101,8 @@ return [
     // the issue record exists; audit events are kept far longer because they are the compliance trail.
     'confirmed_pool_retention_days' => env('COREERP_CONFIRMED_POOL_RETENTION_DAYS', 30),
     'audit_retention_days' => env('COREERP_AUDIT_RETENTION_DAYS', 400),
+    // Masa simpan bawaan catatan penerapan retensi (`retention_policy_log_entries`); tenant dapat mengubahnya.
+    'retention_log_retention_days' => env('COREERP_RETENTION_LOG_RETENTION_DAYS', 365),
 
     /*
      * Alamat antarmuka SigNoz, dipakai untuk menaruh tautan di dalam laporan kesalahan.

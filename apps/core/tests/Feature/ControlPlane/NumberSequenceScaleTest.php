@@ -88,7 +88,7 @@ class NumberSequenceScaleTest extends TestCase
         app(NumberSequenceService::class)->advance($sequence, $context, 999999, null);
     }
 
-    public function test_recover_prunes_confirmed_pool_rows_and_stale_audit_events(): void
+    public function test_retention_prunes_confirmed_pool_rows_and_stale_audit_events(): void
     {
         [$sequence, $context] = $this->sequence(['is_continuous' => true, 'preallocation_enabled' => true, 'preallocation_quantity' => 5]);
         $service = app(NumberSequenceService::class);
@@ -98,7 +98,8 @@ class NumberSequenceScaleTest extends TestCase
         DB::table('number_sequence_continuous_pool')->where('status', 'confirmed')->update(['updated_at' => now()->subDays(90)]);
         DB::table('number_sequence_audit_events')->update(['occurred_at' => now()->subDays(500)]);
 
-        $this->artisan('number-sequences:recover')->assertSuccessful();
+        // Pruning by age moved from the recover job to the retention service (area 4).
+        $this->artisan('retention:apply')->assertSuccessful();
 
         $this->assertSame(0, DB::table('number_sequence_continuous_pool')->where('status', 'confirmed')->count());
         $this->assertSame(0, DB::table('number_sequence_audit_events')->count());

@@ -59,6 +59,10 @@ final class CoreSecurityCatalog
 
     public const CHANGE_LOG_UPDATE = 'core.change-log.update';
 
+    public const RETENTION_READ = 'core.retention.read';
+
+    public const RETENTION_UPDATE = 'core.retention.update';
+
     /** Duty *Kelola akses*: pemegangnya memegang `ACCESS_UPDATE`, permission yang dijaga `AccessGuards` anti-terkunci. */
     public const ACCESS_MANAGE_DUTY = 'core.access.manage';
 

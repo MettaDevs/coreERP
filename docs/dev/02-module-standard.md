@@ -382,6 +382,22 @@ sendiri:
   `ChangeHistory`. Layarnya memakai komponen `ChangeHistory` dari `@/components/change-history`. Rute
   Core `GET /api/v1/change-log/{tabel}/{id}` hanya untuk admin berizin `core.change-log.read`.
 
+### Retensi data log
+
+Log dan berkas teknis yang tumbuh terus dihapus berdasarkan umur oleh satu layanan Core,
+`App\Support\Retention\RetentionService` ([analisa gap BC, gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)).
+Penghapusan fisik di sini sah karena yang dihapus log, bukan data bisnis; tabel data bisnis tidak pernah
+didaftarkan dan tetap hanya diarsipkan.
+
+- **Daftar.** Tabel yang boleh diretensi ditulis di `RetentionPolicies`: kode, tabel, kolom tanggal acuan,
+  masa simpan minimum, dan bawaan dari config (kosong berarti mati sampai tenant menyalakannya). Tabel di
+  luar daftar tidak dapat diberi retensi. Module yang menambah log sendiri menambah barisnya di daftar itu.
+- **Setelan.** Admin tenant mengatur masa simpan di Pengaturan → Retensi data (`core.retention.read`,
+  `core.retention.update`), tidak boleh di bawah minimum. Tenant tanpa setelan mendapat bawaan.
+- **Penerapan.** `retention:apply` berjalan harian dan menghapus per tenant dalam kelompok kecil. Hasilnya
+  ditulis ke `retention_policy_log_entries` bila ada baris terhapus atau penghapusan gagal. Perintah lain
+  yang perlu menghapus log berdasarkan umur memanggil layanan yang sama, tidak menulis `DELETE` sendiri.
+
 ### Penghapusan lunak
 
 Tidak ada baris yang dihapus fisik. Menghapus berarti mengisi `deleted_at`; baris itu tetap ada di

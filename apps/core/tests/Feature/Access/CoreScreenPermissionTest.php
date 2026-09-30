@@ -41,12 +41,12 @@ class CoreScreenPermissionTest extends TestCase
         ]);
     }
 
-    public function test_the_core_catalog_registers_twenty_duties_down_to_entry_points(): void
+    public function test_the_core_catalog_registers_twenty_two_duties_down_to_entry_points(): void
     {
         $duties = SecurityDuty::query()->where('app_id', CoreSecurityCatalog::APP_ID)->with('privileges.permissions')->get();
 
-        // Delapan belas dari katalog layar Core, dua dari log perubahan (Lihat riwayat, Kelola log).
-        $this->assertCount(20, $duties);
+        // Delapan belas dari katalog layar Core, dua dari log perubahan (Lihat riwayat, Kelola log), dua dari retensi data.
+        $this->assertCount(22, $duties);
         foreach ($duties as $duty) {
             $this->assertNotEmpty($duty->privileges, $duty->code);
             foreach ($duty->privileges as $privilege) {
@@ -68,6 +68,8 @@ class CoreScreenPermissionTest extends TestCase
         );
         $this->assertSame([CoreSecurityCatalog::CHANGE_LOG_READ], $this->permissionsOfDuty('core.change-log.inquire'));
         $this->assertSame([CoreSecurityCatalog::CHANGE_LOG_READ, CoreSecurityCatalog::CHANGE_LOG_UPDATE], $this->permissionsOfDuty('core.change-log.manage'));
+        $this->assertSame([CoreSecurityCatalog::RETENTION_READ], $this->permissionsOfDuty('core.retention.inquire'));
+        $this->assertSame([CoreSecurityCatalog::RETENTION_READ, CoreSecurityCatalog::RETENTION_UPDATE], $this->permissionsOfDuty('core.retention.manage'));
     }
 
     public function test_the_owner_role_holds_every_duty_including_ones_registered_later(): void

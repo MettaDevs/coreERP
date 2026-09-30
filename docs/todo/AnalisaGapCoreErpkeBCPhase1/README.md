@@ -200,7 +200,7 @@ Yang belum tercakup, dan sengaja ditulis supaya tidak dianggap sudah:
 - Kolom pembuat lama tetap ada di samping kolom jejak: `invitation_codes.created_by`,
   `report_exports.user_id`, dan `finance_reference_account_imports.imported_by_user_id`.
 - Layar pekerja HR belum ada, jadi riwayat pekerja baru terbaca lewat rute admin.
-- Masa simpan entri log menunggu layanan retensi ([Gap 4](#gap-4)).
+- Masa simpan entri log diatur layanan retensi ([Gap 4](#gap-4)); bawaannya mati sampai tenant menyalakannya.
 
 ## Gap 2: pengaman edit bersamaan {#gap-2}
 
@@ -432,6 +432,42 @@ bisnis. Aturan "tidak ada baris yang dihapus fisik" tetap berlaku untuk data bis
    menghapus sendiri beralih memakai layanan ini.
 5. Tabel data bisnis tidak pernah masuk daftar.
 
+### Yang sudah dibangun (area 4)
+
+- **Daftar tabel yang boleh diretensi** ada di `App\Support\Retention\RetentionPolicies`: kode, keterangan
+  di layar, tabel, kolom tanggal acuan, minimum, dan bawaan. Bawaannya dibaca dari config saat dipakai, dan
+  masa simpan efektif tidak pernah di bawah minimum walau config diisi lebih kecil.
+
+  | Kebijakan | Tabel dan tanggal acuan | Bawaan | Minimum |
+  | --- | --- | --- | --- |
+  | `number_sequence_audit` | `number_sequence_audit_events`, `occurred_at` | `coreerp.audit_retention_days` (400) | 365 |
+  | `number_sequence_confirmed_pool` | `number_sequence_continuous_pool` berstatus `confirmed`, `updated_at` | `coreerp.confirmed_pool_retention_days` (30) | 7 |
+  | `report_exports` | `report_exports`, `created_at`; berkasnya ikut dihapus | `reporting.retention_days` (7) | 1 |
+  | `change_log_access` | `change_log_entries` milik tabel yang selalu dicatat, `changed_at` | mati | 365 |
+  | `change_log_other` | `change_log_entries` selain itu, `changed_at` | mati | 28 |
+  | `retention_policy_log` | `retention_policy_log_entries`, `created_at` | `coreerp.retention_log_retention_days` (365) | 28 |
+
+  Kedua tabel number sequence tidak punya `tenant_id`; tenantnya dibaca dari `sequence_id` ke
+  `tenant_number_sequences`. `change_log_entries` memakai `changed_at` karena tabel itu tidak punya
+  `created_at`. Daftar tabel yang selalu dicatat ada sekali di `AlwaysLoggedTables`, dan test
+  membandingkannya dengan daftar di fungsi SQL `coreerp_log_change`.
+- **Setelan per tenant** di `retention_policy_setups` (unik per tenant dan kebijakan). Tenant tanpa baris
+  memakai bawaan. Kebijakan yang punya bawaan selalu berjalan dan tenant hanya memilih masa simpan;
+  kebijakan tanpa bawaan (riwayat perubahan) mati sampai tenant menyalakannya. Masa simpan di bawah
+  minimum ditolak dengan 422.
+- **Satu layanan**, `RetentionService::apply()`, menghapus per tenant dalam kelompok kecil. Penghapusannya
+  fisik dan itu sah di sini: yang dihapus adalah log dan berkas teknis. Tabel data bisnis tidak pernah
+  didaftarkan. Satu perintah terjadwal, `retention:apply`, berjalan harian; `reporting:purge-exports` tetap
+  tiap jam tetapi memanggil layanan yang sama untuk `report_exports`, dan daftar ekspor memanggilnya untuk
+  tenant yang sedang membaca. `number-sequences:recover` tidak lagi menghapus berdasarkan umur; ia hanya
+  membuang blok alokasi yang habis, karena itu soal struktur, bukan umur.
+- **Log penerapan** di `retention_policy_log_entries`: per tenant dan kebijakan, jumlah baris terhapus,
+  batas waktu yang dipakai, status, dan pesan. Ditulis hanya bila ada baris terhapus atau penghapusan
+  gagal, dan tabel ini sendiri diretensi.
+- **Layar Pengaturan → Retensi data** dengan permission `core.retention.read` dan `core.retention.update`,
+  lewat rantai entry point, privilege, dan duty (`core.retention.inquire`, `core.retention.manage`) yang
+  didaftarkan migration katalog keamanan. Owner memegang keduanya.
+
 ## Gap 5: klasifikasi data pribadi {#gap-5}
 
 ### Keadaan hari ini
@@ -601,7 +637,7 @@ Yang belum setara:
 1. **Semua kegagalan diperlakukan sama.** Job sengaja tidak diulang karena kegagalan layout atau data
    terlalu besar akan terulang dengan cara yang sama. Tetapi gangguan sesaat, misalnya renderer
    terlambat menjawab, juga ikut tidak diulang. BC membedakannya lewat jumlah percobaan maksimum.
-2. **Masa simpan hasil ekspor belum lewat layanan retensi** ([Gap 4](#gap-4)).
+2. ~~Masa simpan hasil ekspor belum lewat layanan retensi~~ Sudah: `RunReportExport` mengisi `expires_at` dari masa simpan tenant, dan penghapusannya lewat layanan retensi ([Gap 4](#gap-4)).
 3. **Tidak ada penjadwalan ekspor berulang**, dan tidak ada job latar per tenant yang terlihat oleh admin
    tenant (`PLAT-08`). Bagian ini butuh notifikasi ketika job gagal, jadi ditunda bersama
    [gap 8](#di-luar-fase-1) (K-08).
@@ -633,6 +669,9 @@ yang jelas. Laporan tetap di server.
 | K-08 | Job latar per tenant | **Diputuskan 28 Sep 2026:** fase 2, bersama notifikasi |
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
 | K-10 | Nilai bawaan zona waktu pengguna | **Diputuskan 28 Sep 2026:** setelan zona waktu entitas legal (nama zona IANA); pengguna yang belum mengisi ikut entitas legal aktif |
+| K-14 | Masa simpan minimum dan bawaan retensi | **Diputuskan 29 Sep 2026:** ikut pola BC. Bawaan sama dengan perilaku hari ini, dibaca dari config. Audit number sequence min. 365 hari, pool terkonfirmasi min. 7, hasil ekspor min. 1, entri log tabel yang selalu dicatat min. 365 dan entri lain min. 28 (keduanya mati bawaannya), catatan penerapan retensi bawaan 365 min. 28 |
+| K-15 | Layar setelan retensi | **Diputuskan 30 Sep 2026:** Pengaturan → Retensi data, dengan permission `core.retention.read` dan `core.retention.update` |
+| K-16 | Catatan hasil penerapan | **Diputuskan 30 Sep 2026:** tabel tenant `retention_policy_log_entries`, tampil di layar yang sama, dan ikut diretensi |
 
 ## Sumber {#sumber}
 

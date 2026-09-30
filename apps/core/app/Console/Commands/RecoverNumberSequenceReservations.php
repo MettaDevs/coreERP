@@ -27,7 +27,7 @@ class RecoverNumberSequenceReservations extends Command
         }
 
         $marked = $service->recoverExpired();
-        $pruned = $this->prune();
+        $pruned = $this->pruneExhaustedAllocations();
 
         // The backlog is the number that matters operationally: reservations sitting in reconciliation_pending hold
         // pool numbers, and a continuous sequence cannot skip them. Emit it every run so it is alertable.
@@ -35,34 +35,23 @@ class RecoverNumberSequenceReservations extends Command
         Log::info('number-sequence.recover.completed', [
             'marked' => $marked,
             'reconciliation_backlog' => $backlog,
-            'pruned' => $pruned,
+            'pruned_exhausted_allocations' => $pruned,
         ]);
 
         $this->info("{$marked} reservation ditandai untuk rekonsiliasi. Backlog rekonsiliasi saat ini: {$backlog}.");
-        $this->info("Baris kedaluwarsa dibersihkan: pool {$pruned['confirmed_pool']}, audit {$pruned['audit_events']}, blok habis {$pruned['exhausted_allocations']}.");
+        $this->info("Blok alokasi habis dibersihkan: {$pruned}.");
 
         return self::SUCCESS;
     }
 
     /**
-     * Bounded growth is a correctness property here, not housekeeping. The continuous pool writes one row per number
-     * and the audit table one row per issue, so without retention both grow forever and take the hot indexes with
-     * them. A confirmed pool row is redundant once number_sequence_issues holds the same number.
-     *
-     * @return array{confirmed_pool:int,audit_events:int,exhausted_allocations:int}
+     * Blok alokasi yang sudah habis dibuang karena strukturnya, bukan umurnya: begitu `next_number` melewati
+     * `last_number` blok itu tidak bisa dipakai lagi dan hanya memberati indeks. Penghapusan berdasarkan umur
+     * (audit dan pool yang sudah dikonfirmasi) ada di layanan retensi, `retention:apply`.
      */
-    private function prune(): array
+    private function pruneExhaustedAllocations(): int
     {
-        $poolCutoff = now()->subDays((int) config('coreerp.confirmed_pool_retention_days', 30));
-        $auditCutoff = now()->subDays((int) config('coreerp.audit_retention_days', 400));
-
-        return [
-            'confirmed_pool' => DB::table('number_sequence_continuous_pool')
-                ->where('status', 'confirmed')->where('updated_at', '<', $poolCutoff)->delete(),
-            'audit_events' => DB::table('number_sequence_audit_events')
-                ->where('occurred_at', '<', $auditCutoff)->delete(),
-            'exhausted_allocations' => DB::table('number_sequence_allocations')
-                ->whereColumn('next_number', '>', 'last_number')->delete(),
-        ];
+        return DB::table('number_sequence_allocations')
+            ->whereColumn('next_number', '>', 'last_number')->delete();
     }
 }
