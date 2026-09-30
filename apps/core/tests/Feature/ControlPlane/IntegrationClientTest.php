@@ -3,11 +3,11 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\Environment;
 use App\Models\IntegrationClient;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Integration\PushDestination;
 use Database\Seeders\AppCatalogSeeder;
 use GuzzleHttp\Exception\ConnectException;

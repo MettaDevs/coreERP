@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Settings;
 
-use App\Models\Client;
 use App\Models\CoreApp;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\ControlPlane\Models\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

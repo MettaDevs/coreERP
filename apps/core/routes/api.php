@@ -1,10 +1,8 @@
 <?php
 
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
-use App\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Http\Controllers\Internal\FinancePostingFeedController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
-use App\Http\Controllers\Internal\FleetController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
@@ -13,6 +11,8 @@ use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app'])->group(function (): void {
@@ -66,7 +66,7 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
  *
  * Grupnya terpisah karena penjaganya berbeda, dan bedanya bukan selera: `internal-app` menuntut
  * app yang terpasang pada sebuah tenant, sedangkan yang di sini justru sedang membuat tenantnya.
- * Alasan lengkapnya di App\Http\Middleware\ControlPlaneOnly.
+ * Alasan lengkapnya di App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly.
  *
  * Throttle-nya juga terpisah. `internal-app` memberi kunci per app dan per tenant lewat header
  * kredensial yang tidak dikirim pemanggil ini — seluruh perintah pusat admin akan berbagi satu

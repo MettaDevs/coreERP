@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Internal;
 
-use App\Models\Environment;
+use App\Platform\Environment\Models\Environment;
 use App\Support\ControlPlane\TemporaryPassword;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;

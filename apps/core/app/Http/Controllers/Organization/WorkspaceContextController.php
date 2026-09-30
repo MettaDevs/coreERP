@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Organization\WorkspaceContextRequest;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Support\Access\CorePermissions;
-use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

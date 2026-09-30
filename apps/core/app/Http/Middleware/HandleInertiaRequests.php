@@ -3,10 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Models\CoreApp;
-use App\Models\Environment;
 use App\Models\TenantMembership;
+use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Access\CorePermissions;
-use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use App\Support\License\SiteLicense;
 use App\Support\UserClock;

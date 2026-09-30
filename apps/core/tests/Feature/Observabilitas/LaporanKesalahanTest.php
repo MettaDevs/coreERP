@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Observabilitas;
 
 use App\Http\Middleware\ResolveModuleContext;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\ModuleRequestContext;
 use App\Support\Observabilitas\LaporanKesalahan;
 use Illuminate\Database\QueryException;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Modules;
 
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\KonteksTenant;
 use Illuminate\Http\Request;
 use RuntimeException;

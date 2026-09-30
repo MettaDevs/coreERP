@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Sso;
 
-use App\Models\Environment;
 use App\Models\TenantIdentityProvider;
+use App\Platform\Environment\Models\Environment;
 use Illuminate\Http\Request;
 
 /**

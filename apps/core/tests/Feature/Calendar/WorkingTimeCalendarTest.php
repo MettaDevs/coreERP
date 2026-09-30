@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Calendar;
 
-use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
@@ -11,6 +10,7 @@ use App\Models\WorkingTimeCalendar;
 use App\Models\WorkingTimeCalendarDay;
 use App\Models\WorkingTimeCalendarLine;
 use App\Models\WorkingTimeTemplate;
+use App\Platform\ControlPlane\Models\Client;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;

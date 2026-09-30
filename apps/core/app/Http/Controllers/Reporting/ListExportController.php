@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Reporting\ExportQueue;
 use App\Support\Reporting\ListExporter;
 use Illuminate\Http\JsonResponse;

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

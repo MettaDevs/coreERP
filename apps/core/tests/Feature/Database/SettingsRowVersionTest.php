@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
-use App\Models\Client;
 use App\Models\FiscalCalendar;
 use App\Models\Organization;
 use App\Models\Tenant;
@@ -12,6 +11,7 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\WorkingTimeCalendar;
 use App\Models\WorkingTimeTemplate;
+use App\Platform\ControlPlane\Models\Client;
 use App\Support\Modules\Contracts\RowVersion;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

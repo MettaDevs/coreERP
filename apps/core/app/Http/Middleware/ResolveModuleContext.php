@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\License\SiteLicense;

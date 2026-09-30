@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Sso;
 
-use App\Support\ControlPlane\OutboundRefused;
+use App\Platform\Environment\Support\OutboundRefused;
 
 /**
  * Mencari satu pengguna di penyedia SSO berdasarkan emailnya.

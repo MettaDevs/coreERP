@@ -6,10 +6,10 @@ namespace App\Http\Controllers\Onboarding;
 
 use App\Actions\Access\CreateInvitation;
 use App\Http\Controllers\Controller;
-use App\Models\Environment;
 use App\Models\InvitationCode;
 use App\Models\Tenant;
-use App\Support\ControlPlane\EnvironmentAddress;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\EnvironmentAddress;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Modules;
 
-use App\Models\Environment;
 use App\Models\ModuleInstallation;
-use App\Support\ControlPlane\EnvironmentConnection;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;

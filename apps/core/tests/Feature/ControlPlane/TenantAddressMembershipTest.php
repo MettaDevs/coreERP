@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\Client;
-use App\Models\Environment;
 use App\Models\ProviderAccess;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Environment\Models\Environment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;

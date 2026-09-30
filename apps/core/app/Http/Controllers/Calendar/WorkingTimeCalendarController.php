@@ -11,7 +11,7 @@ use App\Models\WorkingTimeCalendarDay;
 use App\Models\WorkingTimeCalendarLine;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
