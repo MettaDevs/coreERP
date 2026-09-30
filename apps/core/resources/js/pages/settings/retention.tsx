@@ -24,7 +24,7 @@ import {
 } from '@apperp/ui/table';
 import { Head, useForm } from '@inertiajs/react';
 import Heading from '@/components/heading';
-import { formatTime } from '@/lib/reports';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Policy = {
@@ -150,6 +150,8 @@ export default function RetentionSettings({
     policies,
     entries,
 }: Props) {
+    const formatTime = useDateTimeFormat();
+
     return (
         <>
             <Head title="Retensi data" />

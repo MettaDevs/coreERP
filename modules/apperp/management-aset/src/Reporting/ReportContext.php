@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Reporting;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 
 /**
@@ -11,6 +12,9 @@ use Illuminate\Http\Request;
  * Ia dapat dibekukan ke array dan dihidupkan kembali di worker. Dataset tetap dijalankan
  * lewat {@see OrganizationScope} yang membaca `Request`, jadi kelas ini juga dapat
  * menyusun `Request` tiruan dengan atribut yang sama seperti yang dipasang middleware.
+ *
+ * `timezone` adalah zona waktu pengguna yang meminta, dari Core. "Hari ini" di laporan — periode
+ * bawaan, nama berkas — dihitung dengan {@see now()}, bukan `now()` Laravel yang berjalan dalam UTC.
  */
 final class ReportContext
 {
@@ -25,9 +29,10 @@ final class ReportContext
         public readonly string $userId,
         public readonly array $permissions,
         public readonly array $dataPolicies,
+        public readonly string $timezone,
     ) {}
 
-    public static function fromRequest(Request $request): self
+    public static function fromRequest(Request $request, string $timezone): self
     {
         return new self(
             (string) $request->attributes->get('coreerp.tenant_id'),
@@ -36,6 +41,7 @@ final class ReportContext
             (string) $request->attributes->get('coreerp.user_id'),
             $request->attributes->get('coreerp.permissions', []),
             $request->attributes->get('coreerp.data_policies', []),
+            $timezone,
         );
     }
 
@@ -49,6 +55,7 @@ final class ReportContext
             (string) $data['user_id'],
             array_values(array_filter($data['permissions'] ?? [], 'is_string')),
             is_array($data['data_policies'] ?? null) ? $data['data_policies'] : [],
+            is_string($data['timezone'] ?? null) ? $data['timezone'] : (string) config('app.timezone'),
         );
     }
 
@@ -62,7 +69,14 @@ final class ReportContext
             'user_id' => $this->userId,
             'permissions' => $this->permissions,
             'data_policies' => $this->dataPolicies,
+            'timezone' => $this->timezone,
         ];
+    }
+
+    /** Saat ini menurut zona waktu pengguna. */
+    public function now(): CarbonImmutable
+    {
+        return CarbonImmutable::now($this->timezone);
     }
 
     public function can(string $permission): bool

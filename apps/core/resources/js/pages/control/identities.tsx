@@ -15,6 +15,7 @@ import { Users } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 
 type Identity = {
     id: number;
@@ -40,6 +41,7 @@ type Props = {
 
 export default function Identities({ identities, filters }: Props) {
     const [search, setSearch] = useState(filters.search);
+    const formatDateTime = useDateTimeFormat();
     const columns: DataTableColumn<Identity>[] = [
         {
             id: 'identity',
@@ -78,7 +80,7 @@ export default function Identities({ identities, filters }: Props) {
             header: 'Last login',
             cell: (identity) =>
                 identity.last_login_at
-                    ? new Date(identity.last_login_at).toLocaleString()
+                    ? formatDateTime(identity.last_login_at)
                     : 'Never',
             sortValue: (identity) => identity.last_login_at ?? '',
         },

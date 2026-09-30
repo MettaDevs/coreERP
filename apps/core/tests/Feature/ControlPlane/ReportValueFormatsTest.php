@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Models\Organization;
 use App\Models\TenantMembership;
+use App\Models\User;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use App\Support\Modules\Contracts\ReportFormatter;
@@ -76,7 +78,7 @@ class ReportValueFormatsTest extends TestCase
 
     public function test_money_precision_follows_the_tenant_currency_setting(): void
     {
-        $formats = fn (): array => app(ValueFormats::class)->forFields($this->tenantId(), self::FIELDS);
+        $formats = fn (): array => app(ValueFormats::class)->forFields($this->tenantId(), self::FIELDS, 'UTC');
 
         // Bawaan IDR dua desimal, sampai tenant memutuskan lain di setelan mata uangnya.
         $this->assertSame('Rp 1.234.567,50', $formats()['total']->text('1234567.50'));
@@ -94,7 +96,7 @@ class ReportValueFormatsTest extends TestCase
         $this->expectException(RenderException::class);
         $this->expectExceptionMessage('Tipe kolom `currency` pada `total` tidak dikenal mesin laporan.');
 
-        app(ValueFormats::class)->forFields($this->tenantId(), [['key' => 'total', 'label' => 'Total', 'table' => null, 'type' => 'currency']]);
+        app(ValueFormats::class)->forFields($this->tenantId(), [['key' => 'total', 'label' => 'Total', 'table' => null, 'type' => 'currency']], 'UTC');
     }
 
     public function test_report_source_reads_types_from_the_report_definition(): void
@@ -207,9 +209,138 @@ class ReportValueFormatsTest extends TestCase
             'fields' => ['total' => '3000.00', 'periode' => '2026-08', 'catatan' => 'apa adanya'],
             'tables' => ['baris' => [['nama' => 'Kursi', 'nilai' => '1000.00', 'tanggal' => '2026-07-23', 'tarif' => 25]]],
             'file_name' => 'rekap',
-        ]);
+        ], 'UTC');
         $this->assertSame(['total' => 'Rp 3.000,00', 'periode' => 'Agustus 2026', 'catatan' => 'apa adanya'], $preview['fields']);
         $this->assertSame([['nama' => 'Kursi', 'nilai' => 'Rp 1.000,00', 'tanggal' => '23/07/2026', 'tarif' => '25%']], $preview['tables']['baris']);
+    }
+
+    /**
+     * B-7: waktu di cetakan mengikuti zona pengguna yang mencetak dan menuliskan zonanya. Kasus
+     * klasiknya pukul 00.30 WIB, yaitu 17.30 UTC hari sebelumnya.
+     */
+    public function test_printed_time_follows_the_user_zone_and_names_it(): void
+    {
+        $zones = $this->registerTimeReport();
+        $report = (object) ['app_id' => 'modul-uji-waktu', 'code' => 'modul-uji-waktu.cetak', 'app_name' => 'Modul uji waktu'];
+        $owner = $this->owner();
+        $owner->forceFill(['timezone' => 'Asia/Jakarta'])->save();
+
+        $data = app(SumberLaporan::class)->dataset($report, $this->membership->fresh() ?? $this->membership, null, null, []);
+
+        // Module menerima zona pengguna di konteks laporan, untuk "hari ini" miliknya sendiri.
+        $this->assertSame(['Asia/Jakarta', 'Asia/Jakarta'], $zones->getArrayCopy());
+        $this->assertSame('28/09/2026 00:30 WIB', $data->formats['dicetak_pada']->text($data->fields['dicetak_pada']));
+
+        $word = new PhpWord;
+        $section = $word->addSection();
+        $section->addText('Dicetak ${dicetak_pada}');
+        $table = $section->addTable();
+        $table->addRow();
+        $table->addCell(3000)->addText('${baris.dibuat}');
+        $table->addCell(2000)->addText('${baris.tanggal}');
+        $template = $this->temporaryPath('docx');
+        (new Word2007($word))->save($template);
+        $rendered = app(DocxTemplateRenderer::class)->render($template, $data);
+        $this->temporaryFiles[] = $rendered->localPath;
+        $text = $this->documentText($rendered->localPath);
+
+        $this->assertStringContainsString('Dicetak 28/09/2026 00:30 WIB', $text);
+        // Tanggal tanpa jam tidak punya zona, jadi tidak ikut bergeser ke tanggal 28.
+        $this->assertStringContainsString('28/09/2026 00:30 WIB27/09/2026', $text);
+    }
+
+    public function test_another_user_sees_the_same_instant_in_their_own_zone(): void
+    {
+        $this->registerTimeReport();
+        $report = (object) ['app_id' => 'modul-uji-waktu', 'code' => 'modul-uji-waktu.cetak', 'app_name' => 'Modul uji waktu'];
+        $colleague = User::factory()->create(['timezone' => 'Asia/Jayapura']);
+        $membership = TenantMembership::create(['tenant_id' => $this->tenantId(), 'user_id' => $colleague->id, 'status' => 'active']);
+
+        $data = app(SumberLaporan::class)->dataset($report, $membership, null, null, []);
+
+        $this->assertSame('28/09/2026 02:30 WIT', $data->formats['dicetak_pada']->text($data->fields['dicetak_pada']));
+    }
+
+    public function test_user_without_a_zone_prints_in_the_legal_entity_zone_even_on_the_worker(): void
+    {
+        $zones = $this->registerTimeReport();
+        $report = (object) ['app_id' => 'modul-uji-waktu', 'code' => 'modul-uji-waktu.cetak', 'app_name' => 'Modul uji waktu'];
+        $organization = Organization::create(['tenant_id' => $this->tenantId(), 'name' => 'PT Cabang Makassar', 'classification' => 'legal_entity', 'status' => 'active']);
+        $organization->legalEntity()->create(['tenant_id' => $this->tenantId(), 'company_code' => 'MKS', 'country_code' => 'ID', 'timezone' => 'Asia/Makassar']);
+
+        // Ekspor dikerjakan worker tanpa permintaan maupun sesi: entitas legalnya dari catatan ekspor.
+        $data = app(SumberLaporan::class)->dataset($report, $this->membership, (string) $organization->id, null, []);
+
+        $this->assertSame('Asia/Makassar', $zones->getArrayCopy()[0]);
+        $this->assertSame('28/09/2026 01:30 WITA', $data->formats['dicetak_pada']->text($data->fields['dicetak_pada']));
+    }
+
+    /**
+     * Laporan uji dengan satu waktu cetak dan satu baris: waktu dan tanggal yang sama-sama tanggal 27
+     * dalam UTC. Mengembalikan zona yang diterima module pada setiap panggilan.
+     *
+     * @return \ArrayObject<int, string>
+     */
+    private function registerTimeReport(): \ArrayObject
+    {
+        $zones = new \ArrayObject;
+        app(DaftarLaporan::class)->daftarkan(new class($zones) implements PenyediaLaporanModul
+        {
+            /** @param \ArrayObject<int, string> $zones */
+            public function __construct(private readonly \ArrayObject $zones) {}
+
+            public function idModule(): string
+            {
+                return 'modul-uji-waktu';
+            }
+
+            public function punya(string $kodeLaporan): bool
+            {
+                return $kodeLaporan === 'cetak';
+            }
+
+            public function catalog(): array
+            {
+                return [];
+            }
+
+            public function definisi(string $kodeLaporan, array $konteks): array
+            {
+                $this->zones[] = (string) $konteks['timezone'];
+
+                return ['fields' => [
+                    ['key' => 'dicetak_pada', 'label' => 'Dicetak', 'table' => null, 'type' => 'datetime'],
+                    ['key' => 'baris.dibuat', 'label' => 'Dibuat', 'table' => 'baris', 'type' => 'datetime'],
+                    ['key' => 'baris.tanggal', 'label' => 'Tanggal', 'table' => 'baris', 'type' => 'date'],
+                ], 'parameters' => []];
+            }
+
+            public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string
+            {
+                return '';
+            }
+
+            public function dataset(string $kodeLaporan, array $konteks, array $parameter): array
+            {
+                $this->zones[] = (string) $konteks['timezone'];
+
+                return [
+                    'fields' => ['dicetak_pada' => '2026-09-27T17:30:00Z'],
+                    'tables' => ['baris' => [['dibuat' => '2026-09-27 17:30:00', 'tanggal' => '2026-09-27']]],
+                    'file_name' => 'cetak',
+                ];
+            }
+        });
+
+        return $zones;
+    }
+
+    private function owner(): User
+    {
+        $owner = $this->membership->user;
+        $this->assertInstanceOf(User::class, $owner);
+
+        return $owner;
     }
 
     private function data(): ReportData
@@ -222,7 +353,7 @@ class ReportValueFormatsTest extends TestCase
             ]],
             'rekap',
             [],
-            app(ValueFormats::class)->forFields($this->tenantId(), self::FIELDS),
+            app(ValueFormats::class)->forFields($this->tenantId(), self::FIELDS, 'UTC'),
         );
     }
 

@@ -44,6 +44,7 @@ import { Head } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { toastSaveError } from '@/lib/core-api';
 import type {
     DefaultVersions,
@@ -60,7 +61,6 @@ import {
     setDefaultLayout,
     uploadLayout,
     formatBytes,
-    formatTime,
 } from '@/lib/reports';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -96,6 +96,7 @@ export default function ReportLayouts({
     reports,
     legalEntity,
 }: Props) {
+    const formatTime = useDateTimeFormat();
     const [code, setCode] = useState(reports[0]?.code ?? '');
     const [layouts, setLayouts] = useState<Layout[]>([]);
     const [defaultRef, setDefaultRef] = useState('');

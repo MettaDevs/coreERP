@@ -5,6 +5,7 @@ import { router } from '@inertiajs/react';
 import { Bell, Check, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { useNotifications } from '@/hooks/use-notifications';
 import {
     clearNotifications,
@@ -128,6 +129,8 @@ function BarisNotifikasi({
     onOpen: () => void;
     onRemove: () => void;
 }) {
+    const formatTime = useDateTimeFormat();
+
     return (
         <div
             className={cn(
@@ -160,7 +163,7 @@ function BarisNotifikasi({
                     </p>
                 )}
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                    {item.appName} · {waktuRelatif(item.createdAt)}
+                    {item.appName} · {waktuRelatif(item.createdAt, formatTime)}
                 </p>
             </button>
             <Button
@@ -176,7 +179,10 @@ function BarisNotifikasi({
     );
 }
 
-function waktuRelatif(iso: string): string {
+function waktuRelatif(
+    iso: string,
+    formatTime: ReturnType<typeof useDateTimeFormat>,
+): string {
     const selisih = Date.now() - Date.parse(iso);
 
     if (Number.isNaN(selisih)) {
@@ -199,8 +205,5 @@ function waktuRelatif(iso: string): string {
         return `${jam} jam lalu`;
     }
 
-    return new Date(iso).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-    });
+    return formatTime(iso, { day: 'numeric', month: 'short' });
 }

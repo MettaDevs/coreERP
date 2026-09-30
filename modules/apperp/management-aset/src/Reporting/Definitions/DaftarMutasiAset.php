@@ -91,7 +91,8 @@ final class DaftarMutasiAset implements ReportDefinition
 
         return [
             ...array_map(
-                static fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null],
+                static fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null]
+                    + ($key === 'dicetak_pada' ? ['type' => 'datetime'] : []),
                 array_keys($header),
                 $header,
             ),
@@ -159,7 +160,7 @@ final class DaftarMutasiAset implements ReportDefinition
                 'filter_dari' => $parameters['dari'] ?? '',
                 'filter_sampai' => $parameters['sampai'] ?? '',
                 'jumlah_baris' => $rows->count(),
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: [
                 'baris' => array_values($rows->map(fn (object $row): array => [
@@ -182,7 +183,7 @@ final class DaftarMutasiAset implements ReportDefinition
                     'keterangan' => $row->keterangan,
                 ])->all()),
             ],
-            fileName: 'daftar-mutasi-aset-'.now()->format('Ymd-Hi'),
+            fileName: 'daftar-mutasi-aset-'.$context->now()->format('Ymd-Hi'),
         );
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Modules;
 
 use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Support\UserClock;
 use Illuminate\Http\Request;
 use RuntimeException;
 
@@ -40,7 +41,10 @@ final class ModuleRequestContext implements KonteksPermintaan
 
     public const DATA_POLICIES = 'coreerp.data_policies';
 
-    public function __construct(private readonly Request $permintaan) {}
+    public function __construct(
+        private readonly Request $permintaan,
+        private readonly UserClock $clock,
+    ) {}
 
     public function penggunaId(): string
     {
@@ -96,5 +100,16 @@ final class ModuleRequestContext implements KonteksPermintaan
         }
 
         return $kebijakan;
+    }
+
+    /**
+     * Satu-satunya jawaban di kelas ini yang tidak dibaca dari atribut permintaan: zona waktu sudah
+     * punya penghitung sendiri, `UserClock`, yang juga dipakai layar dan cetakan. Menyalinnya ke
+     * atribut berarti dua sumber, dan menghitungnya di middleware berarti setiap rute module membayar
+     * query entitas legal walau tidak butuh "hari ini".
+     */
+    public function timezone(): string
+    {
+        return $this->clock->timezone($this->permintaan);
     }
 }

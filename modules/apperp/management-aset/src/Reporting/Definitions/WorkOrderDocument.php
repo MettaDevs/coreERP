@@ -22,6 +22,15 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  */
 final class WorkOrderDocument implements ReportDefinition
 {
+    /**
+     * Waktu yang tercatat sebagai kejadian, disimpan dalam UTC dan dikirim mentah: Core menulisnya
+     * menurut zona pengguna yang mencetak, beserta nama zonanya.
+     *
+     * Jadwal (`diharapkan_*`, `dijadwalkan_*`) sengaja tidak termasuk. Jam itu diketik pengguna di
+     * layar work order dan disimpan persis seperti diketik, tanpa zona, sehingga dicetak apa adanya.
+     */
+    private const DATETIME_FIELDS = ['dicetak_pada', 'aktual_mulai', 'aktual_selesai'];
+
     public function code(): string
     {
         return 'work-order';
@@ -172,12 +181,12 @@ final class WorkOrderDocument implements ReportDefinition
             'diharapkan_selesai' => $this->dateTime($wo->diharapkan_selesai),
             'dijadwalkan_mulai' => $this->dateTime($wo->dijadwalkan_mulai),
             'dijadwalkan_selesai' => $this->dateTime($wo->dijadwalkan_selesai),
-            'aktual_mulai' => $this->dateTime($wo->aktual_mulai),
-            'aktual_selesai' => $this->dateTime($wo->aktual_selesai),
+            'aktual_mulai' => $wo->aktual_mulai,
+            'aktual_selesai' => $wo->aktual_selesai,
             'jumlah_baris' => $lines->count(),
             'total_estimasi_jam' => $this->hours($lines->sum(fn (object $line): float => (float) ($line->estimasi_jam ?? 0))),
             'total_aktual_jam' => $this->hours($lines->sum(fn (object $line): float => (float) ($line->aktual_jam ?? 0))),
-            'dicetak_pada' => now()->format('d/m/Y H:i'),
+            'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
         ];
 
         return new ReportData(
@@ -220,12 +229,13 @@ final class WorkOrderDocument implements ReportDefinition
 
     /**
      * @param  array<string, string>  $labels
-     * @return list<array{key: string, label: string, table: ?string}>
+     * @return list<array{key: string, label: string, table: ?string, type?: string}>
      */
     private function describe(array $labels, ?string $table): array
     {
         return array_map(
-            fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => $table],
+            fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => $table]
+                + (in_array($key, self::DATETIME_FIELDS, true) ? ['type' => 'datetime'] : []),
             array_keys($labels),
             $labels,
         );
@@ -244,6 +254,7 @@ final class WorkOrderDocument implements ReportDefinition
         };
     }
 
+    /** Jadwal yang diketik pengguna, dicetak apa adanya; lihat {@see DATETIME_FIELDS}. */
     private function dateTime(?string $value): ?string
     {
         if ($value === null) {

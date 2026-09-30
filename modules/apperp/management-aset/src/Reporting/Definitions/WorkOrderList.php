@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
@@ -19,6 +20,15 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  */
 final class WorkOrderList implements ReportDefinition
 {
+    /**
+     * Waktu yang tercatat sebagai kejadian, disimpan dalam UTC dan dikirim mentah: Core menulisnya
+     * menurut zona pengguna yang mencetak, beserta nama zonanya.
+     *
+     * Jadwal (`diharapkan_*`, `dijadwalkan_*`) sengaja tidak termasuk. Jam itu diketik pengguna di
+     * layar work order dan disimpan persis seperti diketik, tanpa zona, sehingga dicetak apa adanya.
+     */
+    private const DATETIME_FIELDS = ['dicetak_pada', 'baris.aktual_mulai', 'baris.aktual_selesai', 'baris.dibuat_pada'];
+
     public function code(): string
     {
         return 'daftar-work-order';
@@ -82,8 +92,8 @@ final class WorkOrderList implements ReportDefinition
         ];
 
         return [
-            ...array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null], array_keys($header), $header),
-            ...array_map(fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => 'baris'], array_keys($rows), $rows),
+            ...array_map(fn (string $key, string $label): array => $this->field($key, $label, null), array_keys($header), $header),
+            ...array_map(fn (string $key, string $label): array => $this->field($key, $label, 'baris'), array_keys($rows), $rows),
         ];
     }
 
@@ -99,11 +109,14 @@ final class WorkOrderList implements ReportDefinition
         if (! empty($parameters['status'])) {
             $query->where('aset_tr_pemeliharaan_aset.status', $parameters['status']);
         }
+        // `created_at` tersimpan dalam UTC, sedangkan tanggal filter adalah tanggal pengguna. Batas harinya
+        // dihitung di zona pengguna lalu dijadikan UTC: work order yang dibuat pukul 00.30 WIB tanggal 2
+        // (17.30 UTC tanggal 1) ikut filter "dari tanggal 2".
         if (! empty($parameters['dari'])) {
-            $query->where('aset_tr_pemeliharaan_aset.created_at', '>=', $parameters['dari'].' 00:00:00');
+            $query->where('aset_tr_pemeliharaan_aset.created_at', '>=', $this->utc($parameters['dari'], $context, endOfDay: false));
         }
         if (! empty($parameters['sampai'])) {
-            $query->where('aset_tr_pemeliharaan_aset.created_at', '<=', $parameters['sampai'].' 23:59:59');
+            $query->where('aset_tr_pemeliharaan_aset.created_at', '<=', $this->utc($parameters['sampai'], $context, endOfDay: true));
         }
 
         // `toBase()` dipakai supaya barisnya tetap objek biasa, bukan model. Scope tenant sudah
@@ -125,7 +138,7 @@ final class WorkOrderList implements ReportDefinition
                 'filter_dari' => $parameters['dari'] ?? '',
                 'filter_sampai' => $parameters['sampai'] ?? '',
                 'jumlah_work_order' => $rows->count(),
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: [
                 'baris' => array_values($rows->map(fn (object $wo): array => [
@@ -140,12 +153,12 @@ final class WorkOrderList implements ReportDefinition
                     'diharapkan_mulai' => $this->dateTime($wo->diharapkan_mulai),
                     'dijadwalkan_mulai' => $this->dateTime($wo->dijadwalkan_mulai),
                     'dijadwalkan_selesai' => $this->dateTime($wo->dijadwalkan_selesai),
-                    'aktual_mulai' => $this->dateTime($wo->aktual_mulai),
-                    'aktual_selesai' => $this->dateTime($wo->aktual_selesai),
-                    'dibuat_pada' => $this->dateTime($wo->created_at),
+                    'aktual_mulai' => $wo->aktual_mulai,
+                    'aktual_selesai' => $wo->aktual_selesai,
+                    'dibuat_pada' => $wo->created_at,
                 ])->all()),
             ],
-            fileName: 'daftar-work-order-'.now()->format('Ymd-Hi'),
+            fileName: 'daftar-work-order-'.$context->now()->format('Ymd-Hi'),
         );
     }
 
@@ -168,6 +181,24 @@ final class WorkOrderList implements ReportDefinition
             ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'aset_tr_pemeliharaan_aset.id');
     }
 
+    /** @return array{key: string, label: string, table: ?string, type?: string} */
+    private function field(string $key, string $label, ?string $table): array
+    {
+        $field = ['key' => $key, 'label' => $label, 'table' => $table];
+
+        return in_array($key, self::DATETIME_FIELDS, true) ? $field + ['type' => 'datetime'] : $field;
+    }
+
+    /** Awal atau akhir tanggal `Y-m-d` menurut zona pengguna, sebagai waktu UTC `Y-m-d H:i:s`. */
+    private function utc(string $date, ReportContext $context, bool $endOfDay): string
+    {
+        $day = CarbonImmutable::createFromFormat('Y-m-d', $date, $context->timezone);
+        $day = $endOfDay ? $day->endOfDay() : $day->startOfDay();
+
+        return $day->utc()->format('Y-m-d H:i:s');
+    }
+
+    /** Jadwal yang diketik pengguna, dicetak apa adanya; lihat {@see DATETIME_FIELDS}. */
     private function dateTime(?string $value): ?string
     {
         if ($value === null) {

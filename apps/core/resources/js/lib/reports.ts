@@ -247,20 +247,3 @@ export function formatBytes(bytes: number | null): string {
 
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
-
-export function formatTime(value: string | null): string {
-    if (!value) {
-        return '—';
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}

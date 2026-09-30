@@ -10,6 +10,7 @@ use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use App\Support\Modules\PelaksanaTenant;
 use App\Support\Reporting\Rendering\RenderException;
+use App\Support\UserClock;
 use RuntimeException;
 use stdClass;
 use Throwable;
@@ -37,6 +38,7 @@ final class SumberLaporan
         private readonly DataPolicyAccessResolver $kebijakan,
         private readonly PelaksanaTenant $pelaksana,
         private readonly ValueFormats $formats,
+        private readonly UserClock $clock,
     ) {}
 
     /**
@@ -80,7 +82,7 @@ final class SumberLaporan
 
         [$isi, $formats] = $this->jalankan($report, $membership, fn (array $konteks): array => [
             $penyedia->dataset($kode, $konteks, $parameters),
-            $this->formats->forFields((string) $konteks['tenant_id'], $penyedia->definisi($kode, $konteks)['fields']),
+            $this->formats->forFields((string) $konteks['tenant_id'], $penyedia->definisi($kode, $konteks)['fields'], (string) $konteks['timezone']),
         ], $legalEntityId, $orgUnitId);
 
         return ReportData::fromArray($isi, $formats);
@@ -136,6 +138,9 @@ final class SumberLaporan
             'user_id' => (string) $membership->user_id,
             'permissions' => $this->apps->permissionsFor($membership, (string) $report->app_id),
             'data_policies' => $this->kebijakan->resolve($membership),
+            // Zona waktu pengguna yang meminta, untuk "hari ini" di module (periode bawaan, nama berkas)
+            // dan untuk waktu di cetakan. Dihitung di sini karena ekspor berjalan di worker tanpa sesi.
+            'timezone' => $this->clock->timezoneFor($membership->user, $legalEntityId),
         ];
 
         try {

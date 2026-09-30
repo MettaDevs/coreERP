@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from '@apperp/ui/avatar';
 import { Button } from '@apperp/ui/button';
 import { Spinner } from '@apperp/ui/spinner';
 import { useCallback, useEffect, useState } from 'react';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 
 /**
  * Satu entri log perubahan, seperti dipulangkan kontrak `ChangeHistory` Core.
@@ -35,11 +36,6 @@ type Group = {
     changeType: ChangeHistoryEntry['change_type'];
     entries: ChangeHistoryEntry[];
 };
-
-const WAKTU = new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
 
 /**
  * Entri yang lahir dari satu penyimpanan — pelaku, detik, dan jenis yang sama — digabung menjadi
@@ -93,12 +89,6 @@ function value(display: string | null, raw: string | null): string {
     }
 
     return raw === null || raw === '' ? 'kosong' : raw;
-}
-
-function formatTime(value: string): string {
-    const date = new Date(value);
-
-    return Number.isNaN(date.getTime()) ? value : WAKTU.format(date);
 }
 
 /** Satu baris rincian: pengarsipan dibaca sebagai tindakan, bukan sebagai perubahan tanggal. */
@@ -187,6 +177,7 @@ export function ChangeHistory({
 }: {
     load: (page: number) => Promise<ChangeHistoryPage>;
 }) {
+    const formatTime = useDateTimeFormat();
     const [entries, setEntries] = useState<ChangeHistoryEntry[]>([]);
     const [nextPage, setNextPage] = useState<number | null>(null);
     const [state, setState] = useState<'loading' | 'ready' | 'error'>(

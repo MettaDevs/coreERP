@@ -45,6 +45,7 @@ import { Download, FileUp, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
     apiJson,
     CoreApiError,
@@ -135,15 +136,6 @@ const FIELD_LABEL: Record<string, string> = {
     type: 'Jenis',
     active: 'Aktif',
 };
-
-function waktu(value: string | null): string {
-    return value
-        ? new Intl.DateTimeFormat('id-ID', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-          }).format(new Date(value))
-        : '—';
-}
 
 function nilai(value: unknown): string {
     if (typeof value === 'boolean') {
@@ -490,6 +482,7 @@ export default function FinanceAccounts({
     imports,
     header,
 }: Props) {
+    const formatDateTime = useDateTimeFormat();
     const [importing, setImporting] = useState(false);
     const scopeName = (id: string | null) =>
         id === null
@@ -708,7 +701,9 @@ export default function FinanceAccounts({
                                         {imports.map((record) => (
                                             <TableRow key={record.id}>
                                                 <TableCell>
-                                                    {waktu(record.created_at)}
+                                                    {formatDateTime(
+                                                        record.created_at,
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     {record.file_name}
