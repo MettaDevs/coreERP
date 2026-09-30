@@ -47,7 +47,13 @@ final class PdfConverter
                 ->attach('files', file_get_contents($source->localPath), 'dokumen.'.$source->format)
                 ->post($url.'/forms/libreoffice/convert');
         } catch (ConnectionException $exception) {
-            throw new RenderException('Layanan PDF tidak dapat dihubungi. Coba lagi beberapa saat, atau pilih format Word atau Excel.', previous: $exception);
+            // Batas waktu habis dan sambungan ditolak sama-sama keadaan layanannya, bukan isi dokumen.
+            throw RenderException::transient('Layanan PDF tidak dapat dihubungi. Coba lagi beberapa saat, atau pilih format Word atau Excel.', $exception);
+        }
+        // 5xx, 408, dan 429 berarti layanannya sedang tidak sanggup, bukan dokumennya salah; 4xx lainnya
+        // adalah penolakan atas dokumen itu sendiri dan akan terulang persis sama.
+        if ($response->serverError() || in_array($response->status(), [408, 429], true)) {
+            throw RenderException::transient('Layanan PDF sedang tidak dapat melayani. Coba lagi beberapa saat, atau pilih format Word atau Excel.');
         }
         if (! $response->successful()) {
             throw new RenderException('Layanan PDF menolak dokumen ('.$response->status().'). Periksa layout, lalu coba lagi.');
