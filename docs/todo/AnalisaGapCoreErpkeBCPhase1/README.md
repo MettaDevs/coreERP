@@ -670,7 +670,7 @@ yang jelas. Laporan tetap di server.
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
 | K-10 | Nilai bawaan zona waktu pengguna | **Diputuskan 28 Sep 2026:** setelan zona waktu entitas legal (nama zona IANA); pengguna yang belum mengisi ikut entitas legal aktif |
 | K-14 | Masa simpan minimum dan bawaan retensi | **Diputuskan 29 Sep 2026:** ikut pola BC. Bawaan sama dengan perilaku hari ini, dibaca dari config. Audit number sequence min. 365 hari, pool terkonfirmasi min. 7, hasil ekspor min. 1, entri log tabel yang selalu dicatat min. 365 dan entri lain min. 28 (keduanya mati bawaannya), catatan penerapan retensi bawaan 365 min. 28 |
-| K-15 | Layar setelan retensi | **Diputuskan 30 Sep 2026:** Pengaturan → Retensi data, dengan permission `core.retention.read` dan `core.retention.update` |
+| K-15 | Layar setelan retensi | **Diputuskan 30 Sep 2026:** Pengaturan → Retensi data, dengan permission `core.retention.read` dan `core.retention.update` di duty sendiri, `core.retention.inquire` dan `core.retention.manage`, bukan di duty riwayat perubahan: peran yang sudah memegang duty itu tidak diam-diam mendapat hak menghapus log. Owner memegang keduanya |
 | K-16 | Catatan hasil penerapan | **Diputuskan 30 Sep 2026:** tabel tenant `retention_policy_log_entries`, tampil di layar yang sama, dan ikut diretensi |
 
 ## Sumber {#sumber}
