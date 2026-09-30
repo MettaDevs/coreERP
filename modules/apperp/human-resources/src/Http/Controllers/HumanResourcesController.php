@@ -2,10 +2,14 @@
 
 namespace Modules\Apperp\HumanResources\Http\Controllers;
 
+use App\Support\Modules\Contracts\RowVersion;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Modules\Apperp\HumanResources\Models\Job;
 use Modules\Apperp\HumanResources\Models\Position;
 use Modules\Apperp\HumanResources\Models\Worker;
@@ -28,6 +32,8 @@ use Modules\Apperp\HumanResources\Services\PenerbitNomorHr;
  */
 final class HumanResourcesController extends Controller
 {
+    private const ACCOUNT_TAKEN = 'Akun pengguna ini sudah tertaut ke pekerja lain. Lepas dulu tautannya di pekerja itu.';
+
     public function operatingUnits(Request $request, DirektoriHr $core): JsonResponse
     {
         $this->requirePermission($request, 'positions', 'read');
@@ -37,36 +43,89 @@ final class HumanResourcesController extends Controller
         ]);
     }
 
+    /**
+     * Anggota tenant untuk ditautkan ke pekerja: dicari lewat `q`, atau dicocokkan persis lewat `email` untuk
+     * usulan tautan (TODO analisa gap BC 9.1; lewat API saja, K-23). Setiap anggota membawa `linked_worker_id`,
+     * pekerja yang sudah memegang akun itu, supaya layar bisa melewatkannya tanpa menampilkan pekerja yang
+     * mungkin di luar lingkup pengguna.
+     */
     public function coreMembers(Request $request, DirektoriHr $core): JsonResponse
     {
         $this->requirePermission($request, 'core-account-link', 'invoke');
-        $query = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $query = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'string', 'max:255'],
+        ]);
+        $tenantId = $this->tenantId($request);
+
+        $members = isset($query['email'])
+            ? $core->membersWithEmail($tenantId, $query['email'])
+            : $core->members($tenantId, $query['q'] ?? '');
+        $linked = Worker::query()
+            ->whereIn('core_membership_id', array_column($members, 'membership_id'))
+            ->pluck('id', 'core_membership_id');
 
         return response()->json([
-            'data' => $core->members($this->tenantId($request), $query['q'] ?? ''),
+            'data' => array_map(fn (array $member): array => [
+                ...$member,
+                'linked_worker_id' => $linked[$member['membership_id']] ?? null,
+            ], $members),
         ]);
     }
 
-    public function workers(Request $request): JsonResponse
+    /**
+     * Pekerja yang boleh dilihat, masing-masing dengan `account`: nama dan email akun pengguna yang tertaut,
+     * supaya layar tidak menampilkan id keanggotaan. `null` bila belum tertaut atau keanggotaannya tidak aktif.
+     */
+    public function workers(Request $request, DirektoriHr $core): JsonResponse
     {
         $this->requirePermission($request, 'workers', 'read');
 
-        $query = Worker::query()->orderBy('name');
+        $workers = $this->visibleWorkers($request)->orderBy('name')->get();
+        $accounts = $core->membersById(
+            $this->tenantId($request),
+            array_values($workers->pluck('core_membership_id')->filter()->map(fn (mixed $id): string => (string) $id)->unique()->all()),
+        );
 
-        // Pengguna tanpa akses seluruh organisasi hanya melihat pekerja yang **sedang**
-        // memegang posisi di unit kerjanya. Penugasan yang sudah berakhir tidak dihitung, dan
-        // itu disengaja: yang ditanyakan layar ini adalah siapa yang menjadi tanggung
-        // jawabnya hari ini, bukan siapa yang pernah.
-        if (! $this->hasTenantWideScope($request)) {
-            $query->whereHas('assignments', function (Builder $assignment) use ($request): void {
-                $assignment
-                    ->whereDate('valid_from', '<=', today())
-                    ->where(fn (Builder $dates) => $dates->whereNull('valid_until')->orWhereDate('valid_until', '>=', today()))
-                    ->whereHas('position', fn (Builder $position) => $position->whereIn('operating_unit_id', $this->operatingUnitIds($request)));
-            });
+        return response()->json([
+            'data' => $workers->map(fn (Worker $worker): array => [
+                ...$worker->toArray(),
+                'account' => $accounts[(string) $worker->core_membership_id] ?? null,
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * Menautkan atau melepas akun pengguna seorang pekerja (TODO analisa gap BC 9.1).
+     *
+     * Module ini tidak punya permission ubah pekerja; yang boleh menambah pekerja dan menautkan akun
+     * (`workers.create` dan `core-account-link.invoke`, sama dengan saat pekerja dibuat) yang boleh mengubah
+     * tautannya, untuk pekerja yang juga boleh ia lihat. Penyimpanannya memakai versi baris seperti penulisan
+     * lain: tautan yang diubah orang lain sejak form dibuka ditolak 409.
+     */
+    public function linkWorkerAccount(Request $request, DirektoriHr $core, string $worker): JsonResponse
+    {
+        $this->requirePermission($request, 'workers', 'create');
+        $this->requirePermission($request, 'core-account-link', 'invoke');
+        $expected = RowVersion::expected($request);
+        $data = $request->validate(['core_membership_id' => ['present', 'nullable', 'ulid']]);
+        $record = $this->visibleWorkers($request)->whereKey($worker)->first();
+        abort_if($record === null, 404);
+
+        $tenantId = $this->tenantId($request);
+        $membershipId = $data['core_membership_id'] ?? null;
+        $account = null;
+        if ($membershipId !== null) {
+            $account = $this->assertAccountLinkable($core, $tenantId, $membershipId, $record->id);
         }
 
-        return response()->json(['data' => $query->get()]);
+        $this->saveAccountLink(function () use ($record, $expected, $membershipId): void {
+            RowVersion::claim($record, $expected);
+            $record->core_membership_id = $membershipId;
+            $record->save();
+        });
+
+        return response()->json(['data' => [...$record->refresh()->toArray(), 'account' => $account]]);
     }
 
     public function jobs(Request $request): JsonResponse
@@ -123,7 +182,6 @@ final class HumanResourcesController extends Controller
 
         if ($data['core_membership_id'] ?? null) {
             $this->requirePermission($request, 'core-account-link', 'invoke');
-            $core->member($tenantId, $data['core_membership_id']);
         }
         abort_if(! $this->hasTenantWideScope($request), 403, 'Pekerja tanpa posisi hanya dapat dibuat oleh pengguna dengan akses seluruh organisasi.');
 
@@ -134,7 +192,11 @@ final class HumanResourcesController extends Controller
             return response()->json(['data' => $existing]);
         }
 
-        $worker = DB::transaction(fn (): Worker => Worker::query()->create([
+        if ($data['core_membership_id'] ?? null) {
+            $this->assertAccountLinkable($core, $tenantId, $data['core_membership_id'], null);
+        }
+
+        $worker = $this->saveAccountLink(fn (): Worker => Worker::query()->create([
             'creation_key' => $idempotencyKey,
             'personnel_number' => $numbers->issue('human-resources.pekerja', $tenantId, 'worker:'.$idempotencyKey),
             ...$data,
@@ -252,6 +314,79 @@ final class HumanResourcesController extends Controller
     private function tenantId(Request $request): string
     {
         return (string) $request->attributes->get('coreerp.tenant_id');
+    }
+
+    /**
+     * Pekerja yang boleh dilihat pengguna.
+     *
+     * Pengguna tanpa akses seluruh organisasi hanya melihat pekerja yang **sedang** memegang posisi di unit
+     * kerjanya. Penugasan yang sudah berakhir tidak dihitung, dan itu disengaja: yang ditanyakan adalah siapa
+     * yang menjadi tanggung jawabnya hari ini, bukan siapa yang pernah.
+     *
+     * @return Builder<Worker>
+     */
+    private function visibleWorkers(Request $request): Builder
+    {
+        $query = Worker::query();
+
+        if (! $this->hasTenantWideScope($request)) {
+            $query->whereHas('assignments', function (Builder $assignment) use ($request): void {
+                $assignment
+                    ->whereDate('valid_from', '<=', today())
+                    ->where(fn (Builder $dates) => $dates->whereNull('valid_until')->orWhereDate('valid_until', '>=', today()))
+                    ->whereHas('position', fn (Builder $position) => $position->whereIn('operating_unit_id', $this->operatingUnitIds($request)));
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Akun yang ditautkan harus keanggotaan tenant ini, dan belum dipegang pekerja lain yang belum diarsipkan
+     * (B-9). Keanggotaan tenant lain dijawab sama dengan keanggotaan yang tidak ada. Memulangkan akunnya.
+     *
+     * @return array{membership_id: string, name: string, email: string}
+     */
+    private function assertAccountLinkable(DirektoriHr $core, string $tenantId, string $membershipId, ?string $workerId): array
+    {
+        $account = $core->member($tenantId, $membershipId);
+        if ($account === null) {
+            throw ValidationException::withMessages(['core_membership_id' => 'Akun pengguna ini tidak ditemukan di organisasi Anda.']);
+        }
+
+        $taken = Worker::query()
+            ->where('core_membership_id', $membershipId)
+            ->when($workerId !== null, fn (Builder $query) => $query->whereKeyNot($workerId))
+            ->exists();
+        if ($taken) {
+            throw ValidationException::withMessages(['core_membership_id' => self::ACCOUNT_TAKEN]);
+        }
+
+        return $account;
+    }
+
+    /**
+     * Menjalankan penyimpanan tautan di dalam transaksinya sendiri. Dua penyimpanan bersamaan yang sama-sama
+     * lolos pemeriksaan di atas tertahan indeks unik parsial, dan yang kalah dijawab 422 seperti pemeriksaan
+     * biasa, bukan 500. Ditangkap di luar transaksi: PostgreSQL membatalkan seluruh transaksi yang
+     * pernyataannya gagal.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $save
+     * @return T
+     */
+    private function saveAccountLink(Closure $save): mixed
+    {
+        try {
+            return DB::transaction($save);
+        } catch (UniqueConstraintViolationException $exception) {
+            if (! str_contains($exception->getMessage(), 'hr_workers_core_membership_active_unique')) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages(['core_membership_id' => self::ACCOUNT_TAKEN]);
+        }
     }
 
     private function requirePermission(Request $request, string $resource, string $action): void

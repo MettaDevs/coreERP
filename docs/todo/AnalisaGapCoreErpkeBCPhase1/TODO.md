@@ -221,17 +221,17 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 - [ ] 8.4 Opsional: ekspor baris yang sedang tampil di tabel dari frontend, dengan batas baris. Tidak
       dibangun di area ini.
 
-### 9. [ ] Tautan pengguna ke pekerja HR (gap 3)
+### 9. [x] Tautan pengguna ke pekerja HR (gap 3)
 
-**Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** form pekerja HR
-mengusulkan keanggotaan yang cocok, pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
+**Tempat:** module HR dan layar pengguna di Core · **Setelah:** — · **Selesai bila:** API pekerja HR
+mengusulkan keanggotaan yang cocok (tanpa layar HR, K-23), pekerja yang tertaut tampil di layar pengguna, dan test B-9 lulus.
 
 Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
 
-- [ ] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email di form pekerja HR.
-- [ ] 9.2 Pekerja yang tertaut tampil di layar pengguna.
-- [ ] 9.3 Catatan di backlog HR: tautan pekerja ke template jam kerja dibuat saat absensi atau
-      timesheet dibangun.
+- [x] 9.1 Usulan tautan pekerja ke keanggotaan berdasarkan kecocokan email, lewat API saja
+      (`GET core-members?email=`, `PATCH workers/{worker}/core-membership`); module HR belum punya layar
+      (K-23).
+- [x] 9.2 Pekerja yang tertaut tampil di layar pengguna.
 
 ---
 
@@ -263,5 +263,5 @@ Rujukan: [README: Gap 3](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-3).
       sungguhan: gangguan sesaat tiga kali berakhir gagal tanpa percobaan keempat, gangguan yang pulih
       berakhir selesai, penolakan layout dan data terlalu besar gagal pada percobaan pertama, dan baris
       yang ditinggal worker mati diambil alih setelah sewanya habis.
-- [ ] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
+- [x] **B-9** (area 9) Usulan tautan hanya menawarkan keanggotaan tenant yang sama. Satu keanggotaan
       tidak bisa tertaut ke dua pekerja.

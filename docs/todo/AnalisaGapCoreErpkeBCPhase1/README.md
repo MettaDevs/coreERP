@@ -425,7 +425,7 @@ Bagaimana setiap pengguna punya entri di HR, padahal akunnya datang dari SSO?
 bila perlu. Akunnya dari identitas luar, dan tautannya ke orang dibuat terpisah.
 
 **CoreERP sudah memakai bentuk itu.** `hr_workers.core_membership_id` menunjuk keanggotaan tenant
-(pengguna SSO di tenant itu), boleh kosong, dan unik per tenant. Alasannya tertulis di
+(pengguna SSO di tenant itu), boleh kosong, dan unik per tenant di antara pekerja yang belum diarsipkan. Alasannya tertulis di
 `modules/apperp/human-resources/src/Models/Worker.php`: pekerja yang tidak pernah membuka aplikasi tetap
 harus tercatat, dan menuntut akun untuk setiap orang akan menyamakan daftar pekerja dengan daftar
 pengguna. Tautannya dipilih admin HR di form pekerja dan divalidasi ke Core
@@ -440,6 +440,31 @@ legal entity, tetapi belum ditautkan ke siapa pun. Di BC, kalender dasar ditautk
 lokasi, sedangkan kapasitas orang diatur di resource, oleh bagian yang membutuhkannya. Tautan pekerja →
 template jam kerja karena itu milik module HR, dibuat saat absensi atau timesheet dibangun, bukan di
 tabel pengguna Core.
+
+### Yang sudah dibangun (area 9)
+
+- **Tautan lewat API saja (K-23).** Module HR belum punya layar; menu Pekerja tetap halaman pengganti
+  "Layar ini belum dipindah". Usulan dan penyimpanan tautan tersedia untuk layar yang kelak dibangun dan
+  untuk pemanggil API.
+- **Usulan tautan dari email.** `GET /api/modules/human-resources/v1/core-members?email=` memulangkan akun
+  tenant yang sama yang emailnya sama persis dengan email pekerja (tanpa membedakan huruf besar). Setiap akun
+  membawa `linked_worker_id`, sehingga akun yang sudah dipegang pekerja lain bisa dilewatkan. Yang
+  memutuskan tetap pengguna. `GET workers` kini ikut membawa nama dan email akun yang tertaut (`account`).
+- **Satu akun, satu pekerja.** `hr_workers_core_membership_active_unique` menggantikan indeks unik lama,
+  kini parsial untuk pekerja yang belum diarsipkan. Controller menolaknya lebih dulu dengan 422, dan
+  penyimpanan bersamaan yang lolos pemeriksaan tertahan indeks yang sama, juga dijawab 422.
+- **Menautkan dan melepas** lewat `PATCH /api/modules/human-resources/v1/workers/{worker}/core-membership`
+  dengan versi baris (area 3), memakai hak yang sudah ada: `human-resources.workers.create` dan
+  `human-resources.core-account-link.invoke`, untuk pekerja yang boleh dilihat pengguna. Akun tenant lain
+  ditolak 422; sebelumnya akun yang tidak ditemukan saat menambah pekerja berakhir 500.
+- **Pekerja di layar anggota Core.** Kolom **Pekerja** di Identity & access → Anggota menampilkan nama dan
+  nomor pegawai. Core bertanya lewat kontrak baru `LinkedWorkerResolvers`
+  (`apps/core/app/Support/Modules/Contracts/`), yang diisi module HR; hanya module yang terpasang untuk
+  tenant itu yang ditanya, dan kolomnya tidak tampil bila tidak ada.
+
+Tidak ada kolom baru, jadi klasifikasi data (area 5) tidak berubah: `core_membership_id` sudah
+diklasifikasi `EndUserPseudonymousIdentifiers`. Test-nya di
+`modules/apperp/human-resources/tests/Feature/PenyaringanTenantTest.php`.
 
 ## Gap 4: retensi data log {#gap-4}
 
@@ -856,6 +881,7 @@ Yang tidak dibangun:
 | K-20 | Hak melampiri record tanpa permission ubah | **Diputuskan 30 Sep 2026:** `hr_workers` dan `aset_tr_dokumen_siklus_aset` memakai permission `create` resource-nya yang sudah ada (`human-resources.workers.create`, `management-aset.<jenis dokumen>.create`) sebagai hak mengubah, termasuk melampirkan dan mengarsipkan lampiran. Tidak ada kode permission baru |
 | K-21 | Permission ubah permintaan pembelian aset | **Diputuskan 30 Sep 2026:** `management-aset.permintaan-pembelian-aset.update` (akses `update`, entry point API permintaan) dideklarasikan di manifest, masuk privilege `management-aset.permintaan-pembelian-aset.maintain` di duty `management-aset.permintaan-pembelian-aset.manage`. Controller-nya sudah memeriksa permission itu sejak lahir |
 | K-22 | Batas unggah lampiran | **Diputuskan 30 Sep 2026:** 10 MB (`COREERP_ATTACHMENT_MAX_KB` bawaan 10240), jenis PDF, JPG/JPEG, PNG, DOCX, XLSX. Image Core menyetel `upload_max_filesize` 10M dan `post_max_size` 12M |
+| K-23 | Layar tautan pekerja HR | **Diputuskan 30 Sep 2026:** module HR belum punya layar; tautan pekerja lewat API saja, fokus module aset. Menu Pekerja tetap halaman pengganti; kolom Pekerja di layar anggota Core tetap ada |
 
 ## Sumber {#sumber}
 

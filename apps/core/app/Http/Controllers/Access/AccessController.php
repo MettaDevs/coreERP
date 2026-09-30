@@ -12,6 +12,7 @@ use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\TenantProducts;
+use App\Support\Modules\Contracts\LinkedWorkerResolvers;
 use App\Support\Sso\TenantSso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -27,16 +28,25 @@ class AccessController extends Controller
         $tenantId = $membership->tenant_id;
         $entitledAppIds = TenantProducts::appIds($tenantId);
         $mayManage = $membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE);
+        $members = TenantMembership::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['user:id,name,email,last_login_at', 'roleAssignments.role:id,name', 'roleAssignments.dataPolicyScopes.policy'])
+            ->orderBy('created_at')
+            ->get();
+        // Pekerja yang tertaut dibaca dari module pemilik data pekerja lewat kontrak, bukan dari tabelnya
+        // (TODO analisa gap BC 9.2). Satu pertanyaan untuk seluruh anggota, tidak per baris.
+        $linkedWorkers = app(LinkedWorkerResolvers::class);
+        $workersAvailable = $linkedWorkers->availableFor($tenantId);
+        $workers = $workersAvailable
+            ? $linkedWorkers->forMemberships($tenantId, array_values($members->pluck('id')->map(fn (mixed $id): string => (string) $id)->all()))
+            : [];
 
         return Inertia::render('settings/access', [
             'canManage' => $mayManage,
             'tenant' => $membership->tenant->only(['id', 'name']),
-            'members' => TenantMembership::query()
-                ->where('tenant_id', $tenantId)
-                ->with(['user:id,name,email,last_login_at', 'roleAssignments.role:id,name', 'roleAssignments.dataPolicyScopes.policy'])
-                ->orderBy('created_at')
-                ->get()
-                ->map(function (TenantMembership $member) use ($mayManage): array {
+            'workersAvailable' => $workersAvailable,
+            'members' => $members
+                ->map(function (TenantMembership $member) use ($mayManage, $workers): array {
                     $assignments = $member->roleAssignments->where('status', 'active');
 
                     return [
@@ -46,6 +56,7 @@ class AccessController extends Controller
                         'email' => $member->user->email,
                         'status' => $member->status,
                         'last_login_at' => $member->user->last_login_at,
+                        'worker' => $workers[(string) $member->id] ?? null,
                         'roles' => $assignments->map(fn (RoleAssignment $assignment) => $assignment->role->name)->values(),
                         'role_ids' => $assignments->pluck('role_id')->values(),
                         'assignments' => $assignments->map(fn (RoleAssignment $assignment) => [

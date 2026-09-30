@@ -150,6 +150,8 @@ type Member = {
     assignments: Assignment[];
     can_edit_access: boolean;
     version: number;
+    /** Pekerja di aplikasi tenaga kerja yang tertaut ke akun ini, bila ada. */
+    worker: { name: string; personnel_number: string } | null;
 };
 type Invitation = {
     id: string;
@@ -179,6 +181,8 @@ type Props = {
     newInvitationCodes: string[];
     /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
     ssoAvailable: boolean;
+    /** Aplikasi yang mencatat pekerja terpasang, sehingga kolom pekerja punya arti. */
+    workersAvailable: boolean;
     /*
      * Dua prop berikut dikirim `Inertia::defer()`: ia **tidak ada** pada respons pertama dan
      * tiba pada permintaan susulan yang dikirim Inertia sendiri sesudah halaman tercat.
@@ -1970,6 +1974,7 @@ export default function Access({
     invitations = [],
     newInvitationCodes = [],
     ssoAvailable = false,
+    workersAvailable,
 }: Props) {
     const url = usePage().url;
     const queryString = url.includes('?') ? url.split('?')[1] : '';
@@ -2016,6 +2021,30 @@ export default function Access({
             header: 'Security role',
             cell: (member) => member.roles.join(', ') || '—',
         },
+        ...(workersAvailable
+            ? [
+                  {
+                      id: 'worker',
+                      header: 'Pekerja',
+                      cell: (member) =>
+                          member.worker ? (
+                              <div className="flex min-w-0 flex-col">
+                                  <span className="truncate text-sm text-foreground">
+                                      {member.worker.name}
+                                  </span>
+                                  <span className="truncate text-xs text-muted-foreground">
+                                      {member.worker.personnel_number}
+                                  </span>
+                              </div>
+                          ) : (
+                              <span className="text-muted-foreground">
+                                  Belum tertaut
+                              </span>
+                          ),
+                      sortValue: (member) => member.worker?.name ?? '',
+                  } satisfies DataTableColumn<Member>,
+              ]
+            : []),
         {
             id: 'actions',
             header: 'Aksi',

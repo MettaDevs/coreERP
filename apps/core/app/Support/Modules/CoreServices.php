@@ -17,6 +17,7 @@ use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\ReportFormatterCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\Access\LinkedWorkerResolverRegistry;
 use App\Support\Attachments\AttachmentRecordTypeRegistry;
 use App\Support\ChangeLog\ChangeLogValueResolverRegistry;
 use App\Support\Finance\PostingAccountResolverRegistry;
@@ -31,6 +32,7 @@ use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\KonteksPermintaan;
 use App\Support\Modules\Contracts\KonteksTenant;
+use App\Support\Modules\Contracts\LinkedWorkerResolvers;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
@@ -119,6 +121,8 @@ final class CoreServices
         ChangeLogValueResolvers::class => ChangeLogValueResolverRegistry::class,
         // Lampiran dokumen: pemilik tabel menjawab hak atas record induknya dengan aturannya sendiri.
         AttachmentRecordTypes::class => AttachmentRecordTypeRegistry::class,
+        // Layar anggota: module pemilik data pekerja menjawab pekerja yang tertaut ke keanggotaan tenant.
+        LinkedWorkerResolvers::class => LinkedWorkerResolverRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void

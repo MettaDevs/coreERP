@@ -3,7 +3,6 @@
 namespace Modules\Apperp\HumanResources\Services;
 
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
-use RuntimeException;
 
 /**
  * Anggota dan unit kerja tenant lewat kontrak Core, bukan lewat HTTP.
@@ -81,22 +80,65 @@ final class DirektoriHr
     }
 
     /**
-     * Satu anggota, dipakai untuk memastikan keanggotaan yang ditautkan memang ada.
+     * Anggota aktif tenant yang emailnya sama persis dengan email pekerja, tanpa membedakan huruf besar
+     * (TODO analisa gap BC 9.1). Dipakai sebagai usulan tautan pekerja; yang memutuskan tetap
+     * pengguna. Hanya anggota tenant itu yang bisa muncul, karena kontrak Core menyaring per tenant.
      *
-     * Melempar bila tidak ada, sama seperti klien lama: yang memanggilnya sedang memvalidasi
-     * masukan pengguna, dan anggota yang tidak ditemukan berarti masukannya tidak sah.
-     *
-     * @return array{membership_id: string, name: string, email: string}
+     * @return list<array{membership_id: string, name: string, email: string}>
      */
-    public function member(string $tenantId, string $membershipId): array
+    public function membersWithEmail(string $tenantId, string $email): array
+    {
+        $dicari = mb_strtolower(trim($email));
+        if ($dicari === '') {
+            return [];
+        }
+
+        $hasil = [];
+        foreach ($this->direktori->anggota($tenantId) as $anggota) {
+            if (mb_strtolower(trim($anggota['email'])) === $dicari) {
+                $hasil[] = $this->bentukAnggota($anggota);
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Anggota aktif tenant berkunci id keanggotaan, untuk menampilkan nama akun yang tertaut di daftar pekerja.
+     * Keanggotaan yang tidak aktif lagi tidak ikut.
+     *
+     * @param  list<string>  $membershipIds
+     * @return array<string, array{membership_id: string, name: string, email: string}>
+     */
+    public function membersById(string $tenantId, array $membershipIds): array
+    {
+        if ($membershipIds === []) {
+            return [];
+        }
+
+        $dicari = array_flip($membershipIds);
+        $hasil = [];
+        foreach ($this->direktori->anggota($tenantId) as $anggota) {
+            if (isset($dicari[$anggota['id']])) {
+                $hasil[$anggota['id']] = $this->bentukAnggota($anggota);
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Satu anggota tenant, dipakai untuk memastikan keanggotaan yang ditautkan memang milik tenant ini.
+     * `null` bila tidak ada, termasuk keanggotaan milik tenant lain: yang memanggilnya sedang memvalidasi
+     * masukan pengguna, dan jawabannya galat isian, bukan kegagalan server.
+     *
+     * @return array{membership_id: string, name: string, email: string}|null
+     */
+    public function member(string $tenantId, string $membershipId): ?array
     {
         $anggota = $this->direktori->anggotaSatu($tenantId, $membershipId);
 
-        if ($anggota === null) {
-            throw new RuntimeException('Anggota Core tidak tersedia.');
-        }
-
-        return $this->bentukAnggota($anggota);
+        return $anggota === null ? null : $this->bentukAnggota($anggota);
     }
 
     /**

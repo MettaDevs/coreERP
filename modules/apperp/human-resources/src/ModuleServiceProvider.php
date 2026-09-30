@@ -6,8 +6,10 @@ namespace Modules\Apperp\HumanResources;
 
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
+use App\Support\Modules\Contracts\LinkedWorkerResolvers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\HumanResources\Services\LinkedWorkers;
 use Modules\Apperp\HumanResources\Services\WorkerAttachments;
 use Modules\Apperp\HumanResources\Services\WorkerChangeLogValues;
 
@@ -32,6 +34,9 @@ final class ModuleServiceProvider extends ServiceProvider
 
         // Lampiran dokumen di Core (gap 7): pekerja. Core menanyakan hak atas pekerjanya ke sini.
         $this->app->make(AttachmentRecordTypes::class)->register(new WorkerAttachments);
+
+        // Layar anggota Core menampilkan pekerja yang tertaut ke akun pengguna, lewat kontrak (gap 3).
+        $this->app->make(LinkedWorkerResolvers::class)->register(new LinkedWorkers);
 
         $this->app->booted(function (): void {
             // Grup `web` diperlukan, bukan pilihan gaya: konteks module dibaca dari sesi Core,
