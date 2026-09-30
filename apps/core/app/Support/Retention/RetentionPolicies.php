@@ -22,7 +22,7 @@ final class RetentionPolicies
                 365, 'coreerp.audit_retention_days', tenantVia: 'sequence_id',
             ),
             new RetentionPolicy(
-                'number_sequence_confirmed_pool', 'Nomor berurutan yang sudah terpakai', 'number_sequence_continuous_pool', 'updated_at',
+                'number_sequence_confirmed_pool', 'Cadangan nomor berurutan yang sudah dipakai (nomor yang sudah terbit tidak pernah diulang)', 'number_sequence_continuous_pool', 'updated_at',
                 7, 'coreerp.confirmed_pool_retention_days', tenantVia: 'sequence_id',
                 filters: [['column' => 'status', 'values' => ['confirmed']]],
             ),
