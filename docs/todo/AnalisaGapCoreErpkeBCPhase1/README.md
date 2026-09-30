@@ -256,13 +256,15 @@ Yang belum:
   relasi yang disunting dari dua arah (jenis aset ↔ jenis pekerjaan: sisi seberang ikut dinaikkan versinya).
   Kontrol dokumen aset yang dulu menulis penolakannya sendiri beralih ke helper ini.
 - **Skenario load test aset** membaca dan mengirim versi; di profil perlombaan 409 adalah hasil sah.
+- **Load test lulus** (30 September 2026): penjenuhan 1000 VU dan perlombaan koreksi tanpa pelanggaran,
+  kedua `verify.sql` bernilai 0, dan biaya trigger versi tidak terukur di atas selisih antar-run. Rinciannya
+  di `apps/core/loadtest/README.md`.
 
 Yang belum tercakup:
 
 - Satu penyimpanan biasanya menaikkan versi dua kali (klaim, lalu penulisan sesungguhnya). Angkanya tidak
   bermakna selain "berbeda"; klien memakai versi dari jawaban terakhir.
 - `PUT validasi-status-work-order` dan parameter workflow tidak punya baris induk untuk diklaim.
-- Suite penuh dan load test belum dijalankan ulang sesudah seluruh perubahan (butir 3.6).
 
 ## Gap 3: zona waktu, tanggal kerja, dan pengguna ke pekerja HR {#gap-3}
 
