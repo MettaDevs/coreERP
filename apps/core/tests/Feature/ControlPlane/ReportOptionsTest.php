@@ -81,6 +81,39 @@ class ReportOptionsTest extends TestCase
         $this->actingAs($other)->getJson($base.'/options')->assertOk()->assertJsonPath('data.last_used', null);
     }
 
+    public function test_additional_column_filters_are_kept_nested_and_malformed_keys_are_dropped(): void
+    {
+        // Laporan penyusutan menawarkan filter tambahan pada kolom aset (K-30), jadi `filters` ikut parameternya.
+        $base = '/api/v1/reports/management-aset.laporan-penyusutan-aset';
+        $this->actingAs($this->owner)->getJson($base.'/fields')->assertOk()
+            ->assertJsonPath('meta.data_items.0.key', 'aset')
+            ->assertJsonPath('meta.data_items.0.default_fields', ['kode']);
+
+        $this->actingAs($this->owner)->putJson($base.'/options/last-used', ['parameters' => [
+            'periode' => '2026-09',
+            'filters' => [
+                'aset' => ['acquisition_value' => ' >1.000.000 ', 'lokasi_aset_id' => ['a', '', 'a', 'b'], 'serial_number' => ''],
+                'Bukan Kunci' => ['kode' => 'x'],
+                'baris' => 'bukan daftar',
+            ],
+        ]])->assertNoContent();
+        // JSONB menyimpan kunci dalam urutannya sendiri; yang dibandingkan isinya.
+        $this->assertEquals([
+            'periode' => '2026-09',
+            'filters' => ['aset' => ['acquisition_value' => '>1.000.000', 'lokasi_aset_id' => ['a', 'b']]],
+        ], $this->actingAs($this->owner)->getJson($base.'/options')->assertOk()->json('data.last_used.parameters'));
+
+        // `@` di dalam filter tambahan adalah "tidak peka huruf besar" milik sintaks BC, bukan token tanggal.
+        $this->actingAs($this->owner)->putJson($base.'/options/last-used', ['parameters' => [
+            'periode' => '2026-09',
+            'filters' => ['aset' => ['acquisition_value' => '>1.000.000', 'lokasi_aset_id' => ['a', 'b'], 'nama' => '@laptop*']],
+        ]])->assertNoContent();
+        $this->assertEquals([
+            'periode' => '2026-09',
+            'filters' => ['aset' => ['acquisition_value' => '>1.000.000', 'lokasi_aset_id' => ['a', 'b'], 'nama' => '@laptop*']],
+        ], $this->actingAs($this->owner)->getJson($base.'/options')->assertOk()->json('data.last_used.parameters'));
+    }
+
     public function test_private_presets_stay_with_their_owner_and_shared_presets_reach_everyone_allowed_to_run_the_report(): void
     {
         $base = '/api/v1/reports/'.self::REPORT;
