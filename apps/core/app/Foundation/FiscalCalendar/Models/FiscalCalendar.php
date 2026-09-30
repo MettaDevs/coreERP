@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Foundation\FiscalCalendar\Models;
 
+use App\Models\Tenant;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Actions\FiscalCalendar;
+namespace App\Foundation\FiscalCalendar\Actions;
 
-use App\Models\FiscalCalendar;
-use App\Models\FiscalPeriod;
-use App\Models\FiscalYear;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
+use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
+use App\Foundation\FiscalCalendar\Models\FiscalYear;
 use App\Models\LegalEntity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;

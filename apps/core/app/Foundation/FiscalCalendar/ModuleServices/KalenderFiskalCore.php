@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Modules;
+namespace App\Foundation\FiscalCalendar\ModuleServices;
 
-use App\Models\FiscalPeriod;
+use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
 use App\Models\LegalEntity;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use Illuminate\Validation\ValidationException;

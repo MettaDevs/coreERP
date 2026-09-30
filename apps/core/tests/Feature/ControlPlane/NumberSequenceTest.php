@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\NumberSequence\NumberSequenceService;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Models\AppServiceCredential;
-use App\Models\FiscalCalendar;
 use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantMembership;

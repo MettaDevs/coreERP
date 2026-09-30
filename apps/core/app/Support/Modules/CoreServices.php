@@ -6,11 +6,11 @@ namespace App\Support\Modules;
 
 use App\Foundation\Vendor\ModuleServices\DaftarVendorCore;
 use App\Foundation\Currency\ModuleServices\PresisiMataUangCore;
+use App\Foundation\FiscalCalendar\ModuleServices\KalenderFiskalCore;
 use App\Foundation\UnitOfMeasure\ModuleServices\DaftarSatuanCore;
 use App\Services\Modules\ChangeHistoryCore;
 use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
-use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;

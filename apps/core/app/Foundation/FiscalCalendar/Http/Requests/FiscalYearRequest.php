@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\FiscalCalendar;
+namespace App\Foundation\FiscalCalendar\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 

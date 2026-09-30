@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\FiscalCalendar;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Models\AppServiceCredential;
-use App\Models\FiscalCalendar;
 use App\Models\ModuleInstallation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;

@@ -1,9 +1,9 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\FiscalCalendar;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
-use App\Models\FiscalCalendar;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Models\LegalEntity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

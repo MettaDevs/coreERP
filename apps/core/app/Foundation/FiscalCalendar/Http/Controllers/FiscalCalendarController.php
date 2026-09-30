@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\FiscalCalendar;
+namespace App\Foundation\FiscalCalendar\Http\Controllers;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Http\Requests\FiscalCalendarRequest;
+use App\Foundation\FiscalCalendar\Http\Requests\FiscalYearRequest;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
+use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
+use App\Foundation\FiscalCalendar\Models\FiscalYear;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\FiscalCalendar\FiscalCalendarRequest;
-use App\Http\Requests\FiscalCalendar\FiscalYearRequest;
-use App\Models\FiscalCalendar;
-use App\Models\FiscalPeriod;
-use App\Models\FiscalYear;
 use App\Models\LegalEntity;
 use App\Models\Organization;
 use App\Support\Modules\Contracts\RowVersion;
@@ -76,7 +76,7 @@ class FiscalCalendarController extends Controller
             return response()->json(['data' => ['calendars' => $calendars, 'legal_entities' => $legalEntities]]);
         }
 
-        return Inertia::render('settings/fiscal-calendars', [
+        return Inertia::render('foundation/fiscal-calendar/fiscal-calendars', [
             'canManage' => $request->user()->can('manage-number-sequences'),
             'calendars' => $calendars,
             'legalEntities' => $legalEntities,

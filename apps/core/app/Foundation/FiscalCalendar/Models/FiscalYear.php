@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Models;
+namespace App\Foundation\FiscalCalendar\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -16,24 +17,29 @@ use Illuminate\Support\Carbon;
  * @property Carbon $starts_on
  * @property Carbon $ends_on
  */
-class FiscalPeriod extends Model
+class FiscalYear extends Model
 {
     use HasUlids;
 
-    protected $fillable = ['fiscal_year_id', 'ordinal', 'name', 'starts_on', 'ends_on'];
+    protected $fillable = ['fiscal_calendar_id', 'name', 'starts_on', 'ends_on'];
 
     protected function casts(): array
     {
         return [
-            'ordinal' => 'integer',
             'starts_on' => 'date',
             'ends_on' => 'date',
         ];
     }
 
-    /** @return BelongsTo<FiscalYear, $this> */
-    public function year(): BelongsTo
+    /** @return BelongsTo<FiscalCalendar, $this> */
+    public function calendar(): BelongsTo
     {
-        return $this->belongsTo(FiscalYear::class, 'fiscal_year_id');
+        return $this->belongsTo(FiscalCalendar::class, 'fiscal_calendar_id');
+    }
+
+    /** @return HasMany<FiscalPeriod, $this> */
+    public function periods(): HasMany
+    {
+        return $this->hasMany(FiscalPeriod::class);
     }
 }

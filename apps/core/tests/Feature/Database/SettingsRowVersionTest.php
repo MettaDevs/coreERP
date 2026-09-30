@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
-use App\Models\FiscalCalendar;
+use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;

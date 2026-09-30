@@ -2,7 +2,7 @@
 
 namespace App\Actions\NumberSequence;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
 use App\Models\LegalEntity;
 use App\Models\NumberSequenceAllocation;
 use App\Models\NumberSequenceCounter;

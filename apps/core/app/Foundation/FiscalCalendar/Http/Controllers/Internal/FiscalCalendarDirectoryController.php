@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Internal;
+namespace App\Foundation\FiscalCalendar\Http\Controllers\Internal;
 
-use App\Actions\FiscalCalendar\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
+use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
 use App\Http\Controllers\Controller;
-use App\Models\FiscalPeriod;
 use App\Models\LegalEntity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
