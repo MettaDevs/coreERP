@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\AddressBook;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

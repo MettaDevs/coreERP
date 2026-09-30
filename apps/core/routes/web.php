@@ -1,5 +1,7 @@
 <?php
 
+use App\Foundation\AddressBook\Http\Controllers\OrganizationContactController;
+use App\Foundation\AddressBook\Http\Controllers\OrganizationLocationController;
 use App\Foundation\Geography\Http\Controllers\AddressSetupController;
 use App\Foundation\Vendor\Http\Controllers\VendorController;
 use App\Http\Controllers\Access\AccessController;
@@ -21,8 +23,6 @@ use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\Finance\IntegrationClientController;
 use App\Http\Controllers\Finance\ReferenceAccountController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
-use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
-use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
 use App\Http\Controllers\NumberSequence\NumberSequenceController;
 use App\Http\Controllers\Onboarding\BusinessRegistrationController;
 use App\Http\Controllers\Onboarding\InvitationLandingController;
@@ -184,7 +184,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
     Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
     Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
-    Route::inertia('settings/global-address-book', 'settings/global-address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::inertia('settings/global-address-book', 'foundation/address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));

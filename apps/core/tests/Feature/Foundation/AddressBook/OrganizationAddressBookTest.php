@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\AddressBook;
 
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;

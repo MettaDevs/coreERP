@@ -3,12 +3,12 @@ import { Button } from '@apperp/ui/button';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { AddressSection } from '@/components/global-address-book/address-section';
-import { ContactInformationSection } from '@/components/global-address-book/contact-information-section';
-import { OrganizationForm } from '@/components/global-address-book/organization-form';
-import { PersonForm } from '@/components/global-address-book/person-form';
-import { RelationshipSection } from '@/components/global-address-book/relationship-section';
-import { RolesSection } from '@/components/global-address-book/roles-section';
+import { AddressSection } from './components/address-section';
+import { ContactInformationSection } from './components/contact-information-section';
+import { OrganizationForm } from './components/organization-form';
+import { PersonForm } from './components/person-form';
+import { RelationshipSection } from './components/relationship-section';
+import { RolesSection } from './components/roles-section';
 import type {
     PartyType,
     AddressItem,

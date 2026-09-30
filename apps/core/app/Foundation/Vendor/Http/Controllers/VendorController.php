@@ -2,12 +2,12 @@
 
 namespace App\Foundation\Vendor\Http\Controllers;
 
+use App\Foundation\AddressBook\Models\Party;
 use App\Foundation\Vendor\Actions\SaveVendor;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
 use App\Models\NumberSequenceReference;
 use App\Models\Organization;
-use App\Models\Party;
 use App\Models\TenantMembership;
 use App\Models\TenantNumberSequence;
 use App\Support\Access\CoreSecurityCatalog;

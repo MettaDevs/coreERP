@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Foundation\Geography;
 
+use App\Foundation\AddressBook\Models\Location;
+use App\Foundation\AddressBook\Models\Party;
+use App\Foundation\AddressBook\Models\PartyLocation;
+use App\Foundation\AddressBook\Models\PostalAddress;
 use App\Foundation\Geography\Models\AddressHierarchy\Province;
 use App\Foundation\Geography\Models\CountryRegion;
 use App\Models\Client;
-use App\Models\Location;
-use App\Models\Party;
-use App\Models\PartyLocation;
-use App\Models\PostalAddress;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;

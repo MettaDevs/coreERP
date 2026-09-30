@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Foundation\AddressBook\Models;
 
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;

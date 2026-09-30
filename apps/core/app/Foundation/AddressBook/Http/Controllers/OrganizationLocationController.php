@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\GlobalAddressBook;
+namespace App\Foundation\AddressBook\Http\Controllers;
 
+use App\Foundation\AddressBook\Models\LocationPurpose;
+use App\Foundation\AddressBook\Support\OrganizationAddressBook;
 use App\Foundation\Geography\Models\CountryRegion;
 use App\Http\Controllers\Controller;
-use App\Models\LocationPurpose;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
-use App\Support\AddressBook\OrganizationAddressBook;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

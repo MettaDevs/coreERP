@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Foundation\AddressBook\Models\Party;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;

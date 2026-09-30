@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Foundation\Vendor\Actions;
 
 use App\Actions\NumberSequence\NumberSequenceService;
+use App\Foundation\AddressBook\Models\Party;
+use App\Foundation\AddressBook\Models\PartyRoleRegistration;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Models\Organization;
-use App\Models\Party;
-use App\Models\PartyRoleRegistration;
 use App\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\CoreNumberSequences;

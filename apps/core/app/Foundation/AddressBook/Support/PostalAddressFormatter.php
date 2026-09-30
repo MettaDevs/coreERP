@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\AddressBook;
+namespace App\Foundation\AddressBook\Support;
 
 use App\Foundation\Geography\Models\CountryRegion;
 

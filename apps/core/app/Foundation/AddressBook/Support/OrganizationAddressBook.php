@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Support\AddressBook;
+namespace App\Foundation\AddressBook\Support;
 
-use App\Models\ElectronicAddress;
-use App\Models\Location;
-use App\Models\LocationPurpose;
+use App\Foundation\AddressBook\Models\ElectronicAddress;
+use App\Foundation\AddressBook\Models\Location;
+use App\Foundation\AddressBook\Models\LocationPurpose;
+use App\Foundation\AddressBook\Models\Party;
+use App\Foundation\AddressBook\Models\PartyLocation;
+use App\Foundation\AddressBook\Models\PartyLocationPurpose;
+use App\Foundation\AddressBook\Models\PostalAddress;
 use App\Models\Organization;
 use App\Models\OrganizationParty;
-use App\Models\Party;
-use App\Models\PartyLocation;
-use App\Models\PartyLocationPurpose;
-use App\Models\PostalAddress;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
