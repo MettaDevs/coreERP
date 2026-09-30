@@ -72,7 +72,7 @@ Role tidak mempunyai `module_id` dan tidak dimiliki department. App mendaftarkan
 
 Layar setup Core ikut rantai yang sama sebagai app `core`. Katalognya ditulis migration, bukan manifest —
 migration Core juga dijalankan admin.erp tanpa kelas aplikasi, jadi isinya berdiri di migration itu sendiri, sedangkan
-kode permission yang dipakai kode aplikasi ada di `CoreSecurityCatalog`. Delapan kelompok layar punya satu entry point `form` dan dua duty,
+kode permission yang dipakai kode aplikasi ada di `CoreSecurityCatalog`. Sepuluh kelompok layar punya satu entry point `form` dan dua duty,
 padanan duty *Inquire* dan *Maintain* di Dynamics 365:
 
 | Kelompok | Duty Lihat (`read`) | Duty Kelola (`read` + `update`) |
@@ -85,6 +85,8 @@ padanan duty *Inquire* dan *Maintain* di Dynamics 365:
 | Workflow | `core.workflow.inquire` | `core.workflow.manage` |
 | Setup finance | `core.finance-setup.inquire` | `core.finance-setup.manage` |
 | Vendor | `core.vendor.inquire` | `core.vendor.manage` |
+| Riwayat perubahan | `core.change-log.inquire` | `core.change-log.manage` |
+| Retensi data | `core.retention.inquire` | `core.retention.manage` |
 
 Pantau posting finance memisahkan tindak lanjutnya: `core.finance-posting.inquire` hanya melihat, sedangkan
 `core.finance-posting.follow-up` menambah Validasi ulang dan Tandai manual (permission `core.finance-posting.process`,
@@ -200,6 +202,25 @@ Satu worker dapat mempunyai beberapa position aktif. Satu position hanya mempuny
 Contoh kerja pada dua business unit adalah satu worker dengan dua position assignment efektif: `Petugas Aset — Negarow` berada pada business unit Negarow dan `Petugas Aset — Denpasar` berada pada business unit Denpasar. Kedua assignment mempunyai tanggal mulai/akhir masing-masing. Posisi adalah fakta HR; scope data dan role tetap dihitung terpisah dari seluruh assignment aktif.
 
 Automatic assignment rule dapat menghubungkan position atau business data dengan security role. Berakhirnya position assignment harus menghitung ulang role otomatis tanpa mencabut assignment manual yang tidak terkait.
+
+### Tautan pekerja ke akun pengguna
+
+Pekerja bukan pengguna, dan tidak setiap pengguna adalah pekerja. Tautan keduanya — padanan *associate
+user with person* di F&O dan `User Setup` → `Employee No.` di Business Central — disimpan module HR pada
+`hr_workers.core_membership_id`, bukan di Core.
+
+- **Satu akun, satu pekerja.** Indeks unik parsial `hr_workers_core_membership_active_unique` hanya
+  menghitung pekerja yang belum diarsipkan, sehingga akun pekerja yang diarsipkan dapat ditautkan ke
+  penggantinya. Controller menolaknya lebih dulu dengan 422; penyimpanan bersamaan yang lolos pemeriksaan
+  tertahan indeks yang sama.
+- **Usulan, bukan tautan otomatis.** Module HR mengusulkan akun tenant yang emailnya sama dengan email
+  pekerja; yang memutuskan tetap pengguna. Menautkan dan melepas memakai versi baris.
+- **Core membaca lewat kontrak.** Layar anggota di Pengaturan → Akses menampilkan kolom Pekerja dengan
+  bertanya ke `LinkedWorkerResolver` milik module yang terpasang untuk tenant itu, tanpa membaca tabel
+  module.
+
+Sampai module HR punya layar, tautan ini hanya tersedia lewat API module HR (keputusan K-23 di
+[analisa gap BC](/todo/AnalisaGapCoreErpkeBCPhase1/)).
 
 ## Temporary access dan segregation of duties
 
