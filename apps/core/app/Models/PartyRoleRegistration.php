@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * ini hanya membuat pertanyaan "pemasok ini pelanggan kita juga?" dapat dijawab
  * tanpa query lintas database app.
  */
+#[DataClassification(DataClass::CustomerContent)]
 class PartyRoleRegistration extends Model
 {
     use HasUlids;

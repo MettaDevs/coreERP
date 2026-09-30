@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $amount_decimals
  * @property int $unit_amount_decimals
  */
+#[DataClassification(DataClass::CustomerContent)]
 class CurrencyPrecision extends Model
 {
     use HasUlids;

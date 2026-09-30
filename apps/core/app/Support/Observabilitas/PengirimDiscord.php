@@ -19,7 +19,14 @@ use Throwable;
  * **Sebutan harus berada di `content`, tidak boleh di dalam embed.** Discord hanya menerbitkan
  * notifikasi untuk sebutan yang muncul di `content`; yang ditulis di dalam embed tetap tampil
  * biru dan tetap bisa diklik, tetapi tidak pernah membunyikan apa pun. Ini satu-satunya alasan
- * pesan di sini terbelah dua — ringkasan di `content`, laporan utuh di embed.
+ * pesan di sini terbelah dua — ringkasan di `content`, rinciannya di embed.
+ *
+ * **Isinya hanya data teknis, bukan laporan utuh (K-18).** Discord layanan pihak ketiga, jadi yang
+ * dikirim hanya kelas exception, method dan nama rute, status, `tenant_id`, id laporan, dan tautan ke
+ * SigNoz. Pesan exception, SQL beserta nilainya, nama tenant, nama pengguna, alamat IP, dan user agent
+ * tidak ikut: semuanya bisa memuat data pribadi. Laporan utuh tetap ada di berkas log dan SigNoz, yang
+ * berjalan di server kita sendiri; tautannya membawa pembaca ke sana. Ini menyimpang dari BC, yang
+ * hanya mengirim data `SystemMetadata` ke telemetri mana pun, karena SigNoz bukan pihak ketiga.
  *
  * **Tidak ada jalur yang boleh melempar,** aturan yang sama dengan seluruh isi folder ini.
  * Discord yang mati, webhook yang dicabut, atau jaringan yang diblokir tidak boleh menjadi
@@ -35,13 +42,27 @@ use Throwable;
  */
 final class PengirimDiscord
 {
-    /** Batas Discord untuk `content` adalah 2000 karakter, untuk `description` embed 4096. */
+    /** Batas Discord untuk `content` adalah 2000 karakter. */
     private const BATAS_CONTENT = 1900;
-
-    private const BATAS_EMBED = 3800;
 
     /** Merah, menyamai warna yang dipakai Discord sendiri untuk kegagalan. */
     private const WARNA_MERAH = 0xED4245;
+
+    /**
+     * Atribut laporan yang boleh sampai ke Discord (K-18), beserta labelnya. Ini daftar izin, bukan
+     * daftar larangan: atribut baru di {@see LaporanKesalahan} tidak ikut terkirim sebelum ditambahkan
+     * di sini, dan hanya data teknis yang boleh ditambahkan.
+     */
+    private const ATRIBUT_TERKIRIM = [
+        'exception.type' => 'kesalahan',
+        'coreerp.sumber_kesalahan' => 'sumber',
+        'http.request.method' => 'method',
+        'http.route' => 'rute',
+        'http.response.status_code' => 'status',
+        'coreerp.tenant_id' => 'tenant',
+        'coreerp.laporan_id' => 'laporan',
+        'trace_id' => 'jejak',
+    ];
 
     public static function kirim(LaporanKesalahan $laporan): void
     {
@@ -90,66 +111,61 @@ final class PengirimDiscord
         $tautan = self::tautanSigNoz($atribut);
 
         return [
-            'content' => self::potong(trim($sebutan.' '.self::bersihkan($laporan->ringkasan())), self::BATAS_CONTENT),
+            'content' => self::potong(trim($sebutan.' '.self::ringkasan($atribut)), self::BATAS_CONTENT),
             // Tanpa blok ini `@everyone` di dalam `content` tetap tercetak tetapi tidak
             // membunyikan notifikasi: Discord menuntut izin itu dinyatakan, bukan disimpulkan
-            // dari isi pesan. Dinyatakan eksplisit juga berarti pesan kesalahan yang kebetulan
-            // memuat "@everyone" — misalnya karena ikut terbawa dari data pengguna — tidak
-            // bisa menyulut sebutan yang tidak diniatkan.
+            // dari isi pesan. Dinyatakan eksplisit juga berarti teks lain di pesan yang
+            // kebetulan memuat "@everyone" tidak bisa menyulut sebutan yang tidak diniatkan.
             'allowed_mentions' => self::izinSebutan($sebutan),
             'embeds' => [array_filter([
                 'title' => self::potong((string) ($atribut['exception.type'] ?? 'Kesalahan'), 250),
                 'url' => $tautan,
-                'description' => self::badan($laporan, $tautan),
+                'description' => self::badan($atribut, $tautan),
                 'color' => self::WARNA_MERAH,
             ], static fn (mixed $nilai): bool => $nilai !== null)],
         ];
     }
 
     /**
-     * Badan pesan: laporan di dalam blok kode, disusul tautan ke SigNoz.
+     * Ringkasan satu baris untuk `content`: kelas exception dan tempat kejadiannya, tanpa pesannya.
      *
-     * **Blok kodenya bukan hiasan.** Tanpa itu Discord membaca `#`, `*`, dan `_` di dalam
-     * pesan driver sebagai markdown, dan SQL yang gagal berubah bentuk persis ketika ia paling
-     * perlu dibaca apa adanya.
-     *
-     * **Tautannya berada di luar blok kode** karena di dalamnya ia tidak bisa diklik.
+     * @param  array<string, scalar|null>  $atribut
      */
-    private static function badan(LaporanKesalahan $laporan, ?string $tautan): string
+    private static function ringkasan(array $atribut): string
     {
-        $ekor = $tautan !== null ? "\n".self::ekorTautan($laporan->keAtribut(), $tautan) : '';
-        $ruang = self::BATAS_EMBED - mb_strlen($ekor);
-        $teks = self::bersihkan($laporan->keTeks());
+        $tempat = ($atribut['coreerp.sumber_kesalahan'] ?? null) === 'http'
+            ? trim(((string) ($atribut['http.request.method'] ?? '')).' '.((string) ($atribut['http.route'] ?? '-')))
+            : (string) ($atribut['coreerp.sumber_kesalahan'] ?? '-');
 
-        if (mb_strlen($teks) > $ruang) {
-            // Dipotong tanpa penanda "(dipotong)". Yang dibutuhkan orang yang membaca ini
-            // bukan pemberitahuan bahwa ada yang hilang — ia sudah bisa melihatnya — melainkan
-            // jalan menuju yang utuh. Itu tugas tautannya.
-            $teks = mb_substr($teks, 0, $ruang);
-
-            if ($ekor === '') {
-                $ekor = "\n(laporan utuh ada di berkas log)";
-                $teks = mb_substr($teks, 0, $ruang - mb_strlen($ekor));
-            }
-        }
-
-        return "```\n".$teks."\n```".$ekor;
+        return ((string) ($atribut['exception.type'] ?? 'Kesalahan')).' @ '.$tempat;
     }
 
     /**
-     * Membuang hal-hal yang berguna di berkas tetapi menjadi sampah di Discord.
+     * Badan pesan: atribut teknis di dalam blok kode, disusul tautan ke SigNoz.
      *
-     * Garis pemisah menandai batas antar laporan pada berkas yang ditulis sambung-menyambung;
-     * satu pesan Discord sudah menjadi batasnya sendiri, jadi di sini garis itu hanya
-     * menghabiskan tempat. Penanda `(dipotong)` juga dibuang: di berkas ia jujur, di sini ia
-     * digantikan tautan yang membawa orang ke isi yang lengkap.
+     * **Blok kodenya bukan hiasan.** Tanpa itu Discord membaca `_` di nama rute dan kelas sebagai
+     * markdown.
+     *
+     * **Tautannya berada di luar blok kode** karena di dalamnya ia tidak bisa diklik. Tanpa alamat
+     * SigNoz, pembaca diarahkan ke berkas log dengan id laporannya.
+     *
+     * @param  array<string, scalar|null>  $atribut
      */
-    private static function bersihkan(string $teks): string
+    private static function badan(array $atribut, ?string $tautan): string
     {
-        $teks = (string) preg_replace('/ … \(dipotong\)/u', '…', $teks);
-        $teks = (string) preg_replace('/^[─-]{3,}\R?/mu', '', $teks);
+        $baris = [];
+        foreach (self::ATRIBUT_TERKIRIM as $kunci => $label) {
+            $nilai = $atribut[$kunci] ?? null;
+            if ($nilai !== null && $nilai !== '') {
+                $baris[] = sprintf('%-9s: %s', $label, self::potong((string) $nilai, 200));
+            }
+        }
 
-        return trim((string) preg_replace('/\R{3,}/u', "\n\n", $teks));
+        $ekor = $tautan !== null
+            ? "\n".self::ekorTautan($atribut, $tautan)
+            : "\n(laporan utuh ada di berkas log)";
+
+        return "```\n".implode("\n", $baris)."\n```".$ekor;
     }
 
     /**

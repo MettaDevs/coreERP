@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -44,10 +46,16 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class Aset extends Model
 {
     use HasUlids, SoftDeletes;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama' => DataClass::CustomerContent,
+    ];
 
     protected $table = 'aset_tr_aset';
 

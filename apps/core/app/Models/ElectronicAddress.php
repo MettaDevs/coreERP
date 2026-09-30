@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,9 +21,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $is_primary
  * @property int $version
  */
+#[DataClassification(DataClass::CustomerContent)]
 class ElectronicAddress extends Model
 {
     use HasUlids, SoftDeletes;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'value' => DataClass::EndUserIdentifiableInformation,
+    ];
 
     public const TYPES = ['email', 'phone', 'whatsapp', 'fax', 'url'];
 

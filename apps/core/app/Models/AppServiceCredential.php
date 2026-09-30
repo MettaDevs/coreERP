@@ -2,13 +2,23 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[DataClassification(DataClass::SystemMetadata)]
 class AppServiceCredential extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::SystemMetadata,
+        'secret_hash' => DataClass::AccountData,
+        'token_digest' => DataClass::AccountData,
+    ];
 
     protected $fillable = ['app_id', 'tenant_id', 'name', 'secret_hash', 'token_digest', 'status', 'last_used_at'];
 

@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\HumanResources\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -25,10 +27,16 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
+#[DataClassification(DataClass::CustomerContent)]
 class Job extends Model
 {
     use HasUlids, SoftDeletes;
     use MilikTenant;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
 
     protected $table = 'hr_jobs';
 

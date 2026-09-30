@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 
+#[DataClassification(DataClass::AccountData)]
 class TenantAppEntitlement extends Model
 {
     protected $table = 'tenant_app_entitlements';

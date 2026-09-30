@@ -2,6 +2,8 @@
 
 namespace App\Models\ReferenceData\AddressHierarchy;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -22,9 +24,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Village|null $village
  * @property-read Collection<int, LandPlot> $landPlots
  */
+#[DataClassification(DataClass::CustomerContent)]
 final class GroupOfHouses extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'name' => DataClass::CustomerContent,
+    ];
 
     protected $table = 'ref_group_of_houses';
 

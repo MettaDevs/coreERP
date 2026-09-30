@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Modules\Contracts\DataClass;
+use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -30,9 +32,19 @@ use Illuminate\Support\Facades\Crypt;
  * @property-read Collection<int, Role> $roles
  * @property int $version
  */
+#[DataClassification(DataClass::AccountData)]
 class InvitationCode extends Model
 {
     use HasUlids;
+
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'created_by' => DataClass::EndUserPseudonymousIdentifiers,
+        'sso_subject' => DataClass::EndUserPseudonymousIdentifiers,
+        'sso_email_at_invite' => DataClass::EndUserIdentifiableInformation,
+        'sso_name_at_invite' => DataClass::EndUserIdentifiableInformation,
+        'sso_redeemed_by' => DataClass::EndUserPseudonymousIdentifiers,
+    ];
 
     protected $fillable = [
         'tenant_id',
