@@ -857,8 +857,8 @@ Rinciannya di [Dokumen cetak, layout, dan ekspor](/dev/23-document-rendering#ops
 - **Preset (K-25).** `report_presets`: preset pribadi dibuat, dipilih, dan diarsipkan dari baris filter
   laporan, dengan versi baris dan pilihan tanggal relatif (hari ini, bulan ini, bulan lalu, tahun ini,
   tahun lalu) yang diterjemahkan Core menurut zona pengguna. Preset bersama terlihat oleh semua yang
-  boleh menjalankan laporannya, dengan nama pembuatnya; membuat dan mengubahnya menunggu keputusan
-  permission (lihat usulan di bawah).
+  boleh menjalankan laporannya, dengan nama pembuatnya; membuat, mengubah, dan mengarsipkannya hanya
+  untuk pemegang duty `core.report-preset.manage`.
 - **Excel (data saja) (K-26).** Pilihan di dialog cetak untuk setiap laporan; `report_exports.kind = data`,
   ditulis OpenSpout per baris dengan sel bertipe.
 - **Ekspor daftar di layar (K-27, 8.4).** Kontrak `ListExportSource`/`ListExportSources`, rute
@@ -868,12 +868,13 @@ Rinciannya di [Dokumen cetak, layout, dan ekspor](/dev/23-document-rendering#ops
 - **Filter master pilihan banyak (K-28)** di laporan penyusutan, penjualan, dan pemusnahan aset, termasuk
   filter lokasi dan kondisi yang baru, dengan nama pilihan di kepala laporan dan layout bawaannya.
 
-Usulan permission preset bersama (belum dibuat, menunggu keputusan): entry point `core.report-preset.form`,
-permission `core.report-preset.create`, `core.report-preset.update`, dan `core.report-preset.delete` pada
-preset bersama, satu privilege `core.report-preset.maintain`, duty `core.report-preset.manage`, dipegang
-Owner. Membaca preset bersama tetap mengikuti hak menjalankan laporannya. Alternatif yang lebih kecil:
-memakai `core.report-layout.update` (pengelola layout laporan), dengan akibat hak mengganti kop surat
-dan hak membagi preset tidak dapat diberikan terpisah.
+Permission preset bersama (keputusan pemilik 1 Okt 2026, role tersendiri per tenant): entry point
+`core.report-preset.form`, satu permission `core.report-preset.update` (tingkat `update` di layar Core
+mencakup membuat dan mengarsipkan), privilege `core.report-preset.maintain`, dan duty
+`core.report-preset.manage` yang dipegang Owner dan dapat diberikan ke role lain. Membaca preset bersama
+tetap mengikuti hak menjalankan laporannya, jadi tidak ada duty Lihat. Sama dengan BC: Report Settings
+dijaga izin tabel `Object Options` sendiri, bukan izin layout. Layout bawaan laporan (output) tetap milik
+module dan dirilis developer; layout tenant tetap `core.report-layout.update`.
 
 Yang tidak dibangun:
 
@@ -920,7 +921,7 @@ Yang tidak dibangun:
 | K-22 | Batas unggah lampiran | **Diputuskan 30 Sep 2026:** 10 MB (`COREERP_ATTACHMENT_MAX_KB` bawaan 10240), jenis PDF, JPG/JPEG, PNG, DOCX, XLSX. Image Core menyetel `upload_max_filesize` 10M dan `post_max_size` 12M |
 | K-23 | Layar tautan pekerja HR | **Diputuskan 30 Sep 2026:** module HR belum punya layar; tautan pekerja lewat API saja, fokus module aset. Menu Pekerja tetap halaman pengganti; kolom Pekerja di layar anggota Core tetap ada |
 | K-24 | Opsi terakhir per pengguna per laporan | **Diputuskan 1 Okt 2026:** filter dan opsi terakhir tiap pengguna untuk tiap laporan disimpan Core (`report_last_used_options`, dibatasi tenant) dan menjadi isian awal halaman filter dan dialog cetak, seperti "Last used options and filters" BC |
-| K-25 | Preset laporan bernama | **Diputuskan 1 Okt 2026:** preset opsi dan filter bernama per laporan, pribadi atau dibagi ke tenant, dengan token tanggal relatif (bulan ini, bulan lalu, tahun ini, dan sejenisnya) yang diterjemahkan menurut zona pengguna saat dipakai; simpan memakai versi baris. Preset pribadi tidak butuh permission selain hak menjalankan laporan. **Siapa yang boleh membuat dan mengubah preset bersama menunggu keputusan permission**; sampai itu, preset bersama hanya dapat dibaca |
+| K-25 | Preset laporan bernama | **Diputuskan 1 Okt 2026:** preset opsi dan filter bernama per laporan, pribadi atau dibagi ke tenant, dengan token tanggal relatif (bulan ini, bulan lalu, tahun ini, dan sejenisnya) yang diterjemahkan menurut zona pengguna saat dipakai; simpan memakai versi baris. Preset pribadi tidak butuh permission selain hak menjalankan laporan. Preset bersama dibuat, diubah, dan diarsipkan pemegang duty `core.report-preset.manage` (dipegang Owner, dapat diberikan ke role lain), terpisah dari izin layout |
 | K-26 | Excel (data saja) | **Diputuskan 1 Okt 2026:** setiap laporan dapat diekspor sebagai dataset mentah ke xlsx bertipe lewat `ValueFormat`, tanpa layout atau template, melalui antrean ekspor latar yang sama |
 | K-27 | Ekspor daftar di layar (8.4) | **Diputuskan 1 Okt 2026:** daftar yang tampil (kolom, urutan, judul, filter, dan urutan baris; semua baris yang cocok) diekspor lewat antrean ekspor server yang sama, tampil di tray dan ikut masa simpan, dibaca bertahap dengan penulis xlsx streaming; xlsx bertipe sampai batas lembar Excel, CSV sesudahnya. Tanpa template. Pilot register aset lewat mekanisme bersama: module pemilik daftar memenuhinya lewat kontrak Core. Hak ekspor sama dengan hak melihat, dan kebijakan data organisasi berlaku persis seperti daftarnya |
 | K-28 | Filter master pilihan banyak | **Diputuskan 1 Okt 2026:** filter master laporan (lokasi, kondisi, group, dan sejenisnya) boleh banyak pilihan dengan arti *atau*, dari ujung ke ujung: penerapan di module, layar, dan kepala laporan yang menyebut nama |

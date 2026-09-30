@@ -7,6 +7,7 @@ namespace App\Support\Reporting;
 use App\Models\ReportLastUsedOption;
 use App\Models\ReportPreset;
 use App\Models\TenantMembership;
+use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\UserClock;
 use Carbon\CarbonImmutable;
@@ -23,7 +24,9 @@ use stdClass;
  *
  * Semuanya dibatasi tenant dan kode laporan. Yang terakhir dipakai milik satu pengguna. Preset pribadi hanya
  * terlihat oleh pemiliknya; preset bersama terlihat oleh setiap pengguna tenant yang boleh menjalankan
- * laporannya — hak menjalankan itu diperiksa pemanggil sebelum kelas ini dipakai.
+ * laporannya — hak menjalankan itu diperiksa pemanggil sebelum kelas ini dipakai. Membuat, mengubah, dan
+ * mengarsipkan preset bersama butuh `core.report-preset.update`, siapa pun pembuatnya, seperti setelan
+ * "Shared with all users" di Report Settings BC.
  *
  * Nilai yang disimpan hanya parameter yang dikenal laporan, berupa teks atau daftar teks (filter pilihan
  * banyak). Isinya tidak divalidasi di sini: aturannya milik module, dan module memeriksanya setiap kali
@@ -42,7 +45,7 @@ final class ReportOptions
      * Isian awal halaman filter dan dialog cetak: opsi terakhir pengguna ini, dan preset yang boleh ia lihat
      * dengan tanggal relatifnya sudah diterjemahkan menurut zonanya.
      *
-     * @return array{last_used: array<string, mixed>|null, presets: list<array<string, mixed>>}
+     * @return array{last_used: array<string, mixed>|null, presets: list<array<string, mixed>>, can_share: bool}
      */
     public function forMembership(TenantMembership $membership, stdClass $report, ?string $legalEntityId): array
     {
@@ -65,7 +68,14 @@ final class ReportOptions
                 'updated_at' => $last->updated_at?->toIso8601String(),
             ],
             'presets' => array_values($presets->map(fn (ReportPreset $preset): array => $this->present($preset, $membership, $now))->all()),
+            'can_share' => self::canShare($membership),
         ];
+    }
+
+    /** Boleh membuat, mengubah, dan mengarsipkan preset bersama. */
+    public static function canShare(TenantMembership $membership): bool
+    {
+        return $membership->hasCorePermission(CoreSecurityCatalog::REPORT_PRESET_UPDATE);
     }
 
     /**
@@ -95,11 +105,15 @@ final class ReportOptions
         );
     }
 
-    /** @param array<string, mixed> $parameters */
-    public function createPreset(TenantMembership $membership, stdClass $report, string $name, array $parameters): ReportPreset
+    /**
+     * Preset baru. Preset bersama hanya untuk pemegang `core.report-preset.update`; pemanggil memeriksanya.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    public function createPreset(TenantMembership $membership, stdClass $report, string $name, array $parameters, bool $shared = false): ReportPreset
     {
         $name = $this->name($name);
-        $this->assertNameFree($membership, $report, $name, null);
+        $this->assertNameFree($membership, $report, $name, null, $shared);
 
         try {
             // Savepoint: pelanggaran indeks unik membatalkan seluruh transaksi PostgreSQL bila tidak dibatasi.
@@ -108,16 +122,16 @@ final class ReportOptions
                 'user_id' => $membership->user_id,
                 'report_code' => $report->code,
                 'name' => $name,
-                'shared' => false,
+                'shared' => $shared,
                 'parameters' => self::clean($report, $parameters, allowTokens: true),
             ])->refresh());
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage($shared)]]);
         }
     }
 
     /**
-     * Mengganti nama atau isi preset pribadi milik pengguna itu sendiri, dengan versi baris.
+     * Mengganti nama atau isi preset, dengan versi baris. Preset yang boleh diubah dipilih `editablePreset()`.
      *
      * @param  array<string, mixed>|null  $parameters
      */
@@ -126,7 +140,7 @@ final class ReportOptions
         $values = [];
         if ($name !== null) {
             $values['name'] = $this->name($name);
-            $this->assertNameFree($membership, $report, $values['name'], $preset->id);
+            $this->assertNameFree($membership, $report, $values['name'], $preset->id, $preset->shared);
         }
         if ($parameters !== null) {
             $values['parameters'] = self::clean($report, $parameters, allowTokens: true);
@@ -140,13 +154,13 @@ final class ReportOptions
                 }
             });
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage($preset->shared)]]);
         }
 
         return $preset->refresh();
     }
 
-    /** Mengarsipkan preset pribadi milik pengguna itu sendiri, dengan versi baris. */
+    /** Mengarsipkan preset, dengan versi baris. Preset yang boleh diarsipkan dipilih `editablePreset()`. */
     public function archivePreset(ReportPreset $preset, int $expectedVersion): void
     {
         DB::transaction(function () use ($preset, $expectedVersion): void {
@@ -155,11 +169,22 @@ final class ReportOptions
         });
     }
 
-    /** Preset pribadi milik pengguna ini; preset orang lain dan preset bersama dijawab tidak ada. */
-    public function ownPrivatePreset(TenantMembership $membership, stdClass $report, string $id): ?ReportPreset
+    /**
+     * Preset yang boleh diubah dan diarsipkan pengguna ini: preset pribadinya sendiri, dan preset bersama bila
+     * ia memegang `core.report-preset.update`. Selain itu dijawab tidak ada, termasuk preset pribadi orang lain.
+     */
+    public function editablePreset(TenantMembership $membership, stdClass $report, string $id): ?ReportPreset
     {
+        $canShare = self::canShare($membership);
+
         return ReportPreset::query()
-            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'user_id' => $membership->user_id, 'shared' => false])
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code])
+            ->where(function (Builder $query) use ($membership, $canShare): void {
+                $query->where(fn (Builder $own) => $own->where('user_id', $membership->user_id)->where('shared', false));
+                if ($canShare) {
+                    $query->orWhere('shared', true);
+                }
+            })
             ->whereKey($id)
             ->first();
     }
@@ -249,20 +274,24 @@ final class ReportOptions
         return $name;
     }
 
-    private function assertNameFree(TenantMembership $membership, stdClass $report, string $name, ?string $exceptId): void
+    /** Nama preset pribadi unik per pemiliknya; nama preset bersama unik per laporan. */
+    private function assertNameFree(TenantMembership $membership, stdClass $report, string $name, ?string $exceptId, bool $shared): void
     {
         $taken = ReportPreset::query()
-            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'user_id' => $membership->user_id])
+            ->where(['tenant_id' => $membership->tenant_id, 'report_code' => $report->code, 'shared' => $shared])
+            ->when(! $shared, fn (Builder $query) => $query->where('user_id', $membership->user_id))
             ->whereRaw('lower(name) = ?', [mb_strtolower($name)])
             ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
             ->exists();
         if ($taken) {
-            throw ValidationException::withMessages(['name' => [self::duplicateMessage()]]);
+            throw ValidationException::withMessages(['name' => [self::duplicateMessage($shared)]]);
         }
     }
 
-    private static function duplicateMessage(): string
+    private static function duplicateMessage(bool $shared): string
     {
-        return 'Anda sudah punya preset dengan nama ini untuk laporan ini. Pilih nama lain.';
+        return $shared
+            ? 'Sudah ada preset bersama dengan nama ini untuk laporan ini. Pilih nama lain.'
+            : 'Anda sudah punya preset dengan nama ini untuk laporan ini. Pilih nama lain.';
     }
 }

@@ -221,9 +221,8 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
       baris yang cocok dengan filter dan urutan layar; xlsx bertipe sampai batas lembar Excel, CSV
       sesudahnya sampai `reporting.list_export_max_csv_rows`. Pilot register aset.
 - [x] 8.5 Opsi terakhir per pengguna per laporan menjadi isian awal halaman filter dan dialog cetak (K-24).
-- [ ] 8.6 Preset laporan bernama dengan tanggal relatif (K-25). Sudah: preset pribadi, tanggal relatif
-      menurut zona pengguna, dan pembacaan preset bersama. Belum: membuat dan mengubah preset bersama,
-      menunggu keputusan permission (usulan di README, Gap 10).
+- [x] 8.6 Preset laporan bernama dengan tanggal relatif (K-25): preset pribadi, tanggal relatif menurut
+      zona pengguna, dan preset bersama yang dikelola pemegang duty `core.report-preset.manage`.
 - [x] 8.7 Excel (data saja) untuk setiap laporan (K-26).
 - [x] 8.8 Filter master laporan pilihan banyak dengan nama di kepala laporan (K-28).
 

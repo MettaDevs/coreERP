@@ -90,12 +90,11 @@ class ReportOptionsTest extends TestCase
             ->assertJsonPath('data.shared', false)
             ->assertJsonPath('data.mine', true)
             ->json('data.id');
-        // Preset bersama belum dapat dibuat lewat layar (menunggu keputusan permission, K-25); isinya ditulis
-        // langsung supaya aturan siapa yang melihatnya tetap teruji.
-        $shared = ReportPreset::query()->create([
-            'tenant_id' => $this->membership->tenant_id, 'user_id' => $this->owner->id, 'report_code' => self::REPORT,
-            'name' => 'Selesai bulan ini', 'shared' => true, 'parameters' => ['status' => 'selesai', 'dari' => '@this_month.start'],
-        ]);
+        $shared = ReportPreset::query()->findOrFail($this->actingAs($this->owner)
+            ->postJson($base.'/presets', ['name' => 'Selesai bulan ini', 'shared' => true, 'parameters' => ['status' => 'selesai', 'dari' => '@this_month.start']])
+            ->assertCreated()
+            ->assertJsonPath('data.shared', true)
+            ->json('data.id'));
 
         $colleague = $this->member(['management-aset.pemeliharaan-aset.manage']);
         $seen = $this->actingAs($colleague)->getJson($base.'/options')->assertOk()->json('data.presets');
@@ -103,7 +102,10 @@ class ReportOptionsTest extends TestCase
         $this->assertFalse($seen[0]['mine']);
         $this->assertSame('Owner', $seen[0]['owner_name'], 'Preset bersama menyebut nama pembuatnya, bukan id.');
 
-        // Rekan tidak dapat mengubah atau mengarsipkan preset orang lain, pribadi maupun bersama.
+        // Rekan tanpa izin preset bersama tidak dapat mengubah atau mengarsipkan preset orang lain, pribadi maupun
+        // bersama, dan tidak dapat membagikan presetnya sendiri.
+        $this->actingAs($colleague)->getJson($base.'/options')->assertOk()->assertJsonPath('data.can_share', false);
+        $this->actingAs($colleague)->postJson($base.'/presets', ['name' => 'Untuk semua', 'shared' => true, 'parameters' => []])->assertForbidden();
         foreach ([$private, $shared->id] as $id) {
             $this->actingAs($colleague)->patchJson($base.'/presets/'.$id, ['name' => 'Ambil alih', 'version' => 1])->assertNotFound();
             $this->actingAs($colleague)->deleteJson($base.'/presets/'.$id, [], ['If-Match' => 'W/"1"'])->assertNotFound();
@@ -121,6 +123,28 @@ class ReportOptionsTest extends TestCase
         // Tenant lain tidak melihat preset bersama tenant ini, walau kode laporannya sama.
         $other = $this->business('owner@lain.test', 'Tenant lain');
         $this->actingAs($other)->getJson($base.'/options')->assertOk()->assertJsonPath('data.presets', []);
+    }
+
+    public function test_shared_presets_are_managed_by_holders_of_the_shared_preset_duty_whoever_created_them(): void
+    {
+        $base = '/api/v1/reports/'.self::REPORT;
+        $this->actingAs($this->owner)->getJson($base.'/options')->assertOk()->assertJsonPath('data.can_share', true);
+        $id = $this->actingAs($this->owner)
+            ->postJson($base.'/presets', ['name' => 'Bulan ini', 'shared' => true, 'parameters' => ['dari' => '@this_month.start']])
+            ->assertCreated()->json('data.id');
+
+        // Nama preset bersama unik per laporan, tanpa membedakan huruf besar; nama yang sama tetap boleh dipakai
+        // untuk preset pribadi.
+        $curator = $this->member(['management-aset.pemeliharaan-aset.manage', 'core.report-preset.manage']);
+        $this->actingAs($curator)->postJson($base.'/presets', ['name' => 'BULAN INI', 'shared' => true, 'parameters' => []])
+            ->assertStatus(422)->assertJsonValidationErrors('name');
+        $this->actingAs($this->owner)->postJson($base.'/presets', ['name' => 'Bulan ini', 'parameters' => []])->assertCreated();
+
+        // Pemegang duty mengubah dan mengarsipkan preset bersama buatan orang lain, dengan versi baris.
+        $this->actingAs($curator)->patchJson($base.'/presets/'.$id, ['name' => 'Periode berjalan', 'version' => 1])
+            ->assertOk()->assertJsonPath('data.name', 'Periode berjalan')->assertJsonPath('data.shared', true);
+        $this->actingAs($curator)->deleteJson($base.'/presets/'.$id, [], ['If-Match' => 'W/"3"'])->assertNoContent();
+        $this->assertNotNull(DB::table('report_presets')->where('id', $id)->value('deleted_at'));
     }
 
     public function test_preset_changes_need_the_current_row_version_and_archiving_keeps_the_row(): void

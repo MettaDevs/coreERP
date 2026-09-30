@@ -24,10 +24,12 @@ export type ReportApiResponse = {
 export type ReportPresetState = {
     reportCode: string;
     presets: ReportPreset[];
+    /** Boleh membagikan preset ke semua pengguna, dan mengubah atau mengarsipkan preset bersama. */
+    canShare: boolean;
     selectedId: string | null;
     filters: Filters;
     apply: (id: string | null) => void;
-    save: (name: string, parameters: Filters) => Promise<void>;
+    save: (name: string, parameters: Filters, shared: boolean) => Promise<void>;
     archive: (preset: ReportPreset) => Promise<void>;
 };
 
@@ -61,6 +63,7 @@ export function useReportData<T = Record<string, unknown>>(
     const [filters, setFilters] = useState<Filters>(initialFilters);
     const [ready, setReady] = useState(false);
     const [presets, setPresets] = useState<ReportPreset[]>([]);
+    const [canShare, setCanShare] = useState(false);
     const [selectedPresetId, setSelectedPresetId] = useState<string | null>(
         null,
     );
@@ -89,6 +92,7 @@ export function useReportData<T = Record<string, unknown>>(
                 }
 
                 setPresets(options.presets);
+                setCanShare(options.can_share);
 
                 if (options.last_used) {
                     lastRemembered.current = JSON.stringify(
@@ -199,6 +203,7 @@ export function useReportData<T = Record<string, unknown>>(
     const presetState: ReportPresetState = {
         reportCode,
         presets,
+        canShare,
         selectedId: selectedPresetId,
         filters,
         apply: (id) => {
@@ -213,8 +218,13 @@ export function useReportData<T = Record<string, unknown>>(
                 });
             }
         },
-        save: async (name, parameters) => {
-            const preset = await createPreset(reportCode, name, parameters);
+        save: async (name, parameters, shared) => {
+            const preset = await createPreset(
+                reportCode,
+                name,
+                parameters,
+                shared,
+            );
 
             setPresets((prev) => [...prev, preset]);
             setSelectedPresetId(preset.id);

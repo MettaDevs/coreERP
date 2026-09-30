@@ -22,9 +22,9 @@ use stdClass;
  * Semua rute menuntut hak menjalankan laporannya. Laporan yang tidak boleh dijalankan dijawab 404, sama
  * dengan laporan yang tidak ada, seperti daftar field-nya.
  *
- * Preset bersama hanya dibaca di sini. Siapa yang boleh membuat dan mengubahnya menunggu keputusan
- * permission (lihat K-25); sampai itu diputuskan, rute ubah hanya menyentuh preset pribadi milik
- * pemintanya sendiri.
+ * Preset pribadi hanya dapat diubah pemiliknya. Preset bersama dibuat, diubah, dan diarsipkan oleh pemegang
+ * `core.report-preset.update`, siapa pun pembuatnya (K-25). Preset yang tidak boleh diubah dijawab 404, sama
+ * dengan preset yang tidak ada; meminta preset bersama tanpa permission itu dijawab 403.
  */
 class ReportOptionController extends Controller
 {
@@ -61,9 +61,12 @@ class ReportOptionController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'parameters' => ['present', 'array'],
+            'shared' => ['sometimes', 'boolean'],
         ]);
+        $shared = (bool) ($data['shared'] ?? false);
+        abort_if($shared && ! ReportOptions::canShare($membership), 403, 'Anda belum boleh membagikan preset ke semua pengguna.');
 
-        $preset = $this->options->createPreset($membership, $report, $data['name'], $data['parameters']);
+        $preset = $this->options->createPreset($membership, $report, $data['name'], $data['parameters'], $shared);
         $now = $this->options->now($membership, $this->workspace->legalEntity($request, $membership)?->id);
 
         return response()->json(['data' => $this->options->present($preset, $membership, $now)], 201);
@@ -72,7 +75,7 @@ class ReportOptionController extends Controller
     public function updatePreset(Request $request, string $code, string $id): JsonResponse
     {
         [$membership, $report] = $this->report($request, $code);
-        $preset = $this->options->ownPrivatePreset($membership, $report, $id);
+        $preset = $this->options->editablePreset($membership, $report, $id);
         abort_if($preset === null, 404);
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:80'],
@@ -95,7 +98,7 @@ class ReportOptionController extends Controller
     public function destroyPreset(Request $request, string $code, string $id): Response
     {
         [$membership, $report] = $this->report($request, $code);
-        $preset = $this->options->ownPrivatePreset($membership, $report, $id);
+        $preset = $this->options->editablePreset($membership, $report, $id);
         abort_if($preset === null, 404);
         $this->options->archivePreset($preset, RowVersion::expected($request));
 

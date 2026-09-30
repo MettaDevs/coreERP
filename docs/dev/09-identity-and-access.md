@@ -88,6 +88,9 @@ padanan duty *Inquire* dan *Maintain* di Dynamics 365:
 | Riwayat perubahan | `core.change-log.inquire` | `core.change-log.manage` |
 | Retensi data | `core.retention.inquire` | `core.retention.manage` |
 
+Preset laporan bersama hanya punya duty Kelola, `core.report-preset.manage` (permission
+`core.report-preset.update`): membaca preset bersama sudah ikut hak menjalankan laporannya.
+
 Pantau posting finance memisahkan tindak lanjutnya: `core.finance-posting.inquire` hanya melihat, sedangkan
 `core.finance-posting.follow-up` menambah Validasi ulang dan Tandai manual (permission `core.finance-posting.process`,
 tingkat `invoke`). Pada layar setup Core, tingkat `update` mencakup membuat dan mengarsipkan, karena belum ada

@@ -123,6 +123,8 @@ export type ReportOptions = {
         updated_at: string | null;
     } | null;
     presets: ReportPreset[];
+    /** Boleh membuat, mengubah, dan mengarsipkan preset bersama (`core.report-preset.update`). */
+    can_share: boolean;
 };
 
 export const STATUS_LABEL: Record<ExportStatus, string> = {
