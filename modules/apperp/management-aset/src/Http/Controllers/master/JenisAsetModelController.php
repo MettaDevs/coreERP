@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,9 +38,10 @@ class JenisAsetModelController extends Controller
             ],
         ]);
         $modelIds = array_values($data['model_ids']);
+        $expected = RowVersion::expected($request);
 
-        DB::transaction(function () use ($jenisAsetId, $modelIds): void {
-            JenisAset::query()->whereKey($jenisAsetId)->lockForUpdate()->first();
+        DB::transaction(function () use ($jenisAsetId, $modelIds, $expected): void {
+            RowVersion::claim(JenisAset::query()->findOrFail($jenisAsetId), $expected);
 
             $models = ModelAset::query()
                 ->whereKey($modelIds)
@@ -64,6 +66,9 @@ class JenisAsetModelController extends Controller
             }
         });
 
-        return response()->json(['data' => ['model_ids' => $modelIds]]);
+        return response()->json(['data' => [
+            'model_ids' => $modelIds,
+            'version' => (int) JenisAset::query()->whereKey($jenisAsetId)->value('version'),
+        ]]);
     }
 }

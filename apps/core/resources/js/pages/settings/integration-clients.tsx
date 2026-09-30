@@ -74,12 +74,18 @@ import { Copy, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
-import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
+import {
+    apiJson,
+    CoreApiError,
+    errorText,
+    toastSaveError,
+} from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Mode = 'pull' | 'push';
 type Client = {
     id: string;
+    version: number;
     name: string;
     delivery_mode: Mode;
     push_url: string | null;
@@ -198,7 +204,11 @@ function ClientSheet({
                     : '/api/v1/integration-clients',
                 {
                     method: client ? 'PATCH' : 'POST',
-                    body: JSON.stringify(payload(form)),
+                    body: JSON.stringify(
+                        client
+                            ? { ...payload(form), version: client.version }
+                            : payload(form),
+                    ),
                 },
             );
             router.reload({ only: ['clients'] });
@@ -220,7 +230,7 @@ function ClientSheet({
                 setErrors(caught.errors);
             }
 
-            toast.error(errorText(caught, 'Klien integrasi belum disimpan.'));
+            toastSaveError(caught, 'Klien integrasi belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -485,6 +495,8 @@ export default function IntegrationClients({
                 signing_secret?: string;
             }>(`/api/v1/integration-clients/${client.id}/${path}`, {
                 method: 'POST',
+                // Hanya pencabutan yang memeriksa versi; penggantian token mengabaikannya.
+                body: JSON.stringify({ version: client.version }),
             });
             router.reload({ only: ['clients'] });
 
@@ -498,7 +510,7 @@ export default function IntegrationClients({
                 toast.success(success);
             }
         } catch (caught) {
-            toast.error(errorText(caught, 'Tindakan belum berhasil.'));
+            toastSaveError(caught, 'Tindakan belum berhasil.');
         }
     };
 

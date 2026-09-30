@@ -141,6 +141,7 @@ type WorkingTimeTemplate = {
     legal_entity_name?: string | null;
     company_code?: string | null;
     is_active: boolean;
+    version: number;
     lines: WorkingTimeLine[];
 };
 
@@ -409,6 +410,7 @@ export default function WorkingTimeTemplates({
                 code: headerCode.toUpperCase().trim(),
                 name: headerName.trim(),
                 lines: sanitizedLines,
+                version: activeTemplate.version,
             },
             {
                 preserveScroll: true,
@@ -488,6 +490,7 @@ export default function WorkingTimeTemplates({
         }
 
         router.delete(`/settings/working-time-templates/${activeTemplate.id}`, {
+            data: { version: activeTemplate.version },
             preserveScroll: true,
             onSuccess: () => {
                 setSelectedTemplateId(null);

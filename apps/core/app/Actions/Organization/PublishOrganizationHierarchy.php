@@ -17,7 +17,7 @@ class PublishOrganizationHierarchy
             throw new AuthorizationException;
         }
         if ($version->status !== 'draft') {
-            throw ValidationException::withMessages(['version' => 'Hanya draft hierarchy yang dapat dipublikasikan.']);
+            throw ValidationException::withMessages(['hierarchy_version' => 'Hanya draft hierarchy yang dapat dipublikasikan.']);
         }
 
         DB::transaction(function () use ($version): void {

@@ -45,7 +45,7 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { api, ApiError, errorMessage } from '../api';
+import { api, ApiError, errorMessage, toastSaveError } from '../api';
 
 type AccountColumn = { column: string; label: string; required: boolean };
 
@@ -62,7 +62,8 @@ type PostingRow = {
     group_aset_id: string;
     effective_from: string;
     missing: string[];
-    [column: string]: string | string[] | null;
+    version: number;
+    [column: string]: string | string[] | number | null;
 };
 
 type Group = {
@@ -567,9 +568,17 @@ function RowEditor({
         setErrors({});
 
         try {
+            // Baris yang sudah ada disimpan dari versi yang dibuka, termasuk bila tanggal yang
+            // diketik untuk baris baru ternyata sudah punya baris; baris baru tidak punya versi.
+            const existing =
+                row ?? group.rows.find((item) => item.effective_from === date);
             await api(`/posting-group-aset/${group.id}/${date}`, {
                 method: 'PUT',
-                body: JSON.stringify(values),
+                body: JSON.stringify(
+                    existing
+                        ? { ...values, version: existing.version }
+                        : values,
+                ),
             });
             toast.success(`Posting group ${group.kode} disimpan.`);
             onSaved();
@@ -585,7 +594,7 @@ function RowEditor({
                 );
             }
 
-            toast.error(errorMessage(caught, 'Posting group belum tersimpan.'));
+            toastSaveError(caught, 'Posting group belum tersimpan.');
         } finally {
             setSaving(false);
         }
@@ -599,6 +608,7 @@ function RowEditor({
         try {
             await api(`/posting-group-aset/${group.id}/${row.effective_from}`, {
                 method: 'DELETE',
+                body: JSON.stringify({ version: row.version }),
             });
             toast.success(
                 `Baris ${formatDate(row.effective_from)} diarsipkan.`,
@@ -606,7 +616,7 @@ function RowEditor({
             onSaved();
             onClose();
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Baris belum diarsipkan.'));
+            toastSaveError(caught, 'Baris belum diarsipkan.');
         } finally {
             setArchiving(false);
         }

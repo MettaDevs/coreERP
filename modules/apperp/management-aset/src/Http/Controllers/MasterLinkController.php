@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -94,7 +95,7 @@ abstract class MasterLinkController extends Controller
         $this->requirePermission($request, 'read');
         $this->findOwner($ownerId);
 
-        return response()->json(['data' => $this->rows($ownerId)]);
+        return response()->json(['data' => $this->rows($ownerId), 'version' => $this->ownerVersion($ownerId)]);
     }
 
     public function replace(Request $request, string $ownerId): JsonResponse
@@ -108,16 +109,18 @@ abstract class MasterLinkController extends Controller
             $rules['rows.*.'.$column] = $rule;
         }
         $data = $request->validate($rules);
-        DB::transaction(function () use ($tenantId, $ownerId, $data): void {
-            // Mengunci baris pemilik lebih dahulu supaya dua penyuntingan bersamaan pada
-            // pemilik yang sama berjalan berurutan.
+        $expected = RowVersion::expected($request);
+        DB::transaction(function () use ($tenantId, $ownerId, $data, $expected): void {
+            // Klaim versi pemilik lebih dahulu. Selain menolak himpunan yang disusun dari data
+            // basi, klaim itu memegang kunci baris pemilik sampai transaksi selesai, sehingga
+            // dua penyuntingan bersamaan pada pemilik yang sama berjalan berurutan.
             //
             // Tanpa kunci ini keduanya sama-sama tidak melihat INSERT lawannya yang belum
             // commit, lalu sama-sama menyisipkan baris dengan identitas yang sama dan yang
             // kalah menabrak unique index sebagai 500. Kunci pada pemilik, bukan pada
             // barisnya, karena baris yang bertabrakan justru yang belum ada.
             $ownerModel = $this->ownerModel();
-            $ownerModel::query()->whereKey($ownerId)->lockForUpdate()->first();
+            RowVersion::claim($ownerModel::query()->whereKey($ownerId), $expected);
 
             // Aturan yang membaca keadaan pemilik/anak harus diperiksa setelah lock agar
             // hasilnya tetap benar bila ada penulisan lain pada saat yang sama.
@@ -155,7 +158,7 @@ abstract class MasterLinkController extends Controller
             }
         });
 
-        return response()->json(['data' => $this->rows($ownerId)]);
+        return response()->json(['data' => $this->rows($ownerId), 'version' => $this->ownerVersion($ownerId)]);
     }
 
     /**
@@ -178,6 +181,14 @@ abstract class MasterLinkController extends Controller
             ->get($this->columns())
             ->map(fn (Model $row): array => $row->only($this->columns()))
             ->all());
+    }
+
+    /** Versi pemilik: himpunan baris ini disimpan dengan mengklaim versi itu. */
+    private function ownerVersion(string $ownerId): int
+    {
+        $ownerModel = $this->ownerModel();
+
+        return (int) $ownerModel::query()->whereKey($ownerId)->value('version');
     }
 
     private function findOwner(string $ownerId): void

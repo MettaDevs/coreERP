@@ -388,9 +388,10 @@ class FinancePostingMonitorTest extends TestCase
             ->firstOrFail();
         foreach ($penempatan as [$anak, $induk]) {
             $this->post("/settings/organization/hierarchy-versions/{$versi->id}/placements", [
+                'version' => $versi->hierarchy()->value('version'),
                 'organization_id' => $anak->id, 'parent_organization_id' => $induk->id,
             ])->assertSessionHasNoErrors();
         }
-        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish")->assertSessionHasNoErrors();
+        $this->post("/settings/organization/hierarchy-versions/{$versi->id}/publish", ['version' => $versi->hierarchy()->value('version')])->assertSessionHasNoErrors();
     }
 }

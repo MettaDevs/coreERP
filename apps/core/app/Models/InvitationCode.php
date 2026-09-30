@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Crypt;
  * @property Carbon|null $sso_redeemed_at
  * @property int|null $sso_redeemed_by
  * @property-read Collection<int, Role> $roles
+ * @property int $version
  */
 class InvitationCode extends Model
 {

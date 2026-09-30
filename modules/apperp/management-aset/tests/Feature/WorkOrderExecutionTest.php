@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -63,12 +64,12 @@ class WorkOrderExecutionTest extends TestCase
     {
         $workOrder = $this->buatWorkOrder(['dijadwalkan_mulai' => null]);
 
-        $this->pindah($workOrder['id'], 'dijadwalkan', 1)
+        $this->pindah($workOrder['id'], 'dijadwalkan')
             ->assertUnprocessable()->assertJsonValidationErrors('ke_status');
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id'], 'status' => 'draft']);
 
         $terjadwal = $this->buatWorkOrder();
-        $this->pindah($terjadwal['id'], 'dijadwalkan', 1)->assertOk()->assertJsonPath('data.status', 'dijadwalkan');
+        $this->pindah($terjadwal['id'], 'dijadwalkan')->assertOk()->assertJsonPath('data.status', 'dijadwalkan');
     }
 
     public function test_transisi_menuntut_izin_yang_tepat_untuk_setiap_langkah(): void
@@ -76,18 +77,68 @@ class WorkOrderExecutionTest extends TestCase
         $workOrder = $this->buatWorkOrder();
 
         // Teknisi boleh mengerjakan, tetapi tidak boleh menjadwalkan.
-        $this->pindah($workOrder['id'], 'dijadwalkan', 1, ['management-aset.pemeliharaan-aset.execute'])->assertForbidden();
-        $this->pindah($workOrder['id'], 'dijadwalkan', 1, ['management-aset.pemeliharaan-aset.schedule'])->assertOk();
+        $this->pindah($workOrder['id'], 'dijadwalkan', ['management-aset.pemeliharaan-aset.execute'])->assertForbidden();
+        $this->pindah($workOrder['id'], 'dijadwalkan', ['management-aset.pemeliharaan-aset.schedule'])->assertOk();
         // Penjadwal tidak boleh mulai mengerjakan.
-        $this->pindah($workOrder['id'], 'dikerjakan', 2, ['management-aset.pemeliharaan-aset.schedule'])->assertForbidden();
-        $this->pindah($workOrder['id'], 'dikerjakan', 2, ['management-aset.pemeliharaan-aset.execute'])->assertOk();
+        $this->pindah($workOrder['id'], 'dikerjakan', ['management-aset.pemeliharaan-aset.schedule'])->assertForbidden();
+        $this->pindah($workOrder['id'], 'dikerjakan', ['management-aset.pemeliharaan-aset.execute'])->assertOk();
+    }
+
+    public function test_langkah_pelaksanaan_dengan_versi_basi_atau_tanpa_versi_ditolak(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $baris = DB::table('aset_tr_pemeliharaan_aset_checklist')
+            ->where('pemeliharaan_aset_detail_id', $jobId)->where('tipe', 'measurement')->first();
+        $versi = $this->versi($workOrder['id']);
+        $alamat = '/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'];
+
+        $this->headers(self::SEMUA, 'montir-1')
+            ->putJson($alamat.'/jobs/'.$jobId.'/checklist', ['version' => $versi, 'baris' => [['id' => $baris->id, 'nilai' => '32']]])
+            ->assertOk()->assertJsonPath('version', $this->versi($workOrder['id']));
+        $this->headers(self::SEMUA, 'montir-1')
+            ->putJson($alamat.'/jobs/'.$jobId.'/checklist', ['version' => $versi, 'baris' => [['id' => $baris->id, 'nilai' => '99']]])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_checklist', ['id' => $baris->id, 'nilai' => '32']);
+
+        $this->headers(self::SEMUA, 'montir-1')
+            ->patchJson($alamat.'/jobs/'.$jobId.'/execution', ['version' => $versi, 'aktual_jam' => 4])
+            ->assertConflict();
+        $this->headers(self::SEMUA, 'montir-1')
+            ->patchJson($alamat.'/jobs/'.$jobId.'/execution', ['aktual_jam' => 4])
+            ->assertStatus(428);
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'aktual_jam' => null]);
+
+        $this->headers(self::SEMUA, 'penyelia-1')
+            ->postJson($alamat.'/status', ['ke_status' => 'dibatalkan', 'alasan' => 'Tanpa versi'])
+            ->assertStatus(428);
+        $this->headers(self::SEMUA, 'penyelia-1')
+            ->postJson($alamat.'/status', ['ke_status' => 'dibatalkan', 'alasan' => 'Versi basi', 'version' => $versi])
+            ->assertConflict()->assertJsonPath('error.code', 'stale_version');
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id'], 'status' => 'dikerjakan']);
+        $this->assertDatabaseMissing('aset_tr_pemeliharaan_aset_status_log', ['pemeliharaan_aset_id' => $workOrder['id'], 'ke_status' => 'dibatalkan']);
+    }
+
+    public function test_salin_template_tanpa_versi_ditolak_tanpa_menyalin_apa_pun(): void
+    {
+        $workOrder = $this->buatWorkOrder();
+        $jobId = $this->jobId($workOrder['id']);
+
+        $this->headers(self::SEMUA, 'montir-1')
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/checklist/dari-template', [
+                'template_id' => $this->masters()['template'],
+            ])
+            ->assertStatus(428);
+        $this->assertSame(0, DB::table('aset_tr_pemeliharaan_aset_checklist')->where('pemeliharaan_aset_detail_id', $jobId)->count());
     }
 
     public function test_transisi_yang_melompati_status_ditolak(): void
     {
         $workOrder = $this->buatWorkOrder();
 
-        $this->pindah($workOrder['id'], 'selesai', 1)
+        $this->pindah($workOrder['id'], 'selesai')
             ->assertUnprocessable()
             ->assertJsonPath('error.code', 'transisi_tidak_sah');
     }
@@ -96,9 +147,9 @@ class WorkOrderExecutionTest extends TestCase
     {
         $workOrder = $this->buatWorkOrder();
 
-        $this->pindah($workOrder['id'], 'dibatalkan', 1)
+        $this->pindah($workOrder['id'], 'dibatalkan')
             ->assertUnprocessable()->assertJsonValidationErrors('alasan');
-        $this->pindah($workOrder['id'], 'dibatalkan', 1, alasan: 'Aset sudah dijual')->assertOk();
+        $this->pindah($workOrder['id'], 'dibatalkan', alasan: 'Aset sudah dijual')->assertOk();
 
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_status_log', [
             'pemeliharaan_aset_id' => $workOrder['id'], 'dari_status' => 'draft',
@@ -111,7 +162,7 @@ class WorkOrderExecutionTest extends TestCase
         $workOrder = $this->siapDikerjakan();
         $jobId = $this->jobId($workOrder['id']);
 
-        $this->pindah($workOrder['id'], 'selesai', 3)
+        $this->pindah($workOrder['id'], 'selesai')
             ->assertUnprocessable()
             ->assertJsonValidationErrors('ke_status');
 
@@ -122,7 +173,7 @@ class WorkOrderExecutionTest extends TestCase
             'id' => $id, 'tidak_berlaku' => true,
         ])->all())->assertOk();
 
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk()->assertJsonPath('data.status', 'selesai');
+        $this->pindah($workOrder['id'], 'selesai')->assertOk()->assertJsonPath('data.status', 'selesai');
         $this->assertNotNull(DB::table('aset_tr_pemeliharaan_aset')->where('id', $workOrder['id'])->value('aktual_selesai'));
     }
 
@@ -136,7 +187,7 @@ class WorkOrderExecutionTest extends TestCase
         // sebab dan tindakan, bukan pemeriksaan wajib yang kebetulan juga masih kosong.
         $this->tuntaskanChecklist($workOrder['id'], $jobId);
 
-        $this->pindah($workOrder['id'], 'selesai', 3)
+        $this->pindah($workOrder['id'], 'selesai')
             ->assertUnprocessable()->assertJsonValidationErrors('ke_status');
 
         DB::table('aset_tr_pemeliharaan_aset_details')->where('id', $jobId)->update([
@@ -144,7 +195,7 @@ class WorkOrderExecutionTest extends TestCase
             'tindakan_perbaikan_id' => $this->master('aset_m_tindakan_perbaikan', 'Ganti komponen', 'TDPB-1'),
         ]);
 
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk();
+        $this->pindah($workOrder['id'], 'selesai')->assertOk();
     }
 
     public function test_aturan_berkeparahan_peringatan_membiarkan_transisi_tetapi_meninggalkan_jejak(): void
@@ -155,7 +206,7 @@ class WorkOrderExecutionTest extends TestCase
         $this->tuntaskanChecklist($workOrder['id'], $jobId);
 
         // Sebab kerusakan sengaja dibiarkan kosong: peringatan tidak boleh menahan.
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk()->assertJsonPath('data.status', 'selesai');
+        $this->pindah($workOrder['id'], 'selesai')->assertOk()->assertJsonPath('data.status', 'selesai');
 
         $log = DB::table('aset_tr_pemeliharaan_aset_status_log')
             ->where(['pemeliharaan_aset_id' => $workOrder['id'], 'ke_status' => 'selesai'])->first();
@@ -170,7 +221,7 @@ class WorkOrderExecutionTest extends TestCase
         $this->aturan('selesai', 'checklist_wajib', false, 'error');
 
         // Pemeriksaan wajib masih kosong, tetapi aturannya dimatikan tenant.
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk()->assertJsonPath('data.status', 'selesai');
+        $this->pindah($workOrder['id'], 'selesai')->assertOk()->assertJsonPath('data.status', 'selesai');
     }
 
     public function test_salin_template_memekarkan_template_bersarang_dan_menomori_ulang(): void
@@ -235,7 +286,7 @@ class WorkOrderExecutionTest extends TestCase
             ['id' => $baris['variable']->id, 'nilai' => 'Botak'],
         ])->assertOk();
 
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk();
+        $this->pindah($workOrder['id'], 'selesai')->assertOk();
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'hasil' => 'gagal']);
     }
 
@@ -251,7 +302,7 @@ class WorkOrderExecutionTest extends TestCase
             ['id' => $baris['variable']->id, 'nilai' => 'Baik'],
         ])->assertOk();
 
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk();
+        $this->pindah($workOrder['id'], 'selesai')->assertOk();
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'hasil' => 'lulus']);
     }
 
@@ -293,7 +344,7 @@ class WorkOrderExecutionTest extends TestCase
             ['id' => $baris['measurement']->id, 'nilai' => '32'],
             ['id' => $baris['variable']->id, 'nilai' => 'Belum dapat diperiksa', 'catatan_teknisi' => 'Kendaraan tidak dapat dinyalakan.'],
         ])->assertOk();
-        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk();
+        $this->pindah($workOrder['id'], 'selesai')->assertOk();
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'hasil' => 'tidak_dinilai']);
     }
 
@@ -322,6 +373,7 @@ class WorkOrderExecutionTest extends TestCase
 
         $this->headers(self::SEMUA, 'montir-1')
             ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+                'version' => $this->versi($workOrder['id']),
                 'aktual_jam' => 2.25,
                 'sebab_kerusakan_id' => $sebab,
                 'tindakan_perbaikan_id' => $tindakan,
@@ -365,6 +417,7 @@ class WorkOrderExecutionTest extends TestCase
 
         $request = fn (?string $keterangan) => $this->headers(self::SEMUA, 'montir-1')
             ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+                'version' => $this->versi($workOrder['id']),
                 'sebab_kerusakan_id' => $sebab,
                 'sebab_kerusakan_keterangan' => $keterangan,
             ]);
@@ -382,7 +435,7 @@ class WorkOrderExecutionTest extends TestCase
     {
         $milikSaya = $this->siapDikerjakan();
         $orangLain = $this->buatWorkOrder(['ditugaskan_ke' => 'montir-2']);
-        $this->pindah($orangLain['id'], 'dijadwalkan', 1)->assertOk();
+        $this->pindah($orangLain['id'], 'dijadwalkan')->assertOk();
 
         $data = $this->headers([...self::SEMUA], 'montir-1')
             ->getJson('/api/modules/management-aset/v1/pemeliharaan-aset/saya')->assertOk()->json('data');
@@ -407,8 +460,8 @@ class WorkOrderExecutionTest extends TestCase
     }
 
     /**
-     * Work order yang checklist-nya sudah disusun, lalu dijadwalkan dan mulai dikerjakan;
-     * version berakhir di 3. Checklist sengaja disalin lebih dahulu karena prosedur disusun
+     * Work order yang checklist-nya sudah disusun, lalu dijadwalkan dan mulai dikerjakan.
+     * Checklist sengaja disalin lebih dahulu karena prosedur disusun
      * sebelum pekerjaan dimulai, bukan setelahnya.
      *
      * @return array<string, mixed>
@@ -417,8 +470,8 @@ class WorkOrderExecutionTest extends TestCase
     {
         $workOrder = $this->buatWorkOrder($tipe ? ['tipe' => $tipe] : []);
         $this->salinTemplate($workOrder['id'], $this->jobId($workOrder['id']))->assertCreated();
-        $this->pindah($workOrder['id'], 'dijadwalkan', 1)->assertOk();
-        $this->pindah($workOrder['id'], 'dikerjakan', 2)->assertOk();
+        $this->pindah($workOrder['id'], 'dijadwalkan')->assertOk();
+        $this->pindah($workOrder['id'], 'dikerjakan')->assertOk();
 
         return $workOrder;
     }
@@ -427,11 +480,11 @@ class WorkOrderExecutionTest extends TestCase
      * @param  list<string>|null  $permissions
      * @return TestResponse<Response>
      */
-    private function pindah(string $id, string $ke, int $version, ?array $permissions = null, ?string $alasan = null): TestResponse
+    private function pindah(string $id, string $ke, ?array $permissions = null, ?string $alasan = null): TestResponse
     {
         return $this->headers($permissions ?? self::SEMUA, 'penyelia-1')
             ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/status', array_filter([
-                'ke_status' => $ke, 'version' => $version, 'alasan' => $alasan,
+                'ke_status' => $ke, 'version' => $this->versi($id), 'alasan' => $alasan,
             ], static fn ($value) => $value !== null));
     }
 
@@ -440,7 +493,7 @@ class WorkOrderExecutionTest extends TestCase
     {
         return $this->headers(self::SEMUA, 'montir-1')
             ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist/dari-template', [
-                'template_id' => $this->masters()['template'],
+                'template_id' => $this->masters()['template'], 'version' => $this->versi($id),
             ]);
     }
 
@@ -451,7 +504,7 @@ class WorkOrderExecutionTest extends TestCase
     private function simpanChecklist(string $id, string $jobId, array $baris): TestResponse
     {
         return $this->headers(self::SEMUA, 'montir-1')
-            ->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist', ['baris' => $baris]);
+            ->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist', ['version' => $this->versi($id), 'baris' => $baris]);
     }
 
     /** Menandai seluruh pemeriksaan wajib sebagai tidak berlaku supaya gate lain dapat diuji sendiri. */
@@ -462,6 +515,12 @@ class WorkOrderExecutionTest extends TestCase
         $this->simpanChecklist($workOrderId, $jobId, $wajib->map(fn (string $id): array => [
             'id' => $id, 'tidak_berlaku' => true,
         ])->all())->assertOk();
+    }
+
+    /** Versi work order saat ini: setiap langkah pelaksanaan mengirim versi yang terakhir dibacanya. */
+    private function versi(string $workOrderId): int
+    {
+        return (int) DB::table('aset_tr_pemeliharaan_aset')->where('id', $workOrderId)->value('version');
     }
 
     private function jobId(string $workOrderId): string

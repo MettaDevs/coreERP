@@ -276,7 +276,7 @@ class AcquisitionPostingTest extends TestCase
         $this->selesaikan($nol)->assertOk();
         $this->assertSame(0, FinancePosting::query()->count());
 
-        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => false, 'cutover_date' => '2026-01-01'])->assertOk();
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => false, 'cutover_date' => '2026-01-01', 'version' => (int) DB::table('finance_posting_settings')->where('legal_entity_id', $this->le)->value('version')])->assertOk();
         $id = $this->draf([], [$this->baris($group, 1, 1_000_000)]);
         $this->selesaikan($id)->assertOk();
         $this->assertSame(['manual', 'feed_disabled'], [$this->posting($id)->status, $this->posting($id)->manual_reason]);

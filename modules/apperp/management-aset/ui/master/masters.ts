@@ -55,6 +55,8 @@ export type MasterRecord = {
     nama: string;
     keterangan: string | null;
     aktif: boolean;
+    /** Versi record; setiap penyimpanan record ini dan rinciannya mengirimnya kembali. */
+    version: number;
 } & Record<string, unknown>;
 
 /**

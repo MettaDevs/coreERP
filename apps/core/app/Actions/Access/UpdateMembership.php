@@ -8,6 +8,7 @@ use App\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\SodConflictEvaluator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +28,11 @@ class UpdateMembership
      * diberikan atau dicabut pemegang Owner, dan sesudah perubahan harus tetap ada anggota yang dapat mengelola
      * akses.
      *
+     * `$expectedVersion` adalah versi keanggotaan yang dibuka penggunanya; penugasannya ikut terkunci bersamanya.
+     *
      * @param  array{assignments:list<array{role_id:string,policy_scopes:list<array<string,mixed>>}>}  $data
      */
-    public function handle(TenantMembership $actor, TenantMembership $target, array $data): TenantMembership
+    public function handle(TenantMembership $actor, TenantMembership $target, array $data, int $expectedVersion): TenantMembership
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || $actor->tenant_id !== $target->tenant_id) {
             throw new AuthorizationException;
@@ -47,7 +50,8 @@ class UpdateMembership
             $this->scopeResolver->assertNoRedundantGrants($assignment['policy_scopes']);
         }
 
-        return DB::transaction(function () use ($actor, $target, $data, $roles): TenantMembership {
+        return DB::transaction(function () use ($actor, $target, $data, $roles, $expectedVersion): TenantMembership {
+            RowVersion::claim($target, $expectedVersion);
             $target->roleAssignments()->where('source', 'manual')->delete();
             foreach ($data['assignments'] as $input) {
                 $assignment = RoleAssignment::create([
@@ -79,7 +83,7 @@ class UpdateMembership
 
             AccessGuards::assertNotLockedOut($actor->tenant_id);
 
-            return $target->load('roleAssignments.role', 'roleAssignments.dataPolicyScopes');
+            return $target->refresh()->load('roleAssignments.role', 'roleAssignments.dataPolicyScopes');
         });
     }
 }

@@ -34,12 +34,17 @@ export default function JenisAsetModels({
     loading,
     error,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     jenisAsetId: string;
     detail: JenisAsetDetail | null;
     loading: boolean;
     error: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [saving, setSaving] = useState(false);
 
@@ -77,12 +82,17 @@ export default function JenisAsetModels({
         setKerja({ ...aktif, saved: false, saveError: '' });
 
         try {
-            await api(`/jenis-aset/${jenisAsetId}/models`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    model_ids: selected.map((item) => item.id),
-                }),
-            });
+            const result = await api<{ data: { version: number } }>(
+                `/jenis-aset/${jenisAsetId}/models`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        model_ids: selected.map((item) => item.id),
+                    }),
+                },
+            );
+            onVersionChange(result.data.version);
             setKerja((current) => current && { ...current, saved: true });
         } catch (caught) {
             setKerja(

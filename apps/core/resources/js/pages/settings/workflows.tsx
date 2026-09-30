@@ -34,6 +34,7 @@ type Workflow = {
     id: string;
     name: string;
     enabled: boolean;
+    version: number;
     status: 'draft' | 'active' | 'inactive';
     type_name: string;
     app_name: string;
@@ -399,14 +400,20 @@ export default function Workflows({
                                                             toggleForm.processing
                                                         }
                                                         className="text-xs text-muted-foreground hover:text-foreground"
-                                                        onClick={() =>
+                                                        onClick={() => {
+                                                            toggleForm.transform(
+                                                                () => ({
+                                                                    version:
+                                                                        workflow.version,
+                                                                }),
+                                                            );
                                                             toggleForm.post(
                                                                 `/settings/workflows/${workflow.id}/deactivate`,
                                                                 {
                                                                     preserveScroll: true,
                                                                 },
-                                                            )
-                                                        }
+                                                            );
+                                                        }}
                                                     >
                                                         <Power className="mr-1.5 size-3.5" />
                                                         Nonaktifkan
@@ -423,14 +430,20 @@ export default function Workflows({
                                                             toggleForm.processing
                                                         }
                                                         className="text-xs"
-                                                        onClick={() =>
+                                                        onClick={() => {
+                                                            toggleForm.transform(
+                                                                () => ({
+                                                                    version:
+                                                                        workflow.version,
+                                                                }),
+                                                            );
                                                             toggleForm.post(
                                                                 `/settings/workflows/${workflow.id}/activate`,
                                                                 {
                                                                     preserveScroll: true,
                                                                 },
-                                                            )
-                                                        }
+                                                            );
+                                                        }}
                                                     >
                                                         <Check className="mr-1.5 size-3.5" />
                                                         Aktifkan

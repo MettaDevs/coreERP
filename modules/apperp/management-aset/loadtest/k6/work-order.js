@@ -327,7 +327,8 @@ function siklus(tenant) {
 
     const pelaksanaan = http.patch(
         `${WO}/${id}/jobs/${barisPekerjaan}/execution`,
-        JSON.stringify({ aktual_jam: 1 }),
+        // Versi baris work order yang baru dibaca (area 3): tanpa versi penyimpanan ditolak 428.
+        JSON.stringify({ aktual_jam: 1, version: dibaca.json('data.version') }),
         paramsUntuk(tenant, { tags: { op: 'execution', resource: 'pemeliharaan-aset' } }),
     );
     record(pelaksanaan, writeLatency, 200, 'hasil pelaksanaan 200');

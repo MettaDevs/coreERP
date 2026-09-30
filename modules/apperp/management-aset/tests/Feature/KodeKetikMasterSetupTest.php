@@ -70,7 +70,7 @@ class KodeKetikMasterSetupTest extends TestCase
     {
         $id = (string) $this->buat($resource, ['kode' => 'KENDARAAN', 'nama' => 'Kendaraan'])->assertCreated()->json('data.id');
         $this->sebagaiPengguna($this->tenantId, $this->izin($resource))
-            ->deleteJson('/api/modules/management-aset/v1/'.$resource.'/'.$id)
+            ->deleteJson('/api/modules/management-aset/v1/'.$resource.'/'.$id, ['version' => 1])
             ->assertNoContent();
 
         $this->buat($resource, ['kode' => 'kendaraan', 'nama' => 'Kendaraan baru'])
@@ -91,7 +91,7 @@ class KodeKetikMasterSetupTest extends TestCase
         $id = (string) $this->buat($resource, ['kode' => 'KENDARAAN', 'nama' => 'Kendaraan'])->json('data.id');
 
         $this->sebagaiPengguna($this->tenantId, $this->izin($resource))
-            ->patchJson('/api/modules/management-aset/v1/'.$resource.'/'.$id, ['kode' => 'MOBIL', 'nama' => 'Kendaraan dinas'])
+            ->patchJson('/api/modules/management-aset/v1/'.$resource.'/'.$id, ['kode' => 'MOBIL', 'nama' => 'Kendaraan dinas', 'version' => 1])
             ->assertOk()
             ->assertJsonPath('data.kode', 'KENDARAAN')
             ->assertJsonPath('data.nama', 'Kendaraan dinas');

@@ -60,7 +60,7 @@ class SharedLocationTest extends TestCase
         // Mengubah alamat dari satu organisasi mengubahnya bagi yang lain.
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$holding}/locations/{$address['id']}", [
             'name' => 'Menara Bersama', 'purposes' => ['business'], 'country_region_code' => 'ID',
-            'street' => 'Jl. Sudirman No. 2', 'city' => 'Jakarta',
+            'street' => 'Jl. Sudirman No. 2', 'city' => 'Jakarta', 'version' => $this->versi('party_locations', $address['id']),
         ])->assertOk();
         $this->actingAs($this->owner)->getJson("/api/v1/organizations/{$branch}/print-identity")
             ->assertOk()->assertJsonPath('data.address_lines', ['Jl. Sudirman No. 2', 'Jakarta']);
@@ -81,7 +81,7 @@ class SharedLocationTest extends TestCase
             'location_id' => $address['location_id'], 'purposes' => ['delivery'],
         ])->assertCreated()->json('data');
 
-        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$holding}/locations/{$address['id']}")->assertNoContent();
+        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$holding}/locations/{$address['id']}", ['version' => $this->versi('party_locations', $address['id'])])->assertNoContent();
 
         // Tautannya diarsipkan, bukan dihapus; tempat dan alamat posnya tetap untuk pemakai lain.
         $this->assertNotNull(DB::table('party_locations')->where('id', $address['id'])->value('deleted_at'));
@@ -102,6 +102,7 @@ class SharedLocationTest extends TestCase
 
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$organization}/locations/{$address['id']}", [
             'name' => 'Kantor', 'purposes' => ['delivery'], 'country_region_code' => 'ID', 'street' => 'Jl. Satu',
+            'version' => $this->versi('party_locations', $address['id']),
         ])->assertOk()->assertJsonPath('data.purposes', ['delivery']);
 
         // Kegunaan yang dicabut diarsipkan, bukan dihapus.
@@ -111,6 +112,7 @@ class SharedLocationTest extends TestCase
         // Kegunaan dipilih lagi setelah dicabut: satu baris aktif, tidak bentrok dengan yang terarsip.
         $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$organization}/locations/{$address['id']}", [
             'name' => 'Kantor', 'purposes' => ['delivery', 'invoice'], 'country_region_code' => 'ID', 'street' => 'Jl. Satu',
+            'version' => $this->versi('party_locations', $address['id']),
         ])->assertOk()->assertJsonPath('data.purposes', ['delivery', 'invoice']);
 
         $post = fn (array $purposes) => $this->actingAs($this->owner)->postJson("/api/v1/organizations/{$organization}/locations", [
@@ -162,7 +164,7 @@ class SharedLocationTest extends TestCase
             ->assertOk()->assertJsonPath('data.email', 'info@tanpa.test')->assertJsonPath('data.address_lines', []);
 
         // Mengarsipkan kontak mengisi deleted_at, bukan membuang barisnya.
-        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/contacts/{$contact['id']}")->assertNoContent();
+        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/contacts/{$contact['id']}", ['version' => $contact['version']])->assertNoContent();
         $this->assertNotNull(DB::table('electronic_addresses')->where('id', $contact['id'])->value('deleted_at'));
     }
 
@@ -202,6 +204,11 @@ class SharedLocationTest extends TestCase
         return $this->actingAs($this->owner)->postJson("/api/v1/organizations/{$organization}/locations", [
             'purposes' => ['business'], 'country_region_code' => 'ID', ...$data,
         ])->assertCreated()->json('data');
+    }
+
+    private function versi(string $table, string $id): int
+    {
+        return (int) DB::table($table)->where('id', $id)->value('version');
     }
 
     private function legalEntity(string $name, ?string $tenantId = null): string

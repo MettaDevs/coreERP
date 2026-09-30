@@ -118,7 +118,7 @@ class OpeningBalanceTest extends TestCase
 
         // Cutover yang dimundurkan sesudah draf disimpan tetap menahan penyelesaiannya.
         $id = $this->drafSaldoAwal([$this->barisSaldoAwal($group, 1, '10000000', '0', 0)], ['tanggal' => '2025-12-01', 'tanggal_siap_pakai' => '2025-12-01']);
-        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => true, 'cutover_date' => '2025-06-01'])->assertOk();
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le}/finance-posting", ['enabled' => true, 'cutover_date' => '2025-06-01', 'version' => (int) DB::table('finance_posting_settings')->where('legal_entity_id', $this->le)->value('version')])->assertOk();
         $this->pratinjau($id)->assertOk()->assertJsonPath('data.blockers.0.field', 'tanggal');
         $this->selesaikan($id)->assertStatus(422)->assertJsonValidationErrors(['tanggal']);
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->count());
@@ -233,7 +233,7 @@ class OpeningBalanceTest extends TestCase
         $komersial = $this->bukuBerprofil('KOM-'.$kode, 'Komersial '.$nama, 'current', $metode, $masaKomersial);
         $fiskal = $this->bukuBerprofil('FIS-'.$kode, 'Fiskal '.$nama, 'none', $metode, $masaFiskal);
         $this->sebagaiPengguna($this->tenantId, $this->izin('group-aset'))
-            ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', ['rows' => [
+            ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', ['version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'), 'rows' => [
                 ['buku_id' => $komersial, 'useful_life_periods' => $masaKomersial, 'convention' => 'full_month', 'depreciate' => true],
                 ['buku_id' => $fiskal, 'useful_life_periods' => $masaFiskal, 'convention' => 'full_month', 'depreciate' => true],
             ]])->assertOk();

@@ -70,3 +70,81 @@ NumberSequenceUnavailable:
     application/json:
       schema:
         $ref: '#/components/schemas/ErrorResponse'
+VersionRequired:
+  description: |
+    Versi data yang diubah tidak dikirim (`error.code` = `version_required`). Kirim header `If-Match`
+    berisi ETag dari jawaban baca, atau field `version` pada body. Header `If-Match` yang bentuknya
+    bukan ETag angka juga dijawab begini. Tidak ada yang berubah.
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+      example:
+        error:
+          code: version_required
+          message: 'Versi data yang sedang diubah wajib dikirim: header If-Match berisi ETag, atau field version.'
+StaleVersion:
+  description: |
+    Data sudah diubah sejak pengguna membukanya (`error.code` = `stale_version`). Perubahan tidak
+    disimpan; muat ulang untuk mendapat `version` terbaru, lalu ulangi perubahannya.
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+      example:
+        error:
+          code: stale_version
+          message: Perubahanmu belum disimpan karena data ini sudah diubah sejak kamu membukanya. Muat ulang untuk melihat data terbaru, lalu ulangi perubahanmu.
+StaleVersionOrReferencedByChildren:
+  description: |
+    Dua kemungkinan, dibedakan `error.code`:
+
+    | `error.code` | Arti |
+    | --- | --- |
+    | `stale_version` | Data sudah diubah sejak dibuka; muat ulang lalu ulangi |
+    | `referenced_by_children` | Data masih dipakai master turunan yang aktif; arsipkan turunannya lebih dulu |
+
+    Versi diperiksa lebih dulu. Penolakan `referenced_by_children` membatalkan transaksinya, jadi
+    `version` data tidak bertambah karenanya.
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+StaleVersionOrAttributeValuesInUse:
+  description: |
+    Dua kemungkinan, dibedakan `error.code`:
+
+    | `error.code` | Arti |
+    | --- | --- |
+    | `stale_version` | Tipe atribut sudah diubah sejak dibuka; muat ulang lalu ulangi |
+    | `attribute_values_in_use` | Values baru tidak mencakup seluruh nilai aset yang tersimpan; bentuknya `AttributeValuesConflictResponse` |
+  content:
+    application/json:
+      schema:
+        oneOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - $ref: '#/components/schemas/AttributeValuesConflictResponse'
+StaleVersionOrTypeLocked:
+  description: |
+    Tiga kemungkinan, dibedakan `error.code`:
+
+    | `error.code` | Arti |
+    | --- | --- |
+    | `stale_version` | Tipe atribut sudah diubah sejak dibuka; muat ulang lalu ulangi |
+    | `data_type_locked` | Tipe data sudah pernah dipakai dan tidak dapat diubah |
+    | `attribute_type_has_values` | Tipe teks masih memiliki Values aktif |
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+StaleVersionOrAsetLocked:
+  description: |
+    Beberapa kemungkinan; hanya versi yang membawa `error.code` = `stale_version`:
+
+    - `stale_version`: aset sudah diubah sejak dibuka; muat ulang lalu ulangi.
+    - Aset sudah dilepas, sehingga tidak dapat diubah.
+    - Nilai perolehan atau residu diubah padahal sudah ada periode penyusutan; balikkan periodenya lebih dulu.
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'

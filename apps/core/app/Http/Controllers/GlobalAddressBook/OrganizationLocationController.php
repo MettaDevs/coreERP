@@ -8,6 +8,7 @@ use App\Models\LocationPurpose;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\AddressBook\OrganizationAddressBook;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -49,13 +50,15 @@ class OrganizationLocationController extends Controller
     {
         $this->guardOrganization($request, $organization, manage: true);
 
-        return response()->json(['data' => $this->addressBook->saveLocation($organization, $this->validated($request), $location)]);
+        $data = $this->validated($request);
+
+        return response()->json(['data' => $this->addressBook->saveLocation($organization, $data, $location, RowVersion::expected($request))]);
     }
 
     public function destroy(Request $request, Organization $organization, string $location): Response
     {
         $this->guardOrganization($request, $organization, manage: true);
-        $this->addressBook->deleteLocation($organization, $location);
+        $this->addressBook->deleteLocation($organization, $location, RowVersion::expected($request));
 
         return response()->noContent();
     }

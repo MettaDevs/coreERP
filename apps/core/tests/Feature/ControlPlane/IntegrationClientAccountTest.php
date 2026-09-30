@@ -46,10 +46,10 @@ final class IntegrationClientAccountTest extends TestCase
         $this->assertStringEndsWith('@application.invalid', $account->email);
         $this->assertNull($account->activeMembership());
 
-        $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", $this->bentuk('Finance baru'))->assertOk();
+        $this->actingAs($this->owner)->patchJson("/api/v1/integration-clients/{$id}", [...$this->bentuk('Finance baru'), 'version' => IntegrationClient::query()->findOrFail($id)->version])->assertOk();
         $this->assertSame('Finance baru', $account->fresh()?->name);
 
-        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/revoke")->assertOk();
+        $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/revoke", ['version' => IntegrationClient::query()->findOrFail($id)->version])->assertOk();
         $this->assertSame($account->id, IntegrationClient::query()->findOrFail($id)->user_id);
         $this->assertNotNull($account->fresh());
     }

@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -293,6 +294,42 @@ class RegisterAsetTest extends TestCase
 
         $this->selesaikanPenerimaan($this->tenantId, (string) $penerimaan)->assertStatus(422);
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $penerimaan)->count());
+    }
+
+    public function test_koreksi_aset_kedua_dengan_versi_yang_sama_ditolak(): void
+    {
+        $aset = $this->receive();
+        $alamat = '/api/modules/management-aset/v1/aset/'.$aset;
+        $versi = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])->getJson($alamat)
+            ->assertOk()->json('data.version');
+        $this->assertIsInt($versi);
+        $pengubah = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update']);
+
+        $baru = $pengubah->patchJson($alamat, ['version' => $versi, 'nama' => 'Koreksi pertama'])->assertOk()->json('data.version');
+        $this->assertGreaterThan($versi, $baru);
+        $pengubah->patchJson($alamat, ['version' => $versi, 'nama' => 'Koreksi kedua'])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'nama' => 'Koreksi pertama']);
+
+        // Versi dari jawaban simpan pertama langsung dapat dipakai lagi tanpa memuat ulang.
+        $pengubah->patchJson($alamat, ['version' => $baru, 'nama' => 'Koreksi ketiga'])->assertOk();
+    }
+
+    public function test_koreksi_aset_tanpa_versi_ditolak_dan_rincian_memulangkan_etag(): void
+    {
+        $aset = $this->receive();
+        $alamat = '/api/modules/management-aset/v1/aset/'.$aset;
+        $versi = (int) DB::table('aset_tr_aset')->where('id', $aset)->value('version');
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
+            ->patchJson($alamat, ['nama' => 'Tanpa versi'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'nama' => 'Aset uji', 'version' => $versi]);
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])->getJson($alamat)
+            ->assertOk()->assertJsonPath('data.version', $versi)->assertHeader('ETag', RowVersion::etag($versi));
     }
 
     private function receive(): string

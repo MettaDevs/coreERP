@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\NumberSequence\NumberSequenceSettingsRequest;
 use App\Models\TenantNumberSequence;
 use App\Support\Finance\CoreNumberSequences;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -41,7 +43,12 @@ class NumberSequenceController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($sequence->tenant_id === $membership->tenant_id, 404);
         $sequence->load('reference');
-        $sequence = $service->configure($sequence, $request->payload(), $request->user()->id);
+        // Klaim dan simpan dalam satu transaksi: pengaturan yang ditolak validasi tidak menaikkan versi.
+        $sequence = DB::transaction(function () use ($request, $sequence, $service): TenantNumberSequence {
+            RowVersion::claim($sequence, RowVersion::expected($request));
+
+            return $service->configure($sequence, $request->payload(), $request->user()->id);
+        });
 
         return $request->is('api/*')
             ? response()->json(['data' => $this->present($sequence)])
@@ -87,6 +94,7 @@ class NumberSequenceController extends Controller
             'minimum_number' => $sequence->minimum_number,
             'maximum_number' => $sequence->maximum_number,
             'segments' => $sequence->segments,
+            'version' => $sequence->version,
         ];
     }
 }

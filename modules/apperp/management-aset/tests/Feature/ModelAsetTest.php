@@ -41,13 +41,14 @@ class ModelAsetTest extends TestCase
         // **dan** dipakai untuk mencatat penerbitannya.
         $this->assertDatabaseHas('number_sequence_issues', ['idempotency_key' => 'model-aset:create-model-1']);
 
-        $this->withContext(['management-aset.model-aset.update'])
-            ->patchJson('/api/modules/management-aset/v1/model-aset/'.$id, ['nama' => 'PC200-8 MK2', 'aktif' => false])
+        $versi = $this->withContext(['management-aset.model-aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/model-aset/'.$id, ['nama' => 'PC200-8 MK2', 'aktif' => false, 'version' => $created->json('data.version')])
             ->assertOk()
-            ->assertJsonPath('data.aktif', false);
+            ->assertJsonPath('data.aktif', false)
+            ->json('data.version');
 
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$id)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$id, ['version' => $versi])
             ->assertNoContent();
 
         $this->assertSoftDeleted('aset_m_model_aset', ['id' => $id, 'tenant_id' => $this->tenantId]);
@@ -190,15 +191,16 @@ class ModelAsetTest extends TestCase
         $model = $this->model($pabrikan);
         $aset = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
+        $versi = DB::table('aset_m_model_aset')->where('id', $model)->value('version');
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model, ['version' => $versi])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
         DB::table('aset_tr_aset')->where('id', $aset)->update(['deleted_at' => now()]);
 
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model, ['version' => $versi])
             ->assertNoContent();
     }
 

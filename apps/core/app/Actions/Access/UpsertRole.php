@@ -7,17 +7,23 @@ use App\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\TenantProducts;
+use App\Support\Modules\Contracts\RowVersion;
 use App\Support\RoleHierarchy;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 class UpsertRole
 {
     public function __construct(private readonly RoleHierarchy $hierarchy) {}
 
-    /** @param array{name:string,duty_codes:list<string>,child_role_ids?:list<string>} $data */
-    public function handle(TenantMembership $actor, array $data, ?Role $role = null): Role
+    /**
+     * `$expectedVersion` wajib saat mengubah role yang sudah ada: versi yang dibuka penggunanya.
+     *
+     * @param  array{name:string,duty_codes:list<string>,child_role_ids?:list<string>}  $data
+     */
+    public function handle(TenantMembership $actor, array $data, ?Role $role = null, ?int $expectedVersion = null): Role
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) || ($role && $role->tenant_id !== $actor->tenant_id)) {
             throw new AuthorizationException;
@@ -52,7 +58,10 @@ class UpsertRole
             }
         }
 
-        return DB::transaction(function () use ($actor, $data, $role, $validDuties, $childRoleIds): Role {
+        return DB::transaction(function () use ($actor, $data, $role, $expectedVersion, $validDuties, $childRoleIds): Role {
+            if ($role !== null) {
+                RowVersion::claim($role, $expectedVersion ?? throw new LogicException('Mengubah role wajib membawa versi yang dibuka.'));
+            }
             $role ??= new Role(['tenant_id' => $actor->tenant_id]);
             $role->fill([
                 'name' => $data['name'],
@@ -72,7 +81,7 @@ class UpsertRole
 
             AccessGuards::assertNotLockedOut($actor->tenant_id);
 
-            return $role->load('duties', 'children');
+            return $role->refresh()->load('duties', 'children');
         });
     }
 }

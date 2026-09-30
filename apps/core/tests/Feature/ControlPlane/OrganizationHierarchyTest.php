@@ -54,10 +54,11 @@ class OrganizationHierarchyTest extends TestCase
 
         $version = OrganizationHierarchyVersion::query()->firstOrFail();
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'version' => $version->hierarchy()->value('version'),
             'organization_id' => $department->id,
             'parent_organization_id' => $legalEntity->id,
         ])->assertRedirect();
-        $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish")->assertRedirect();
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish", ['version' => $version->hierarchy()->value('version')])->assertRedirect();
 
         $this->assertDatabaseHas('organization_hierarchy_purposes', ['hierarchy_id' => $version->hierarchy_id]);
         $this->assertDatabaseHas('organization_hierarchy_closures', [
@@ -102,11 +103,13 @@ class OrganizationHierarchyTest extends TestCase
         ]);
         $published = OrganizationHierarchyVersion::query()->firstOrFail();
         $this->post("/settings/organization/hierarchy-versions/{$published->id}/placements", [
+            'version' => $published->hierarchy()->value('version'),
             'organization_id' => $department->id, 'parent_organization_id' => $legalEntity->id,
         ]);
-        $this->post("/settings/organization/hierarchy-versions/{$published->id}/publish");
+        $this->post("/settings/organization/hierarchy-versions/{$published->id}/publish", ['version' => $published->hierarchy()->value('version')]);
 
         $this->post("/settings/organization/hierarchy-versions/{$published->id}/drafts", [
+            'version' => $published->hierarchy()->value('version'),
             'effective_from' => now()->addDay()->toDateString(),
         ])->assertRedirect();
 
@@ -136,8 +139,8 @@ class OrganizationHierarchyTest extends TestCase
         $version = OrganizationHierarchyVersion::query()->firstOrFail();
         $payload = ['organization_id' => $department->id, 'parent_organization_id' => $legalEntity->id];
 
-        $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", $payload)->assertRedirect();
-        $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", $payload)
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", $payload + ['version' => $version->hierarchy()->value('version')])->assertRedirect();
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", $payload + ['version' => $version->hierarchy()->value('version')])
             ->assertRedirect()
             ->assertSessionHasErrors('organization_id');
 
@@ -162,20 +165,23 @@ class OrganizationHierarchyTest extends TestCase
         $version = OrganizationHierarchyVersion::query()->firstOrFail();
 
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'version' => $version->hierarchy()->value('version'),
             'organization_id' => $branch->id, 'parent_organization_id' => $legalEntity->id,
         ]);
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'version' => $version->hierarchy()->value('version'),
             'organization_id' => $department->id, 'parent_organization_id' => $legalEntity->id,
         ]);
         $node = OrganizationHierarchyNode::query()->where('version_id', $version->id)->where('organization_id', $department->id)->firstOrFail();
 
-        $this->delete("/settings/organization/hierarchy-versions/{$version->id}/placements/{$node->id}")->assertRedirect();
+        $this->delete("/settings/organization/hierarchy-versions/{$version->id}/placements/{$node->id}", ['version' => $version->hierarchy()->value('version')])->assertRedirect();
         $this->assertDatabaseMissing('organization_hierarchy_nodes', ['id' => $node->id]);
         $this->assertDatabaseMissing('organization_hierarchy_closures', [
             'version_id' => $version->id, 'descendant_organization_id' => $department->id,
         ]);
 
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'version' => $version->hierarchy()->value('version'),
             'organization_id' => $department->id, 'parent_organization_id' => $branch->id,
         ])->assertRedirect();
         $this->assertDatabaseHas('organization_hierarchy_closures', [
@@ -202,7 +208,7 @@ class OrganizationHierarchyTest extends TestCase
 
         $units->each(fn (Organization $unit) => $this->post(
             "/settings/organization/hierarchy-versions/{$version->id}/placements",
-            ['organization_id' => $unit->id, 'parent_organization_id' => $legalEntity->id],
+            ['organization_id' => $unit->id, 'parent_organization_id' => $legalEntity->id, 'version' => $version->hierarchy()->value('version')],
         )->assertRedirect());
 
         $this->assertDatabaseCount('organization_hierarchy_nodes', 4);
@@ -288,6 +294,7 @@ class OrganizationHierarchyTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)->patchJson("/api/v1/organizations/{$organization->id}", [
+            'version' => $organization->fresh()->version,
             'name' => 'Unit Operasi Denpasar',
             'operating_unit_type' => 'business_unit',
         ])->assertOk()

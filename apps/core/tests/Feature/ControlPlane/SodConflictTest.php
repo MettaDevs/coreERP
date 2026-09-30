@@ -49,6 +49,7 @@ class SodConflictTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$this->member->id}", [
+            'version' => $this->member->fresh()->version,
             'assignments' => [['role_id' => $first->id], ['role_id' => $second->id]],
         ])->assertUnprocessable()->assertJsonValidationErrors('assignments');
 

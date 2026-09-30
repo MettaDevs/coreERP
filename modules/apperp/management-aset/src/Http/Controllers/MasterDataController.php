@@ -2,9 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -206,12 +208,13 @@ abstract class MasterDataController extends Controller
                     $this->resource().':'.$creationKey,
                 );
 
+                // Dibaca ulang supaya jawaban membawa versi awal yang diisi database.
                 return $this->newQuery()->create([
                     'tenant_id' => $tenantId,
                     'creation_key' => $creationKey,
                     'kode' => $kode,
                     ...$payload,
-                ]);
+                ])->refresh();
             });
         } catch (NumberSequenceException $exception) {
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
@@ -247,7 +250,9 @@ abstract class MasterDataController extends Controller
     {
         $this->requirePermission($request, 'read');
 
-        return response()->json(['data' => $this->present($this->find($request, $id))]);
+        $record = $this->find($request, $id);
+
+        return response()->json(['data' => $this->present($record)], 200, ['ETag' => RowVersion::etag($record->version)]);
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -255,35 +260,45 @@ abstract class MasterDataController extends Controller
         $this->requirePermission($request, 'update');
         $tenantId = $this->tenantId($request);
         $data = $request->validate($this->writeRules($tenantId, creating: false));
-        $write = function () use ($request, $id, $data, $tenantId): JsonResponse {
-            $record = $this->find($request, $id, $this->updateUnderLock());
+        $expected = RowVersion::expected($request);
+
+        return DB::transaction(function () use ($request, $id, $data, $tenantId, $expected): JsonResponse {
+            // Klaim versi sebelum pemeriksaan apa pun: ia memegang kunci baris sampai transaksi
+            // selesai, jadi pemeriksaan sesudahnya membaca keadaan yang tidak dapat disela
+            // penyimpanan lain. Record yang dibaca sebelum klaim tetap sahih, sebab klaim hanya
+            // berhasil bila versinya — dan dengan itu isinya — belum berubah sejak dibaca.
+            $record = $this->find($request, $id);
+            RowVersion::claim($record, $expected);
             $this->afterWriteValidation($data, $tenantId, creating: false, record: $record);
             $this->rejectParentCycle($record, $data);
             $record->update($this->changes($data));
-            // Induk boleh berpindah, jadi relasi lama dibuang agar dimuat ulang saat disajikan.
-            foreach ($this->parentMasters() as $parent) {
-                $record->unsetRelation($parent->relation);
-            }
 
-            return response()->json(['data' => $this->present($record)]);
-        };
-
-        return $this->updateUnderLock() ? DB::transaction($write) : $write();
+            // Dibaca ulang: versi dinaikkan trigger di database, dan induk boleh berpindah
+            // sehingga relasi lama tidak boleh ikut disajikan.
+            return response()->json(['data' => $this->present($this->find($request, $id))]);
+        });
     }
 
     public function destroy(Request $request, string $id): JsonResponse
     {
         $this->requirePermission($request, 'archive');
-        $record = $this->find($request, $id);
-        if ($child = $this->unarchivedChild($record)) {
-            return response()->json(['error' => [
-                'code' => 'referenced_by_children',
-                'message' => 'Data ini masih dipakai '.$child->label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
-            ]], 409);
-        }
-        $record->delete();
+        $expected = RowVersion::expected($request);
 
-        return response()->json(status: 204);
+        return DB::transaction(function () use ($request, $id, $expected): JsonResponse {
+            $record = $this->find($request, $id);
+            RowVersion::claim($record, $expected);
+            if ($child = $this->unarchivedChild($record)) {
+                // Dilempar, bukan dikembalikan: transaksi harus batal supaya klaim versi di atas
+                // ikut batal dan penolakan ini tidak membuat versi yang dipegang layar menjadi basi.
+                throw new HttpResponseException(response()->json(['error' => [
+                    'code' => 'referenced_by_children',
+                    'message' => 'Data ini masih dipakai '.$child->label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
+                ]], 409));
+            }
+            $record->delete();
+
+            return response()->json(status: 204);
+        });
     }
 
     /**
@@ -368,11 +383,9 @@ abstract class MasterDataController extends Controller
     }
 
     /** @return TModel */
-    private function find(Request $request, string $id, bool $lock = false): MasterData
+    private function find(Request $request, string $id): MasterData
     {
-        $query = $this->prepareQuery($this->masterQuery(), $request);
-
-        return ($lock ? $query->lockForUpdate() : $query)->findOrFail($id);
+        return $this->prepareQuery($this->masterQuery(), $request)->findOrFail($id);
     }
 
     /**
@@ -553,6 +566,7 @@ abstract class MasterDataController extends Controller
             'nama' => $record->nama,
             'keterangan' => $record->keterangan,
             'aktif' => $record->aktif,
+            'version' => $record->version,
         ];
 
         foreach ($this->parentMasters() as $parent) {
@@ -625,11 +639,5 @@ abstract class MasterDataController extends Controller
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {
         return $query;
-    }
-
-    /** Master tertentu dapat meminta PATCH berjalan di dalam transaksi dengan row lock. */
-    protected function updateUnderLock(): bool
-    {
-        return false;
     }
 }

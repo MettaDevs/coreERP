@@ -99,8 +99,8 @@ class AssetPostingGroupTest extends TestCase
         $this->simpan($group, '2026-07-01', $this->wajib(), ['read', 'update'])->assertForbidden();
         $this->simpan($group, '2026-01-01', $this->wajib(), ['read', 'update'])->assertOk();
 
-        $this->pengguna(['read', 'create', 'update'])->deleteJson(self::API.'/'.$group.'/2026-01-01')->assertForbidden();
-        $this->pengguna(['archive'])->deleteJson(self::API.'/'.$group.'/2026-01-01')->assertNoContent();
+        $this->arsipkan($group, '2026-01-01', ['read', 'create', 'update'])->assertForbidden();
+        $this->arsipkan($group, '2026-01-01', ['archive'])->assertNoContent();
     }
 
     public function test_only_active_accounts_valid_for_every_legal_entity_can_be_mapped(): void
@@ -177,8 +177,8 @@ class AssetPostingGroupTest extends TestCase
         $group = $this->group('KENDARAAN');
         $this->simpan($group, '2026-01-01', $this->wajib())->assertCreated();
 
-        $this->pengguna(['archive'])->deleteJson(self::API.'/'.$group.'/2026-01-01')->assertNoContent();
-        $this->pengguna(['archive'])->deleteJson(self::API.'/'.$group.'/2026-01-01')->assertNotFound();
+        $this->arsipkan($group, '2026-01-01', ['archive'])->assertNoContent();
+        $this->arsipkan($group, '2026-01-01', ['archive'])->assertNotFound();
 
         $baris = $this->pengguna(['read'])->getJson(self::API)->collect('data.groups')->firstWhere('id', $group);
         $this->assertSame([], $baris['rows']);
@@ -197,10 +197,46 @@ class AssetPostingGroupTest extends TestCase
         $this->tenantId = $tenantku;
 
         $this->simpan($milikLain, '2026-01-01', [])->assertNotFound();
-        $this->pengguna(['archive'])->deleteJson(self::API.'/'.$milikLain.'/2026-01-01')->assertNotFound();
+        $this->arsipkan($milikLain, '2026-01-01', ['archive'])->assertNotFound();
         $this->simpan($milikku, '2026-13-01', [])->assertStatus(422)->assertJsonValidationErrors('effective_from');
         $this->simpan($milikku, '01-01-2026', [])->assertNotFound();
         $this->assertSame(0, DB::table('aset_m_posting_group')->count());
+    }
+
+    /**
+     * Baris yang sudah ada hanya berubah dari versi yang dibuka pengguna: penyimpanan kedua dari
+     * versi yang sama ditolak dan akun dari penyimpanan pertama tetap, penyimpanan tanpa versi
+     * tidak mengubah apa pun. Baris baru untuk tanggal baru tidak butuh versi.
+     */
+    public function test_an_existing_row_only_changes_from_the_version_that_was_opened(): void
+    {
+        $group = $this->group('KENDARAAN');
+        $alamat = self::API.'/'.$group.'/2026-01-01';
+        $pengguna = $this->pengguna(['read', 'create', 'update', 'archive']);
+
+        $pengguna->putJson($alamat, $this->wajib())->assertCreated()->assertJsonPath('data.version', 1);
+        $pengguna->getJson(self::API)->assertJsonPath('data.groups.0.rows.0.version', 1);
+
+        $versi = $pengguna->putJson($alamat, [...$this->wajib(), 'payable_account_id' => $this->akun['hutang_lain'], 'version' => 1])
+            ->assertOk()
+            ->json('data.version');
+        $this->assertGreaterThan(1, $versi);
+        $pengguna->putJson($alamat, [...$this->wajib(), 'input_vat_account_id' => $this->akun['ppn'], 'version' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'stale_version');
+        $pengguna->putJson($alamat, [...$this->wajib(), 'input_vat_account_id' => $this->akun['ppn']])
+            ->assertStatus(428)
+            ->assertJsonPath('error.code', 'version_required');
+        $pengguna->deleteJson($alamat, ['version' => 1])->assertStatus(409);
+        $pengguna->deleteJson($alamat)->assertStatus(428);
+
+        $this->assertDatabaseHas('aset_m_posting_group', [
+            'group_aset_id' => $group,
+            'payable_account_id' => $this->akun['hutang_lain'],
+            'input_vat_account_id' => null,
+            'version' => $versi,
+            'deleted_at' => null,
+        ]);
     }
 
     public function test_the_row_in_force_is_read_by_posting_date_and_every_acquisition_method_uses_its_account(): void
@@ -247,7 +283,36 @@ class AssetPostingGroupTest extends TestCase
      */
     private function simpan(string $group, string $date, array $accounts, array $actions = ['read', 'create', 'update']): TestResponse
     {
-        return $this->pengguna($actions)->putJson(self::API.'/'.$group.'/'.$date, $accounts);
+        $versi = $this->versi($group, $date);
+
+        return $this->pengguna($actions)->putJson(self::API.'/'.$group.'/'.$date, $versi === null ? $accounts : [...$accounts, 'version' => $versi]);
+    }
+
+    /**
+     * @param  list<string>  $actions
+     * @return TestResponse<Response>
+     */
+    private function arsipkan(string $group, string $date, array $actions): TestResponse
+    {
+        // Baris yang sudah diarsipkan tidak punya versi lagi; layar tetap mengirim versi terakhir
+        // yang dipegangnya, dan jawabannya 404.
+        return $this->pengguna($actions)->deleteJson(self::API.'/'.$group.'/'.$date, ['version' => $this->versi($group, $date) ?? 1]);
+    }
+
+    /** Versi baris yang belum diarsipkan pada pasangan group dan tanggal itu, bila ada. */
+    private function versi(string $group, string $date): ?int
+    {
+        $tanggal = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if ($tanggal === false || $tanggal->format('Y-m-d') !== $date) {
+            return null;
+        }
+        $versi = DB::table('aset_m_posting_group')
+            ->where('group_aset_id', $group)
+            ->whereDate('effective_from', $date)
+            ->whereNull('deleted_at')
+            ->value('version');
+
+        return $versi === null ? null : (int) $versi;
     }
 
     /** @param  list<string>  $actions */

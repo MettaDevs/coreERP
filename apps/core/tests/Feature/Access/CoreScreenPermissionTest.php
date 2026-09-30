@@ -103,8 +103,8 @@ class CoreScreenPermissionTest extends TestCase
 
         $this->assertNotContains($duty->code, $this->ownerRole()->duties()->pluck('code')->all(), 'Draf belum sah.');
 
-        $this->actingAs($this->owner)->post("/settings/security-configuration/privileges/{$privilege}/publish")->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/security-configuration/duties/{$duty->code}/publish")->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/security-configuration/privileges/{$privilege}/publish", ['version' => DB::table('security_privileges')->where('code', $privilege)->value('version')])->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/security-configuration/duties/{$duty->code}/publish", ['version' => $duty->fresh()->version])->assertRedirect();
 
         $this->assertContains($duty->code, $this->ownerRole()->duties()->pluck('code')->all());
     }

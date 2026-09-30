@@ -8,6 +8,7 @@ use App\Models\FinanceReferenceAccountImport;
 use App\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\ReferenceAccountImporter;
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -126,9 +127,12 @@ final class ReferenceAccountController extends Controller
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE), 403);
         $data = $request->validate(['active' => ['required', 'boolean']]);
 
-        $account->update(['active' => (bool) $data['active']]);
+        DB::transaction(function () use ($request, $account, $data): void {
+            RowVersion::claim($account, RowVersion::expected($request));
+            $account->update(['active' => (bool) $data['active']]);
+        });
 
-        return response()->json(['data' => $this->present($account)]);
+        return response()->json(['data' => $this->present($account->refresh())]);
     }
 
     public function template(): HttpResponse
@@ -180,6 +184,7 @@ final class ReferenceAccountController extends Controller
     {
         return [
             'id' => $akun->id,
+            'version' => (int) $akun->version,
             'external_id' => $akun->external_id,
             'code' => $akun->code,
             'name' => $akun->name,

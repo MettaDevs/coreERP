@@ -39,6 +39,8 @@ type LoggedTable = Flags & {
     table_name: string;
     table_caption: string;
     customized: boolean;
+    /** 0 selama tabel ini masih memakai bawaan. */
+    version: number;
     fields: LoggedField[];
 };
 
@@ -103,6 +105,7 @@ function TableSetup({
             className="space-y-4"
             onSubmit={(event) => {
                 event.preventDefault();
+                form.transform((data) => ({ ...data, version: table.version }));
                 form.put(`/settings/change-log/${table.table_name}`, {
                     preserveScroll: true,
                 });

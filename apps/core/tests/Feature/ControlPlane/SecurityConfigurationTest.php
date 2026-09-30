@@ -47,8 +47,8 @@ class SecurityConfigurationTest extends TestCase
             'name' => 'Pembaca', 'duty_codes' => [$duty->code],
         ])->assertStatus(422);
 
-        $this->actingAs($this->owner)->post("/settings/security-configuration/privileges/{$privilege->code}/publish")->assertRedirect();
-        $this->actingAs($this->owner)->post("/settings/security-configuration/duties/{$duty->code}/publish")->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/security-configuration/privileges/{$privilege->code}/publish", ['version' => $privilege->fresh()->version])->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/security-configuration/duties/{$duty->code}/publish", ['version' => $duty->fresh()->version])->assertRedirect();
 
         $roleId = $this->actingAs($this->owner)->postJson('/api/v1/roles', [
             'name' => 'Pembaca', 'duty_codes' => [$duty->code],

@@ -1,9 +1,13 @@
+import { toast } from 'sonner';
+
 export type ApiValidationErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
     constructor(
         message: string,
         public readonly validationErrors: ApiValidationErrors = {},
+        public readonly status: number = 0,
+        public readonly code: string | null = null,
     ) {
         super(message);
         this.name = 'ApiError';
@@ -123,6 +127,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
             message?: unknown;
             errors?: unknown;
             error?: {
+                code?: unknown;
                 message?: unknown;
                 errors?: unknown;
                 details?: { errors?: unknown };
@@ -138,7 +143,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
                   ? body.message
                   : 'Permintaan belum berhasil.';
 
-        throw new ApiError(message, validationErrors);
+        throw new ApiError(
+            message,
+            validationErrors,
+            response.status,
+            typeof body?.error?.code === 'string' ? body.error.code : null,
+        );
     }
 
     return response.status === 204 ? (undefined as T) : response.json();
@@ -146,4 +156,24 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function errorMessage(caught: unknown, fallback: string): string {
     return caught instanceof Error ? caught.message : fallback;
+}
+
+/**
+ * Toast untuk kegagalan menyimpan. Versi basi mendapat tombol muat ulang penuh: isian form
+ * harus kembali ke data terbaru supaya pengguna melihat perubahan orang lain lebih dulu.
+ */
+export function toastSaveError(caught: unknown, fallback: string): void {
+    if (caught instanceof ApiError && caught.code === 'stale_version') {
+        toast.error(caught.message, {
+            duration: Infinity,
+            action: {
+                label: 'Muat ulang',
+                onClick: () => window.location.reload(),
+            },
+        });
+
+        return;
+    }
+
+    toast.error(errorMessage(caught, fallback));
 }

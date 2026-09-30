@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $location_id
  * @property bool $is_primary
  * @property-read Location $location
+ * @property int $version
  */
 class PartyLocation extends Model
 {

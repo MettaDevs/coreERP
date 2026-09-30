@@ -78,6 +78,9 @@
     responses:
       '200':
         description: Analisa maintenance ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -93,6 +96,8 @@
     - Master data
     operationId: updateAnalisaMaintenance
     summary: Mengubah nama, keterangan, atau status analisa maintenance
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -112,13 +117,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveAnalisaMaintenance
     summary: Mengarsipkan analisa maintenance
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Analisa maintenance diarsipkan
@@ -128,6 +145,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/group-aset:
   get:
     tags:
@@ -207,6 +228,9 @@
     responses:
       '200':
         description: Group aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -222,6 +246,8 @@
     - Master data
     operationId: updateGroupAset
     summary: Mengubah nama, keterangan, atau status group aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -241,13 +267,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveGroupAset
     summary: Mengarsipkan group aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Group aset diarsipkan
@@ -258,7 +296,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/group-aset/{id}/buku-penyusutan:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -292,6 +332,8 @@
       Saat disimpan, daftar yang dikirim menggantikan seluruh baris lama. Baris yang
       tidak disertakan diarsipkan. Karena itu permintaan yang sama dapat diulang tanpa
       efek tambahan dan tidak memerlukan `Idempotency-Key`.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -311,8 +353,12 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/posting-group-aset:
   get:
     tags:
@@ -392,6 +438,12 @@
       Setiap akun harus ada di daftar akun tenant, berlaku untuk semua entitas legal, dan aktif.
       Akun yang dinonaktifkan sesudah dipetakan boleh tetap di kolom yang tidak diubah, supaya
       baris lama masih dapat disimpan untuk memperbaiki kolom lain.
+
+      Baris yang sudah ada hanya boleh diubah dari versi yang dibuka pengguna (`version` pada body
+      atau header `If-Match`). Baris untuk tanggal berlaku yang belum ada dikirim dengan versi 0; bila
+      tab lain sudah membuatnya lebih dulu, versi 0 itu ditolak 409 `stale_version`.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -417,8 +469,12 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
@@ -428,6 +484,14 @@
       Permission `management-aset.fixed-asset-posting-profiles.archive`. Posting yang tanggalnya
       jatuh di masa berlaku baris ini lalu memakai baris sebelumnya, atau tertahan bila tidak ada.
       Tanggal yang sama boleh dipakai lagi untuk baris baru.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Baris diarsipkan
@@ -437,6 +501,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/jenis-aset/{id}/atribut:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -468,6 +536,8 @@
       permission tersendiri. Saat disimpan, daftar yang dikirim menggantikan seluruh
       baris lama. Baris yang tidak disertakan diarsipkan. Permintaan yang sama dapat
       diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -487,8 +557,12 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/jenis-aset/{id}/atribut-definisi:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -562,6 +636,8 @@
       karena tindakannya mengubah jenis aset tetapi membaca isi resource model. Satu model
       hanya boleh dimiliki satu jenis aset; mengaitkan model yang sudah dipegang jenis aset
       lain ditolak sebagai galat validasi, bukan dipindahkan diam-diam.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -571,6 +647,8 @@
             required:
             - model_ids
             properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
               model_ids:
                 type: array
                 maxItems: 100
@@ -591,7 +669,11 @@
                   type: object
                   required:
                   - model_ids
+                  - version
                   properties:
+                    version:
+                      description: Versi jenis aset sesudah disimpan; kirim pada penyimpanan berikutnya.
+                      $ref: '#/components/schemas/RecordVersion'
                     model_ids:
                       type: array
                       items:
@@ -602,8 +684,12 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/tipe-atribut/{id}/nilai:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -636,6 +722,8 @@
       pilihan lama. Pilihan yang tidak disertakan diarsipkan. Daftar kosong membuat
       atribut kembali menjadi teks bebas. Daftar nonkosong ditolak bila tidak mencakup
       seluruh nilai aset yang masih tersimpan.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -656,9 +744,11 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/AttributeValuesInUse'
+        $ref: '#/components/responses/StaleVersionOrAttributeValuesInUse'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/item-checklist-maintenance:
   get:
     tags:
@@ -738,6 +828,9 @@
     responses:
       '200':
         description: Item checklist maintenance ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -753,6 +846,8 @@
     - Master data
     operationId: updateItemChecklistMaintenance
     summary: Mengubah nama, keterangan, atau status item checklist maintenance
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -772,13 +867,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveItemChecklistMaintenance
     summary: Mengarsipkan item checklist maintenance
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Item checklist maintenance diarsipkan
@@ -788,6 +895,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/jenis-aset:
   get:
     tags:
@@ -867,6 +978,9 @@
     responses:
       '200':
         description: Jenis aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -882,6 +996,8 @@
     - Master data
     operationId: updateJenisAset
     summary: Mengubah nama, keterangan, atau status jenis aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -901,13 +1017,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveJenisAset
     summary: Mengarsipkan jenis aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Jenis aset diarsipkan
@@ -917,6 +1045,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/kondisi-aset:
   get:
     tags:
@@ -996,6 +1128,9 @@
     responses:
       '200':
         description: Kondisi aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1011,6 +1146,8 @@
     - Master data
     operationId: updateKondisiAset
     summary: Mengubah nama, keterangan, atau status kondisi aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1030,13 +1167,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveKondisiAset
     summary: Mengarsipkan kondisi aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Kondisi aset diarsipkan
@@ -1046,6 +1195,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/lokasi-aset:
   get:
     tags:
@@ -1127,6 +1280,9 @@
     responses:
       '200':
         description: Lokasi aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1142,6 +1298,8 @@
     - Master data
     operationId: updateLokasiAset
     summary: Mengubah lokasi aset, termasuk induk, tipe, dan pemetaan unit organisasinya
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1161,13 +1319,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveLokasiAset
     summary: Mengarsipkan lokasi aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Lokasi aset diarsipkan
@@ -1178,7 +1348,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/model-aset:
   get:
     tags:
@@ -1263,6 +1435,9 @@
     responses:
       '200':
         description: Model aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1278,6 +1453,8 @@
     - Master data
     operationId: updateModelAset
     summary: Mengubah model aset, termasuk memindahkannya ke pabrikan atau jenis lain
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1297,13 +1474,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveModelAset
     summary: Mengarsipkan model aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Model aset diarsipkan
@@ -1314,7 +1503,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/profil-penyusutan:
   get:
     tags:
@@ -1394,6 +1585,9 @@
     responses:
       '200':
         description: Profil penyusutan ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1409,6 +1603,8 @@
     - Master data
     operationId: updateProfilPenyusutan
     summary: Mengubah aturan, nama, keterangan, atau status profil penyusutan
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1428,13 +1624,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveProfilPenyusutan
     summary: Mengarsipkan profil penyusutan
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Profil penyusutan diarsipkan
@@ -1444,6 +1652,10 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/tipe-lokasi-aset:
   get:
     tags:
@@ -1523,6 +1735,9 @@
     responses:
       '200':
         description: Tipe lokasi aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1538,6 +1753,8 @@
     - Master data
     operationId: updateTipeLokasiAset
     summary: Mengubah nama, keterangan, atau status tipe lokasi aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1557,13 +1774,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveTipeLokasiAset
     summary: Mengarsipkan tipe lokasi aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Tipe lokasi aset diarsipkan
@@ -1574,7 +1803,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/buku-penyusutan:
   get:
     tags:
@@ -1654,6 +1885,9 @@
     responses:
       '200':
         description: Buku penyusutan ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1669,6 +1903,8 @@
     - Master data
     operationId: updateBukuPenyusutan
     summary: Mengubah buku penyusutan, termasuk profil, lapisan, dan pembulatan nominalnya
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1688,13 +1924,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveBukuPenyusutan
     summary: Mengarsipkan buku penyusutan
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Buku penyusutan diarsipkan
@@ -1705,7 +1953,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/tipe-atribut:
   get:
     tags:
@@ -1785,6 +2035,9 @@
     responses:
       '200':
         description: Tipe atribut ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1800,6 +2053,8 @@
     - Master data
     operationId: updateTipeAtribut
     summary: Mengubah tipe atribut, termasuk tipe dasar dan batas angka opsional
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1820,18 +2075,24 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Tipe dasar terkunci (`data_type_locked`) atau Values harus dikosongkan dahulu (`attribute_type_has_values`)
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ErrorResponse'
+        $ref: '#/components/responses/StaleVersionOrTypeLocked'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archiveTipeAtribut
     summary: Mengarsipkan tipe atribut
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Tipe atribut diarsipkan
@@ -1842,7 +2103,9 @@
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        $ref: '#/components/responses/ReferencedByChildren'
+        $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/pabrikan-aset:
   get:
     tags:
@@ -1948,6 +2211,9 @@
     responses:
       '200':
         description: Pabrikan aset ditemukan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
         content:
           application/json:
             schema:
@@ -1963,6 +2229,8 @@
     - Master data
     operationId: updatePabrikanAset
     summary: Mengubah nama, keterangan, atau status pabrikan aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -1982,13 +2250,25 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Master data
     operationId: archivePabrikanAset
     summary: Mengarsipkan pabrikan aset
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Pabrikan aset diarsipkan
@@ -1998,3 +2278,7 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '428':
+        $ref: '#/components/responses/VersionRequired'

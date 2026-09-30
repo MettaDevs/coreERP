@@ -87,9 +87,14 @@ const emptyRow = (bukuId: string): Row => ({
 export default function GroupBookMatrix({
     groupId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     groupId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [books, setBooks] = useState<Buku[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
@@ -175,28 +180,33 @@ export default function GroupBookMatrix({
 
         try {
             // Kiriman memuat daftar penuh; baris yang dihapus dari layar ikut diarsipkan.
-            await api(`/group-aset/${groupId}/buku-penyusutan`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    rows: rows.map((row) => ({
-                        buku_id: row.buku_id,
-                        depreciation_profile_id:
-                            row.depreciation_profile_id || null,
-                        alternative_profile_id:
-                            row.alternative_profile_id || null,
-                        useful_life_periods:
-                            row.useful_life_periods === ''
-                                ? null
-                                : Number(row.useful_life_periods),
-                        convention: row.convention || null,
-                        depreciate: row.depreciate,
-                        round_off_depreciation:
-                            row.round_off_depreciation === ''
-                                ? null
-                                : Number(row.round_off_depreciation),
-                    })),
-                }),
-            });
+            const result = await api<{ version: number }>(
+                `/group-aset/${groupId}/buku-penyusutan`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        rows: rows.map((row) => ({
+                            buku_id: row.buku_id,
+                            depreciation_profile_id:
+                                row.depreciation_profile_id || null,
+                            alternative_profile_id:
+                                row.alternative_profile_id || null,
+                            useful_life_periods:
+                                row.useful_life_periods === ''
+                                    ? null
+                                    : Number(row.useful_life_periods),
+                            convention: row.convention || null,
+                            depreciate: row.depreciate,
+                            round_off_depreciation:
+                                row.round_off_depreciation === ''
+                                    ? null
+                                    : Number(row.round_off_depreciation),
+                        })),
+                    }),
+                },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(errorMessage(caught, 'Matriks belum dapat disimpan.'));

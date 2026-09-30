@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -83,6 +84,53 @@ class WorkOrderTest extends TestCase
         $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
     }
 
+    public function test_simpan_kedua_dengan_versi_yang_sama_ditolak_dan_baris_simpan_pertama_bertahan(): void
+    {
+        $seed = $this->seedMasters();
+        $workOrder = $this->create($seed)->assertCreated()->assertJsonPath('data.version', 1)->json('data');
+        $alamat = '/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'];
+        $pengubah = $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update']);
+
+        $pertama = $this->payload($seed);
+        $pertama['keterangan'] = 'Simpan pertama';
+        $pertama['details'][0]['estimasi_jam'] = 2;
+        $pengubah->patchJson($alamat, [...$pertama, 'version' => 1])->assertOk();
+
+        $kedua = $this->payload($seed);
+        $kedua['keterangan'] = 'Simpan kedua';
+        $kedua['details'][0]['estimasi_jam'] = 7;
+        $pengubah->patchJson($alamat, [...$kedua, 'version' => 1])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'stale_version')
+            ->assertJsonPath('error.message', RowVersion::STALE_MESSAGE);
+
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id'], 'keterangan' => 'Simpan pertama']);
+        $this->assertSame(
+            [2.0],
+            DB::table('aset_tr_pemeliharaan_aset_details')->where('pemeliharaan_aset_id', $workOrder['id'])->pluck('estimasi_jam')->map(fn ($jam): float => (float) $jam)->all(),
+        );
+    }
+
+    public function test_simpan_dan_arsip_tanpa_versi_ditolak_dan_rincian_memulangkan_etag(): void
+    {
+        $seed = $this->seedMasters();
+        $workOrder = $this->create($seed)->assertCreated()->json('data');
+        $alamat = '/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'];
+        $payload = $this->payload($seed);
+        $payload['keterangan'] = 'Tanpa versi';
+
+        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update'])
+            ->patchJson($alamat, $payload)->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive'])
+            ->deleteJson($alamat)->assertStatus(428);
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', [
+            'id' => $workOrder['id'], 'keterangan' => 'Ban depan kanan bocor', 'version' => 1, 'deleted_at' => null,
+        ]);
+
+        $this->headers(['management-aset.pemeliharaan-aset.read'])->getJson($alamat)
+            ->assertOk()->assertJsonPath('data.version', 1)->assertHeader('ETag', RowVersion::etag(1));
+    }
+
     public function test_update_dan_archive_menuntut_izinnya_sendiri_dan_versi_terkini(): void
     {
         $seed = $this->seedMasters();
@@ -93,12 +141,12 @@ class WorkOrderTest extends TestCase
 
         $this->headers(['management-aset.pemeliharaan-aset.read'])
             ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertForbidden();
-        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update'])
-            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
+        $versi = $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertOk()->json('data.version');
         $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive'])
             ->deleteJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 1])->assertConflict();
         $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive'])
-            ->deleteJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 2])->assertNoContent();
+            ->deleteJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => $versi])->assertNoContent();
         $this->assertSoftDeleted('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id']]);
     }
 

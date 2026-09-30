@@ -138,9 +138,10 @@ class InvitationAccessTest extends TestCase
         ])->assertRedirect();
         $version = OrganizationHierarchyVersion::query()->firstOrFail();
         $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'version' => $version->hierarchy()->value('version'),
             'organization_id' => $unit->id, 'parent_organization_id' => $legalEntity->id,
         ])->assertRedirect();
-        $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish")->assertRedirect();
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish", ['version' => $version->hierarchy()->value('version')])->assertRedirect();
 
         $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
             'assignments' => [[
@@ -175,6 +176,7 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [[
                 'policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null,
                 'hierarchy_id' => null, 'include_descendants' => false,
@@ -197,6 +199,7 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [
                 ['policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null, 'hierarchy_id' => null, 'include_descendants' => false],
                 ['policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => null, 'hierarchy_id' => null, 'include_descendants' => false],
@@ -216,6 +219,7 @@ class InvitationAccessTest extends TestCase
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [[
                 'role_id' => $role->id,
                 'policy_scopes' => [[
@@ -262,6 +266,7 @@ class InvitationAccessTest extends TestCase
         $this->assertSame([$first->id], $joined->roleAssignments()->pluck('role_id')->all());
 
         $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'version' => InvitationCode::query()->whereKey($invitationId)->value('version'),
             'label' => 'Batch Agustus (revisi)',
             'assignments' => [['role_id' => $second->id, 'policy_scopes' => [$scope]]],
         ])->assertOk();
@@ -309,6 +314,7 @@ class InvitationAccessTest extends TestCase
         InvitationCode::findOrFail($invitationId)->update(['revoked_at' => now()]);
 
         $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'version' => InvitationCode::query()->whereKey($invitationId)->value('version'),
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertUnprocessable();
     }
@@ -336,6 +342,7 @@ class InvitationAccessTest extends TestCase
         ]);
 
         $this->actingAs($plain)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'version' => InvitationCode::query()->whereKey($invitationId)->value('version'),
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertForbidden();
     }
@@ -358,10 +365,12 @@ class InvitationAccessTest extends TestCase
         ];
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
         ])->assertUnprocessable()->assertJsonValidationErrors('organization_id');
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => [[...$scope, 'unrestricted' => true]]]],
         ])->assertOk();
 
@@ -391,6 +400,7 @@ class InvitationAccessTest extends TestCase
         // Memberi dirinya sendiri role Owner.
         $managerMembership = $manager->activeMembership();
         $this->actingAs($manager)->patchJson("/api/v1/memberships/{$managerMembership->id}", [
+            'version' => $managerMembership->fresh()->version,
             'assignments' => [
                 ['role_id' => $managerMembership->roleAssignments()->value('role_id'), 'policy_scopes' => []],
                 ['role_id' => $ownerRole->id, 'policy_scopes' => []],
@@ -406,11 +416,13 @@ class InvitationAccessTest extends TestCase
         $colleague = User::factory()->create();
         $colleagueMembership = TenantMembership::create(['tenant_id' => $ownerMembership->tenant_id, 'user_id' => $colleague->id, 'status' => 'active']);
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$colleagueMembership->id}", [
+            'version' => $colleagueMembership->fresh()->version,
             'assignments' => [['role_id' => $ownerRole->id, 'policy_scopes' => []]],
         ])->assertOk();
         $this->assertTrue(AccessGuards::holdsOwnerRole($colleagueMembership->fresh()));
 
         $this->actingAs($manager)->patchJson("/api/v1/memberships/{$colleagueMembership->id}", [
+            'version' => $colleagueMembership->fresh()->version,
             'assignments' => [],
         ])->assertUnprocessable()->assertJsonValidationErrors('role_ids');
         $this->assertTrue(AccessGuards::holdsOwnerRole($colleagueMembership->fresh()));
@@ -424,6 +436,7 @@ class InvitationAccessTest extends TestCase
         $memberMembership = TenantMembership::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'user_id' => $member->id, 'status' => 'active']);
 
         $this->actingAs($manager)->patchJson("/api/v1/memberships/{$memberMembership->id}", [
+            'version' => $memberMembership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => []]],
         ])->assertOk();
 
@@ -438,9 +451,10 @@ class InvitationAccessTest extends TestCase
         $membership = $manager->activeMembership();
 
         $this->actingAs($manager)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [],
         ])->assertUnprocessable()->assertJsonValidationErrors('access');
-        $this->actingAs($manager)->deleteJson("/api/v1/roles/{$managerRole->id}")
+        $this->actingAs($manager)->deleteJson("/api/v1/roles/{$managerRole->id}", ['version' => $managerRole->fresh()->version])
             ->assertUnprocessable()->assertJsonValidationErrors('access');
 
         $this->assertSame([$managerRole->id], $membership->roleAssignments()->pluck('role_id')->all());
@@ -452,10 +466,11 @@ class InvitationAccessTest extends TestCase
         $ownerRole = $this->ownerRole();
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$ownerRole->id}", [
+            'version' => $ownerRole->fresh()->version,
             'name' => 'Owner',
             'duty_codes' => ['app-uji.entitas.manage'],
         ])->assertUnprocessable()->assertJsonValidationErrors('name');
-        $this->actingAs($this->owner)->deleteJson("/api/v1/roles/{$ownerRole->id}")
+        $this->actingAs($this->owner)->deleteJson("/api/v1/roles/{$ownerRole->id}", ['version' => $ownerRole->fresh()->version])
             ->assertUnprocessable()->assertJsonValidationErrors('role');
         $this->actingAs($this->owner)->postJson('/api/v1/roles', [
             'name' => 'Super',
@@ -486,6 +501,7 @@ class InvitationAccessTest extends TestCase
         $user = User::factory()->create();
         $membership = TenantMembership::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'user_id' => $user->id, 'status' => 'active']);
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'version' => $membership->fresh()->version,
             'assignments' => [['role_id' => $role->id, 'policy_scopes' => []]],
         ])->assertOk();
 

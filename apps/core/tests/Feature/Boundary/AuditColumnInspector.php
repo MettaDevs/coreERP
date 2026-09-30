@@ -8,8 +8,8 @@ use App\Support\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Connection;
 
 /**
- * Membaca skema database untuk mencari tabel ber-`tenant_id` yang tidak membawa kolom jejak (K-01)
- * atau trigger pengisinya. Dipakai penjaga Core dan penjaga migration module.
+ * Membaca skema database untuk mencari tabel ber-`tenant_id` yang tidak membawa kolom jejak (K-01),
+ * versi baris (K-03), atau trigger pengisinya. Dipakai penjaga Core dan penjaga migration module.
  */
 final class AuditColumnInspector
 {
@@ -28,9 +28,10 @@ final class AuditColumnInspector
 
     /**
      * @param  list<string>  $tables
+     * @param  list<string>  $withoutRowVersion  tabel yang kolom `version`-nya bermakna lain
      * @return array<string, string> tabel => apa yang kurang
      */
-    public function missing(array $tables): array
+    public function missing(array $tables, array $withoutRowVersion = []): array
     {
         $missing = [];
 
@@ -49,7 +50,18 @@ final class AuditColumnInspector
                 }
             }
 
-            foreach ([AuditColumns::TRIGGER, AuditColumns::LOG_TRIGGER] as $trigger) {
+            $triggers = [AuditColumns::TRIGGER, AuditColumns::LOG_TRIGGER];
+            if (! in_array($table, $withoutRowVersion, true)) {
+                $triggers[] = AuditColumns::VERSION_TRIGGER;
+                $version = $columns[AuditColumns::VERSION] ?? null;
+                if ($version === null) {
+                    $problems[] = 'kolom '.AuditColumns::VERSION.' tidak ada';
+                } elseif ($version !== 'integer') {
+                    $problems[] = 'kolom '.AuditColumns::VERSION." bertipe {$version}, bukan integer";
+                }
+            }
+
+            foreach ($triggers as $trigger) {
                 $hasTrigger = $this->connection->selectOne(
                     'select 1 as ada from pg_trigger where tgname = ? and tgrelid = to_regclass(?) and not tgisinternal',
                     [$trigger, $table],

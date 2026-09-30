@@ -20,6 +20,7 @@ type Variant = {
     nama: string;
     keterangan: string | null;
     aktif: boolean;
+    version: number;
 };
 type Choice = { id: string; kode: string; nama: string };
 
@@ -30,9 +31,14 @@ function choiceItem(item: Choice): TransferListItem {
 export default function MaintenanceJobTypeDetails({
     jobTypeId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     jobTypeId: string;
     canEdit: boolean;
+    /** Versi job type; daftar jenis aset di bawah disimpan dengan mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [variants, setVariants] = useState<Variant[]>([]);
     const [remaining, setRemaining] = useState<TransferListItem[]>([]);
@@ -119,14 +125,15 @@ export default function MaintenanceJobTypeDetails({
         }
     }
 
-    async function removeVariant(id: string) {
+    async function removeVariant(variant: Variant) {
         if (!window.confirm('Arsipkan varian ini?')) {
             return;
         }
 
         try {
-            await api(`/maintenance-job-type-variants/${id}`, {
+            await api(`/maintenance-job-type-variants/${variant.id}`, {
                 method: 'DELETE',
+                body: JSON.stringify({ version: variant.version }),
             });
             muatUlang();
         } catch (caught) {
@@ -139,12 +146,17 @@ export default function MaintenanceJobTypeDetails({
         setError('');
 
         try {
-            await api(`/maintenance-job-types/${jobTypeId}/jenis-aset`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    jenis_aset_ids: selected.map((item) => item.id),
-                }),
-            });
+            const result = await api<{ version: number }>(
+                `/maintenance-job-types/${jobTypeId}/jenis-aset`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        version,
+                        jenis_aset_ids: selected.map((item) => item.id),
+                    }),
+                },
+            );
+            onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
             setError(
@@ -224,9 +236,7 @@ export default function MaintenanceJobTypeDetails({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() =>
-                                                        void removeVariant(
-                                                            item.id,
-                                                        )
+                                                        void removeVariant(item)
                                                     }
                                                 >
                                                     Arsipkan

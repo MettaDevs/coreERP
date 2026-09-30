@@ -1,0 +1,11 @@
+# Header jawaban yang dipakai ulang lintas endpoint.
+ETag:
+  description: |
+    Versi data yang dibaca, dalam bentuk ETag lemah `W/"<n>"` dengan `<n>` sama dengan field
+    `version` pada `data`. Kirim kembali sebagai header `If-Match` (atau sebagai field `version`)
+    saat mengubah data ini.
+  schema:
+    type: string
+    pattern: ^W/"\d+"$
+    examples:
+    - W/"12"

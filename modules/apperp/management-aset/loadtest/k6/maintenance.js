@@ -186,16 +186,28 @@ function linkRace(data) {
         ? [...arena.setA, ...arena.setB].sort()
         : exec.vu.idInTest % 2 === 0 ? arena.setA : arena.setB;
 
+    // Versi job type dibaca dulu, seperti layar yang dibuka sebelum menyimpan.
+    const buka = record(
+        http.get(`${ASET('maintenance-job-types')}/${arena.jobTypeId}/jenis-aset`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'job-type-jenis-aset' } })),
+        readLatency,
+        'read',
+    );
+
+    if (buka.status !== 200) {
+        return;
+    }
+
+    // 409 sah: VU lain menyimpan lebih dulu, sehingga versi yang dibaca sudah basi.
     const tulis = record(
         http.put(
             `${ASET('maintenance-job-types')}/${arena.jobTypeId}/jenis-aset`,
-            JSON.stringify({ jenis_aset_ids: diminta }),
-            paramsUntuk(tenant, { tags: { op: 'replace', resource: 'job-type-jenis-aset' } }),
+            JSON.stringify({ jenis_aset_ids: diminta, version: buka.json('version') }),
+            paramsUntuk(tenant, { tags: { op: 'replace', resource: 'job-type-jenis-aset' }, responseCallback: http.expectedStatuses(200, 409) }),
         ),
         writeLatency,
         'replace',
     );
-    check(tulis, { 'replace diterima': (response) => response.status === 200 });
+    check(tulis, { 'replace diterima atau basi': (response) => response.status === 200 || response.status === 409 });
 
     const baca = record(
         http.get(`${ASET('maintenance-job-types')}/${arena.jobTypeId}/jenis-aset`, paramsUntuk(tenant, { tags: { op: 'read', resource: 'job-type-jenis-aset' } })),
@@ -245,7 +257,7 @@ function saturation(data) {
         const nilai = record(
             http.put(
                 `${ASET('maintenance-checklist-variables')}/${variabel.json('data.id')}/values`,
-                JSON.stringify({ values: [{ line_number: 1, value: 'Baik', result_code: 'pass' }, { line_number: 2, value: 'Rusak', result_code: 'fail' }] }),
+                JSON.stringify({ values: [{ line_number: 1, value: 'Baik', result_code: 'pass' }, { line_number: 2, value: 'Rusak', result_code: 'fail' }], version: variabel.json('data.version') }),
                 paramsUntuk(tenant, { tags: { op: 'replace', resource: 'variable-values' } }),
             ),
             writeLatency,

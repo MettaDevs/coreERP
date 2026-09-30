@@ -44,7 +44,13 @@ import { Head } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
-import type { Layout, Report, ReportField } from '@/lib/reports';
+import { toastSaveError } from '@/lib/core-api';
+import type {
+    DefaultVersions,
+    Layout,
+    Report,
+    ReportField,
+} from '@/lib/reports';
 import {
     deleteLayout,
     downloadLayout,
@@ -93,6 +99,10 @@ export default function ReportLayouts({
     const [code, setCode] = useState(reports[0]?.code ?? '');
     const [layouts, setLayouts] = useState<Layout[]>([]);
     const [defaultRef, setDefaultRef] = useState('');
+    const [defaultVersions, setDefaultVersions] = useState<DefaultVersions>({
+        tenant: 0,
+        legal_entity: null,
+    });
     const [fields, setFields] = useState<ReportField[]>([]);
     const [error, setError] = useState('');
     const [uploading, setUploading] = useState(false);
@@ -112,6 +122,7 @@ export default function ReportLayouts({
             ]);
             setLayouts(result.data);
             setDefaultRef(result.meta.default_ref);
+            setDefaultVersions(result.meta.default_versions);
             setFields(definition.data);
             setError('');
         } catch (caught) {
@@ -134,20 +145,18 @@ export default function ReportLayouts({
                 code,
                 layout?.ref ?? null,
                 scope,
+                defaultVersions[scope],
             );
             setLayouts(result.data);
             setDefaultRef(result.meta.default_ref);
+            setDefaultVersions(result.meta.default_versions);
             toast.success(
                 layout
                     ? `${layout.name} dijadikan default ${scope === 'tenant' ? 'seluruh perusahaan' : (legalEntity?.name ?? 'entitas legal aktif')}.`
                     : 'Pilihan default dihapus; laporan kembali memakai layout bawaan.',
             );
         } catch (caught) {
-            toast.error(
-                caught instanceof Error && caught.message
-                    ? caught.message
-                    : 'Default belum dapat diubah.',
-            );
+            toastSaveError(caught, 'Default belum dapat diubah.');
         }
     };
 
@@ -157,16 +166,12 @@ export default function ReportLayouts({
         }
 
         try {
-            await deleteLayout(code, removing.ref);
+            await deleteLayout(code, removing.ref, removing.version ?? 0);
             toast.success(`${removing.name} dihapus.`);
             setRemoving(null);
             await load();
         } catch (caught) {
-            toast.error(
-                caught instanceof Error && caught.message
-                    ? caught.message
-                    : 'Layout belum dapat dihapus.',
-            );
+            toastSaveError(caught, 'Layout belum dapat dihapus.');
         }
     };
 
@@ -176,16 +181,17 @@ export default function ReportLayouts({
         }
 
         try {
-            const result = await replaceLayoutFile(code, replacing.ref, file);
+            const result = await replaceLayoutFile(
+                code,
+                replacing.ref,
+                file,
+                replacing.version ?? 0,
+            );
             warnUnknown(result.meta.unknown_placeholders);
             toast.success(`Berkas ${replacing.name} diganti.`);
             await load();
         } catch (caught) {
-            toast.error(
-                caught instanceof Error && caught.message
-                    ? caught.message
-                    : 'Berkas belum dapat diganti.',
-            );
+            toastSaveError(caught, 'Berkas belum dapat diganti.');
         } finally {
             setReplacing(null);
 

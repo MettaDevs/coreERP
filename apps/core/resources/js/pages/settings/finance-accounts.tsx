@@ -45,12 +45,18 @@ import { Download, FileUp, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
-import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
+import {
+    apiJson,
+    CoreApiError,
+    errorText,
+    toastSaveError,
+} from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type AccountType = 'balance_sheet' | 'profit_loss';
 type Account = {
     id: string;
+    version: number;
     external_id: string;
     code: string;
     name: string;
@@ -494,14 +500,17 @@ export default function FinanceAccounts({
         try {
             await apiJson(`/api/v1/finance-reference-accounts/${account.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ active: !account.active }),
+                body: JSON.stringify({
+                    active: !account.active,
+                    version: account.version,
+                }),
             });
             toast.success(
                 account.active ? 'Akun dinonaktifkan.' : 'Akun diaktifkan.',
             );
             router.reload({ only: ['accounts'] });
         } catch (caught) {
-            toast.error(errorText(caught, 'Status akun belum dapat diubah.'));
+            toastSaveError(caught, 'Status akun belum dapat diubah.');
         }
     };
 

@@ -58,6 +58,7 @@ export type CalendarOption = {
     code: string;
     name: string;
     standard_work_hours: number;
+    version: number;
 };
 
 type Props = {
@@ -176,6 +177,7 @@ export default function WorkingTimeCalendarTimes({
                 template_id: composeTemplateId,
                 from_date: composeFromDate,
                 to_date: composeToDate,
+                version: calendar.version,
             },
             {
                 preserveScroll: true,
@@ -202,7 +204,7 @@ export default function WorkingTimeCalendarTimes({
             `/settings/working-time-calendars/${calendar.id}/days/${day.id}`,
             // Hanya statusnya yang dikirim. Tutup pengambilan tidak ikut berubah, dan jumlah
             // jam dihitung ulang server dari baris jam kerja hari itu.
-            { control: newControl },
+            { control: newControl, version: calendar.version },
             {
                 preserveScroll: true,
                 onFinish: () => setIsUpdatingDay(false),

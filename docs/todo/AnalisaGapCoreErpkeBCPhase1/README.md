@@ -239,6 +239,33 @@ Yang belum:
 4. Proses berlangkah banyak di dalam satu transaksi tetap memakai kunci baris (`SELECT ... FOR UPDATE`);
    versi baris tidak menggantikannya.
 
+### Yang sudah dibangun (area 3)
+
+- **Kolom `version` di setiap tabel tenant**, Core dan module, dinaikkan trigger `coreerp_bump_row_version`
+  pada setiap UPDATE (K-11, K-12). Nilai yang ditulis kode diabaikan. Pengecualiannya
+  `core_module_installations`, yang kolom `version`-nya nomor rilis module.
+- **Kolom aktivitas mesin tidak menaikkan versi** (keputusan pemilik 29 September 2026): `last_pulled_at`
+  dan `last_used_at` klien integrasi serta `last_used_at` kredensial app, diteruskan sebagai argumen
+  trigger. Tanpa itu admin tidak pernah bisa menyimpan klien yang sedang aktif pull.
+- **Satu helper `RowVersion`.** `claim()` adalah update bersyarat yang juga memegang kunci baris, jadi
+  endpoint yang hanya mengganti baris anak tetap aman. `claimIfExists()` untuk setelan yang baru lahir saat
+  pertama disimpan: layar mengirim versi 0, dan kunci advisory transaksi mengurutkan dua penyimpanan pertama
+  yang bersamaan. Jawabannya 409 `stale_version`, atau 428 `version_required` tanpa versi. Form Inertia
+  menerimanya sebagai galat field `version`, ditampilkan sebagai toast dengan tombol **Muat ulang**.
+- **Semua endpoint ubah dan arsip** di Core dan module aset (K-13), termasuk pengganti baris anak dan
+  relasi yang disunting dari dua arah (jenis aset ↔ jenis pekerjaan: sisi seberang ikut dinaikkan versinya).
+  Kontrol dokumen aset yang dulu menulis penolakannya sendiri beralih ke helper ini.
+- **Skenario load test aset** membaca dan mengirim versi; di profil perlombaan 409 adalah hasil sah.
+- **Load test lulus** (30 September 2026): penjenuhan 1000 VU dan perlombaan koreksi tanpa pelanggaran,
+  kedua `verify.sql` bernilai 0, dan biaya trigger versi tidak terukur di atas selisih antar-run. Rinciannya
+  di `apps/core/loadtest/README.md`.
+
+Yang belum tercakup:
+
+- Satu penyimpanan biasanya menaikkan versi dua kali (klaim, lalu penulisan sesungguhnya). Angkanya tidak
+  bermakna selain "berbeda"; klien memakai versi dari jawaban terakhir.
+- `PUT validasi-status-work-order` dan parameter workflow tidak punya baris induk untuk diklaim.
+
 ## Gap 3: zona waktu, tanggal kerja, dan pengguna ke pekerja HR {#gap-3}
 
 Dua hal berbeda yang sempat tertukar dalam pembahasan: **tanggal kerja** bukan **jadwal kerja**. Zona
@@ -633,6 +660,9 @@ yang jelas. Laporan tetap di server.
 | K-08 | Job latar per tenant | **Diputuskan 28 Sep 2026:** fase 2, bersama notifikasi |
 | K-09 | Bentuk lampiran | **Diputuskan 28 Sep 2026:** satu tabel untuk semua record, seperti `Document Attachment` BC |
 | K-10 | Nilai bawaan zona waktu pengguna | **Diputuskan 28 Sep 2026:** setelan zona waktu entitas legal (nama zona IANA); pengguna yang belum mengisi ikut entitas legal aktif |
+| K-11 | Penaik versi baris | **Diputuskan 29 Sep 2026:** trigger PostgreSQL `coreerp_bump_row_version` pada setiap UPDATE, alasan yang sama dengan K-02: update lewat query builder dan job latar ikut menaikkan versi |
+| K-12 | Tabel yang membawa versi baris | **Diputuskan 29 Sep 2026:** semua tabel tenant, seperti `SystemRowVersion` BC, dijaga test boundary yang sama dengan kolom jejak |
+| K-13 | Luas pewajiban versi | **Diputuskan 29 Sep 2026:** semua endpoint ubah dan arsip di Core dan module beserta form-nya, dalam satu PR |
 
 ## Sumber {#sumber}
 

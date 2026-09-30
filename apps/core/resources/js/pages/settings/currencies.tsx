@@ -39,6 +39,8 @@ type Currency = {
     amount_decimals: number;
     unit_amount_decimals: number;
     is_default: boolean;
+    /** 0 selama mata uang ini masih memakai bawaan. */
+    version: number;
 };
 type Props = {
     canManage: boolean;
@@ -88,6 +90,10 @@ function EditPrecisionDialog({
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
+                        form.transform((data) => ({
+                            ...data,
+                            version: currency.version,
+                        }));
                         form.put(`/settings/currencies/${currency.code}`, {
                             preserveScroll: true,
                             onSuccess: onClose,

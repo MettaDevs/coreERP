@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $input_vat_account_id
  * @property ?string $opening_balance_offset_account_id
  * @property ?string $grant_offset_account_id
+ * @property int $version
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property ?Carbon $deleted_at

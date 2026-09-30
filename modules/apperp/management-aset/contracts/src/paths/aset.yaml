@@ -23,6 +23,9 @@
     responses:
       '200':
         description: Aset beserta atributnya
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
@@ -52,17 +55,27 @@
       berubah.
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      description: Field aset yang dikoreksi, ditambah `version` bila header `If-Match` tidak dikirim.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
-        description: Aset diperbarui
+        description: Aset diperbarui; `data.version` berisi versi terbaru
       '403':
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
       '409':
-        description: Aset sudah dilepas, atau nilainya terkunci oleh periode penyusutan
+        $ref: '#/components/responses/StaleVersionOrAsetLocked'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
       '500':
         description: Jurnal koreksi gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); tidak ada yang berubah
 /api/v1/aset/{id}/pratinjau-koreksi:
@@ -203,6 +216,9 @@
     responses:
       '200':
         description: Rencana aset
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
       '401':
         $ref: '#/components/responses/Unauthenticated'
       '403':
@@ -216,6 +232,7 @@
     summary: Mengubah rencana draf dengan version saat ini
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
       required: true
       content:
@@ -223,22 +240,18 @@
           schema:
             allOf:
             - $ref: '#/components/schemas/AsetPlanningWrite'
-            - type: object
-              required:
-              - version
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
+            - $ref: '#/components/schemas/VersionInput'
     responses:
       '200':
         description: Rencana diperbarui
       '403':
         $ref: '#/components/responses/Forbidden'
       '409':
-        description: Version sudah berubah
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
   delete:
     tags:
     - Perencanaan aset
@@ -246,27 +259,24 @@
     summary: Mengarsipkan rencana draf tanpa menghapus data fisik
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
     requestBody:
-      required: true
+      required: false
       content:
         application/json:
           schema:
-            type: object
-            required:
-            - version
-            properties:
-              version:
-                type: integer
-                minimum: 1
+            $ref: '#/components/schemas/VersionInput'
     responses:
       '204':
         description: Rencana diarsipkan
       '403':
         $ref: '#/components/responses/Forbidden'
       '409':
-        description: Version sudah berubah
+        $ref: '#/components/responses/StaleVersion'
       '422':
         $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
 /api/v1/{lifecycleDocument}:
   get:
     tags:

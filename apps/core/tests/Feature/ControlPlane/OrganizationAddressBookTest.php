@@ -70,6 +70,7 @@ class OrganizationAddressBookTest extends TestCase
             ->putJson("/api/v1/organizations/{$organization}/locations/{$second}", [
                 'name' => 'Gudang Singapura', 'purpose' => 'delivery', 'country_region_code' => 'SG',
                 'street' => '10 Tuas Avenue', 'city' => 'Singapore', 'postal_code' => '639123', 'is_primary' => true,
+                'version' => $this->versi('party_locations', $second),
             ])
             ->assertOk()
             ->assertJsonPath('data.is_primary', true);
@@ -79,7 +80,7 @@ class OrganizationAddressBookTest extends TestCase
         $this->assertNotEmpty($list->json('meta.countries'));
 
         // Menghapus yang utama menaikkan lokasi tertua yang tersisa.
-        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/locations/{$second}")->assertNoContent();
+        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/locations/{$second}", ['version' => $this->versi('party_locations', $second)])->assertNoContent();
         $this->assertTrue((bool) DB::table('party_locations')->where('id', $first)->value('is_primary'));
 
         // Kode negara yang tidak dikenal ditolak, bukan disimpan sebagai teks bebas.
@@ -100,10 +101,45 @@ class OrganizationAddressBookTest extends TestCase
         $post(['type' => 'email', 'value' => 'info@kontakjaya.co.id'])->assertCreated();
         $post(['type' => 'telex', 'value' => '1'])->assertStatus(422);
 
-        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/contacts/{$phone}")->assertNoContent();
+        $this->actingAs($this->owner)->deleteJson("/api/v1/organizations/{$organization}/contacts/{$phone}", [], ['If-Match' => 'W/"'.$this->versi('electronic_addresses', $phone).'"'])->assertNoContent();
         $contacts = collect($this->actingAs($this->owner)->getJson("/api/v1/organizations/{$organization}/contacts")->assertOk()->json('data'));
         $this->assertTrue($contacts->firstWhere('type', 'phone')['is_primary'], 'Telepon yang tersisa menjadi utama.');
         $this->assertSame(['email', 'phone', 'whatsapp'], $contacts->pluck('type')->sort()->values()->all());
+    }
+
+    public function test_address_and_contact_saves_need_the_version_that_was_opened(): void
+    {
+        $organization = $this->legalEntity('PT Versi Alamat');
+        $locations = "/api/v1/organizations/{$organization}/locations";
+        $contacts = "/api/v1/organizations/{$organization}/contacts";
+        $address = ['name' => 'Kantor', 'purposes' => ['business'], 'country_region_code' => 'ID', 'street' => 'Jl. Satu'];
+        $link = $this->actingAs($this->owner)->postJson($locations, $address)->assertCreated()->json('data');
+        $contact = $this->postJson($contacts, ['type' => 'phone', 'value' => '0361-1'])->assertCreated()->json('data');
+
+        $this->getJson($locations)->assertJsonPath('data.0.version', $link['version']);
+        $this->getJson($contacts)->assertJsonPath('data.0.version', $contact['version']);
+
+        // Dua tab membuka alamat yang sama: yang kedua ditolak, dan isi serta kegunaan simpanan pertama bertahan.
+        $saved = $this->putJson("{$locations}/{$link['id']}", [...$address, 'street' => 'Jl. Dua', 'purposes' => ['business', 'delivery'], 'version' => $link['version']])
+            ->assertOk()->json('data');
+        $this->assertSame($this->versi('party_locations', $link['id']), $saved['version']);
+        $this->putJson("{$locations}/{$link['id']}", [...$address, 'street' => 'Jl. Tiga', 'purposes' => ['invoice'], 'version' => $link['version']])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->putJson("{$locations}/{$link['id']}", [...$address, 'street' => 'Jl. Empat'])
+            ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
+        $this->deleteJson("{$locations}/{$link['id']}", ['version' => $link['version']])->assertStatus(409);
+        $this->deleteJson("{$locations}/{$link['id']}")->assertStatus(428);
+        $this->getJson($locations)
+            ->assertJsonPath('data.0.street', 'Jl. Dua')
+            ->assertJsonPath('data.0.purposes', ['business', 'delivery']);
+
+        $this->putJson("{$contacts}/{$contact['id']}", ['type' => 'phone', 'value' => '0361-2', 'version' => $contact['version']])->assertOk();
+        $this->putJson("{$contacts}/{$contact['id']}", ['type' => 'phone', 'value' => '0361-3', 'version' => $contact['version']])
+            ->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
+        $this->putJson("{$contacts}/{$contact['id']}", ['type' => 'phone', 'value' => '0361-4'])->assertStatus(428);
+        $this->deleteJson("{$contacts}/{$contact['id']}", [], ['If-Match' => 'W/"'.$contact['version'].'"'])->assertStatus(409);
+        $this->assertSame('0361-2', DB::table('electronic_addresses')->where('id', $contact['id'])->value('value'));
+        $this->assertNull(DB::table('electronic_addresses')->where('id', $contact['id'])->value('deleted_at'));
     }
 
     public function test_print_identity_reads_address_and_contacts_from_the_address_book(): void
@@ -156,6 +192,11 @@ class OrganizationAddressBookTest extends TestCase
         ]);
 
         return $id;
+    }
+
+    private function versi(string $table, string $id): int
+    {
+        return (int) DB::table($table)->where('id', $id)->value('version');
     }
 
     private function memberWithoutRoles(): User

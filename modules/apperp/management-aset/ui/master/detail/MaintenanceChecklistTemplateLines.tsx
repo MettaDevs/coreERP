@@ -120,9 +120,14 @@ function validationSummary(caught: unknown): string {
 export default function MaintenanceChecklistTemplateLines({
     templateId,
     canEdit,
+    version,
+    onVersionChange,
 }: {
     templateId: string;
     canEdit: boolean;
+    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
+    version: number;
+    onVersionChange: (version: number) => void;
 }) {
     const [lines, setLines] = useState<Line[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -234,10 +239,11 @@ export default function MaintenanceChecklistTemplateLines({
         setLineErrors({});
 
         try {
-            const result = await api<{ data: Line[] }>(
+            const result = await api<{ data: Line[]; version: number }>(
                 `/maintenance-checklist-templates/${templateId}/lines`,
-                { method: 'PUT', body: JSON.stringify({ lines }) },
+                { method: 'PUT', body: JSON.stringify({ version, lines }) },
             );
+            onVersionChange(result.version);
             setLines(result.data);
             setSaved(true);
         } catch (caught) {

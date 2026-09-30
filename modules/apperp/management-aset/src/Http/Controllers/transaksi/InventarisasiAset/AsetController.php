@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
 use App\Support\Modules\Contracts\ChangeHistory;
+use App\Support\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,7 +55,7 @@ class AsetController extends Controller
         return response()->json(['data' => [
             ...$this->present($aset),
             'atribut' => $this->attributesOf($aset->id),
-        ]]);
+        ]], 200, ['ETag' => RowVersion::etag((int) $aset->version)]);
     }
 
     /**
@@ -112,13 +113,16 @@ class AsetController extends Controller
             409,
             self::VALUE_LOCKED
         );
+        $version = RowVersion::expected($request);
 
         try {
-            [$aset, $koreksi] = DB::transaction(function () use ($aset, $data, $tenantId, $periods, $touchesValue, $pembuat): array {
-                // Satu aset dapat dikoreksi dari beberapa instance API sekaligus. Kunci
-                // register aset lebih dulu agar penggantian baris atribut tidak saling
-                // menyelip di antara delete dan insert — dan supaya nomor urut jurnal
-                // koreksinya tidak pernah dipakai dua kali.
+            [$aset, $koreksi] = DB::transaction(function () use ($aset, $version, $data, $tenantId, $periods, $touchesValue, $pembuat): array {
+                // Versi yang dibuka pengguna diklaim lebih dulu; klaim itu juga mengunci
+                // register aset. Satu aset dapat dikoreksi dari beberapa instance API sekaligus,
+                // dan kuncinya menjaga penggantian baris atribut tidak saling menyelip di antara
+                // delete dan insert — dan supaya nomor urut jurnal koreksinya tidak pernah
+                // dipakai dua kali.
+                RowVersion::claim(Aset::query()->whereKey($aset->id), $version);
                 $asetTerkunci = Aset::query()
                     ->where('id', $aset->id)
                     ->lockForUpdate()
@@ -515,6 +519,6 @@ class AsetController extends Controller
     /** @return array<string, mixed> */
     private function present(Aset $aset): array
     {
-        return $aset->only(['id', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan']);
+        return $aset->only(['id', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan', 'version']);
     }
 }

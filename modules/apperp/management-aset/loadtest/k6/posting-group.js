@@ -212,8 +212,22 @@ function tanggal(hari) {
     return new Date(Date.UTC(2030, 0, 1) + hari * 86400000).toISOString().slice(0, 10);
 }
 
-function badan(nilai) {
-    return JSON.stringify(Object.fromEntries(KOLOM.map((kolom, index) => [kolom, nilai[index]])));
+// Baris yang sudah ada hanya bisa disimpan dari versi yang dibaca. Versi 0 berarti "baris ini belum
+// ada": untuk tanggal baru ia diabaikan, dan untuk baris yang ternyata sudah lahir dijawab 409.
+function badan(nilai, version = 0) {
+    return JSON.stringify({ ...Object.fromEntries(KOLOM.map((kolom, index) => [kolom, nilai[index]])), version });
+}
+
+// Versi baris pada satu tanggal berlaku, dari jawaban pembacaan matriks; 0 bila barisnya belum ada.
+function versiBaris(baca, groupId, tanggalBerlaku) {
+    if (baca.status !== 200) {
+        return 0;
+    }
+
+    const group = (baca.json('data.groups') || []).find((item) => item.id === groupId);
+    const baris = group ? group.rows.find((row) => row.effective_from === tanggalBerlaku) : null;
+
+    return baris ? Number(baris.version) : 0;
 }
 
 function simpan(tenant, groupId, tanggalBerlaku, body, op, extra) {
@@ -235,7 +249,7 @@ function periksaBalik(tenant, arena) {
     check(baca, { 'matriks terbaca': (response) => response.status === 200 });
 
     if (baca.status !== 200) {
-        return;
+        return baca;
     }
 
     const group = (baca.json('data.groups') || []).find((item) => item.id === arena.groupId);
@@ -244,7 +258,7 @@ function periksaBalik(tenant, arena) {
         violations.add(1, { kind: 'group_missing_from_matrix' });
         console.error('correctness violation: group_missing_from_matrix');
 
-        return;
+        return baca;
     }
 
     for (const row of group.rows) {
@@ -256,6 +270,8 @@ function periksaBalik(tenant, arena) {
             console.error(`posting_group_mixed_rows: ${row.effective_from} ${JSON.stringify(nilai)}`);
         }
     }
+
+    return baca;
 }
 
 /** Tenant lain tidak boleh menulis ke group ini, dan akun tenant lain tidak boleh diterima. */
@@ -267,7 +283,7 @@ function probe(tenant, arena, data) {
     }
 
     const sasaran = SELFTEST ? arena.groupId : lain.groupId;
-    const tulis = simpan(tenant, sasaran, '2028-06-01', badan(arena.setA), 'probe', { responseCallback: http.expectedStatuses(404) });
+    const tulis = simpan(tenant, sasaran, '2028-06-01', badan(arena.setA, 0), 'probe', { responseCallback: http.expectedStatuses(404) });
 
     if (tulis.status === 200 || tulis.status === 201) {
         violations.add(1, { kind: 'cross_tenant_write' });
@@ -275,7 +291,7 @@ function probe(tenant, arena, data) {
     }
 
     const akunAsing = SELFTEST ? arena.setA : lain.setA;
-    const pinjam = simpan(tenant, arena.groupId, TANGGAL_PROBE, badan(akunAsing), 'probe', { responseCallback: http.expectedStatuses(422) });
+    const pinjam = simpan(tenant, arena.groupId, TANGGAL_PROBE, badan(akunAsing, 0), 'probe', { responseCallback: http.expectedStatuses(422) });
 
     if (pinjam.status === 200 || pinjam.status === 201) {
         violations.add(1, { kind: 'foreign_account_accepted' });
@@ -297,39 +313,46 @@ function race(data) {
     // 1. Balapan pembuatan: seluruh VU arena menulis tanggal baru yang sama pada detik yang sama.
     //    Satu yang pertama dijawab 201, sisanya 200. 500 berarti yang kalah menabrak indeks unik.
     const baru = tanggal(Math.floor(Date.now() / 1000) % 30000);
-    const buat = simpan(tenant, arena.groupId, baru, badan(diminta), 'create_race');
-    check(buat, { 'simpan tanggal baru diterima': (response) => response.status === 200 || response.status === 201 });
+    //    Semua mengirim versi 0 ("belum ada"): yang pertama membuat baris (201), yang kalah menemukan
+    //    baris itu sudah ada dengan versi lain dan dijawab 409, yang sah. 500 tetap cacat.
+    const buat = simpan(tenant, arena.groupId, baru, badan(diminta, 0), 'create_race', { responseCallback: http.expectedStatuses(200, 201, 409) });
+    check(buat, { 'simpan tanggal baru diterima': (response) => response.status === 200 || response.status === 201 || response.status === 409 });
 
     if (baru !== tanggalTerakhir) {
         tanggalTerakhir = baru;
 
         if (buat.status === 201) {
             createsWon.add(1);
-        } else if (buat.status === 200) {
+        } else if (buat.status === 409) {
             createsLost.add(1);
         }
     }
 
     // 2. Satu tanggal tetap diperebutkan penulis dan pengarsip. Sesudah arsip, penulis berikutnya
     //    membuat baris baru di atas indeks unik parsial.
+    //    Versi barisnya dibaca dulu; penulis lain boleh menyimpan atau mengarsipkan di sela-selanya,
+    //    jadi 409 sah pada penyimpanan maupun pengarsipan.
+    const buka = record(http.get(API, paramsUntuk(tenant, { tags: { op: 'read', resource: 'posting-group-aset' } })), readLatency, 'read');
+    const versi = versiBaris(buka, arena.groupId, TANGGAL_TETAP);
+
     if (exec.vu.idInTest % 4 === 1 && exec.vu.iterationInInstance % 3 === 0) {
         const arsip = record(
             http.del(
                 `${API}/${arena.groupId}/${TANGGAL_TETAP}`,
                 null,
-                paramsUntuk(tenant, { tags: { op: 'archive', resource: 'posting-group-aset' }, responseCallback: http.expectedStatuses(204, 404) }),
+                paramsUntuk(tenant, { tags: { op: 'archive', resource: 'posting-group-aset' }, responseCallback: http.expectedStatuses(204, 404, 409) }, { 'If-Match': `W/"${versi}"` }),
             ),
             writeLatency,
             'archive',
         );
-        check(arsip, { 'arsip dijawab 204 atau 404': (response) => response.status === 204 || response.status === 404 });
+        check(arsip, { 'arsip dijawab 204, 404, atau 409': (response) => response.status === 204 || response.status === 404 || response.status === 409 });
 
         if (arsip.status === 204) {
             archives.add(1);
         }
     } else {
-        const ubah = simpan(tenant, arena.groupId, TANGGAL_TETAP, badan(diminta), 'update_race');
-        check(ubah, { 'simpan tanggal tetap diterima': (response) => response.status === 200 || response.status === 201 });
+        const ubah = simpan(tenant, arena.groupId, TANGGAL_TETAP, badan(diminta, versi), 'update_race', { responseCallback: http.expectedStatuses(200, 201, 409) });
+        check(ubah, { 'simpan tanggal tetap diterima': (response) => response.status === 200 || response.status === 201 || response.status === 409 });
     }
 
     periksaBalik(tenant, arena);
@@ -344,15 +367,17 @@ function saturation(data) {
     const tenant = tenantVu(data.tenants, arena.tenantIndex);
     const diminta = exec.vu.idInTest % 2 === 0 ? arena.setA : arena.setB;
 
-    periksaBalik(tenant, arena);
+    const matriks = periksaBalik(tenant, arena);
 
     const akun = record(http.get(`${API}/akun?q=PG`, paramsUntuk(tenant, { tags: { op: 'search', resource: 'posting-group-aset' } })), readLatency, 'search');
     check(akun, { 'pemilih akun terbaca': (response) => response.status === 200 });
 
     // Lima tanggal per group: riwayat tetap pendek seperti di dunia nyata, dan VU yang berbagi
     // tenant tetap sesekali bertemu pada tanggal yang sama.
-    const tulis = simpan(tenant, arena.groupId, tanggal(exec.vu.iterationInInstance % 5), badan(diminta), 'write');
-    check(tulis, { 'simpan diterima': (response) => response.status === 200 || response.status === 201 });
+    // VU yang berbagi group dan tanggal sesekali menyimpan lebih dulu, jadi 409 (versi basi) sah.
+    const tanggalTulis = tanggal(exec.vu.iterationInInstance % 5);
+    const tulis = simpan(tenant, arena.groupId, tanggalTulis, badan(diminta, versiBaris(matriks, arena.groupId, tanggalTulis)), 'write', { responseCallback: http.expectedStatuses(200, 201, 409) });
+    check(tulis, { 'simpan diterima': (response) => response.status === 200 || response.status === 201 || response.status === 409 });
 
     probe(tenant, arena, data);
 }
