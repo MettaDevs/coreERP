@@ -28,6 +28,8 @@ export type ReportPreset = {
 export type ReportOptions = {
     last_used: { parameters: Filters } | null;
     presets: ReportPreset[];
+    /** Boleh membuat, mengubah, dan mengarsipkan preset bersama. */
+    can_share: boolean;
 };
 
 const path = (report: string) =>
@@ -48,10 +50,11 @@ export const createPreset = (
     report: string,
     name: string,
     parameters: Filters,
+    shared = false,
 ) =>
     coreApi<{ data: ReportPreset }>(`${path(report)}/presets`, {
         method: 'POST',
-        body: JSON.stringify({ name, parameters }),
+        body: JSON.stringify({ name, parameters, shared }),
     }).then((response) => response.data);
 
 export const archivePreset = (report: string, preset: ReportPreset) =>

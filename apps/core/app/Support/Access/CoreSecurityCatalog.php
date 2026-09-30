@@ -63,6 +63,9 @@ final class CoreSecurityCatalog
 
     public const RETENTION_UPDATE = 'core.retention.update';
 
+    /** Membuat, mengubah, dan mengarsipkan preset laporan yang dibagikan ke semua pengguna tenant (K-25). */
+    public const REPORT_PRESET_UPDATE = 'core.report-preset.update';
+
     /** Duty *Kelola akses*: pemegangnya memegang `ACCESS_UPDATE`, permission yang dijaga `AccessGuards` anti-terkunci. */
     public const ACCESS_MANAGE_DUTY = 'core.access.manage';
 

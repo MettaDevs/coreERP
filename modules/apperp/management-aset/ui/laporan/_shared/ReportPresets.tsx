@@ -13,6 +13,7 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
+import { Checkbox } from '@apperp/ui/checkbox';
 import {
     Dialog,
     DialogAction,
@@ -88,7 +89,8 @@ function presetParameters(
 /**
  * Preset laporan (K-25): memasang filter yang tersimpan dengan satu pilihan, dan menyimpan filter yang
  * sedang dipakai dengan nama. Preset pribadi hanya terlihat pemiliknya; preset bersama terlihat semua orang
- * yang boleh menjalankan laporannya, dengan nama pembuatnya.
+ * yang boleh menjalankan laporannya, dengan nama pembuatnya. Membagikan preset, dan mengarsipkan preset
+ * bersama buatan siapa pun, hanya untuk pemegang izin preset bersama.
  */
 export function ReportPresets({
     state,
@@ -101,6 +103,7 @@ export function ReportPresets({
     const [archiving, setArchiving] = useState(false);
     const [name, setName] = useState('');
     const [choice, setChoice] = useState('fixed');
+    const [shared, setShared] = useState(false);
     const [nameError, setNameError] = useState('');
     const [busy, setBusy] = useState(false);
 
@@ -116,10 +119,16 @@ export function ReportPresets({
         })),
     ];
     const choices = dates && 'month' in dates ? MONTH_CHOICES : RANGE_CHOICES;
+    const canArchive = selected
+        ? selected.shared
+            ? state.canShare
+            : selected.mine
+        : false;
 
     const openSave = () => {
         setName('');
         setChoice('fixed');
+        setShared(false);
         setNameError('');
         setSaving(true);
     };
@@ -137,9 +146,12 @@ export function ReportPresets({
             await state.save(
                 name.trim(),
                 presetParameters(state.filters, dates, choice),
+                shared,
             );
             toast.success(
-                'Preset disimpan. Pilih lagi kapan saja dari daftar Preset.',
+                shared
+                    ? 'Preset disimpan dan terlihat oleh semua pengguna yang boleh menjalankan laporan ini.'
+                    : 'Preset disimpan. Pilih lagi kapan saja dari daftar Preset.',
             );
             setSaving(false);
         } catch (caught) {
@@ -184,7 +196,7 @@ export function ReportPresets({
                 <BookmarkPlus />
                 Simpan preset
             </Button>
-            {selected?.mine && !selected.shared && (
+            {canArchive && (
                 <ActionButton
                     action="archive"
                     type="button"
@@ -199,9 +211,9 @@ export function ReportPresets({
                     <DialogHeader>
                         <DialogTitle>Simpan filter sebagai preset</DialogTitle>
                         <DialogDescription>
-                            Filter yang sedang dipakai disimpan dengan nama,
-                            hanya untuk Anda. Pilih preset itu nanti untuk
-                            memasang semua filternya sekaligus.
+                            Filter yang sedang dipakai disimpan dengan nama.
+                            Pilih preset itu nanti untuk memasang semua
+                            filternya sekaligus.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody className="space-y-4">
@@ -243,6 +255,25 @@ export function ReportPresets({
                                 </FieldDescription>
                             </Field>
                         )}
+                        {state.canShare && (
+                            <Field>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={shared}
+                                        onCheckedChange={(value) =>
+                                            setShared(value === true)
+                                        }
+                                    />
+                                    Bagikan filter ini ke semua pengguna di
+                                    perusahaan ini
+                                </label>
+                                <FieldDescription>
+                                    Tanpa centang, preset hanya terlihat oleh
+                                    Anda. Dengan centang, semua orang yang boleh
+                                    menjalankan laporan ini dapat memakainya.
+                                </FieldDescription>
+                            </Field>
+                        )}
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction
@@ -267,9 +298,11 @@ export function ReportPresets({
                             Arsipkan preset {selected?.name ?? ''}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Preset hilang dari daftar Preset. Filter yang sedang
-                            tampil dan laporan yang sudah diekspor tidak
-                            berubah.
+                            {selected?.shared
+                                ? 'Preset hilang dari daftar Preset semua pengguna.'
+                                : 'Preset hilang dari daftar Preset.'}{' '}
+                            Filter yang sedang tampil dan laporan yang sudah
+                            diekspor tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
