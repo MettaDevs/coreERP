@@ -27,6 +27,17 @@ final class OrganizationScope
         );
     }
 
+    /**
+     * Pengguna menjangkau seluruh organisasi, bukan hanya pasangan entitas legal dan unit tertentu.
+     *
+     * Dipakai untuk record yang boleh tidak menyebut unit kerja: tanpa unit, tidak ada hibah yang
+     * dapat dicocokkan, jadi hanya jangkauan penuh yang boleh membuat dan melihatnya.
+     */
+    public function unrestricted(Request $request): bool
+    {
+        return $this->scope($request)['all'];
+    }
+
     public function require(Request $request, ?string $legalEntityId, ?string $operatingUnitId): void
     {
         abort_unless($this->allows($request, $legalEntityId, $operatingUnitId), 403, 'Data ini berada di luar unit kerja yang dapat Anda akses.');

@@ -20,6 +20,7 @@ use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDepreciationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalSaleReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalScrapReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMonitoringReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
@@ -76,6 +77,7 @@ final class ModuleServiceProvider extends ServiceProvider
             $registry->register(new AssetDepreciationReport);
             $registry->register(new AssetDisposalScrapReport);
             $registry->register(new AssetDisposalSaleReport);
+            $registry->register(new AssetMonitoringReport);
 
             return $registry;
         });

@@ -135,6 +135,200 @@ AsetTransferWrite:
       minItems: 1
       items:
         $ref: '#/components/schemas/AsetTransferDetailWrite'
+AssetMonitoringWrite:
+  type: object
+  description: |
+    Satu pemeriksaan fisik di satu lokasi. Hasil tiap baris dan keadaan register tidak dikirim
+    klien: server menghitung dan membacanya sendiri.
+  required:
+  - legal_entity_id
+  - lokasi_aset_id
+  - tanggal
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      description: |
+        Unit organisasi, opsional. Menyempitkan isi otomatis ke aset milik unit ini dan menjadi
+        pemilik dokumen menurut kebijakan organisasi. Kosong hanya diterima dari pengguna yang
+        menjangkau seluruh organisasi; pengguna lain mendapat 422 pada field ini.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    penanggung_jawab_user_id:
+      description: Penanggung jawab, opsional. Menyempitkan isi otomatis ke aset yang penempatan terakhirnya dipegang orang ini.
+      type: string
+      maxLength: 64
+      nullable: true
+    lokasi_aset_id:
+      $ref: '#/components/schemas/Ulid'
+    tanggal:
+      type: string
+      format: date
+    keterangan:
+      type: string
+      maxLength: 2000
+      nullable: true
+    details:
+      description: Wajib dikirim pada PATCH, walau kosong. Satu aset paling banyak sekali.
+      type: array
+      items:
+        $ref: '#/components/schemas/AssetMonitoringLineWrite'
+AssetMonitoringLineWrite:
+  type: object
+  required:
+  - aset_id
+  properties:
+    aset_id:
+      $ref: '#/components/schemas/Ulid'
+    ada:
+      description: Temuan pemeriksa. `null` berarti belum diperiksa; monitoring tidak dapat diselesaikan selama masih ada.
+      type: boolean
+      nullable: true
+    kondisi_aset_id:
+      description: Kondisi fisik yang dilihat, dari master kondisi aset. Temuan saja, tidak ditulis ke aset.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    keterangan:
+      description: |
+        Bila kosong dan aset ditemukan ada padahal tercatat di lokasi lain, server mengisinya
+        "Tercatat di <nama lokasi>" (atau "Belum tercatat di lokasi mana pun"). Keterangan yang
+        dikirim tidak pernah ditimpa.
+      type: string
+      maxLength: 2000
+      nullable: true
+AssetMonitoring:
+  type: object
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    kode:
+      type: string
+    status:
+      type: string
+      enum: [draft, selesai]
+    version:
+      $ref: '#/components/schemas/RecordVersion'
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      type: string
+      nullable: true
+    responsible_org_unit_nama:
+      type: string
+      nullable: true
+    penanggung_jawab_user_id:
+      type: string
+      nullable: true
+    penanggung_jawab_nama:
+      type: string
+      nullable: true
+    lokasi_aset_id:
+      $ref: '#/components/schemas/Ulid'
+    lokasi_aset_kode:
+      type: string
+      nullable: true
+    lokasi_aset_nama:
+      type: string
+      nullable: true
+    tanggal:
+      type: string
+      format: date
+    keterangan:
+      type: string
+      nullable: true
+    diselesaikan_pada:
+      type: string
+      format: date-time
+      nullable: true
+    jumlah_baris:
+      type: integer
+    jumlah_belum_diperiksa:
+      type: integer
+    jumlah_tidak_sesuai:
+      type: integer
+    details:
+      description: Hanya pada jawaban satu dokumen, bukan pada daftar.
+      type: array
+      items:
+        $ref: '#/components/schemas/AssetMonitoringLine'
+AssetMonitoringLine:
+  type: object
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    line_number:
+      type: integer
+    aset_id:
+      $ref: '#/components/schemas/Ulid'
+    aset_kode:
+      type: string
+    aset_nama:
+      type: string
+    spesifikasi:
+      type: string
+    ada:
+      type: boolean
+      nullable: true
+    kondisi_aset_id:
+      type: string
+      nullable: true
+    kondisi_aset_nama:
+      type: string
+      nullable: true
+    keterangan:
+      type: string
+      nullable: true
+    sistem_lifecycle_state:
+      type: string
+      nullable: true
+      description: Status siklus hidup aset menurut register; nilai beku bila monitoring selesai.
+    sistem_lifecycle_label:
+      type: string
+    sistem_lokasi_id:
+      type: string
+      nullable: true
+    sistem_lokasi_nama:
+      type: string
+      nullable: true
+    sistem_org_unit_id:
+      type: string
+      nullable: true
+    sistem_org_unit_nama:
+      type: string
+      nullable: true
+    sistem_custodian_user_id:
+      type: string
+      nullable: true
+    sistem_custodian_nama:
+      type: string
+      nullable: true
+    nilai_perolehan:
+      type: string
+      nullable: true
+    akumulasi_penyusutan:
+      type: string
+      nullable: true
+    nilai_buku:
+      type: string
+      nullable: true
+    hasil:
+      type: string
+      enum: [sesuai, tidak_sesuai]
+      nullable: true
+      description: |
+        Aset yang ditemukan (`ada: true`) `sesuai` hanya bila masih beredar dan tercatat di lokasi
+        yang diperiksa; ditemukan padahal sudah didekomisioning atau dilepas, atau tercatat di lokasi
+        lain, `tidak_sesuai`. Aset yang tidak ditemukan dinilai menurut siklus hidupnya saja: yang
+        sudah didekomisioning atau dilepas `sesuai`, yang lain `tidak_sesuai`. `null` bila belum
+        diperiksa.
+AssetMonitoringResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      $ref: '#/components/schemas/AssetMonitoring'
 AsetTransferDetailWrite:
   type: object
   required:

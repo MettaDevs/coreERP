@@ -263,8 +263,11 @@ export function sempitkanTenant(tenant, dutyCode = DUTY_SEMPIT) {
     }
 
     const ada = (daftar.json('data') || []).find((role) => role.name === ROLE_SEMPIT);
-    const isi = JSON.stringify({ name: ROLE_SEMPIT, duty_codes: [dutyCode] });
-    const role = ada ? http.put(`${BASE}/api/v1/roles/${ada.id}`, isi, owner) : http.post(`${BASE}/api/v1/roles`, isi, owner);
+    const isi = { name: ROLE_SEMPIT, duty_codes: [dutyCode] };
+    // Mengubah role yang sudah ada membawa versi barisnya (area 3); membuat role baru tidak.
+    const role = ada
+        ? http.put(`${BASE}/api/v1/roles/${ada.id}`, JSON.stringify({ ...isi, version: ada.version }), owner)
+        : http.post(`${BASE}/api/v1/roles`, JSON.stringify(isi), owner);
 
     if (![200, 201].includes(role.status)) {
         fail(`setup penyempitan role gagal: ${role.status} ${String(role.body).slice(0, 300)}`);

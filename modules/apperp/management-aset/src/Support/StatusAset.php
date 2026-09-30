@@ -112,6 +112,32 @@ final class StatusAset
     }
 
     /**
+     * Diharapkan masih ada secara fisik saat diperiksa di lapangan.
+     *
+     * Dipakai monitoring aset untuk menilai temuan pemeriksa. Aset yang sudah dihentikan atau
+     * dilepas seharusnya sudah tidak berada di tempatnya; menemukannya masih ada adalah temuan,
+     * sama pentingnya dengan aset aktif yang tidak ditemukan.
+     */
+    public static function expectedOnSite(?string $status): bool
+    {
+        return ! in_array($status, self::tidakLagiBeredar(), true);
+    }
+
+    /**
+     * Label status yang dibaca pengguna, sama dengan layar register aset.
+     */
+    public static function label(?string $status): string
+    {
+        return match ($status) {
+            self::DITERIMA => 'Diterima',
+            'in_use' => 'Digunakan',
+            self::DIHENTIKAN => 'Didekomisioning',
+            self::DILEPAS => 'Dilepas',
+            default => $status ?? '—',
+        };
+    }
+
+    /**
      * Boleh dikoreksi datanya.
      *
      * Lebih longgar daripada yang lain, dan itu disengaja: aset yang sudah dihentikan masih

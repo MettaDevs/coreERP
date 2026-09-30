@@ -146,6 +146,26 @@ Dua laporan mengikuti dokumen ini: `management-aset.berita-acara-serah-terima` (
 dokumen, hanya untuk mutasi yang sudah selesai) dan `management-aset.daftar-mutasi-aset`
 (Excel, satu baris per aset yang berpindah).
 
+## Monitoring aset
+
+Monitoring adalah **pemeriksaan fisik** aset di satu lokasi: satu dokumen, satu lokasi, satu
+tanggal, dan satu baris per aset yang diperiksa. Pemeriksa mencatat ada atau tidak ada, kondisi
+fisik (opsional, dari master kondisi), dan keterangan; sistem menghitung **Sesuai/Tidak sesuai**
+dari register: aset yang ditemukan wajib masih beredar dan tercatat di lokasi yang diperiksa
+(bila tercatat di tempat lain, keterangannya otomatis "Tercatat di …"), aset yang tidak ditemukan
+dinilai menurut siklus hidupnya saja. Nomornya memakai reference `management-aset.monitoring-aset` per entitas legal.
+
+`POST /api/v1/monitoring-aset/{id}/isi-otomatis` memasukkan semua aset yang tercatat di lokasi
+dokumen, termasuk yang sudah dilepas. `POST /api/v1/monitoring-aset/{id}/selesaikan` membekukan
+temuan beserta keadaan register dan nilai buku saat itu, lalu mengunci dokumen. **Register aset
+tidak pernah berubah karena monitoring**; tindak lanjutnya mutasi atau dekomisioning.
+
+Hak aksesnya satu duty, `management-aset.monitoring-aset.manage` (Pantau aset), dengan permission
+`management-aset.monitoring-aset.{read,create,update,archive,complete}` ditambah baca lokasi, kondisi,
+dan register aset untuk isian manual — tanpa hak tulis atas ketiganya. Keputusan dan alasannya
+ada di `docs/apps/management-aset/transaction/monitoring-aset/` pada repo CoreERP. Laporannya
+`management-aset.laporan-monitoring-aset` (Excel, hanya monitoring yang sudah selesai).
+
 ## Penyusutan massal
 
 `POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
@@ -350,6 +370,7 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.permintaan-pembelian-aset` | `RPPA` | `legal_entity` |
 | `management-aset.pemeliharaan-aset` | `PMHA` | `legal_entity` |
 | `management-aset.mutasi-aset` | `MUTA` | `legal_entity` |
+| `management-aset.monitoring-aset` | `MONA` | `legal_entity` |
 | `management-aset.dekomisioning-aset` | `DKMA` | `legal_entity` |
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |

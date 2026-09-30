@@ -11,6 +11,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
@@ -154,6 +155,70 @@ class NumberSequenceConcurrencyTest extends TestCase
 
         $this->assertCount(9, array_unique($numbers), 'Preallocated blocks handed out a duplicate number.');
         $this->assertSame(9, DB::table('number_sequence_issues')->where('sequence_id', $sequence->id)->count());
+    }
+
+    /**
+     * Deadlock yang ditemukan load test monitoring aset, direproduksi dengan proses sungguhan.
+     *
+     * Siklusnya butuh setidaknya tiga transaksi yang berjalan bersamaan tepat saat satu blok habis: satu mengambil nomor
+     * terakhir, satu mengantre di blok itu lalu mendapatinya habis dan meminta counter sambil tetap memegang kunci blok,
+     * dan satu lagi sudah memegang counter lalu menunggu blok yang sama. Dua koneksi di satu proses tidak dapat saling
+     * menunggu, jadi test ini menjalankan beberapa proses PHP yang masing-masing mem-boot aplikasi dan menerbitkan nomor
+     * lewat layanan yang sama. Blok berisi dua nomor membuat blok habis hampir di setiap penerbitan kedua.
+     *
+     * Sebelum perbaikan, test ini merah hampir di setiap putaran dengan SQLSTATE 40P01.
+     */
+    public function test_concurrent_processes_crossing_block_boundaries_never_deadlock(): void
+    {
+        [$sequence, $context] = $this->sequence(['preallocation_enabled' => true, 'preallocation_quantity' => 2]);
+        $processes = 8;
+        $issuesPerProcess = 25;
+        $startAt = microtime(true) + 8;
+
+        $script = <<<'PHP'
+            require 'vendor/autoload.php';
+            $app = require 'bootstrap/app.php';
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            config(['database.connections.pgsql_test' => json_decode(getenv('NS_CONNECTION'), true), 'database.default' => 'pgsql_test']);
+            $context = json_decode(getenv('NS_CONTEXT'), true);
+            $service = $app->make(App\Actions\NumberSequence\NumberSequenceService::class);
+            while (microtime(true) < (float) getenv('NS_START_AT')) {
+                usleep(10000);
+            }
+            for ($i = 0; $i < (int) getenv('NS_ISSUES'); $i++) {
+                try {
+                    $service->issue($context, 'sample-app.document', getenv('NS_WORKER').'-'.$i);
+                } catch (Throwable $e) {
+                    fwrite(STDOUT, get_class($e).': '.strtok($e->getMessage(), "\n").PHP_EOL);
+                }
+            }
+            PHP;
+
+        $running = [];
+        foreach (range(1, $processes) as $worker) {
+            $process = new Process([PHP_BINARY, '-d', 'memory_limit=512M', '-r', $script], base_path(), [
+                'NS_CONNECTION' => json_encode(DB::connection('pgsql_test')->getConfig(), JSON_THROW_ON_ERROR),
+                'NS_CONTEXT' => json_encode($context, JSON_THROW_ON_ERROR),
+                'NS_START_AT' => (string) $startAt,
+                'NS_ISSUES' => (string) $issuesPerProcess,
+                'NS_WORKER' => 'worker-'.$worker,
+            ], null, 180);
+            $process->start();
+            $running[] = $process;
+        }
+
+        $failures = [];
+        foreach ($running as $process) {
+            $process->wait();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            array_push($failures, ...array_filter(explode(PHP_EOL, $process->getOutput())));
+        }
+
+        $this->assertLessThan(microtime(true), $startAt, 'Proses selesai sebelum titik mulai bersama; test ini tidak menguji apa pun.');
+        $this->assertSame([], $failures, 'Penerbitan nomor gagal saat beberapa proses melewati batas blok bersamaan.');
+        $issued = DB::table('number_sequence_issues')->where('sequence_id', $sequence->id);
+        $this->assertSame($processes * $issuesPerProcess, (clone $issued)->count());
+        $this->assertSame($processes * $issuesPerProcess, (clone $issued)->distinct()->count('formatted_value'));
     }
 
     private function claimAvailable(Connection $connection, string $sequenceId): ?int

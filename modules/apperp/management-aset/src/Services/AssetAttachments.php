@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
+use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoringLine;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
@@ -61,6 +63,8 @@ final class AssetAttachments implements AttachmentRecordType
             new self('aset_tr_aset', Aset::class, 'aset', 'update', 'responsible_org_unit_id'),
             new self('aset_tr_penerimaan_aset', PenerimaanAset::class, 'penerimaan-aset', 'update', 'responsible_org_unit_id', PenerimaanAsetDetail::class, 'penerimaan_aset_id'),
             new self('aset_tr_mutasi_aset', MutasiAset::class, 'mutasi-aset', 'update', 'responsible_org_unit_id', MutasiAsetDetail::class, 'mutasi_aset_id'),
+            // Foto bukti pemeriksaan fisik, pada dokumen atau pada baris asetnya.
+            new self('aset_tr_monitoring_aset', AssetMonitoring::class, 'monitoring-aset', 'update', 'responsible_org_unit_id', AssetMonitoringLine::class, 'monitoring_aset_id'),
             new self('aset_tr_pemeliharaan_aset', PemeliharaanAset::class, 'pemeliharaan-aset', 'update', 'responsible_org_unit_id', PemeliharaanAsetDetail::class, 'pemeliharaan_aset_id'),
             new self('aset_tr_perencanaan_aset', PerencanaanAset::class, 'perencanaan-aset', 'update', 'planning_org_unit_id', PerencanaanAsetDetail::class, 'planning_id'),
             new self('aset_tr_permintaan_pengadaan_aset', PermintaanPengadaanAset::class, 'permintaan-pembelian-aset', 'update', 'requesting_org_unit_id', PermintaanPengadaanAsetDetail::class, 'request_id'),

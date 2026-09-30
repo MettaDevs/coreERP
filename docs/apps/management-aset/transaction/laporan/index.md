@@ -25,6 +25,7 @@ Daftar lengkapnya didaftarkan di `src/ModuleServiceProvider.php` pada `ReportReg
 | --- | --- | --- | --- | --- |
 | `management-aset.work-order` | `src/Reporting/Definitions/WorkOrderDocument.php` | `id` work order | Word: header, tabel `baris`, tabel `checklist` | `pemeliharaan-aset.read` |
 | `management-aset.daftar-work-order` | `src/Reporting/Definitions/WorkOrderList.php` | `status`, `dari`, `sampai` | Excel: satu lembar, satu baris per work order | `pemeliharaan-aset.read` |
+| `management-aset.laporan-monitoring-aset` | `src/Reporting/Definitions/AssetMonitoringReport.php` | periode, filter aset, kondisi, lokasi, penanggung jawab, unit | Excel: satu baris per aset pada monitoring yang sudah selesai | `monitoring-aset.read` |
 
 Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `daftar-work-order`).
 

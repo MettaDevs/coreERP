@@ -167,6 +167,28 @@ export function DepreciationBookFilter({ value, onChange }: FilterProps) {
     );
 }
 
+export function OrganizationUnitFilter(props: MultiFilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="reference-data/unit-kerja"
+            label="Unit organisasi"
+            unavailable="Pilihan unit organisasi tidak dapat dimuat."
+        />
+    );
+}
+
+export function PersonFilter(props: MultiFilterProps) {
+    return (
+        <MasterFilter
+            {...props}
+            resource="reference-data/anggota"
+            label="Penanggung jawab"
+            unavailable="Pilihan penanggung jawab tidak dapat dimuat."
+        />
+    );
+}
+
 type AssetOption = {
     id: string;
     kode: string;

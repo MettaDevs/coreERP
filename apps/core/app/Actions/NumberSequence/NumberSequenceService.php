@@ -550,6 +550,14 @@ class NumberSequenceService
             return $this->nextDirectNumber($sequence, $scope);
         }
 
+        // Counter dikunci lebih dulu, sebelum blok mana pun, oleh setiap penerbit. Dulu blok hidup dikunci lebih dulu
+        // dan counter hanya diminta saat blok habis, sehingga dua urutan kunci berjalan bersamaan: penerbit yang
+        // mengantre di blok lalu mendapatinya habis tetap memegang kunci blok itu (PostgreSQL tidak melepas kunci baris
+        // yang gagal diperiksa ulang) sambil meminta counter, sementara pemegang counter menunggu blok yang sama untuk
+        // mencari atau membuang blok. Itu deadlock 40P01 yang ditemukan load test monitoring aset. Dengan satu urutan
+        // — counter, lalu blok — siklus itu tidak dapat terbentuk. Antreannya tidak bertambah: semua penerbit pada
+        // scope ini memang sudah berbaris di satu blok hidup yang sama.
+        $counter = $this->counter($sequence, $scope);
         $allocation = NumberSequenceAllocation::query()
             ->where('sequence_id', $sequence->id)
             ->where('scope_key', $scope['key'])
@@ -560,35 +568,24 @@ class NumberSequenceService
             ->first();
 
         if (! $allocation) {
-            $counter = $this->counter($sequence, $scope);
-            $allocation = NumberSequenceAllocation::query()
+            // Exhausted blocks are dead weight: the hot lookup above still has to walk past every one of them to find
+            // the live block, so a long-lived sequence would get linearly slower forever. The counter row is locked
+            // here, so nothing can be mid-claim on this scope.
+            NumberSequenceAllocation::query()
                 ->where('sequence_id', $sequence->id)
                 ->where('scope_key', $scope['key'])
                 ->where('period_key', $scope['period'])
-                ->whereColumn('next_number', '<=', 'last_number')
-                ->orderBy('created_at')
-                ->lockForUpdate()
-                ->first();
-            if (! $allocation) {
-                // Exhausted blocks are dead weight: the hot lookup below still has to walk past every one of them to
-                // find the live block, so a long-lived sequence would get linearly slower forever. The counter row is
-                // locked here, so nothing can be mid-claim on this scope.
-                NumberSequenceAllocation::query()
-                    ->where('sequence_id', $sequence->id)
-                    ->where('scope_key', $scope['key'])
-                    ->where('period_key', $scope['period'])
-                    ->whereColumn('next_number', '>', 'last_number')
-                    ->delete();
+                ->whereColumn('next_number', '>', 'last_number')
+                ->delete();
 
-                $first = $this->withinMaximum($sequence, (int) $counter->next_number);
-                $last = $this->allocationEnd($sequence, $first);
-                $allocation = NumberSequenceAllocation::query()->create([
-                    'sequence_id' => $sequence->id, 'scope_key' => $scope['key'], 'period_key' => $scope['period'],
-                    'first_number' => $first, 'last_number' => $last, 'next_number' => $first,
-                ]);
-                $counter->update(['next_number' => $last + 1]);
-                $this->audit($sequence->id, null, 'preallocated', null, ['scope' => $scope['key'], 'first' => $first, 'last' => $last]);
-            }
+            $first = $this->withinMaximum($sequence, (int) $counter->next_number);
+            $last = $this->allocationEnd($sequence, $first);
+            $allocation = NumberSequenceAllocation::query()->create([
+                'sequence_id' => $sequence->id, 'scope_key' => $scope['key'], 'period_key' => $scope['period'],
+                'first_number' => $first, 'last_number' => $last, 'next_number' => $first,
+            ]);
+            $counter->update(['next_number' => $last + 1]);
+            $this->audit($sequence->id, null, 'preallocated', null, ['scope' => $scope['key'], 'first' => $first, 'last' => $last]);
         }
 
         $numeric = $this->withinMaximum($sequence, (int) $allocation->next_number);
