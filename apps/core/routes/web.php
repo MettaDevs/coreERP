@@ -6,6 +6,7 @@ use App\Http\Controllers\Access\MembershipController;
 use App\Http\Controllers\Access\RoleController;
 use App\Http\Controllers\Access\SecurityConfigurationController;
 use App\Http\Controllers\AppLaunchManifestController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
 use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeCalendarController;
@@ -39,6 +40,7 @@ use App\Http\Controllers\Reporting\ReportLayoutController;
 use App\Http\Controllers\RetentionController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
+use App\Http\Middleware\ResolveAttachmentContext;
 use App\Models\CoreApp;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\CurrentWorkspace;
@@ -319,6 +321,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('change-log/{table}/{record}', [ChangeLogController::class, 'history'])->name('change-log.history')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::CHANGE_LOG_READ));
+        // Lampiran dokumen: haknya mengikuti record induk, dijawab pemilik tabelnya; lihat ResolveAttachmentContext.
+        Route::middleware(ResolveAttachmentContext::class)->group(function (): void {
+            Route::get('records/{recordType}/{recordId}/attachments', [AttachmentController::class, 'index'])->name('attachments.index');
+            Route::post('records/{recordType}/{recordId}/attachments', [AttachmentController::class, 'store'])->middleware('throttle:60,1')->name('attachments.store');
+            Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download'])->name('attachments.download');
+            Route::delete('attachments/{attachment}', [AttachmentController::class, 'destroy'])->name('attachments.destroy');
+        });
         Route::get('report-exports', [ReportExportController::class, 'index'])->name('report-exports.list');
         Route::get('report-exports/{id}/download', [ReportExportController::class, 'download'])->name('report-exports.download');
         Route::get('report-exports/{id}', [ReportExportController::class, 'show'])->name('report-exports.show');

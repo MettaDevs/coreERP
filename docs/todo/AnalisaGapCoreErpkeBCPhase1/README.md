@@ -674,6 +674,52 @@ Record yang diberi lampiran pada fase 1, mengikuti pola BC:
 Apakah lampiran penerimaan ikut ke aset yang lahir dari penerimaan itu, mirip *Document Flow* di BC,
 diputuskan di K-07.
 
+### Yang sudah dibangun (area 6)
+
+- **Satu tabel `document_attachments`** (K-09): tenant, jenis record (nama tabel induk), ID record, nomor
+  baris dokumen yang opsional, nama berkas, jenis isi (dibaca dari isi berkas, bukan dari nama), ukuran,
+  lokasi di disk, hash SHA-256, klasifikasi, kolom jejak dan versi, `created_at`, dan `deleted_at`. Pelampir
+  adalah `created_by_user_id` (K-01). Tanpa foreign key ke induk, karena induknya bisa tabel module. Model
+  `App\Models\DocumentAttachment`; bawaan tabel `CustomerContent` seperti BC, dengan `file_name` sebagai
+  data pribadi karena orang menamai berkas dengan nama orang.
+- **Pendaftaran jenis record lewat kontrak** `AttachmentRecordType` dan `AttachmentRecordTypes` di
+  `App\Support\Modules\Contracts`. Pemilik tabel menyatakan klasifikasi lampirannya dan menjawab boleh
+  membuka, boleh mengubah, dan ada-tidaknya baris dokumen. Core memasang konteks module pemiliknya lebih
+  dulu (`ResolveAttachmentContext` memakai `ResolveModuleContext`), jadi jawabannya memakai permission dan
+  kebijakan organisasi yang sama dengan layar record itu. Core tidak membaca tabel module.
+- **Klasifikasi mengikuti induk**: disalin ke kolom `data_class` saat diunggah. `hr_workers` dan `vendors`
+  `EndUserIdentifiableInformation` (vendor bisa perorangan, aturan yang sama dengan `vendors.tax_number`);
+  dokumen aset `CustomerContent`.
+- **Berkas di disk `s3`** lewat `coreerp.attachments.disk`, di `attachments/<tenant>/<id lampiran>` tanpa
+  nama berkas. Setiap unduhan menghitung ulang hash-nya; isi yang berbeda atau berkas yang hilang tidak
+  dikirim, dijawab 500 `attachment_corrupted`, dan dilaporkan sebagai `AttachmentContentMismatch`.
+- **Endpoint** sesi login di bawah `api/v1`, untuk layar Shell (tanpa kontrak `internal/v1`):
+  `GET`/`POST records/{tabel}/{id}/attachments`, `GET attachments/{id}/download`, dan
+  `DELETE attachments/{id}` dengan `If-Match` atau `version`. Record yang tidak boleh dibuka dijawab 404;
+  boleh dibuka tetapi tidak boleh diubah dijawab 403. Daftar memulangkan `meta.can_change`, batas ukuran,
+  dan jenis berkas yang diterima.
+- **Batas unggah bawaan**: 2 MB (`COREERP_ATTACHMENT_MAX_KB`), jenis PDF, JPG/JPEG, PNG, DOCX, dan XLSX,
+  diperiksa dari ekstensi dan isinya. 2 MB mengikuti `upload_max_filesize` bawaan PHP di image Core dan
+  unggahan Core lain; menaikkannya perlu menaikkan setelan PHP image juga.
+- **Pendaftaran fase 1**: tujuh tabel aset (`AssetAttachments`), `hr_workers` (`WorkerAttachments`), dan
+  `vendors` (`VendorAttachments`). Hak ubah memakai permission `update` resource-nya. Status dokumen tidak
+  menahan lampiran, seperti lampiran pada dokumen terposting di BC. Baris dokumen menempel ke header
+  dengan `line_number` untuk penerimaan, mutasi, work order, perencanaan, dan permintaan pengadaan.
+- **Tidak didaftarkan untuk retensi**: lampiran data bisnis dan hanya diarsipkan.
+- **Test B-6**: `tests/Feature/Attachments/DocumentAttachmentTest.php` (vendor, antar tenant, hash, arsip
+  dan versi, batas unggah, daftar pendaftaran), `LampiranDokumenAsetTest` di module aset (hak baca/ubah,
+  lingkup organisasi, antar tenant, baris dokumen), dan `PenyaringanTenantTest` di module HR (lingkup
+  pekerja, data pribadi).
+
+Yang belum, dan menunggu keputusan pemilik:
+
+- **Belum ada yang dapat melampirkan** ke `hr_workers`, `aset_tr_dokumen_siklus_aset` (dekomisioning,
+  penjualan, pemusnahan), dan `aset_tr_permintaan_pengadaan_aset`. Dua yang pertama tidak punya permission
+  ubah sama sekali (hanya `read` dan `create`); yang ketiga dijaga `permintaan-pembelian-aset.update` di
+  controller-nya, tetapi permission itu tidak ada di manifest. Lampirannya tetap dapat dilihat oleh yang
+  berhak membaca.
+- Tampilan lampiran di layar dibuat di PRD lain.
+
 ## Gap 10: job latar dan ekspor laporan {#gap-10}
 
 ### Pertanyaan pemilik

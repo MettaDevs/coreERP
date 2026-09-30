@@ -27,7 +27,7 @@ class DokumenSiklusAsetController extends Controller
      * status pengerjaan sendiri; lihat `transaksi\PemeliharaanAset`. Baris lama pada
      * `aset_tr_dokumen_siklus_aset` tidak disentuh, hanya tidak lagi dilayani route ini.
      */
-    private const TYPES = ['permintaan-pembelian-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'];
+    public const TYPES = ['permintaan-pembelian-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'];
 
     public function indexByRoute(Request $request): JsonResponse
     {

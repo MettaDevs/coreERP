@@ -6,6 +6,7 @@ use App\Models\Passkey;
 use App\Models\User;
 use App\Support\Access\CorePermissions;
 use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Attachments\VendorAttachments;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
@@ -13,6 +14,7 @@ use App\Support\Database\AuditActor;
 use App\Support\Database\ChangeLogSwitch;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\License\SiteLicense;
+use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
@@ -135,6 +137,10 @@ class AppServiceProvider extends ServiceProvider
         // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
         // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
         OutboundGuard::install();
+
+        // Lampiran dokumen (gap 7): vendor adalah record milik Core yang boleh diberi lampiran. Module
+        // mendaftarkan record miliknya dari penyedia layanannya sendiri.
+        $this->app->make(AttachmentRecordTypes::class)->register(new VendorAttachments);
 
         // Gate lama tetap bernama sama, tetapi kini membaca permission ubah kelompok layarnya masing-masing
         // lewat rantai security role (SEC-22), bukan penanda owner/admin.

@@ -17,8 +17,10 @@ use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\ReportFormatterCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\Attachments\AttachmentRecordTypeRegistry;
 use App\Support\ChangeLog\ChangeLogValueResolverRegistry;
 use App\Support\Finance\PostingAccountResolverRegistry;
+use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeHistory;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\DaftarAkun;
@@ -115,6 +117,8 @@ final class CoreServices
         PostingAccountResolvers::class => PostingAccountResolverRegistry::class,
         // Log perubahan: nilai mentah (ULID, kode status) diterjemahkan pemilik tabelnya menjadi nama.
         ChangeLogValueResolvers::class => ChangeLogValueResolverRegistry::class,
+        // Lampiran dokumen: pemilik tabel menjawab hak atas record induknya dengan aturannya sendiri.
+        AttachmentRecordTypes::class => AttachmentRecordTypeRegistry::class,
     ];
 
     public static function daftarkan(Application $app): void
