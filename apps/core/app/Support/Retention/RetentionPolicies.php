@@ -25,6 +25,10 @@ final class RetentionPolicies
                 'number_sequence_confirmed_pool', 'Cadangan nomor berurutan yang sudah dipakai (nomor yang sudah terbit tidak pernah diulang)', 'number_sequence_continuous_pool', 'updated_at',
                 7, 'coreerp.confirmed_pool_retention_days', tenantVia: 'sequence_id',
                 filters: [['column' => 'status', 'values' => ['confirmed']]],
+                // Pemeliharaan database, bukan data yang punya arti bagi tenant: nomor yang terbit tetap
+                // tercatat di number_sequence_issues. Tidak tampil di layar; operator mengaturnya lewat config
+                // (keputusan pemilik 30 September 2026, di luar pola BC yang menampilkan semua tabel terdaftar).
+                tenantConfigurable: false,
             ),
             new RetentionPolicy(
                 'report_exports', 'Hasil ekspor laporan', 'report_exports', 'created_at',

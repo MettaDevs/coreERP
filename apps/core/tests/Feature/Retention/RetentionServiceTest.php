@@ -132,8 +132,9 @@ final class RetentionServiceTest extends TestCase
             ->assertSessionHasErrors('retention_days');
         $this->actingAs($this->owner)->put('/settings/retention/retention_policy_log', ['retention_days' => 27])
             ->assertSessionHasErrors('retention_days');
-        $this->actingAs($this->owner)->put('/settings/retention/number_sequence_confirmed_pool', ['retention_days' => 6])
-            ->assertSessionHasErrors('retention_days');
+        // Cadangan nomor berurutan tidak diatur tenant: hanya config operator.
+        $this->actingAs($this->owner)->put('/settings/retention/number_sequence_confirmed_pool', ['retention_days' => 400])
+            ->assertNotFound();
 
         $this->assertSame(0, DB::table('retention_policy_setups')->count());
     }
@@ -299,11 +300,12 @@ final class RetentionServiceTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('settings/retention')
                 ->where('canManage', true)
-                ->has('policies', count(RetentionPolicies::all()))
+                ->has('policies', count(RetentionPolicies::all()) - 1)
+                ->where('policies', fn ($policies): bool => ! collect($policies)->contains('code', 'number_sequence_confirmed_pool'))
                 ->where('policies.0.code', 'number_sequence_audit')
                 ->where('policies.0.days', 400)
                 ->where('policies.0.minimum_days', 365)
-                ->where('policies.3.enabled', false)
+                ->where('policies.2.enabled', false)
                 ->has('entries', 1)
                 ->where('entries.0.policy', 'Catatan audit penomoran')
                 ->where('entries.0.deleted_count', 1));

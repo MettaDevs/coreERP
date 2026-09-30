@@ -34,11 +34,12 @@ final class RetentionController extends Controller
             'minimum_days' => $policy->minimumDays,
             'default_days' => $policy->defaultDays(),
             ...$settings[$policy->code],
-        ], RetentionPolicies::all());
+        ], array_values(array_filter(RetentionPolicies::all(), fn ($policy): bool => $policy->tenantConfigurable)));
 
         $captions = array_column($policies, 'caption', 'code');
         $entries = DB::table('retention_policy_log_entries')
             ->where('tenant_id', $membership->tenant_id)
+            ->whereIn('policy_code', array_keys($captions))
             ->orderByDesc('created_at')->orderByDesc('id')
             ->limit(self::LATEST_ENTRIES)
             ->get()
@@ -63,7 +64,7 @@ final class RetentionController extends Controller
     {
         $membership = $this->membershipWith($request, CoreSecurityCatalog::RETENTION_UPDATE);
         $registered = collect(RetentionPolicies::all())->firstWhere('code', $policy);
-        abort_if($registered === null, 404);
+        abort_if($registered === null || ! $registered->tenantConfigurable, 404);
 
         $optional = $registered->defaultDays() === null;
         $data = $request->validate([

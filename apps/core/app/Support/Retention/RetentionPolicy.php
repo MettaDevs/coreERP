@@ -26,6 +26,7 @@ final readonly class RetentionPolicy
         public string $tenantVia = 'tenant_id',
         public array $filters = [],
         public ?string $fileColumn = null,
+        public bool $tenantConfigurable = true,
     ) {}
 
     public function defaultDays(): ?int

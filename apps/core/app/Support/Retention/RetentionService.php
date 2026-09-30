@@ -63,7 +63,7 @@ final class RetentionService
 
         $settings = [];
         foreach (RetentionPolicies::all() as $policy) {
-            $row = $rows->get($policy->code);
+            $row = $policy->tenantConfigurable ? $rows->get($policy->code) : null;
             $default = $policy->defaultDays();
             $optional = $default === null;
 
