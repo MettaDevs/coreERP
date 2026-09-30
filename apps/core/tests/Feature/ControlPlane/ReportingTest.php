@@ -3,14 +3,20 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Jobs\RunReportExport;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Reporting\DaftarLaporanModul;
+use App\Support\Retention\RetentionPolicies;
+use App\Support\Retention\RetentionService;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Queue\TimeoutExceededException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -77,6 +83,13 @@ class ReportingTest extends TestCase
      * @var list<string>
      */
     private array $permintaanHttpLain = [];
+
+    /**
+     * Jawaban layanan render berikutnya, dipakai berurutan sebelum jawaban PDF yang berhasil.
+     *
+     * @var list<mixed>
+     */
+    private array $jawabanRenderer = [];
 
     protected function setUp(): void
     {
@@ -346,6 +359,174 @@ class ReportingTest extends TestCase
         Storage::disk('reporting-test')->assertMissing($path);
     }
 
+    /**
+     * 8.2: masa simpan yang tertulis pada baris berasal dari setelan tenant, bukan dari config, dan
+     * penghapusannya berjalan lewat layanan retensi — dibuktikan dengan menjalankan job-nya sungguhan.
+     */
+    public function test_masa_simpan_ekspor_mengikuti_setelan_tenant_dan_dihapus_layanan_retensi(): void
+    {
+        $tenantId = (string) $this->membership->tenant_id;
+        app(RetentionService::class)->save($tenantId, RetentionPolicies::find('report_exports'), true, 3);
+        $this->assertNotSame(3, (int) config('reporting.retention_days'), 'Setelan tenant harus berbeda dari bawaan config supaya test ini membuktikan sesuatu.');
+
+        $lama = $this->ekspor('docx');
+        $baru = $this->ekspor('docx');
+        foreach ([$lama, $baru] as $export) {
+            $this->assertSame('done', $export->status, $export->failure_message ?? '');
+            $this->assertEqualsWithDelta(
+                now()->addDays(3)->getTimestamp(),
+                Carbon::parse($export->expires_at)->getTimestamp(),
+                60,
+                'expires_at tidak mengikuti masa simpan tenant (3 hari).',
+            );
+        }
+
+        // Hanya yang lebih tua dari masa simpan tenant yang hilang; bawaan config (7 hari) menahan keduanya.
+        DB::table('report_exports')->where('id', $lama->id)->update(['created_at' => now()->subDays(4)]);
+        DB::table('report_exports')->where('id', $baru->id)->update(['created_at' => now()->subDays(2)]);
+        $this->artisan('reporting:purge-exports')->assertSuccessful();
+
+        $this->assertFalse(DB::table('report_exports')->where('id', $lama->id)->exists());
+        Storage::disk('reporting-test')->assertMissing($lama->file_path);
+        $this->assertTrue(DB::table('report_exports')->where('id', $baru->id)->exists());
+        Storage::disk('reporting-test')->assertExists($baru->file_path);
+    }
+
+    /** B-8: gangguan sesaat pada layanan PDF diulang sampai batas percobaan, lalu gagal dengan pesan yang jelas. */
+    public function test_gangguan_sesaat_diulang_sampai_batas_percobaan_lalu_gagal(): void
+    {
+        $this->pakaiAntreanDatabase();
+        $this->jawabanRenderer = [
+            Http::response('sibuk', 503),
+            Http::failedConnection('cURL error 28: Operation timed out'),
+            Http::response('gateway', 504),
+        ];
+
+        $id = $this->mintaEkspor('pdf');
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('queued', $export->status, 'Gangguan sesaat pertama tidak boleh langsung menggagalkan ekspor.');
+        $this->assertSame('Gangguan sesaat saat membuat dokumen. Ekspor dicoba lagi otomatis (percobaan 2 dari 3).', $export->failure_message);
+        $this->assertSame(1, DB::table('jobs')->count(), 'Job-nya harus kembali ke antrean untuk dicoba lagi.');
+
+        $this->jalankanWorkerSekali();
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('failed', $export->status);
+        $this->assertSame(
+            'Layanan PDF sedang tidak dapat melayani. Coba lagi beberapa saat, atau pilih format Word atau Excel. Sudah dicoba 3 kali.',
+            $export->failure_message,
+        );
+        $this->assertSame(3, $this->jumlahPanggilanRenderer());
+        $this->assertSame(0, DB::table('jobs')->count(), 'Percobaan keempat tidak boleh ada.');
+        $this->assertSame(0, DB::table('failed_jobs')->count(), 'Kegagalan sudah dicatat pada baris ekspor; job-nya sendiri selesai.');
+    }
+
+    /** B-8: gangguan sesaat yang pulih pada percobaan berikutnya berakhir sebagai ekspor yang selesai. */
+    public function test_gangguan_sesaat_yang_pulih_berakhir_selesai(): void
+    {
+        $this->pakaiAntreanDatabase();
+        $this->jawabanRenderer = [Http::failedConnection('cURL error 7: Connection refused')];
+
+        $id = $this->mintaEkspor('pdf');
+        $this->jalankanWorkerSekali();
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('done', $export->status, $export->failure_message ?? '');
+        $this->assertNull($export->failure_message, 'Catatan percobaan ulang harus hilang setelah ekspornya berhasil.');
+        Storage::disk('reporting-test')->assertExists($export->file_path);
+        $this->assertSame(2, $this->jumlahPanggilanRenderer());
+        $this->assertSame(0, DB::table('jobs')->count());
+    }
+
+    /** B-8: layout yang ditolak dan data yang terlalu besar gagal pada percobaan pertama tanpa diulang. */
+    public function test_kegagalan_layout_dan_data_terlalu_besar_tidak_diulang(): void
+    {
+        $this->pakaiAntreanDatabase();
+
+        $this->jawabanRenderer = [Http::response('dokumen rusak', 400)];
+        $id = $this->mintaEkspor('pdf');
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('failed', $export->status);
+        $this->assertSame('Layanan PDF menolak dokumen (400). Periksa layout, lalu coba lagi.', $export->failure_message);
+        $this->assertSame(1, $this->jumlahPanggilanRenderer());
+        $this->assertSame(0, DB::table('jobs')->count(), 'Penolakan atas dokumen akan terulang persis sama; ia tidak boleh diulang.');
+
+        config(['reporting.max_rows' => 0]);
+        $id = $this->mintaEkspor('docx');
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('failed', $export->status);
+        $this->assertStringStartsWith('Data terlalu besar untuk satu ekspor', (string) $export->failure_message);
+        $this->assertSame(0, DB::table('jobs')->count(), 'Data terlalu besar akan terulang persis sama; ia tidak boleh diulang.');
+        $this->assertSame(0, DB::table('failed_jobs')->count());
+    }
+
+    /**
+     * B-8: worker yang mati di tengah ekspor meninggalkan baris `running`. Selama sewanya belum habis,
+     * percobaan berikutnya tidak menyentuhnya — worker pertama mungkin masih bekerja — tetapi setelah
+     * sewanya habis ekspor itu diambil alih dan selesai.
+     */
+    public function test_ekspor_yang_ditinggal_worker_mati_diambil_alih_setelah_sewanya_habis(): void
+    {
+        $this->pakaiAntreanDatabase();
+        $id = $this->mintaEkspor('docx');
+        DB::table('report_exports')->where('id', $id)->update(['status' => 'running', 'progress' => 40, 'started_at' => now()->subSeconds(10)]);
+
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('running', $export->status, 'Baris yang sewanya belum habis tidak boleh dikerjakan worker kedua.');
+        $this->assertSame(40, (int) $export->progress);
+        $job = DB::table('jobs')->first();
+        $this->assertNotNull($job, 'Job-nya harus kembali ke antrean sampai sewa worker pertama habis.');
+        $this->assertGreaterThan(now()->addSeconds(500)->getTimestamp(), (int) $job->available_at);
+
+        // Worker pertama tidak pernah kembali: sewanya habis, dan antrean menyerahkan job-nya lagi.
+        DB::table('report_exports')->where('id', $id)->update(['started_at' => now()->subSeconds(700)]);
+        DB::table('jobs')->update(['available_at' => now()->getTimestamp()]);
+        $this->jalankanWorkerSekali();
+
+        $export = DB::table('report_exports')->where('id', $id)->first();
+        $this->assertSame('done', $export->status, $export->failure_message ?? '');
+        $this->assertSame(0, DB::table('jobs')->count());
+    }
+
+    /**
+     * Antrean yang menyerah atas nama job ini tetap meninggalkan pesan pada baris ekspor — kecuali bila
+     * percobaan yang masih memegang sewa akan menulis hasilnya sendiri.
+     */
+    public function test_antrean_yang_menyerah_meninggalkan_pesan_pada_baris_ekspor(): void
+    {
+        $tenantId = (string) $this->membership->tenant_id;
+        $this->pakaiAntreanDatabase();
+
+        $habisWaktu = $this->mintaEkspor('docx');
+        DB::table('report_exports')->where('id', $habisWaktu)->update(['status' => 'running', 'started_at' => now()]);
+        (new RunReportExport($tenantId, $habisWaktu))->failed(new TimeoutExceededException('habis waktu'));
+        $this->assertSame(
+            'Ekspor dihentikan karena melewati batas waktu 10 menit. Persempit filternya, lalu coba lagi.',
+            DB::table('report_exports')->where('id', $habisWaktu)->value('failure_message'),
+        );
+
+        $masihBerjalan = $this->mintaEkspor('docx');
+        DB::table('report_exports')->where('id', $masihBerjalan)->update(['status' => 'running', 'started_at' => now()->subSeconds(30)]);
+        (new RunReportExport($tenantId, $masihBerjalan))->failed(new MaxAttemptsExceededException('habis percobaan'));
+        $this->assertSame('running', DB::table('report_exports')->where('id', $masihBerjalan)->value('status'));
+
+        DB::table('report_exports')->where('id', $masihBerjalan)->update(['started_at' => now()->subSeconds(700)]);
+        (new RunReportExport($tenantId, $masihBerjalan))->failed(new MaxAttemptsExceededException('habis percobaan'));
+        $export = DB::table('report_exports')->where('id', $masihBerjalan)->first();
+        $this->assertSame('failed', $export->status);
+        $this->assertSame('Ekspor terhenti karena proses di server terputus berulang kali. Coba cetak lagi; bila terulang, hubungi administrator.', $export->failure_message);
+    }
+
     public function test_identitas_cetak_mengisi_placeholder_kop_dan_logo_pada_dokumen(): void
     {
         $legalEntity = $this->legalEntityId;
@@ -456,7 +637,11 @@ class ReportingTest extends TestCase
     private function fakeHanyaLayananRender(): void
     {
         Http::fake([
-            'renderer.test/*' => Http::response('%PDF-1.4 palsu', 200, ['Content-Type' => 'application/pdf']),
+            'renderer.test/*' => function (ClientRequest $request) {
+                $jawaban = array_shift($this->jawabanRenderer) ?? Http::response('%PDF-1.4 palsu', 200, ['Content-Type' => 'application/pdf']);
+
+                return $jawaban instanceof \Closure ? $jawaban($request) : $jawaban;
+            },
             '*' => function (ClientRequest $request) {
                 // Laravel memanggil **setiap** stub untuk tiap permintaan lalu memakai jawaban
                 // pertama yang bukan null, jadi stub penampung ini ikut terpanggil untuk
@@ -470,6 +655,44 @@ class ReportingTest extends TestCase
                 return Http::response(['message' => 'Bagian ini tidak boleh dihubungi lewat HTTP.'], 503);
             },
         ]);
+    }
+
+    /** Meminta ekspor work order lewat API dan memulangkan id barisnya. */
+    private function mintaEkspor(string $format): string
+    {
+        return (string) $this->actingAs($this->owner)
+            ->postJson('/api/v1/reports/'.self::KODE_LAPORAN.'/exports', ['format' => $format, 'parameters' => ['id' => $this->workOrderId]])
+            ->assertStatus(202)
+            ->json('data.id');
+    }
+
+    /** Baris ekspor setelah job-nya berjalan; hanya bermakna selama antreannya `sync`. */
+    private function ekspor(string $format): \stdClass
+    {
+        $export = DB::table('report_exports')->where('id', $this->mintaEkspor($format))->first();
+        $this->assertNotNull($export);
+
+        return $export;
+    }
+
+    /**
+     * Antrean sync tidak pernah menjalankan ulang job yang dikembalikan, jadi test percobaan ulang memakai
+     * antrean database yang sama dengan deployment dan worker sungguhan. Jedanya nol supaya job yang
+     * dikembalikan langsung dapat diambil lagi.
+     */
+    private function pakaiAntreanDatabase(): void
+    {
+        config(['queue.default' => 'database', 'reporting.export_attempts' => 3, 'reporting.export_retry_seconds' => [0, 0]]);
+    }
+
+    private function jalankanWorkerSekali(): void
+    {
+        $this->artisan('queue:work', ['connection' => 'database', '--once' => true, '--sleep' => 0, '--memory' => 4096])->assertSuccessful();
+    }
+
+    private function jumlahPanggilanRenderer(): int
+    {
+        return Http::recorded(fn (ClientRequest $request) => str_contains($request->url(), 'renderer.test/'))->count();
     }
 
     /** Pesan kegagalan pada baris ekspor untuk sebuah parameter `id`. */

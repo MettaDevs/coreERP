@@ -41,6 +41,11 @@ return [
     // Cetak berkali-kali tidak boleh membuat pengguna lain menunggu.
     'max_active_per_user' => (int) env('COREERP_REPORTING_MAX_ACTIVE_PER_USER', 5),
     'history_per_user' => 50,
+    // Percobaan untuk gangguan sesaat — layanan PDF terlambat, menolak sambungan, menjawab 5xx, atau
+    // worker yang mati di tengah ekspor — beserta jedanya dalam detik. Kegagalan tetap (layout,
+    // data terlalu besar, hak) tidak pernah diulang. Lihat RunReportExport.
+    'export_attempts' => (int) env('COREERP_REPORTING_EXPORT_ATTEMPTS', 3),
+    'export_retry_seconds' => [15, 60],
 
     /*
     |--------------------------------------------------------------------------
