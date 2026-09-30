@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Calendar;
+namespace App\Foundation\WorkingCalendar\Http\Controllers;
 
+use App\Foundation\WorkingCalendar\Models\WorkingTimeLine;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
-use App\Models\WorkingTimeLine;
-use App\Models\WorkingTimeTemplate;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
@@ -79,7 +79,7 @@ class WorkingTimeTemplateController extends Controller
             ]);
         }
 
-        return Inertia::render('settings/working-time-templates', [
+        return Inertia::render('foundation/working-calendar/working-time-templates', [
             'templates' => $templates,
             'currentLegalEntity' => $currentLegalEntityData,
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,

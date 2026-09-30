@@ -1,32 +1,34 @@
 <?php
 
-namespace App\Models;
+namespace App\Foundation\WorkingCalendar\Models;
 
+use App\Models\Tenant;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[DataClassification(DataClass::CustomerContent)]
-class WorkingTimeCalendarDay extends Model
+class WorkingTimeLine extends Model
 {
     use HasUlids;
 
     protected $fillable = [
         'tenant_id',
-        'working_time_calendar_id',
-        'date',
+        'working_time_template_id',
         'day_of_week',
-        'control',
+        'from_time',
+        'to_time',
+        'efficiency',
+        'property',
         'closed_for_pickup',
         'hours',
     ];
 
     protected $casts = [
-        'date' => 'date:Y-m-d',
         'day_of_week' => 'integer',
+        'efficiency' => 'float',
         'closed_for_pickup' => 'boolean',
         'hours' => 'float',
     ];
@@ -37,15 +39,9 @@ class WorkingTimeCalendarDay extends Model
         return $this->belongsTo(Tenant::class);
     }
 
-    /** @return BelongsTo<WorkingTimeCalendar, $this> */
-    public function calendar(): BelongsTo
+    /** @return BelongsTo<WorkingTimeTemplate, $this> */
+    public function template(): BelongsTo
     {
-        return $this->belongsTo(WorkingTimeCalendar::class, 'working_time_calendar_id');
-    }
-
-    /** @return HasMany<WorkingTimeCalendarLine, $this> */
-    public function lines(): HasMany
-    {
-        return $this->hasMany(WorkingTimeCalendarLine::class, 'working_time_calendar_day_id');
+        return $this->belongsTo(WorkingTimeTemplate::class, 'working_time_template_id');
     }
 }

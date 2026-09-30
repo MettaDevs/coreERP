@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Actions\Calendar;
+namespace App\Foundation\WorkingCalendar\Actions;
 
-use App\Models\WorkingTimeCalendar;
-use App\Models\WorkingTimeCalendarDay;
-use App\Models\WorkingTimeCalendarLine;
-use App\Models\WorkingTimeTemplate;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendar;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarDay;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarLine;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

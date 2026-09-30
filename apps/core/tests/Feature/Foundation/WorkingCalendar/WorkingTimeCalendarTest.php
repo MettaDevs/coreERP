@@ -1,15 +1,15 @@
 <?php
 
-namespace Tests\Feature\Calendar;
+namespace Tests\Feature\Foundation\WorkingCalendar;
 
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendar;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarDay;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarLine;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Models\WorkingTimeCalendar;
-use App\Models\WorkingTimeCalendarDay;
-use App\Models\WorkingTimeCalendarLine;
-use App\Models\WorkingTimeTemplate;
 use App\Platform\ControlPlane\Models\Client;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
@@ -314,7 +314,7 @@ class WorkingTimeCalendarTest extends TestCase
         $day = $calendar->days()->create(['tenant_id' => $tenant->id, 'date' => '2026-09-07', 'day_of_week' => 0, 'control' => 'open', 'hours' => 8]);
 
         $this->actingAs($user)->get('/settings/working-time-calendars')->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('settings/working-time-calendars')->where('canManage', false)->etc());
+            ->assertInertia(fn (Assert $page) => $page->component('foundation/working-calendar/working-time-calendars')->where('canManage', false)->etc());
         $this->actingAs($user)->get("/settings/working-time-calendars/{$calendar->id}/times")->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('canManage', false)->etc());
         // Halaman "Jadwal dari pola" hanya berisi formulir penyusunan.

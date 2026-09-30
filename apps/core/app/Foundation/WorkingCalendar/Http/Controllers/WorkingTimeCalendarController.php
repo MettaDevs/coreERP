@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Http\Controllers\Calendar;
+namespace App\Foundation\WorkingCalendar\Http\Controllers;
 
-use App\Actions\Calendar\ComposeWorkingTimesService;
+use App\Foundation\WorkingCalendar\Actions\ComposeWorkingTimesService;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendar;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarDay;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarLine;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeLine;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Models\WorkingTimeCalendar;
-use App\Models\WorkingTimeCalendarDay;
-use App\Models\WorkingTimeCalendarLine;
-use App\Models\WorkingTimeLine;
-use App\Models\WorkingTimeTemplate;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Carbon\Carbon;
@@ -73,7 +73,7 @@ class WorkingTimeCalendarController extends Controller
             ]);
         }
 
-        return Inertia::render('settings/working-time-calendars', [
+        return Inertia::render('foundation/working-calendar/working-time-calendars', [
             'calendars' => $calendars,
             'currentLegalEntity' => $currentLegalEntityData,
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,
@@ -319,7 +319,7 @@ class WorkingTimeCalendarController extends Controller
             ]);
         }
 
-        return Inertia::render('settings/working-time-calendar-times', [
+        return Inertia::render('foundation/working-calendar/working-time-calendar-times', [
             'calendar' => $calendarData,
             'allCalendars' => $allCalendarsData,
             'days' => $days,
@@ -462,7 +462,7 @@ class WorkingTimeCalendarController extends Controller
             ]);
         }
 
-        return Inertia::render('settings/compose-working-times', [
+        return Inertia::render('foundation/working-calendar/compose-working-times', [
             'calendars' => $calendarsData,
             'templates' => $templatesData,
             'initialCalendarId' => $selectedCalendarId,

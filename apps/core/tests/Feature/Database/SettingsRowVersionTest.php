@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Database;
 
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendar;
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Models\WorkingTimeCalendar;
-use App\Models\WorkingTimeTemplate;
 use App\Platform\ControlPlane\Models\Client;
 use App\Support\Modules\Contracts\RowVersion;
 use Database\Seeders\NumberSequenceProfileSeeder;

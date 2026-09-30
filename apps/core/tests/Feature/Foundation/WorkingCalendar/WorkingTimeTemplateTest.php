@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Feature\Calendar;
+namespace Tests\Feature\Foundation\WorkingCalendar;
 
+use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Models\WorkingTimeTemplate;
 use App\Platform\ControlPlane\Models\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
