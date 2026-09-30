@@ -1,5 +1,6 @@
 <?php
 
+use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Http\Controllers\Internal\FinancePostingFeedController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
@@ -10,7 +11,6 @@ use App\Http\Controllers\Internal\OrganizationDirectoryController;
 use App\Http\Controllers\Internal\TenantEntitlementController;
 use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
-use App\Http\Controllers\Internal\VendorDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
 use Illuminate\Support\Facades\Route;

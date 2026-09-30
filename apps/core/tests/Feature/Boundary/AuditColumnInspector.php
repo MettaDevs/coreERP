@@ -91,17 +91,7 @@ final class AuditColumnInspector
     {
         $tables = [];
 
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Models'), \FilesystemIterator::SKIP_DOTS)) as $file) {
-            if (! $file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $class = 'App\\Models\\'.str_replace(
-                [app_path('Models').DIRECTORY_SEPARATOR, '/', '.php'],
-                ['', '\\', ''],
-                $file->getPathname(),
-            );
-
+        foreach (CoreModelFolders::classNames() as $class) {
             if (class_exists($class) && is_subclass_of($class, Model::class)
                 && in_array(OwnedByControlPlane::class, class_uses_recursive($class), true)) {
                 $tables[] = (new $class)->getTable();

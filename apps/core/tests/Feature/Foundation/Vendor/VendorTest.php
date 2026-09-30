@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\Vendor;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Models\TenantMembership;
 use App\Models\TenantNumberSequence;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Support\Modules\Contracts\DaftarVendor;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
@@ -340,7 +340,7 @@ class VendorTest extends TestCase
 
         $this->actingAs($this->owner)->get('/settings/vendors')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('settings/vendors')
+                ->component('foundation/vendor/vendors')
                 ->where('canManage', true)
                 ->where('manualNumbers', true)
                 ->where('vendors.total', 3)

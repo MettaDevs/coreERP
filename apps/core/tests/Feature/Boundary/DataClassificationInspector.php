@@ -16,7 +16,7 @@ use ReflectionClass;
  * Membaca klasifikasi data (gap 5, K-06, K-19) dari model tenant dan registry tabel tanpa model, lalu
  * mencocokkannya dengan skema database. Padanan AS0016 di Business Central.
  *
- * Yang dibaca: `app/Models` Core dan `src/Models` setiap module. Model menyatakan bawaan tabel lewat
+ * Yang dibaca: folder model Core (`CoreModelFolders`) dan `src/Models` setiap module. Model menyatakan bawaan tabel lewat
  * atribut {@see DataClassification} (dicari juga di kelas induk) dan timpaan kolom lewat konstanta
  * `COLUMN_CLASSIFICATION`. Kelas yang memakai {@see DataClassificationRegistry} menyatakan tabel yang
  * tidak punya model.
@@ -46,7 +46,7 @@ final class DataClassificationInspector
 
     public static function fromCodebase(Connection $connection): self
     {
-        $sources = [[app_path('Models'), 'App\\Models\\']];
+        $sources = CoreModelFolders::all();
         foreach (PemindaiModul::padaRepo()->folderModul() as $folder) {
             $sources[] = [$folder.'/src/Models', 'Modules\\'.PemindaiModul::namespaceModul($folder).'\\Models\\'];
         }

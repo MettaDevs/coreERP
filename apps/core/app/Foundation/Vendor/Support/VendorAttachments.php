@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Attachments;
+namespace App\Foundation\Vendor\Support;
 
-use App\Models\Vendor;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\AttachmentRecordType;

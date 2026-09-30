@@ -2,11 +2,11 @@
 
 namespace App\Providers;
 
+use App\Foundation\Vendor\Support\VendorAttachments;
 use App\Models\Passkey;
 use App\Models\User;
 use App\Support\Access\CorePermissions;
 use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Attachments\VendorAttachments;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;

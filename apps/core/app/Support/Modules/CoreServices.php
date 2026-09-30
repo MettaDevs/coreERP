@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Foundation\Vendor\ModuleServices\DaftarVendorCore;
 use App\Services\Modules\ChangeHistoryCore;
 use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DaftarSatuanCore;
-use App\Services\Modules\DaftarVendorCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
 use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;

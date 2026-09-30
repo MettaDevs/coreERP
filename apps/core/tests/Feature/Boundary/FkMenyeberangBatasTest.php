@@ -212,18 +212,7 @@ class FkMenyeberangBatasTest extends TestCase
     {
         $tabel = [];
 
-        /** @var \SplFileInfo $berkas */
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Models'), \FilesystemIterator::SKIP_DOTS)) as $berkas) {
-            if (! $berkas->isFile() || $berkas->getExtension() !== 'php') {
-                continue;
-            }
-
-            $kelas = 'App\\Models\\'.str_replace(
-                [app_path('Models').DIRECTORY_SEPARATOR, '/', '.php'],
-                ['', '\\', ''],
-                $berkas->getPathname(),
-            );
-
+        foreach (CoreModelFolders::classNames() as $kelas) {
             if (! class_exists($kelas) || ! is_subclass_of($kelas, Model::class)) {
                 continue;
             }

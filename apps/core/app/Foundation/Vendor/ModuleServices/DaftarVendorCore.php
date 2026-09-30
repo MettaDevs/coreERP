@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Modules;
+namespace App\Foundation\Vendor\ModuleServices;
 
-use App\Models\Vendor;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Support\Modules\Contracts\DaftarVendor;
 use Illuminate\Database\Eloquent\Builder;
 
