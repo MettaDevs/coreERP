@@ -31,6 +31,7 @@ final class AssetMonitoringReportLayout extends BuiltinLayoutBuilder
         ['Nama aset', 'asset_nama', 28],
         ['Spesifikasi', 'spesifikasi', 26],
         ['Status di sistem', 'kondisi_sistem', 16],
+        ['Lokasi tercatat', 'lokasi_tercatat', 22],
         ['Keberadaan fisik', 'kondisi_fisik', 14],
         ['Kondisi fisik', 'kondisi_aset', 16],
         ['Status monitoring', 'status_monitoring', 16],
@@ -80,9 +81,9 @@ final class AssetMonitoringReportLayout extends BuiltinLayoutBuilder
 
         // Baris total di bawah baris template ikut bergeser saat baris data disisipkan.
         $sheet->setCellValue('A13', 'Total');
-        $sheet->mergeCells('A13:L13');
-        $sheet->setCellValue('M13', '${total_nilai_perolehan}');
-        $sheet->setCellValue('O13', '${total_nilai_buku}');
+        $sheet->mergeCells('A13:M13');
+        $sheet->setCellValue('N13', '${total_nilai_perolehan}');
+        $sheet->setCellValue('P13', '${total_nilai_buku}');
         $total = $sheet->getStyle("A13:{$last}13");
         $total->getFont()->setBold(true);
         $total->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');

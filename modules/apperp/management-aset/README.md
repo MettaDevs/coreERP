@@ -151,8 +151,9 @@ dokumen, hanya untuk mutasi yang sudah selesai) dan `management-aset.daftar-muta
 Monitoring adalah **pemeriksaan fisik** aset di satu lokasi: satu dokumen, satu lokasi, satu
 tanggal, dan satu baris per aset yang diperiksa. Pemeriksa mencatat ada atau tidak ada, kondisi
 fisik (opsional, dari master kondisi), dan keterangan; sistem menghitung **Sesuai/Tidak sesuai**
-dari status siklus hidup aset — aset yang sudah didekomisioning atau dilepas diharapkan tidak
-ada. Nomornya memakai reference `management-aset.monitoring-aset` per entitas legal.
+dari register: aset yang ditemukan wajib masih beredar dan tercatat di lokasi yang diperiksa
+(bila tercatat di tempat lain, keterangannya otomatis "Tercatat di …"), aset yang tidak ditemukan
+dinilai menurut siklus hidupnya saja. Nomornya memakai reference `management-aset.monitoring-aset` per entitas legal.
 
 `POST /api/v1/monitoring-aset/{id}/isi-otomatis` memasukkan semua aset yang tercatat di lokasi
 dokumen, termasuk yang sudah dilepas. `POST /api/v1/monitoring-aset/{id}/selesaikan` membekukan
@@ -160,7 +161,8 @@ temuan beserta keadaan register dan nilai buku saat itu, lalu mengunci dokumen. 
 tidak pernah berubah karena monitoring**; tindak lanjutnya mutasi atau dekomisioning.
 
 Hak aksesnya satu duty, `management-aset.monitoring-aset.manage` (Pantau aset), dengan permission
-`management-aset.monitoring-aset.{read,create,update,archive,complete}`. Keputusan dan alasannya
+`management-aset.monitoring-aset.{read,create,update,archive,complete}` ditambah baca lokasi, kondisi,
+dan register aset untuk isian manual — tanpa hak tulis atas ketiganya. Keputusan dan alasannya
 ada di `docs/apps/management-aset/transaction/monitoring-aset/` pada repo CoreERP. Laporannya
 `management-aset.laporan-monitoring-aset` (Excel, hanya monitoring yang sudah selesai).
 

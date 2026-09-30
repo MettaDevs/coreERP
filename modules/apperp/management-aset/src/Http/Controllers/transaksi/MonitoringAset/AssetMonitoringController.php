@@ -42,8 +42,9 @@ use stdClass;
  * mengenal jurnal aset tetap, dan penyesuaian register di sana juga dokumen terpisah.
  *
  * **Hasil tiap baris dihitung, tidak dipilih.** Pemeriksa mencatat ada atau tidak ada; sistem
- * membandingkannya dengan status siklus hidup aset. Aset yang sudah didekomisioning atau dilepas
- * diharapkan tidak ada, aset lain diharapkan ada.
+ * membandingkannya dengan register. Aset yang ditemukan wajib masih beredar dan tercatat di lokasi yang
+ * diperiksa; aset yang tidak ditemukan dinilai menurut status siklus hidupnya saja. Lihat
+ * {@see AssetMonitoringStatus::result()}.
  */
 class AssetMonitoringController extends Controller
 {
@@ -132,7 +133,7 @@ class AssetMonitoringController extends Controller
                     'status' => AssetMonitoringStatus::DRAFT,
                     ...$this->headerValues($data),
                 ])->save();
-                $this->syncLines($id, $data['details']);
+                $this->syncLines($id, $data['lokasi_aset_id'], $data['details']);
 
                 return $id;
             });
@@ -178,7 +179,7 @@ class AssetMonitoringController extends Controller
                 ->where(['id' => $id, 'status' => AssetMonitoringStatus::DRAFT])
                 ->update([...$this->headerValues($data), 'updated_at' => now()]);
             abort_unless($updated > 0, 422, self::LOCKED);
-            $this->syncLines($id, $data['details']);
+            $this->syncLines($id, $data['lokasi_aset_id'], $data['details']);
         });
 
         return $this->document($request, $id);
@@ -277,7 +278,7 @@ class AssetMonitoringController extends Controller
         abort_unless($monitoring->status === AssetMonitoringStatus::DRAFT, 422, 'Monitoring ini sudah diselesaikan.');
         $version = RowVersion::expected($request);
 
-        DB::transaction(function () use ($id, $version): void {
+        DB::transaction(function () use ($monitoring, $id, $version): void {
             // Versi diklaim lebih dulu, baru barisnya dibaca: baris yang dibaca sebelum klaim dapat
             // sudah diganti penyimpanan lain yang lolos di antaranya.
             RowVersion::claim(AssetMonitoring::query()->whereKey($id), $version);
@@ -298,9 +299,17 @@ class AssetMonitoringController extends Controller
             }
 
             $state = $this->registerState(array_values($lines->map(fn (AssetMonitoringLine $line): string => $line->aset_id)->all()));
+            $names = $this->locationNames(array_values(array_unique(array_filter(array_column($state, 'lokasi_aset_id')))));
             foreach ($lines as $line) {
                 $current = $state[$line->aset_id] ?? null;
+                $registered = $current['lokasi_aset_id'] ?? null;
+                // Lokasi tercatat bisa berubah sejak baris disimpan; keterangan otomatis ditulis dari
+                // lokasi yang dibekukan, kecuali pemeriksa sudah mengisi keterangannya sendiri.
+                $note = ($line->keterangan ?? '') === ''
+                    ? AssetMonitoringStatus::locationNote($line->ada, $registered, $monitoring->lokasi_aset_id, $registered === null ? null : ($names[$registered] ?? null))
+                    : null;
                 $line->forceFill([
+                    ...($note === null ? [] : ['keterangan' => $note]),
                     'sistem_lifecycle_state' => $current['lifecycle_state'] ?? null,
                     'sistem_lokasi_id' => $current['lokasi_aset_id'] ?? null,
                     'sistem_org_unit_id' => $current['org_unit_id'] ?? null,
@@ -308,7 +317,7 @@ class AssetMonitoringController extends Controller
                     'nilai_perolehan' => $current['nilai_perolehan'] ?? null,
                     'akumulasi_penyusutan' => $current['akumulasi_penyusutan'] ?? null,
                     'nilai_buku' => $current['nilai_buku'] ?? null,
-                    'hasil' => AssetMonitoringStatus::result($current['lifecycle_state'] ?? null, $line->ada),
+                    'hasil' => AssetMonitoringStatus::result($current['lifecycle_state'] ?? null, $line->ada, $registered, $monitoring->lokasi_aset_id),
                 ])->save();
             }
         });
@@ -422,20 +431,38 @@ class AssetMonitoringController extends Controller
         ];
     }
 
-    /** @param list<array<string, mixed>> $details */
-    private function syncLines(string $monitoringId, array $details): void
+    /**
+     * Menyamakan baris dengan daftar yang dikirim.
+     *
+     * Aset yang ditemukan ada padahal tercatat di lokasi lain diberi keterangan "Tercatat di …" bila
+     * pemeriksa belum menulis keterangan sendiri, supaya temuan itu terbaca tanpa membuka asetnya.
+     *
+     * @param  list<array<string, mixed>>  $details
+     */
+    private function syncLines(string $monitoringId, string $checkedLocationId, array $details): void
     {
         $existing = AssetMonitoringLine::query()->where('monitoring_aset_id', $monitoringId)->get()->keyBy('aset_id');
         $next = $this->lastLineNumber($monitoringId);
         $sent = [];
+        $registered = [];
+        foreach (Aset::withTrashed()->whereIn('id', array_column($details, 'aset_id'))->toBase()->get(['id', 'lokasi_aset_id']) as $aset) {
+            $registered[(string) $aset->id] = $aset->lokasi_aset_id === null ? null : (string) $aset->lokasi_aset_id;
+        }
+        $names = $this->locationNames(array_values(array_unique(array_filter($registered))));
 
         foreach ($details as $detail) {
             $asetId = (string) $detail['aset_id'];
             $sent[] = $asetId;
+            $present = isset($detail['ada']) ? (bool) $detail['ada'] : null;
+            $note = $detail['keterangan'] ?? null;
+            if ($note === null || $note === '') {
+                $location = $registered[$asetId] ?? null;
+                $note = AssetMonitoringStatus::locationNote($present, $location, $checkedLocationId, $location === null ? null : ($names[$location] ?? null));
+            }
             $values = [
-                'ada' => isset($detail['ada']) ? (bool) $detail['ada'] : null,
+                'ada' => $present,
                 'kondisi_aset_id' => $detail['kondisi_aset_id'] ?? null,
-                'keterangan' => $detail['keterangan'] ?? null,
+                'keterangan' => $note,
             ];
 
             $line = $existing->get($asetId);
@@ -562,7 +589,7 @@ class AssetMonitoringController extends Controller
         $query = AssetMonitoring::query()->where(self::HEADER.'.id', $id);
         app(OrganizationScope::class)->query($query, $request, self::HEADER.'.legal_entity_id', self::HEADER.'.responsible_org_unit_id');
         $row = $this->withNames($tenant, $this->withLookups($query)->firstOrFail());
-        $row->details = $this->lines($id, $tenant, $row->status === AssetMonitoringStatus::COMPLETED);
+        $row->details = $this->lines($id, $tenant, (string) $row->lokasi_aset_id, $row->status === AssetMonitoringStatus::COMPLETED);
 
         return response()->json(
             array_filter(['data' => $row, 'meta' => $meta === [] ? null : $meta], static fn ($value): bool => $value !== null),
@@ -603,10 +630,18 @@ class AssetMonitoringController extends Controller
             ->where(function ($query): void {
                 $query->where(self::LINES.'.hasil', AssetMonitoringStatus::MISMATCH)
                     ->orWhere(function ($query): void {
+                        // Selama draf: ditemukan padahal sudah tidak beredar atau tercatat di lokasi
+                        // lain, atau tidak ditemukan padahal masih beredar — aturan yang sama dengan
+                        // AssetMonitoringStatus::result().
                         [$decommissioned, $disposed] = StatusAset::tidakLagiBeredar();
                         $query->whereNull(self::LINES.'.hasil')
                             ->whereNotNull(self::LINES.'.ada')
-                            ->whereRaw('"'.self::LINES.'"."ada" = ("aset_hitung"."lifecycle_state" in (?, ?))', [$decommissioned, $disposed]);
+                            ->whereRaw(
+                                'case when "'.self::LINES.'"."ada" '
+                                .'then ("aset_hitung"."lifecycle_state" in (?, ?) or "aset_hitung"."lokasi_aset_id" is distinct from "'.self::HEADER.'"."lokasi_aset_id") '
+                                .'else "aset_hitung"."lifecycle_state" not in (?, ?) end',
+                                [$decommissioned, $disposed, $decommissioned, $disposed],
+                            );
                     });
             });
 
@@ -643,7 +678,7 @@ class AssetMonitoringController extends Controller
      *
      * @return Collection<int, stdClass>
      */
-    private function lines(string $monitoringId, string $tenantId, bool $frozen): Collection
+    private function lines(string $monitoringId, string $tenantId, string $checkedLocationId, bool $frozen): Collection
     {
         $directory = app(DirektoriAset::class);
         $rows = AssetMonitoringLine::query()
@@ -676,7 +711,7 @@ class AssetMonitoringController extends Controller
         }
         $locations = $this->locationNames(array_values(array_unique(array_filter($locationIds))));
 
-        return $rows->map(function (stdClass $row) use ($frozen, $state, $locations, $directory, $tenantId): stdClass {
+        return $rows->map(function (stdClass $row) use ($frozen, $state, $locations, $directory, $tenantId, $checkedLocationId): stdClass {
             $current = $state[(string) $row->aset_id] ?? [];
             $present = $row->ada === null ? null : (bool) $row->ada;
             $row->ada = $present;
@@ -689,7 +724,7 @@ class AssetMonitoringController extends Controller
                 $row->nilai_perolehan = $current['nilai_perolehan'] ?? null;
                 $row->akumulasi_penyusutan = $current['akumulasi_penyusutan'] ?? null;
                 $row->nilai_buku = $current['nilai_buku'] ?? null;
-                $row->hasil = AssetMonitoringStatus::result($row->sistem_lifecycle_state, $present);
+                $row->hasil = AssetMonitoringStatus::result($row->sistem_lifecycle_state, $present, $row->sistem_lokasi_id, $checkedLocationId);
             }
             $row->sistem_lifecycle_label = StatusAset::label($row->sistem_lifecycle_state);
             $row->sistem_lokasi_nama = $locations[(string) $row->sistem_lokasi_id] ?? null;

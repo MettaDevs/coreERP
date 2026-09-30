@@ -31,9 +31,17 @@ security:
       entry_point: management-aset.monitoring-aset.api
       access: invoke
   privileges:
+    # Pemeriksa perlu membaca lokasi, kondisi, dan register aset untuk mengisi daftar periksa
+    # (keputusan pemilik produk 30 September 2026). Modul ini belum punya privilege baca saja untuk
+    # ketiganya — privilege yang ada juga membawa hak buat dan ubah — jadi permission baca yang sudah
+    # ada dipasang di sini, tanpa satu pun hak tulis.
     - code: management-aset.monitoring-aset.view
       name: Pantau aset
-      permissions: [management-aset.monitoring-aset.read]
+      permissions:
+        - management-aset.monitoring-aset.read
+        - management-aset.lokasi-aset.read
+        - management-aset.kondisi-aset.read
+        - management-aset.aset.read
     # Menyusun pemeriksaan dan mencatat temuannya.
     - code: management-aset.monitoring-aset.maintain
       name: Susun monitoring aset

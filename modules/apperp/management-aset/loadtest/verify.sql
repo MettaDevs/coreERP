@@ -602,11 +602,20 @@ join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id
 where m.status = 'selesai' and l.deleted_at is null
   and (l.ada is null or l.hasil is null or l.sistem_lifecycle_state is null);
 
+-- Aturan hasil (keputusan 3, diperluas 30 September 2026): aset yang ditemukan wajib masih beredar dan
+-- tercatat di lokasi yang diperiksa; aset yang tidak ditemukan dinilai menurut siklus hidupnya saja.
 insert into hasil_aset
 select 'hasil monitoring menyimpang dari aturan', count(*)
 from aset_tr_monitoring_aset_details l
+join aset_tr_monitoring_aset m on m.id = l.monitoring_aset_id
 where l.hasil is not null
-  and l.hasil <> case when l.ada = (l.sistem_lifecycle_state in ('decommissioned', 'disposed')) then 'tidak_sesuai' else 'sesuai' end;
+  and l.hasil <> case
+      when l.ada then case
+          when l.sistem_lifecycle_state not in ('decommissioned', 'disposed')
+               and l.sistem_lokasi_id is not distinct from m.lokasi_aset_id then 'sesuai'
+          else 'tidak_sesuai' end
+      else case when l.sistem_lifecycle_state in ('decommissioned', 'disposed') then 'sesuai' else 'tidak_sesuai' end
+  end;
 
 insert into hasil_aset
 select 'monitoring draf dengan hasil beku', count(*)

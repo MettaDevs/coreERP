@@ -191,6 +191,10 @@ AssetMonitoringLineWrite:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
     keterangan:
+      description: |
+        Bila kosong dan aset ditemukan ada padahal tercatat di lokasi lain, server mengisinya
+        "Tercatat di <nama lokasi>" (atau "Belum tercatat di lokasi mana pun"). Keterangan yang
+        dikirim tidak pernah ditimpa.
       type: string
       maxLength: 2000
       nullable: true
@@ -314,9 +318,11 @@ AssetMonitoringLine:
       enum: [sesuai, tidak_sesuai]
       nullable: true
       description: |
-        `sesuai` bila keberadaan fisiknya sama dengan yang diharapkan register: aset yang sudah
-        didekomisioning atau dilepas diharapkan tidak ada, aset lain diharapkan ada. `null` bila
-        belum diperiksa.
+        Aset yang ditemukan (`ada: true`) `sesuai` hanya bila masih beredar dan tercatat di lokasi
+        yang diperiksa; ditemukan padahal sudah didekomisioning atau dilepas, atau tercatat di lokasi
+        lain, `tidak_sesuai`. Aset yang tidak ditemukan dinilai menurut siklus hidupnya saja: yang
+        sudah didekomisioning atau dilepas `sesuai`, yang lain `tidak_sesuai`. `null` bila belum
+        diperiksa.
 AssetMonitoringResponse:
   type: object
   required: [data]

@@ -45,17 +45,40 @@ final class AssetMonitoringStatus
     }
 
     /**
-     * Hasil satu baris: cocok bila keberadaan fisiknya sama dengan yang diharapkan register.
+     * Hasil satu baris: cocok bila temuan pemeriksa sama dengan yang diharapkan register.
      *
-     * Aset yang sudah didekomisioning atau dilepas diharapkan tidak ada lagi; aset lain diharapkan
-     * ada. Baris yang belum diperiksa belum punya hasil.
+     * Aset yang ditemukan ada wajib aktif **dan** tercatat di lokasi yang diperiksa: aset yang sudah
+     * didekomisioning atau dilepas seharusnya tidak ada lagi, dan aset yang tercatat di lokasi lain
+     * berarti catatan lokasinya salah (keputusan 3, diperluas 30 September 2026). Aset yang tidak
+     * ditemukan dinilai menurut status siklus hidupnya saja: yang sudah didekomisioning atau dilepas
+     * memang diharapkan tidak ada. Baris yang belum diperiksa belum punya hasil.
      */
-    public static function result(?string $lifecycleState, ?bool $present): ?string
+    public static function result(?string $lifecycleState, ?bool $present, ?string $registeredLocationId, string $checkedLocationId): ?string
     {
         if ($present === null) {
             return null;
         }
 
-        return StatusAset::expectedOnSite($lifecycleState) === $present ? self::MATCH : self::MISMATCH;
+        $expectedOnSite = StatusAset::expectedOnSite($lifecycleState);
+        $match = $present
+            ? $expectedOnSite && $registeredLocationId === $checkedLocationId
+            : ! $expectedOnSite;
+
+        return $match ? self::MATCH : self::MISMATCH;
+    }
+
+    /**
+     * Keterangan otomatis untuk aset yang ditemukan di lokasi yang diperiksa padahal tercatat di tempat
+     * lain; `null` bila lokasinya cocok atau asetnya tidak ditemukan. Pemeriksa tetap boleh menggantinya.
+     */
+    public static function locationNote(?bool $present, ?string $registeredLocationId, string $checkedLocationId, ?string $registeredLocationName): ?string
+    {
+        if ($present !== true || $registeredLocationId === $checkedLocationId) {
+            return null;
+        }
+
+        return $registeredLocationId === null
+            ? 'Belum tercatat di lokasi mana pun'
+            : 'Tercatat di '.($registeredLocationName ?? 'lokasi lain');
     }
 }

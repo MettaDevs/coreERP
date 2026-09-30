@@ -24,7 +24,9 @@ use Modules\Apperp\ManagementAset\Support\StatusAset;
  * Laporan monitoring aset: satu baris per aset yang diperiksa pada monitoring yang sudah selesai.
  *
  * Seluruh nilainya dibaca dari yang dibekukan saat pemeriksaan diselesaikan — status siklus hidup,
- * penanggung jawab, unit, dan nilai buku — bukan dari register hari ini. Laporan pemeriksaan
+ * lokasi tercatat, penanggung jawab, unit, dan nilai buku — bukan dari register hari ini. Aset yang
+ * ditemukan di lokasi yang diperiksa padahal tercatat di tempat lain muncul Tidak sesuai, dengan
+ * lokasi tercatatnya di kolom sendiri. Laporan pemeriksaan
  * Agustus yang dicetak Desember harus tetap menyebut keadaan Agustus. Monitoring yang masih draf
  * tidak ikut: temuannya belum final.
  *
@@ -97,6 +99,7 @@ final class AssetMonitoringReport implements ReportDefinition
             ['key' => 'baris.asset_nama', 'label' => 'Nama aset', 'table' => 'baris'],
             ['key' => 'baris.spesifikasi', 'label' => 'Spesifikasi', 'table' => 'baris'],
             ['key' => 'baris.kondisi_sistem', 'label' => 'Status di sistem', 'table' => 'baris'],
+            ['key' => 'baris.lokasi_tercatat', 'label' => 'Lokasi tercatat', 'table' => 'baris'],
             ['key' => 'baris.kondisi_fisik', 'label' => 'Keberadaan fisik', 'table' => 'baris'],
             ['key' => 'baris.kondisi_aset', 'label' => 'Kondisi fisik', 'table' => 'baris'],
             ['key' => 'baris.status_monitoring', 'label' => 'Status monitoring', 'table' => 'baris'],
@@ -120,6 +123,7 @@ final class AssetMonitoringReport implements ReportDefinition
                 $join->on('aset.id', '=', "{$lines}.aset_id")->on('aset.tenant_id', '=', "{$lines}.tenant_id");
             })
             ->leftJoin('aset_m_lokasi_aset as lokasi', fn (JoinClause $join) => $join->on('lokasi.id', '=', 'monitoring.lokasi_aset_id')->on('lokasi.tenant_id', '=', 'monitoring.tenant_id'))
+            ->leftJoin('aset_m_lokasi_aset as lokasi_tercatat', fn (JoinClause $join) => $join->on('lokasi_tercatat.id', '=', "{$lines}.sistem_lokasi_id")->on('lokasi_tercatat.tenant_id', '=', "{$lines}.tenant_id"))
             ->leftJoin('aset_m_kondisi_aset as kondisi', fn (JoinClause $join) => $join->on('kondisi.id', '=', "{$lines}.kondisi_aset_id")->on('kondisi.tenant_id', '=', "{$lines}.tenant_id"))
             ->leftJoin('aset_m_model_aset as model', fn (JoinClause $join) => $join->on('model.id', '=', 'aset.model_aset_id')->on('model.tenant_id', '=', 'aset.tenant_id'))
             ->where('monitoring.status', AssetMonitoringStatus::COMPLETED)
@@ -148,7 +152,7 @@ final class AssetMonitoringReport implements ReportDefinition
             ->get([
                 "{$lines}.*",
                 'monitoring.kode as no_bukti', 'monitoring.tanggal as tanggal_monitoring',
-                'lokasi.nama as lokasi_nama',
+                'lokasi.nama as lokasi_nama', 'lokasi_tercatat.nama as lokasi_tercatat_nama',
                 'aset.kode as aset_kode', 'aset.nama as aset_nama', 'aset.model_number', 'aset.serial_number',
                 'model.nama as model_nama', 'kondisi.nama as kondisi_nama',
             ]);
@@ -174,6 +178,7 @@ final class AssetMonitoringReport implements ReportDefinition
                 'asset_nama' => $row->aset_nama,
                 'spesifikasi' => AssetSpecification::describe($row->model_nama, $row->model_number, $row->serial_number),
                 'kondisi_sistem' => StatusAset::label($row->sistem_lifecycle_state),
+                'lokasi_tercatat' => $row->lokasi_tercatat_nama ?? '—',
                 'kondisi_fisik' => $row->ada ? 'Ada' : 'Tidak ada',
                 'kondisi_aset' => $row->kondisi_nama ?? '—',
                 'status_monitoring' => $row->hasil === AssetMonitoringStatus::MATCH ? 'Sesuai' : 'Tidak sesuai',

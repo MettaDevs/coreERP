@@ -123,6 +123,9 @@ class AssetMonitoringTest extends TestCase
             [$draft[$aktifAda]['hasil'], $draft[$aktifHilang]['hasil'], $draft[$musnahAda]['hasil'], $draft[$henti]['hasil']],
         );
         $this->assertSame('Dilepas', $draft[$musnahAda]['sistem_lifecycle_label']);
+        // Semua aset tercatat di lokasi yang diperiksa: tidak ada keterangan lokasi otomatis, dan
+        // keterangan pemeriksa tetap apa adanya.
+        $this->assertSame(['Belum dimusnahkan', null], [$draft[$musnahAda]['keterangan'], $draft[$aktifAda]['keterangan']]);
         $this->show($id)->assertJsonPath('data.jumlah_tidak_sesuai', 2)->assertJsonPath('data.jumlah_belum_diperiksa', 0);
 
         $this->complete($id)->assertOk();
@@ -135,6 +138,56 @@ class AssetMonitoringTest extends TestCase
         $frozen = $this->linesByAsset($id);
         $this->assertSame('tidak_sesuai', $frozen[$aktifHilang]['hasil']);
         $this->assertSame('received', $frozen[$aktifHilang]['sistem_lifecycle_state']);
+    }
+
+    public function test_asset_found_but_registered_elsewhere_is_a_mismatch_with_an_automatic_note(): void
+    {
+        $diperiksa = $this->location('Ruang rapat lantai 2');
+        $tercatat = $this->location('Gudang pusat');
+        $pindahan = $this->receive('Proyektor pindahan', $tercatat);
+        $diedit = $this->receive('Kursi pindahan', $tercatat);
+        $hilangAktif = $this->receive('Kamera tercatat di gudang', $tercatat);
+        $hilangHenti = $this->receive('Kipas sudah dihentikan', $tercatat);
+        $tanpaLokasi = $this->receive('Papan tanpa lokasi', $tercatat);
+        DB::table('aset_tr_aset')->where('id', $hilangHenti)->update(['lifecycle_state' => 'decommissioned']);
+        DB::table('aset_tr_aset')->where('id', $tanpaLokasi)->update(['lokasi_aset_id' => null]);
+
+        $id = $this->draft($diperiksa, ['details' => [
+            ['aset_id' => $pindahan, 'ada' => true],
+            ['aset_id' => $diedit, 'ada' => true, 'keterangan' => 'Dipinjam untuk rapat'],
+            ['aset_id' => $hilangAktif, 'ada' => false],
+            ['aset_id' => $hilangHenti, 'ada' => false],
+            ['aset_id' => $tanpaLokasi, 'ada' => true],
+        ]]);
+
+        $draft = $this->linesByAsset($id);
+        // Ditemukan di lokasi yang diperiksa padahal tercatat di tempat lain: tidak sesuai, dengan nama
+        // lokasinya — bukan ULID — sebagai keterangan otomatis. Keterangan pemeriksa tidak ditimpa.
+        $this->assertSame(['tidak_sesuai', 'Tercatat di Gudang pusat'], [$draft[$pindahan]['hasil'], $draft[$pindahan]['keterangan']]);
+        $this->assertSame(['tidak_sesuai', 'Dipinjam untuk rapat'], [$draft[$diedit]['hasil'], $draft[$diedit]['keterangan']]);
+        $this->assertSame(['tidak_sesuai', 'Belum tercatat di lokasi mana pun'], [$draft[$tanpaLokasi]['hasil'], $draft[$tanpaLokasi]['keterangan']]);
+        // Yang tidak ditemukan tetap mengikuti status siklus hidupnya, di mana pun ia tercatat.
+        $this->assertSame(['tidak_sesuai', null], [$draft[$hilangAktif]['hasil'], $draft[$hilangAktif]['keterangan']]);
+        $this->assertSame(['sesuai', null], [$draft[$hilangHenti]['hasil'], $draft[$hilangHenti]['keterangan']]);
+        $this->show($id)->assertJsonPath('data.jumlah_tidak_sesuai', 4);
+
+        // Pemeriksa boleh mengganti keterangan otomatis.
+        $this->save($id, $diperiksa, [
+            ['aset_id' => $pindahan, 'ada' => true, 'keterangan' => 'Dipindah tanpa berita acara'],
+            ['aset_id' => $diedit, 'ada' => true, 'keterangan' => 'Dipinjam untuk rapat'],
+            ['aset_id' => $hilangAktif, 'ada' => false],
+            ['aset_id' => $hilangHenti, 'ada' => false],
+            ['aset_id' => $tanpaLokasi, 'ada' => true, 'keterangan' => 'Belum tercatat di lokasi mana pun'],
+        ])->assertOk();
+        $this->complete($id)->assertOk()->assertJsonPath('data.jumlah_tidak_sesuai', 4);
+
+        $this->assertDatabaseHas('aset_tr_monitoring_aset_details', [
+            'monitoring_aset_id' => $id, 'aset_id' => $pindahan, 'hasil' => 'tidak_sesuai',
+            'sistem_lokasi_id' => $tercatat, 'keterangan' => 'Dipindah tanpa berita acara',
+        ]);
+        $this->assertDatabaseHas('aset_tr_monitoring_aset_details', ['monitoring_aset_id' => $id, 'aset_id' => $hilangHenti, 'hasil' => 'sesuai']);
+        // Temuan tidak memindahkan aset.
+        $this->assertSame($tercatat, (string) DB::table('aset_tr_aset')->where('id', $pindahan)->value('lokasi_aset_id'));
     }
 
     public function test_fill_follows_unit_and_person_on_the_header_and_skips_assets_already_listed(): void
@@ -336,6 +389,51 @@ class AssetMonitoringTest extends TestCase
         $this->withHeader('Idempotency-Key', 'monitoring-'.Str::ulid())->postJson(self::URL, $this->header($gudang))->assertForbidden();
     }
 
+    /**
+     * Keputusan 30 September 2026: duty Pantau aset membawa hak baca lokasi, kondisi, dan register aset
+     * untuk isian manual, tanpa satu pun hak tulis atas ketiganya.
+     */
+    public function test_monitoring_duty_alone_loads_the_manual_pickers_and_grants_no_write(): void
+    {
+        $this->assertSame(0, Artisan::call('app:register-manifest', ['module' => 'management-aset']), Artisan::output());
+        $gudang = $this->location('Gudang pemilih');
+        $baik = $this->master('kondisi-aset', ['nama' => 'Baik']);
+        $aset = $this->receive('Televisi', $gudang);
+        $asetVersion = (int) DB::table('aset_tr_aset')->where('id', $aset)->value('version');
+
+        // Seluruh permission yang dijangkau duty ini lewat katalog sungguhan: hanya baca, selain
+        // permission monitoring sendiri.
+        $reachable = DB::table('security_duty_privileges as dp')
+            ->join('security_privilege_permissions as pp', 'pp.privilege_code', '=', 'dp.privilege_code')
+            ->join('permissions as p', 'p.code', '=', 'pp.permission_code')
+            ->where('dp.duty_code', 'management-aset.monitoring-aset.manage')
+            ->where('p.code', 'not like', 'management-aset.monitoring-aset.%')
+            ->pluck('p.access_level', 'p.code')->all();
+        $this->assertEqualsCanonicalizing(
+            ['management-aset.lokasi-aset.read' => 'read', 'management-aset.kondisi-aset.read' => 'read', 'management-aset.aset.read' => 'read'],
+            $reachable,
+        );
+
+        $this->withDuty(['management-aset.monitoring-aset.manage']);
+        $this->getJson('/api/modules/management-aset/v1/lokasi-aset?per_page=100&aktif=true')->assertOk()->assertJsonFragment(['id' => $gudang]);
+        $this->getJson('/api/modules/management-aset/v1/kondisi-aset?per_page=100&aktif=true')->assertOk()->assertJsonFragment(['id' => $baik]);
+        $this->getJson('/api/modules/management-aset/v1/aset')->assertOk()->assertJsonFragment(['id' => $aset]);
+        $this->getJson('/api/modules/management-aset/v1/reference-data/unit-kerja')->assertOk();
+
+        $id = (string) $this->withHeader('Idempotency-Key', 'monitoring-'.Str::ulid())
+            ->postJson(self::URL, [...$this->header($gudang), 'details' => [['aset_id' => $aset, 'ada' => true, 'kondisi_aset_id' => $baik]]])
+            ->assertCreated()->json('data.id');
+        $this->postJson(self::URL.'/'.$id.'/selesaikan', ['version' => 1])->assertOk()->assertJsonPath('data.details.0.hasil', 'sesuai');
+
+        // Baca saja: master dan register tidak dapat ditulis.
+        $this->withHeader('Idempotency-Key', 'lokasi-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/lokasi-aset', $this->denganKodeKetik('lokasi-aset', ['nama' => 'Lokasi liar']))->assertForbidden();
+        $this->withHeader('Idempotency-Key', 'kondisi-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/kondisi-aset', $this->denganKodeKetik('kondisi-aset', ['nama' => 'Kondisi liar']))->assertForbidden();
+        $this->patchJson('/api/modules/management-aset/v1/aset/'.$aset, ['nama' => 'Televisi diganti', 'version' => $asetVersion])->assertForbidden();
+        $this->assertSame('Televisi', (string) DB::table('aset_tr_aset')->where('id', $aset)->value('nama'));
+    }
+
     public function test_photo_evidence_attaches_to_the_document_and_its_lines(): void
     {
         Storage::fake('s3');
@@ -384,8 +482,8 @@ class AssetMonitoringTest extends TestCase
         $rows = array_column($report['tables']['baris'], null, 'asset_kode');
         $row = $rows[(string) DB::table('aset_tr_aset')->where('id', $hilang)->value('kode')];
         $this->assertSame(
-            ['Diterima', 'Tidak ada', 'Tidak sesuai', 'Tidak ditemukan', 'Gudang laporan'],
-            [$row['kondisi_sistem'], $row['kondisi_fisik'], $row['status_monitoring'], $row['keterangan'], $row['lokasi']],
+            ['Diterima', 'Tidak ada', 'Tidak sesuai', 'Tidak ditemukan', 'Gudang laporan', 'Gudang laporan'],
+            [$row['kondisi_sistem'], $row['kondisi_fisik'], $row['status_monitoring'], $row['keterangan'], $row['lokasi'], $row['lokasi_tercatat']],
         );
 
         $filtered = app(PenyediaLaporan::class)->dataset('laporan-monitoring-aset', $context, ['kondisi_aset_id' => $baik]);

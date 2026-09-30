@@ -2,8 +2,8 @@
 #
 # Menyelesaikannya hanya membekukan temuan; register aset tidak pernah berubah karenanya.
 # Perubahan register yang sungguhan tetap lewat mutasi atau dekomisioning. Hasil tiap baris
-# (`sesuai`/`tidak_sesuai`) dihitung server dari status siklus hidup aset dan temuan `ada`,
-# tidak pernah dikirim klien.
+# (`sesuai`/`tidak_sesuai`) dihitung server dari status siklus hidup aset, lokasi tercatatnya, dan
+# temuan `ada`, tidak pernah dikirim klien.
 /api/v1/monitoring-aset:
   get:
     tags:
