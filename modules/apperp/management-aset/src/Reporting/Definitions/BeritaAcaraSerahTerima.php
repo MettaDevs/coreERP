@@ -88,7 +88,8 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
 
         return [
             ...array_map(
-                static fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null],
+                static fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null]
+                    + ($key === 'dicetak_pada' ? ['type' => 'datetime'] : []),
                 array_keys($header),
                 $header,
             ),
@@ -155,7 +156,7 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
                 'diserahkan_oleh' => $direktori->namaOrang($context->tenantId, $mutasi->diserahkan_oleh_user_id) ?? $mutasi->diserahkan_oleh_user_id,
                 'diterima_oleh' => $direktori->namaOrang($context->tenantId, $mutasi->diterima_oleh_user_id) ?? $mutasi->diterima_oleh_user_id,
                 'jumlah_aset' => $lines->count(),
-                'dicetak_pada' => now()->format('d/m/Y H:i'),
+                'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: [
                 'baris' => array_values($lines->map(static fn (object $line): array => [

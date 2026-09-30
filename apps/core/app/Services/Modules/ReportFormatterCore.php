@@ -17,8 +17,8 @@ final class ReportFormatterCore implements ReportFormatter
 {
     public function __construct(private readonly ValueFormats $formats) {}
 
-    public function display(string $tenantId, array $fields, array $dataset): array
+    public function display(string $tenantId, array $fields, array $dataset, string $timezone): array
     {
-        return $this->formats->display($tenantId, $fields, $dataset);
+        return $this->formats->display($tenantId, $fields, $dataset, $timezone);
     }
 }

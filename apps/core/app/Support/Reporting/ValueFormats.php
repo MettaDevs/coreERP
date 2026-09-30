@@ -14,6 +14,9 @@ use App\Support\Reporting\Rendering\RenderException;
  * dari setelan mata uang tenant lewat {@see MoneyPrecision} — sumber yang sama dengan yang
  * membulatkan jurnal — jadi mengubah presisi IDR di Data referensi ikut mengubah laporan,
  * tanpa satu pun definisi laporan disentuh.
+ *
+ * Waktu (`datetime`) ditampilkan menurut zona waktu pengguna yang mencetak, bukan zona server;
+ * zonanya dibawa pemanggil karena ekspor berjalan di worker yang tidak punya permintaan.
  */
 final class ValueFormats
 {
@@ -21,12 +24,13 @@ final class ValueFormats
 
     /**
      * @param  list<array<string, mixed>>  $fields  `fields` dari definisi laporan.
+     * @param  string  $timezone  Zona waktu pengguna yang mencetak, nama IANA.
      * @return array<string, ValueFormat> Per placeholder (`total`, `baris.nilai`) yang menyatakan tipe.
      *
      * @throws RenderException Tipe yang tidak dikenal: definisi laporannya yang salah, dan
      *                         kesalahannya harus terlihat saat dicoba, bukan tercetak diam-diam.
      */
-    public function forFields(string $tenantId, array $fields): array
+    public function forFields(string $tenantId, array $fields, string $timezone): array
     {
         $formats = [];
         foreach ($fields as $field) {
@@ -43,7 +47,11 @@ final class ValueFormats
                     implode(', ', ValueFormat::TYPES),
                 ));
             }
-            $formats[$key] = $type === ValueFormat::MONEY ? $this->money($tenantId) : new ValueFormat($type);
+            $formats[$key] = match ($type) {
+                ValueFormat::MONEY => $this->money($tenantId),
+                ValueFormat::DATETIME => new ValueFormat($type, timezone: $timezone),
+                default => new ValueFormat($type),
+            };
         }
 
         return $formats;
@@ -56,9 +64,9 @@ final class ValueFormats
      * @param  array{fields: array<string, mixed>, tables: array<string, mixed>, file_name: string}  $dataset
      * @return array{fields: array<string, mixed>, tables: array<string, mixed>, file_name: string}
      */
-    public function display(string $tenantId, array $fields, array $dataset): array
+    public function display(string $tenantId, array $fields, array $dataset, string $timezone): array
     {
-        $formats = $this->forFields($tenantId, $fields);
+        $formats = $this->forFields($tenantId, $fields, $timezone);
         if ($formats === []) {
             return $dataset;
         }

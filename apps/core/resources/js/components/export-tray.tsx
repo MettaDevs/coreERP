@@ -8,6 +8,7 @@ import { Download, FileOutput } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
     getExports,
     refreshExports,
@@ -16,7 +17,6 @@ import {
 import {
     downloadExport,
     FORMAT_LABEL,
-    formatTime,
     isActive,
     STATUS_LABEL,
 } from '@/lib/reports';
@@ -110,6 +110,7 @@ export function ExportTray() {
 }
 
 function ExportRow({ item }: { item: ReportExport }) {
+    const formatTime = useDateTimeFormat();
     const download = () =>
         void downloadExport(item).catch((caught: Error) =>
             toast.error(caught.message || 'Berkas belum dapat diunduh.'),
