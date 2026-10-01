@@ -36,7 +36,7 @@ Pada `RegisterBusiness`, entitlement dicatat lebih dulu untuk seluruh app yang d
 dipasang hanya yang benar-benar ada sebagai module di runtime ini:
 
 ```php
-// apps/core/app/Actions/Onboarding/RegisterBusiness.php
+// apps/core/app/Platform/Tenant/Actions/RegisterBusiness.php
 foreach ($appIds as $appId) {
     if ($registry->cari($appId) === null) {
         continue;

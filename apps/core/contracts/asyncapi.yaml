@@ -7,7 +7,7 @@ info:
 
     Envelope wajib mengikuti `docs/dev/04-api-and-integration.md`. Pengiriman
     memakai outbox (`outbox_events`) lalu webhook bertanda tangan; implementasinya
-    ada di `app/Console/Commands/PublishWorkflowEvents.php`.
+    ada di `app/Foundation/Workflow/Console/PublishWorkflowEvents.php`.
 
     Bukan event, jangan dicari di sini: sinkronisasi penugasan posisi dari
     Human Resources adalah REST `POST /api/internal/v1/human-resources/position-assignments`.

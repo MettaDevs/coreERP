@@ -164,7 +164,7 @@ adalah berkas sendiri di folder areanya; lihat [folder Fixed Assets di BCApps](h
 Alasannya sama dengan `routes/api/<fitur>.php`: dua orang yang mengerjakan fitur berbeda tidak
 menyunting berkas yang sama, jadi merge mereka tidak bentrok.
 
-`app:register-manifest` menggabungkan keduanya lewat `App\Support\Modules\ModuleManifestFiles`:
+`app:register-manifest` menggabungkan keduanya lewat `App\Platform\Modules\Support\ModuleManifestFiles`:
 
 - Daftar hanya disambung, isi `app.yaml` lebih dulu, lalu berkas `manifest/` menurut jalurnya.
   Urutan itu tidak menentukan isi katalog, karena pendaftaran mencocokkan baris menurut kodenya.
@@ -418,7 +418,7 @@ class Worker extends Model
   `[...parent::COLUMN_CLASSIFICATION, 'email' => DataClass::EndUserIdentifiableInformation]`.
 - **Tabel tanpa model** dinyatakan di satu kelas registry per module di `src/Models`, yang memakai
   `DataClassificationRegistry`; bentuk isinya sama: bawaan tabel lalu kolom yang berbeda. Registry Core
-  adalah `App\Models\UnmodeledTables`.
+  adalah `App\Platform\Modules\Models\UnmodeledTables`.
 
 `DataClassificationBoundaryTest` menolak tabel tenant tanpa klasifikasi, timpaan untuk kolom yang tidak
 ada, dan kolom bernama seperti nama, email, telepon, NIK, NPWP, tanggal lahir, atau alamat yang ikut
@@ -466,7 +466,7 @@ memakai `lockForUpdate()`. Tabel yang kolom `version`-nya sudah bermakna lain di
 ### Retensi data log
 
 Log dan berkas teknis yang tumbuh terus dihapus berdasarkan umur oleh satu layanan Core,
-`App\Support\Retention\RetentionService` ([analisa gap BC, gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)).
+`App\Platform\Retention\Support\RetentionService` ([analisa gap BC, gap 4](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-4)).
 Penghapusan fisik di sini sah karena yang dihapus log, bukan data bisnis; tabel data bisnis tidak pernah
 didaftarkan dan tetap hanya diarsipkan.
 
@@ -809,7 +809,7 @@ Jangan memakai `new Date().toISOString().slice(0, 10)`: itu tanggal UTC, jadi an
 setelan pengguna.
 
 Zona pengguna adalah pilihannya di My Profile. Bila kosong, yang dipakai zona entitas legal aktif
-(`legal_entities.timezone`), lalu zona aplikasi. Penghitungnya `App\Support\UserClock`, dan hasilnya ikut
+(`legal_entities.timezone`), lalu zona aplikasi. Penghitungnya `App\Platform\Identity\Support\UserClock`, dan hasilnya ikut
 setiap halaman Inertia sebagai `clock` dan `workDate`.
 
 Waktu dari server (misalnya kapan record dibuat) ditampilkan lewat `useDateTimeFormat()` dari

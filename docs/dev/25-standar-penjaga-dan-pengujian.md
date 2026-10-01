@@ -88,7 +88,7 @@ PHPStan tetap dipakai, untuk pertanyaan lain: kebenaran tipe. Setelannya ada di 
 
 ## Daftar pengecualian yang boleh kosong tetap harus membuktikan aturannya
 
-`App\Support\Modules\ModulTanpaAnalisaTipe` di `apps/core/app/Support/Modules/ModulTanpaAnalisaTipe.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
+`App\Platform\Modules\Support\ModulTanpaAnalisaTipe` di `apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
 
 Daftar kosong membuat setiap pemeriksaan yang membacanya hijau **tanpa subjek**. Penjaga tanpa subjek tidak boleh dianggap hijau: ia tidak membuktikan aturannya berlaku, ia hanya membuktikan tidak ada yang diperiksa. Karena itu syarat "alasan menyebut angka terukur" dan "tenggat ditulis `YYYY-MM-DD`" dibuktikan pada entri buatan di dalam test, lewat penyedia data yang memberi entri cacat dan menuntut pemeriksanya merah.
 
@@ -133,7 +133,7 @@ Fixture katalog di `apps/core/tests/TestCase.php` dulu memakai id modul aset yan
 
 Perbaikannya satu baris makna: fixture memakai id `app-uji`, yang tidak akan pernah menjadi folder di `modules/`. **Dua sumber kebenaran untuk satu katalog adalah dua sumber yang akan menyimpang** — pertanyaannya kapan, bukan apakah.
 
-Sisi lain aturan yang sama: fixture katalog yang memang harus mewakili modul sungguhan mendaftarkan manifest modul itu apa adanya, lewat perintah `app:register-manifest` di `apps/core/app/Console/Commands/RegisterAppManifestCommand.php` — perintah yang sama dengan yang dijalankan admin on-prem. Daftar kecil yang ditulis tangan di dalam test adalah sumber kebenaran kedua, dan itu yang menyimpang.
+Sisi lain aturan yang sama: fixture katalog yang memang harus mewakili modul sungguhan mendaftarkan manifest modul itu apa adanya, lewat perintah `app:register-manifest` di `apps/core/app/Platform/Modules/Console/RegisterAppManifestCommand.php` — perintah yang sama dengan yang dijalankan admin on-prem. Daftar kecil yang ditulis tangan di dalam test adalah sumber kebenaran kedua, dan itu yang menyimpang.
 
 ## Menjalankan suitenya
 

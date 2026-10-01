@@ -92,10 +92,10 @@ graph TD
 Semua master mandiri tidak menulis ulang logika CRUD atau penomoran. Mereka hanya mewarisi `MasterDataController`:
 
 ```php
-namespace App\Http\Controllers\master;
+namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use App\Http\Controllers\MasterDataController;
-use App\Models\master\Trade;
+use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
+use Modules\Apperp\ManagementAset\Models\master\Trade;
 
 class TradeController extends MasterDataController
 {

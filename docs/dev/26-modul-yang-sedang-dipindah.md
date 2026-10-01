@@ -15,9 +15,9 @@ aturannya, dan kenapa aturannya begitu.
 ## Keadaan sekarang: daftarnya kosong
 
 Daftar modul yang sedang dipindah ada di
-`apps/core/app/Support/Modules/ModulSedangDipindah.php`, dan **isinya sekarang kosong**.
+`apps/core/app/Platform/Modules/Support/ModulSedangDipindah.php`, dan **isinya sekarang kosong**.
 Begitu juga daftar modul yang belum ikut analisa tipe PHP,
-`apps/core/app/Support/Modules/ModulTanpaAnalisaTipe.php`, dan ketiga berkas pengecualian yang
+`apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php`, dan ketiga berkas pengecualian yang
 mengikutinya (`apps/core/.prettierignore`, `exclude` pada
 `apps/core/tsconfig.json`, `excludePaths` pada `apps/core/phpstan.neon`).
 
@@ -172,7 +172,7 @@ daftarnya berubah.
 
 ## Registry membedakan dilayani dari dimuat
 
-`apps/core/app/Support/Modules/ModuleRegistry.php` punya dua pintu, dan bedanya bukan
+`apps/core/app/Platform/Modules/Support/ModuleRegistry.php` punya dua pintu, dan bedanya bukan
 kenyamanan:
 
 | Pintu | Untuk apa | Modul yang sedang dipindah |
@@ -240,9 +240,9 @@ Aturan ini masih berlaku: `app-erp-procurement` belum dipindah.
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/core/app/Support/Modules/ModulSedangDipindah.php` | Daftar modul yang sedang dipindah, beserta alasan, tenggat, dan penghalangnya |
-| `apps/core/app/Support/Modules/ModulTanpaAnalisaTipe.php` | Daftar modul yang belum ikut analisa tipe PHP |
-| `apps/core/app/Support/Modules/ModuleRegistry.php` | Pembedaan `semua()` dan `semuaTermasukYangSedangDipindah()` |
+| `apps/core/app/Platform/Modules/Support/ModulSedangDipindah.php` | Daftar modul yang sedang dipindah, beserta alasan, tenggat, dan penghalangnya |
+| `apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php` | Daftar modul yang belum ikut analisa tipe PHP |
+| `apps/core/app/Platform/Modules/Support/ModuleRegistry.php` | Pembedaan `semua()` dan `semuaTermasukYangSedangDipindah()` |
 | `apps/core/app/Providers/ModuleServiceProvider.php` | Pendaftaran penyedia layanan modul dan pemuatan migration modul yang sedang dipindah |
 | `apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Tenggat, pemeriksaan basi, syarat entri, dan kesamaan berkas pengecualian |
 | `apps/core/tests/Feature/Boundary/ModulTanpaAnalisaTipeTest.php` | Kesamaan daftar dengan `excludePaths` pada `phpstan.neon`, dan tenggatnya |

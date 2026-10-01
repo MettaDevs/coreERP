@@ -13,7 +13,7 @@ Sampai 10 September 2026 dua bentuk hidup berdampingan, dan hampir semua kesalah
 | Salinan React | satu, milik shell | dua, satu di shell dan satu di dalam bingkai |
 | Token konteks | tidak ada | ada, beserta muat ulang berkalanya |
 
-Yang **tidak** berubah oleh pembuangan itu: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Rute `apps/{app}` di `apps/core/routes/web.php` sekarang hanya mengalihkan ke entri menu pertama yang boleh dilihat pengguna. Satu tautan peluncur yang tetap benar lebih murah daripada peluncur yang harus tahu entri menu mana yang pertama boleh dilihat tiap pengguna.
+Yang **tidak** berubah oleh pembuangan itu: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Platform\Modules\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Rute `apps/{app}` di `apps/core/routes/web.php` sekarang hanya mengalihkan ke entri menu pertama yang boleh dilihat pengguna. Satu tautan peluncur yang tetap benar lebih murah daripada peluncur yang harus tahu entri menu mana yang pertama boleh dilihat tiap pengguna.
 
 ## Nama halaman dan satu tuan rumah Inertia
 
@@ -53,7 +53,7 @@ Route::middleware(['web', 'auth', 'konteks-module:management-aset'])
 
 `where('sisa', '.*')` bukan soal gaya. Tanpanya Laravel berhenti pada garis miring pertama, dan alamat seperti `/management-aset/pemeliharaan-aset/<id>/ubah` tidak pernah sampai ke controller. Ruas sesudah id menu inilah yang dulu ditulis sesudah tanda pagar oleh perutean hash di dalam iframe; sekarang ia alamat biasa, sehingga tombol kembali peramban, muat ulang, dan tautan yang disalin semuanya mendarat di record yang sama.
 
-`konteks-module` — alias middleware yang didaftarkan `apps/core/bootstrap/app.php` untuk `App\Http\Middleware\ResolveModuleContext` — menerima id module sebagai parameter, jadi ia dipasang di grup rute module dan bukan sebagai middleware global: izin bersifat per app, dan middleware global tidak tahu ia sedang melayani module yang mana.
+`konteks-module` — alias middleware yang didaftarkan `apps/core/bootstrap/app.php` untuk `App\Platform\Modules\Http\Middleware\ResolveModuleContext` — menerima id module sebagai parameter, jadi ia dipasang di grup rute module dan bukan sebagai middleware global: izin bersifat per app, dan middleware global tidak tahu ia sedang melayani module yang mana.
 
 ## Manifest adalah satu-satunya daftar id menu
 
@@ -124,9 +124,9 @@ Akar repo menjadi akar workspace npm, dan itu yang membuat pencarian `node_modul
 | --- | --- |
 | `apps/core/resources/js/app.tsx` | Pemilih halaman: mengenali nama `Modul::Halaman` dan memindai folder UI module |
 | `apps/core/resources/js/lib/halaman-module.tsx` | Tuan rumah module: pembatas penangguhan, pembatas kesalahan, simpanan komponen malas |
-| `apps/core/app/Support/LaunchableAppCatalog.php` | Menu dari manifest, penyaringan permission, aturan tautan `/<id module>/<id entri menu>` |
+| `apps/core/app/Platform/Modules/Support/LaunchableAppCatalog.php` | Menu dari manifest, penyaringan permission, aturan tautan `/<id module>/<id entri menu>` |
 | `apps/core/routes/web.php` | Rute `apps/{app}`: peluncur produk untuk kedua bentuk |
-| `apps/core/app/Http/Middleware/ResolveModuleContext.php` | Konteks module per permintaan, dipasang lewat alias `konteks-module` |
+| `apps/core/app/Platform/Modules/Http/Middleware/ResolveModuleContext.php` | Konteks module per permintaan, dipasang lewat alias `konteks-module` |
 | `apps/core/resources/js/components/jembatan-cetak-module.tsx` | Penampung `CustomEvent('coreerp:print')` dan `CustomEvent('coreerp:list-export')` dari layar module |
 | `apps/core/scripts/periksa-bundel.mjs` | Pemeriksa React tunggal, dijalankan `npm run bundle:check` |
 | `apps/core/vite.config.ts` | `resolve.dedupe`, alias `@modules`, `server.fs.allow` |

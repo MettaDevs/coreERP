@@ -412,9 +412,9 @@ approval, bukan disimpulkan hanya dari konfigurasi.
 
 ## Struktur kode
 
-API memakai satu base controller `App\Http\Controllers\MasterDataController` yang memegang seluruh perilaku bersama: hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, dan penjagaan arsip. Kode khusus master berada di `api/app/Http/Controllers/master/` dan `api/app/Models/master/`. UI master berada di `ui/src/master/`. Pola folder untuk fitur berikutnya tercatat pada `docs/agent.md`.
+API memakai satu base controller `Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController` yang memegang seluruh perilaku bersama: hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, dan penjagaan arsip. Kode khusus master berada di `src/Http/Controllers/master/` dan `src/Models/master/`. UI master berada di `ui/master/`. Pola folder untuk fitur berikutnya tercatat pada `docs/agent.md`.
 
-Test berada di `api/tests/Feature`. Selain CRUD, test menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak, hak satu master tidak merembet ke master lain, induk beranak yang belum diarsipkan tidak dapat diarsipkan, dan `kode` selalu berasal dari Core.
+Test berada di `tests/Feature`. Selain CRUD, test menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak, hak satu master tidak merembet ke master lain, induk beranak yang belum diarsipkan tidak dapat diarsipkan, dan `kode` selalu berasal dari Core.
 
 ## Load test
 
