@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\Role;
-use App\Models\SecurityDuty;
-use App\Models\SecurityPrivilege;
+use App\Platform\Access\Models\Permission;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Models\SecurityDuty;
+use App\Platform\Access\Models\SecurityPrivilege;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;

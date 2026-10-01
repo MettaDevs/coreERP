@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Reporting;
 
+use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use App\Support\Modules\PelaksanaTenant;

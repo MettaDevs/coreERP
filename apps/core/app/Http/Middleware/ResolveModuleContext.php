@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\License\SiteLicense;
 use App\Support\Modules\ModuleRequestContext;

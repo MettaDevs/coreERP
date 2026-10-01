@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Foundation\Vendor\Support;
 
 use App\Foundation\Vendor\Models\Vendor;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\AttachmentRecordType;
 use App\Support\Modules\Contracts\DataClass;
 

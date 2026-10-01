@@ -2,8 +2,8 @@
 
 namespace App\Platform\Tenant\Http\Controllers;
 
-use App\Actions\Access\CreateInvitation;
 use App\Http\Controllers\Controller;
+use App\Platform\Access\Actions\CreateInvitation;
 use App\Platform\Identity\Models\User;
 use App\Platform\Identity\Support\Sso\SsoFailure;
 use App\Platform\Tenant\Actions\RedeemInvitation;

@@ -2,7 +2,7 @@
 
 namespace App\Platform\Tenant\Models;
 
-use App\Models\Role;
+use App\Platform\Access\Models\Role;
 use App\Platform\Identity\Models\User;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;

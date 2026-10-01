@@ -2,8 +2,8 @@
 
 namespace App\Platform\Tenant\Actions;
 
-use App\Actions\Access\CreateInvitation;
-use App\Models\RoleAssignment;
+use App\Platform\Access\Actions\CreateInvitation;
+use App\Platform\Access\Models\RoleAssignment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\TenantMembership;

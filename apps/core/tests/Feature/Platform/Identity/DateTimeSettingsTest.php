@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Identity;
 
-use App\Models\RoleAssignment;
+use App\Platform\Access\Models\RoleAssignment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Actions\RegisterBusiness;

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
+use App\Platform\Access\Support\RoleHierarchy;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\License\SiteLicense;
 use Illuminate\Database\Query\Builder;

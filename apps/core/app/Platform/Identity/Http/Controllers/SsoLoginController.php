@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Identity\Http\Controllers;
 
-use App\Actions\Access\CreateInvitation;
 use App\Http\Controllers\Controller;
+use App\Platform\Access\Actions\CreateInvitation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
 use App\Platform\Identity\Models\ExternalIdentity;

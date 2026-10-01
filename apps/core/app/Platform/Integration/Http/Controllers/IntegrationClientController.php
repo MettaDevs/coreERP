@@ -4,12 +4,12 @@ namespace App\Platform\Integration\Http\Controllers;
 
 use App\Foundation\FinancePosting\Support\IntegrationClientAccounts;
 use App\Http\Controllers\Controller;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Integration\Support\PushDestination;
 use App\Platform\Integration\Support\SignedPush;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\Client\ConnectionException;

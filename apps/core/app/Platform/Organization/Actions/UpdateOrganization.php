@@ -2,10 +2,10 @@
 
 namespace App\Platform\Organization\Actions;
 
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Organization\Models\OperatingUnit;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;

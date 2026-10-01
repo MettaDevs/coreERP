@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Platform\Organization;
 
-use App\Models\Role;
-use App\Models\RoleAssignment;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Models\RoleAssignment;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;

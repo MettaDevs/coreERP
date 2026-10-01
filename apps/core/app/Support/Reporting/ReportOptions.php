@@ -6,9 +6,9 @@ namespace App\Support\Reporting;
 
 use App\Models\ReportLastUsedOption;
 use App\Models\ReportPreset;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;

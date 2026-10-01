@@ -345,7 +345,7 @@ class PenyaringanTenantTest extends TestCase
         $otherTenant = $this->buatTenantUji();
         DB::table('hr_workers')->where('id', $this->seedPekerja($otherTenant, 'Pekerja tenant lain'))->update(['core_membership_id' => $membershipId]);
 
-        $member = fn (Assert $page) => $page->component('settings/access')->etc();
+        $member = fn (Assert $page) => $page->component('platform/access/access')->etc();
 
         // Module belum terpasang untuk tenant ini: layar tidak menanyakan pekerja sama sekali.
         $this->actingAs($admin)->get('/settings/access?section=members')->assertInertia(fn (Assert $page) => $member($page)

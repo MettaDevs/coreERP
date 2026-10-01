@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Retention\RetentionPolicies;
 use App\Support\Retention\RetentionService;

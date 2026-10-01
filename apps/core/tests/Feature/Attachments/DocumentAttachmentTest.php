@@ -3,7 +3,7 @@
 namespace Tests\Feature\Attachments;
 
 use App\Models\DocumentAttachment;
-use App\Models\Role;
+use App\Platform\Access\Models\Role;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
