@@ -3,8 +3,8 @@
 namespace Tests\Feature\Foundation\Vendor;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Foundation\Vendor\Models\Vendor;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Modules\Contracts\DaftarVendor;

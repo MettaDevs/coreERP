@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
-use App\Foundation\Vendor\ModuleServices\DaftarVendorCore;
 use App\Foundation\Currency\ModuleServices\PresisiMataUangCore;
 use App\Foundation\FiscalCalendar\ModuleServices\KalenderFiskalCore;
 use App\Foundation\NumberSequence\ModuleServices\PenerbitNomorCore;
 use App\Foundation\UnitOfMeasure\ModuleServices\DaftarSatuanCore;
+use App\Foundation\Vendor\ModuleServices\DaftarVendorCore;
 use App\Services\Modules\ChangeHistoryCore;
 use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DirektoriOrganisasiCore;

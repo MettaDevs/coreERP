@@ -2,12 +2,12 @@
 
 use App\Foundation\AddressBook\Http\Controllers\OrganizationContactController;
 use App\Foundation\AddressBook\Http\Controllers\OrganizationLocationController;
-use App\Foundation\Geography\Http\Controllers\AddressSetupController;
-use App\Foundation\Vendor\Http\Controllers\VendorController;
 use App\Foundation\Currency\Http\Controllers\CurrencyPrecisionController;
 use App\Foundation\FiscalCalendar\Http\Controllers\FiscalCalendarController;
+use App\Foundation\Geography\Http\Controllers\AddressSetupController;
 use App\Foundation\NumberSequence\Http\Controllers\NumberSequenceController;
 use App\Foundation\UnitOfMeasure\Http\Controllers\UnitOfMeasureController;
+use App\Foundation\Vendor\Http\Controllers\VendorController;
 use App\Foundation\WorkingCalendar\Http\Controllers\WorkingTimeCalendarController;
 use App\Foundation\WorkingCalendar\Http\Controllers\WorkingTimeTemplateController;
 use App\Http\Controllers\Access\AccessController;

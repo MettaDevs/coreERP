@@ -3,11 +3,11 @@
 namespace App\Foundation\Vendor\Http\Controllers;
 
 use App\Foundation\AddressBook\Models\Party;
-use App\Foundation\Vendor\Actions\SaveVendor;
-use App\Foundation\Vendor\Models\Vendor;
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
+use App\Foundation\Vendor\Actions\SaveVendor;
+use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\TenantMembership;
