@@ -8,7 +8,7 @@ use App\Foundation\Workflow\Console\PublishWorkflowEvents;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
-use App\Support\Reporting\ExportStatus;
+use App\Platform\Reporting\Support\ExportStatus;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
