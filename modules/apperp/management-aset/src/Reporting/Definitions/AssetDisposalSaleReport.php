@@ -115,6 +115,8 @@ final class AssetDisposalSaleReport implements ReportDefinition
 
         $query = DokumenSiklusAset::query()
             ->where('aset_tr_dokumen_siklus_aset.jenis_dokumen', 'penjualan-aset')
+            // Hanya yang sudah diposting: draf belum melepas asetnya.
+            ->where('aset_tr_dokumen_siklus_aset.status', 'posted')
             ->join('aset_tr_aset as aset', fn (JoinClause $join) => $join->on('aset.id', '=', 'aset_tr_dokumen_siklus_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_dokumen_siklus_aset.tenant_id'))
             ->leftJoin('aset_m_model_aset as model', fn (JoinClause $join) => $join->on('model.id', '=', 'aset.model_aset_id')->on('model.tenant_id', '=', 'aset.tenant_id'))
             ->leftJoin('aset_tr_buku_aset as buku', function (JoinClause $join) use ($bookId): void {

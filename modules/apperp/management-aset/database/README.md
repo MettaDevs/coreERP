@@ -128,10 +128,12 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 | `tr_mutasi_aset_details` | Satu aset per baris. `asal_*` kosong selama draf dan dibekukan saat dokumen diselesaikan. |
 | `tr_monitoring_aset` | Header pemeriksaan fisik: satu lokasi, tanggal, unit organisasi dan penanggung jawab opsional. Nomor unik per entitas legal (indeks parsial). |
 | `tr_monitoring_aset_details` | Satu aset per baris: temuan `ada`, kondisi fisik, keterangan. `sistem_*`, nilai, dan `hasil` kosong selama draf dan dibekukan saat diselesaikan. Baris yang dikeluarkan diarsipkan; nomor baris tidak dipakai ulang. |
-| `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. |
+| `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. `write_down_amount` dan `appreciation_amount` adalah saldo penurunan dan kenaikan nilai yang diposting; keduanya bagian `net_book_value`. |
 | `tr_penyusutan_aset` | Proposal, finalisasi, dan reversal penyusutan per periode. `posted_posting_id` menyebut posting finance yang membawanya — `asset.depreciation` dari "Post penyusutan" untuk periode asli, `asset.depreciation_reversal` untuk baris pembalik — dan kosong berarti belum di-post (area 11). |
 | `tr_export_penyusutan` | Bukti export penyusutan ke backoffice. Tidak lagi ditulis sejak area 11; tabel dan riwayatnya dibiarkan. |
-| `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. |
+| `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. Penjualan dan pemusnahan berstatus `draft`, `posted`, atau `cancelled`; aset baru dilepas saat diposting. |
+| `tr_penyesuaian_nilai_aset` | Header penyesuaian nilai: jenis (`write_down`/`appreciation`), buku penyusutan, tanggal, alasan, status, `posting_id`. Nomor unik per entitas legal (indeks parsial). |
+| `tr_penyesuaian_nilai_aset_details` | Satu aset per baris dengan nilai penyesuaian; nilai buku sebelum dan sesudah dibekukan saat diposting. |
 | `tr_perencanaan_aset` | Header perencanaan aset per entitas legal dan unit kerja. |
 | `tr_perencanaan_aset_details` | Rincian jenis aset, jumlah, harga perkiraan, dan spesifikasi yang diminta. |
 | `tr_aset_atribut` | Nilai atribut bertipe per aset; tipe dasar pemiliknya dikunci saat baris pertama tersimpan. |

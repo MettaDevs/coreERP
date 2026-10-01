@@ -1,0 +1,161 @@
+# Draf penjualan dan pemusnahan aset sampai diposting — alur jurnal aset tetap Business Central.
+#
+# Draf dibuat lewat `POST /api/v1/{lifecycleDocument}` dan tidak melepas apa pun. Posting menerbitkan
+# jurnal pelepasan (`asset.disposal_sale` / `asset.disposal_scrap`) ke feed posting finance, menandai
+# aset `disposed`, dan menutup seluruh bukunya per tanggal dokumen, di satu transaksi.
+/api/v1/{disposalDocument}/{id}:
+  parameters:
+  - $ref: '#/components/parameters/DisposalDocument'
+  - $ref: '#/components/parameters/RecordId'
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: showAssetDisposal
+    summary: Membaca satu penjualan atau pemusnahan beserta asetnya dan keadaan jurnalnya
+    responses:
+      '200':
+        description: Dokumen pelepasan
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalResponse'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Lifecycle aset
+    operationId: updateAssetDisposal
+    summary: Mengubah tanggal, nilai, atau keterangan draf
+    description: |
+      Butuh izin membuat dokumen jenis itu (`management-aset.<jenis>.create`); dokumen siklus tidak
+      punya izin ubah. Asetnya tidak dapat diganti. Pemusnahan tidak membawa nilai penjualan.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/AssetDisposalWrite'
+            - $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Draf setelah diubah
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Dokumen sudah diposting atau dibatalkan, atau isian tidak sah
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+/api/v1/{disposalDocument}/{id}/batal:
+  post:
+    tags:
+    - Lifecycle aset
+    operationId: cancelAssetDisposal
+    summary: Membatalkan draf; dokumen siklus tidak pernah dihapus
+    parameters:
+    - $ref: '#/components/parameters/DisposalDocument'
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Dokumen berstatus `cancelled`
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Dokumen sudah diposting atau dibatalkan
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+/api/v1/{disposalDocument}/{id}/pratinjau-posting:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: previewAssetDisposalPosting
+    summary: Pratinjau jurnal pelepasan draf, tanpa menyimpan apa pun
+    description: |
+      Butuh izin memposting atau membuat dokumen jenis itu. `data` berisi `currency_code`, `blockers`
+      (daftar `{field, message}` yang menahan posting: aset belum dihentikan pemakaiannya atau sudah
+      dilepas, usulan penyusutan yang belum difinalkan, penyusutan final yang berakhir sesudah tanggal
+      pelepasan, nilai pemusnahan, atau nilai yang lebih halus dari presisi mata uang), `note` (kenapa
+      tidak ada jurnal, misalnya group aset tanpa buku yang di-post), `amounts` — saldo buku yang di-post
+      `{book, acquisition_value, accumulated_depreciation, write_down_amount, appreciation_amount,
+      net_book_value, proceeds, gain_loss}` — dan `posting` `{posting_id, status, posting_date, currency,
+      total, lines, problems}` atau `null`. Pemeriksaannya sama persis dengan posting.
+    parameters:
+    - $ref: '#/components/parameters/DisposalDocument'
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Pratinjau jurnal pelepasan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Dokumen sudah diposting atau dibatalkan
+      '500':
+        description: Jurnal tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
+/api/v1/{disposalDocument}/{id}/posting:
+  post:
+    tags:
+    - Lifecycle aset
+    operationId: postAssetDisposal
+    summary: Memposting draf — jurnal pelepasan terbit, aset dilepas, bukunya ditutup
+    description: |
+      Butuh izin `management-aset.<jenis>.post`. Jurnal hanya terbit dari buku yang di-post ke
+      aplikasi finance untuk group asetnya; posting yang pemetaan akunnya belum lengkap tetap terbit
+      sebagai `held` dan asetnya tetap dilepas. Penghalangnya sama dengan pratinjau dan dijawab 422
+      berkunci field-nya.
+    parameters:
+    - $ref: '#/components/parameters/DisposalDocument'
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Dokumen berstatus `posted`, dengan `posting` berisi keadaan jurnalnya atau `null`
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDisposalResponse'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+      '500':
+        description: Jurnal pelepasan gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); aset tidak dilepas

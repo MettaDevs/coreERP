@@ -475,7 +475,8 @@ class AsetController extends Controller
      * Menyesuaikan buku aset setelah nilai perolehan atau residu dikoreksi.
      *
      * Hanya dijalankan saat belum ada periode penyusutan sama sekali, sehingga akumulasi
-     * masih nol dan nilai buku dapat disamakan langsung dengan nilai perolehan yang baru.
+     * masih nol. Nilai buku menjadi nilai perolehan yang baru dikurangi penurunan nilai dan
+     * ditambah kenaikan nilai yang sudah diposting pada buku itu.
      *
      * @param  array<string, mixed>  $data
      */
@@ -484,12 +485,15 @@ class AsetController extends Controller
         $changes = ['updated_at' => now()];
         if (array_key_exists('acquisition_value', $data)) {
             $changes['acquisition_value'] = $data['acquisition_value'];
-            $changes['net_book_value'] = $data['acquisition_value'];
         }
         if (array_key_exists('residual_value', $data)) {
             $changes['residual_value'] = $data['residual_value'] ?? 0;
         }
         BukuAset::query()->where('aset_id', $aset->id)->update($changes);
+        // Perintah kedua: di satu UPDATE, PostgreSQL membaca nilai perolehan yang lama.
+        BukuAset::query()->where('aset_id', $aset->id)->update([
+            'net_book_value' => DB::raw('acquisition_value - accumulated_depreciation - write_down_amount + appreciation_amount'),
+        ]);
     }
 
     /**

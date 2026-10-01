@@ -76,6 +76,20 @@ class DepreciationCalculatorTest extends TestCase
         $this->assertSame(100.0, $this->calculator->amount($book, 9));
     }
 
+    public function test_straight_line_after_a_value_adjustment_spreads_the_new_book_value_over_the_remaining_life(): void
+    {
+        // Disusutkan 3 bulan (900 tersisa), lalu diturunkan nilainya 450: 450 dibagi sisa 9 bulan, bukan 1200 / 12.
+        $turun = $this->book(['net_book_value' => 450, 'write_down_amount' => '450.00', 'appreciation_amount' => '0.00']);
+        $this->assertSame(50.0, $this->calculator->amount($turun, 3));
+
+        // Kenaikan nilai juga: 900 + 90 dibagi sisa 9 bulan.
+        $naik = $this->book(['net_book_value' => 990, 'write_down_amount' => '0.00', 'appreciation_amount' => '90.00']);
+        $this->assertSame(110.0, $this->calculator->amount($naik, 3));
+
+        // Buku yang tidak pernah disesuaikan tetap memakai rumus lamanya.
+        $this->assertSame(100.0, $this->calculator->amount($this->book(['net_book_value' => 900, 'write_down_amount' => '0.00', 'appreciation_amount' => '0.00']), 3));
+    }
+
     public function test_round_off_menurunkan_periode_tengah_dan_periode_terakhir_mengambil_sisa(): void
     {
         $book = $this->book([
