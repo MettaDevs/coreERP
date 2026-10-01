@@ -60,6 +60,23 @@ seluruh susunan. Batas yang dijaga hari ini — satu namespace kontrak, tidak ad
 module, nama event yang tidak berubah bentuknya di dalam maupun di luar proses — memang dirancang
 supaya penarikan satu module tidak menuntut penulisan ulang yang lain.
 
+### Tiga lapis kode
+
+Di dalam satu runtime itu, kode tersusun dalam tiga lapis yang meniru Business Central (System
+Application → Business Foundation → Base App dan app):
+
+| Lapis | Isi | Contoh |
+| --- | --- | --- |
+| `App\Platform\<Fitur>` | mesin tanpa istilah bisnis | tenant, identitas dan SSO, akses, lingkungan, organisasi, runtime module, laporan, integrasi |
+| `App\Foundation\<Fitur>` | master dan layanan bisnis yang dipakai bersama | buku alamat, wilayah, satuan, mata uang, kalender, number sequence, vendor, workflow, posting finance |
+| `modules/` | kemampuan bisnis yang dijual dan dipasang sendiri | aset, HR |
+
+Ketergantungan hanya ke bawah: Platform tidak memakai Foundation, dan module hanya memakai Core lewat
+kontrak. Lapis hanya urusan susunan kode; ia tidak pernah muncul di nama tabel, kode permission, nama
+event, atau URL. Penjaganya `LayerDirectionBoundaryTest`, dan pelanggaran yang sudah ada tercatat di
+[rencana pemindahan lapis](../todo/lapis-core/README.md). Aturan letak master yang dipakai lebih dari
+satu module ada di [standar module](02-module-standard.md#master-bersama-dan-modul-yang-berdiri-sendiri).
+
 ## Cara membaca grand design
 
 Untuk orang yang baru masuk ke CoreERP, gunakan tiga kalimat ini sebagai peta:

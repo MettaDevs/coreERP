@@ -7,7 +7,7 @@ description: Discover and propose a CoreERP app, master, transaction, or busines
 
 1. Read `docs/dev/README.md`, the relevant canonical documents, and the owning app manifest when one exists.
 2. Search official Microsoft Learn Dynamics 365 documentation for the closest business process. Report the direct links and whether the mapping is direct, adapted, or absent. Do not claim a Dynamics feature when no official reference was found.
-3. Classify ownership: existing app feature, new business app, Core policy/coordinator, or a future app whose owner is not available. Never place business facts in Core only for convenience.
+3. Classify ownership: existing app feature, new business app, Core policy/coordinator, or a future app whose owner is not available. Never place business facts in Core only for convenience. For every **master**, decide Foundation or module with the rule in `docs/dev/02-module-standard.md#master-bersama-dan-modul-yang-berdiri-sendiri`: used by two or more modules, a party/legal-entity identity, or shared-layer in BC/F&O → Foundation. A customer who buys one module must not need another module to fill a master that module uses.
 4. Produce this proposal before code or manifest edits, then wait for approval if a material choice is unresolved:
 
 | Capability | Decision | Reason / Dynamics reference | User approval needed |
