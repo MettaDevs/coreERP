@@ -2,7 +2,7 @@
 
 namespace App\Platform\Reporting\Support;
 
-use App\Foundation\AddressBook\Support\OrganizationAddressBook;
+use App\Platform\AddressBook\Support\OrganizationAddressBook;
 use App\Platform\Organization\Models\Organization;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;

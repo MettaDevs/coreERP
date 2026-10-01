@@ -59,6 +59,7 @@ apps/core/app/
     Identity/        (termasuk SSO, Fortify, passkey, profil)
     Access/
     Organization/
+    AddressBook/  Geography/   (K-2)
     Modules/         (runtime module, katalog, entitlement, pemasangan)
     Reporting/
     ChangeLog/
@@ -69,7 +70,7 @@ apps/core/app/
     License/
     Docs/
   Foundation/
-    AddressBook/  Geography/  UnitOfMeasure/  Currency/  NumberSequence/
+    UnitOfMeasure/  Currency/  NumberSequence/
     FiscalCalendar/  WorkingCalendar/  Vendor/  Workflow/  Finance/
   Http/ Providers/   (hanya perekat Laravel: Controller dasar, HandleInertiaRequests, provider)
 ```
@@ -94,9 +95,9 @@ Hasil pemetaan 426 berkas PHP di `apps/core/app` pada `origin/main` 1 Oktober 20
 | Platform/ChangeLog, Observability, Integration, License, Docs | 7 + 9 + 6 + 3 + 2 | folder `Support/` bernama sama, beserta middleware dan controllernya |
 | Platform/Attachments, Retention | ±10 | `Support/Attachments`, `Support/Retention`, `DocumentAttachment`, `AttachmentController`, `RetentionController`, `ApplyRetention` |
 | Foundation/Finance | 27 | `Support/Finance`, `Http/Controllers/Finance` (kecuali `IntegrationClientController`), model `Finance*`, facade akun/posting |
-| Foundation/Geography | 24 | `Models/ReferenceData`, `CountryRegion`, `AddressSetupController`, `Services/AddressHierarchy`, perintah impor wilayah dan kode pos |
+| Platform/Geography (K-2; awalnya Foundation) | 24 | `Models/ReferenceData`, `CountryRegion`, `AddressSetupController`, `Services/AddressHierarchy`, perintah impor wilayah dan kode pos |
 | Foundation/NumberSequence | 21 | semua `NumberSequence*`, `CoreNumberSequences`, `NumberSequenceIssuerCore` |
-| Foundation/AddressBook | 13 | model `Party*`, `PostalAddress`, `ElectronicAddress`, `Location*`, `Support/AddressBook`, `Http/Controllers/GlobalAddressBook` |
+| Platform/AddressBook (K-2; awalnya Foundation) | 13 | model `Party*`, `PostalAddress`, `ElectronicAddress`, `Location*`, `Support/AddressBook`, `Http/Controllers/GlobalAddressBook` |
 | Foundation/FiscalCalendar, WorkingCalendar, Workflow | 9 + 8 + 9 | nama sama |
 | Foundation/Vendor, UnitOfMeasure, Currency | 6 + 5 + 4 | nama sama; `MoneyPrecision` ke Currency |
 | Facade (`Platform/Modules/Contracts`) | 38 | lihat [Facade module](#facade-module) |
@@ -114,14 +115,21 @@ Dengan keputusan di atas ada **23 import** yang melanggar arah. Semuanya jatuh k
 | Integration dan onboarding menyentuh milik fitur lain | ~~`AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance)~~; `RegisterBusiness` → `Client` (ControlPlane) (1 import tersisa) | `IntegrationClientAccounts` pindah ke `Platform\Integration\Support` di PR 8b: isinya hanya akun aplikasi klien integrasi (`User` dan `IntegrationClient`, keduanya Platform), tanpa satu pun model posting. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
 | ~~ControlPlane menyebut perintah workflow di docblock (ditemukan saat PR 5)~~ | ~~`ConvertEnvironment`, `CopyEnvironment` → `PublishWorkflowEvents` (Workflow) (2 import)~~ | Selesai di PR 8b: `use` dihapus, docblock menyebut `workflow-events:publish` |
 | ~~Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation~~ | ~~`InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure`, `NumberSequenceReference` (6 import)~~ | **Selesai.** Platform mengirim event internal (`Platform\Tenant\Events\TenantCreated`, `TenantModulesInstalled`, `Platform\Modules\Events\ModuleInstallationRecorded`, `AppNumberSequenceReferencesDeclared`, `AppCatalogRegistered`) sinkron di titik pemanggilan lama, dan Foundation mendengarkannya. `TenantProvisioned` tidak dipakai karena ia dikirim per module sesudah commit. Listener didaftarkan di `NumberSequenceServiceProvider` dan `UnitOfMeasureServiceProvider` |
-| Reporting memakai presisi uang dan buku alamat | ~~`ValueFormat`, `ValueFormats` → `MoneyPrecision`~~; `PrintIdentityStore` → `OrganizationAddressBook` (1 import tersisa) | `ValueFormats` membaca presisi lewat `CurrencyRounding`; `ValueFormat` membawa pembulatan tampilannya sendiri, dijaga sama persis dengan `MoneyPrecision::round` oleh `ValueFormatRoundingTest`. `PrintIdentityStore` menunggu AddressBook pindah ke Platform (K-2) |
+| Reporting memakai presisi uang dan buku alamat | ~~`ValueFormat`, `ValueFormats` → `MoneyPrecision`~~; ~~`PrintIdentityStore` → `OrganizationAddressBook`~~ | `ValueFormats` membaca presisi lewat `CurrencyRounding`; `ValueFormat` membawa pembulatan tampilannya sendiri, dijaga sama persis dengan `MoneyPrecision::round` oleh `ValueFormatRoundingTest`. **Selesai.** `PrintIdentityStore` → `OrganizationAddressBook` hilang karena AddressBook pindah ke Platform (K-2) |
 | Model tenant mengenal client milik pusat | `Tenant` → `Client` (ControlPlane) (1 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: isi kelas `Tenant` tidak diubah |
-| Model organisasi menunjuk data Foundation | `LegalEntity` → `FiscalCalendar`; `OrganizationParty` → `Party` (AddressBook) (2 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: PR pemindahan tidak mengubah isi kelas. `OrganizationParty` → `Party` bergantung pada K-2 |
+| Model organisasi menunjuk data Foundation | `LegalEntity` → `FiscalCalendar`; ~~`OrganizationParty` → `Party` (AddressBook)~~ (1 import tersisa) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: PR pemindahan tidak mengubah isi kelas. `OrganizationParty` → `Party` hilang karena AddressBook pindah ke Platform (K-2) |
 
-**Keputusan terbuka K-2: letak AddressBook.** Organization, Vendor, dan Worker semuanya party.
-Apakah AddressBook (`Party`) seharusnya di Platform, seperti global address book di F&O yang
-menjadi dasar model organisasi? Kalau ya, pengecualian `OrganizationParty` → `Party` dan
-`PrintIdentityStore` → `OrganizationAddressBook` ikut hilang.
+**K-2: letak AddressBook — diputuskan pemilik produk 1 Oktober 2026: Platform.** Organization,
+Vendor, dan Worker semuanya party, dan di F&O global address book menjadi dasar model organisasi.
+AddressBook pindah ke `App\Platform\AddressBook`, sehingga pengecualian `OrganizationParty` → `Party`
+dan `PrintIdentityStore` → `OrganizationAddressBook` hilang. Vendor (Foundation) memakai AddressBook
+(Platform), dan arah itu sah.
+
+Geography ikut pindah ke `App\Platform\Geography` dalam PR yang sama. Alasannya: AddressBook memakai
+`CountryRegion` (`PostalAddressFormatter` dan `OrganizationLocationController`), sehingga AddressBook
+di Platform dengan Geography di Foundation melahirkan dua pelanggaran arah baru. Di F&O, address setup
+(country/region, provinsi, kode pos) memang bagian dari global address book. Geography sendiri hanya
+memakai Platform, jadi pemindahannya tidak menambah pengecualian.
 
 Test Boundary lahir dengan **daftar pengecualian** berisi 23 import ini. Setiap PR hanya boleh
 memperpendek daftar itu, tidak boleh memperpanjangnya.
@@ -184,14 +192,15 @@ dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta
 - [ ] **Pembalikan arah pemasangan dan onboarding:** `InstallModule`, `RegisterAppCatalog`, dan
       `RegisterBusiness` berhenti menyiapkan data Foundation secara langsung (pola kedua pada tabel
       pelanggaran)
-- [ ] **K-2:** putuskan letak AddressBook. Jawabannya menentukan nasib pengecualian
-      `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`
+- [x] **K-2:** AddressBook dan Geography pindah ke Platform. Pengecualian
+      `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook` hilang;
+      `ALLOWED` tinggal 3 baris
 - [ ] **Daftar `ALLOWED` kosong.** Selama pekerjaan di atas belum selesai, daftar itu belum bisa
       kosong; ia hanya boleh memendek
 - [ ] **CODEOWNERS per lapis** dan **ESLint `no-restricted-imports`** untuk `resources/js`, bagian
       PR 0 yang belum dikerjakan
-- [ ] **Pecah berkas raksasa:** `pages/foundation/geography/address-setup.tsx`,
-      `Foundation/Geography/Http/Controllers/AddressSetupController.php`,
+- [ ] **Pecah berkas raksasa:** `pages/platform/geography/address-setup.tsx`,
+      `Platform/Geography/Http/Controllers/AddressSetupController.php`,
       `pages/platform/organization/organization.tsx`, `pages/platform/access/access.tsx`, dan
       `pages/platform/access/security-configuration.tsx`. Ini perubahan isi, jadi PR-nya terpisah
       dari pemindahan
