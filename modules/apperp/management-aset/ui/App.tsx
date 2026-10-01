@@ -10,8 +10,6 @@ import {
 import type { Permission } from './master/masters';
 import { DETAIL_LAYOUT_RESOURCES, MASTERS, permission } from './master/masters';
 import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
-import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
-import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
 
 /**
@@ -61,6 +59,10 @@ const LifecycleDocumentPage = lazy(
 const MutationPage = lazy(
     () => import('./transactions/mutasi-aset/MutationPage'),
 );
+const DisposalPage = lazy(() => import('./transactions/disposal/DisposalPage'));
+const ValueAdjustmentPage = lazy(
+    () => import('./transactions/value-adjustment/ValueAdjustmentPage'),
+);
 const MonitoringPage = lazy(
     () => import('./transactions/monitoring-aset/MonitoringPage'),
 );
@@ -87,8 +89,8 @@ const InsurancePage = lazy(
 );
 const WarrantyPage = lazy(() => import('./transactions/warranty/WarrantyPage'));
 const DowntimePage = lazy(() => import('./transactions/downtime/DowntimePage'));
-const PengaturanAsetTetapPlaceholderPage = lazy(
-    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage'),
+const PengaturanAsetTetapPage = lazy(
+    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPage'),
 );
 const AssetPostingGroupPage = lazy(
     () => import('./asset-posting-group/AssetPostingGroupPage'),
@@ -139,17 +141,16 @@ const REPORT_PAGES: Record<
 /**
  * Dokumen siklus hidup aset, berkunci id entri menunya.
  *
- * Keempat konfigurasinya tetap, jadi petanya disusun sekali di lingkup modul. Berkas
+ * Konfigurasinya tetap, jadi petanya disusun sekali di lingkup modul. Penjualan dan
+ * pemusnahan tidak di sini lagi: keduanya draf yang diposting, dengan halaman sendiri. Berkas
  * `config.ts` hanya berisi data dan menyebut halamannya lewat `import type`, sehingga
  * menyebutnya di sini tidak menarik `LifecycleDocumentPage` keluar dari potongannya.
  */
 const LIFECYCLE = Object.fromEntries(
-    [
-        permintaanPembelianAset,
-        dekomisioningAset,
-        penjualanAset,
-        pemusnahanAset,
-    ].map((config) => [config.resource, config]),
+    [permintaanPembelianAset, dekomisioningAset].map((config) => [
+        config.resource,
+        config,
+    ]),
 );
 
 export default function App({
@@ -223,8 +224,11 @@ export default function App({
         permissions.includes('management-aset.fixed-asset-parameters.read')
     ) {
         return (
-            <main>
-                <PengaturanAsetTetapPlaceholderPage kind="parameters" />
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <PengaturanAsetTetapPage permissions={permissions} />
             </main>
         );
     }
@@ -270,6 +274,42 @@ export default function App({
                 className="h-full min-h-0 overflow-hidden"
             >
                 <MonitoringPage
+                    context={konteks}
+                    permissions={permissions}
+                    segments={segments}
+                />
+            </main>
+        );
+    }
+
+    if (
+        (view === 'penjualan-aset' || view === 'pemusnahan-aset') &&
+        permissions.includes(`management-aset.${view}.read`)
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <DisposalPage
+                    resource={view}
+                    permissions={permissions}
+                    segments={segments}
+                />
+            </main>
+        );
+    }
+
+    if (
+        view === 'penyesuaian-nilai-aset' &&
+        permissions.includes('management-aset.penyesuaian-nilai-aset.read')
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <ValueAdjustmentPage
                     context={konteks}
                     permissions={permissions}
                     segments={segments}

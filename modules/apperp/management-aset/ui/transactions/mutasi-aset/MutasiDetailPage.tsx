@@ -35,6 +35,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import { defaultDepartmentOf } from '../../master/locationDefaults';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
 import type { Context, EditableMutasi, Mutasi, MutasiLine } from './mutasi';
@@ -160,18 +161,18 @@ export default function MutasiDetailPage({
         };
     }, [mutasiId]);
 
-    // Unit tujuan mengikuti unit yang dipetakan pada lokasi tujuan bila ada — padanan
-    // toggle "Update asset dimension" pada functional location type di F&O — dan jatuh
-    // kembali ke unit kerja aktif bila lokasinya belum dipetakan.
-    const unitDariLokasi = useMemo(() => {
-        const dipilih = lokasi.options.find(
-            (option) => option.id === record.tujuan_lokasi_id,
-        );
-
-        return typeof dipilih?.org_unit_id === 'string'
-            ? dipilih.org_unit_id
-            : null;
-    }, [lokasi.options, record.tujuan_lokasi_id]);
+    // Unit tujuan mengikuti unit kerja bawaan lokasi tujuan (termasuk warisan lokasi induknya)
+    // bila ada, dan jatuh kembali ke unit kerja aktif bila lokasinya tidak punya. Memilih lokasi
+    // mengisi unit tujuan; pengguna tetap boleh menggantinya sesudah itu.
+    const unitDariLokasi = useMemo(
+        () =>
+            defaultDepartmentOf(
+                lokasi.options.find(
+                    (option) => option.id === record.tujuan_lokasi_id,
+                ),
+            ),
+        [lokasi.options, record.tujuan_lokasi_id],
+    );
 
     const unitTujuan =
         record.tujuan_org_unit_id ||
@@ -445,17 +446,19 @@ export default function MutasiDetailPage({
                                     emptyMessage="Lokasi aset tidak ditemukan."
                                     ariaLabel="Lokasi tujuan"
                                     portalContainer={panelRef}
-                                    onValueChange={(item) =>
+                                    onValueChange={(item) => {
+                                        const dipilih = lokasi.options.find(
+                                            (option) =>
+                                                optionLabel(option) === item,
+                                        );
                                         setRecord({
                                             ...record,
-                                            tujuan_lokasi_id:
-                                                lokasi.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
-                                        })
-                                    }
+                                            tujuan_lokasi_id: dipilih?.id ?? '',
+                                            tujuan_org_unit_id:
+                                                defaultDepartmentOf(dipilih) ??
+                                                record.tujuan_org_unit_id,
+                                        });
+                                    }}
                                 />
                             </EditShield>
                             <FieldDescription>
@@ -505,7 +508,7 @@ export default function MutasiDetailPage({
                             <FieldDescription>
                                 {unitKerja.error ||
                                     (unitDariLokasi
-                                        ? 'Terisi sendiri dari unit yang dipetakan pada lokasi tujuan; masih dapat diganti.'
+                                        ? 'Terisi sendiri dari unit kerja bawaan lokasi tujuan; masih dapat diganti.'
                                         : 'Unit kerja yang menanggung aset setelah serah terima.')}
                             </FieldDescription>
                         </Field>

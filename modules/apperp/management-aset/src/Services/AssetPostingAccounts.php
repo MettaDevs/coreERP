@@ -18,6 +18,9 @@ final class AssetPostingAccounts
     /** Mode penyelesaian entitas legal yang mengkreditkan perolehan ke perantara (K-10). */
     public const CLEARING = 'clearing';
 
+    /** @var array<string, ?AssetPostingGroup> Baris posting group per group dan tanggal, untuk `line()`. */
+    private array $effectiveRows = [];
+
     /**
      * Baris posting group yang berlaku bagi `$groupAsetId` pada tanggal posting (`Y-m-d`): baris
      * dengan `effective_from` terbesar yang tidak melewati tanggal itu. `null` bila group belum
@@ -30,6 +33,36 @@ final class AssetPostingAccounts
             ->whereDate('effective_from', '<=', $postingDate)
             ->orderByDesc('effective_from')
             ->first();
+    }
+
+    /**
+     * Satu baris jurnal yang menyebut satu kolom posting group satu group, beserta `mapping`-nya, supaya
+     * akunnya dapat dibaca ulang saat posting yang tertahan divalidasi ulang. Dipakai jurnal pelepasan dan
+     * penyesuaian nilai; penerbit yang lebih tua menyusun bentuk yang sama sendiri.
+     *
+     * @param  string  $groupCode  Kode group untuk label pemetaan; id group bila kodenya tidak terbaca.
+     * @return array<string, mixed>
+     */
+    public function line(string $groupAsetId, string $groupCode, string $column, string $debit, string $credit, string $description, string $orgUnitId, string $postingDate): array
+    {
+        $kunci = $groupAsetId.'|'.$postingDate;
+        if (! array_key_exists($kunci, $this->effectiveRows)) {
+            $this->effectiveRows[$kunci] = $this->effective($groupAsetId, $postingDate);
+        }
+        $akun = $this->effectiveRows[$kunci]?->getAttribute($column);
+
+        return [
+            'account_id' => is_string($akun) ? $akun : null,
+            'debit' => $debit,
+            'credit' => $credit,
+            'description' => mb_substr($description, 0, 255),
+            'org_unit_id' => $orgUnitId,
+            'mapping' => [
+                'label' => sprintf('Group %s · %s', $groupCode, lcfirst(AssetPostingGroup::ACCOUNTS[$column])),
+                'fix_url' => AcquisitionPosting::POSTING_GROUP_URL,
+                'reference' => PostingGroupAccountResolver::reference($groupAsetId, $column),
+            ],
+        ];
     }
 
     /**

@@ -42,6 +42,8 @@ Poin 4 sering terlewat: memindahkan aset ke lokasi yang dipetakan ke unit lain b
 
 **Aset yang sudah `decommissioned` atau `disposed` tidak bisa dimutasi.** Barang yang sudah dihentikan pemakaiannya tidak berpindah tangan lagi.
 
+**Unit tujuan boleh dikosongkan bila lokasi tujuan punya unit kerja bawaan.** Unit itu yang dipakai, termasuk warisan lokasi induk terdekat; bila keduanya kosong, 422. Layar mengisinya saat lokasi dipilih dan pengguna masih bisa menggantinya. Lihat [Lokasi aset](/apps/management-aset/master/lokasi/#unit-kerja-bawaan).
+
 **Unit tujuan harus menjadi tanggung jawab pemanggil.** Diperiksa lewat `OrganizationScope::require()`. Tanpa ini, mutasi jadi pintu belakang untuk memindahkan aset ke unit yang tidak boleh diakses.
 
 **Buku penyusutan harus lengkap sebelum mutasi pertama.** Kode memeriksa apakah matriks group × buku sudah terisi dan profilnya bisa dihitung. Kalau belum, mutasi ditolak dengan pesan yang menunjuk matriksnya.

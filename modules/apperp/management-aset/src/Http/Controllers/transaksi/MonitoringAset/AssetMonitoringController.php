@@ -24,7 +24,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitorin
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
-use Modules\Apperp\ManagementAset\Services\CommercialBookValues;
+use Modules\Apperp\ManagementAset\Services\AssetBookValues;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Support\AssetMonitoringStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
@@ -495,7 +495,7 @@ class AssetMonitoringController extends Controller
      * Keadaan register untuk sejumlah aset, dibaca sekaligus.
      *
      * Penanggung jawab dibaca dari penempatan terakhir, karena aset tidak menyimpannya. Nilai dibaca
-     * dari buku komersial; aturannya di {@see CommercialBookValues}.
+     * dari buku bawaan pengaturan aset tetap atau buku komersial; aturannya di {@see AssetBookValues}.
      *
      * @param  list<string>  $asetIds
      * @return array<string, array{lifecycle_state: ?string, lokasi_aset_id: ?string, org_unit_id: ?string, custodian_user_id: ?string, nilai_perolehan: ?string, akumulasi_penyusutan: ?string, nilai_buku: ?string}>
@@ -507,7 +507,7 @@ class AssetMonitoringController extends Controller
         }
 
         $custodians = $this->latestCustodians($asetIds);
-        $books = app(CommercialBookValues::class)->forAssets($asetIds);
+        $books = app(AssetBookValues::class)->forAssets($asetIds);
 
         $state = [];
         foreach (Aset::withTrashed()->whereIn('id', $asetIds)->toBase()->get(['id', 'lifecycle_state', 'lokasi_aset_id', 'responsible_org_unit_id', 'acquisition_value']) as $aset) {

@@ -167,6 +167,23 @@ dan register aset untuk isian manual — tanpa hak tulis atas ketiganya. Keputus
 ada di `docs/apps/management-aset/transaction/monitoring-aset/` pada repo CoreERP. Laporannya
 `management-aset.laporan-monitoring-aset` (Excel, hanya monitoring yang sudah selesai).
 
+## Penjualan, pemusnahan, dan penyesuaian nilai
+
+Penjualan dan pemusnahan disimpan sebagai **draf** lalu **diposting**, seperti jurnal aset tetap
+Business Central. Posting (`POST /api/v1/{penjualan-aset|pemusnahan-aset}/{id}/posting`, permission
+`.post` pada duty tersendiri `….posting`) menerbitkan jurnal pelepasan `asset.disposal_sale` /
+`asset.disposal_scrap` ke feed posting finance, menandai aset `disposed`, dan menutup seluruh bukunya.
+Pratinjau jurnalnya di `GET …/{id}/pratinjau-posting`. Penyusutan sampai tanggal pelepasan harus sudah
+final. Sebelum rilis ini dokumen pelepasan langsung melepas aset saat disimpan; dokumen lama ditandai
+`posted` lewat migration.
+
+Penyesuaian nilai aset (`/api/v1/penyesuaian-nilai-aset`) menurunkan (write-down) atau menaikkan
+(appreciation) nilai buku satu buku penyusutan, dengan jurnal `asset.write_down` / `asset.appreciation`
+untuk buku yang di-post ke finance. Penyusutan garis lurus berikutnya membagi nilai buku baru ke sisa
+masa manfaat, dan pelepasan membalik kedua saldonya. Akun ketiganya ada di posting group aset.
+Rinciannya di `docs/apps/management-aset/transaction/siklus-aset/` dan
+`docs/apps/management-aset/transaction/penyesuaian-nilai-aset/` pada repo CoreERP.
+
 ## Penyusutan massal
 
 `POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
@@ -227,6 +244,8 @@ Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr
 Pohon lokasi sengaja **terpisah** dari struktur organisasi. "Di mana benda ini berada" dan "siapa yang bertanggung jawab" adalah dua pertanyaan berbeda yang berubah karena sebab berbeda: reorganisasi tidak memindahkan barang, dan memindahkan barang tidak mengubah struktur organisasi. Menyatukan keduanya membuat riwayat lokasi rusak setiap kali unit kerja digabung, dan membatasi kedalaman lokasi pada unit organisasi terkecil — padahal stock opname butuh sampai tingkat ruangan atau rak.
 
 Keduanya dihubungkan lewat satu field opsional, `m_lokasi_aset.org_unit_id`; padanan toggle **Update asset dimension** pada Functional location type di F&O. Saat aset diterima atau dimutasi, `financial_dimension_org_unit_id` pada aset diisi dari unit milik lokasinya. Lokasi yang tidak dipetakan mewarisi unit lokasi induk terdekat yang dipetakan (K-08): satu poli bisa tersebar di beberapa ruang, dan cukup lantainya yang dipetakan. Baru bila tidak ada satu pun lokasi di jalur ke akar yang dipetakan, aset memakai unit penggunanya. Aturannya satu, `Services/LocationDimension`, dipakai penerimaan dan mutasi; pendakiannya dibatasi 32 tingkat dan berhenti pada siklus, yang hanya mungkin bila datanya rusak karena penulisan lokasi menolak siklus, lalu melaporkannya. Nilainya **disalin, bukan dilihat saat dibaca**: mengubah pemetaan lokasi kelak tidak menulis ulang pembebanan aset yang sudah berjalan.
+
+Lokasi juga membawa **alamat** dari buku alamat Core dan **unit kerja bawaan**, keduanya diwarisi lokasi anak yang mengosongkannya. Unit kerja bawaan mengisi unit penanggung jawab saat aset diterima atau dimutasi ke lokasi itu bila dokumennya tidak menyebut unit; pengguna tetap boleh menggantinya. Rinciannya di `docs/apps/management-aset/master/lokasi/`.
 
 Aturan yang berlaku pada master berinduk:
 
@@ -375,6 +394,7 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.dekomisioning-aset` | `DKMA` | `legal_entity` |
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |
+| `management-aset.penyesuaian-nilai-aset` | `PNLA` | `legal_entity` |
 | `management-aset.maintenance-job-types` | `JPMA` | `tenant` |
 | `management-aset.maintenance-job-type-variants` | `VJMA` | `tenant` |
 | `management-aset.maintenance-job-type-defaults` | `DJMA` | `tenant` |

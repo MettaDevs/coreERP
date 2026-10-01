@@ -759,13 +759,14 @@ class PenyediaLaporanTest extends TestCase
             ]);
         }
         DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.penjualan-aset.create'])
+        $dibuat = $this->sebagaiPengguna($this->tenantId, ['management-aset.penjualan-aset.create'])
             ->withHeader('Idempotency-Key', 'penjualan-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/penjualan-aset', [
                 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
                 'aset_id' => $asetId, 'tanggal' => '2026-08-30', 'nilai' => 12000000,
             ])
             ->assertCreated();
+        $this->postingPelepasanUji('penjualan-aset', (string) $dibuat->json('data.id'));
 
         $laporan = $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks(['management-aset.penjualan-aset.read']), []);
 
@@ -912,13 +913,14 @@ class PenyediaLaporanTest extends TestCase
             [$dijual, 'penjualan-aset', '2026-08-12', null],
         ] as [$asetId, $dokumen, $tanggal, $keterangan]) {
             DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
-            $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.create'])
+            $dibuat = $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.create'])
                 ->withHeader('Idempotency-Key', $dokumen.'-'.Str::ulid())
                 ->postJson('/api/modules/management-aset/v1/'.$dokumen, [
                     'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
                     'aset_id' => $asetId, 'tanggal' => $tanggal, 'keterangan' => $keterangan,
                 ])
                 ->assertCreated();
+            $this->postingPelepasanUji($dokumen, (string) $dibuat->json('data.id'));
         }
 
         return ['group' => $group, 'fiskal' => $fiskal];
@@ -980,16 +982,27 @@ class PenyediaLaporanTest extends TestCase
             [$dimusnahkan, 'pemusnahan-aset', '2026-08-01', null, null],
         ] as [$asetId, $dokumen, $tanggal, $nilai, $keterangan]) {
             DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
-            $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.create'])
+            $dibuat = $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.create'])
                 ->withHeader('Idempotency-Key', $dokumen.'-'.Str::ulid())
                 ->postJson('/api/modules/management-aset/v1/'.$dokumen, [
                     'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
                     'aset_id' => $asetId, 'tanggal' => $tanggal, 'nilai' => $nilai, 'keterangan' => $keterangan,
                 ])
                 ->assertCreated();
+            $this->postingPelepasanUji($dokumen, (string) $dibuat->json('data.id'));
         }
 
         return ['fiskal' => $fiskal];
+    }
+
+    /** Penjualan dan pemusnahan baru masuk laporan sesudah diposting. */
+    private function postingPelepasanUji(string $dokumen, string $id): void
+    {
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$dokumen.'.post'])
+            ->postJson('/api/modules/management-aset/v1/'.$dokumen.'/'.$id.'/posting', [
+                'version' => DB::table('aset_tr_dokumen_siklus_aset')->where('id', $id)->value('version'),
+            ])
+            ->assertOk();
     }
 
     private function insertAsset(string $kode, string $diperoleh, int $nilai, string $group, string $jenis): string

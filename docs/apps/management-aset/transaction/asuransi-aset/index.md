@@ -43,7 +43,7 @@ Pertanggungan terhitung pada tanggal D bila periodenya mencakup D **dan** polisn
 - **Total yang ditanggung (polis, D)** = jumlah nilai pertanggungan polis itu yang terhitung pada D.
 - **Selisih plafon** = nilai pertanggungan polis − total yang ditanggung polis. Negatif berarti melebihi plafon.
 - **Status aset**: *belum diasuransikan* bila total = 0; *kurang diasuransikan* bila 0 < total < nilai perolehan; selain itu *cukup*.
-- **Nilai perolehan** dibaca dari buku komersial aset (buku tanpa master atau ber-lapisan posting `current`, kode paling awal), atau nilai perolehan di register bila aset belum punya buku. Aturannya satu, `Services/CommercialBookValues`, dipakai juga pemeriksaan fisik aset.
+- **Nilai perolehan** dibaca dari buku penyusutan bawaan pada Parameter aset tetap (*Default Depr. Book*) bila aset itu memilikinya, selain itu dari buku komersial (buku tanpa master atau ber-lapisan posting `current`, kode paling awal), atau dari nilai perolehan di register bila aset belum punya buku. Aturannya satu, `Services/AssetBookValues`, dipakai juga pemeriksaan fisik aset. Ini sama dengan bawaan BC: *Insurance Depr. Book* yang kosong diisi *Default Depr. Book*.
 
 "Hari ini" selalu menurut zona pengguna (`RequestContext::timezone()`).
 
@@ -85,7 +85,7 @@ Kontraknya di `contracts/src/paths/asuransi.yaml`.
 
 ## Belum ada
 
-- **Buku penyusutan asuransi.** BC memilih satu buku di *FA Setup* (*Insurance Depr. Book*) sebagai sumber nilai perolehan asuransi. Sampai halaman Parameter aset tetap memuat setelan itu, yang dipakai buku komersial. Setelan ini sengaja tidak ditambahkan di PR asuransi karena halaman pengaturan dipegang pekerjaan lain.
+- **Buku penyusutan asuransi tersendiri.** BC memilih satu buku di *FA Setup* (*Insurance Depr. Book*) sebagai sumber nilai perolehan asuransi. Sampai Parameter aset tetap memuat setelan itu, yang dipakai buku bawaan (*Default Depr. Book*) lalu buku komersial. Setelan ini sengaja tidak ditambahkan di sini karena halaman pengaturan dipegang pekerjaan lain; menambahkannya cukup mengubah `AssetBookValues`.
 - **Pertanggungan otomatis saat aset diterima** (*Automatic Insurance Posting* BC).
 - **Index insurance massal** (naik/turun persen untuk seluruh aset satu polis), dan laporan cetak *Insurance - List* / *Coverage Details* lewat mesin laporan Core.
 

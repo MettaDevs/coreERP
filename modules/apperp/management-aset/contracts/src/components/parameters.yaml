@@ -29,6 +29,26 @@ IdempotencyKeyMonitoring:
     type: string
     maxLength: 143
     pattern: ^[A-Za-z0-9._:-]+$
+IdempotencyKeyPenyesuaianNilai:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: |
+    Sama seperti `IdempotencyKey`, untuk penyesuaian nilai aset: kunci diteruskan ke Core diawali
+    `penyesuaian-nilai-aset:`, sehingga batasnya 135 karakter.
+  schema:
+    type: string
+    maxLength: 135
+    pattern: ^[A-Za-z0-9._:-]+$
+DisposalDocument:
+  name: disposalDocument
+  in: path
+  required: true
+  schema:
+    type: string
+    enum:
+    - penjualan-aset
+    - pemusnahan-aset
 IdempotencyKeyTransaksi:
   name: Idempotency-Key
   in: header

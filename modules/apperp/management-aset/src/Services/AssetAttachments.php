@@ -26,6 +26,8 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAs
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\ServiceContract\ServiceContract;
+use Modules\Apperp\ManagementAset\Models\transaksi\ValueAdjustment\AssetValueAdjustment;
+use Modules\Apperp\ManagementAset\Models\transaksi\ValueAdjustment\AssetValueAdjustmentLine;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
 /**
@@ -73,6 +75,8 @@ final class AssetAttachments implements AttachmentRecordType
             // Foto kerusakan dari pelapor; padanan *Add photos* pada permintaan F&O.
             new self('aset_tr_permintaan_pemeliharaan', MaintenanceRequest::class, 'permintaan-pemeliharaan', 'update', 'responsible_org_unit_id'),
             new self('aset_tr_perencanaan_aset', PerencanaanAset::class, 'perencanaan-aset', 'update', 'planning_org_unit_id', PerencanaanAsetDetail::class, 'planning_id'),
+            // Dasar penurunan atau kenaikan nilai, misalnya laporan penilai, pada dokumen atau barisnya.
+            new self('aset_tr_penyesuaian_nilai_aset', AssetValueAdjustment::class, 'penyesuaian-nilai-aset', 'update', 'responsible_org_unit_id', AssetValueAdjustmentLine::class, 'penyesuaian_nilai_aset_id'),
             new self('aset_tr_permintaan_pengadaan_aset', PermintaanPengadaanAset::class, 'permintaan-pembelian-aset', 'update', 'requesting_org_unit_id', PermintaanPengadaanAsetDetail::class, 'request_id'),
             // Dekomisioning, penjualan, dan pemusnahan tidak punya permission ubah; yang boleh membuat dokumennya
             // yang boleh melampirinya (K-20).

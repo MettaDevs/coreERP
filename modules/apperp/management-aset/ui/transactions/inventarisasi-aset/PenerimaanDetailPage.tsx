@@ -39,6 +39,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import { defaultDepartmentOf } from '../../master/locationDefaults';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import {
@@ -713,6 +714,17 @@ export default function PenerimaanDetailPage({
                                             setRecord({
                                                 ...record,
                                                 lokasi_aset_id: id,
+                                                // Unit kerja bawaan lokasi mengisi unit pengguna;
+                                                // pengguna tetap boleh menggantinya sesudah ini.
+                                                responsible_org_unit_id:
+                                                    defaultDepartmentOf(
+                                                        lokasi.options.find(
+                                                            (option) =>
+                                                                option.id ===
+                                                                id,
+                                                        ),
+                                                    ) ??
+                                                    record.responsible_org_unit_id,
                                             }),
                                         { placeholder: 'Tanpa lokasi' },
                                     )}
@@ -896,7 +908,7 @@ export default function PenerimaanDetailPage({
                                     )}
                                     <FieldDescription>
                                         {unitKerja.error ||
-                                            'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima.'}
+                                            'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima. Terisi sendiri dari unit kerja bawaan lokasi awal, dan masih dapat diganti.'}
                                     </FieldDescription>
                                 </Field>
 

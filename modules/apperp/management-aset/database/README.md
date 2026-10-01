@@ -27,6 +27,7 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | `m_tipe_atribut_nilai` | `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut (tenant_id, id)` |
 | `m_jenis_aset_atribut` | `(tenant_id, jenis_aset_id)` → `m_jenis_aset`, `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut` |
 | `m_posting_group` | `(tenant_id, group_aset_id)` → `m_group_aset (tenant_id, id)`; delapan kolom akun menunjuk daftar akun referensi Core tanpa foreign key |
+| `pengaturan_aset_tetap` | `(tenant_id, buku_penyusutan_bawaan_id)` → `m_buku_penyusutan (tenant_id, id)`; satu baris aktif per tenant (indeks unik parsial), padanan `FA Setup` BC |
 
 Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_type_variant`,
 `m_maintenance_job_type_default`, `m_maintenance_job_type_jenis_aset`,
@@ -81,7 +82,7 @@ Seed katalog Indonesia–Asia pada `m_pabrikan_aset` dan `m_model_aset` memakai 
 model menunjuk pabrikan yang sama tenant, sementara `jenis_aset_id` dan `model_number`
 dibiarkan `NULL` agar tenant dapat mengaitkannya kemudian.
 
-Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `lokasi_aset_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `lokasi_aset_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, `alamat_id` (tempat di buku alamat Core), dan `departemen_bawaan_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
 
 `m_tipe_atribut.data_type` menyimpan tipe dasar `string`, `decimal`, `integer`, `date`, atau `boolean`. Values aktif berada terpisah di `m_tipe_atribut_nilai`; min/max opsional berada pada tipe atribut dan wajib berpasangan untuk angka. `data_type_locked` menjadi benar saat nilai pertama berhasil ditulis ke `tr_aset_atribut` dan tidak dibuka kembali saat nilai aset dikoreksi atau dihapus.
 
@@ -118,7 +119,7 @@ angkanya berbeda, `[{buku_id, akumulasi_per_unit, periode_berjalan}]`. `tr_buku_
 saldo awal + periode final tetap dapat diperiksa, dan `elapsed_periods_offset` yang ditambahkan ke
 hitungan periode berjalan saat penyusutan diusulkan.
 
-`m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
+`m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Begitu pula `m_lokasi_aset.alamat_id` dan `m_lokasi_aset.departemen_bawaan_id`; keduanya tidak disalin ke aset, dan lokasi kosong mewarisi nilai lokasi induk terdekat saat dibaca (`Services/LocationInheritance`). Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 
 Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation_key`, `kode`, `nama`, `keterangan`, `aktif`, `deleted_at`, dan timestamps. Constraint yang berlaku pada semuanya:
 
@@ -137,10 +138,12 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 | `tr_mutasi_aset_details` | Satu aset per baris. `asal_*` kosong selama draf dan dibekukan saat dokumen diselesaikan. |
 | `tr_monitoring_aset` | Header pemeriksaan fisik: satu lokasi, tanggal, unit organisasi dan penanggung jawab opsional. Nomor unik per entitas legal (indeks parsial). |
 | `tr_monitoring_aset_details` | Satu aset per baris: temuan `ada`, kondisi fisik, keterangan. `sistem_*`, nilai, dan `hasil` kosong selama draf dan dibekukan saat diselesaikan. Baris yang dikeluarkan diarsipkan; nomor baris tidak dipakai ulang. |
-| `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. |
+| `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. `write_down_amount` dan `appreciation_amount` adalah saldo penurunan dan kenaikan nilai yang diposting; keduanya bagian `net_book_value`. |
 | `tr_penyusutan_aset` | Proposal, finalisasi, dan reversal penyusutan per periode. `posted_posting_id` menyebut posting finance yang membawanya — `asset.depreciation` dari "Post penyusutan" untuk periode asli, `asset.depreciation_reversal` untuk baris pembalik — dan kosong berarti belum di-post (area 11). |
 | `tr_export_penyusutan` | Bukti export penyusutan ke backoffice. Tidak lagi ditulis sejak area 11; tabel dan riwayatnya dibiarkan. |
-| `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. |
+| `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. Penjualan dan pemusnahan berstatus `draft`, `posted`, atau `cancelled`; aset baru dilepas saat diposting. |
+| `tr_penyesuaian_nilai_aset` | Header penyesuaian nilai: jenis (`write_down`/`appreciation`), buku penyusutan, tanggal, alasan, status, `posting_id`. Nomor unik per entitas legal (indeks parsial). |
+| `tr_penyesuaian_nilai_aset_details` | Satu aset per baris dengan nilai penyesuaian; nilai buku sebelum dan sesudah dibekukan saat diposting. |
 | `tr_perencanaan_aset` | Header perencanaan aset per entitas legal dan unit kerja. |
 | `tr_perencanaan_aset_details` | Rincian jenis aset, jumlah, harga perkiraan, dan spesifikasi yang diminta. |
 | `tr_aset_atribut` | Nilai atribut bertipe per aset; tipe dasar pemiliknya dikunci saat baris pertama tersimpan. |

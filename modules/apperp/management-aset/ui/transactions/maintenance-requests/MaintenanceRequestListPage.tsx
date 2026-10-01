@@ -28,8 +28,14 @@ import {
     permissionCheck,
 } from './maintenanceRequest';
 
+/**
+ * Nilai pilihan "semua". `Select` baru menganggap field terisi bila nilainya tidak kosong; dengan nilai
+ * kosong label "Status" turun ke tengah dan bertumpuk dengan teks pilihannya.
+ */
+const ALL = '__all__';
+
 const STATUS_FILTER = [
-    { value: '', label: 'Semua status' },
+    { value: ALL, label: 'Semua status' },
     ...Object.entries(STATUS).map(([value, { label }]) => ({ value, label })),
 ];
 
@@ -204,12 +210,11 @@ export default function MaintenanceRequestListPage({
                     <Select
                         label="Status"
                         items={STATUS_FILTER}
-                        value={status}
-                        placeholder="Semua status"
+                        value={status || ALL}
                         ariaLabel="Saring berdasarkan status"
                         onValueChange={(value) => {
                             setLoading(true);
-                            setStatus(value ?? '');
+                            setStatus(!value || value === ALL ? '' : value);
                         }}
                     />
                 </div>

@@ -28,8 +28,8 @@ info:
     ```text
     Modul aset CoreERP            CoreERP                         Aplikasi finance Anda
     ──────────────────            ─────────────────────           ─────────────────────
-    penerimaan, penyusutan  ──▶   posting berstatus pending  ──▶  pull atau push
-                                  status akhir: posted /     ◀──  ack: posted atau
+    penerimaan, penyusutan, ──▶   posting berstatus pending  ──▶  pull atau push
+    pelepasan, nilai aset         status akhir: posted /     ◀──  ack: posted atau
                                   rejected                        rejected
     ```
 
@@ -206,6 +206,10 @@ info:
     | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
     | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
     | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |
+    | `asset.disposal_sale` | Penjualan aset diposting | Sudah |
+    | `asset.disposal_scrap` | Pemusnahan aset diposting | Sudah |
+    | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
+    | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
 
     **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
     *Belum* tidak pernah muncul di `GET /finance-postings` sampai modulnya menerbitkannya.
@@ -253,6 +257,27 @@ info:
     kebalikan baris aset itu. Bila periode itu sudah tutup di aplikasi Anda, tolak lewat ack; koreksinya
     dibuat manual di periode yang masih terbuka. Penyusutan yang dibalik sebelum di-post tidak pernah
     terbit, jadi tidak ada pembaliknya.
+
+    `asset.disposal_sale` dan `asset.disposal_scrap` mengeluarkan satu aset dari buku saat penjualan
+    atau pemusnahannya diposting, dengan `posting_id` `AST-DSP-<id aset>` — satu aset hanya dilepas
+    sekali. `posting_date` dan `document_date`-nya tanggal dokumen pelepasan. Barisnya membalik saldo
+    buku aset itu: debit akumulasi penyusutan, debit akumulasi penurunan nilai bila ada, kredit harga
+    perolehan, dan kredit kenaikan nilai bila ada. Penjualan menambah debit akun hasil penjualan aset
+    sebesar nilai jualnya (tanpa `vendor` dan tanpa PPN; tagihan ke pembelinya dibuat di aplikasi Anda).
+    Selisih hasil penjualan dengan nilai buku menjadi kredit laba pelepasan atau debit rugi pelepasan,
+    per business unit dan department; pemusnahan tidak membawa hasil, jadi seluruh nilai bukunya menjadi
+    rugi. Rincian di `details.assets` membawa `acquisition_value`, `accumulated_depreciation`,
+    `write_down_amount`, `appreciation_amount`, `net_book_value`, `proceeds`, dan `gain_loss` bertanda.
+
+    `asset.write_down` dan `asset.appreciation` menurunkan atau menaikkan nilai buku aset (penurunan
+    nilai dan revaluasi), satu posting per dokumen penyesuaian nilai, dengan `posting_id`
+    `AST-WDN-<id dokumen>` atau `AST-APR-<id dokumen>`, bertanggal dokumen itu. Barisnya per group aset
+    dan unit organisasi. Penurunan nilai: debit beban penurunan nilai (business unit dan department),
+    kredit akumulasi penurunan nilai. Kenaikan nilai: debit akun kenaikan nilai aset, kredit akun
+    lawannya, lazimnya surplus revaluasi. Rincian per aset di `details.assets` membawa
+    `adjustment_amount`, `net_book_value_before`, dan `net_book_value_after`; alasannya di
+    `details.reason` dan `source_document.description`. Saat aset itu kelak dilepas, kedua saldo ini
+    ikut dibalik oleh `asset.disposal_sale` atau `asset.disposal_scrap`.
 
     Menyaring di `GET /finance-postings`:
 

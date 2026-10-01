@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\transaksi\Insurance\InsuranceCoverage;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
-use Modules\Apperp\ManagementAset\Services\CommercialBookValues;
+use Modules\Apperp\ManagementAset\Services\AssetBookValues;
 use Modules\Apperp\ManagementAset\Services\InsuredValues;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -41,7 +41,7 @@ class AssetInsuranceController extends Controller
 
     public const INSURED = 'cukup';
 
-    public function forAsset(Request $request, CommercialBookValues $books, InsuredValues $insured): JsonResponse
+    public function forAsset(Request $request, AssetBookValues $books, InsuredValues $insured): JsonResponse
     {
         $this->guard($request);
         $asetId = $request->validate(['aset_id' => ['required', 'ulid']])['aset_id'];
@@ -88,7 +88,7 @@ class AssetInsuranceController extends Controller
      * Aset yang masih beredar beserta total pertanggungannya pada satu tanggal, disaring statusnya.
      * Bawaannya hanya yang bermasalah: tidak diasuransikan dan kurang diasuransikan.
      */
-    public function summary(Request $request, CommercialBookValues $books, InsuredValues $insured): JsonResponse
+    public function summary(Request $request, AssetBookValues $books, InsuredValues $insured): JsonResponse
     {
         $this->guard($request);
         $filter = $request->validate([

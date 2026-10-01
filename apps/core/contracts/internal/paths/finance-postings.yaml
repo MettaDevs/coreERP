@@ -65,6 +65,10 @@ get:
         - `asset.opening_balance` — saldo awal aset lama saat mulai memakai feed
         - `asset.depreciation` — proses "Post penyusutan" satu periode
         - `asset.depreciation_reversal` — penyusutan satu periode dibalik
+        - `asset.disposal_sale` — penjualan aset diposting
+        - `asset.disposal_scrap` — pemusnahan aset diposting
+        - `asset.write_down` — penurunan nilai aset diposting
+        - `asset.appreciation` — kenaikan nilai aset diposting
 
         Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
     - name: legal_entity
@@ -390,6 +394,153 @@ get:
                     details:
                       assets:
                         - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, period_starts_on: '2026-10-01', period_ends_on: '2026-10-31', depreciation_amount: '2500000.00' }
+                meta: { count: 1, has_more: false }
+            penjualan_aset:
+              summary: Ambulans dijual 50 juta saat nilai bukunya 47 juta, diposting akhir Oktober
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-DSP-01J9Z5D4E6F8G0H2J4K6M8N0P2
+                    posting_type: asset.disposal_sale
+                    settlement_mode: null
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-10-31'
+                    document_date: '2026-10-31'
+                    occurred_at: '2026-11-02T09:00:00+07:00'
+                    published_at: '2026-11-02T02:00:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penjualan-aset
+                      number: PJLA-2026-10-0001
+                      description: 'Penjualan aset KEND-0012: Lelang'
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1459', code: 1-2390, name: Akumulasi Penyusutan - Kendaraan }
+                        debit: '1000000.00'
+                        credit: '0.00'
+                        description: Akumulasi penyusutan aset dilepas · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '1452', code: 1-2300, name: Aset Tetap - Kendaraan }
+                        debit: '0.00'
+                        credit: '48000000.00'
+                        description: Harga perolehan aset dilepas · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 3
+                        account: { external_id: '1130', code: 1-1300, name: Piutang Penjualan Aset }
+                        debit: '50000000.00'
+                        credit: '0.00'
+                        description: Hasil penjualan aset · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 4
+                        account: { external_id: '7110', code: 7-1100, name: Laba Pelepasan Aset }
+                        debit: '0.00'
+                        credit: '3000000.00'
+                        description: Laba pelepasan aset · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                          - { code: DEPARTMENT, display_name: Department, value_code: POLI-UMUM, value_display_name: Poli Umum, value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD }
+                    totals: { debit: '51000000.00', credit: '51000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, acquisition_value: '48000000.00', accumulated_depreciation: '1000000.00', write_down_amount: '0.00', appreciation_amount: '0.00', net_book_value: '47000000.00', proceeds: '50000000.00', gain_loss: '3000000.00' }
+                meta: { count: 1, has_more: false }
+            penurunan_nilai:
+              summary: Penurunan nilai satu ambulans 11 juta di buku komersial
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-WDN-01J9Z7A1B2C3D4E5F6G7H8J9K0
+                    posting_type: asset.write_down
+                    settlement_mode: null
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-10-31'
+                    document_date: '2026-10-31'
+                    occurred_at: '2026-11-03T10:00:00+07:00'
+                    published_at: '2026-11-03T03:00:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penyesuaian-nilai-aset
+                      number: PNLA-2026-10-0001
+                      description: 'Penurunan nilai aset PNLA-2026-10-0001: Ambulans rusak berat, nilai pakai di bawah nilai buku'
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '6520', code: 6-5200, name: Rugi Penurunan Nilai Aset }
+                        debit: '11000000.00'
+                        credit: '0.00'
+                        description: Penurunan nilai aset 31/10/2026 · PNLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                          - { code: DEPARTMENT, display_name: Department, value_code: POLI-UMUM, value_display_name: Poli Umum, value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD }
+                      - line_no: 2
+                        account: { external_id: '1458', code: 1-2395, name: Akumulasi Penurunan Nilai - Kendaraan }
+                        debit: '0.00'
+                        credit: '11000000.00'
+                        description: Penurunan nilai aset 31/10/2026 · PNLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '11000000.00', credit: '11000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, adjustment_amount: '11000000.00', net_book_value_before: '47000000.00', net_book_value_after: '36000000.00' }
+                      reason: Ambulans rusak berat, nilai pakai di bawah nilai buku
+                meta: { count: 1, has_more: false }
+            kenaikan_nilai:
+              summary: Revaluasi satu ambulans naik 2 juta ke surplus revaluasi
+              value:
+                data:
+                  - contract_version: 1
+                    posting_id: AST-APR-01J9Z8B2C3D4E5F6G7H8J9K0M1
+                    posting_type: asset.appreciation
+                    settlement_mode: null
+                    legal_entity: { id: 01J9Z2AAAAAAAAAAAAAAAAAAAA, code: PT-METTA }
+                    currency: { code: IDR, decimals: 2 }
+                    posting_date: '2026-12-31'
+                    document_date: '2026-12-31'
+                    occurred_at: '2027-01-05T10:00:00+07:00'
+                    published_at: '2027-01-05T03:00:01+00:00'
+                    source_document:
+                      module: management-aset
+                      type: penyesuaian-nilai-aset
+                      number: PNLA-2026-12-0002
+                      description: 'Kenaikan nilai aset PNLA-2026-12-0002: Revaluasi akhir tahun oleh penilai'
+                    vendor: null
+                    vendor_invoice_reference: null
+                    journal_lines:
+                      - line_no: 1
+                        account: { external_id: '1453', code: 1-2310, name: Revaluasi Aset Tetap - Kendaraan }
+                        debit: '2000000.00'
+                        credit: '0.00'
+                        description: Kenaikan nilai aset 31/12/2026 · PNLA-2026-12-0002 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                      - line_no: 2
+                        account: { external_id: '3410', code: 3-4100, name: Surplus Revaluasi Aset Tetap }
+                        debit: '0.00'
+                        credit: '2000000.00'
+                        description: Kenaikan nilai aset 31/12/2026 · PNLA-2026-12-0002 · Kendaraan
+                        financial_dimensions:
+                          - { code: BUSINESS_UNIT, display_name: Business unit, value_code: KLN-A, value_display_name: Klinik Metta A, value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC }
+                    totals: { debit: '2000000.00', credit: '2000000.00' }
+                    reverses_posting_id: null
+                    adjusts_posting_id: null
+                    details:
+                      assets:
+                        - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, adjustment_amount: '2000000.00', net_book_value_before: '34000000.00', net_book_value_after: '36000000.00' }
+                      reason: Revaluasi akhir tahun oleh penilai
                 meta: { count: 1, has_more: false }
     '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
     '403': { $ref: '#/components/responses/IntegrationForbidden' }

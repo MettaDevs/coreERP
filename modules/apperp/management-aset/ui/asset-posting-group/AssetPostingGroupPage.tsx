@@ -801,6 +801,20 @@ const ACCOUNT_HINTS: Record<string, string> = {
         'Lawan saat aset lama dipindahkan dari sistem sebelumnya. Contoh aset 100 dengan akumulasi 40: Dr Aset Tetap 100, Cr Akumulasi Penyusutan 40, Cr Penyeimbang Saldo Awal 60.',
     grant_offset_account_id:
         'Lawan untuk aset yang diterima sebagai hibah, lazimnya akun ekuitas atau pendapatan hibah. Contoh hibah 500: Dr Aset Tetap 500, Cr akun ini 500.',
+    write_down_account_id:
+        'Akun pengurang aset tetap yang menampung penurunan nilai. Contoh penurunan nilai 110: Cr Akumulasi Penurunan Nilai 110; saat aset dilepas, saldonya didebit kembali.',
+    write_down_expense_account_id:
+        'Akun beban di laba rugi untuk penurunan nilai. Contoh: Dr Rugi Penurunan Nilai Aset 110.',
+    appreciation_account_id:
+        'Akun aset tetap yang menampung kenaikan nilai hasil revaluasi. Contoh kenaikan 20: Dr akun ini 20; saat aset dilepas, saldonya dikreditkan kembali.',
+    appreciation_offset_account_id:
+        'Lawan kenaikan nilai, lazimnya surplus revaluasi di ekuitas. Contoh kenaikan 20: Cr Surplus Revaluasi 20.',
+    disposal_proceeds_account_id:
+        'Tagihan atau kas dari penjualan aset. Contoh ambulans dijual 500: Dr Piutang Penjualan Aset 500; tagihan ke pembelinya dibuat di aplikasi finance.',
+    disposal_gain_account_id:
+        'Laba bila hasil penjualan lebih besar dari nilai buku. Contoh nilai buku 470 dijual 500: Cr Laba Pelepasan Aset 30.',
+    disposal_loss_account_id:
+        'Rugi bila hasil penjualan lebih kecil dari nilai buku, dan seluruh nilai buku aset yang dimusnahkan. Contoh nilai buku 470 dimusnahkan: Dr Rugi Pelepasan Aset 470.',
 };
 
 /** Ikon bantuan kecil di sebelah kontrolnya, pola yang sama dengan `DynamicField`. */
