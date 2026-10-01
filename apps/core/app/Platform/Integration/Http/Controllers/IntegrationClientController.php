@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\Finance;
+namespace App\Platform\Integration\Http\Controllers;
 
 use App\Foundation\FinancePosting\Support\IntegrationClientAccounts;
 use App\Http\Controllers\Controller;
-use App\Models\IntegrationClient;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Support\PushDestination;
+use App\Platform\Integration\Support\SignedPush;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Integration\PushDestination;
-use App\Support\Integration\SignedPush;
 use App\Support\Modules\Contracts\RowVersion;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\Client\ConnectionException;
@@ -40,7 +40,7 @@ final class IntegrationClientController extends Controller
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_READ);
 
-        return Inertia::render('settings/integration-clients', [
+        return Inertia::render('platform/integration/integration-clients', [
             'clients' => IntegrationClient::query()
                 ->where('tenant_id', $membership->tenant_id)
                 ->orderBy('status')

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Integration;
+namespace App\Platform\Integration\Support;
 
-use App\Models\IntegrationClient;
+use App\Platform\Integration\Models\IntegrationClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;

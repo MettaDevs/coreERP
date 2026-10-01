@@ -2,8 +2,8 @@
 
 namespace App\Foundation\FinancePosting\Support;
 
-use App\Models\IntegrationClient;
 use App\Models\User;
+use App\Platform\Integration\Models\IntegrationClient;
 use Illuminate\Support\Str;
 
 /**

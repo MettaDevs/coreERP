@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAppService;
-use App\Http\Middleware\AuthenticateIntegrationClient;
-use App\Http\Middleware\AuthenticateInternalCaller;
 use App\Http\Middleware\EnforceSiteLicense;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -13,6 +11,8 @@ use App\Http\Middleware\ThrottleRequestsPerRoute;
 use App\Http\Middleware\WajibGantiSandi;
 use App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly;
 use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
+use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
+use App\Platform\Integration\Http\Middleware\AuthenticateInternalCaller;
 use App\Platform\Tenant\Http\Middleware\RequireTenantMembershipAtAddress;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;

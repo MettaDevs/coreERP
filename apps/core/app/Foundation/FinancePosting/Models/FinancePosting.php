@@ -2,7 +2,7 @@
 
 namespace App\Foundation\FinancePosting\Models;
 
-use App\Models\IntegrationClient;
+use App\Platform\Integration\Models\IntegrationClient;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Builder;

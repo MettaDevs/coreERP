@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Integration;
+namespace App\Platform\Integration\Support;
 
 use Closure;
 use Symfony\Component\HttpFoundation\IpUtils;

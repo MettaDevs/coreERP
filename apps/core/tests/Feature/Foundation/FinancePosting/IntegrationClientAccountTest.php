@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Foundation\FinancePosting;
 
-use App\Models\IntegrationClient;
 use App\Models\User;
+use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\ProviderAdminSeeder;

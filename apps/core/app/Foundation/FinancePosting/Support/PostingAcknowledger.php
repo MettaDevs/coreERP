@@ -6,7 +6,7 @@ namespace App\Foundation\FinancePosting\Support;
 
 use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinancePostingEvent;
-use App\Models\IntegrationClient;
+use App\Platform\Integration\Models\IntegrationClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 

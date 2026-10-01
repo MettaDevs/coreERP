@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Platform\Integration\Models;
 
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;

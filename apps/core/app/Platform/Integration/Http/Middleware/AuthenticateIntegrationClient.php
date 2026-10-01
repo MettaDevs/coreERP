@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Middleware;
+namespace App\Platform\Integration\Http\Middleware;
 
 use App\Foundation\FinancePosting\Support\IntegrationClientAccounts;
-use App\Models\IntegrationClient;
+use App\Http\Middleware\AuthenticateAppService;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Integration\Models\IntegrationClient;
 use App\Support\Database\AuditActor;
 use App\Support\Modules\TenantScope;
 use Closure;

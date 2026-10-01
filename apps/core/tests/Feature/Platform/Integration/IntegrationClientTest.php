@@ -1,14 +1,14 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Integration;
 
-use App\Models\IntegrationClient;
 use App\Models\User;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Support\PushDestination;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Integration\PushDestination;
 use Database\Seeders\AppCatalogSeeder;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -369,7 +369,7 @@ class IntegrationClientTest extends TestCase
 
         $this->actingAs($this->owner)->get('/settings/integration-clients')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('settings/integration-clients')
+                ->component('platform/integration/integration-clients')
                 ->where('clients.0.id', $id)
                 ->missing('clients.0.token_digest')
                 ->missing('clients.0.signing_secret')
