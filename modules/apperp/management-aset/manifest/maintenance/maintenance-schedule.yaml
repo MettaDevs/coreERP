@@ -1,0 +1,36 @@
+security:
+  entry_points:
+    - code: management-aset.jadwal-pemeliharaan.form
+      name: Layar jadwal pemeliharaan
+      type: form
+    - code: management-aset.jadwal-pemeliharaan.api
+      name: API jadwal pemeliharaan
+      type: api
+  permissions:
+    - code: management-aset.jadwal-pemeliharaan.read
+      name: Lihat jadwal pemeliharaan
+      entry_point: management-aset.jadwal-pemeliharaan.form
+      access: read
+    - code: management-aset.jadwal-pemeliharaan.run
+      name: Hitung jadwal pemeliharaan dari rencana
+      entry_point: management-aset.jadwal-pemeliharaan.api
+      access: invoke
+    - code: management-aset.jadwal-pemeliharaan.discard
+      name: Abaikan usulan jadwal pemeliharaan
+      entry_point: management-aset.jadwal-pemeliharaan.api
+      access: invoke
+  privileges:
+    - code: management-aset.jadwal-pemeliharaan.plan
+      name: Hitung dan tinjau jadwal pemeliharaan
+      permissions:
+        - management-aset.jadwal-pemeliharaan.read
+        - management-aset.jadwal-pemeliharaan.run
+        - management-aset.jadwal-pemeliharaan.discard
+  duties:
+    # Mengubah usulan menjadi work order tidak ada di sini. Ia menuntut permission membuat work order
+    # (`management-aset.pemeliharaan-aset.create`, duty kelola work order), jadi penjadwal yang tidak
+    # memegang duty itu hanya dapat menghitung dan meninjau.
+    - code: management-aset.jadwal-pemeliharaan.manage
+      name: Kelola jadwal pemeliharaan preventif
+      privileges:
+        - management-aset.jadwal-pemeliharaan.plan

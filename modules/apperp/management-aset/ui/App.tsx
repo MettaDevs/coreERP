@@ -78,8 +78,17 @@ const StatusValidationPage = lazy(
 const WorkOrderPage = lazy(
     () => import('./transactions/pemeliharaan-aset/WorkOrderPage'),
 );
-const PengaturanAsetTetapPlaceholderPage = lazy(
-    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage'),
+const MaintenanceRequestPage = lazy(
+    () => import('./transactions/maintenance-requests/MaintenanceRequestPage'),
+);
+const MaintenanceSchedulePage = lazy(
+    () => import('./transactions/maintenance-schedule/MaintenanceSchedulePage'),
+);
+const CounterReadingPage = lazy(
+    () => import('./transactions/counter-readings/CounterReadingPage'),
+);
+const PengaturanAsetTetapPage = lazy(
+    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPage'),
 );
 const AssetPostingGroupPage = lazy(
     () => import('./asset-posting-group/AssetPostingGroupPage'),
@@ -225,8 +234,11 @@ export default function App({
         permissions.includes('management-aset.fixed-asset-parameters.read')
     ) {
         return (
-            <main>
-                <PengaturanAsetTetapPlaceholderPage kind="parameters" />
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <PengaturanAsetTetapPage permissions={permissions} />
             </main>
         );
     }
@@ -371,6 +383,54 @@ export default function App({
                     context={konteks}
                     permissions={permissions}
                     segments={segments}
+                />
+            </main>
+        );
+    }
+
+    // Tiga layar pemeliharaan preventif dan reaktif: permintaan dari unit, usulan jadwal dari
+    // rencana, dan pembacaan counter yang menjadi dasar rencana berbasis pemakaian.
+    if (
+        view === 'permintaan-pemeliharaan' &&
+        permissions.includes('management-aset.permintaan-pemeliharaan.read')
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <MaintenanceRequestPage
+                    context={konteks}
+                    permissions={permissions}
+                    segments={segments}
+                />
+            </main>
+        );
+    }
+
+    if (
+        view === 'jadwal-pemeliharaan' &&
+        permissions.includes('management-aset.jadwal-pemeliharaan.read')
+    ) {
+        return (
+            <main>
+                <MaintenanceSchedulePage
+                    context={konteks}
+                    permissions={permissions}
+                />
+            </main>
+        );
+    }
+
+    if (
+        view === 'pembacaan-counter' &&
+        permissions.includes('management-aset.pembacaan-counter.read')
+    ) {
+        return (
+            <main>
+                <CounterReadingPage
+                    context={konteks}
+                    permissions={permissions}
                 />
             </main>
         );

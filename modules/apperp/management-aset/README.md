@@ -39,9 +39,10 @@ Baris template dapat berupa header, teks, pengukuran, variabel, atau template la
 pengukuran, satuan dipilih dari CoreERP; batas minimum dan maksimum opsional ikut disalin ke
 work order dan menghasilkan gagal bila angka yang diisi berada di luar rentang.
 
-Transaksi maintenance seperti maintenance request, work order, maintenance plan,
-scheduling, dan fault belum termasuk dalam versi ini. Tombol Forecast, Tools, dan Work
-description juga belum ditampilkan karena model bisnisnya belum tersedia.
+Transaksi maintenance di atas setup ini: work order, permintaan pemeliharaan, counter aset,
+rencana pemeliharaan, dan jadwal yang dihitung darinya. Rinciannya ada di halaman docs
+**Pemeliharaan aset**, **Permintaan pemeliharaan**, dan **Pemeliharaan preventif**. Maintenance
+round, Forecast, Tools, dan Work description belum ada karena model bisnisnya belum tersedia.
 
 Tenant baru menerima seed starter Indonesia secara otomatis. Untuk tenant yang sudah ada,
 jalankan perintah berikut dari container API tanpa mengganti data custom yang sudah dibuat:
@@ -254,6 +255,8 @@ Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr
 Pohon lokasi sengaja **terpisah** dari struktur organisasi. "Di mana benda ini berada" dan "siapa yang bertanggung jawab" adalah dua pertanyaan berbeda yang berubah karena sebab berbeda: reorganisasi tidak memindahkan barang, dan memindahkan barang tidak mengubah struktur organisasi. Menyatukan keduanya membuat riwayat lokasi rusak setiap kali unit kerja digabung, dan membatasi kedalaman lokasi pada unit organisasi terkecil — padahal stock opname butuh sampai tingkat ruangan atau rak.
 
 Keduanya dihubungkan lewat satu field opsional, `m_lokasi_aset.org_unit_id`; padanan toggle **Update asset dimension** pada Functional location type di F&O. Saat aset diterima atau dimutasi, `financial_dimension_org_unit_id` pada aset diisi dari unit milik lokasinya. Lokasi yang tidak dipetakan mewarisi unit lokasi induk terdekat yang dipetakan (K-08): satu poli bisa tersebar di beberapa ruang, dan cukup lantainya yang dipetakan. Baru bila tidak ada satu pun lokasi di jalur ke akar yang dipetakan, aset memakai unit penggunanya. Aturannya satu, `Services/LocationDimension`, dipakai penerimaan dan mutasi; pendakiannya dibatasi 32 tingkat dan berhenti pada siklus, yang hanya mungkin bila datanya rusak karena penulisan lokasi menolak siklus, lalu melaporkannya. Nilainya **disalin, bukan dilihat saat dibaca**: mengubah pemetaan lokasi kelak tidak menulis ulang pembebanan aset yang sudah berjalan.
+
+Lokasi juga membawa **alamat** dari buku alamat Core dan **unit kerja bawaan**, keduanya diwarisi lokasi anak yang mengosongkannya. Unit kerja bawaan mengisi unit penanggung jawab saat aset diterima atau dimutasi ke lokasi itu bila dokumennya tidak menyebut unit; pengguna tetap boleh menggantinya. Rinciannya di `docs/apps/management-aset/master/lokasi/`.
 
 Aturan yang berlaku pada master berinduk:
 

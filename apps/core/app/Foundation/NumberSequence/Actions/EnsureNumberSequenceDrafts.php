@@ -81,7 +81,10 @@ class EnsureNumberSequenceDrafts
                     'allow_manual' => (bool) $profile->allow_manual,
                     'preallocation_enabled' => (bool) $profile->preallocation_enabled,
                     'preallocation_quantity' => (int) $profile->preallocation_quantity,
-                    'minimum_number' => 0,
+                    // Dokumen pertama bernomor 1, sama dengan default kolom dan urutan nomor Core, dan
+                    // sama dengan `Starting No.` Business Central yang lazimnya `…00001`. Admin tetap
+                    // boleh memilih 0 lewat Atur nomor; yang ditetapkan di sini hanya bawaannya.
+                    'minimum_number' => 1,
                     'maximum_number' => 19999,
                     'segments' => array_values(array_filter([
                         $reference->default_prefix ? ['type' => 'constant', 'value' => $reference->default_prefix] : null,

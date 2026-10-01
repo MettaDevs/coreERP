@@ -22,6 +22,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\LocationDimension;
+use Modules\Apperp\ManagementAset\Services\LocationInheritance;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
@@ -329,7 +330,8 @@ class MutasiAsetController extends Controller
             'responsible_org_unit_id' => ['required', 'ulid'],
             'tanggal' => ['required', 'date_format:Y-m-d'],
             'tujuan_lokasi_id' => ['nullable', 'ulid', Rule::exists('aset_m_lokasi_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
-            'tujuan_org_unit_id' => ['required', 'ulid'],
+            // Boleh kosong bila lokasi tujuan punya unit kerja bawaan; lihat di bawah validasi.
+            'tujuan_org_unit_id' => ['nullable', 'ulid'],
             'diserahkan_oleh_user_id' => ['nullable', 'string', 'max:64'],
             'diterima_oleh_user_id' => ['nullable', 'string', 'max:64'],
             'alasan' => ['required', 'string', 'max:250'],
@@ -347,6 +349,15 @@ class MutasiAsetController extends Controller
         // validasi. Menormalkannya di batas membuat anotasi `list<...>` di bawah benar
         // sungguhan, bukan hanya benar menurut PHPDoc.
         $data['details'] = array_values($data['details']);
+
+        // Unit tujuan yang tidak dikirim diisi unit kerja bawaan lokasi tujuan, termasuk warisan
+        // lokasi induknya. Layar sudah mengisinya saat lokasi dipilih dan pengguna boleh menggantinya.
+        $data['tujuan_org_unit_id'] ??= app(LocationInheritance::class)->defaultDepartment($data['tujuan_lokasi_id'] ?? null);
+        if ($data['tujuan_org_unit_id'] === null) {
+            throw ValidationException::withMessages([
+                'tujuan_org_unit_id' => 'Pilih unit kerja tujuan, atau pilih lokasi tujuan yang punya unit kerja bawaan.',
+            ]);
+        }
 
         return $data;
     }

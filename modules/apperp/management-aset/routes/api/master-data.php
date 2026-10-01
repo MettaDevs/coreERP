@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\CounterTypeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupBukuPenyusutanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ItemChecklistMaintenanceController;
@@ -18,6 +19,8 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceChecklistVa
 use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceJobTypeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceJobTypeDefaultController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceJobTypeVariantController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenancePlanController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceRequestTypeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceSetupLinkController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ModelAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\PabrikanAsetController;
@@ -60,6 +63,9 @@ $masters = [
     'profil-penyusutan' => ProfilPenyusutanController::class,
     'buku-penyusutan' => BukuPenyusutanController::class,
     'tipe-atribut' => TipeAtributController::class,
+    'jenis-counter' => CounterTypeController::class,
+    'rencana-pemeliharaan' => MaintenancePlanController::class,
+    'jenis-permintaan-pemeliharaan' => MaintenanceRequestTypeController::class,
 ];
 
 // Matriks group x buku disunting di dalam form group, jadi ia memakai permission

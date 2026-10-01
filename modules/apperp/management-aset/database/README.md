@@ -27,6 +27,7 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | `m_tipe_atribut_nilai` | `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut (tenant_id, id)` |
 | `m_jenis_aset_atribut` | `(tenant_id, jenis_aset_id)` → `m_jenis_aset`, `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut` |
 | `m_posting_group` | `(tenant_id, group_aset_id)` → `m_group_aset (tenant_id, id)`; delapan kolom akun menunjuk daftar akun referensi Core tanpa foreign key |
+| `pengaturan_aset_tetap` | `(tenant_id, buku_penyusutan_bawaan_id)` → `m_buku_penyusutan (tenant_id, id)`; satu baris aktif per tenant (indeks unik parsial), padanan `FA Setup` BC |
 
 Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_type_variant`,
 `m_maintenance_job_type_default`, `m_maintenance_job_type_jenis_aset`,
@@ -51,6 +52,15 @@ Work order menambah master `m_tipe_work_order`, `m_tingkat_layanan`, `m_trade`,
 `tr_pemeliharaan_aset_details`, `tr_pemeliharaan_aset_checklist`, dan
 `tr_pemeliharaan_aset_status_log`.
 
+Pemeliharaan preventif menambah master `aset_m_jenis_counter`, `aset_m_jenis_aset_counter`,
+`aset_m_rencana_pemeliharaan`, `aset_m_rencana_pemeliharaan_baris`, dan
+`aset_m_rencana_pemeliharaan_objek`, serta transaksi `aset_tr_pembacaan_counter` dan
+`aset_tr_jadwal_pemeliharaan`. Keunikan usulan jadwal dijaga dua indeks unik parsial — per
+tanggal jatuh tempo untuk baris waktu, per batas total counter untuk baris counter — supaya
+perhitungan ulang idempoten. Permintaan pemeliharaan menambah `aset_m_jenis_permintaan_pemeliharaan`
+dan `aset_tr_permintaan_pemeliharaan`. Rinciannya di docs **Pemeliharaan preventif** dan
+**Permintaan pemeliharaan**.
+
 Master sebab dan tindakan memiliki `minta_keterangan`. Jika aktif, baris pekerjaan wajib
 menyimpan teks bebas pada `sebab_kerusakan_keterangan` atau
 `tindakan_perbaikan_keterangan`; teks tersebut dikosongkan bila pilihan tidak memintanya.
@@ -72,7 +82,7 @@ Seed katalog Indonesia–Asia pada `m_pabrikan_aset` dan `m_model_aset` memakai 
 model menunjuk pabrikan yang sama tenant, sementara `jenis_aset_id` dan `model_number`
 dibiarkan `NULL` agar tenant dapat mengaitkannya kemudian.
 
-Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `lokasi_aset_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `lokasi_aset_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, `alamat_id` (tempat di buku alamat Core), dan `departemen_bawaan_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
 
 `m_tipe_atribut.data_type` menyimpan tipe dasar `string`, `decimal`, `integer`, `date`, atau `boolean`. Values aktif berada terpisah di `m_tipe_atribut_nilai`; min/max opsional berada pada tipe atribut dan wajib berpasangan untuk angka. `data_type_locked` menjadi benar saat nilai pertama berhasil ditulis ke `tr_aset_atribut` dan tidak dibuka kembali saat nilai aset dikoreksi atau dihapus.
 
@@ -109,7 +119,7 @@ angkanya berbeda, `[{buku_id, akumulasi_per_unit, periode_berjalan}]`. `tr_buku_
 saldo awal + periode final tetap dapat diperiksa, dan `elapsed_periods_offset` yang ditambahkan ke
 hitungan periode berjalan saat penyusutan diusulkan.
 
-`m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
+`m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Begitu pula `m_lokasi_aset.alamat_id` dan `m_lokasi_aset.departemen_bawaan_id`; keduanya tidak disalin ke aset, dan lokasi kosong mewarisi nilai lokasi induk terdekat saat dibaca (`Services/LocationInheritance`). Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 
 Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation_key`, `kode`, `nama`, `keterangan`, `aktif`, `deleted_at`, dan timestamps. Constraint yang berlaku pada semuanya:
 

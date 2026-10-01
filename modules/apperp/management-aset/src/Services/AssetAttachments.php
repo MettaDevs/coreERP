@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\MaintenanceRequest\MaintenanceRequest;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoringLine;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
@@ -70,6 +71,8 @@ final class AssetAttachments implements AttachmentRecordType
             // Foto bukti pemeriksaan fisik, pada dokumen atau pada baris asetnya.
             new self('aset_tr_monitoring_aset', AssetMonitoring::class, 'monitoring-aset', 'update', 'responsible_org_unit_id', AssetMonitoringLine::class, 'monitoring_aset_id'),
             new self('aset_tr_pemeliharaan_aset', PemeliharaanAset::class, 'pemeliharaan-aset', 'update', 'responsible_org_unit_id', PemeliharaanAsetDetail::class, 'pemeliharaan_aset_id'),
+            // Foto kerusakan dari pelapor; padanan *Add photos* pada permintaan F&O.
+            new self('aset_tr_permintaan_pemeliharaan', MaintenanceRequest::class, 'permintaan-pemeliharaan', 'update', 'responsible_org_unit_id'),
             new self('aset_tr_perencanaan_aset', PerencanaanAset::class, 'perencanaan-aset', 'update', 'planning_org_unit_id', PerencanaanAsetDetail::class, 'planning_id'),
             // Dasar penurunan atau kenaikan nilai, misalnya laporan penilai, pada dokumen atau barisnya.
             new self('aset_tr_penyesuaian_nilai_aset', AssetValueAdjustment::class, 'penyesuaian-nilai-aset', 'update', 'responsible_org_unit_id', AssetValueAdjustmentLine::class, 'penyesuaian_nilai_aset_id'),

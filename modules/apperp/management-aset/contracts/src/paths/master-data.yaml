@@ -2282,3 +2282,67 @@
         $ref: '#/components/responses/StaleVersion'
       '428':
         $ref: '#/components/responses/VersionRequired'
+/api/v1/pengaturan-aset-tetap:
+  get:
+    tags:
+    - Master data
+    operationId: getPengaturanAsetTetap
+    summary: Membaca pengaturan aset tetap tenant aktif
+    description: |
+      Padanan halaman Fixed Asset Setup Business Central. Barisnya baru ada setelah disimpan
+      pertama kali; sebelum itu jawaban membawa `version` 0 dan pengaturan kosong.
+    responses:
+      '200':
+        description: Pengaturan aset tetap
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/PengaturanAsetTetap'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  put:
+    tags:
+    - Master data
+    operationId: updatePengaturanAsetTetap
+    summary: Menyimpan pengaturan aset tetap tenant aktif
+    description: |
+      Butuh `management-aset.fixed-asset-parameters.update`. Penyimpanan pertama membawa
+      `version` 0 dan membuat barisnya; berikutnya membawa versi yang dibuka pengguna.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PengaturanAsetTetapWrite'
+    responses:
+      '200':
+        description: Pengaturan aset tetap disimpan
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/PengaturanAsetTetap'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'

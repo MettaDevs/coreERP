@@ -152,7 +152,7 @@ class BusinessOnboardingTest extends TestCase
         $this->assertSame(0, DB::table('app_placements')->count());
         $this->assertDatabaseHas('tenant_number_sequences', [
             'status' => 'active',
-            'minimum_number' => 0,
+            'minimum_number' => 1,
             'maximum_number' => 19999,
         ]);
     }

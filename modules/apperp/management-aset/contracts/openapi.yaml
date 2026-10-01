@@ -55,6 +55,10 @@ tags:
   description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Monitoring aset
   description: Pemeriksaan fisik aset di satu lokasi; mencatat dan membekukan temuan tanpa mengubah register.
+- name: Pemeliharaan preventif
+  description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
+- name: Permintaan pemeliharaan
+  description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
 - name: Penyesuaian nilai aset
   description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya
     ke aplikasi finance.
@@ -149,13 +153,39 @@ paths:
         ke database Core; daftar ini dibaca lewat kontrak `OrganizationDirectory` di dalam
         proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
 
-        Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
-        pemeliharaan — sama seperti daftar satuan.
+        Izinnya menumpang izin layar yang memakainya — mutasi, register aset, pemeliharaan,
+        monitoring, atau lokasi aset — sama seperti daftar satuan.
       responses:
         '200':
           description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
         '403':
           description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+  /api/v1/reference-data/alamat:
+    get:
+      tags:
+      - Reference data
+      operationId: listAddresses
+      summary: Alamat dari buku alamat Core, untuk dipilih pada lokasi aset
+      description: |
+        Tempat beralamat pos milik tenant aktif, dibaca lewat kontrak `AddressDirectory`. Modul
+        menyimpan id tempatnya saja; nama dan alamat diterjemahkan saat dibaca. Butuh
+        `management-aset.lokasi-aset.read`.
+
+        Dengan `unit_kerja_id`, yang dipulangkan hanya alamat utama unit kerja itu (nol atau satu
+        baris) — saran alamat saat lokasi diberi unit kerja bawaan.
+      parameters:
+      - name: unit_kerja_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Daftar alamat dengan `id`, `kode` (= nama), `nama`, `alamat`, dan `display_label`
+        '403':
+          description: Pengguna tidak memegang izin lihat lokasi aset
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/v1/reference-data/anggota:
     get:
       tags:
@@ -2453,6 +2483,72 @@ paths:
           $ref: '#/components/responses/StaleVersion'
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/v1/pengaturan-aset-tetap:
+    get:
+      tags:
+      - Master data
+      operationId: getPengaturanAsetTetap
+      summary: Membaca pengaturan aset tetap tenant aktif
+      description: |
+        Padanan halaman Fixed Asset Setup Business Central. Barisnya baru ada setelah disimpan
+        pertama kali; sebelum itu jawaban membawa `version` 0 dan pengaturan kosong.
+      responses:
+        '200':
+          description: Pengaturan aset tetap
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PengaturanAsetTetap'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags:
+      - Master data
+      operationId: updatePengaturanAsetTetap
+      summary: Menyimpan pengaturan aset tetap tenant aktif
+      description: |
+        Butuh `management-aset.fixed-asset-parameters.update`. Penyimpanan pertama membawa
+        `version` 0 dan membuat barisnya; berikutnya membawa versi yang dibuka pengguna.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PengaturanAsetTetapWrite'
+      responses:
+        '200':
+          description: Pengaturan aset tetap disimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PengaturanAsetTetap'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-types:
     get:
       tags:
@@ -4052,6 +4148,10 @@ paths:
         Akumulasi ditambah residu tidak boleh melebihi nilai per unit, dan periode berjalan tidak
         boleh melebihi masa manfaat buku yang memakainya. Dokumen selain saldo awal tidak boleh
         membawa angka-angka itu.
+
+        `responsible_org_unit_id` boleh kosong bila `lokasi_aset_id` punya unit kerja bawaan
+        (milik sendiri atau warisan lokasi induk terdekat); unit itulah yang dipakai. Bila keduanya
+        kosong, 422 pada `responsible_org_unit_id`. Aturan yang sama berlaku pada `PATCH`.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
       responses:
@@ -5898,6 +5998,1069 @@ paths:
           description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/v1/jenis-counter:
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listCounterTypes
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar jenis counter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterTypeList'
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: createCounterType
+      description: Satuan wajib dan harus satuan aktif di daftar satuan Core; kodenya disalin ke `satuan` untuk tampilan.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CounterTypeCreate'
+      responses:
+        '201':
+          description: Jenis counter dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterTypeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/jenis-counter/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: getCounterType
+      responses:
+        '200':
+          description: Jenis counter
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterTypeResponse'
+    patch:
+      tags:
+      - Pemeliharaan preventif
+      operationId: updateCounterType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CounterTypePatch'
+      responses:
+        '200':
+          description: Jenis counter diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterTypeResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Pemeliharaan preventif
+      operationId: archiveCounterType
+      description: Ditolak 409 selama masih dipakai baris rencana pemeliharaan yang belum diarsipkan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Jenis counter diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersionOrReferencedByChildren'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/jenis-aset/{id}/counter:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listAssetTypeCounters
+      summary: Counter yang boleh dibaca pada aset jenis ini
+      description: Counter yang tidak dikaitkan ke jenis aset mana pun berlaku untuk semua jenis aset. Memakai permission
+        jenis aset.
+      responses:
+        '200':
+          description: Counter terpilih dan tersisa beserta versi jenis aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetTypeCounterTransfer'
+    put:
+      tags:
+      - Pemeliharaan preventif
+      operationId: replaceAssetTypeCounters
+      description: Mengganti himpunan counter jenis aset ini dan mengklaim versi jenis aset. Kaitan yang dilepas diarsipkan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - jenis_counter_ids
+              - version
+              properties:
+                jenis_counter_ids:
+                  type: array
+                  maxItems: 200
+                  items:
+                    $ref: '#/components/schemas/Ulid'
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Himpunan baru
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetTypeCounterTransfer'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/pembacaan-counter:
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listCounterReadings
+      description: Paling banyak 500 pembacaan terbaru dalam jangkauan organisasi aset pengguna.
+      parameters:
+      - name: aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: jenis_counter_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Daftar pembacaan
+          terbaru lebih dulu: null
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CounterReading'
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: recordCounterReading
+      description: |
+        `nilai_total` dihitung server. Angka meter tidak boleh lebih kecil dari pembacaan terakhir kecuali
+        `reset` (penggantian meter); waktu baca tidak boleh lebih awal dari pembacaan terakhir. Aset harus
+        dalam jangkauan organisasi pengguna, masih beredar, dan counternya berlaku untuk jenis asetnya.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CounterReadingWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Pembacaan dicatat
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CounterReading'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/pembacaan-counter/counter-aset:
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listAssetCounters
+      summary: Counter yang dapat dibaca pada satu aset beserta pembacaan terakhirnya
+      parameters:
+      - name: aset_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Counter aset
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetCounter'
+  /api/v1/pembacaan-counter/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    delete:
+      tags:
+      - Pemeliharaan preventif
+      operationId: archiveCounterReading
+      description: Hanya pembacaan terakhir untuk aset dan counter itu; total pembacaan sesudahnya bergantung padanya.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Pembacaan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Bukan pembacaan terakhir
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/rencana-pemeliharaan:
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listMaintenancePlans
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar rencana pemeliharaan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenancePlanList'
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: createMaintenancePlan
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenancePlanCreate'
+      responses:
+        '201':
+          description: Rencana dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenancePlanResponse'
+  /api/v1/rencana-pemeliharaan/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: getMaintenancePlan
+      responses:
+        '200':
+          description: Rencana pemeliharaan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenancePlanResponse'
+    patch:
+      tags:
+      - Pemeliharaan preventif
+      operationId: updateMaintenancePlan
+      description: Rencana yang dimatikan tidak menghasilkan usulan; usulan terbukanya dibersihkan pada perhitungan berikutnya.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenancePlanPatch'
+      responses:
+        '200':
+          description: Rencana diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenancePlanResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Pemeliharaan preventif
+      operationId: archiveMaintenancePlan
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Rencana diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/rencana-pemeliharaan/{id}/baris:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listMaintenancePlanLines
+      responses:
+        '200':
+          description: Baris rencana beserta versi header
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - version
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenancePlanLine'
+                  version:
+                    $ref: '#/components/schemas/RecordVersion'
+    put:
+      tags:
+      - Pemeliharaan preventif
+      operationId: replaceMaintenancePlanLines
+      description: |
+        Baris yang membawa `id` diperbarui di tempat; baris tanpa `id` ditambahkan; baris yang tidak
+        dikirim diarsipkan. Identitas baris dipertahankan karena usulan jadwal menunjuknya. Mengklaim
+        versi header rencana.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - lines
+              - version
+              properties:
+                lines:
+                  type: array
+                  maxItems: 50
+                  items:
+                    $ref: '#/components/schemas/MaintenancePlanLineWrite'
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Baris tersimpan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/rencana-pemeliharaan/{id}/objek:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listMaintenancePlanTargets
+      responses:
+        '200':
+          description: Objek rencana beserta versi header
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - version
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenancePlanTarget'
+                  version:
+                    $ref: '#/components/schemas/RecordVersion'
+    put:
+      tags:
+      - Pemeliharaan preventif
+      operationId: replaceMaintenancePlanTargets
+      description: Setiap objek menyebut tepat satu aset atau satu jenis aset. Pola pembaruannya sama dengan baris rencana.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - targets
+              - version
+              properties:
+                targets:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: '#/components/schemas/MaintenancePlanTargetWrite'
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Objek tersimpan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/jadwal-pemeliharaan:
+    get:
+      tags:
+      - Pemeliharaan preventif
+      operationId: listMaintenanceSchedule
+      description: Usulan dalam jangkauan organisasi pengguna, urut jatuh tempo. Bawaannya hanya yang berstatus `usulan`.
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - usulan
+          - work_order_dibuat
+          - diabaikan
+          - semua
+      - name: rencana_pemeliharaan_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: sampai
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Daftar usulan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenanceScheduleLine'
+                  meta:
+                    type: object
+                    properties:
+                      hari_ini:
+                        type: string
+                        format: date
+  /api/v1/jadwal-pemeliharaan/hitung:
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: runMaintenanceSchedule
+      summary: Menghitung usulan jadwal dari rencana aktif sampai tanggal batas
+      description: |
+        Idempoten: jatuh tempo yang sudah diusulkan, dibuatkan work order, atau diabaikan tidak diusulkan
+        lagi. Usulan terbuka yang tidak lagi dihasilkan perhitungan diarsipkan. Hanya aset dalam
+        jangkauan organisasi pengguna yang dihitung. Tanggal batas paling jauh satu tahun dari hari ini.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - sampai
+              properties:
+                sampai:
+                  type: string
+                  format: date
+                rencana_pemeliharaan_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+      responses:
+        '200':
+          description: Jumlah usulan baru dan yang dibersihkan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - dibuat
+                    - dibersihkan
+                    properties:
+                      dibuat:
+                        type: integer
+                      dibersihkan:
+                        type: integer
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/jadwal-pemeliharaan/work-order:
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: createWorkOrdersFromSchedule
+      summary: Mengubah usulan terpilih menjadi work order draf
+      description: |
+        Menuntut `management-aset.pemeliharaan-aset.create` di samping hak membaca jadwal. `kelompok=baris`
+        membuat satu work order per usulan; `kelompok=aset` menggabungkan usulan satu aset dengan tipe work
+        order yang sama. Work order dibuat lewat jalur yang sama dengan `POST /pemeliharaan-aset`, termasuk
+        nomor dan checklist bawaan jenis pekerjaan. Setiap usulan mengklaim versinya sendiri.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - lines
+              properties:
+                kelompok:
+                  type: string
+                  enum:
+                  - baris
+                  - aset
+                  default: baris
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    required:
+                    - id
+                    - version
+                    properties:
+                      id:
+                        $ref: '#/components/schemas/Ulid'
+                      version:
+                        $ref: '#/components/schemas/VersionField'
+      responses:
+        '201':
+          description: Work order yang dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      work_orders:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              $ref: '#/components/schemas/Ulid'
+                            kode:
+                              type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/jadwal-pemeliharaan/{id}/abaikan:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Pemeliharaan preventif
+      operationId: discardMaintenanceScheduleLine
+      description: Usulan yang diabaikan tidak diusulkan lagi untuk jatuh tempo yang sama.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Usulan diabaikan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MaintenanceScheduleLine'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Usulan sudah dibuatkan work order atau diabaikan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/jenis-permintaan-pemeliharaan:
+    get:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: listMaintenanceRequestTypes
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar jenis permintaan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestTypeList'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: createMaintenanceRequestType
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequestTypeCreate'
+      responses:
+        '201':
+          description: Jenis permintaan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestTypeResponse'
+  /api/v1/jenis-permintaan-pemeliharaan/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: getMaintenanceRequestType
+      responses:
+        '200':
+          description: Jenis permintaan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestTypeResponse'
+    patch:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: updateMaintenanceRequestType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequestTypePatch'
+      responses:
+        '200':
+          description: Jenis permintaan diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestTypeResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: archiveMaintenanceRequestType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Jenis permintaan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/permintaan-pemeliharaan:
+    get:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: listMaintenanceRequests
+      description: Paling banyak 500 permintaan terbaru dalam jangkauan organisasi pengguna (unit pelapor).
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - diajukan
+          - diterima
+          - ditolak
+          - work_order_dibuat
+      responses:
+        '200':
+          description: Daftar permintaan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenanceRequest'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: createMaintenanceRequest
+      description: Membuat permintaan draf; nomor diterbitkan Number Sequence Core per entitas legal. Lokasi kosong diisi
+        lokasi aset saat ini.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequestWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Permintaan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/permintaan-pemeliharaan/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: getMaintenanceRequest
+      responses:
+        '200':
+          description: Permintaan beserta nama unit
+          pelapor: null
+          dan pemutus: null
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: updateMaintenanceRequest
+      description: Hanya permintaan draf.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/MaintenanceRequestWrite'
+              - type: object
+                properties:
+                  version:
+                    $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Permintaan diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: archiveMaintenanceRequest
+      description: Hanya permintaan draf atau yang ditolak.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Permintaan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Status tidak boleh diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/permintaan-pemeliharaan/{id}/ajukan:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: submitMaintenanceRequest
+      description: draft → diajukan. Permission `submit`.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Permintaan diajukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Status tidak sesuai
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/permintaan-pemeliharaan/{id}/terima:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: acceptMaintenanceRequest
+      description: diajukan → diterima. Permission `review`.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Permintaan diterima
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Status tidak sesuai
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/permintaan-pemeliharaan/{id}/tolak:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: rejectMaintenanceRequest
+      description: diajukan → ditolak, dengan alasan wajib. Permission `review`.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - alasan
+              properties:
+                alasan:
+                  type: string
+                  maxLength: 2000
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Permintaan ditolak
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/permintaan-pemeliharaan/{id}/work-order:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Permintaan pemeliharaan
+      operationId: createWorkOrderFromMaintenanceRequest
+      description: |
+        diterima → work_order_dibuat. Menuntut permission `review` dan `management-aset.pemeliharaan-aset.create`.
+        Membuat satu work order draf lewat jalur yang sama dengan `POST /pemeliharaan-aset`. Tipe work
+        order bawaannya dari jenis permintaan; `aset_id` wajib bila permintaan hanya menyebut lokasi.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - maintenance_job_type_id
+              properties:
+                aset_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+                maintenance_job_type_id:
+                  $ref: '#/components/schemas/Ulid'
+                variant_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+                trade_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+                tipe_work_order_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Permintaan beserta nomor work order-nya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceRequestResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
   /api/v1/penyusutan/proposal:
     post:
       tags:
@@ -6456,7 +7619,6 @@ components:
       - legal_entity_id
       - responsible_org_unit_id
       - tanggal
-      - tujuan_org_unit_id
       - alasan
       - details
       properties:
@@ -6473,7 +7635,13 @@ components:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
         tujuan_org_unit_id:
-          $ref: '#/components/schemas/Ulid'
+          description: |
+            Unit kerja penanggung jawab aset setelah serah terima. Bila kosong, diisi unit kerja
+            bawaan lokasi tujuan (atau lokasi induk terdekat yang mengisinya); bila keduanya kosong,
+            422 pada field ini.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
         diserahkan_oleh_user_id:
           type: string
           maxLength: 64
@@ -8456,6 +9624,43 @@ components:
           oneOf:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
+        alamat_id:
+          description: |
+            Tempat beralamat pos di buku alamat Core (Address pada functional location D365).
+            Kosong berarti mewarisi alamat lokasi induk terdekat yang punya alamat. Id yang tidak
+            ada di buku alamat tenant aktif ditolak 422.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        departemen_bawaan_id:
+          description: |
+            Unit kerja Core yang mengisi unit penanggung jawab aset saat aset diterima atau
+            dimutasi ke lokasi ini, bila dokumennya tidak menyebut unit. Kosong berarti mewarisi
+            lokasi induk terdekat yang mengisinya. Berbeda dari `org_unit_id` (dimensi keuangan).
+            Unit yang tidak ada di tenant aktif ditolak 422.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    LokasiAsetAlamat:
+      type: object
+      required:
+      - id
+      - nama
+      - alamat
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        nama:
+          type: string
+          description: Nama tempat di buku alamat.
+        alamat:
+          type: string
+          description: Alamat tercetak, beberapa baris dipisah baris baru.
+    LokasiAsetWarisanSumber:
+      description: Lokasi pemilik nilai yang diwarisi; `null` bila nilainya milik lokasi ini sendiri.
+      oneOf:
+      - $ref: '#/components/schemas/MasterSummary'
+      - type: 'null'
     LokasiAset:
       description: |
         Pohon lokasi fisik aset; padanan "Functional location" di Dynamics 365 F&O. Ia
@@ -8469,6 +9674,10 @@ components:
         required:
         - parent
         - tipe_lokasi
+        - alamat
+        - alamat_efektif
+        - departemen_bawaan_nama
+        - departemen_bawaan_efektif
         properties:
           parent:
             oneOf:
@@ -8477,6 +9686,43 @@ components:
           tipe_lokasi:
             oneOf:
             - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+          alamat:
+            description: Alamat milik lokasi ini sendiri, diterjemahkan saat dibaca.
+            oneOf:
+            - $ref: '#/components/schemas/LokasiAsetAlamat'
+            - type: 'null'
+          alamat_efektif:
+            description: Alamat yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+            oneOf:
+            - allOf:
+              - $ref: '#/components/schemas/LokasiAsetAlamat'
+              - type: object
+                required:
+                - diwarisi_dari
+                properties:
+                  diwarisi_dari:
+                    $ref: '#/components/schemas/LokasiAsetWarisanSumber'
+            - type: 'null'
+          departemen_bawaan_nama:
+            type: string
+            nullable: true
+          departemen_bawaan_efektif:
+            description: Unit kerja bawaan yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+            oneOf:
+            - type: object
+              required:
+              - id
+              - nama
+              - diwarisi_dari
+              properties:
+                id:
+                  $ref: '#/components/schemas/Ulid'
+                nama:
+                  type: string
+                  nullable: true
+                diwarisi_dari:
+                  $ref: '#/components/schemas/LokasiAsetWarisanSumber'
             - type: 'null'
     LokasiAsetCreate:
       allOf:
@@ -9463,6 +10709,685 @@ components:
           type:
           - integer
           - 'null'
+    CounterType:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - type: object
+        required:
+        - satuan_id
+        - satuan
+        properties:
+          satuan_id:
+            $ref: '#/components/schemas/Ulid'
+          satuan:
+            type:
+            - string
+            - 'null'
+            description: Salinan kode satuan Core untuk tampilan.
+    CounterTypeCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - type: object
+        required:
+        - satuan_id
+        properties:
+          satuan_id:
+            $ref: '#/components/schemas/Ulid'
+    CounterTypePatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - type: object
+        properties:
+          satuan_id:
+            $ref: '#/components/schemas/Ulid'
+    CounterTypeResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/CounterType'
+    CounterTypeList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CounterType'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    AssetTypeCounterTransfer:
+      type: object
+      required:
+      - data
+      - version
+      properties:
+        data:
+          type: object
+          properties:
+            remaining:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    $ref: '#/components/schemas/Ulid'
+                  kode:
+                    type: string
+                  nama:
+                    type: string
+                  satuan:
+                    type:
+                    - string
+                    - 'null'
+            selected:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    $ref: '#/components/schemas/Ulid'
+                  kode:
+                    type: string
+                  nama:
+                    type: string
+                  satuan:
+                    type:
+                    - string
+                    - 'null'
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    CounterReadingWrite:
+      type: object
+      required:
+      - aset_id
+      - jenis_counter_id
+      - dibaca_pada
+      - nilai
+      properties:
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis_counter_id:
+          $ref: '#/components/schemas/Ulid'
+        dibaca_pada:
+          type: string
+          description: Tanggal dan jam baca, YYYY-MM-DD HH:MM:SS.
+        nilai:
+          type: number
+          minimum: 0
+          description: Angka yang tertera di meter.
+        reset:
+          type: boolean
+          default: false
+          description: Meter diganti atau direset; angka ini angka awal meter baru dan tidak menambah total.
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+    CounterReading:
+      type: object
+      required:
+      - id
+      - aset_id
+      - jenis_counter_id
+      - dibaca_pada
+      - nilai
+      - nilai_total
+      - reset
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_kode:
+          type: string
+        aset_nama:
+          type: string
+        jenis_counter_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis_counter_kode:
+          type: string
+        jenis_counter_nama:
+          type: string
+        satuan:
+          type:
+          - string
+          - 'null'
+        dibaca_pada:
+          type: string
+        nilai:
+          type: string
+          description: Desimal dua angka di belakang koma
+          sebagai teks.: null
+        nilai_total:
+          type: string
+          description: Pemakaian kumulatif melewati penggantian meter; dihitung server.
+        reset:
+          type: boolean
+        keterangan:
+          type:
+          - string
+          - 'null'
+        dicatat_oleh_nama:
+          type:
+          - string
+          - 'null'
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    AssetCounter:
+      type: object
+      properties:
+        jenis_counter_id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        nama:
+          type: string
+        satuan:
+          type:
+          - string
+          - 'null'
+        terakhir:
+          oneOf:
+          - type: 'null'
+          - type: object
+            properties:
+              dibaca_pada:
+                type: string
+              nilai:
+                type: string
+              nilai_total:
+                type: string
+    MaintenancePlanFields:
+      type: object
+      properties:
+        tanggal_mulai:
+          type: string
+          format: date
+          description: Titik hitung baris berbasis waktu bila objek tidak menyebut tanggal mulai sendiri.
+        toleransi_hari_sebelum:
+          type: integer
+          minimum: 0
+          maximum: 365
+        toleransi_hari_sesudah:
+          type: integer
+          minimum: 0
+          maximum: 365
+          description: Jatuh tempo tidak diusulkan bila sudah ada work order jenis pekerjaan yang sama dalam rentang ini.
+    MaintenancePlan:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MaintenancePlanFields'
+    MaintenancePlanCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MaintenancePlanFields'
+      - type: object
+        required:
+        - tanggal_mulai
+    MaintenancePlanPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MaintenancePlanFields'
+    MaintenancePlanResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/MaintenancePlan'
+    MaintenancePlanList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenancePlan'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    MaintenancePlanLineWrite:
+      type: object
+      required:
+      - dasar
+      - maintenance_job_type_id
+      - tipe_work_order_id
+      description: |
+        Dasar tanggal_mulai dan work_order_terakhir membutuhkan interval dan satuan_interval;
+        nilai_counter membutuhkan jenis_counter_id dan interval_counter. Isian milik dasar lain
+        dikosongkan server.
+      properties:
+        id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+          description: Baris yang sudah ada; kosong untuk baris baru.
+        dasar:
+          type: string
+          enum:
+          - tanggal_mulai
+          - work_order_terakhir
+          - nilai_counter
+        interval:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 1000
+        satuan_interval:
+          type:
+          - string
+          - 'null'
+          enum:
+          - hari
+          - minggu
+          - bulan
+          - tahun
+          - null
+        jenis_counter_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        interval_counter:
+          type:
+          - number
+          - 'null'
+          exclusiveMinimum: 0
+        toleransi_counter:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          description: Usulan muncul saat total counter mencapai batas dikurangi angka ini; harus lebih kecil dari interval.
+        maintenance_job_type_id:
+          $ref: '#/components/schemas/Ulid'
+        variant_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        trade_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        tipe_work_order_id:
+          $ref: '#/components/schemas/Ulid'
+        tingkat_layanan_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        selesai_dalam_hari:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+          maximum: 3650
+        deskripsi:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Disalin ke keterangan work order.
+        aktif:
+          type: boolean
+          default: true
+    MaintenancePlanLine:
+      allOf:
+      - $ref: '#/components/schemas/MaintenancePlanLineWrite'
+      - type: object
+        properties:
+          line_number:
+            type: integer
+          job_type_kode:
+            type: string
+          job_type_nama:
+            type: string
+          jenis_counter_nama:
+            type:
+            - string
+            - 'null'
+          jenis_counter_satuan:
+            type:
+            - string
+            - 'null'
+          tipe_work_order_nama:
+            type: string
+          version:
+            $ref: '#/components/schemas/RecordVersion'
+    MaintenancePlanTargetWrite:
+      type: object
+      description: Tepat satu dari aset_id dan jenis_aset_id. Objek jenis aset mencakup seluruh aset jenis itu saat jadwal
+        dihitung.
+      properties:
+        id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        jenis_aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        tanggal_mulai:
+          type:
+          - string
+          - 'null'
+          format: date
+        aktif:
+          type: boolean
+          default: true
+    MaintenancePlanTarget:
+      allOf:
+      - $ref: '#/components/schemas/MaintenancePlanTargetWrite'
+      - type: object
+        properties:
+          aset_kode:
+            type:
+            - string
+            - 'null'
+          aset_nama:
+            type:
+            - string
+            - 'null'
+          jenis_aset_kode:
+            type:
+            - string
+            - 'null'
+          jenis_aset_nama:
+            type:
+            - string
+            - 'null'
+          version:
+            $ref: '#/components/schemas/RecordVersion'
+    MaintenanceScheduleLine:
+      type: object
+      required:
+      - id
+      - rencana_pemeliharaan_id
+      - rencana_baris_id
+      - aset_id
+      - jatuh_tempo
+      - status
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        rencana_pemeliharaan_id:
+          $ref: '#/components/schemas/Ulid'
+        rencana_baris_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        jatuh_tempo:
+          type: string
+          format: date
+        nilai_jatuh_tempo:
+          type:
+          - string
+          - 'null'
+          description: Batas total counter yang dicapai; kosong untuk baris berbasis waktu.
+        nilai_counter:
+          type:
+          - string
+          - 'null'
+          description: Total counter saat usulan dihitung.
+        status:
+          type: string
+          enum:
+          - usulan
+          - work_order_dibuat
+          - diabaikan
+        terlambat:
+          type: boolean
+          description: Usulan yang jatuh temponya sebelum hari ini menurut zona waktu pengguna.
+        pemeliharaan_aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        work_order_kode:
+          type:
+          - string
+          - 'null'
+        rencana_kode:
+          type: string
+        rencana_nama:
+          type: string
+        job_type_nama:
+          type: string
+        aset_kode:
+          type: string
+        aset_nama:
+          type: string
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    MaintenanceRequestType:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - type: object
+        properties:
+          tipe_work_order_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+            description: Tipe bawaan work order yang dibuat dari permintaan jenis ini.
+          tipe_work_order:
+            oneOf:
+            - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+    MaintenanceRequestTypeCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - type: object
+        properties:
+          tipe_work_order_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+    MaintenanceRequestTypePatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - type: object
+        properties:
+          tipe_work_order_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+    MaintenanceRequestTypeResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/MaintenanceRequestType'
+    MaintenanceRequestTypeList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceRequestType'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    MaintenanceRequestWrite:
+      type: object
+      required:
+      - legal_entity_id
+      - responsible_org_unit_id
+      - jenis_permintaan_id
+      - deskripsi
+      description: Salah satu dari aset_id dan lokasi_aset_id wajib.
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis_permintaan_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        lokasi_aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        deskripsi:
+          type: string
+          maxLength: 4000
+        tingkat_layanan_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        sebab_kerusakan_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    MaintenanceRequest:
+      allOf:
+      - $ref: '#/components/schemas/MaintenanceRequestWrite'
+      - type: object
+        required:
+        - id
+        - kode
+        - status
+        - version
+        properties:
+          id:
+            $ref: '#/components/schemas/Ulid'
+          kode:
+            type: string
+          status:
+            type: string
+            enum:
+            - draft
+            - diajukan
+            - diterima
+            - ditolak
+            - work_order_dibuat
+          diajukan_pada:
+            type:
+            - string
+            - 'null'
+            format: date-time
+          diputuskan_pada:
+            type:
+            - string
+            - 'null'
+            format: date-time
+          diputuskan_oleh_user_id:
+            type:
+            - string
+            - 'null'
+          alasan_penolakan:
+            type:
+            - string
+            - 'null'
+          pemeliharaan_aset_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+          work_order_kode:
+            type:
+            - string
+            - 'null'
+          jenis_permintaan_nama:
+            type: string
+          aset_kode:
+            type:
+            - string
+            - 'null'
+          aset_nama:
+            type:
+            - string
+            - 'null'
+          lokasi_nama:
+            type:
+            - string
+            - 'null'
+          unit_nama:
+            type:
+            - string
+            - 'null'
+            description: Hanya pada GET detail.
+          dilaporkan_oleh_nama:
+            type:
+            - string
+            - 'null'
+            description: Hanya pada GET detail.
+          diputuskan_oleh_nama:
+            type:
+            - string
+            - 'null'
+            description: Hanya pada GET detail.
+          version:
+            $ref: '#/components/schemas/RecordVersion'
+    MaintenanceRequestResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/MaintenanceRequest'
+    PengaturanAsetTetap:
+      type: object
+      description: |
+        Pengaturan aset tetap satu tenant, padanan Fixed Asset Setup (tabel 5603) Business Central.
+        Selama belum pernah disimpan, `version` bernilai 0 dan setiap pengaturan `null`.
+      required:
+      - version
+      - buku_penyusutan_bawaan_id
+      - buku_penyusutan_bawaan
+      - updated_at
+      properties:
+        version:
+          type: integer
+          minimum: 0
+        buku_penyusutan_bawaan_id:
+          description: Default Depr. Book BC. Nilai buku ini yang dibekukan monitoring aset.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        buku_penyusutan_bawaan:
+          oneOf:
+          - $ref: '#/components/schemas/MasterSummary'
+          - type: 'null'
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    PengaturanAsetTetapWrite:
+      type: object
+      required:
+      - version
+      description: Field yang tidak dikirim tidak diubah.
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          description: Versi yang dibuka pengguna; 0 untuk penyimpanan pertama.
+        buku_penyusutan_bawaan_id:
+          description: Buku penyusutan aktif milik tenant aktif; `null` mengosongkan.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

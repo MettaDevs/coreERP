@@ -22,7 +22,10 @@ export type MasterResource =
     | 'lokasi-aset'
     | 'tipe-atribut'
     | 'buku-penyusutan'
-    | 'profil-penyusutan';
+    | 'profil-penyusutan'
+    | 'jenis-counter'
+    | 'rencana-pemeliharaan'
+    | 'jenis-permintaan-pemeliharaan';
 
 export type MasterAction = 'read' | 'create' | 'update' | 'archive';
 
@@ -36,7 +39,7 @@ export type Permission =
     | `management-aset.pemeliharaan-aset.${'read' | 'create' | 'update' | 'archive' | 'schedule' | 'execute' | 'close'}`
     | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
-    | 'management-aset.fixed-asset-parameters.read'
+    | `management-aset.fixed-asset-parameters.${'read' | 'update'}`
     | `management-aset.fixed-asset-posting-profiles.${MasterAction}`
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
@@ -441,6 +444,82 @@ export const MASTERS: MasterConfig[] = [
         ],
     },
     {
+        resource: 'jenis-permintaan-pemeliharaan',
+        nav: 'Jenis permintaan pemeliharaan',
+        title: 'Jenis permintaan pemeliharaan',
+        subtitle:
+            'Golongan laporan kerusakan atau kebutuhan perbaikan dari unit.',
+        kodeLabel: 'Kode jenis permintaan',
+        namaLabel: 'Nama jenis permintaan',
+        singular: 'jenis permintaan pemeliharaan',
+        parents: [
+            {
+                resource: 'tipe-work-order',
+                field: 'tipe_work_order_id',
+                summaryKey: 'tipe_work_order',
+                label: 'Tipe work order bawaan',
+                required: false,
+            },
+        ],
+    },
+    {
+        resource: 'jenis-counter',
+        nav: 'Jenis counter',
+        title: 'Jenis counter',
+        subtitle:
+            'Meter pemakaian aset, misalnya jam operasi, kilometer, atau jumlah tindakan.',
+        kodeLabel: 'Kode jenis counter',
+        namaLabel: 'Nama jenis counter',
+        singular: 'jenis counter',
+        extraFields: [
+            {
+                name: 'satuan_id',
+                label: 'Satuan',
+                type: 'reference',
+                resource: 'reference-data/units-of-measure',
+                required: true,
+                help: 'Diambil dari daftar satuan Core, supaya "jam" berarti hal yang sama di seluruh aplikasi.',
+            },
+        ],
+    },
+    {
+        resource: 'rencana-pemeliharaan',
+        nav: 'Rencana pemeliharaan',
+        title: 'Rencana pemeliharaan',
+        subtitle:
+            'Pekerjaan berkala per waktu atau per pemakaian, untuk aset tertentu atau satu jenis aset.',
+        kodeLabel: 'Kode rencana',
+        namaLabel: 'Nama rencana',
+        singular: 'rencana pemeliharaan',
+        extraFields: [
+            {
+                name: 'tanggal_mulai',
+                label: 'Tanggal mulai',
+                type: 'date',
+                required: true,
+                help: 'Jatuh tempo pertama baris berbasis waktu dihitung dari tanggal ini, kecuali aset atau jenis aset pada rencana menyebut tanggal mulainya sendiri.',
+            },
+            {
+                name: 'toleransi_hari_sebelum',
+                label: 'Toleransi sebelum (hari)',
+                type: 'number',
+                min: 0,
+                max: 365,
+                step: 1,
+                help: 'Jatuh tempo tidak diusulkan bila aset sudah punya work order jenis pekerjaan yang sama sekian hari sebelum tanggal itu.',
+            },
+            {
+                name: 'toleransi_hari_sesudah',
+                label: 'Toleransi sesudah (hari)',
+                type: 'number',
+                min: 0,
+                max: 365,
+                step: 1,
+                help: 'Sama seperti toleransi sebelum, untuk work order yang dijadwalkan sesudah tanggal jatuh tempo.',
+            },
+        ],
+    },
+    {
         resource: 'trade',
         nav: 'Bidang keahlian',
         title: 'Bidang keahlian',
@@ -519,6 +598,25 @@ export const MASTERS: MasterConfig[] = [
                 summaryKey: 'tipe_lokasi',
                 label: 'Tipe lokasi',
                 required: false,
+            },
+        ],
+        // Dirender `LokasiAsetFields`, yang menambahkan nilai warisan dan saran alamat di bawahnya.
+        extraFields: [
+            {
+                name: 'departemen_bawaan_id',
+                label: 'Unit kerja bawaan',
+                type: 'reference',
+                resource: 'reference-data/unit-kerja',
+                placeholder: 'Ikuti lokasi induk',
+                help: 'Mengisi unit penanggung jawab saat aset diterima atau dimutasi ke lokasi ini. Pengguna masih dapat menggantinya di dokumen.',
+            },
+            {
+                name: 'alamat_id',
+                label: 'Alamat',
+                type: 'reference',
+                resource: 'reference-data/alamat',
+                placeholder: 'Ikuti lokasi induk',
+                help: 'Diambil dari alamat yang tercatat di organisasi. Kosongkan bila sama dengan lokasi induk.',
             },
         ],
     },
@@ -789,4 +887,5 @@ export const DETAIL_LAYOUT_RESOURCES: MasterResource[] = [
     'maintenance-job-types',
     'maintenance-checklist-variables',
     'maintenance-checklist-templates',
+    'rencana-pemeliharaan',
 ];

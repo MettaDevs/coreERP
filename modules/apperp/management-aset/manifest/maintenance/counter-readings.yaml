@@ -1,0 +1,40 @@
+security:
+  entry_points:
+    - code: management-aset.pembacaan-counter.form
+      name: Layar pembacaan counter aset
+      type: form
+    - code: management-aset.pembacaan-counter.api
+      name: API pembacaan counter aset
+      type: api
+  permissions:
+    - code: management-aset.pembacaan-counter.read
+      name: Lihat pembacaan counter aset
+      entry_point: management-aset.pembacaan-counter.form
+      access: read
+    - code: management-aset.pembacaan-counter.create
+      name: Catat pembacaan counter aset
+      entry_point: management-aset.pembacaan-counter.api
+      access: create
+    - code: management-aset.pembacaan-counter.archive
+      name: Arsipkan pembacaan counter aset terakhir
+      entry_point: management-aset.pembacaan-counter.api
+      access: delete
+  privileges:
+    - code: management-aset.pembacaan-counter.record
+      name: Catat pembacaan counter aset
+      permissions:
+        - management-aset.pembacaan-counter.read
+        - management-aset.pembacaan-counter.create
+    - code: management-aset.pembacaan-counter.correct
+      name: Arsipkan pembacaan counter yang salah
+      permissions:
+        - management-aset.pembacaan-counter.read
+        - management-aset.pembacaan-counter.archive
+  duties:
+    # Dipisahkan dari kelola work order: yang membaca meter di lapangan tidak perlu boleh menyusun
+    # pekerjaan, dan sebaliknya.
+    - code: management-aset.pembacaan-counter.maintain-readings
+      name: Catat dan koreksi pembacaan counter aset
+      privileges:
+        - management-aset.pembacaan-counter.record
+        - management-aset.pembacaan-counter.correct
