@@ -1,0 +1,427 @@
+{
+    "data": [
+        {
+            "totals": {
+                "debit": "150000.00",
+                "credit": "150000.00"
+            },
+            "vendor": {
+                "id": "{vendor}",
+                "name": "PT Karoseri Sehat",
+                "number": "VND-000001"
+            },
+            "details": {},
+            "currency": {
+                "code": "IDR",
+                "decimals": 2
+            },
+            "posting_id": "KSR-0001",
+            "occurred_at": "2026-09-27T23:50:00+07:00",
+            "legal_entity": {
+                "id": "{legal_entity}",
+                "code": "META"
+            },
+            "posting_date": "2026-09-27",
+            "posting_type": "cashier.receipt",
+            "published_at": "2026-09-28T16:50:08+00:00",
+            "document_date": "2026-09-27",
+            "journal_lines": [
+                {
+                    "debit": "150000.00",
+                    "credit": "0.00",
+                    "account": {
+                        "code": "1-2300",
+                        "name": "Aset Tetap - Kendaraan",
+                        "external_id": "1452"
+                    },
+                    "line_no": 1,
+                    "description": "PNA-2026-09-0007 · Kendaraan",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                },
+                {
+                    "debit": "0.00",
+                    "credit": "150000.00",
+                    "account": {
+                        "code": "2-1100",
+                        "name": "Hutang Usaha",
+                        "external_id": "2110"
+                    },
+                    "line_no": 2,
+                    "description": "PT Karoseri Sehat / PNA-2026-09-0007",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                }
+            ],
+            "settlement_mode": "direct_payable",
+            "source_document": {
+                "type": "penerimaan-aset",
+                "module": "management-aset",
+                "number": "PNA-2026-09-0007",
+                "description": "Penerimaan ambulans"
+            },
+            "contract_version": 1,
+            "adjusts_posting_id": null,
+            "reverses_posting_id": null,
+            "vendor_invoice_reference": null
+        },
+        {
+            "totals": {
+                "debit": "500000000.00",
+                "credit": "500000000.00"
+            },
+            "vendor": {
+                "id": "{vendor}",
+                "name": "PT Karoseri Sehat",
+                "number": "VND-000001"
+            },
+            "details": {
+                "assets": [
+                    {
+                        "asset_code": "KEND-0012",
+                        "acquisition_value": "500000000.00"
+                    }
+                ]
+            },
+            "currency": {
+                "code": "IDR",
+                "decimals": 2
+            },
+            "posting_id": "AST-ACQ-0001",
+            "occurred_at": "2026-09-28T23:50:00+07:00",
+            "legal_entity": {
+                "id": "{legal_entity}",
+                "code": "META"
+            },
+            "posting_date": "2026-09-28",
+            "posting_type": "asset.acquisition",
+            "published_at": "2026-09-28T16:50:04+00:00",
+            "document_date": "2026-09-28",
+            "journal_lines": [
+                {
+                    "debit": "500000000.00",
+                    "credit": "0.00",
+                    "account": {
+                        "code": "1-2300",
+                        "name": "Aset Tetap - Kendaraan",
+                        "external_id": "1452"
+                    },
+                    "line_no": 1,
+                    "description": "PNA-2026-09-0007 · Kendaraan",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                },
+                {
+                    "debit": "0.00",
+                    "credit": "500000000.00",
+                    "account": {
+                        "code": "2-1100",
+                        "name": "Hutang Usaha",
+                        "external_id": "2110"
+                    },
+                    "line_no": 2,
+                    "description": "PT Karoseri Sehat / PNA-2026-09-0007",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                }
+            ],
+            "settlement_mode": "direct_payable",
+            "source_document": {
+                "type": "penerimaan-aset",
+                "module": "management-aset",
+                "number": "PNA-2026-09-0007",
+                "description": "Penerimaan ambulans"
+            },
+            "contract_version": 1,
+            "adjusts_posting_id": null,
+            "reverses_posting_id": null,
+            "vendor_invoice_reference": null
+        },
+        {
+            "totals": {
+                "debit": "10000000.00",
+                "credit": "10000000.00"
+            },
+            "vendor": {
+                "id": "{vendor}",
+                "name": "PT Karoseri Sehat",
+                "number": "VND-000001"
+            },
+            "details": {
+                "assets": [
+                    {
+                        "asset_code": "KEND-0012",
+                        "acquisition_value": "10000000.00"
+                    }
+                ]
+            },
+            "currency": {
+                "code": "IDR",
+                "decimals": 2
+            },
+            "posting_id": "AST-ADJ-0001",
+            "occurred_at": "2026-09-29T23:50:00+07:00",
+            "legal_entity": {
+                "id": "{legal_entity}",
+                "code": "META"
+            },
+            "posting_date": "2026-09-29",
+            "posting_type": "asset.acquisition_adjustment",
+            "published_at": "2026-09-28T16:50:06+00:00",
+            "document_date": "2026-09-29",
+            "journal_lines": [
+                {
+                    "debit": "10000000.00",
+                    "credit": "0.00",
+                    "account": {
+                        "code": "1-2300",
+                        "name": "Aset Tetap - Kendaraan",
+                        "external_id": "1452"
+                    },
+                    "line_no": 1,
+                    "description": "PNA-2026-09-0007 · Kendaraan",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                },
+                {
+                    "debit": "0.00",
+                    "credit": "10000000.00",
+                    "account": {
+                        "code": "2-1100",
+                        "name": "Hutang Usaha",
+                        "external_id": "2110"
+                    },
+                    "line_no": 2,
+                    "description": "PT Karoseri Sehat / PNA-2026-09-0007",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                }
+            ],
+            "settlement_mode": "direct_payable",
+            "source_document": {
+                "type": "penerimaan-aset",
+                "module": "management-aset",
+                "number": "PNA-2026-09-0007",
+                "description": "Penerimaan ambulans"
+            },
+            "contract_version": 1,
+            "adjusts_posting_id": "AST-ACQ-0001",
+            "reverses_posting_id": null,
+            "vendor_invoice_reference": null
+        },
+        {
+            "totals": {
+                "debit": "75000000.00",
+                "credit": "75000000.00"
+            },
+            "vendor": {
+                "id": "{vendor}",
+                "name": "PT Karoseri Sehat",
+                "number": "VND-000001"
+            },
+            "details": {
+                "assets": [
+                    {
+                        "asset_code": "KEND-0012",
+                        "acquisition_value": "75000000.00"
+                    }
+                ]
+            },
+            "currency": {
+                "code": "IDR",
+                "decimals": 2
+            },
+            "posting_id": "AST-ACQ-0002",
+            "occurred_at": "2026-09-29T23:50:00+07:00",
+            "legal_entity": {
+                "id": "{legal_entity}",
+                "code": "META"
+            },
+            "posting_date": "2026-09-29",
+            "posting_type": "asset.acquisition",
+            "published_at": "2026-09-28T16:50:07+00:00",
+            "document_date": "2026-09-29",
+            "journal_lines": [
+                {
+                    "debit": "75000000.00",
+                    "credit": "0.00",
+                    "account": {
+                        "code": "1-2300",
+                        "name": "Aset Tetap - Kendaraan",
+                        "external_id": "1452"
+                    },
+                    "line_no": 1,
+                    "description": "PNA-2026-09-0007 · Kendaraan",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                },
+                {
+                    "debit": "0.00",
+                    "credit": "75000000.00",
+                    "account": {
+                        "code": "2-1100",
+                        "name": "Hutang Usaha",
+                        "external_id": "2110"
+                    },
+                    "line_no": 2,
+                    "description": "PT Karoseri Sehat / PNA-2026-09-0007",
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                }
+            ],
+            "settlement_mode": "direct_payable",
+            "source_document": {
+                "type": "penerimaan-aset",
+                "module": "management-aset",
+                "number": "PNA-2026-09-0007",
+                "description": "Penerimaan ambulans"
+            },
+            "contract_version": 1,
+            "adjusts_posting_id": null,
+            "reverses_posting_id": null,
+            "vendor_invoice_reference": null
+        },
+        {
+            "totals": {
+                "debit": "1250000.00",
+                "credit": "1250000.00"
+            },
+            "vendor": null,
+            "details": {},
+            "currency": {
+                "code": "IDR",
+                "decimals": 2
+            },
+            "posting_id": "AST-DEP-2026-09",
+            "occurred_at": "2026-10-01T08:00:00+07:00",
+            "legal_entity": {
+                "id": "{legal_entity}",
+                "code": "META"
+            },
+            "posting_date": "2026-09-30",
+            "posting_type": "asset.depreciation",
+            "published_at": "2026-09-28T16:50:05+00:00",
+            "document_date": "2026-09-30",
+            "journal_lines": [
+                {
+                    "debit": "1250000.00",
+                    "credit": "0.00",
+                    "account": {
+                        "code": "6-5100",
+                        "name": "Beban Penyusutan Kendaraan",
+                        "external_id": "6510"
+                    },
+                    "line_no": 1,
+                    "description": null,
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        },
+                        {
+                            "code": "DEPARTMENT",
+                            "value_id": "{department}",
+                            "value_code": "POLI-UMUM",
+                            "display_name": "Department",
+                            "value_display_name": "Poli Umum"
+                        }
+                    ]
+                },
+                {
+                    "debit": "0.00",
+                    "credit": "1250000.00",
+                    "account": {
+                        "code": "1-2390",
+                        "name": "Akumulasi Penyusutan - Kendaraan",
+                        "external_id": "1453"
+                    },
+                    "line_no": 2,
+                    "description": null,
+                    "financial_dimensions": [
+                        {
+                            "code": "BUSINESS_UNIT",
+                            "value_id": "{business_unit}",
+                            "value_code": "KLN-A",
+                            "display_name": "Business unit",
+                            "value_display_name": "Klinik A"
+                        }
+                    ]
+                }
+            ],
+            "settlement_mode": null,
+            "source_document": {
+                "type": "penyusutan",
+                "module": "management-aset",
+                "number": null,
+                "description": "Penyusutan buku KOMERSIAL"
+            },
+            "contract_version": 1,
+            "adjusts_posting_id": null,
+            "reverses_posting_id": null,
+            "vendor_invoice_reference": null
+        }
+    ],
+    "meta": {
+        "count": 5,
+        "has_more": false
+    }
+}

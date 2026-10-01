@@ -1,0 +1,79 @@
+{
+    "status_posted": {
+        "status": 422,
+        "body": {
+            "message": "The selected status is invalid.",
+            "errors": {
+                "status": [
+                    "The selected status is invalid."
+                ]
+            }
+        }
+    },
+    "posting_type_huruf_besar": {
+        "status": 422,
+        "body": {
+            "message": "posting_type berupa jenis lengkap (asset.acquisition) atau awalan dengan .* (asset.*).",
+            "errors": {
+                "posting_type": [
+                    "posting_type berupa jenis lengkap (asset.acquisition) atau awalan dengan .* (asset.*)."
+                ]
+            }
+        }
+    },
+    "posting_type_bintang_tanpa_titik": {
+        "status": 422,
+        "body": {
+            "message": "posting_type berupa jenis lengkap (asset.acquisition) atau awalan dengan .* (asset.*).",
+            "errors": {
+                "posting_type": [
+                    "posting_type berupa jenis lengkap (asset.acquisition) atau awalan dengan .* (asset.*)."
+                ]
+            }
+        }
+    },
+    "limit_nol": {
+        "status": 422,
+        "body": {
+            "message": "The limit field must be at least 1.",
+            "errors": {
+                "limit": [
+                    "The limit field must be at least 1."
+                ]
+            }
+        }
+    },
+    "limit_501": {
+        "status": 422,
+        "body": {
+            "message": "The limit field must not be greater than 500.",
+            "errors": {
+                "limit": [
+                    "The limit field must not be greater than 500."
+                ]
+            }
+        }
+    },
+    "limit_bukan_angka": {
+        "status": 422,
+        "body": {
+            "message": "The limit field must be an integer.",
+            "errors": {
+                "limit": [
+                    "The limit field must be an integer."
+                ]
+            }
+        }
+    },
+    "legal_entity_terlalu_panjang": {
+        "status": 422,
+        "body": {
+            "message": "The legal entity field must not be greater than 50 characters.",
+            "errors": {
+                "legal_entity": [
+                    "The legal entity field must not be greater than 50 characters."
+                ]
+            }
+        }
+    }
+}
