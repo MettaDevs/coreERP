@@ -29,6 +29,12 @@ export type DetailSection = {
     checklistTemplateLines?: boolean;
     /** Seksi relasi jenis pekerjaan maintenance pada jenis aset. */
     maintenanceJobTypes?: boolean;
+    /** Seksi counter yang boleh dibaca pada aset jenis ini. */
+    assetTypeCounters?: boolean;
+    /** Seksi baris rencana pemeliharaan. */
+    maintenancePlanLines?: boolean;
+    /** Seksi aset dan jenis aset yang dikenai rencana pemeliharaan. */
+    maintenancePlanTargets?: boolean;
     /** Seksi ini belum punya tabel/relasi pendukung; tampil sebagai penjelasan kosong. */
     placeholder?: string;
     defaultOpen?: boolean;
@@ -101,8 +107,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'counter-aset',
                 title: 'Counter aset',
                 fields: [],
-                placeholder:
-                    'Counter aset (misalnya jam pakai atau suhu) belum dapat dipasang di sini. Fitur ini menyusul setelah master counter aset dan relasinya ke jenis aset dibangun.',
+                assetTypeCounters: true,
             },
             {
                 id: 'atribut',
@@ -178,6 +183,36 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 fields: [],
             },
             { id: 'status', title: 'Status', fields: [KETERANGAN, AKTIF] },
+        ];
+    }
+
+    if (config.resource === 'rencana-pemeliharaan') {
+        return [
+            {
+                id: 'umum',
+                title: 'Umum',
+                defaultOpen: true,
+                fields: pick(
+                    'tanggal_mulai',
+                    'toleransi_hari_sebelum',
+                    'toleransi_hari_sesudah',
+                ),
+            },
+            {
+                id: 'baris',
+                title: 'Baris rencana',
+                defaultOpen: true,
+                maintenancePlanLines: true,
+                fields: [],
+            },
+            {
+                id: 'objek',
+                title: 'Berlaku untuk',
+                defaultOpen: true,
+                maintenancePlanTargets: true,
+                fields: [],
+            },
+            { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
         ];
     }
 
