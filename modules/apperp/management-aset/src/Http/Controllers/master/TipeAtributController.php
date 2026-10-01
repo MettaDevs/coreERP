@@ -11,7 +11,7 @@ use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
+use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use RuntimeException;
 
@@ -174,7 +174,7 @@ class TipeAtributController extends MasterDataController
             return $this->unitCodes[$satuanId];
         }
         try {
-            $units = app(DaftarSatuanAset::class)->resolve($this->tenantId, [$satuanId]);
+            $units = app(AssetUnitOfMeasureDirectory::class)->resolve($this->tenantId, [$satuanId]);
         } catch (RuntimeException) {
             throw ValidationException::withMessages([
                 'satuan_id' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.',

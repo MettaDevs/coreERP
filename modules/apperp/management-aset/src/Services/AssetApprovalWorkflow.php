@@ -28,13 +28,13 @@ use RuntimeException;
  * Pengaju disebut dengan id pengguna dari konteks permintaan; Core yang menerjemahkannya
  * menjadi keanggotaan tenant. Module tidak pernah membaca tabel keanggotaan.
  */
-class PersetujuanAset
+class AssetApprovalWorkflow
 {
-    private const TIPE_DEKOMISIONING = 'management-aset.dekomisioning-aset-verification';
+    private const DECOMMISSIONING_TYPE = 'management-aset.dekomisioning-aset-verification';
 
     public function __construct(
-        private readonly WorkflowEngine $mesin,
-        private readonly RequestContext $konteks,
+        private readonly WorkflowEngine $engine,
+        private readonly RequestContext $context,
     ) {}
 
     /**
@@ -46,38 +46,38 @@ class PersetujuanAset
      *
      * @throws RuntimeException bila alur persetujuannya belum bisa dijalankan untuk tenant ini
      */
-    public function ajukanDekomisioning(string $tenantId, string $legalEntityId, string $kunciIdempoten, string $documentId, string $asetId): string
+    public function submitDecommissioning(string $tenantId, string $legalEntityId, string $idempotencyKey, string $documentId, string $assetId): string
     {
         try {
-            $hasil = $this->mesin->submit(
+            $result = $this->engine->submit(
                 $tenantId,
                 'management-aset',
-                self::TIPE_DEKOMISIONING,
-                $this->konteks->userId(),
+                self::DECOMMISSIONING_TYPE,
+                $this->context->userId(),
                 $documentId,
-                'dekomisioning:'.$kunciIdempoten,
+                'dekomisioning:'.$idempotencyKey,
                 [
                     'legal_entity_id' => $legalEntityId,
                     'source_document_type' => 'dekomisioning-aset',
                     'source_document_id' => $documentId,
-                    'decision_context' => ['document_id' => $documentId, 'aset_id' => $asetId],
+                    'decision_context' => ['document_id' => $documentId, 'aset_id' => $assetId],
                 ],
             );
-        } catch (ValidationException $kegagalan) {
+        } catch (ValidationException $failure) {
             // Kunci pesannya milik permintaan **Core** — `pengaju`, `decision_context` — dan
             // bukan field yang pernah dikirim pengguna module. Dibiarkan lewat, ia muncul
             // sebagai kesalahan validasi pada field yang tidak ada di layar mana pun. Yang
-            // diambil isinya saja; sama seperti yang dilakukan `DaftarSatuanAset`.
-            throw new RuntimeException($this->pesanPertama($kegagalan), previous: $kegagalan);
+            // diambil isinya saja; sama seperti yang dilakukan `AssetUnitOfMeasureDirectory`.
+            throw new RuntimeException($this->firstMessage($failure), previous: $failure);
         }
 
-        return $hasil['id'];
+        return $result['id'];
     }
 
-    private function pesanPertama(ValidationException $kegagalan): string
+    private function firstMessage(ValidationException $failure): string
     {
-        $pesan = $kegagalan->validator->errors()->first();
+        $message = $failure->validator->errors()->first();
 
-        return $pesan === '' ? 'Permintaan persetujuan tidak dapat diajukan.' : $pesan;
+        return $message === '' ? 'Permintaan persetujuan tidak dapat diajukan.' : $message;
     }
 }

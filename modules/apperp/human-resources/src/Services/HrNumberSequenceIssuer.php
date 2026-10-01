@@ -19,9 +19,9 @@ use Throwable;
  * Tanda tangan `issue()` dipertahankan persis seperti milik klien lama supaya pemanggilnya
  * tidak ikut berubah.
  */
-final class PenerbitNomorHr
+final class HrNumberSequenceIssuer
 {
-    public function __construct(private readonly NumberSequenceIssuer $penerbit) {}
+    public function __construct(private readonly NumberSequenceIssuer $issuer) {}
 
     /**
      * Menerbitkan satu nomor untuk referensi milik module ini.
@@ -32,24 +32,24 @@ final class PenerbitNomorHr
     public function issue(string $reference, string $tenantId, string $key): string
     {
         try {
-            $hasil = $this->penerbit->issue(
+            $result = $this->issuer->issue(
                 ['tenant_id' => $tenantId, 'app_id' => 'human-resources'],
                 $reference,
                 $key,
             );
-        } catch (Throwable $kegagalan) {
+        } catch (Throwable $failure) {
             // Pesannya dipertahankan apa adanya karena ia sudah muncul di layar pengguna.
             // Yang berubah hanya sebab yang mungkin: kegagalan di sini tidak pernah lagi
             // berarti "Core tidak dapat dihubungi" — Core ada di proses ini — melainkan
             // permintaannya sendiri tidak dapat dipenuhi, misalnya referensi yang belum
             // punya urutan nomor untuk tenant ini.
-            throw new RuntimeException('Nomor belum dapat diterbitkan.', previous: $kegagalan);
+            throw new RuntimeException('Nomor belum dapat diterbitkan.', previous: $failure);
         }
 
-        if ($hasil['number'] === '') {
+        if ($result['number'] === '') {
             throw new RuntimeException('Nomor belum dapat diterbitkan.');
         }
 
-        return $hasil['number'];
+        return $result['number'];
     }
 }

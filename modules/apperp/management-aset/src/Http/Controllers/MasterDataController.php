@@ -27,8 +27,8 @@ use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 use RuntimeException;
@@ -172,7 +172,7 @@ abstract class MasterDataController extends Controller
         ]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->requirePermission($request, 'create');
         $creationKey = (string) $request->header('Idempotency-Key');

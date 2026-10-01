@@ -432,7 +432,7 @@ dan PPN, untuk kedua mode.
   - [x] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
   - [x] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
     Jurnalnya sekali per aset lewat satu buku yang di-post, bukan sekali per buku (K-26).
-- [x] 9.7 Pembungkus `PostingFeed` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `InvalidPosting` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
+- [x] 9.7 Pembungkus `PostingFeed` di sisi module, mengikuti pola `AssetFiscalCalendar` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `InvalidPosting` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
 - [x] 9.5 Test (`AcquisitionPostingTest`).
   - [x] 9.5.1 Mode `direct_payable`: jurnal seperti di PRD, seimbang, dengan vendor.
   - [x] 9.5.2 Mode `clearing`: kredit ke perantara, vendor boleh kosong.

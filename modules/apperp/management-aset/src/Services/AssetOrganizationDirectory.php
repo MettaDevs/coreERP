@@ -22,26 +22,26 @@ use App\Platform\Modules\Contracts\OrganizationDirectory;
  * menunjuk segelintir unit yang sama, dan tanpa hafalan itu berarti puluhan pembacaan
  * direktori untuk jawaban yang selalu sama.
  */
-final class DirektoriAset
+final class AssetOrganizationDirectory
 {
     /** @var array<string, array<string, string>> */
-    private array $unitTerhafal = [];
+    private array $unitCache = [];
 
     /** @var array<string, array<string, string>> */
-    private array $anggotaTerhafal = [];
+    private array $memberCache = [];
 
-    public function __construct(private readonly OrganizationDirectory $direktori) {}
+    public function __construct(private readonly OrganizationDirectory $directory) {}
 
     /**
      * Unit kerja tenant sebagai pilihan dropdown.
      *
      * @return list<array{id: string, nama: string}>
      */
-    public function unitKerja(string $tenantId): array
+    public function operatingUnits(string $tenantId): array
     {
         return array_map(
             static fn (array $unit): array => ['id' => $unit['id'], 'nama' => $unit['nama']],
-            $this->direktori->operatingUnits($tenantId),
+            $this->directory->operatingUnits($tenantId),
         );
     }
 
@@ -55,49 +55,49 @@ final class DirektoriAset
      *
      * @return list<array{id: string, nama: string, email: string}>
      */
-    public function anggota(string $tenantId): array
+    public function members(string $tenantId): array
     {
         return array_map(
-            static fn (array $anggota): array => [
-                'id' => $anggota['user_id'],
-                'nama' => $anggota['nama'],
-                'email' => $anggota['email'],
+            static fn (array $members): array => [
+                'id' => $members['user_id'],
+                'nama' => $members['nama'],
+                'email' => $members['email'],
             ],
-            $this->direktori->members($tenantId),
+            $this->directory->members($tenantId),
         );
     }
 
     /** Nama satu unit kerja; `null` bila idnya kosong atau unitnya sudah tidak ada. */
-    public function namaUnit(string $tenantId, ?string $unitId): ?string
+    public function unitName(string $tenantId, ?string $unitId): ?string
     {
         return $unitId === null || $unitId === ''
             ? null
-            : ($this->petaUnit($tenantId)[$unitId] ?? null);
+            : ($this->unitMap($tenantId)[$unitId] ?? null);
     }
 
     /** Nama satu orang; `null` bila idnya kosong atau keanggotaannya sudah dicabut. */
-    public function namaOrang(string $tenantId, ?string $userId): ?string
+    public function personName(string $tenantId, ?string $userId): ?string
     {
         return $userId === null || $userId === ''
             ? null
-            : ($this->petaAnggota($tenantId)[$userId] ?? null);
+            : ($this->memberMap($tenantId)[$userId] ?? null);
     }
 
     /** @return array<string, string> */
-    private function petaUnit(string $tenantId): array
+    private function unitMap(string $tenantId): array
     {
-        return $this->unitTerhafal[$tenantId] ??= array_column(
-            $this->direktori->operatingUnits($tenantId),
+        return $this->unitCache[$tenantId] ??= array_column(
+            $this->directory->operatingUnits($tenantId),
             'nama',
             'id',
         );
     }
 
     /** @return array<string, string> */
-    private function petaAnggota(string $tenantId): array
+    private function memberMap(string $tenantId): array
     {
-        return $this->anggotaTerhafal[$tenantId] ??= array_column(
-            $this->direktori->members($tenantId),
+        return $this->memberCache[$tenantId] ??= array_column(
+            $this->directory->members($tenantId),
             'nama',
             'user_id',
         );

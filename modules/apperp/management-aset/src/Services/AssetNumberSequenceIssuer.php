@@ -22,9 +22,9 @@ use Throwable;
  * Tanda tangan `issue()` sengaja dipertahankan persis seperti milik klien lama supaya
  * pemanggilnya tidak ikut berubah pada pull request yang hanya mengganti jalurnya.
  */
-class PenerbitNomorAset
+class AssetNumberSequenceIssuer
 {
-    public function __construct(private readonly NumberSequenceIssuer $penerbit) {}
+    public function __construct(private readonly NumberSequenceIssuer $issuer) {}
 
     /**
      * Menerbitkan satu nomor untuk reference milik module ini.
@@ -34,7 +34,7 @@ class PenerbitNomorAset
     public function issue(string $reference, string $tenantId, string $idempotencyKey, ?string $legalEntityId = null): string
     {
         try {
-            $hasil = $this->penerbit->issue(
+            $result = $this->issuer->issue(
                 [
                     'tenant_id' => $tenantId,
                     'app_id' => 'management-aset',
@@ -43,23 +43,23 @@ class PenerbitNomorAset
                 $reference,
                 $idempotencyKey,
             );
-        } catch (Throwable $kegagalan) {
-            throw $this->gagal('number_sequence_failed', $kegagalan->getMessage(), $reference, $tenantId, $kegagalan);
+        } catch (Throwable $failure) {
+            throw $this->fail('number_sequence_failed', $failure->getMessage(), $reference, $tenantId, $failure);
         }
 
         // Kontrak `NumberSequenceIssuer` sudah menjamin kunci `number` ada dan berupa string, jadi
         // yang tersisa untuk diperiksa hanyalah nomor kosong — satu-satunya bentuk jawaban
         // tidak valid yang masih mungkin lolos dari penerbit.
-        $nomor = $hasil['number'];
+        $number = $result['number'];
 
-        if ($nomor === '') {
-            throw $this->gagal('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $tenantId);
+        if ($number === '') {
+            throw $this->fail('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $tenantId);
         }
 
-        return $nomor;
+        return $number;
     }
 
-    private function gagal(string $code, string $message, string $reference, string $tenantId, ?Throwable $sebab = null): NumberSequenceException
+    private function fail(string $code, string $message, string $reference, string $tenantId, ?Throwable $cause = null): NumberSequenceException
     {
         Log::warning('Penerbitan nomor gagal.', [
             'code' => $code,
@@ -71,6 +71,6 @@ class PenerbitNomorAset
         // penerbitan nomor tidak pernah lagi berarti "layanan belum dapat dihubungi" — ia selalu
         // berarti permintaannya sendiri tidak bisa dipenuhi, misalnya reference yang belum
         // terdaftar untuk tenant ini. Satu jawaban, jadi satu tempat: NumberSequenceException.
-        return new NumberSequenceException($code, $message, $sebab);
+        return new NumberSequenceException($code, $message, $cause);
     }
 }

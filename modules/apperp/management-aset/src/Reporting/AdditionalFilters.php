@@ -26,7 +26,7 @@ use Modules\Apperp\ManagementAset\Models\master\TingkatLayanan;
 use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
 use Modules\Apperp\ManagementAset\Models\master\Trade;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 
 /**
  * Filter tambahan pengguna pada kolom data item laporan (K-30), padanan "+ Filter" di request page BC.
@@ -236,14 +236,14 @@ final class AdditionalFilters
      */
     private static function referenceNames(string $lookup, array $ids, ReportContext $context): array
     {
-        $directory = app(DirektoriAset::class);
+        $directory = app(AssetOrganizationDirectory::class);
         [$model, $column] = self::LOOKUP_MODELS[$lookup] ?? [null, null];
         $names = $model === null ? [] : $model::query()->whereKey($ids)->pluck($column, 'id')->all();
 
         return array_map(static function (string $id) use ($lookup, $names, $directory, $context): string {
             $name = match ($lookup) {
-                'reference-data/unit-kerja' => $directory->namaUnit($context->tenantId, $id),
-                'reference-data/anggota' => $directory->namaOrang($context->tenantId, $id),
+                'reference-data/unit-kerja' => $directory->unitName($context->tenantId, $id),
+                'reference-data/anggota' => $directory->personName($context->tenantId, $id),
                 default => $names[$id] ?? null,
             };
 

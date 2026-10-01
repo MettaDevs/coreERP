@@ -15,9 +15,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAsetDetail;
-use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
 use stdClass;
@@ -65,7 +65,7 @@ class PerencanaanAsetController extends Controller
         return response()->json(['data' => $plan], 200, ['ETag' => RowVersion::etag((int) $plan->version)]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers, DaftarSatuanAset $units): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers, AssetUnitOfMeasureDirectory $units): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
@@ -102,7 +102,7 @@ class PerencanaanAsetController extends Controller
         return response()->json(['data' => $this->replay($key)], 201);
     }
 
-    public function update(Request $request, string $id, DaftarSatuanAset $units): JsonResponse
+    public function update(Request $request, string $id, AssetUnitOfMeasureDirectory $units): JsonResponse
     {
         $this->guard($request, 'update');
         $plan = $this->plan($request, $id);
@@ -183,7 +183,7 @@ class PerencanaanAsetController extends Controller
      * @param  list<array<string, mixed>>  $details
      * @return array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>
      */
-    private function validateLookupMasters(string $tenant, array $details, DaftarSatuanAset $units): array
+    private function validateLookupMasters(string $tenant, array $details, AssetUnitOfMeasureDirectory $units): array
     {
         $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
         $count = JenisAset::query()->whereIn('id', $ids)->where('aktif', true)->count();

@@ -203,8 +203,8 @@ dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta
       Yang tersisa, sebagai pekerjaan lanjutan:
       - nama parameter method facade di `App\Platform\Modules\Contracts`, yang ikut terlihat oleh
         module lewat argumen bernama;
-      - pembungkus facade di module, misalnya `PenerbitNomorAset`, `DaftarSatuanAset`, dan
-        `PenerbitNomorHr`;
+      - pembungkus facade di module, misalnya `AssetNumberSequenceIssuer`, `AssetUnitOfMeasureDirectory`, dan
+        `HrNumberSequenceIssuer`;
       - kelas Platform dan Foundation, misalnya `ErrorReporter`, `ActiveSpan`,
         `AttachTraceContext`, `RequirePasswordChange`, `PostingStatusChanged`, `ModulesBeingMoved`, dan
         `ModulesWithoutTypeAnalysis`.

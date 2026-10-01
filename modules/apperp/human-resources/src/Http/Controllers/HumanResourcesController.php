@@ -14,8 +14,8 @@ use Modules\Apperp\HumanResources\Models\Job;
 use Modules\Apperp\HumanResources\Models\Position;
 use Modules\Apperp\HumanResources\Models\Worker;
 use Modules\Apperp\HumanResources\Models\WorkerPositionAssignment;
-use Modules\Apperp\HumanResources\Services\DirektoriHr;
-use Modules\Apperp\HumanResources\Services\PenerbitNomorHr;
+use Modules\Apperp\HumanResources\Services\HrNumberSequenceIssuer;
+use Modules\Apperp\HumanResources\Services\HrOrganizationDirectory;
 
 /**
  * Seluruh endpoint tenaga kerja module ini.
@@ -34,7 +34,7 @@ final class HumanResourcesController extends Controller
 {
     private const ACCOUNT_TAKEN = 'Akun pengguna ini sudah tertaut ke pekerja lain. Lepas dulu tautannya di pekerja itu.';
 
-    public function operatingUnits(Request $request, DirektoriHr $core): JsonResponse
+    public function operatingUnits(Request $request, HrOrganizationDirectory $core): JsonResponse
     {
         $this->requirePermission($request, 'positions', 'read');
 
@@ -49,7 +49,7 @@ final class HumanResourcesController extends Controller
      * pekerja yang sudah memegang akun itu, supaya layar bisa melewatkannya tanpa menampilkan pekerja yang
      * mungkin di luar lingkup pengguna.
      */
-    public function coreMembers(Request $request, DirektoriHr $core): JsonResponse
+    public function coreMembers(Request $request, HrOrganizationDirectory $core): JsonResponse
     {
         $this->requirePermission($request, 'core-account-link', 'invoke');
         $query = $request->validate([
@@ -77,7 +77,7 @@ final class HumanResourcesController extends Controller
      * Pekerja yang boleh dilihat, masing-masing dengan `account`: nama dan email akun pengguna yang tertaut,
      * supaya layar tidak menampilkan id keanggotaan. `null` bila belum tertaut atau keanggotaannya tidak aktif.
      */
-    public function workers(Request $request, DirektoriHr $core): JsonResponse
+    public function workers(Request $request, HrOrganizationDirectory $core): JsonResponse
     {
         $this->requirePermission($request, 'workers', 'read');
 
@@ -103,7 +103,7 @@ final class HumanResourcesController extends Controller
      * tautannya, untuk pekerja yang juga boleh ia lihat. Penyimpanannya memakai versi baris seperti penulisan
      * lain: tautan yang diubah orang lain sejak form dibuka ditolak 409.
      */
-    public function linkWorkerAccount(Request $request, DirektoriHr $core, string $worker): JsonResponse
+    public function linkWorkerAccount(Request $request, HrOrganizationDirectory $core, string $worker): JsonResponse
     {
         $this->requirePermission($request, 'workers', 'create');
         $this->requirePermission($request, 'core-account-link', 'invoke');
@@ -170,7 +170,7 @@ final class HumanResourcesController extends Controller
         return response()->json(['data' => $query->get()]);
     }
 
-    public function storeWorker(Request $request, PenerbitNomorHr $numbers, DirektoriHr $core): JsonResponse
+    public function storeWorker(Request $request, HrNumberSequenceIssuer $numbers, HrOrganizationDirectory $core): JsonResponse
     {
         $this->requirePermission($request, 'workers', 'create');
         $tenantId = $this->tenantId($request);
@@ -205,7 +205,7 @@ final class HumanResourcesController extends Controller
         return response()->json(['data' => $worker], 201);
     }
 
-    public function storeJob(Request $request, PenerbitNomorHr $numbers): JsonResponse
+    public function storeJob(Request $request, HrNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->requirePermission($request, 'jobs', 'create');
         $tenantId = $this->tenantId($request);
@@ -230,7 +230,7 @@ final class HumanResourcesController extends Controller
         return response()->json(['data' => $job], 201);
     }
 
-    public function storePosition(Request $request, PenerbitNomorHr $numbers): JsonResponse
+    public function storePosition(Request $request, HrNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->requirePermission($request, 'positions', 'create');
         $tenantId = $this->tenantId($request);
@@ -347,7 +347,7 @@ final class HumanResourcesController extends Controller
      *
      * @return array{membership_id: string, name: string, email: string}
      */
-    private function assertAccountLinkable(DirektoriHr $core, string $tenantId, string $membershipId, ?string $workerId): array
+    private function assertAccountLinkable(HrOrganizationDirectory $core, string $tenantId, string $membershipId, ?string $workerId): array
     {
         $account = $core->member($tenantId, $membershipId);
         if ($account === null) {

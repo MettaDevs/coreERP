@@ -18,7 +18,7 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValu
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeJenisAset;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
-use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
+use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 
 final class MaintenanceSetupLinkController extends Controller
 {
@@ -220,7 +220,7 @@ final class MaintenanceSetupLinkController extends Controller
         }
 
         try {
-            return collect(app(DaftarSatuanAset::class)->resolve($tenant, $ids))
+            return collect(app(AssetUnitOfMeasureDirectory::class)->resolve($tenant, $ids))
                 ->mapWithKeys(fn (array $unit, string $id): array => [$id => $unit['code']])->all();
         } catch (\RuntimeException) {
             throw ValidationException::withMessages(['lines' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.']);

@@ -23,9 +23,9 @@ use Illuminate\Validation\ValidationException;
  * tersendiri; `FiscalCalendarDirectoryController` menyalin ulang logika layanannya. Dibereskan
  * pada F3-20.
  */
-class KalenderFiskalAset
+class AssetFiscalCalendar
 {
-    public function __construct(private readonly FiscalCalendarDirectory $kalender) {}
+    public function __construct(private readonly FiscalCalendarDirectory $calendar) {}
 
     /**
      * `null` bila entitas legal belum punya kalender atau tanggalnya belum tercakup.
@@ -42,7 +42,7 @@ class KalenderFiskalAset
     public function resolve(string $tenantId, string $legalEntityId, string $date): ?array
     {
         try {
-            return $this->kalender->period($legalEntityId, $date);
+            return $this->calendar->period($legalEntityId, $date);
         } catch (ValidationException) {
             return null;
         }

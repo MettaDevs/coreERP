@@ -18,7 +18,7 @@ use App\Platform\Modules\Contracts\OrganizationDirectory;
  * pemanggil, jadi penerjemahan kunci dikerjakan di sini — satu tempat, bukan di setiap
  * controller yang memakainya.
  */
-final class DirektoriHr
+final class HrOrganizationDirectory
 {
     /**
      * Sebanyak-banyaknya anggota yang dipulangkan pencarian.
@@ -27,9 +27,9 @@ final class DirektoriHr
      * kotak pencarian pada layar penautan akun, dan sebuah tenant besar akan mengirim ribuan
      * baris ke layar yang hanya menampilkan beberapa.
      */
-    private const BATAS_HASIL = 20;
+    private const RESULT_LIMIT = 20;
 
-    public function __construct(private readonly OrganizationDirectory $direktori) {}
+    public function __construct(private readonly OrganizationDirectory $directory) {}
 
     /**
      * Anggota tenant yang cocok dengan kata pencarian.
@@ -43,24 +43,24 @@ final class DirektoriHr
      */
     public function members(string $tenantId, string $query): array
     {
-        $cari = mb_strtolower(trim($query));
-        $hasil = [];
+        $search = mb_strtolower(trim($query));
+        $result = [];
 
-        foreach ($this->direktori->members($tenantId) as $anggota) {
-            if ($cari !== ''
-                && ! str_contains(mb_strtolower($anggota['nama']), $cari)
-                && ! str_contains(mb_strtolower($anggota['email']), $cari)) {
+        foreach ($this->directory->members($tenantId) as $member) {
+            if ($search !== ''
+                && ! str_contains(mb_strtolower($member['nama']), $search)
+                && ! str_contains(mb_strtolower($member['email']), $search)) {
                 continue;
             }
 
-            $hasil[] = $this->bentukAnggota($anggota);
+            $result[] = $this->shapeMember($member);
 
-            if (count($hasil) === self::BATAS_HASIL) {
+            if (count($result) === self::RESULT_LIMIT) {
                 break;
             }
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -70,13 +70,13 @@ final class DirektoriHr
      */
     public function operatingUnits(string $tenantId): array
     {
-        $hasil = [];
+        $result = [];
 
-        foreach ($this->direktori->operatingUnits($tenantId) as $unit) {
-            $hasil[] = ['id' => $unit['id'], 'name' => $unit['nama']];
+        foreach ($this->directory->operatingUnits($tenantId) as $unit) {
+            $result[] = ['id' => $unit['id'], 'name' => $unit['nama']];
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -88,19 +88,19 @@ final class DirektoriHr
      */
     public function membersWithEmail(string $tenantId, string $email): array
     {
-        $dicari = mb_strtolower(trim($email));
-        if ($dicari === '') {
+        $wanted = mb_strtolower(trim($email));
+        if ($wanted === '') {
             return [];
         }
 
-        $hasil = [];
-        foreach ($this->direktori->members($tenantId) as $anggota) {
-            if (mb_strtolower(trim($anggota['email'])) === $dicari) {
-                $hasil[] = $this->bentukAnggota($anggota);
+        $result = [];
+        foreach ($this->directory->members($tenantId) as $member) {
+            if (mb_strtolower(trim($member['email'])) === $wanted) {
+                $result[] = $this->shapeMember($member);
             }
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -116,15 +116,15 @@ final class DirektoriHr
             return [];
         }
 
-        $dicari = array_flip($membershipIds);
-        $hasil = [];
-        foreach ($this->direktori->members($tenantId) as $anggota) {
-            if (isset($dicari[$anggota['id']])) {
-                $hasil[$anggota['id']] = $this->bentukAnggota($anggota);
+        $wanted = array_flip($membershipIds);
+        $result = [];
+        foreach ($this->directory->members($tenantId) as $member) {
+            if (isset($wanted[$member['id']])) {
+                $result[$member['id']] = $this->shapeMember($member);
             }
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -136,21 +136,21 @@ final class DirektoriHr
      */
     public function member(string $tenantId, string $membershipId): ?array
     {
-        $anggota = $this->direktori->member($tenantId, $membershipId);
+        $member = $this->directory->member($tenantId, $membershipId);
 
-        return $anggota === null ? null : $this->bentukAnggota($anggota);
+        return $member === null ? null : $this->shapeMember($member);
     }
 
     /**
-     * @param  array{id: string, nama: string, email: string}  $anggota
+     * @param  array{id: string, nama: string, email: string}  $member
      * @return array{membership_id: string, name: string, email: string}
      */
-    private function bentukAnggota(array $anggota): array
+    private function shapeMember(array $member): array
     {
         return [
-            'membership_id' => $anggota['id'],
-            'name' => $anggota['nama'],
-            'email' => $anggota['email'],
+            'membership_id' => $member['id'],
+            'name' => $member['nama'],
+            'email' => $member['email'],
         ];
     }
 }

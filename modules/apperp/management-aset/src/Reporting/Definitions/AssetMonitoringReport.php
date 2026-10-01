@@ -18,7 +18,7 @@ use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Support\AssetMonitoringStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -179,7 +179,7 @@ final class AssetMonitoringReport implements ReportDefinition
                 'model.nama as model_nama', 'kondisi.nama as kondisi_nama',
             ]);
 
-        $directory = app(DirektoriAset::class);
+        $directory = app(AssetOrganizationDirectory::class);
         $totalAcquisition = BigDecimal::zero();
         $totalBookValue = BigDecimal::zero();
         $mismatches = 0;
@@ -208,8 +208,8 @@ final class AssetMonitoringReport implements ReportDefinition
                 'nilai_perolehan' => $acquisition,
                 'akumulasi_penyusutan' => $row->akumulasi_penyusutan === null ? null : (string) $row->akumulasi_penyusutan,
                 'nilai_buku_akhir' => $bookValue,
-                'penanggung_jawab' => $directory->namaOrang($context->tenantId, $row->sistem_custodian_user_id) ?? '—',
-                'unit_organisasi' => $directory->namaUnit($context->tenantId, $row->sistem_org_unit_id) ?? '—',
+                'penanggung_jawab' => $directory->personName($context->tenantId, $row->sistem_custodian_user_id) ?? '—',
+                'unit_organisasi' => $directory->unitName($context->tenantId, $row->sistem_org_unit_id) ?? '—',
             ];
         }
 
@@ -223,8 +223,8 @@ final class AssetMonitoringReport implements ReportDefinition
                 'filter_sampai' => $parameters['sampai'] ?? 'Semua',
                 'filter_kondisi' => $this->filterNames($parameters['kondisi_aset_id'] ?? null, static fn (string $id): mixed => KondisiAset::withTrashed()->whereKey($id)->value('nama')),
                 'filter_lokasi' => $this->filterNames($parameters['lokasi_aset_id'] ?? null, static fn (string $id): mixed => LokasiAset::withTrashed()->whereKey($id)->value('nama')),
-                'filter_penanggung_jawab' => $this->filterNames($parameters['penanggung_jawab_user_id'] ?? null, static fn (string $id): ?string => $directory->namaOrang($context->tenantId, $id)),
-                'filter_unit' => $this->filterNames($parameters['org_unit_id'] ?? null, static fn (string $id): ?string => $directory->namaUnit($context->tenantId, $id)),
+                'filter_penanggung_jawab' => $this->filterNames($parameters['penanggung_jawab_user_id'] ?? null, static fn (string $id): ?string => $directory->personName($context->tenantId, $id)),
+                'filter_unit' => $this->filterNames($parameters['org_unit_id'] ?? null, static fn (string $id): ?string => $directory->unitName($context->tenantId, $id)),
                 'jumlah_aset' => count($table),
                 'jumlah_tidak_sesuai' => $mismatches,
                 'total_nilai_perolehan' => (string) $totalAcquisition,

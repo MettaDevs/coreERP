@@ -400,7 +400,7 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
 | `src/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |
 | `src/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
-| `src/Services/PenerbitNomorAset.php` | Permintaan nomor ke Core |
+| `src/Services/AssetNumberSequenceIssuer.php` | Permintaan nomor ke Core |
 | `ui/transactions/inventarisasi-aset/AssetPage.tsx` | Layar register aset, tabel, dan Sheet detail |
 | `database/migrations/2026_07_28_090000_create_asset_register_and_depreciation_tables.php` | Tabel aset dan penyusutan |
 | `database/migrations/2026_08_07_130000_create_asset_attribute_tables.php` | Tabel atribut dinamis |

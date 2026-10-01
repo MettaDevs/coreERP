@@ -201,7 +201,7 @@ class NoInternalHttpTest extends TestCase
             'Komentar dihitung sebagai pelanggaran. Penjaga yang menuntut sejarahnya dihapus akan mendapatkan sejarah yang dihapus, bukan jalur yang diperbaiki.',
         );
 
-        $berkas = dirname(__DIR__, 5).'/modules/apperp/management-aset/src/Services/PersetujuanAset.php';
+        $berkas = dirname(__DIR__, 5).'/modules/apperp/management-aset/src/Services/AssetApprovalWorkflow.php';
 
         $this->assertFileExists($berkas, 'Berkas yang dipakai sebagai contoh nyata sudah pindah; sesuaikan test ini atau buang contohnya.');
 
@@ -217,7 +217,7 @@ class NoInternalHttpTest extends TestCase
      * Alur cetak laporan sengaja **tidak** diambil di sini; ia dibuktikan tersendiri. Yang ini
      * menempuh tiga dari empat jalur yang dulu HTTP, dalam satu permintaan berantai:
      *
-     * 1. **Satuan** dibaca lewat `DaftarSatuanAset`, yang dulu memanggil direktori satuan Core.
+     * 1. **Satuan** dibaca lewat `AssetUnitOfMeasureDirectory`, yang dulu memanggil direktori satuan Core.
      * 2. **Nomor** diterbitkan lewat `NumberSequenceIssuer` — dua kali, sekali untuk aset dan sekali
      *    untuk dokumen dekomisioning.
      * 3. **Kalender fiskal** dibaca lewat `FiscalCalendarDirectory`. Ini yang paling mudah lolos diam-diam:
