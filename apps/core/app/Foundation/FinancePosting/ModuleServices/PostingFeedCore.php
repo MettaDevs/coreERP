@@ -14,20 +14,20 @@ use App\Platform\Modules\Contracts\PostingFeed;
  */
 final class PostingFeedCore implements PostingFeed
 {
-    public function __construct(private readonly PostingPublisher $penerbit) {}
+    public function __construct(private readonly PostingPublisher $publisher) {}
 
     public function publish(array $posting): array
     {
-        return $this->penerbit->publish($posting);
+        return $this->publisher->publish($posting);
     }
 
     public function preview(array $posting): array
     {
-        return $this->penerbit->preview($posting);
+        return $this->publisher->preview($posting);
     }
 
     public function status(string $tenantId, string $postingId): ?array
     {
-        return $this->penerbit->status($tenantId, $postingId);
+        return $this->publisher->status($tenantId, $postingId);
     }
 }

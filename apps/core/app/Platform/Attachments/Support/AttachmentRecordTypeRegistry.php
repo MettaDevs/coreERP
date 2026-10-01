@@ -11,7 +11,7 @@ use LogicException;
 /**
  * Jenis record yang boleh diberi lampiran di proses ini, berkunci nama tabel.
  *
- * Diikat sebagai satu benda (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran dari penyedia layanan
+ * Diikat sebagai satu benda (`CoreServices::SINGLETON_BINDINGS`), supaya pendaftaran dari penyedia layanan
  * module dan layanan lampiran memegang daftar yang sama.
  */
 final class AttachmentRecordTypeRegistry implements AttachmentRecordTypes

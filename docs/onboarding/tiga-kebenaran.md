@@ -38,7 +38,7 @@ dipasang hanya yang benar-benar ada sebagai module di runtime ini:
 ```php
 // apps/core/app/Platform/Tenant/Actions/RegisterBusiness.php
 foreach ($appIds as $appId) {
-    if ($registry->cari($appId) === null) {
+    if ($registry->find($appId) === null) {
         continue;
     }
 

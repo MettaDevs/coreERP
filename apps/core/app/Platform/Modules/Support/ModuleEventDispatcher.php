@@ -26,14 +26,14 @@ use Illuminate\Contracts\Events\Dispatcher;
  * ikatan yang kebetulan sudah ada: sebuah perintah yang memproses dua tenant berturut-turut
  * akan memakai ikatan pertama untuk keduanya, dan tidak ada yang gagal karenanya.
  */
-final class PengirimEventModul
+final class ModuleEventDispatcher
 {
     public function __construct(
         private readonly Dispatcher $events,
         private readonly TenantRunnerCore $runner,
     ) {}
 
-    public function kirim(object $event, string $tenantId): void
+    public function dispatch(object $event, string $tenantId): void
     {
         $this->runner->runFor($tenantId, function () use ($event): void {
             $this->events->dispatch($event);

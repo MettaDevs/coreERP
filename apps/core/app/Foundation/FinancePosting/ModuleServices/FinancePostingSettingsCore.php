@@ -18,23 +18,23 @@ use RuntimeException;
  */
 final class FinancePostingSettingsCore implements FinancePostingSettings
 {
-    public function __construct(private readonly PostingSettings $setelan) {}
+    public function __construct(private readonly PostingSettings $settings) {}
 
-    public function settlementMode(string $legalEntityId, string $tanggal): string
+    public function settlementMode(string $legalEntityId, string $date): string
     {
-        $this->pastikanAda($legalEntityId);
+        $this->ensureExists($legalEntityId);
 
-        return $this->setelan->settlementMode($legalEntityId, $tanggal);
+        return $this->settings->settlementMode($legalEntityId, $date);
     }
 
     public function cutover(string $legalEntityId): ?string
     {
-        $this->pastikanAda($legalEntityId);
+        $this->ensureExists($legalEntityId);
 
-        return $this->setelan->cutover($legalEntityId);
+        return $this->settings->cutover($legalEntityId);
     }
 
-    private function pastikanAda(string $legalEntityId): void
+    private function ensureExists(string $legalEntityId): void
     {
         if (! LegalEntity::query()->whereKey($legalEntityId)->exists()) {
             throw new RuntimeException(sprintf('Entitas legal %s tidak ditemukan.', $legalEntityId));

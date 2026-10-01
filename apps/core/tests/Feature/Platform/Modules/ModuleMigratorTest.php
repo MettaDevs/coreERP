@@ -23,22 +23,22 @@ class ModuleMigratorTest extends TestCase
 
     public function test_migration_module_membuat_tabel_berawalan_miliknya(): void
     {
-        $module = $this->app->make(ModuleRegistry::class)->cari('contoh-a');
+        $module = $this->app->make(ModuleRegistry::class)->find('contoh-a');
         $this->assertNotNull($module);
 
-        $this->app->make(ModuleMigrator::class)->naik($module);
+        $this->app->make(ModuleMigrator::class)->migrate($module);
 
         $this->assertTrue($this->tabelAda('contoh_a_m_barang'));
     }
 
     public function test_menjalankan_dua_kali_tidak_mengulang_migration_yang_sama(): void
     {
-        $module = $this->app->make(ModuleRegistry::class)->cari('contoh-a');
+        $module = $this->app->make(ModuleRegistry::class)->find('contoh-a');
         $this->assertNotNull($module);
         $migrator = $this->app->make(ModuleMigrator::class);
 
-        $pertama = $migrator->naik($module);
-        $kedua = $migrator->naik($module);
+        $pertama = $migrator->migrate($module);
+        $kedua = $migrator->migrate($module);
 
         $this->assertNotEmpty($pertama, 'Jalan pertama harus benar-benar menjalankan sesuatu.');
         $this->assertSame([], $kedua, 'Jalan kedua tidak boleh mengulang migration yang sudah tercatat.');
@@ -47,11 +47,11 @@ class ModuleMigratorTest extends TestCase
 
     public function test_riwayat_module_tidak_menambah_tabel_migrations_milik_core(): void
     {
-        $module = $this->app->make(ModuleRegistry::class)->cari('contoh-a');
+        $module = $this->app->make(ModuleRegistry::class)->find('contoh-a');
         $this->assertNotNull($module);
 
         $sebelum = DB::table('migrations')->count();
-        $this->app->make(ModuleMigrator::class)->naik($module);
+        $this->app->make(ModuleMigrator::class)->migrate($module);
         $sesudah = DB::table('migrations')->count();
 
         $this->assertSame($sebelum, $sesudah, 'Migration module tidak boleh tercatat di riwayat milik Core.');
@@ -63,13 +63,13 @@ class ModuleMigratorTest extends TestCase
         $registry = $this->app->make(ModuleRegistry::class);
         $migrator = $this->app->make(ModuleMigrator::class);
 
-        $a = $registry->cari('contoh-a');
-        $b = $registry->cari('contoh-b');
+        $a = $registry->find('contoh-a');
+        $b = $registry->find('contoh-b');
         $this->assertNotNull($a);
         $this->assertNotNull($b);
 
-        $migrator->naik($a);
-        $migrator->naik($b);
+        $migrator->migrate($a);
+        $migrator->migrate($b);
 
         $this->assertTrue($this->tabelAda('contoh_a_m_barang'));
         $this->assertTrue($this->tabelAda('contoh_b_m_rak'));

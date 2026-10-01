@@ -35,11 +35,11 @@ final class ModuleListCommand extends Command
             ['Id', 'Nama', 'Versi', 'Penerbit', 'Jenis', 'Awalan tabel'],
             array_map(static fn ($m): array => [
                 $m->id,
-                $m->nama,
-                $m->versi,
-                $m->penerbit,
-                $m->internalTestFixtures() ? $m->jenis.' (tidak ikut ke pelanggan)' : $m->jenis,
-                $m->awalanTabel,
+                $m->name,
+                $m->version,
+                $m->publisher,
+                $m->internalTestFixtures() ? $m->kind.' (tidak ikut ke pelanggan)' : $m->kind,
+                $m->tablePrefix,
             ], $module),
         );
 

@@ -27,7 +27,7 @@ final class ModuleSeeder
     /**
      * @return bool true bila data awal benar-benar diisi pada pemanggilan ini
      */
-    public function jalankan(ModuleManifest $module, string $tenantId): bool
+    public function run(ModuleManifest $module, string $tenantId): bool
     {
         $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
@@ -83,7 +83,7 @@ final class ModuleSeeder
         foreach (glob($folder.'/*.php') ?: [] as $file) {
             $name = sprintf(
                 'Modules\\%s\\%s\\Database\\Seeders\\%s',
-                $this->studly($module->penerbit),
+                $this->studly($module->publisher),
                 $this->studly(basename($module->folder)),
                 pathinfo($file, PATHINFO_FILENAME),
             );

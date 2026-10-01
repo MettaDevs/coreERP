@@ -29,7 +29,7 @@ final class ModuleMigrateCommand extends Command
     public function handle(ModuleRegistry $registry, ModuleMigrator $migrator): int
     {
         $id = (string) $this->argument('module');
-        $module = $registry->cari($id);
+        $module = $registry->find($id);
 
         if ($module === null) {
             $this->error(sprintf('Module "%s" tidak ditemukan. Jalankan `module:list` untuk melihat yang terbaca runtime.', $id));
@@ -44,7 +44,7 @@ final class ModuleMigrateCommand extends Command
         }
 
         $connection = $this->option('connection');
-        $newMigrations = $migrator->naik($module, is_string($connection) && $connection !== '' ? $connection : null);
+        $newMigrations = $migrator->migrate($module, is_string($connection) && $connection !== '' ? $connection : null);
 
         if ($newMigrations === []) {
             $this->info(sprintf('Module "%s" sudah mutakhir; tidak ada migration yang dijalankan.', $id));

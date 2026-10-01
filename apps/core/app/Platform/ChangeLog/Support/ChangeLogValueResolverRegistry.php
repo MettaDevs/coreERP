@@ -10,7 +10,7 @@ use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
 /**
  * Penerjemah nilai log perubahan yang terdaftar di proses ini, berkunci nama tabel.
  *
- * Diikat sebagai satu benda (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran dari penyedia layanan
+ * Diikat sebagai satu benda (`CoreServices::SINGLETON_BINDINGS`), supaya pendaftaran dari penyedia layanan
  * module dan pembacaan riwayat memegang daftar yang sama.
  */
 final class ChangeLogValueResolverRegistry implements ChangeLogValueResolvers

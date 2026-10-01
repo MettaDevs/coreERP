@@ -327,7 +327,7 @@ class AppCatalogRequest extends FormRequest
     {
         $id = $this->string('id')->toString();
 
-        return $id === '' || app(ModuleRegistry::class)->cari($id) === null;
+        return $id === '' || app(ModuleRegistry::class)->find($id) === null;
     }
 
     /** @return array{id:string,name:string,description:?string,version:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */

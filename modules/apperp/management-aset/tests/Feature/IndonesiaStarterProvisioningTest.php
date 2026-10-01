@@ -173,7 +173,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
      * tenant yang salah. `event()` telanjang di sini akan membuat test menempuh keadaan yang
      * tidak pernah dipakai produksi.
      *
-     * Yang dipakai `TenantRunner`, sebuah kontrak, bukan `PengirimEventModul` milik
+     * Yang dipakai `TenantRunner`, sebuah kontrak, bukan `ModuleEventDispatcher` milik
      * Core. Keduanya melakukan hal yang sama, dan itu memang kelemahan yang diterima sadar:
      * test ini jadi meniru pengirimnya alih-alih memanggilnya, sehingga perubahan pada
      * pengirim tidak akan terlihat di sini. Yang menutup celah itu test pendaftaran usaha di

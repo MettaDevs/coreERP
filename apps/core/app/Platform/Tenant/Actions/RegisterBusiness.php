@@ -13,8 +13,8 @@ use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Actions\InstallModule;
 use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Modules\Support\AppDependencyGraph;
+use App\Platform\Modules\Support\ModuleEventDispatcher;
 use App\Platform\Modules\Support\ModuleRegistry;
-use App\Platform\Modules\Support\PengirimEventModul;
 use App\Platform\Tenant\Events\TenantCreated;
 use App\Platform\Tenant\Events\TenantModulesInstalled;
 use App\Platform\Tenant\Models\Tenant;
@@ -60,9 +60,9 @@ class RegisterBusiness
     public function handle(array $data): User
     {
         $hashedPassword = $this->hashedPassword($data);
-        $wajibGantiSandi = $data['must_change_password'] ?? false;
+        $mustChangePassword = $data['must_change_password'] ?? false;
 
-        return DB::transaction(function () use ($data, $hashedPassword, $wajibGantiSandi): User {
+        return DB::transaction(function () use ($data, $hashedPassword, $mustChangePassword): User {
             $appIds = $this->dependencyGraph->resolveAvailable($data['app_ids']);
             $slug = $this->uniqueSlug($data['business_name']);
             $user = User::create([
@@ -74,7 +74,7 @@ class RegisterBusiness
             // penanda ini di luar `Fillable` supaya tidak ada permintaan yang bisa menyalakannya,
             // dan pendaftaran mandiri tidak menjalankan satu query pun lebih banyak daripada
             // kemarin.
-            if ($wajibGantiSandi) {
+            if ($mustChangePassword) {
                 $user->forceFill(['must_change_password' => true])->save();
             }
             $client = Client::create([
@@ -109,9 +109,9 @@ class RegisterBusiness
             // Tenant provisioning adalah fakta lintas app. Payload starter sengaja
             // kosong: setiap app memilih template versinya sendiri dari konfigurasi,
             // sedangkan Core hanya meneruskan tenant context yang tepercaya.
-            $idEvent = (string) Str::ulid();
+            $eventId = (string) Str::ulid();
             DB::table('outbox_events')->insert([
-                'id' => $idEvent,
+                'id' => $eventId,
                 'tenant_id' => $tenant->id,
                 'type' => 'core.tenant.provisioned.v1',
                 'correlation_id' => $tenant->id,
@@ -137,7 +137,7 @@ class RegisterBusiness
              * on-prem, dan di sana ia permanen. Demo justru sebaliknya: ia memperoleh databasenya
              * sendiri saat disiapkan, dan karena itu lahir sebagai `provisioning`, bukan `active`.
              */
-            $jenisPertama = $data['first_environment'] ?? 'production';
+            $firstKind = $data['first_environment'] ?? 'production';
             $environment = null;
 
             /*
@@ -149,16 +149,16 @@ class RegisterBusiness
              * lupa memvalidasi berhenti di PostgreSQL di dalam transaksi yang sama.
              */
             $hosting = $data['first_environment_hosting'] ?? Environment::HOSTING_PROVIDER;
-            $diServerKlien = $hosting === Environment::HOSTING_CLIENT_SERVER;
+            $onClientServer = $hosting === Environment::HOSTING_CLIENT_SERVER;
 
-            if ($jenisPertama !== 'none') {
-                $produksi = $jenisPertama === 'production';
+            if ($firstKind !== 'none') {
+                $isProduction = $firstKind === 'production';
 
                 $environment = Environment::create([
                     'tenant_id' => $tenant->id,
-                    'kind' => $jenisPertama,
-                    'name' => $produksi ? 'Production' : 'Peragaan',
-                    'slug' => $produksi ? $slug : 'peragaan',
+                    'kind' => $firstKind,
+                    'name' => $isProduction ? 'Production' : 'Peragaan',
+                    'slug' => $isProduction ? $slug : 'peragaan',
                     'database_name' => null,
                     'hosting' => $hosting,
                     // Produksi ikut database bawaan, jadi ia langsung dapat dimasuki. Yang bukan
@@ -169,11 +169,11 @@ class RegisterBusiness
                     // pasang dijalankan di server itu. `provisioning` adalah status registry untuk
                     // "belum berjalan", dan `active` di sini akan terbaca di setiap layar sebagai
                     // tempat kerja yang sudah dapat dipakai pelanggan.
-                    'status' => $produksi && ! $diServerKlien ? 'active' : 'provisioning',
+                    'status' => $isProduction && ! $onClientServer ? 'active' : 'provisioning',
                     // Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya
                     // alasan lingkungan terpisah dapat dipercaya memegang salinan data sungguhan.
-                    'outbound_allowed' => $produksi,
-                    'expires_at' => $produksi ? null : ($data['first_environment_expires_at'] ?? null),
+                    'outbound_allowed' => $isProduction,
+                    'expires_at' => $isProduction ? null : ($data['first_environment_expires_at'] ?? null),
                 ]);
             }
             $membership = TenantMembership::create([
@@ -235,7 +235,7 @@ class RegisterBusiness
                 ]);
             }
 
-            DB::afterCommit(function () use ($appIds, $idEvent, $tenant, $environment): void {
+            DB::afterCommit(function () use ($appIds, $eventId, $tenant, $environment): void {
                 /*
                  * Tanpa lingkungan, tidak ada tempat untuk memasang module — dan itu bukan
                  * kegagalan melainkan keadaan yang sah.
@@ -274,7 +274,7 @@ class RegisterBusiness
                     // tercatat, tetapi tidak ada apa pun yang bisa dipasang untuknya sampai
                     // module-nya benar-benar ada di edisi ini. Ia tidak akan muncul di
                     // peluncur, karena peluncur membaca catatan pemasangan.
-                    if ($registry->cari($appId) === null) {
+                    if ($registry->find($appId) === null) {
                         continue;
                     }
 
@@ -296,8 +296,8 @@ class RegisterBusiness
                     // Letaknya sesudah `InstallModule` karena di sanalah migration, catatan
                     // pemasangan, dan urutan nomor module dibuat — dan penyediaan data awal
                     // membutuhkan ketiganya.
-                    app(PengirimEventModul::class)->kirim(
-                        new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
+                    app(ModuleEventDispatcher::class)->dispatch(
+                        new TenantProvisioned($eventId, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
                         (string) $tenant->id,
                     );
                 }

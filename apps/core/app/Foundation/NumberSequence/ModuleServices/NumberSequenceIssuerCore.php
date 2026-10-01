@@ -16,15 +16,15 @@ use App\Platform\Modules\Contracts\NumberSequenceIssuer;
  */
 final class NumberSequenceIssuerCore implements NumberSequenceIssuer
 {
-    public function __construct(private readonly NumberSequenceService $layanan) {}
+    public function __construct(private readonly NumberSequenceService $service) {}
 
-    public function issue(array $konteks, string $kodeReferensi, string $kunciIdempoten, ?string $nilaiManual = null): array
+    public function issue(array $context, string $referenceCode, string $idempotencyKey, ?string $manualValue = null): array
     {
-        return $this->layanan->issue($konteks, $kodeReferensi, $kunciIdempoten, $nilaiManual);
+        return $this->service->issue($context, $referenceCode, $idempotencyKey, $manualValue);
     }
 
-    public function reserve(array $konteks, string $kodeReferensi, string $kunciIdempoten): array
+    public function reserve(array $context, string $referenceCode, string $idempotencyKey): array
     {
-        return $this->layanan->reserve($konteks, $kodeReferensi, $kunciIdempoten);
+        return $this->service->reserve($context, $referenceCode, $idempotencyKey);
     }
 }

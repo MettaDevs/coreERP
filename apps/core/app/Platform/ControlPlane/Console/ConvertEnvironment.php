@@ -158,7 +158,7 @@ final class ConvertEnvironment extends Command
         // Tidak ada operasi yang dibuka di sini. "Tidak mengubah apa pun" termasuk tidak menambah
         // baris riwayat — riwayat yang penuh operasi yang tidak mengerjakan apa-apa adalah riwayat
         // yang berhenti dibaca orang.
-        if ($environment->produksi()) {
+        if ($environment->isProduction()) {
             $this->info(sprintf(
                 'Environment "%s" sudah berjenis produksi; tidak ada yang diubah.',
                 $environment->slug,
@@ -316,7 +316,7 @@ final class ConvertEnvironment extends Command
      */
     private function promoteToProduction(Environment $environment): void
     {
-        $koneksi = DB::connection($environment->getConnectionName());
+        $connection = DB::connection($environment->getConnectionName());
 
         try {
             // Savepoint. PostgreSQL membatalkan seluruh blok transaksi begitu satu pernyataan di
@@ -324,7 +324,7 @@ final class ConvertEnvironment extends Command
             // berlomba diselesaikan oleh partial unique index, bukan oleh pemeriksaan di atas.
             // Tanpa savepoint, penolakan yang sudah diperhitungkan ini menjatuhkan transaksi milik
             // siapa pun yang kebetulan membungkus perintah ini.
-            $koneksi->transaction(function () use ($environment): void {
+            $connection->transaction(function () use ($environment): void {
                 $environment->update([
                     'kind' => 'production',
                     'outbound_allowed' => true,
@@ -358,11 +358,11 @@ final class ConvertEnvironment extends Command
      */
     private function disarmEventQueue(Environment $environment): int
     {
-        $koneksi = $this->environmentConnection($environment);
+        $connection = $this->environmentConnection($environment);
         $count = 0;
 
         while (true) {
-            $id = $koneksi->table('outbox_events')
+            $id = $connection->table('outbox_events')
                 ->where('tenant_id', $environment->tenant_id)
                 ->whereNull('published_at')
                 ->orderBy('occurred_at')
@@ -378,7 +378,7 @@ final class ConvertEnvironment extends Command
             // pooled sebuah penerbit yang sedang berjalan boleh saja menerbitkan baris yang sama
             // di sela keduanya, dan menimpa `published_at` miliknya akan memalsukan waktu terbit
             // sebuah event yang benar-benar terkirim.
-            $count += $koneksi->table('outbox_events')
+            $count += $connection->table('outbox_events')
                 ->whereIn('id', $id)
                 ->whereNull('published_at')
                 ->update(['published_at' => now(), 'updated_at' => now()]);
@@ -404,18 +404,18 @@ final class ConvertEnvironment extends Command
         }
 
         $default = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$default);
+        $config = config('database.connections.'.$default);
 
-        if (! is_array($konfigurasi)) {
+        if (! is_array($config)) {
             throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
-        $konfigurasi['database'] = $name;
+        $config['database'] = $name;
         // Laravel mendahulukan `url` di atas `database` bila ia terisi. Dibiarkan, seluruh
         // pelucutan di atas akan berjalan pada database pusat.
-        $konfigurasi['url'] = null;
+        $config['url'] = null;
 
-        config(['database.connections.'.self::CONNECTION => $konfigurasi]);
+        config(['database.connections.'.self::CONNECTION => $config]);
         DB::purge(self::CONNECTION);
 
         return DB::connection(self::CONNECTION);

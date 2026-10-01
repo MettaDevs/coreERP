@@ -113,7 +113,7 @@ final class UninstallModule
                 continue;
             }
 
-            $manifest = $this->registry->cari((string) $other);
+            $manifest = $this->registry->find((string) $other);
 
             if ($manifest !== null && in_array($moduleId, $manifest->dependency, true)) {
                 $blockers[] = (string) $other;

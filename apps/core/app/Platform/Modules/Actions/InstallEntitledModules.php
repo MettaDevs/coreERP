@@ -64,7 +64,7 @@ final class InstallEntitledModules
         $installed = [];
 
         foreach ($this->graph->resolveAvailable($entitled) as $id) {
-            if ($this->registry->cari($id) === null) {
+            if ($this->registry->find($id) === null) {
                 continue;
             }
 

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class OrganizationDirectoryCore implements OrganizationDirectory
 {
-    public function __construct(private readonly BusinessUnitResolver $unitBisnis) {}
+    public function __construct(private readonly BusinessUnitResolver $businessUnits) {}
 
     public function members(string $tenantId): array
     {
@@ -30,32 +30,32 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
             ->where('memberships.status', 'active')
             ->orderBy('users.name')
             ->get(['memberships.id', 'memberships.user_id', 'users.name', 'users.email'])
-            ->map(static fn (object $baris): array => [
-                'id' => (string) $baris->id,
-                'user_id' => (string) $baris->user_id,
-                'nama' => (string) $baris->name,
-                'email' => (string) $baris->email,
+            ->map(static fn (object $row): array => [
+                'id' => (string) $row->id,
+                'user_id' => (string) $row->user_id,
+                'nama' => (string) $row->name,
+                'email' => (string) $row->email,
             ])
             ->all());
     }
 
     public function member(string $tenantId, string $membershipId): ?array
     {
-        $baris = DB::table('tenant_memberships as memberships')
+        $row = DB::table('tenant_memberships as memberships')
             ->join('users', 'users.id', '=', 'memberships.user_id')
             ->where('memberships.tenant_id', $tenantId)
             ->where('memberships.id', $membershipId)
             ->first(['memberships.id', 'memberships.user_id', 'users.name', 'users.email']);
 
-        if ($baris === null) {
+        if ($row === null) {
             return null;
         }
 
         return [
-            'id' => (string) $baris->id,
-            'user_id' => (string) $baris->user_id,
-            'nama' => (string) $baris->name,
-            'email' => (string) $baris->email,
+            'id' => (string) $row->id,
+            'user_id' => (string) $row->user_id,
+            'nama' => (string) $row->name,
+            'email' => (string) $row->email,
         ];
     }
 
@@ -67,17 +67,17 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
             ->where('organizations.classification', 'operating_unit')
             ->orderBy('organizations.name')
             ->get(['organizations.id', 'organizations.name', 'organizations.classification', 'unit.type', 'unit.number'])
-            ->map(static fn (object $baris): array => [
-                'id' => (string) $baris->id,
-                'nama' => (string) $baris->name,
-                'klasifikasi' => (string) $baris->classification,
-                'tipe' => $baris->type === null ? null : (string) $baris->type,
-                'nomor' => $baris->number === null ? null : (string) $baris->number,
+            ->map(static fn (object $row): array => [
+                'id' => (string) $row->id,
+                'nama' => (string) $row->name,
+                'klasifikasi' => (string) $row->classification,
+                'tipe' => $row->type === null ? null : (string) $row->type,
+                'nomor' => $row->number === null ? null : (string) $row->number,
             ])
             ->all());
     }
 
-    public function parentBusinessUnits(string $tenantId, array $orgUnitIds, string $tanggal): array
+    public function parentBusinessUnits(string $tenantId, array $orgUnitIds, string $date): array
     {
         return array_map(
             static fn (?array $bu): ?array => $bu === null ? null : [
@@ -85,7 +85,7 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
                 'nama' => $bu['name'],
                 'nomor' => $bu['number'],
             ],
-            $this->unitBisnis->resolve($tenantId, $orgUnitIds, $tanggal),
+            $this->businessUnits->resolve($tenantId, $orgUnitIds, $date),
         );
     }
 }

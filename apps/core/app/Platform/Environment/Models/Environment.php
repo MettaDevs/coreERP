@@ -123,7 +123,7 @@ class Environment extends Model
         return $this->hasMany(EnvironmentOperation::class);
     }
 
-    public function produksi(): bool
+    public function isProduction(): bool
     {
         return $this->kind === 'production';
     }
