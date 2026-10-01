@@ -1,0 +1,8 @@
+description: |
+  Token klien integrasi tidak dikirim, tidak berbentuk `<client_id>.<secret>`, secret-nya salah,
+  atau kliennya sudah dicabut. Keempatnya dijawab dengan pesan yang sama dan sengaja tidak
+  dibedakan.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }
+    example: { message: Token klien integrasi tidak sah atau sudah dicabut. }

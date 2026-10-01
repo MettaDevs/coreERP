@@ -17,6 +17,31 @@ get:
     dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
     vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
     tidak pernah dijurnal ke akun cadangan (K-18).
+
+    **Tidak ada cursor.** Parameter `cursor`, `after`, `page`, atau parameter lain yang tidak
+    tercantum di bawah diabaikan; tanpa ack, pull berikutnya menyajikan halaman yang sama lagi.
+
+    **Penyaringan.** Prefix klien diterapkan lebih dulu, dan parameter tidak dapat memperluasnya:
+    klien berprefix `asset.` yang mengirim `posting_type=cashier.receipt` menerima daftar kosong,
+    bukan `403`. Prefix klien `asset.` dan `asset.*` sama artinya. `posting_type` tanpa `.*`
+    dicocokkan persis, jadi `posting_type=asset` tidak cocok dengan jenis apa pun. `legal_entity`
+    yang tidak dikenal menghasilkan daftar kosong, bukan `422`.
+
+    **Feed yang dimatikan bukan kesalahan.** Posting entitas legal yang feed-nya tidak aktif,
+    atau yang bertanggal sebelum cutover, berstatus `manual` dan tidak pernah disajikan;
+    jawabannya tetap `200`.
+
+    **Urutan field tidak dijamin.** Kunci di dalam setiap posting tidak terkirim dalam urutan
+    properti skema `FinancePosting`, dan urutannya bisa berubah tanpa versi kontrak baru. Baca
+    sebagai objek JSON menurut nama kunci; jangan membandingkan teksnya. Yang dijamin hanya
+    urutan **posting** di `data`, seperti di atas.
+
+    **Urutan pemeriksaan.** Rate limit (`429`), lalu token (`401`), allowlist IP (`403`), scope
+    (`403`), salinan sandbox (`503`), lalu parameter (`422`).
+
+    **Pesan `422`.** Field yang salah ada di kunci `errors`. Teks `message` dan isi `errors`
+    sebagian berbahasa Inggris dan sebagian Indonesia, dan tidak dijamin tetap; jangan
+    mencocokkan teksnya.
   parameters:
     - name: status
       in: query
@@ -46,7 +71,7 @@ get:
       in: query
       required: false
       schema: { type: string, maxLength: 50 }
-      description: Kode perusahaan (`company_code`) atau id entitas legal.
+      description: Kode perusahaan (`company_code`) atau id entitas legal. Nilai yang tidak dikenal menghasilkan daftar kosong.
     - name: limit
       in: query
       required: false
@@ -54,6 +79,9 @@ get:
   responses:
     '200':
       description: Posting yang belum di-ack, dalam urutan pembukuan.
+      headers:
+        X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+        X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
       content:
         application/json:
           schema:
@@ -363,8 +391,8 @@ get:
                       assets:
                         - { asset_code: KEND-0012, asset_group: KENDARAAN, book: KOMERSIAL, period_starts_on: '2026-10-01', period_ends_on: '2026-10-31', depreciation_amount: '2500000.00' }
                 meta: { count: 1, has_more: false }
-    '401': { $ref: '#/components/responses/Unauthenticated' }
-    '403': { $ref: '#/components/responses/Forbidden' }
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/IntegrationForbidden' }
     '422': { $ref: '#/components/responses/ValidationError' }
-    '429': { $ref: '#/components/responses/RateLimited' }
+    '429': { $ref: '#/components/responses/IntegrationRateLimited' }
     '503': { $ref: '#/components/responses/OutboundRefused' }

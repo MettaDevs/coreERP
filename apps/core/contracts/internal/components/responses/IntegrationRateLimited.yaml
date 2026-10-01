@@ -1,0 +1,16 @@
+description: |
+  Rate limit terlampaui. Jatahnya 120 permintaan per menit **per klien integrasi**, dihitung dari
+  `client_id` di depan token, bukan per alamat IP: klien lain dari alamat yang sama tidak ikut
+  terbatas. Permintaan tanpa token dihitung per alamat IP.
+
+  Satu jatah dipakai bersama oleh `GET /finance-postings`, `POST /finance-postings/{posting_id}/ack`,
+  dan `GET /vendors`. Permintaan yang ditolak dengan `404` atau `422` tetap menghabiskan jatah.
+  Rate limit diperiksa sebelum token, jadi jawaban `429` bisa datang lebih dulu dari `401`.
+headers:
+  Retry-After: { $ref: '#/components/headers/RetryAfter' }
+  X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+  X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }
+    example: { message: Too Many Attempts. }

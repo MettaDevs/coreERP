@@ -6,6 +6,9 @@ required: [contract_version, posting_id, posting_type, settlement_mode, legal_en
 description: |
   Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai mode pull dan
   mode push (`webhooks.financePosting`).
+
+  Urutan kunci di dalam objek ini tidak dijamin dan tidak mengikuti urutan properti di bawah.
+  Pull dan push membawa nilai yang sama, tetapi byte body push tidak sama dengan teks pull.
 properties:
   contract_version: { type: integer, enum: [1] }
   posting_id:

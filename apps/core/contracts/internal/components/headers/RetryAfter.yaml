@@ -1,0 +1,2 @@
+description: Detik sampai jatah pulih. Tunggu selama itu sebelum mengirim permintaan berikutnya.
+schema: { type: integer, example: 60 }
