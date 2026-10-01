@@ -1,0 +1,62 @@
+{
+    "tanpa_token": {
+        "status": 401,
+        "body": {
+            "message": "Token klien integrasi tidak sah atau sudah dicabut."
+        }
+    },
+    "token_bukan_bentuk_id_titik_rahasia": {
+        "status": 401,
+        "body": {
+            "message": "Token klien integrasi tidak sah atau sudah dicabut."
+        }
+    },
+    "rahasia_salah": {
+        "status": 401,
+        "body": {
+            "message": "Token klien integrasi tidak sah atau sudah dicabut."
+        }
+    },
+    "klien_dicabut": {
+        "status": 401,
+        "body": {
+            "message": "Token klien integrasi tidak sah atau sudah dicabut."
+        }
+    },
+    "ip_di_luar_allowlist": {
+        "status": 403,
+        "body": {
+            "message": "Alamat asal permintaan tidak termasuk alamat yang diizinkan untuk klien integrasi ini."
+        }
+    },
+    "ip_diperiksa_sebelum_scope": {
+        "status": 403,
+        "body": {
+            "message": "Alamat asal permintaan tidak termasuk alamat yang diizinkan untuk klien integrasi ini."
+        }
+    },
+    "scope_kurang": {
+        "status": 403,
+        "body": {
+            "message": "Klien integrasi ini tidak punya izin finance-postings.read."
+        }
+    },
+    "ip_di_dalam_allowlist_tetap_butuh_scope": {
+        "status": 403,
+        "body": {
+            "message": "Klien integrasi ini tidak punya izin finance-postings.read."
+        }
+    },
+    "salinan_sandbox": {
+        "status": 503,
+        "body": {
+            "message": "Sambungan keluar ditolak: lingkungan \"Uji sandbox\" berjenis sandbox, bukan produksi. Email, pengiriman otomatis ke sistem lain, dan laporan terjadwal sengaja dimatikan di sana supaya salinan data tidak menghubungi pihak yang sebenarnya."
+        }
+    },
+    "salinan_sandbox_scope_kurang_lebih_dulu": {
+        "status": 403,
+        "body": {
+            "message": "Klien integrasi ini tidak punya izin finance-postings.read."
+        }
+    }
+}

@@ -1,0 +1,374 @@
+[
+    {
+        "langkah": "posted_pertama",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-2026-0001"
+        },
+        "status": 200,
+        "body": {
+            "data": {
+                "posting_id": "AST-ACQ-P",
+                "status": "posted",
+                "external_reference": "JV-2026-0001",
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": "2026-09-28T16:50:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "posted_diulang_sama",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-2026-0001"
+        },
+        "status": 200,
+        "body": {
+            "data": {
+                "posting_id": "AST-ACQ-P",
+                "status": "posted",
+                "external_reference": "JV-2026-0001",
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": "2026-09-28T16:50:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "posted_diulang_referensi_dirapikan",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted",
+            "external_reference": "  JV-2026-0001  "
+        },
+        "status": 200,
+        "body": {
+            "data": {
+                "posting_id": "AST-ACQ-P",
+                "status": "posted",
+                "external_reference": "JV-2026-0001",
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": "2026-09-28T16:50:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "posted_referensi_lain",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-2026-0002"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-P berstatus posted; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-P",
+                "status": "posted",
+                "external_reference": "JV-2026-0001",
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": "2026-09-28T16:50:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "rejected_atas_posted",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "rejected",
+            "reason_code": "PERIOD_CLOSED",
+            "reason": "Tutup"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-P berstatus posted; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-P",
+                "status": "posted",
+                "external_reference": "JV-2026-0001",
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": "2026-09-28T16:50:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "rejected_pertama",
+        "posting_id": "AST-ACQ-R",
+        "request": {
+            "status": "rejected",
+            "reason_code": "UNKNOWN_ACCOUNT",
+            "reason": "Akun 1452 tidak dikenal",
+            "external_reference": "diabaikan"
+        },
+        "status": 200,
+        "body": {
+            "data": {
+                "posting_id": "AST-ACQ-R",
+                "status": "rejected",
+                "external_reference": null,
+                "reason_code": "UNKNOWN_ACCOUNT",
+                "reason": "Akun 1452 tidak dikenal",
+                "acknowledged_at": "2026-09-28T16:55:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "rejected_kode_sama_teks_lain",
+        "posting_id": "AST-ACQ-R",
+        "request": {
+            "status": "rejected",
+            "reason_code": "UNKNOWN_ACCOUNT",
+            "reason": "Teks lain"
+        },
+        "status": 200,
+        "body": {
+            "data": {
+                "posting_id": "AST-ACQ-R",
+                "status": "rejected",
+                "external_reference": null,
+                "reason_code": "UNKNOWN_ACCOUNT",
+                "reason": "Akun 1452 tidak dikenal",
+                "acknowledged_at": "2026-09-28T16:55:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "rejected_kode_lain",
+        "posting_id": "AST-ACQ-R",
+        "request": {
+            "status": "rejected",
+            "reason_code": "INVALID",
+            "reason": "Lain"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-R berstatus rejected; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-R",
+                "status": "rejected",
+                "external_reference": null,
+                "reason_code": "UNKNOWN_ACCOUNT",
+                "reason": "Akun 1452 tidak dikenal",
+                "acknowledged_at": "2026-09-28T16:55:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "posted_atas_rejected",
+        "posting_id": "AST-ACQ-R",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-9"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-R berstatus rejected; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-R",
+                "status": "rejected",
+                "external_reference": null,
+                "reason_code": "UNKNOWN_ACCOUNT",
+                "reason": "Akun 1452 tidak dikenal",
+                "acknowledged_at": "2026-09-28T16:55:04+00:00"
+            }
+        }
+    },
+    {
+        "langkah": "ack_atas_held",
+        "posting_id": "AST-ACQ-HELD",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-1"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-HELD berstatus held; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-HELD",
+                "status": "held",
+                "external_reference": null,
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": null
+            }
+        }
+    },
+    {
+        "langkah": "ack_atas_manual",
+        "posting_id": "AST-ACQ-LAMA",
+        "request": {
+            "status": "rejected",
+            "reason_code": "INVALID",
+            "reason": "x"
+        },
+        "status": 409,
+        "body": {
+            "message": "Posting AST-ACQ-LAMA berstatus manual; ack ini bertentangan dengannya.",
+            "data": {
+                "posting_id": "AST-ACQ-LAMA",
+                "status": "manual",
+                "external_reference": null,
+                "reason_code": null,
+                "reason": null,
+                "acknowledged_at": null
+            }
+        }
+    },
+    {
+        "langkah": "tidak_dikenal",
+        "posting_id": "TIDAK-ADA",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-1"
+        },
+        "status": 404,
+        "body": {
+            "message": "Posting tidak ditemukan."
+        }
+    },
+    {
+        "langkah": "di_luar_prefix",
+        "posting_id": "KSR-0001",
+        "request": {
+            "status": "posted",
+            "external_reference": "JV-1"
+        },
+        "status": 404,
+        "body": {
+            "message": "Posting tidak ditemukan."
+        }
+    },
+    {
+        "langkah": "tidak_dikenal_body_salah",
+        "posting_id": "TIDAK-ADA",
+        "request": {},
+        "status": 404,
+        "body": {
+            "message": "Posting tidak ditemukan."
+        }
+    },
+    {
+        "langkah": "tanpa_status",
+        "posting_id": "AST-ACQ-P",
+        "request": {},
+        "status": 422,
+        "body": {
+            "message": "The status field is required.",
+            "errors": {
+                "status": [
+                    "The status field is required."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "status_lain",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "pending"
+        },
+        "status": 422,
+        "body": {
+            "message": "The selected status is invalid.",
+            "errors": {
+                "status": [
+                    "The selected status is invalid."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "posted_tanpa_referensi",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted"
+        },
+        "status": 422,
+        "body": {
+            "message": "Ack posted wajib membawa external_reference (nomor voucher atau faktur).",
+            "errors": {
+                "external_reference": [
+                    "Ack posted wajib membawa external_reference (nomor voucher atau faktur)."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "posted_referensi_121",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "posted",
+            "external_reference": "JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ"
+        },
+        "status": 422,
+        "body": {
+            "message": "The external reference field must not be greater than 120 characters.",
+            "errors": {
+                "external_reference": [
+                    "The external reference field must not be greater than 120 characters."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "rejected_tanpa_kode_dan_alasan",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "rejected"
+        },
+        "status": 422,
+        "body": {
+            "message": "Ack rejected wajib membawa reason_code. (and 1 more error)",
+            "errors": {
+                "reason_code": [
+                    "Ack rejected wajib membawa reason_code."
+                ],
+                "reason": [
+                    "Ack rejected wajib membawa reason."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "rejected_kode_tidak_dikenal",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "rejected",
+            "reason_code": "LUPA",
+            "reason": "x"
+        },
+        "status": 422,
+        "body": {
+            "message": "The selected reason code is invalid.",
+            "errors": {
+                "reason_code": [
+                    "The selected reason code is invalid."
+                ]
+            }
+        }
+    },
+    {
+        "langkah": "rejected_alasan_1001",
+        "posting_id": "AST-ACQ-P",
+        "request": {
+            "status": "rejected",
+            "reason_code": "INVALID",
+            "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "status": 422,
+        "body": {
+            "message": "The reason field must not be greater than 1000 characters.",
+            "errors": {
+                "reason": [
+                    "The reason field must not be greater than 1000 characters."
+                ]
+            }
+        }
+    }
+]
