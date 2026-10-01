@@ -396,6 +396,10 @@ export default withMermaid({
                   text: 'Master bersama dan modul yang berdiri sendiri',
                   link: '/todo/master-bersama/',
                 },
+                {
+                  text: 'K-W: identitas Worker di Foundation',
+                  link: '/todo/master-bersama/k-w-worker',
+                },
               ],
             },
             {

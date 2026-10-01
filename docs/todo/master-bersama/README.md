@@ -104,6 +104,8 @@ modul HR. Ini mengubah keputusan gap 3 (#221).
 
 **Diputuskan pemilik pada 1 Oktober 2026: setuju.**
 
+Rincian desain yang menunggu persetujuan: [K-W: identitas Worker di Foundation](./k-w-worker.md).
+
 ## Sisa bentuk microservice yang diganti
 
 Modul dulu hidup di proses dan database sendiri. Di satu runtime, sebagian aturan tetap benar dan
