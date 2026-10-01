@@ -1,0 +1,163 @@
+<?php
+
+namespace App\Foundation\FinancePosting\Http\Controllers;
+
+use App\Foundation\FinancePosting\Models\FinancePostingSetting;
+use App\Foundation\FinancePosting\Models\FinanceSettlementMode;
+use App\Foundation\FinancePosting\Support\PostingPublisher;
+use App\Foundation\FinancePosting\Support\PostingSettings;
+use App\Http\Controllers\Controller;
+use App\Platform\Organization\Models\Organization;
+use App\Support\Access\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Setelan feed posting finance pada halaman entitas legal (K-10, K-16).
+ *
+ * Dibaca semua anggota tenant, diubah owner atau admin. Core belum punya katalog izin sendiri,
+ * jadi penjaganya sama dengan layar organisasi lain.
+ */
+final class FinancePostingSettingController extends Controller
+{
+    public function __construct(private readonly PostingSettings $settings) {}
+
+    public function show(Request $request, Organization $organization): JsonResponse
+    {
+        $this->guard($request, $organization);
+        $data = $this->present($organization);
+
+        return response()->json(['data' => $data])->header('ETag', RowVersion::etag($data['version']));
+    }
+
+    public function update(Request $request, Organization $organization, PostingPublisher $penerbit): JsonResponse
+    {
+        $this->guard($request, $organization, manage: true);
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'cutover_date' => ['nullable', 'date_format:Y-m-d', 'required_if_accepted:enabled'],
+        ], [
+            'cutover_date.required_if_accepted' => 'Isi tanggal cutover sebelum mengaktifkan pengiriman posting. Tanpa cutover, seluruh riwayat yang sudah dijurnal manual ikut terkirim.',
+        ]);
+
+        $expected = RowVersion::expected($request);
+
+        DB::transaction(function () use ($organization, $data, $expected): void {
+            // Setelan baru lahir pada penyimpanan pertama; layar yang belum menemukannya mengirim versi 0.
+            RowVersion::claimIfExists(FinancePostingSetting::query()->whereKey($organization->id), $expected);
+
+            FinancePostingSetting::query()->updateOrCreate(
+                ['legal_entity_id' => $organization->id],
+                [
+                    'tenant_id' => $organization->tenant_id,
+                    'enabled' => (bool) $data['enabled'],
+                    'cutover_date' => $data['cutover_date'] ?? null,
+                ],
+            );
+        });
+        // Posting yang sudah terbit tetapi belum pernah sampai ke pembaca mengikuti setelan baru:
+        // yang kini sesudah cutover diperiksa dan disajikan, yang sebelumnya menjadi manual.
+        $dinilaiUlang = $penerbit->reevaluateCutover($organization->tenant_id, $organization->id, $request->user()?->id);
+
+        return response()->json(['data' => $this->present($organization), 'meta' => ['reevaluated_postings' => $dinilaiUlang]]);
+    }
+
+    public function storeMode(Request $request, Organization $organization): JsonResponse
+    {
+        $this->guard($request, $organization, manage: true);
+        $ganda = 'Sudah ada mode yang berlaku mulai tanggal itu. Pilih tanggal lain.';
+        $data = $request->validate([
+            'mode' => ['required', Rule::in(FinanceSettlementMode::MODES)],
+            'effective_from' => [
+                'required', 'date_format:Y-m-d',
+                Rule::unique('finance_settlement_modes', 'effective_from')->where('legal_entity_id', $organization->id),
+            ],
+        ], ['effective_from.unique' => $ganda]);
+
+        try {
+            // Transaksi bersarang menjadi SAVEPOINT. Tanpanya, bentrokan indeks unik dari dua
+            // permintaan bersamaan membatalkan seluruh transaksi luar di PostgreSQL, dan
+            // penangkapan di bawah tidak memulihkan apa pun.
+            DB::transaction(fn () => FinanceSettlementMode::query()->create([
+                'tenant_id' => $organization->tenant_id,
+                'legal_entity_id' => $organization->id,
+                'mode' => $data['mode'],
+                'effective_from' => $data['effective_from'],
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['effective_from' => $ganda]);
+        }
+
+        return response()->json(['data' => $this->present($organization)], 201);
+    }
+
+    /**
+     * Hanya mode yang belum berlaku yang boleh dihapus.
+     *
+     * Posting mencatat modenya sendiri, jadi menghapus mode lama tidak mengubah jurnal yang sudah
+     * terbit. Tetapi riwayat yang berubah diam-diam membuat "mode apa yang berlaku bulan lalu"
+     * dijawab berbeda dari yang sebenarnya terjadi. Mode yang keliru diganti dengan baris baru.
+     */
+    public function destroyMode(Request $request, Organization $organization, string $mode): Response
+    {
+        $this->guard($request, $organization, manage: true);
+        $baris = FinanceSettlementMode::query()
+            ->where('legal_entity_id', $organization->id)
+            ->whereKey($mode)
+            ->firstOrFail();
+        if (! $baris->effective_from->isAfter(today())) {
+            throw ValidationException::withMessages([
+                'mode' => 'Mode yang sudah berlaku tidak dapat dihapus. Tambahkan mode baru dengan tanggal berlaku berikutnya.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $baris): void {
+            RowVersion::claim($baris, RowVersion::expected($request));
+            $baris->delete();
+        });
+
+        return response()->noContent();
+    }
+
+    /** @return array<string, mixed> */
+    private function present(Organization $organization): array
+    {
+        $setting = $this->settings->setting($organization->id);
+
+        return [
+            // 0 selama setelan belum pernah disimpan; lihat RowVersion::claimIfExists().
+            'version' => (int) ($setting->version ?? 0),
+            'enabled' => $setting->enabled ?? false,
+            'cutover_date' => $setting?->cutover_date?->toDateString(),
+            'current_mode' => $this->settings->settlementMode($organization->id, today()->toDateString()),
+            'default_mode' => FinanceSettlementMode::DEFAULT,
+            'modes' => FinanceSettlementMode::query()
+                ->where('legal_entity_id', $organization->id)
+                ->orderByDesc('effective_from')
+                ->get()
+                ->map(static fn (FinanceSettlementMode $baris): array => [
+                    'id' => $baris->id,
+                    'version' => (int) $baris->version,
+                    'mode' => $baris->mode,
+                    'effective_from' => $baris->effective_from->toDateString(),
+                    'removable' => $baris->effective_from->isAfter(today()),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function guard(Request $request, Organization $organization, bool $manage = false): void
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($organization->tenant_id === $membership->tenant_id, 404);
+        abort_unless($organization->classification === 'legal_entity', 404);
+        abort_unless($membership->hasCorePermission($manage ? CoreSecurityCatalog::FINANCE_SETUP_UPDATE : CoreSecurityCatalog::FINANCE_SETUP_READ), 403);
+    }
+}

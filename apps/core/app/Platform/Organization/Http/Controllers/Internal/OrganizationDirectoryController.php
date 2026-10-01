@@ -3,7 +3,7 @@
 namespace App\Platform\Organization\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Http\Middleware\AuthenticateIntegrationClient;
+use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;

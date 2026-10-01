@@ -4,8 +4,8 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Foundation\Currency\Models\CurrencyPrecision;
 use App\Foundation\Currency\Support\MoneyPrecision;
-use App\Models\FinancePosting;
-use App\Models\FinanceReferenceAccount;
+use App\Foundation\FinancePosting\Models\FinancePosting;
+use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Events\QueryExecuted;
