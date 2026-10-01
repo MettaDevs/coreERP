@@ -2,11 +2,11 @@
 
 namespace App\Foundation\UnitOfMeasure\Http\Controllers\Internal;
 
+use App\Foundation\UnitOfMeasure\Http\Requests\ConvertUnitsRequest;
+use App\Foundation\UnitOfMeasure\Http\Requests\ResolveUnitsRequest;
 use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ReferenceData\ConvertUnitsRequest;
-use App\Http\Requests\ReferenceData\ResolveUnitsRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

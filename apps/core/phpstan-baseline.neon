@@ -337,16 +337,16 @@ parameters:
 			path: app/Platform/Organization/Http/Requests/UpdateOrganizationRequest.php
 
 		-
-			message: '#^Method App\\Http\\Requests\\ReferenceData\\ConvertUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Foundation\\UnitOfMeasure\\Http\\Requests\\ConvertUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: app/Http/Requests/ReferenceData/ConvertUnitsRequest.php
+			path: app/Foundation/UnitOfMeasure/Http/Requests/ConvertUnitsRequest.php
 
 		-
-			message: '#^Method App\\Http\\Requests\\ReferenceData\\ResolveUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Foundation\\UnitOfMeasure\\Http\\Requests\\ResolveUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: app/Http/Requests/ReferenceData/ResolveUnitsRequest.php
+			path: app/Foundation/UnitOfMeasure/Http/Requests/ResolveUnitsRequest.php
 
 		-
 			message: '#^Method App\\Foundation\\UnitOfMeasure\\Support\\UnitOfMeasureService\:\:resolve\(\) return type has no value type specified in iterable type array\.$#'

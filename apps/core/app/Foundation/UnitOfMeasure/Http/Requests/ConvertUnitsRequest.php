@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\ReferenceData;
+namespace App\Foundation\UnitOfMeasure\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
