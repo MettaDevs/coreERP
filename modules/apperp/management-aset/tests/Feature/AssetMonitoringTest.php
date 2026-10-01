@@ -96,6 +96,39 @@ class AssetMonitoringTest extends TestCase
         $this->assertSame($placements, DB::table('aset_tr_penempatan_aset')->count());
     }
 
+    /**
+     * Buku penyusutan bawaan di pengaturan aset tetap (Default Depr. Book BC) menentukan buku yang
+     * nilainya dibekukan, mendahului aturan "buku komersial berkode paling awal".
+     */
+    public function test_frozen_value_comes_from_the_default_depreciation_book_when_set(): void
+    {
+        $gudang = $this->location('Gudang buku');
+        $laptop = $this->receive('Laptop fiskal', $gudang);
+        $komersial = (array) DB::table('aset_tr_buku_aset')->where('aset_id', $laptop)->first();
+        $fiskal = (string) Str::ulid();
+        DB::table('aset_m_buku_penyusutan')->insert([
+            'id' => $fiskal, 'tenant_id' => $this->tenantId, 'creation_key' => 'fiskal-'.$fiskal, 'kode' => 'FISKAL',
+            'nama' => 'Buku fiskal', 'aktif' => true, 'posting_layer' => 'tax', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('aset_tr_buku_aset')->insert([
+            ...array_diff_key($komersial, array_flip(['version', 'created_by_user_id', 'updated_by_user_id'])),
+            'id' => (string) Str::ulid(), 'buku_id' => $fiskal, 'book_code' => 'FISKAL',
+            'acquisition_value' => '1200000.00', 'accumulated_depreciation' => '200000.00', 'net_book_value' => '1000000.00',
+        ]);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.fixed-asset-parameters.update'])
+            ->putJson('/api/modules/management-aset/v1/pengaturan-aset-tetap', ['buku_penyusutan_bawaan_id' => $fiskal, 'version' => 0])
+            ->assertOk();
+
+        $id = $this->draft($gudang);
+        $this->save($id, $gudang, [['aset_id' => $laptop, 'ada' => true]])->assertOk();
+        $this->complete($id)->assertOk();
+
+        $this->assertDatabaseHas('aset_tr_monitoring_aset_details', [
+            'monitoring_aset_id' => $id, 'aset_id' => $laptop,
+            'akumulasi_penyusutan' => '200000.00', 'nilai_buku' => '1000000.00',
+        ]);
+    }
+
     public function test_result_is_computed_from_the_lifecycle_state_including_the_qa_example(): void
     {
         $gudang = $this->location('Gudang arsip');

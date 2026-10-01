@@ -96,7 +96,6 @@ AsetTransferWrite:
   - legal_entity_id
   - responsible_org_unit_id
   - tanggal
-  - tujuan_org_unit_id
   - alasan
   - details
   properties:
@@ -113,7 +112,13 @@ AsetTransferWrite:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
     tujuan_org_unit_id:
-      $ref: '#/components/schemas/Ulid'
+      description: |
+        Unit kerja penanggung jawab aset setelah serah terima. Bila kosong, diisi unit kerja
+        bawaan lokasi tujuan (atau lokasi induk terdekat yang mengisinya); bila keduanya kosong,
+        422 pada field ini.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
     diserahkan_oleh_user_id:
       type: string
       maxLength: 64
@@ -1563,6 +1568,40 @@ LokasiAsetFields:
       oneOf:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
+    alamat_id:
+      description: |
+        Tempat beralamat pos di buku alamat Core (Address pada functional location D365).
+        Kosong berarti mewarisi alamat lokasi induk terdekat yang punya alamat. Id yang tidak
+        ada di buku alamat tenant aktif ditolak 422.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    departemen_bawaan_id:
+      description: |
+        Unit kerja Core yang mengisi unit penanggung jawab aset saat aset diterima atau
+        dimutasi ke lokasi ini, bila dokumennya tidak menyebut unit. Kosong berarti mewarisi
+        lokasi induk terdekat yang mengisinya. Berbeda dari `org_unit_id` (dimensi keuangan).
+        Unit yang tidak ada di tenant aktif ditolak 422.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+LokasiAsetAlamat:
+  type: object
+  required: [id, nama, alamat]
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    nama:
+      type: string
+      description: Nama tempat di buku alamat.
+    alamat:
+      type: string
+      description: Alamat tercetak, beberapa baris dipisah baris baru.
+LokasiAsetWarisanSumber:
+  description: Lokasi pemilik nilai yang diwarisi; `null` bila nilainya milik lokasi ini sendiri.
+  oneOf:
+  - $ref: '#/components/schemas/MasterSummary'
+  - type: 'null'
 LokasiAset:
   description: |
     Pohon lokasi fisik aset; padanan "Functional location" di Dynamics 365 F&O. Ia
@@ -1576,6 +1615,10 @@ LokasiAset:
     required:
     - parent
     - tipe_lokasi
+    - alamat
+    - alamat_efektif
+    - departemen_bawaan_nama
+    - departemen_bawaan_efektif
     properties:
       parent:
         oneOf:
@@ -1584,6 +1627,39 @@ LokasiAset:
       tipe_lokasi:
         oneOf:
         - $ref: '#/components/schemas/MasterSummary'
+        - type: 'null'
+      alamat:
+        description: Alamat milik lokasi ini sendiri, diterjemahkan saat dibaca.
+        oneOf:
+        - $ref: '#/components/schemas/LokasiAsetAlamat'
+        - type: 'null'
+      alamat_efektif:
+        description: Alamat yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+        oneOf:
+        - allOf:
+          - $ref: '#/components/schemas/LokasiAsetAlamat'
+          - type: object
+            required: [diwarisi_dari]
+            properties:
+              diwarisi_dari:
+                $ref: '#/components/schemas/LokasiAsetWarisanSumber'
+        - type: 'null'
+      departemen_bawaan_nama:
+        type: string
+        nullable: true
+      departemen_bawaan_efektif:
+        description: Unit kerja bawaan yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+        oneOf:
+        - type: object
+          required: [id, nama, diwarisi_dari]
+          properties:
+            id:
+              $ref: '#/components/schemas/Ulid'
+            nama:
+              type: string
+              nullable: true
+            diwarisi_dari:
+              $ref: '#/components/schemas/LokasiAsetWarisanSumber'
         - type: 'null'
 LokasiAsetCreate:
   allOf:
@@ -2444,3 +2520,40 @@ ChangeHistoryPage:
       type:
       - integer
       - 'null'
+PengaturanAsetTetap:
+  type: object
+  description: |
+    Pengaturan aset tetap satu tenant, padanan Fixed Asset Setup (tabel 5603) Business Central.
+    Selama belum pernah disimpan, `version` bernilai 0 dan setiap pengaturan `null`.
+  required: [version, buku_penyusutan_bawaan_id, buku_penyusutan_bawaan, updated_at]
+  properties:
+    version:
+      type: integer
+      minimum: 0
+    buku_penyusutan_bawaan_id:
+      description: Default Depr. Book BC. Nilai buku ini yang dibekukan monitoring aset.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    buku_penyusutan_bawaan:
+      oneOf:
+      - $ref: '#/components/schemas/MasterSummary'
+      - type: 'null'
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+PengaturanAsetTetapWrite:
+  type: object
+  required: [version]
+  description: Field yang tidak dikirim tidak diubah.
+  properties:
+    version:
+      type: integer
+      minimum: 0
+      description: Versi yang dibuka pengguna; 0 untuk penyimpanan pertama.
+    buku_penyusutan_bawaan_id:
+      description: Buku penyusutan aktif milik tenant aktif; `null` mengosongkan.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'

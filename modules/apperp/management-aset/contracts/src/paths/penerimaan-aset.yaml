@@ -74,6 +74,10 @@
       Akumulasi ditambah residu tidak boleh melebihi nilai per unit, dan periode berjalan tidak
       boleh melebihi masa manfaat buku yang memakainya. Dokumen selain saldo awal tidak boleh
       membawa angka-angka itu.
+
+      `responsible_org_unit_id` boleh kosong bila `lokasi_aset_id` punya unit kerja bawaan
+      (milik sendiri atau warisan lokasi induk terdekat); unit itulah yang dipakai. Bila keduanya
+      kosong, 422 pada `responsible_org_unit_id`. Aturan yang sama berlaku pada `PATCH`.
     parameters:
     - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
     responses:

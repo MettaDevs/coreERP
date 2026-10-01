@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\Access\Support\LinkedWorkerResolverRegistry;
+use App\Platform\AddressBook\ModuleServices\AddressDirectoryCore;
 use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
 use App\Platform\ChangeLog\Support\ChangeLogValueResolverRegistry;
 use App\Platform\Modules\Contracts\AccountDirectory;
+use App\Platform\Modules\Contracts\AddressDirectory;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\ChangeHistory;
 use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
@@ -79,6 +81,9 @@ final class CoreServices
         ReportFormatter::class => ReportFormatterCore::class,
         // Log perubahan: module membuka riwayat record miliknya sesudah memeriksa haknya sendiri.
         ChangeHistory::class => ChangeHistoryCore::class,
+        // Buku alamat: module menunjuk tempat beralamat pos (mis. lokasi aset) dan menerjemahkannya
+        // menjadi nama dan alamat saat dibaca. Alamat dipelihara di Core, tidak disalin.
+        AddressDirectory::class => AddressDirectoryCore::class,
     ];
 
     /**

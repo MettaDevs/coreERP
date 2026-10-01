@@ -36,7 +36,7 @@ export type Permission =
     | `management-aset.pemeliharaan-aset.${'read' | 'create' | 'update' | 'archive' | 'schedule' | 'execute' | 'close'}`
     | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
-    | 'management-aset.fixed-asset-parameters.read'
+    | `management-aset.fixed-asset-parameters.${'read' | 'update'}`
     | `management-aset.fixed-asset-posting-profiles.${MasterAction}`
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
@@ -519,6 +519,25 @@ export const MASTERS: MasterConfig[] = [
                 summaryKey: 'tipe_lokasi',
                 label: 'Tipe lokasi',
                 required: false,
+            },
+        ],
+        // Dirender `LokasiAsetFields`, yang menambahkan nilai warisan dan saran alamat di bawahnya.
+        extraFields: [
+            {
+                name: 'departemen_bawaan_id',
+                label: 'Unit kerja bawaan',
+                type: 'reference',
+                resource: 'reference-data/unit-kerja',
+                placeholder: 'Ikuti lokasi induk',
+                help: 'Mengisi unit penanggung jawab saat aset diterima atau dimutasi ke lokasi ini. Pengguna masih dapat menggantinya di dokumen.',
+            },
+            {
+                name: 'alamat_id',
+                label: 'Alamat',
+                type: 'reference',
+                resource: 'reference-data/alamat',
+                placeholder: 'Ikuti lokasi induk',
+                help: 'Diambil dari alamat yang tercatat di organisasi. Kosongkan bila sama dengan lokasi induk.',
             },
         ],
     },
