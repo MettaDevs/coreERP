@@ -1,0 +1,224 @@
+# Dokumen penyesuaian nilai aset — penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu
+# buku penyusutan. Draf disusun, dipratinjau, lalu diposting: nilai buku aset berubah dan jurnalnya
+# (`asset.write_down` / `asset.appreciation`) terbit ke feed posting finance di satu transaksi, untuk aset
+# yang buku dokumennya adalah buku yang di-post ke finance. Penyusutan garis lurus berikutnya membagi nilai
+# buku baru ke sisa masa manfaat.
+/api/v1/penyesuaian-nilai-aset:
+  get:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: listAssetValueAdjustments
+    summary: Menampilkan penyesuaian nilai aset dalam jangkauan organisasi pengguna
+    parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, posted]
+    - name: jenis
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [write_down, appreciation]
+    - name: dari
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    - name: sampai
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    responses:
+      '200':
+        description: Daftar penyesuaian beserta kode dan nama buku, jumlah baris, dan total nilai
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetValueAdjustment'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: createAssetValueAdjustment
+    summary: Membuat draf penyesuaian; nomor diterbitkan Number Sequence Core per entitas legal
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyPenyesuaianNilai'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetValueAdjustmentWrite'
+    responses:
+      '200':
+        description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+      '201':
+        description: Draf dibuat beserta barisnya
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        description: Buku tidak ada, aset di luar jangkauan, milik entitas legal lain, sudah dilepas, atau muncul dua kali
+/api/v1/penyesuaian-nilai-aset/{id}:
+  get:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: showAssetValueAdjustment
+    summary: Membaca satu penyesuaian beserta nilai buku tiap aset
+    description: |
+      Selama draf, `nilai_buku_sebelum` dibaca dari buku aset sekarang dan `nilai_buku_sesudah` dihitung
+      darinya; sesudah diposting keduanya nilai yang dibekukan saat posting.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Penyesuaian beserta barisnya
+        headers:
+          ETag:
+            $ref: '#/components/headers/ETag'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: updateAssetValueAdjustment
+    summary: Mengubah draf dan menyamakan barisnya dengan daftar yang dikirim
+    description: |
+      `details` wajib dikirim, walau kosong. Baris dicocokkan menurut `aset_id`: yang masih dikirim
+      dipertahankan beserta nomornya, yang tidak dikirim diarsipkan. `legal_entity_id` wajib sama dengan
+      milik dokumen.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/AssetValueAdjustmentWrite'
+            - $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Penyesuaian setelah diubah
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Penyesuaian sudah diposting, atau isian tidak sah
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+  delete:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: archiveAssetValueAdjustment
+    summary: Mengarsipkan draf penyesuaian
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '204':
+        description: Draf diarsipkan
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Penyesuaian yang sudah diposting tidak dapat diarsipkan
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+/api/v1/penyesuaian-nilai-aset/{id}/pratinjau-posting:
+  get:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: previewAssetValueAdjustmentPosting
+    summary: Pratinjau jurnal penyesuaian draf, tanpa menyimpan apa pun
+    description: |
+      Butuh izin `management-aset.penyesuaian-nilai-aset.post` atau `.update`. `data` berisi `blockers`
+      (daftar `{field, message}`: dokumen tanpa baris, aset sudah dilepas atau tanpa buku dokumen, penurunan
+      nilai melebihi nilai buku, usulan penyusutan yang belum difinalkan, penyusutan final sesudah tanggal
+      penyesuaian, atau masalah mata uang berkunci `currency_code`), `note` (kenapa tidak ada jurnal, misalnya
+      buku yang tidak di-post ke finance), dan `posting` `{posting_id, status, posting_date, currency, total,
+      lines, problems}` atau `null`.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Pratinjau jurnal penyesuaian
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Penyesuaian sudah diposting
+      '500':
+        description: Jurnal tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
+/api/v1/penyesuaian-nilai-aset/{id}/posting:
+  post:
+    tags:
+    - Penyesuaian nilai aset
+    operationId: postAssetValueAdjustment
+    summary: Memposting draf — nilai buku berubah, jurnalnya terbit, dokumen terkunci
+    description: |
+      Butuh izin `management-aset.penyesuaian-nilai-aset.post`. Penghalangnya sama dengan pratinjau dan
+      dijawab 422 berkunci field-nya. Posting yang pemetaan akunnya belum lengkap tetap terbit sebagai
+      `held` dan nilai bukunya tetap berubah.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200':
+        description: Penyesuaian berstatus `posted`
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '428':
+        $ref: '#/components/responses/VersionRequired'
+      '500':
+        description: Jurnal gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); nilai buku tidak berubah

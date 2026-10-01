@@ -166,6 +166,23 @@ dan register aset untuk isian manual — tanpa hak tulis atas ketiganya. Keputus
 ada di `docs/apps/management-aset/transaction/monitoring-aset/` pada repo CoreERP. Laporannya
 `management-aset.laporan-monitoring-aset` (Excel, hanya monitoring yang sudah selesai).
 
+## Penjualan, pemusnahan, dan penyesuaian nilai
+
+Penjualan dan pemusnahan disimpan sebagai **draf** lalu **diposting**, seperti jurnal aset tetap
+Business Central. Posting (`POST /api/v1/{penjualan-aset|pemusnahan-aset}/{id}/posting`, permission
+`.post` pada duty tersendiri `….posting`) menerbitkan jurnal pelepasan `asset.disposal_sale` /
+`asset.disposal_scrap` ke feed posting finance, menandai aset `disposed`, dan menutup seluruh bukunya.
+Pratinjau jurnalnya di `GET …/{id}/pratinjau-posting`. Penyusutan sampai tanggal pelepasan harus sudah
+final. Sebelum rilis ini dokumen pelepasan langsung melepas aset saat disimpan; dokumen lama ditandai
+`posted` lewat migration.
+
+Penyesuaian nilai aset (`/api/v1/penyesuaian-nilai-aset`) menurunkan (write-down) atau menaikkan
+(appreciation) nilai buku satu buku penyusutan, dengan jurnal `asset.write_down` / `asset.appreciation`
+untuk buku yang di-post ke finance. Penyusutan garis lurus berikutnya membagi nilai buku baru ke sisa
+masa manfaat, dan pelepasan membalik kedua saldonya. Akun ketiganya ada di posting group aset.
+Rinciannya di `docs/apps/management-aset/transaction/siklus-aset/` dan
+`docs/apps/management-aset/transaction/penyesuaian-nilai-aset/` pada repo CoreERP.
+
 ## Penyusutan massal
 
 `POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
@@ -374,6 +391,7 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.dekomisioning-aset` | `DKMA` | `legal_entity` |
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |
+| `management-aset.penyesuaian-nilai-aset` | `PNLA` | `legal_entity` |
 | `management-aset.maintenance-job-types` | `JPMA` | `tenant` |
 | `management-aset.maintenance-job-type-variants` | `VJMA` | `tenant` |
 | `management-aset.maintenance-job-type-defaults` | `DJMA` | `tenant` |

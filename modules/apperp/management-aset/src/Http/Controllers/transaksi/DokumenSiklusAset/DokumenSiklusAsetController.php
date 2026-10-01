@@ -7,12 +7,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\AssetApprovalWorkflow;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\DisposalPosting;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -22,6 +23,10 @@ use stdClass;
 class DokumenSiklusAsetController extends Controller
 {
     /**
+     * Penjualan dan pemusnahan lahir di sini sebagai draf dan tidak melepas apa pun. Asetnya baru dilepas,
+     * bukunya ditutup, dan jurnal pelepasannya terbit saat draf diposting lewat `AssetDisposalController`,
+     * seperti jurnal aset tetap Business Central.
+     *
      * `pemeliharaan-aset` sengaja tidak lagi di sini. Ia dulu sebuah catatan satu baris
      * dan kini menjadi work order dengan baris pekerjaan, checklist, penugasan, dan
      * status pengerjaan sendiri; lihat `transaksi\PemeliharaanAset`. Baris lama pada
@@ -45,7 +50,15 @@ class DokumenSiklusAsetController extends Controller
         $query = DokumenSiklusAset::query()->where('jenis_dokumen', $type);
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
 
-        return response()->json(['data' => $query->toBase()->latest('created_at')->get()]);
+        $rows = $query->toBase()->latest('created_at')->get();
+        // Kode dan nama aset di samping id-nya, dibaca sekaligus untuk seluruh daftar.
+        $aset = Aset::withTrashed()->whereIn('id', $rows->pluck('aset_id')->filter()->unique()->values()->all())->toBase()->get(['id', 'kode', 'nama'])->keyBy('id');
+        foreach ($rows as $row) {
+            $row->aset_kode = $aset[$row->aset_id]->kode ?? null;
+            $row->aset_nama = $aset[$row->aset_id]->nama ?? null;
+        }
+
+        return response()->json(['data' => $rows]);
     }
 
     public function store(Request $request, string $type, AssetNumberSequenceIssuer $numbers, AssetApprovalWorkflow $workflow): JsonResponse
@@ -57,8 +70,11 @@ class DokumenSiklusAsetController extends Controller
         $data = $request->validate([
             'legal_entity_id' => ['required', 'ulid'], 'responsible_org_unit_id' => ['required', 'ulid'], 'tanggal' => ['required', 'date'],
             'aset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
-            'nilai' => ['nullable', 'numeric', 'min:0'], 'keterangan' => ['nullable', 'string', 'max:2000'],
+            'nilai' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'], 'keterangan' => ['nullable', 'string', 'max:2000'],
         ]);
+        if ($type === DisposalPosting::SCRAP && ! empty($data['nilai'])) {
+            throw ValidationException::withMessages(['nilai' => DisposalPosting::SCRAP_HAS_NO_PROCEEDS]);
+        }
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         if (in_array($type, ['dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'], true)) {
             validator($data, ['aset_id' => ['required']])->validate();
@@ -103,9 +119,6 @@ class DokumenSiklusAsetController extends Controller
             $record = DB::transaction(function () use ($record, $type, $tenant, $key, $numbers, $workflow, $data): array {
                 $record['kode'] = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
                 (new DokumenSiklusAset)->forceFill($record)->save();
-                if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
-                    $this->dispose((string) $record['aset_id'], (string) $record['tanggal']);
-                }
                 if ($type === 'dekomisioning-aset') {
                     $this->submitWorkflow((object) $record, $tenant, (string) $data['legal_entity_id'], $key, $workflow);
                 }
@@ -127,27 +140,6 @@ class DokumenSiklusAsetController extends Controller
     private function dokumen(string $id): array
     {
         return (array) DokumenSiklusAset::query()->where('id', $id)->toBase()->first();
-    }
-
-    /**
-     * Melepas aset dan menutup buku penyusutannya.
-     *
-     * Penjualan dan pemusnahan adalah akhir masa hidup aset di subledger ini. Tanpa
-     * langkah ini `lifecycle_state` tidak pernah menjadi `disposed` — nilainya hanya
-     * dibaca sebagai penjaga di beberapa tempat dan tidak pernah ditulis — sehingga aset
-     * yang sudah dijual tetap muncul sebagai buku aktif dan masih menerima proposal
-     * penyusutan bulan berikutnya.
-     *
-     * Ini murni subledger: menutup buku tidak menjurnal apa pun.
-     */
-    private function dispose(string $asetId, string $tanggal): void
-    {
-        Aset::query()
-            ->where('id', $asetId)
-            ->update(['lifecycle_state' => StatusAset::DILEPAS, 'updated_at' => now()]);
-        BukuAset::query()
-            ->where(['aset_id' => $asetId, 'status' => 'active'])
-            ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
 
     /**

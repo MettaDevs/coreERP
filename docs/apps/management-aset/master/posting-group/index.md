@@ -2,9 +2,9 @@
 
 Halaman ini untuk developer. Perilaku dasar master ada di [Master data](/apps/management-aset/master/), dan feed yang memakai akun-akun ini ada di [Feed posting finance](/dev/34-feed-posting-finance).
 
-Posting group menjawab satu pertanyaan: **jurnal aset dari group ini masuk ke akun mana.** Satu baris adalah delapan akun untuk satu group aset, berlaku sejak satu tanggal. Padanannya *FA Posting Groups* di Business Central dan *fixed asset posting profile* di F&O.
+Posting group menjawab satu pertanyaan: **jurnal aset dari group ini masuk ke akun mana.** Satu baris adalah lima belas akun untuk satu group aset, berlaku sejak satu tanggal. Padanannya *FA Posting Groups* di Business Central dan *fixed asset posting profile* di F&O.
 
-Penerimaan, saldo awal, dan "Post penyusutan" (area 9 sampai 11 feed posting finance) membaca akunnya dari sini. Selama akunnya kosong, posting yang membutuhkannya tertahan di Core.
+Penerimaan, saldo awal, "Post penyusutan" (area 9 sampai 11 feed posting finance), [penyesuaian nilai aset](/apps/management-aset/transaction/penyesuaian-nilai-aset/), dan [pelepasan aset](/apps/management-aset/transaction/siklus-aset/#jurnal-pelepasan) membaca akunnya dari sini. Selama akunnya kosong, posting yang membutuhkannya tertahan di Core.
 
 ## Konsep yang mudah tertukar
 
@@ -30,6 +30,15 @@ Posting group tidak menyimpan akun, hanya menunjuknya. Nomor dan nama akun tetap
 | `input_vat_account_id` | bila dipakai | PPN Masukan, untuk penerimaan yang membawa PPN (K-11) |
 | `opening_balance_offset_account_id` | bila dipakai | Penyeimbang saldo awal saat cutover (K-13) |
 | `grant_offset_account_id` | bila dipakai | Lawan hibah: kredit penerimaan dengan cara perolehan `hibah` (K-25) |
+| `write_down_account_id` | bila dipakai | Akumulasi penurunan nilai: kredit saat penurunan nilai diposting, debit saat aset dilepas. BC *Write-Down Account* |
+| `write_down_expense_account_id` | bila dipakai | Beban penurunan nilai, akun laba rugi. BC *Write-Down Expense Acc.* |
+| `appreciation_account_id` | bila dipakai | Kenaikan nilai aset: debit saat kenaikan nilai diposting, kredit saat aset dilepas. BC *Appreciation Account* |
+| `appreciation_offset_account_id` | bila dipakai | Lawan kenaikan nilai, lazimnya surplus revaluasi. BC *Appreciation Bal. Account* |
+| `disposal_proceeds_account_id` | bila dipakai | Hasil penjualan aset: debit sebesar nilai jual. BC *Sales Bal. Acc.* |
+| `disposal_gain_account_id` | bila dipakai | Laba pelepasan, akun laba rugi. BC *Gains Acc. on Disposal* |
+| `disposal_loss_account_id` | bila dipakai | Rugi pelepasan, akun laba rugi; juga seluruh nilai buku aset yang dimusnahkan. BC *Losses Acc. on Disposal* |
+
+Tujuh kolom terakhir lahir di migration `2026_10_01_100000_add_disposal_and_revaluation_accounts_to_aset_posting_group`. Akun "on Disposal" BC untuk harga perolehan, akumulasi penyusutan, penurunan nilai, dan kenaikan nilai (field 8 sampai 11) sengaja tidak dibuat: jurnal pelepasan membalik saldo ke akun yang sama dengan yang dulu menerimanya, sehingga buku besar aset satu group tetap satu akun per jenis saldo. Bila kelak pelanggan butuh akun pelepasan terpisah, kolomnya ditambahkan di sini dan dipilih di `DisposalPosting`.
 
 Di layar, tiap kolom akun membawa ikon bantuan berisi contoh jurnalnya, diambil dari bagian "Jenis posting dan jurnalnya" di PRD feed posting finance (K-39). Akun diisi langsung di layar ini; tidak ada templat berkas terpisah.
 

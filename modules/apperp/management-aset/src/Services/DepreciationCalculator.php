@@ -79,7 +79,13 @@ final class DepreciationCalculator
         }
 
         $amount = match ($book->method) {
-            'straight_line' => ($acquisition - $residual) / $usefulLife,
+            // Sesudah penurunan atau kenaikan nilai, garis lurus membagi nilai buku baru ke sisa masa
+            // manfaat (PSAK 48 / IAS 36 ¶63, PSAK 16 / IAS 16), sama dengan garis lurus Business Central
+            // yang selalu menghitung dari nilai buku dan sisa umur. Tanpa ini aset yang diturunkan nilainya
+            // tetap disusutkan sebesar harga perolehan dibagi umur dan habis sebelum masa manfaatnya.
+            'straight_line' => $this->valueAdjusted($book)
+                ? $remaining / max(1, $usefulLife - $elapsedPeriods)
+                : ($acquisition - $residual) / $usefulLife,
             // Garis lurus sisa umur: sisa nilai dibagi sisa periode, sehingga pembulatan
             // periode-periode awal tidak menyisakan ekor di akhir masa manfaat.
             'straight_line_life_remaining' => $remaining / max(1, $usefulLife - $elapsedPeriods),
@@ -117,6 +123,12 @@ final class DepreciationCalculator
         $straightLine = $remaining / max(1, $usefulLife - $elapsedPeriods);
 
         return round($reducing, 2) < round($straightLine, 2);
+    }
+
+    /** Buku ini pernah diturunkan atau dinaikkan nilainya lewat dokumen penyesuaian nilai aset. */
+    private function valueAdjusted(stdClass $book): bool
+    {
+        return (float) ($book->write_down_amount ?? 0) !== 0.0 || (float) ($book->appreciation_amount ?? 0) !== 0.0;
     }
 
     public function periodsPerYear(?string $frequency): int

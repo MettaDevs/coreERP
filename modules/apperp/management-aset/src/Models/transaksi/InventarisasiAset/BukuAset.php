@@ -13,6 +13,11 @@ use Illuminate\Support\Carbon;
 /**
  * Buku penyusutan satu aset: satu baris per pasangan aset dan buku.
  *
+ * `net_book_value` = harga perolehan − akumulasi penyusutan − `write_down_amount` + `appreciation_amount`,
+ * dipelihara oleh finalisasi dan pembalikan penyusutan serta posting penyesuaian nilai aset. Penurunan dan
+ * kenaikan nilai adalah bagian nilai buku dan dibalik saat aset dilepas, seperti `Part of Book Value`
+ * bawaan Business Central.
+ *
  * Kolom uangnya di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan
  * float. `closed_on` sengaja tidak ikut `casts()` — ia hanya ditulis lewat query update,
  * tidak pernah dibaca sebagai properti — sehingga tipenya tetap string apa adanya.
@@ -34,6 +39,8 @@ use Illuminate\Support\Carbon;
  * @property string $accumulated_depreciation
  * @property string $opening_accumulated_depreciation
  * @property int $elapsed_periods_offset
+ * @property string $write_down_amount
+ * @property string $appreciation_amount
  * @property string $net_book_value
  * @property string $status
  * @property ?string $closed_on
@@ -97,6 +104,8 @@ class BukuAset extends Model
         'aset_id' => 'Kunci aset pemilik buku; saring lewat bagian Aset.',
         'accumulated_depreciation' => 'Nilai hari ini; laporan penyusutan menghitung akumulasi per periode dari riwayat penyusutan.',
         'net_book_value' => 'Nilai hari ini; laporan penyusutan menghitung nilai buku per periode dari riwayat penyusutan.',
+        'write_down_amount' => 'Saldo hari ini; riwayatnya ada di dokumen penyesuaian nilai aset.',
+        'appreciation_amount' => 'Saldo hari ini; riwayatnya ada di dokumen penyesuaian nilai aset.',
         'elapsed_periods_offset' => 'Angka koreksi internal penghitung umur untuk saldo awal, tidak bermakna sebagai filter.',
     ];
 
@@ -106,7 +115,8 @@ class BukuAset extends Model
         'tenant_id', 'aset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',
         'useful_life_periods', 'convention', 'depreciation_start_on', 'depreciate', 'round_off_depreciation',
         'acquisition_value', 'residual_value', 'accumulated_depreciation',
-        'opening_accumulated_depreciation', 'elapsed_periods_offset', 'net_book_value', 'status',
+        'opening_accumulated_depreciation', 'elapsed_periods_offset', 'write_down_amount', 'appreciation_amount',
+        'net_book_value', 'status',
     ];
 
     /** @return array<string, string> */
@@ -118,6 +128,8 @@ class BukuAset extends Model
             'accumulated_depreciation' => 'decimal:2',
             'opening_accumulated_depreciation' => 'decimal:2',
             'elapsed_periods_offset' => 'integer',
+            'write_down_amount' => 'decimal:2',
+            'appreciation_amount' => 'decimal:2',
             'net_book_value' => 'decimal:2',
             'useful_life_periods' => 'integer',
             'depreciation_start_on' => 'date',
