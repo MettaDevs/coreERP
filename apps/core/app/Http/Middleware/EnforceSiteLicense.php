@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
+use App\Platform\Identity\Http\Middleware\WajibGantiSandi;
+use App\Platform\Identity\Models\User;
 use App\Support\License\SiteLicense;
 use Closure;
 use Illuminate\Http\Request;

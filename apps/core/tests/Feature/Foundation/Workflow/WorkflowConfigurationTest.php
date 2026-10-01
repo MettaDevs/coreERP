@@ -7,7 +7,7 @@ use App\Foundation\Workflow\Support\ParameterWorkflow;
 use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;

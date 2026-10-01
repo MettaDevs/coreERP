@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Modules;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\Modules\Contracts\ChangeHistory;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;

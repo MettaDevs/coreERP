@@ -4,7 +4,7 @@ namespace Tests\Feature\Platform\Organization;
 
 use App\Models\AppServiceCredential;
 use App\Models\ModuleInstallation;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;

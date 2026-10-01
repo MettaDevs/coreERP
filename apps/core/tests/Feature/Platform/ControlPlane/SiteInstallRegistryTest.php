@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use Closure;
 use Illuminate\Database\QueryException;

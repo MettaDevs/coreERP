@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Observabilitas;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Support\Observabilitas\BerkasLaporan;
 use Database\Seeders\AppCatalogSeeder;

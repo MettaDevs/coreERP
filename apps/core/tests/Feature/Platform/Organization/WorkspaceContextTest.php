@@ -4,8 +4,8 @@ namespace Tests\Feature\Platform\Organization;
 
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;

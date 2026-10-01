@@ -4,8 +4,8 @@ namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
-use App\Models\User;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;

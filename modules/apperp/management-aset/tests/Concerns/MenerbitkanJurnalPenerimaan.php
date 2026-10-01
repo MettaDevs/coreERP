@@ -4,7 +4,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
 use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Models\TenantMembership;

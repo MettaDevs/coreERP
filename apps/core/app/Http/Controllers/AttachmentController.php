@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Middleware\ResolveAttachmentContext;
 use App\Models\DocumentAttachment;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\Attachments\AttachmentContentMismatch;
 use App\Support\Modules\Contracts\AttachmentRecordType;
 use App\Support\Modules\Contracts\RowVersion;

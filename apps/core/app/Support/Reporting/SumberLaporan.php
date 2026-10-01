@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Reporting;
 
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use App\Support\Modules\PelaksanaTenant;
 use App\Support\Reporting\Rendering\RenderException;
-use App\Support\UserClock;
 use RuntimeException;
 use stdClass;
 use Throwable;

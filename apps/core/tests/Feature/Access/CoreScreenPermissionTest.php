@@ -4,7 +4,7 @@ namespace Tests\Feature\Access;
 
 use App\Models\Role;
 use App\Models\SecurityDuty;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\AccessGuards;

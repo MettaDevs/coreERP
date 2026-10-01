@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Platform\ControlPlane\Console;
 
 use App\Models\CoreApp;
-use App\Models\User;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\TemporaryPassword;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\ControlPlane\TemporaryPassword;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;

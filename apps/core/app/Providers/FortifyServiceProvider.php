@@ -4,12 +4,12 @@ namespace App\Providers;
 
 /* @chisel-registration */
 
-use App\Actions\Fortify\CreateNewUser;
-use App\Actions\Fortify\ResetUserPassword;
 use App\Models\CoreApp;
+use App\Platform\Identity\Actions\CreateNewUser;
+use App\Platform\Identity\Actions\ResetUserPassword;
 /* @end-chisel-registration */
-use App\Support\Sso\SsoFailure;
-use App\Support\Sso\TenantSso;
+use App\Platform\Identity\Support\Sso\SsoFailure;
+use App\Platform\Identity\Support\Sso\TenantSso;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -56,7 +56,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureViews(): void
     {
-        Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
+        Fortify::loginView(fn (Request $request) => Inertia::render('platform/identity/auth/login', [
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
             // Null di alamat yang tidak menawarkan SSO — tombolnya tidak tampil sama sekali.
@@ -65,18 +65,18 @@ class FortifyServiceProvider extends ServiceProvider
             'ssoError' => SsoFailure::messageFor($request->query('sso_error')),
         ]));
 
-        Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
+        Fortify::resetPasswordView(fn (Request $request) => Inertia::render('platform/identity/auth/reset-password', [
             'email' => $request->email,
             'token' => $request->route('token'),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]));
 
-        Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('auth/forgot-password', [
+        Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('platform/identity/auth/forgot-password', [
             'status' => $request->session()->get('status'),
         ]));
 
         /* @chisel-email-verification */
-        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
+        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('platform/identity/auth/verify-email', [
             'status' => $request->session()->get('status'),
         ]));
         /* @end-chisel-email-verification */
@@ -97,11 +97,11 @@ class FortifyServiceProvider extends ServiceProvider
         /* @end-chisel-registration */
 
         /* @chisel-2fa */
-        Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));
+        Fortify::twoFactorChallengeView(fn () => Inertia::render('platform/identity/auth/two-factor-challenge'));
         /* @end-chisel-2fa */
 
         /* @chisel-password-confirmation */
-        Fortify::confirmPasswordView(fn () => Inertia::render('auth/confirm-password'));
+        Fortify::confirmPasswordView(fn () => Inertia::render('platform/identity/auth/confirm-password'));
         /* @end-chisel-password-confirmation */
     }
 

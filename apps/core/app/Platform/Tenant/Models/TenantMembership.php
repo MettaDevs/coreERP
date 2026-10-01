@@ -3,8 +3,8 @@
 namespace App\Platform\Tenant\Models;
 
 use App\Models\RoleAssignment;
-use App\Models\User;
 use App\Platform\ControlPlane\OwnedByControlPlane;
+use App\Platform\Identity\Models\User;
 use App\Support\Access\CorePermissions;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;

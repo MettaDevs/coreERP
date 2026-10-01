@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Platform\Integration;
 
-use App\Models\User;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Integration\Support\PushDestination;
 use App\Platform\Tenant\Actions\RegisterBusiness;

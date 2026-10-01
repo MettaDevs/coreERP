@@ -4,7 +4,7 @@ namespace Tests\Feature\Foundation\Vendor;
 
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\Vendor\Models\Vendor;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DaftarVendor;

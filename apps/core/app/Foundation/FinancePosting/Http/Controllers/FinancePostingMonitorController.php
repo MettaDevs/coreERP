@@ -11,7 +11,7 @@ use App\Foundation\FinancePosting\Support\PostingPublisher;
 use App\Foundation\FinancePosting\Support\StatusPostingBerubah;
 use App\Http\Controllers\Controller;
 use App\Models\CoreApp;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;

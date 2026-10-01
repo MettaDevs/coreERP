@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Platform\Identity\Support\Sso;
+
+use RuntimeException;
+
+/**
+ * Upacara masuk lewat SSO berhenti, dengan kode yang boleh ditampilkan ke orangnya.
+ *
+ * Kodenya sempit dan tetap, bukan pesan bebas. Kegagalan di alamat balik bersama dikembalikan ke
+ * halaman masuk tenant lewat query string, dan halaman yang mencetak teks apa pun dari query string
+ * adalah halaman yang dapat dipakai orang lain untuk menulis pesan palsu atas nama kita.
+ */
+final class SsoFailure extends RuntimeException
+{
+    public const PROVIDER_UNREACHABLE = 'penyedia-tidak-terjangkau';
+
+    public const REJECTED_BY_PROVIDER = 'ditolak-penyedia';
+
+    public const INVALID_TOKEN = 'token-tidak-sah';
+
+    /** Akun SSO ini belum pernah dihubungkan ke akun CoreERP mana pun. */
+    public const NOT_LINKED = 'belum-terhubung';
+
+    /** Akun SSO ini sudah terhubung ke akun CoreERP lain, atau akun ini sudah terhubung ke akun SSO lain. */
+    public const LINKED_ELSEWHERE = 'terhubung-ke-akun-lain';
+
+    public const NOT_A_MEMBER = 'bukan-anggota';
+
+    public const EXPIRED = 'kedaluwarsa';
+
+    /** Undangan sudah dicabut, kedaluwarsa, atau sudah dipakai. */
+    public const INVITATION_UNUSABLE = 'undangan-tidak-berlaku';
+
+    /** Akun SSO yang masuk bukan akun yang diundang. Inilah penjaga yang sebenarnya. */
+    public const INVITATION_OTHER_SUBJECT = 'undangan-untuk-akun-lain';
+
+    public const ALREADY_A_MEMBER = 'sudah-menjadi-anggota';
+
+    /** Email akun SSO ini sudah dipakai akun CoreERP yang belum terhubung ke SSO mana pun. */
+    public const EMAIL_TAKEN = 'email-sudah-punya-akun';
+
+    /** @var list<string> */
+    public const CODES = [
+        self::PROVIDER_UNREACHABLE,
+        self::REJECTED_BY_PROVIDER,
+        self::INVALID_TOKEN,
+        self::NOT_LINKED,
+        self::LINKED_ELSEWHERE,
+        self::NOT_A_MEMBER,
+        self::EXPIRED,
+        self::INVITATION_UNUSABLE,
+        self::INVITATION_OTHER_SUBJECT,
+        self::ALREADY_A_MEMBER,
+        self::EMAIL_TAKEN,
+    ];
+
+    public function __construct(public readonly string $reason, string $detail)
+    {
+        parent::__construct($detail);
+    }
+
+    /** Kalimat untuk orangnya. Null bila kodenya tidak dikenal — dan kode asing tidak ditampilkan. */
+    public static function messageFor(mixed $code): ?string
+    {
+        return match ($code) {
+            self::PROVIDER_UNREACHABLE => 'Penyedia SSO sedang tidak dapat dihubungi. Coba lagi sebentar lagi, atau masuk dengan kata sandi.',
+            self::REJECTED_BY_PROVIDER => 'Penyedia SSO tidak mengizinkan masuk ke aplikasi ini.',
+            self::INVALID_TOKEN => 'Tanda masuk dari penyedia SSO tidak dapat diverifikasi.',
+            self::NOT_LINKED => 'Akun SSO ini belum terhubung ke akun CoreERP. Masuk dengan kata sandi, lalu hubungkan SSO di Pengaturan > Keamanan.',
+            self::LINKED_ELSEWHERE => 'Akun SSO ini sudah terhubung ke akun CoreERP lain, atau akun Anda sudah terhubung ke akun SSO yang berbeda.',
+            self::NOT_A_MEMBER => 'Akun ini bukan anggota aktif tenant ini.',
+            self::EXPIRED => 'Upacara masuk sudah kedaluwarsa. Tekan tombol masuk lewat SSO sekali lagi.',
+            self::INVITATION_UNUSABLE => 'Undangan ini sudah dicabut, kedaluwarsa, atau sudah dipakai. Minta undangan baru kepada admin tenant.',
+            self::INVITATION_OTHER_SUBJECT => 'Undangan ini diterbitkan untuk akun SSO yang berbeda. Masuk dengan akun SSO yang diundang.',
+            self::ALREADY_A_MEMBER => 'Akun ini sudah menjadi anggota tenant ini. Masuk saja lewat SSO, undangan tidak diperlukan.',
+            self::EMAIL_TAKEN => 'Email akun SSO ini sudah dipakai akun CoreERP lain. Masuk dengan kata sandinya, hubungkan SSO di Pengaturan > Keamanan, lalu tukarkan undangan ini.',
+            default => null,
+        };
+    }
+}

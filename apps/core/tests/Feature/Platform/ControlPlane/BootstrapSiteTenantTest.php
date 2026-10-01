@@ -6,8 +6,8 @@ namespace Tests\Feature\Platform\ControlPlane;
 
 use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Models\ModuleInstallation;
-use App\Models\User;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\ModuleManifest;

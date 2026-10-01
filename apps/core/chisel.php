@@ -98,7 +98,7 @@ return Chisel::script(__DIR__)
             )->removeSection('registration');
 
             $c->files(
-                'app/Actions/Fortify/CreateNewUser.php',
+                'app/Platform/Identity/Actions/CreateNewUser.php',
                 'app/Http/Responses/RegisterResponse.php',
                 $paths['register'],
                 'tests/Feature/Auth/RegistrationTest.php',
@@ -116,7 +116,7 @@ return Chisel::script(__DIR__)
             )->removeSectionMarkers('email-verification');
         },
         else: function (Chisel $c) use ($paths) {
-            $c->php('app/Models/User.php')
+            $c->php('app/Platform/Identity/Models/User.php')
                 ->removeImport('Illuminate\Contracts\Auth\MustVerifyEmail')
                 ->removeInterface('MustVerifyEmail');
 
@@ -129,8 +129,8 @@ return Chisel::script(__DIR__)
             $c->files(
                 'app/Http/Responses/VerifyEmailResponse.php',
                 $paths['verify_email'],
-                'tests/Feature/Auth/EmailVerificationTest.php',
-                'tests/Feature/Auth/VerificationNotificationTest.php',
+                'tests/Feature/Platform/Identity/EmailVerificationTest.php',
+                'tests/Feature/Platform/Identity/VerificationNotificationTest.php',
             )->delete();
         },
     )
@@ -139,26 +139,26 @@ return Chisel::script(__DIR__)
         '2fa',
         then: function (Chisel $c) use ($paths) {
             $c->files(
-                'app/Models/User.php',
+                'app/Platform/Identity/Models/User.php',
                 'database/factories/UserFactory.php',
                 $paths['security'],
                 $paths['auth_types'],
                 'config/fortify.php',
                 'app/Providers/FortifyServiceProvider.php',
-                'app/Http/Controllers/Settings/SecurityController.php',
+                'app/Platform/Identity/Http/Controllers/SecurityController.php',
             )->removeSectionMarkers('2fa');
         },
         else: function (Chisel $c) use ($paths) {
-            $c->php('app/Models/User.php')
+            $c->php('app/Platform/Identity/Models/User.php')
                 ->removeImport('Laravel\Fortify\TwoFactorAuthenticatable')
                 ->removeTrait('TwoFactorAuthenticatable');
 
             $c->files(
-                'app/Models/User.php',
+                'app/Platform/Identity/Models/User.php',
                 'database/factories/UserFactory.php',
                 'config/fortify.php',
                 'app/Providers/FortifyServiceProvider.php',
-                'app/Http/Controllers/Settings/SecurityController.php',
+                'app/Platform/Identity/Http/Controllers/SecurityController.php',
                 $paths['security'],
                 $paths['auth_types'],
             )->removeSection('2fa');
@@ -171,7 +171,7 @@ return Chisel::script(__DIR__)
                 $paths['two_factor_challenge'],
                 ...$paths['two_factor_files'],
                 'database/migrations/2025_08_14_170933_add_two_factor_columns_to_users_table.php',
-                'tests/Feature/Auth/TwoFactorChallengeTest.php',
+                'tests/Feature/Platform/Identity/TwoFactorChallengeTest.php',
             ])->delete();
         },
     )
@@ -182,17 +182,17 @@ return Chisel::script(__DIR__)
             $c->files(
                 'config/fortify.php',
                 'app/Providers/FortifyServiceProvider.php',
-                'app/Http/Controllers/Settings/SecurityController.php',
+                'app/Platform/Identity/Http/Controllers/SecurityController.php',
                 'routes/settings.php',
-                'tests/Feature/Auth/AuthenticationTest.php',
-                'tests/Feature/Settings/SecurityTest.php',
+                'tests/Feature/Platform/Identity/AuthenticationTest.php',
+                'tests/Feature/Platform/Identity/SecurityTest.php',
                 $paths['security'],
                 $paths['login'],
                 $paths['confirm_password'],
             )->removeSectionMarkers('passkeys');
         },
         else: function (Chisel $c) use ($paths) {
-            $c->php('app/Models/User.php')
+            $c->php('app/Platform/Identity/Models/User.php')
                 ->removeImport('Laravel\Fortify\PasskeyAuthenticatable')
                 ->removeImport('Laravel\Fortify\Contracts\PasskeyUser')
                 ->removeTrait('PasskeyAuthenticatable')
@@ -201,10 +201,10 @@ return Chisel::script(__DIR__)
             $c->files(
                 'config/fortify.php',
                 'app/Providers/FortifyServiceProvider.php',
-                'app/Http/Controllers/Settings/SecurityController.php',
+                'app/Platform/Identity/Http/Controllers/SecurityController.php',
                 'routes/settings.php',
-                'tests/Feature/Auth/AuthenticationTest.php',
-                'tests/Feature/Settings/SecurityTest.php',
+                'tests/Feature/Platform/Identity/AuthenticationTest.php',
+                'tests/Feature/Platform/Identity/SecurityTest.php',
                 $paths['security'],
                 $paths['login'],
                 $paths['confirm_password'],
@@ -238,7 +238,7 @@ return Chisel::script(__DIR__)
             $c->files(
                 'app/Providers/FortifyServiceProvider.php',
                 'routes/settings.php',
-                'tests/Feature/Settings/SecurityTest.php',
+                'tests/Feature/Platform/Identity/SecurityTest.php',
             )->removeSectionMarkers('password-confirmation');
         },
         else: function (Chisel $c) use ($paths) {
@@ -248,12 +248,12 @@ return Chisel::script(__DIR__)
             $c->files(
                 'app/Providers/FortifyServiceProvider.php',
                 'routes/settings.php',
-                'tests/Feature/Settings/SecurityTest.php',
+                'tests/Feature/Platform/Identity/SecurityTest.php',
             )->removeSection('password-confirmation');
 
             $c->files(
                 $paths['confirm_password'],
-                'tests/Feature/Auth/PasswordConfirmationTest.php',
+                'tests/Feature/Platform/Identity/PasswordConfirmationTest.php',
             )->delete();
         },
     )

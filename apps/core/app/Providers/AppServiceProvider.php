@@ -4,11 +4,11 @@ namespace App\Providers;
 
 use App\Foundation\Vendor\Support\VendorAttachments;
 use App\Foundation\Workflow\Support\ParameterWorkflow;
-use App\Models\Passkey;
-use App\Models\User;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Environment\Support\OutboundGuard;
+use App\Platform\Identity\Models\Passkey;
+use App\Platform\Identity\Models\User;
 use App\Support\Access\CorePermissions;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Database\AuditActor;

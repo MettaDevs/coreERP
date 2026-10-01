@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Database\AuditActor;
 use App\Support\Reporting\ExportQueue;
@@ -15,7 +16,6 @@ use App\Support\Reporting\Rendering\RenderPipeline;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\SumberLaporan;
 use App\Support\Retention\RetentionService;
-use App\Support\UserClock;
 use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

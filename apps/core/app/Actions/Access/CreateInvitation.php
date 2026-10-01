@@ -2,20 +2,20 @@
 
 namespace App\Actions\Access;
 
-use App\Models\ExternalIdentity;
 use App\Models\Role;
 use App\Platform\Environment\Support\OutboundRefused;
+use App\Platform\Identity\Models\ExternalIdentity;
+use App\Platform\Identity\Support\Sso\SharedIdentityProvider;
+use App\Platform\Identity\Support\Sso\SsoApiUnavailable;
+use App\Platform\Identity\Support\Sso\SsoDirectory;
+use App\Platform\Identity\Support\Sso\SsoDirectoryUser;
+use App\Platform\Identity\Support\Sso\SsoInvitationMailer;
+use App\Platform\Identity\Support\Sso\TenantSso;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;
-use App\Support\Sso\SharedIdentityProvider;
-use App\Support\Sso\SsoApiUnavailable;
-use App\Support\Sso\SsoDirectory;
-use App\Support\Sso\SsoDirectoryUser;
-use App\Support\Sso\SsoInvitationMailer;
-use App\Support\Sso\TenantSso;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Crypt;

@@ -3,7 +3,7 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Models\Role;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;

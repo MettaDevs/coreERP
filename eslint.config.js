@@ -178,10 +178,10 @@ export default [
         // fitur diam-diam membuang baris yang salah. Urutan impor pada berkas ini dijaga
         // tangan sampai penandanya tidak lagi dipakai.
         files: [
-            'apps/core/resources/js/pages/auth/confirm-password.tsx',
-            'apps/core/resources/js/pages/auth/login.tsx',
-            'apps/core/resources/js/pages/settings/profile.tsx',
-            'apps/core/resources/js/pages/settings/security.tsx',
+            'apps/core/resources/js/pages/platform/identity/auth/confirm-password.tsx',
+            'apps/core/resources/js/pages/platform/identity/auth/login.tsx',
+            'apps/core/resources/js/pages/platform/identity/profile.tsx',
+            'apps/core/resources/js/pages/platform/identity/security.tsx',
             'apps/core/resources/js/pages/welcome.tsx',
             'apps/core/resources/js/types/auth.ts',
         ],

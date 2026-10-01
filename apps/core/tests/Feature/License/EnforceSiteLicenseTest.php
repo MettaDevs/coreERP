@@ -6,7 +6,7 @@ namespace Tests\Feature\License;
 
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\ProviderAccess;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\License\SiteLicenseState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -181,7 +181,7 @@ final class EnforceSiteLicenseTest extends TestCase
     {
         $this->lockWith($this->licenseJson(now()->subDay()->toDateString()));
 
-        $this->get(route('login'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('auth/login'));
+        $this->get(route('login'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('platform/identity/auth/login'));
         // Beranda tidak dijaga `auth` dan tidak ada di daftar yang dilepas; yang melepas tamu di sana
         // hanya pemeriksaan tamu itu sendiri.
         $this->get(route('home'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('welcome'));

@@ -2,7 +2,7 @@
 
 namespace App\Platform\Tenant\Http\Requests;
 
-use App\Concerns\PasswordValidationRules;
+use App\Platform\Identity\Concerns\PasswordValidationRules;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**

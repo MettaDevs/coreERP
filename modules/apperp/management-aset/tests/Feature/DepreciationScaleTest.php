@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;

@@ -4,7 +4,7 @@ namespace App\Platform\Tenant\Actions;
 
 use App\Actions\Access\CreateInvitation;
 use App\Models\RoleAssignment;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Collection;

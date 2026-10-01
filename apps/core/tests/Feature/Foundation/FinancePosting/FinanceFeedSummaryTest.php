@@ -7,7 +7,7 @@ namespace Tests\Feature\Foundation\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Support\PostingFeedSummary;
 use App\Foundation\FinancePosting\Support\PostingPusher;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Actions\RegisterBusiness;

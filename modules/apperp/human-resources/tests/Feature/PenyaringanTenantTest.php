@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Tests\Feature;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;

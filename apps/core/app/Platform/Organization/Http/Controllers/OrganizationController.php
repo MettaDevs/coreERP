@@ -3,6 +3,7 @@
 namespace App\Platform\Organization\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Organization\Actions\CreateOrganization;
 use App\Platform\Organization\Actions\CreateOrganizationHierarchy;
 use App\Platform\Organization\Actions\CreateOrganizationHierarchyDraft;
@@ -20,7 +21,6 @@ use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
-use App\Support\UserClock;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

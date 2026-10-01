@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\Database\AuditActor;
 use App\Support\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Schema\Blueprint;

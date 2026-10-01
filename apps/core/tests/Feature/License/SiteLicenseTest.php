@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\License;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\License\SiteLicense;
 use App\Support\License\SiteLicenseState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
