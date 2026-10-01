@@ -26,7 +26,7 @@ use Throwable;
  * penyebab berarti berbohong dengan percaya diri — dan laporan yang salah menunjuk lebih
  * buruk daripada laporan yang tidak menunjuk apa-apa.
  */
-final class TersangkaPemotongan
+final class TruncationSuspects
 {
     /** Berapa banyak kolom teratas yang ditampilkan. Lebih dari ini hanya jadi kebisingan. */
     private const COUNT = 5;

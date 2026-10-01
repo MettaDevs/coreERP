@@ -6,8 +6,8 @@ namespace Tests\Feature\Platform\Observability;
 
 use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
 use App\Platform\Modules\Support\ModuleRequestContext;
-use App\Platform\Observability\Http\Middleware\LampirkanKonteksJejak;
-use App\Platform\Observability\Support\JejakAktif;
+use App\Platform\Observability\Http\Middleware\AttachTraceContext;
+use App\Platform\Observability\Support\ActiveSpan;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use OpenTelemetry\SDK\Trace\SpanExporter\InMemoryExporter;
@@ -36,7 +36,7 @@ use RuntimeException;
  * dalamnya, dan menggantungkannya pada PostgreSQL berarti sifat di atas berhenti terjaga
  * setiap kali basis data test kebetulan tidak menyala.
  */
-class LampirkanKonteksJejakTest extends TestCase
+class AttachTraceContextTest extends TestCase
 {
     private const ATRIBUT = [
         'coreerp.tenant_id',
@@ -55,7 +55,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $lingkup = $span->activate();
 
         try {
-            (new LampirkanKonteksJejak)->handle(
+            (new AttachTraceContext)->handle(
                 Request::create('/module/app-uji/entitas'),
                 function (Request $permintaan): Response {
                     // Ditulis di sini, bukan sebelum middleware dipanggil: inilah tempat
@@ -96,7 +96,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $lingkup = $span->activate();
 
         try {
-            (new LampirkanKonteksJejak)->handle(
+            (new AttachTraceContext)->handle(
                 Request::create('/module/app-uji/entitas'),
                 fn (): Response => new Response('ok'),
             );
@@ -121,7 +121,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $lingkup = $span->activate();
 
         try {
-            JejakAktif::recordException(new RuntimeException('sequence aktif tidak ditemukan'));
+            ActiveSpan::recordException(new RuntimeException('sequence aktif tidak ditemukan'));
         } finally {
             $lingkup->detach();
             $span->end();
@@ -141,7 +141,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $permintaan = Request::create('/module/app-uji/entitas');
         $permintaan->attributes->set(ModuleRequestContext::TENANT_ID, 'tenant-1');
 
-        $jawaban = (new LampirkanKonteksJejak)->handle($permintaan, fn (): Response => new Response('ok'));
+        $jawaban = (new AttachTraceContext)->handle($permintaan, fn (): Response => new Response('ok'));
 
         $this->assertSame('ok', $jawaban->getContent());
     }
@@ -153,7 +153,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('hilir gagal');
 
-        (new LampirkanKonteksJejak)->handle(
+        (new AttachTraceContext)->handle(
             Request::create('/module/app-uji/entitas'),
             function (): Response {
                 throw new RuntimeException('hilir gagal');

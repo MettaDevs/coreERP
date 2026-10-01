@@ -28,11 +28,11 @@ use Throwable;
  * dirender, tujuan kedua bisa mendapat isi yang berbeda dari tujuan pertama — dan perbedaan
  * itu baru ketahuan saat seseorang membandingkan berkas log dengan SigNoz di tengah insiden.
  *
- * **Tidak ada jalur yang boleh melempar.** Aturan yang sama dengan {@see JejakAktif}, dan di
+ * **Tidak ada jalur yang boleh melempar.** Aturan yang sama dengan {@see ActiveSpan}, dan di
  * sini alasannya lebih tajam: kelas ini berjalan setelah sesuatu sudah gagal. Lemparan kedua
  * dari sini menghasilkan layar putih tanpa satu pun keterangan tentang kegagalan pertama.
  */
-final class LaporanKesalahan
+final class ErrorReport
 {
     /**
      * Atribut permintaan berisi **nama** yang bersanding dengan id.
@@ -248,8 +248,8 @@ final class LaporanKesalahan
         $attributes['http.route'] = self::text($request->route()?->getName());
 
         // Nama field ini persis seperti yang dicari SigNoz untuk menyambungkan log ke jejak.
-        $attributes['trace_id'] = JejakAktif::traceId();
-        $attributes['span_id'] = JejakAktif::spanId();
+        $attributes['trace_id'] = ActiveSpan::traceId();
+        $attributes['span_id'] = ActiveSpan::spanId();
 
         $correlation = self::requestCorrelation($request);
         if ($correlation !== null) {
@@ -399,7 +399,7 @@ final class LaporanKesalahan
         }
 
         if ($sql !== null) {
-            $readable = SqlTerbaca::interpolate($sql, $binding);
+            $readable = ReadableSql::interpolate($sql, $binding);
 
             $lines[] = '';
             $lines[] = 'SQL:';
@@ -420,9 +420,9 @@ final class LaporanKesalahan
             // Kesalahan "nilai tidak muat" adalah satu-satunya jenis yang pesannya tidak
             // pernah menyebut nilai penyebabnya. Menghitungnya di sini, saat kejadiannya masih
             // segar, menghemat pekerjaan mencocokkan tanda tanya dengan binding satu per satu.
-            if (TersangkaPemotongan::matches($sqlstate, $driverMessage)) {
-                $limit = TersangkaPemotongan::limitFromMessage($driverMessage);
-                $suspects = TersangkaPemotongan::list($sql, $binding, $limit);
+            if (TruncationSuspects::matches($sqlstate, $driverMessage)) {
+                $limit = TruncationSuspects::limitFromMessage($driverMessage);
+                $suspects = TruncationSuspects::list($sql, $binding, $limit);
 
                 if ($suspects !== []) {
                     $lines[] = '';
@@ -525,7 +525,7 @@ final class LaporanKesalahan
     {
         $parts = [];
 
-        $trace = JejakAktif::traceId();
+        $trace = ActiveSpan::traceId();
         if ($trace !== null) {
             $parts[] = 'jejak '.$trace;
         }
@@ -621,7 +621,7 @@ final class LaporanKesalahan
         return mb_substr($value, 0, $limit).' … (dipotong)';
     }
 
-    /** Dipakai {@see PelaporKesalahan} untuk memutuskan sebuah kesalahan layak dilaporkan. */
+    /** Dipakai {@see ErrorReporter} untuk memutuskan sebuah kesalahan layak dilaporkan. */
     public static function isReportable(Throwable $error): bool
     {
         // 404, 419, dan 422 bukan kesalahan internal. Membiarkannya masuk berarti mengubur

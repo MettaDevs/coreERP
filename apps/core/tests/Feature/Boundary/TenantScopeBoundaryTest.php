@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use App\Platform\Modules\Support\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -23,10 +23,10 @@ use Tests\TestCase;
  * gabungan, dan database tidak bisa mencegahnya.
  *
  * Modul yang sedang dipindah masuk dan belum dibentuk ulang dilewati pada pemeriksaan berkas
- * di bawah. Ia tetap dipindai penuh oleh pemeriksaan basi di `ModulSedangDipindahTest`, jadi
+ * di bawah. Ia tetap dipindai penuh oleh pemeriksaan basi di `ModulesBeingMovedTest`, jadi
  * yang berubah bukan cakupan pemindaiannya melainkan arti hasilnya: selama modulnya masih
  * melanggar, pengecualian itu sah; begitu ia bersih, pengecualiannya sendiri yang gagal.
- * Daftarnya, alasannya, dan tenggatnya ada di `ModulSedangDipindah`.
+ * Daftarnya, alasannya, dan tenggatnya ada di `ModulesBeingMoved`.
  */
 class TenantScopeBoundaryTest extends TestCase
 {
@@ -149,7 +149,7 @@ class TenantScopeBoundaryTest extends TestCase
     public function test_module_tidak_memakai_query_builder_mentah_pada_tabelnya(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::default();
+        $dipindah = ModulesBeingMoved::default();
 
         $berkasDiperiksa = 0;
         $moduleDiperiksa = 0;
@@ -173,7 +173,7 @@ class TenantScopeBoundaryTest extends TestCase
             'Pakai model module; bila memang butuh SQL langsung, saring tenant secara eksplisit dan',
             'daftarkan pengecualiannya di berkas test ini supaya terlihat pada diff.',
             'Modul yang sedang dipindah masuk dan belum dibentuk ulang punya pintu lain, dengan',
-            'tenggat dan pemeriksaan basi: ModulSedangDipindah.',
+            'tenggat dan pemeriksaan basi: ModulesBeingMoved.',
         ]));
     }
 

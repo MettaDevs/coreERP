@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,10 +22,10 @@ use PHPUnit\Framework\TestCase;
  * mudah dipakai untuk menembus batas.
  *
  * Pemindaiannya sendiri hidup di `PemindaiModul`, karena pemeriksaan basi pada
- * `ModulSedangDipindahTest` harus memakai aturan yang persis sama.
+ * `ModulesBeingMovedTest` harus memakai aturan yang persis sama.
  *
  * Modul yang sedang dipindah masuk dan belum dibentuk ulang dilewati di sini dan diperiksa
- * di sana; daftarnya, alasannya, dan tenggatnya ada di `ModulSedangDipindah`.
+ * di sana; daftarnya, alasannya, dan tenggatnya ada di `ModulesBeingMoved`.
  *
  * Test ini tidak menyentuh database dan tidak memuat Laravel, jadi ia memakai TestCase
  * polos PHPUnit.
@@ -35,7 +35,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_module_tidak_menyebut_namespace_module_lain(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::default();
+        $dipindah = ModulesBeingMoved::default();
 
         $pelanggaran = [];
         $berkasDiperiksa = 0;
@@ -62,7 +62,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_module_hanya_menyentuh_kelas_core_yang_dikontrakkan(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::default();
+        $dipindah = ModulesBeingMoved::default();
 
         $pelanggaran = [];
         $moduleDiperiksa = 0;

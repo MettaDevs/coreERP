@@ -2,9 +2,9 @@
 
 namespace App\Foundation\Workflow\Http\Controllers;
 
-use App\Foundation\Workflow\Support\DefinisiParameterWorkflow;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
 use App\Foundation\Workflow\Support\WorkflowGraph;
+use App\Foundation\Workflow\Support\WorkflowParameterDefinitions;
+use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -22,7 +22,7 @@ use Inertia\Response;
 
 class WorkflowConfigurationController extends Controller
 {
-    public function index(Request $request, ParameterWorkflow $parameter): JsonResponse|Response
+    public function index(Request $request, WorkflowParameters $parameter): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_READ), 403);
@@ -78,7 +78,7 @@ class WorkflowConfigurationController extends Controller
      * Barisnya dibuat saat pertama kali diubah, bukan saat tenant dibuat. Tenant tanpa baris
      * menjawab bawaan, dan bawaannya sama dengan D365: pengaju boleh menyetujui.
      */
-    public function updateParameters(Request $request, ParameterWorkflow $parameter): RedirectResponse
+    public function updateParameters(Request $request, WorkflowParameters $parameter): RedirectResponse
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
@@ -87,7 +87,7 @@ class WorkflowConfigurationController extends Controller
         // sini. Daftar kedua akan menyimpang pada hari seseorang menambah parameter, dan yang
         // menyimpang menolak parameter yang sah dengan pesan yang tidak menyebut sebabnya.
         $data = $request->validate([
-            'code' => ['required', 'string', Rule::in(array_keys(DefinisiParameterWorkflow::DEFINITIONS))],
+            'code' => ['required', 'string', Rule::in(array_keys(WorkflowParameterDefinitions::DEFINITIONS))],
             'value' => ['required', 'boolean'],
         ]);
 
@@ -101,12 +101,12 @@ class WorkflowConfigurationController extends Controller
      *
      * @return list<array{code: string, tipe: string, label: string, penjelasan: string, value: bool}>
      */
-    private function parametersForScreen(string $tenantId, ParameterWorkflow $parameter): array
+    private function parametersForScreen(string $tenantId, WorkflowParameters $parameter): array
     {
         $value = $parameter->all($tenantId);
         $list = [];
 
-        foreach (DefinisiParameterWorkflow::DEFINITIONS as $code => $definition) {
+        foreach (WorkflowParameterDefinitions::DEFINITIONS as $code => $definition) {
             $list[] = [
                 'code' => $code,
                 'tipe' => $definition['tipe'],

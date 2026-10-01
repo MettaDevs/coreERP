@@ -7,7 +7,7 @@ namespace App\Platform\Modules\Support;
 /**
  * Module yang belum ikut analisa tipe statis, beserta alasan dan tenggatnya.
  *
- * **Kenapa daftarnya terpisah dari `ModulSedangDipindah`.** Sampai 9 September 2026 keduanya
+ * **Kenapa daftarnya terpisah dari `ModulesBeingMoved`.** Sampai 9 September 2026 keduanya
  * satu daftar, dengan anggapan seluruh pengecualian sebuah module berakhir bersamaan. Anggapan
  * itu terbukti salah pada hari modul aset selesai dipindah: ia lulus kelima penjaga batas,
  * lulus pemeriksaan tipe frontend, dan lulus pemeriksaan gaya — sambil masih menyisakan 405
@@ -19,11 +19,11 @@ namespace App\Platform\Modules\Support;
  * anotasi tipenya belum ditulis.
  *
  * **Yang tidak boleh terjadi: daftar ini menjadi tempat sembunyi.** Karena itu bentuknya sama
- * dengan `ModulSedangDipindah` — alasan yang menyebut angka terukur, dan tenggat. Keduanya
- * dijaga `ModulTanpaAnalisaTipeTest`: daftar ini wajib sama persis dengan `excludePaths` pada
+ * dengan `ModulesBeingMoved` — alasan yang menyebut angka terukur, dan tenggat. Keduanya
+ * dijaga `ModulesWithoutTypeAnalysisTest`: daftar ini wajib sama persis dengan `excludePaths` pada
  * `phpstan.neon`, dan tenggat yang lewat membuat alur merah.
  */
-final class ModulTanpaAnalisaTipe
+final class ModulesWithoutTypeAnalysis
 {
     /**
      * Nama folder modul dipetakan ke alasan dan tenggatnya.

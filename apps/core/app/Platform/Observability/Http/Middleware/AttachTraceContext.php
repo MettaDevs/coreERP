@@ -6,8 +6,8 @@ namespace App\Platform\Observability\Http\Middleware;
 
 use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
 use App\Platform\Modules\Support\ModuleRequestContext;
-use App\Platform\Observability\Support\JejakAktif;
-use App\Platform\Observability\Support\PelaporKesalahan;
+use App\Platform\Observability\Support\ActiveSpan;
+use App\Platform\Observability\Support\ErrorReporter;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\Response;
  * ketika permintaan berakhir dengan lemparan. Justru permintaan itu yang paling butuh
  * dikenali tenantnya.
  */
-final class LampirkanKonteksJejak
+final class AttachTraceContext
 {
     /**
      * Nama atribut span untuk id module.
@@ -57,12 +57,12 @@ final class LampirkanKonteksJejak
         // Keduanya sering disamakan lewat `runningInConsole()`, dan itu keliru justru di tempat
         // yang penting: di dalam test, permintaan yang menembus seluruh middleware tetap
         // berjalan pada SAPI `cli`.
-        $request->attributes->set(PelaporKesalahan::HTTP_MARKER, true);
+        $request->attributes->set(ErrorReporter::HTTP_MARKER, true);
 
         try {
             return $next($request);
         } finally {
-            JejakAktif::setAttributes([
+            ActiveSpan::setAttributes([
                 'coreerp.tenant_id' => $this->text($request, ModuleRequestContext::TENANT_ID),
                 self::MODULE_ATTRIBUTE => $this->text($request, ResolveModuleContext::ACTIVE_MODULE),
                 'coreerp.legal_entity_id' => $this->text($request, ModuleRequestContext::LEGAL_ENTITY_ID),

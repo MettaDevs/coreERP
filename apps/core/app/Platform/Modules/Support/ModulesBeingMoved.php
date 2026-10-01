@@ -32,7 +32,7 @@ use DateTimeImmutable;
  * **Dua cara pengecualian ini berakhir.** Keduanya harus ada, karena masing-masing menjawab
  * pertanyaan yang berbeda.
  *
- * 1. `tenggat` menjawab "kapan ini harus selesai". Setelah lewat, `ModulSedangDipindahTest`
+ * 1. `tenggat` menjawab "kapan ini harus selesai". Setelah lewat, `ModulesBeingMovedTest`
  *    membuat alur merah. Tidak ada cara memperpanjangnya diam-diam; memperpanjang berarti
  *    mengubah baris di berkas ini dan baris itu terlihat pada diff.
  * 2. Pemeriksaan basi menjawab "bagaimana orang tahu ini sudah boleh dibuang". Modul yang
@@ -56,7 +56,7 @@ use DateTimeImmutable;
  * Karena registry membacanya, ia harus berada di kode aplikasi; penjaga batas membaca daftar
  * yang sama supaya tidak ada dua daftar yang bisa menyimpang.
  */
-final class ModulSedangDipindah
+final class ModulesBeingMoved
 {
     /**
      * Nama folder modul dipetakan ke alasan dan tenggatnya.

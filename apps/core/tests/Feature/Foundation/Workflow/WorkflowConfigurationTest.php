@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Foundation\Workflow;
 
-use App\Foundation\Workflow\Support\DefinisiParameterWorkflow;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
+use App\Foundation\Workflow\Support\WorkflowParameterDefinitions;
+use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\RoleAssignment;
@@ -428,7 +428,7 @@ class WorkflowConfigurationTest extends TestCase
     {
         $tenantId = $this->owner->activeMembership()->tenant_id;
 
-        $kode = DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL;
+        $kode = WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL;
 
         $this->actingAs($this->owner)
             ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
@@ -480,7 +480,7 @@ class WorkflowConfigurationTest extends TestCase
                 $parameter = $page->toArray()['props']['parameters'];
             });
 
-        $baris = collect($parameter)->firstWhere('code', DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
+        $baris = collect($parameter)->firstWhere('code', WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
 
         $this->assertNotNull($baris, 'Parameter yang terdaftar tidak muncul pada payload layar.');
         $this->assertSame('boolean', $baris['tipe']);
@@ -501,7 +501,7 @@ class WorkflowConfigurationTest extends TestCase
     public function test_changing_a_parameter_leaves_an_audit_trail(): void
     {
         $membership = $this->owner->activeMembership();
-        $kode = DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL;
+        $kode = WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL;
 
         $this->actingAs($this->owner)
             ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
@@ -547,7 +547,7 @@ class WorkflowConfigurationTest extends TestCase
         DB::table('workflow_parameters')->insert([
             'id' => (string) Str::ulid(),
             'tenant_id' => $tenantId,
-            'code' => DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL,
+            'code' => WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL,
             'value' => json_encode('mungkin', JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
@@ -556,14 +556,14 @@ class WorkflowConfigurationTest extends TestCase
         $this->expectException(UnexpectedValueException::class);
         $this->expectExceptionMessage('dijanjikan boolean oleh registry');
 
-        app(ParameterWorkflow::class)->boolean($tenantId, DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
+        app(WorkflowParameters::class)->boolean($tenantId, WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
     }
 
     private function larangPersetujuanPengaju(string $tenantId): void
     {
-        app(ParameterWorkflow::class)->save(
+        app(WorkflowParameters::class)->save(
             $tenantId,
-            DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL,
+            WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL,
             true,
             (string) $this->owner->activeMembership()->id,
         );

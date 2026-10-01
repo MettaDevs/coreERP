@@ -165,14 +165,14 @@ final class PostingPublisher
      * yang memutuskan, dan layar pantau memperingatkan bahwa pembaca mungkin sudah membukukannya.
      * Ack yang tiba sesudahnya dijawab konflik oleh `PostingAcknowledger`.
      *
-     * @throws StatusPostingBerubah Status posting tidak lagi mengizinkannya.
+     * @throws PostingStatusChanged Status posting tidak lagi mengizinkannya.
      */
     public function markManual(FinancePosting $posting, string $reason, int $userId): FinancePosting
     {
         return DB::transaction(function () use ($posting, $reason, $userId): FinancePosting {
             $locked = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
             if (! in_array($locked->status, FinancePosting::MARKABLE_MANUAL, true)) {
-                throw new StatusPostingBerubah(sprintf('Posting %s berstatus %s dan tidak dapat ditandai manual.', $locked->posting_id, $locked->status));
+                throw new PostingStatusChanged(sprintf('Posting %s berstatus %s dan tidak dapat ditandai manual.', $locked->posting_id, $locked->status));
             }
             $from = $locked->status;
             $locked->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_USER, 'hold_reasons' => null])->save();

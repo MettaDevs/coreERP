@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Observability\Support;
 
-use App\Platform\Observability\Http\Middleware\LampirkanKonteksJejak;
+use App\Platform\Observability\Http\Middleware\AttachTraceContext;
 use Illuminate\Http\Request;
 use OpenTelemetry\API\Globals;
 use Throwable;
@@ -23,13 +23,13 @@ use Throwable;
  * Satu menjamin laporan selalu ada, satu membuatnya berguna, satu memberitahu. Kegagalan satu
  * tujuan tidak boleh menghapus yang lain, jadi ketiganya punya penjaga sendiri-sendiri.
  *
- * **Tidak ada jalur yang boleh melempar.** Aturan yang sama seperti {@see JejakAktif} dan
- * {@see LaporanKesalahan}, dan di sini paling keras: kelas ini dipanggil dari dalam penangan
+ * **Tidak ada jalur yang boleh melempar.** Aturan yang sama seperti {@see ActiveSpan} dan
+ * {@see ErrorReport}, dan di sini paling keras: kelas ini dipanggil dari dalam penangan
  * kesalahan Laravel. Lemparan dari sini menimpa kesalahan asli dengan kesalahan tentang
  * pelaporan kesalahan — dan yang hilang justru satu-satunya keterangan tentang apa yang
  * sebenarnya terjadi.
  */
-final class PelaporKesalahan
+final class ErrorReporter
 {
     /**
      * Penjaga masuk-ulang.
@@ -50,15 +50,15 @@ final class PelaporKesalahan
         self::$reporting = true;
 
         try {
-            if (! LaporanKesalahan::isReportable($error)) {
+            if (! ErrorReport::isReportable($error)) {
                 return;
             }
 
-            $report = LaporanKesalahan::from($error, $request);
+            $report = ErrorReport::from($error, $request);
 
             self::toFile($report);
             self::toSigNoz($report);
-            PengirimDiscord::send($report);
+            DiscordNotifier::send($report);
         } catch (Throwable) {
             // Sengaja dibiarkan. Lihat catatan kelas.
         } finally {
@@ -69,7 +69,7 @@ final class PelaporKesalahan
     /**
      * Penanda bahwa sebuah permintaan benar-benar melewati pipeline HTTP.
      *
-     * Dipasang {@see LampirkanKonteksJejak}, yang terdaftar global dan
+     * Dipasang {@see AttachTraceContext}, yang terdaftar global dan
      * karena itu dilewati setiap permintaan HTTP — dan hanya permintaan HTTP.
      */
     public const HTTP_MARKER = 'observabilitas.permintaan_http';
@@ -105,16 +105,16 @@ final class PelaporKesalahan
         }
     }
 
-    private static function toFile(LaporanKesalahan $report): void
+    private static function toFile(ErrorReport $report): void
     {
         try {
-            BerkasLaporan::write($report->toText());
+            ErrorReportFile::write($report->toText());
         } catch (Throwable) {
             // Collector yang mati tidak boleh ikut menghapus berkasnya, dan sebaliknya.
         }
     }
 
-    private static function toSigNoz(LaporanKesalahan $report): void
+    private static function toSigNoz(ErrorReport $report): void
     {
         try {
             if (! class_exists(Globals::class)) {

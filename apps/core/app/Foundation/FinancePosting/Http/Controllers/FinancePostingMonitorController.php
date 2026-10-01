@@ -8,7 +8,7 @@ use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinancePostingDelivery;
 use App\Foundation\FinancePosting\Models\FinancePostingEvent;
 use App\Foundation\FinancePosting\Support\PostingPublisher;
-use App\Foundation\FinancePosting\Support\StatusPostingBerubah;
+use App\Foundation\FinancePosting\Support\PostingStatusChanged;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Models\User;
@@ -209,7 +209,7 @@ final class FinancePostingMonitorController extends Controller
 
         try {
             $result = $publisher->markManual($posting, trim((string) $data['reason']), (int) $request->user()?->getAuthIdentifier());
-        } catch (StatusPostingBerubah) {
+        } catch (PostingStatusChanged) {
             throw ValidationException::withMessages(['status' => 'Status posting ini baru saja berubah. Muat ulang halaman lalu periksa lagi.']);
         }
 

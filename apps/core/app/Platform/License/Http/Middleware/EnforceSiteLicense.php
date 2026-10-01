@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\License\Http\Middleware;
 
-use App\Platform\Identity\Http\Middleware\WajibGantiSandi;
+use App\Platform\Identity\Http\Middleware\RequirePasswordChange;
 use App\Platform\Identity\Models\User;
 use App\Platform\License\Support\SiteLicense;
 use Closure;
@@ -39,7 +39,7 @@ use Symfony\Component\HttpFoundation\Response;
  * alamat yang ditahan menjawab halaman kunci itu sendiri dengan 403. Lisensi yang diperpanjang agen
  * membuka kunci pada muat ulang berikutnya di alamat yang sama, tanpa orangnya harus tahu ke mana
  * kembali. Pengalihan ke satu rute kunci akan membuang alamat tujuannya dan membutuhkan pengecualian
- * yang dapat lupa ditulis — persis kurungan tanpa pintu yang dijaga `WajibGantiSandi`.
+ * yang dapat lupa ditulis — persis kurungan tanpa pintu yang dijaga `RequirePasswordChange`.
  *
  * ## Urutan pemeriksaannya
  *
@@ -52,7 +52,7 @@ final class EnforceSiteLicense
     /**
      * Rute yang tetap dapat dicapai selama terkunci.
      *
-     * Nama rute, bukan path, dengan alasan yang sama dengan `WajibGantiSandi`: path berubah ketika
+     * Nama rute, bukan path, dengan alasan yang sama dengan `RequirePasswordChange`: path berubah ketika
      * seseorang merapikan URL, dan penjaga yang memakai path diam-diam berhenti melepaskan apa pun.
      */
     private const OPEN_ROUTES = [

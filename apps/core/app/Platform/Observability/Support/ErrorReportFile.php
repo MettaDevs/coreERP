@@ -24,7 +24,7 @@ use Throwable;
  * ketiganya menulis ke satu berkas, tulisan mereka berselang-seling dan satu blok laporan
  * yang terdiri dari belasan baris tercabik di tengah.
  */
-final class BerkasLaporan
+final class ErrorReportFile
 {
     public static function write(string $content): void
     {
@@ -39,7 +39,7 @@ final class BerkasLaporan
 
             self::sweepOldFiles(dirname($file));
         } catch (Throwable) {
-            // Lihat catatan pada PelaporKesalahan: pelaporan tidak pernah menjadi sebab gagal.
+            // Lihat catatan pada ErrorReporter: pelaporan tidak pernah menjadi sebab gagal.
         }
     }
 

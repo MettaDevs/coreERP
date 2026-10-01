@@ -28,7 +28,7 @@ namespace App\Foundation\Workflow\Support;
  * sementara menghapusnya berarti membuang pilihan yang pernah diambil pelanggan tanpa bisa
  * dikembalikan bila parameternya ternyata masih dipakai.
  */
-final class DefinisiParameterWorkflow
+final class WorkflowParameterDefinitions
 {
     public const PREVENT_SUBMITTER_APPROVAL = 'disallow_approval_by_submitter';
 

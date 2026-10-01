@@ -26,7 +26,7 @@ final class LayoutStore
 
     public function __construct(
         private readonly LayoutInspector $inspector,
-        private readonly SumberLaporan $client,
+        private readonly ReportSource $client,
     ) {}
 
     /**

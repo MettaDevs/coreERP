@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Observability;
 
 use App\Platform\Identity\Models\User;
-use App\Platform\Observability\Support\BerkasLaporan;
+use App\Platform\Observability\Support\ErrorReportFile;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
@@ -67,7 +67,7 @@ class KonteksLaporanPermintaanTest extends TestCase
         //
         // Karena itu yang dicatat adalah **panjangnya sebelum test**, dan yang dibaca hanya
         // bagian yang bertambah sesudahnya.
-        $this->panjangAwal = is_file(BerkasLaporan::path()) ? (int) filesize(BerkasLaporan::path()) : 0;
+        $this->panjangAwal = is_file(ErrorReportFile::path()) ? (int) filesize(ErrorReportFile::path()) : 0;
     }
 
     public function test_laporan_dari_permintaan_terautentikasi_memuat_tenant_dan_pengguna(): void
@@ -123,7 +123,7 @@ class KonteksLaporanPermintaanTest extends TestCase
     /** Hanya bagian yang ditambahkan test ini, bukan seluruh isi berkas bersama. */
     private function isiLaporan(): string
     {
-        $berkas = BerkasLaporan::path();
+        $berkas = ErrorReportFile::path();
 
         $this->assertFileExists($berkas, 'Laporan kesalahan tidak ditulis untuk permintaan yang gagal.');
 

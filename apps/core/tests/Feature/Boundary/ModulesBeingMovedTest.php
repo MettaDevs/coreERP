@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use DateTimeImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -17,14 +17,14 @@ use SplFileInfo;
  * Penjaga atas penjaga: yang diuji di sini adalah pengecualiannya sendiri.
  *
  * Pengecualian tanpa cara berakhir bukan pengecualian, melainkan pelonggaran permanen yang
- * kebetulan ditulis dengan kata "sementara". Berkas ini memberi `ModulSedangDipindah` dua cara
+ * kebetulan ditulis dengan kata "sementara". Berkas ini memberi `ModulesBeingMoved` dua cara
  * berakhir dan membuktikan keduanya bekerja, lalu membuktikan hal yang paling mudah salah:
  * melonggarkan untuk satu modul tidak melonggarkan untuk modul lain.
  *
  * Test ini tidak menyentuh database dan tidak memuat Laravel, jadi ia memakai TestCase polos
  * PHPUnit.
  */
-class ModulSedangDipindahTest extends TestCase
+class ModulesBeingMovedTest extends TestCase
 {
     /**
      * Akar folder sementara tempat modul palsu dibuat, atau null bila belum ada.
@@ -52,7 +52,7 @@ class ModulSedangDipindahTest extends TestCase
 
     public function test_folder_tanpa_awalan_tabel_wajib_terdaftar_sedang_dipindah(): void
     {
-        $dipindah = ModulSedangDipindah::default();
+        $dipindah = ModulesBeingMoved::default();
         $akar = dirname(__DIR__, 5).'/modules';
         $manifest = glob($akar.'/*/*/app.yaml');
         $manifest = $manifest === false ? [] : $manifest;
@@ -102,7 +102,7 @@ class ModulSedangDipindahTest extends TestCase
             'prettier' => ['.prettierignore', 'pemeriksaan gaya frontend', ''],
             'typescript' => ['tsconfig.json', 'pemeriksaan tipe frontend', '"exclude"'],
             // `phpstan.neon` sengaja tidak di sini sejak 9 September 2026. Pengecualian analisa
-            // tipe PHP punya daftarnya sendiri, `ModulTanpaAnalisaTipe`, dengan tenggat dan
+            // tipe PHP punya daftarnya sendiri, `ModulesWithoutTypeAnalysis`, dengan tenggat dan
             // penjaganya sendiri. Alasannya: modul aset lulus kelima penjaga batas sambil masih
             // menyisakan 405 temuan tipe, jadi kedua pengecualian itu memang berakhir pada waktu
             // yang berbeda. Menyatukannya berarti kelima penjaga batas ikut mati sampai anotasi
@@ -126,7 +126,7 @@ class ModulSedangDipindahTest extends TestCase
     #[DataProvider('berkasPengecualian')]
     public function test_daftar_pengecualian_sama_dengan_daftar_modul_dipindah(string $namaBerkas, string $keterangan, string $penanda): void
     {
-        $dipindah = array_keys(ModulSedangDipindah::default()->all());
+        $dipindah = array_keys(ModulesBeingMoved::default()->all());
         $berkas = dirname(__DIR__, 3).'/'.$namaBerkas;
 
         $this->assertFileExists($berkas);
@@ -167,7 +167,7 @@ class ModulSedangDipindahTest extends TestCase
 
     public function test_tiap_entri_menyebut_alasan_dan_tenggat(): void
     {
-        $daftar = ModulSedangDipindah::default()->all();
+        $daftar = ModulesBeingMoved::default()->all();
 
         foreach ($daftar as $nama => $entri) {
             $this->assertNotSame('', trim($entri['alasan']), sprintf(
@@ -190,12 +190,12 @@ class ModulSedangDipindahTest extends TestCase
      */
     public function test_tenggat_tiap_entri_belum_lewat(): void
     {
-        $lewat = ModulSedangDipindah::default()->overdue(new DateTimeImmutable('today'));
+        $lewat = ModulesBeingMoved::default()->overdue(new DateTimeImmutable('today'));
 
         $this->assertSame([], $lewat, implode("\n", [
             'Ada modul yang masih dikecualikan padahal tenggatnya sudah lewat: '.implode(', ', array_keys($lewat)).'.',
             'Pilihannya dua, dan keduanya harus ditulis pada pull request: selesaikan pembentukan',
-            'ulang modulnya lalu buang entrinya dari ModulSedangDipindah, atau perpanjang tenggatnya',
+            'ulang modulnya lalu buang entrinya dari ModulesBeingMoved, atau perpanjang tenggatnya',
             'dengan alasan kenapa perkiraan sebelumnya meleset. Yang tidak boleh adalah membiarkannya.',
         ]));
     }
@@ -210,12 +210,12 @@ class ModulSedangDipindahTest extends TestCase
     public function test_modul_yang_dikecualikan_masih_benar_benar_melanggar(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::default();
+        $dipindah = ModulesBeingMoved::default();
 
         $basi = $this->entriBasi($pemindai, $dipindah);
 
         $this->assertSame([], $basi, implode("\n", [
-            'Modul ini sudah bersih, buang entrinya dari ModulSedangDipindah: '.implode(', ', $basi).'.',
+            'Modul ini sudah bersih, buang entrinya dari ModulesBeingMoved: '.implode(', ', $basi).'.',
             'Pemindaian penuh atas foldernya tidak menemukan satu pun pelanggaran namespace,',
             'kelas Core di luar kontrak, maupun query builder mentah. Pengecualian yang tidak lagi',
             'mengecualikan apa pun hanya menyisakan lubang yang menunggu dipakai orang berikutnya.',
@@ -231,7 +231,7 @@ class ModulSedangDipindahTest extends TestCase
      */
     public function test_pemblokir_menyebut_task_yang_membuangnya(): void
     {
-        foreach (ModulSedangDipindah::default()->all() as $nama => $entri) {
+        foreach (ModulesBeingMoved::default()->all() as $nama => $entri) {
             $this->assertPemblokirMenyebutTask($nama, $entri['pemblokir'] ?? '');
         }
 
@@ -283,7 +283,7 @@ class ModulSedangDipindahTest extends TestCase
             'Tanpa penghalang, modul yang sudah bersih harus dilaporkan basi; kalau tidak, pemeriksaan di bawah tidak membuktikan apa pun.',
         );
 
-        $denganPemblokir = ModulSedangDipindah::custom([
+        $denganPemblokir = ModulesBeingMoved::custom([
             $bersih => [
                 'alasan' => 'Modul palsu milik test ini.',
                 'tenggat' => '2999-12-31',
@@ -444,7 +444,7 @@ class ModulSedangDipindahTest extends TestCase
      *
      * @return list<string>
      */
-    private function entriBasi(PemindaiModul $pemindai, ModulSedangDipindah $dipindah): array
+    private function entriBasi(PemindaiModul $pemindai, ModulesBeingMoved $dipindah): array
     {
         $folderModul = $pemindai->folderModul();
         $basi = [];
@@ -492,9 +492,9 @@ class ModulSedangDipindahTest extends TestCase
         return [new PemindaiModul($akar.'/modules'), $ditandai, $tanpaTanda];
     }
 
-    private function daftarBerisi(string $namaFolder): ModulSedangDipindah
+    private function daftarBerisi(string $namaFolder): ModulesBeingMoved
     {
-        return ModulSedangDipindah::custom([
+        return ModulesBeingMoved::custom([
             $namaFolder => [
                 'alasan' => 'Modul palsu milik test ini.',
                 'tenggat' => '2999-12-31',

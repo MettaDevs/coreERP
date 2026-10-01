@@ -256,7 +256,7 @@ Di sisi pembaca, idempotensinya `UNIQUE(posting_id)`. Posting yang sama bisa sam
 
 - Hanya untuk `held`, `pending`, dan `rejected` (`FinancePosting::MARKABLE_MANUAL`). `posted` tidak termasuk: pembaca sudah membukukannya, jadi menandainya manual berarti jurnal kedua.
 - Alasannya wajib, dan dicatat di peristiwa `marked_manual` bersama penggunanya. `manual_reason` menjadi `user`, dan `hold_reasons` dikosongkan.
-- **Status diperiksa ulang di dalam kunci baris.** Ack pembaca bisa tiba di antara layar dibuka dan tombol ditekan. Bila statusnya sudah tidak mengizinkan, `StatusPostingBerubah` dilempar, dan controller menjawab 422 "Status posting ini baru saja berubah". Kelasnya sendiri, bukan `RuntimeException` biasa, karena `QueryException` juga turunan `RuntimeException`: menangkap induknya akan ikut menelan kesalahan database dan menampilkannya sebagai "status berubah".
+- **Status diperiksa ulang di dalam kunci baris.** Ack pembaca bisa tiba di antara layar dibuka dan tombol ditekan. Bila statusnya sudah tidak mengizinkan, `PostingStatusChanged` dilempar, dan controller menjawab 422 "Status posting ini baru saja berubah". Kelasnya sendiri, bukan `RuntimeException` biasa, karena `QueryException` juga turunan `RuntimeException`: menangkap induknya akan ikut menelan kesalahan database dan menampilkannya sebagai "status berubah".
 - Posting `pending` yang sudah pernah di-pull atau dicoba dikirim tetap boleh ditandai. Pengguna yang memutuskan, dan layar pantau memperingatkan bahwa pembaca mungkin sudah membukukannya. Ack yang tiba sesudahnya dijawab 409, karena postingnya sudah bukan `pending`.
 
 ## Penilaian ulang cutover
@@ -535,7 +535,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | `apps/core/app/Foundation/FinancePosting/Support/PostingSettings.php` | Feed aktif, cutover, dan mode per tanggal |
 | `apps/core/app/Foundation/FinancePosting/Support/PostingAcknowledger.php` | Aturan ack untuk pull dan push |
 | `apps/core/app/Foundation/FinancePosting/Support/PostingPusher.php` | Kiriman push: urutan, jeda, dan kegagalan |
-| `apps/core/app/Foundation/FinancePosting/Support/StatusPostingBerubah.php` | Status berubah di antara layar dibuka dan tombol ditekan |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingStatusChanged.php` | Status berubah di antara layar dibuka dan tombol ditekan |
 | `apps/core/app/Platform/Integration/Support/SignedPush.php` | Signature dan kiriman HTTP |
 | `apps/core/app/Platform/Integration/Support/PushDestination.php` | Aturan URL tujuan push |
 | `apps/core/app/Foundation/FinancePosting/Console/PushFinancePostings.php` | Perintah `finance-postings:push` |

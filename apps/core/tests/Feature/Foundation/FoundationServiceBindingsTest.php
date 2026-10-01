@@ -14,7 +14,7 @@ use App\Foundation\NumberSequence\ModuleServices\NumberSequenceIssuerCore;
 use App\Foundation\UnitOfMeasure\ModuleServices\UnitOfMeasureDirectoryCore;
 use App\Foundation\Vendor\ModuleServices\VendorDirectoryCore;
 use App\Foundation\Workflow\ModuleServices\WorkflowEngineCore;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
+use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Modules\Contracts\CurrencyRounding;
 use App\Platform\Modules\Contracts\FinancePostingSettings;
@@ -71,12 +71,12 @@ class FoundationServiceBindingsTest extends TestCase
 
     public function test_parameter_workflow_is_scoped_to_one_request(): void
     {
-        $first = $this->app->make(ParameterWorkflow::class);
+        $first = $this->app->make(WorkflowParameters::class);
 
-        $this->assertSame($first, $this->app->make(ParameterWorkflow::class));
+        $this->assertSame($first, $this->app->make(WorkflowParameters::class));
 
         $this->app->forgetScopedInstances();
 
-        $this->assertNotSame($first, $this->app->make(ParameterWorkflow::class));
+        $this->assertNotSame($first, $this->app->make(WorkflowParameters::class));
     }
 }

@@ -15,9 +15,9 @@ aturannya, dan kenapa aturannya begitu.
 ## Keadaan sekarang: daftarnya kosong
 
 Daftar modul yang sedang dipindah ada di
-`apps/core/app/Platform/Modules/Support/ModulSedangDipindah.php`, dan **isinya sekarang kosong**.
+`apps/core/app/Platform/Modules/Support/ModulesBeingMoved.php`, dan **isinya sekarang kosong**.
 Begitu juga daftar modul yang belum ikut analisa tipe PHP,
-`apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php`, dan ketiga berkas pengecualian yang
+`apps/core/app/Platform/Modules/Support/ModulesWithoutTypeAnalysis.php`, dan ketiga berkas pengecualian yang
 mengikutinya (`apps/core/.prettierignore`, `exclude` pada
 `apps/core/tsconfig.json`, `excludePaths` pada `apps/core/phpstan.neon`).
 
@@ -42,7 +42,7 @@ hari modul aset selesai dipindah: ia lulus seluruh penjaga batas, lulus pemeriks
 lulus pemeriksaan gaya, sambil masih menyisakan ratusan temuan analisa tipe PHP. Menyatukan keduanya
 berarti tonggak yang lebih lambat menyandera yang lebih cepat — modul harus tetap dianggap sedang
 dipindah, dengan seluruh penjaga batasnya ikut mati, hanya karena anotasi tipenya belum ditulis. Karena
-itu `ModulTanpaAnalisaTipe` berdiri sendiri, dengan tenggat dan penjaganya sendiri.
+itu `ModulesWithoutTypeAnalysis` berdiri sendiri, dengan tenggat dan penjaganya sendiri.
 
 ## Aturan pengecualian penjaga
 
@@ -103,7 +103,7 @@ Penjaga batas bukan satu-satunya pemeriksaan Core yang menjangkau `modules/`. Pe
 pemeriksaan tipe frontend, dan analisa statis PHP juga — masing-masing benar sendiri-sendiri, dan
 masing-masing mulai menjangkau modul yang belum siap dijangkau begitu foldernya mendarat.
 
-Yang menyatukannya satu daftar. `ModulSedangDipindahTest` menjaganya lewat satu test bertabel: setiap
+Yang menyatukannya satu daftar. `ModulesBeingMovedTest` menjaganya lewat satu test bertabel: setiap
 berkas pengecualian Core wajib mendaftar modul yang **sama persis** dengan daftar modul yang sedang
 dipindah. Menambahkan pemeriksaan berikutnya ke tabel itu satu baris.
 
@@ -115,7 +115,7 @@ Dua arah sama pentingnya, dan yang kedua justru lebih berbahaya:
   selamanya — dan itu tidak terlihat siapa pun, karena tidak ada yang gagal.
 
 Berkas mana saja yang masuk tabel itu dibaca dari `berkasPengecualian()` pada
-`apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php`. `phpstan.neon` sengaja tidak di
+`apps/core/tests/Feature/Boundary/ModulesBeingMovedTest.php`. `phpstan.neon` sengaja tidak di
 sana: pengecualian analisa tipe PHP punya daftar dan penjaganya sendiri, karena kedua pengecualian itu
 memang berakhir pada waktu yang berbeda.
 
@@ -160,8 +160,8 @@ Daftar yang kosong membuat setiap pemeriksaan yang membacanya hijau **tanpa subj
 menguji apa pun. Itu persis keadaan yang berulang kali dilarang berkas-berkas ini sendiri, dan ia jauh
 lebih berbahaya daripada merah, karena ia terlihat seperti keberhasilan.
 
-Karena itu kedua kelas daftar menyediakan pintu untuk daftar buatan (`ModulSedangDipindah::buatan()` dan
-`ModulTanpaAnalisaTipe::dariDaftar()`), dan testnya membuktikan aturannya pada entri buatan: penghalang
+Karena itu kedua kelas daftar menyediakan pintu untuk daftar buatan (`ModulesBeingMoved::buatan()` dan
+`ModulesWithoutTypeAnalysis::dariDaftar()`), dan testnya membuktikan aturannya pada entri buatan: penghalang
 tanpa nomor task ditolak, tenggat berformat salah ditolak, entri yang menyatakan penghalang tidak
 dihitung basi walau modulnya sudah bersih, dan melonggarkan untuk satu modul tidak melonggarkan untuk
 modul lain.
@@ -240,12 +240,12 @@ Aturan ini masih berlaku: `app-erp-procurement` belum dipindah.
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/core/app/Platform/Modules/Support/ModulSedangDipindah.php` | Daftar modul yang sedang dipindah, beserta alasan, tenggat, dan penghalangnya |
-| `apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php` | Daftar modul yang belum ikut analisa tipe PHP |
+| `apps/core/app/Platform/Modules/Support/ModulesBeingMoved.php` | Daftar modul yang sedang dipindah, beserta alasan, tenggat, dan penghalangnya |
+| `apps/core/app/Platform/Modules/Support/ModulesWithoutTypeAnalysis.php` | Daftar modul yang belum ikut analisa tipe PHP |
 | `apps/core/app/Platform/Modules/Support/ModuleRegistry.php` | Pembedaan `semua()` dan `semuaTermasukYangSedangDipindah()` |
 | `apps/core/app/Providers/ModuleServiceProvider.php` | Pendaftaran penyedia layanan modul dan pemuatan migration modul yang sedang dipindah |
-| `apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Tenggat, pemeriksaan basi, syarat entri, dan kesamaan berkas pengecualian |
-| `apps/core/tests/Feature/Boundary/ModulTanpaAnalisaTipeTest.php` | Kesamaan daftar dengan `excludePaths` pada `phpstan.neon`, dan tenggatnya |
+| `apps/core/tests/Feature/Boundary/ModulesBeingMovedTest.php` | Tenggat, pemeriksaan basi, syarat entri, dan kesamaan berkas pengecualian |
+| `apps/core/tests/Feature/Boundary/ModulesWithoutTypeAnalysisTest.php` | Kesamaan daftar dengan `excludePaths` pada `phpstan.neon`, dan tenggatnya |
 | `apps/core/tests/Feature/Boundary/PemindaiModul.php` | Pemindaian folder modul yang dipakai bersama penjaga dan pemeriksaan basi |
 | `apps/core/tests/Feature/Boundary/` | Seluruh penjaga batas; docblock masing-masing menyebut apakah ia membaca daftar ini |
 

@@ -14,4 +14,4 @@ use RuntimeException;
  * jadi menangkap induknya akan ikut menelan kesalahan database dan menampilkannya sebagai
  * "status berubah".
  */
-final class StatusPostingBerubah extends RuntimeException {}
+final class PostingStatusChanged extends RuntimeException {}

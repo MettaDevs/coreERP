@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use App\Platform\Modules\Support\TableOwnershipInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -31,7 +31,7 @@ use Tests\TestCase;
  * Karena itu, untuk penjaga ini pengecualian harus **melewatkan penjalanannya sama sekali**.
  * Konsekuensinya jujur dan harus ditulis di sini supaya tidak ada yang menyangka pengecualian
  * bekerja seragam pada ketiga penjaga: untuk dimensi awalan tabel, pemeriksaan basi tidak bisa
- * dihitung, dan `tenggat` pada `ModulSedangDipindah` menjadi satu-satunya yang mengakhirinya.
+ * dihitung, dan `tenggat` pada `ModulesBeingMoved` menjadi satu-satunya yang mengakhirinya.
  * Bila entri dibuang sebelum awalan tabelnya benar-benar dibereskan, yang memberi tahu adalah
  * penjaga ini pada pull request berikutnya, bukan pemeriksaan basi.
  */
@@ -52,10 +52,10 @@ class ModuleTableBoundaryTest extends TestCase
     public function test_migration_tiap_module_hanya_membuat_tabel_berawalan_miliknya(): void
     {
         // Modul yang sedang dipindah tidak ikut dijalankan; alasannya ada pada docblock kelas ini.
-        // Daftarnya tidak ditulis ulang di sini melainkan dibaca dari ModulSedangDipindah, satu
+        // Daftarnya tidak ditulis ulang di sini melainkan dibaca dari ModulesBeingMoved, satu
         // tempat yang sama dengan dua penjaga lain. Daftar batas modul yang hidup di tiga tempat
         // akan menyimpang, dan yang menyimpang lebih berbahaya daripada yang tidak ada.
-        $modules = PemindaiModul::padaRepo()->modulDenganMigration(ModulSedangDipindah::default());
+        $modules = PemindaiModul::padaRepo()->modulDenganMigration(ModulesBeingMoved::default());
         $this->assertNotEmpty($modules, 'Tidak ada module yang dijalankan; penjaga ini akan lulus tanpa menguji apa pun.');
 
         $inspector = new TableOwnershipInspector;

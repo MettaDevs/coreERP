@@ -13,7 +13,7 @@ use UnexpectedValueException;
  * Membaca parameter workflow milik sebuah tenant.
  *
  * Pembacanya generik dan tidak mengenal satu pun parameter secara nama; yang mengenal namanya
- * adalah `DefinisiParameterWorkflow`. Bentuk itu yang membuat penambahan parameter berhenti
+ * adalah `WorkflowParameterDefinitions`. Bentuk itu yang membuat penambahan parameter berhenti
  * menyentuh kelas ini.
  *
  * **Seluruh parameter sebuah tenant dibaca sekali per permintaan.** Satu workflow bercabang
@@ -22,7 +22,7 @@ use UnexpectedValueException;
  * yang tidak mungkin berubah di tengah permintaan. Membaca semuanya sekaligus, bukan satu per
  * satu, membuat jumlah query tetap satu berapa pun banyaknya parameter yang ditanyakan.
  */
-final class ParameterWorkflow
+final class WorkflowParameters
 {
     /** @var array<string, array<string, bool>> */
     private array $cache = [];
@@ -36,7 +36,7 @@ final class ParameterWorkflow
      */
     public function boolean(string $tenantId, string $code): bool
     {
-        if (! DefinisiParameterWorkflow::known($code)) {
+        if (! WorkflowParameterDefinitions::known($code)) {
             throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $code));
         }
 
@@ -61,16 +61,16 @@ final class ParameterWorkflow
 
         foreach (DB::table('workflow_parameters')->where('tenant_id', $tenantId)->get(['code', 'value']) as $row) {
             // Kode yang tidak lagi terdaftar dilewati. Baris yatim boleh tertinggal di database
-            // — lihat alasannya pada `DefinisiParameterWorkflow` — tetapi ia tidak boleh ikut
+            // — lihat alasannya pada `WorkflowParameterDefinitions` — tetapi ia tidak boleh ikut
             // menjawab pertanyaan siapa pun.
-            if (! DefinisiParameterWorkflow::known((string) $row->code)) {
+            if (! WorkflowParameterDefinitions::known((string) $row->code)) {
                 continue;
             }
 
             $stored[(string) $row->code] = $this->matchesType((string) $row->code, (string) $row->value);
         }
 
-        return $this->cache[$tenantId] = $stored + DefinisiParameterWorkflow::default();
+        return $this->cache[$tenantId] = $stored + WorkflowParameterDefinitions::default();
     }
 
     /**
@@ -126,7 +126,7 @@ final class ParameterWorkflow
      */
     public function save(string $tenantId, string $code, bool $value, string $actorMembershipId): void
     {
-        if (! DefinisiParameterWorkflow::known($code)) {
+        if (! WorkflowParameterDefinitions::known($code)) {
             throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $code));
         }
 

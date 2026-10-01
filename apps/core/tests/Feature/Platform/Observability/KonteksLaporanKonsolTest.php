@@ -6,7 +6,7 @@ namespace Tests\Feature\Platform\Observability;
 
 use App\Platform\Modules\Support\TenantRunnerCore;
 use App\Platform\Modules\Support\TenantScope;
-use App\Platform\Observability\Support\LaporanKesalahan;
+use App\Platform\Observability\Support\ErrorReport;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -39,7 +39,7 @@ class KonteksLaporanKonsolTest extends TestCase
 
     private function laporan(): string
     {
-        return LaporanKesalahan::from(new RuntimeException('gagal'), null)->toText();
+        return ErrorReport::from(new RuntimeException('gagal'), null)->toText();
     }
 
     public function test_menyebut_perintah_yang_sedang_berjalan(): void

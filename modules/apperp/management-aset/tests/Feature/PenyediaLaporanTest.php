@@ -1193,7 +1193,7 @@ class PenyediaLaporanTest extends TestCase
 /**
  * Penyedia laporan yang setiap panggilannya berjalan dengan tenant aktif terikat.
  *
- * Ini yang dikerjakan `SumberLaporan` milik Core sebelum menyerahkan panggilan ke module.
+ * Ini yang dikerjakan `ReportSource` milik Core sebelum menyerahkan panggilan ke module.
  * Ditiru di sini supaya test menempuh keadaan yang sama, bukan keadaan yang kebetulan
  * tersisa dari permintaan HTTP sebelumnya.
  */

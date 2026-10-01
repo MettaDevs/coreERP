@@ -30,7 +30,7 @@ use Throwable;
  * panggilan selesai, karena satu worker menjalankan banyak ekspor milik tenant berbeda
  * berturut-turut di container yang sama.
  */
-final class SumberLaporan
+final class ReportSource
 {
     public function __construct(
         private readonly ModuleReportProviderRegistry $list,

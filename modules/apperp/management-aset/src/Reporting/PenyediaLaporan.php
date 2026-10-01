@@ -24,7 +24,7 @@ use RuntimeException;
  *
  * Kegagalan dilempar sebagai `RuntimeException` dengan pesan siap-baca. Module tidak boleh
  * menyebut kelas Core di luar kontrak, jadi ia tidak bisa melempar kegagalan laporan milik
- * Core; penerjemahannya dikerjakan `SumberLaporan` di sisi pemanggil.
+ * Core; penerjemahannya dikerjakan `ReportSource` di sisi pemanggil.
  */
 final class PenyediaLaporan implements ModuleReportProvider
 {

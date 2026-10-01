@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulTanpaAnalisaTipe;
+use App\Platform\Modules\Support\ModulesWithoutTypeAnalysis;
 use DateTimeImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -13,19 +13,19 @@ use PHPUnit\Framework\TestCase;
 /**
  * Penjaga atas pengecualian analisa tipe.
  *
- * Daftar ini dipisahkan dari `ModulSedangDipindah` pada 9 September 2026, dan pemisahan itu
+ * Daftar ini dipisahkan dari `ModulesBeingMoved` pada 9 September 2026, dan pemisahan itu
  * membawa risikonya sendiri: pengecualian yang berdiri sendiri lebih mudah dilupakan daripada
  * pengecualian yang menumpang daftar yang setiap hari dilihat orang. Berkas ini yang
  * menahannya — dua cara berakhir, dan keduanya dibuktikan bisa merah.
  */
-class ModulTanpaAnalisaTipeTest extends TestCase
+class ModulesWithoutTypeAnalysisTest extends TestCase
 {
     /**
      * Cara berakhir pertama: tenggat.
      */
     public function test_tenggat_tiap_entri_belum_lewat(): void
     {
-        $lewat = ModulTanpaAnalisaTipe::default()->overdue(new DateTimeImmutable('today'));
+        $lewat = ModulesWithoutTypeAnalysis::default()->overdue(new DateTimeImmutable('today'));
 
         $this->assertSame([], $lewat, implode("\n", [
             'Tenggat pengecualian analisa tipe sudah lewat: '.implode(', ', $lewat).'.',
@@ -43,7 +43,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      */
     public function test_tenggat_yang_lewat_terdeteksi(): void
     {
-        $daftar = ModulTanpaAnalisaTipe::fromList([
+        $daftar = ModulesWithoutTypeAnalysis::fromList([
             'modul-uji' => ['alasan' => 'Bahan uji.', 'tenggat' => '2020-01-01'],
         ]);
 
@@ -55,7 +55,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      *
      * Yang dijaga bukan kerapian. Entri yang tertinggal di `phpstan.neon` setelah dibuang dari
      * sini membuat modulnya lolos analisa selamanya, dan tidak ada yang gagal karenanya —
-     * kegagalan diam yang persis sama seperti yang dijaga `ModulSedangDipindahTest` untuk
+     * kegagalan diam yang persis sama seperti yang dijaga `ModulesBeingMovedTest` untuk
      * pengecualian lainnya.
      */
     public function test_pengecualian_phpstan_sama_dengan_daftar(): void
@@ -77,11 +77,11 @@ class ModulTanpaAnalisaTipeTest extends TestCase
         sort($diBerkas);
 
         $this->assertSame(
-            ModulTanpaAnalisaTipe::default()->folderNames(),
+            ModulesWithoutTypeAnalysis::default()->folderNames(),
             $diBerkas,
             implode("\n", [
                 'Daftar module yang dikecualikan analisa tipe (phpstan.neon) tidak sama dengan',
-                'ModulTanpaAnalisaTipe. Yang kurang membuat alur merah pada modul yang memang',
+                'ModulesWithoutTypeAnalysis. Yang kurang membuat alur merah pada modul yang memang',
                 'belum siap dianalisa. Yang berlebih membiarkan modul yang sudah selesai lolos',
                 'pemeriksaan selamanya — dan itu tidak terlihat siapa pun, karena tidak ada yang',
                 'gagal.',
@@ -97,7 +97,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      */
     public function test_tiap_entri_menyebut_alasan_terukur_dan_tenggat(): void
     {
-        foreach (ModulTanpaAnalisaTipe::default()->all() as $nama => $entri) {
+        foreach (ModulesWithoutTypeAnalysis::default()->all() as $nama => $entri) {
             $this->assertEntriDapatDitinjau($nama, $entri);
         }
 

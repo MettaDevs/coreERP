@@ -230,14 +230,14 @@ final class ModuleRegistry
         // Tandanya daftar yang ditulis sengaja, bukan sifat manifest yang kebetulan. F3-25
         // sempat memakai `table_prefix` yang belum ada sebagai tanda, dan tanda itu runtuh pada
         // F3-04 — task yang justru memberi awalan tabel, dan dengan itu menyalakan module yang
-        // belum siap. Alasan lengkapnya ada di `ModulSedangDipindah`.
-        if (! $ignoreMovedList && ModulSedangDipindah::default()->marks(basename(dirname($file)))) {
+        // belum siap. Alasan lengkapnya ada di `ModulesBeingMoved`.
+        if (! $ignoreMovedList && ModulesBeingMoved::default()->marks(basename(dirname($file)))) {
             return null;
         }
 
         // Module yang **tidak** sedang dipindah wajib menyatakan awalan tabelnya. Tanpa awalan,
         // tabelnya memakai nama apa adanya dan bertabrakan dengan milik Core. Ini dijaga
-        // `ModulSedangDipindahTest` supaya tidak ada module yang lenyap tanpa suara.
+        // `ModulesBeingMovedTest` supaya tidak ada module yang lenyap tanpa suara.
         if ($this->tablePrefixes($content) === '') {
             return null;
         }

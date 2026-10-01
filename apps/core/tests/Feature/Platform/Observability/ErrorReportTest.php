@@ -7,7 +7,7 @@ namespace Tests\Feature\Platform\Observability;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
 use App\Platform\Modules\Support\ModuleRequestContext;
-use App\Platform\Observability\Support\LaporanKesalahan;
+use App\Platform\Observability\Support\ErrorReport;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use PDOException;
@@ -31,7 +31,7 @@ use Tests\TestCase;
  * 3. **Kesalahan 4xx tidak dilaporkan.** 404 bukan kesalahan internal; membiarkannya masuk
  *    mengubur laporan yang berarti di bawah lalu lintas biasa.
  */
-class LaporanKesalahanTest extends TestCase
+class ErrorReportTest extends TestCase
 {
     public function test_konteks_module_lengkap_muncul_di_laporan(): void
     {
@@ -42,7 +42,7 @@ class LaporanKesalahanTest extends TestCase
         $permintaan->attributes->set(ModuleRequestContext::ORG_UNIT_ID, 'unit-01');
         $permintaan->attributes->set(ModuleRequestContext::USER_ID, 'pengguna-01');
 
-        $laporan = LaporanKesalahan::from(new RuntimeException('gagal menyimpan'), $permintaan);
+        $laporan = ErrorReport::from(new RuntimeException('gagal menyimpan'), $permintaan);
 
         $teks = $laporan->toText();
         $this->assertStringContainsString('POST', $teks);
@@ -67,7 +67,7 @@ class LaporanKesalahanTest extends TestCase
         // middleware module berjalan, jadi tidak satu pun atribut tersedia.
         $permintaan = Request::create('https://erp.test/dashboard', 'GET');
 
-        $laporan = LaporanKesalahan::from(new RuntimeException('meledak'), $permintaan);
+        $laporan = ErrorReport::from(new RuntimeException('meledak'), $permintaan);
 
         $teks = $laporan->toText();
         $this->assertStringContainsString('meledak', $teks);
@@ -79,7 +79,7 @@ class LaporanKesalahanTest extends TestCase
 
     public function test_kegagalan_kueri_menampilkan_sql_dan_pesan_driver(): void
     {
-        $laporan = LaporanKesalahan::from($this->kesalahanKueri(), Request::create('https://erp.test/x', 'POST'));
+        $laporan = ErrorReport::from($this->kesalahanKueri(), Request::create('https://erp.test/x', 'POST'));
 
         $teks = $laporan->toText();
         $this->assertStringContainsString('duplicate key value', $teks);
@@ -118,7 +118,7 @@ class LaporanKesalahanTest extends TestCase
         $permintaan = Request::create('https://erp.test/dashboard', 'GET');
         $permintaan->setLaravelSession($this->app['session']->driver());
 
-        LaporanKesalahan::from($this->kesalahanKueri(), $permintaan);
+        ErrorReport::from($this->kesalahanKueri(), $permintaan);
 
         $this->assertFalse($disentuh, 'CurrentWorkspace tidak boleh diselesaikan ketika kesalahannya menyangkut database');
     }
@@ -128,14 +128,14 @@ class LaporanKesalahanTest extends TestCase
         // Koneksi ditolak sebelum satu query pun tersusun tidak pernah menjadi
         // `QueryException` — padahal justru itu keadaan ketika database paling tidak boleh
         // disentuh lagi.
-        $this->assertTrue(LaporanKesalahan::isDatabaseFailure(new PDOException('connection refused')));
-        $this->assertTrue(LaporanKesalahan::isDatabaseFailure(new RuntimeException('dibungkus', 0, new PDOException('refused'))));
-        $this->assertFalse(LaporanKesalahan::isDatabaseFailure(new RuntimeException('biasa')));
+        $this->assertTrue(ErrorReport::isDatabaseFailure(new PDOException('connection refused')));
+        $this->assertTrue(ErrorReport::isDatabaseFailure(new RuntimeException('dibungkus', 0, new PDOException('refused'))));
+        $this->assertFalse(ErrorReport::isDatabaseFailure(new RuntimeException('biasa')));
     }
 
     public function test_bentuk_konsol_tanpa_permintaan(): void
     {
-        $laporan = LaporanKesalahan::from(new RuntimeException('job gagal'), null);
+        $laporan = ErrorReport::from(new RuntimeException('job gagal'), null);
 
         $teks = $laporan->toText();
         $this->assertStringContainsString('konsol', $teks);
@@ -149,8 +149,8 @@ class LaporanKesalahanTest extends TestCase
 
     public function test_kesalahan_4xx_tidak_layak_dilaporkan(): void
     {
-        $this->assertFalse(LaporanKesalahan::isReportable(new NotFoundHttpException));
-        $this->assertTrue(LaporanKesalahan::isReportable(new RuntimeException('nyata')));
+        $this->assertFalse(ErrorReport::isReportable(new NotFoundHttpException));
+        $this->assertTrue(ErrorReport::isReportable(new RuntimeException('nyata')));
     }
 
     private function kesalahanKueri(): QueryException

@@ -32,7 +32,7 @@ use Illuminate\Support\Str;
  * adanya, jadi mengubah nama cookie tidak lagi menuntut cache setelan dibangun ulang agar
  * dokumen API-nya ikut benar.
  */
-final class KeamananSesiCore extends MiddlewareAuthSecurityStrategy
+final class CoreSessionSecurity extends MiddlewareAuthSecurityStrategy
 {
     public function __construct()
     {

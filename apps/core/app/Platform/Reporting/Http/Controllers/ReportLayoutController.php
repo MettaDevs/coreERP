@@ -9,7 +9,7 @@ use App\Platform\Reporting\Support\LayoutRef;
 use App\Platform\Reporting\Support\LayoutStore;
 use App\Platform\Reporting\Support\PrintIdentityStore;
 use App\Platform\Reporting\Support\ReportCatalog;
-use App\Platform\Reporting\Support\SumberLaporan;
+use App\Platform\Reporting\Support\ReportSource;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +34,7 @@ class ReportLayoutController extends Controller
     public function __construct(
         private readonly ReportCatalog $catalog,
         private readonly LayoutStore $layouts,
-        private readonly SumberLaporan $client,
+        private readonly ReportSource $client,
         private readonly CurrentWorkspace $workspace,
         private readonly PrintIdentityStore $identities,
     ) {}

@@ -10,7 +10,7 @@ use App\Platform\License\Support\SiteLicense;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Modules\Support\ModuleRequestContext;
 use App\Platform\Modules\Support\TenantScope;
-use App\Platform\Observability\Support\LaporanKesalahan;
+use App\Platform\Observability\Support\ErrorReport;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -118,10 +118,10 @@ final class ResolveModuleContext
          * justru ketika database sedang tidak bisa ditanya — sehingga satu-satunya nama yang
          * aman baginya adalah nama yang sudah berada di memori sebelum kegagalan terjadi.
          */
-        $request->attributes->set(LaporanKesalahan::TENANT_NAME, $membership->tenant->name);
-        $request->attributes->set(LaporanKesalahan::LEGAL_ENTITY_NAME, $legalEntity?->name);
-        $request->attributes->set(LaporanKesalahan::ORG_UNIT_NAME, $orgUnit?->name);
-        $request->attributes->set(LaporanKesalahan::USER_NAME, $request->user()?->name);
+        $request->attributes->set(ErrorReport::TENANT_NAME, $membership->tenant->name);
+        $request->attributes->set(ErrorReport::LEGAL_ENTITY_NAME, $legalEntity?->name);
+        $request->attributes->set(ErrorReport::ORG_UNIT_NAME, $orgUnit?->name);
+        $request->attributes->set(ErrorReport::USER_NAME, $request->user()?->name);
         $request->attributes->set(ModuleRequestContext::DATA_POLICIES, $this->policy->resolve($membership));
 
         /*

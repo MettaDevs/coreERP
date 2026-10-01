@@ -17,7 +17,7 @@ use Tests\TestCase;
  * menahan orang yang salah" — dan yang kedua tidak akan terlihat sebagai satu test merah,
  * melainkan sebagai puluhan test yang tiba-tiba mendapat 302 tanpa menyebut sebabnya.
  */
-final class WajibGantiSandiTest extends TestCase
+final class RequirePasswordChangeTest extends TestCase
 {
     use RefreshDatabase;
 

@@ -27,7 +27,7 @@ use Throwable;
  * ketiga container — web, worker, penjadwal. Kalau masing-masing memegang penjedanya sendiri,
  * satu kesalahan yang terjadi di ketiganya tetap berbunyi tiga kali.
  */
-final class PenjedaKiriman
+final class NotificationThrottle
 {
     /**
      * Apakah laporan ini boleh dikirim sekarang.
@@ -36,7 +36,7 @@ final class PenjedaKiriman
      * penuh — jawabannya `true`. Peringatan yang dobel masih jauh lebih baik daripada
      * peringatan yang hilang karena mekanisme peredamnya rusak.
      */
-    public static function allows(LaporanKesalahan $report): bool
+    public static function allows(ErrorReport $report): bool
     {
         try {
             $delay = self::pauseSeconds();
@@ -72,7 +72,7 @@ final class PenjedaKiriman
      * tidak pernah menjeda apa pun. Yang dipakai di sini sengaja lebih tumpul: kalau tempatnya
      * sama, anggap itu bug yang sama.
      */
-    private static function fingerprint(LaporanKesalahan $report): string
+    private static function fingerprint(ErrorReport $report): string
     {
         $attributes = $report->toAttributes();
 

@@ -35,7 +35,7 @@ class ModuleRegistryTest extends TestCase
      *
      * Daftarnya ditulis lengkap dan bukan sekadar "berisi", supaya module yang **hilang** dari
      * runtime ikut terlihat. `management-aset` masuk sejak F3-30: selama entrinya ada di
-     * `ModulSedangDipindah` ia dimuat tetapi tidak dilayani, dan test ini yang menandai
+     * `ModulesBeingMoved` ia dimuat tetapi tidak dilayani, dan test ini yang menandai
      * perpindahannya.
      */
     public function test_registry_menemukan_seluruh_module_di_repo(): void

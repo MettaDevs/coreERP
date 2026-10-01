@@ -39,7 +39,7 @@ class NoInternalHttpTest extends TestCase
      *
      * **Penjaga ini tidak pernah mengecualikan siapa pun, dan itu keputusan yang disengaja.**
      * Sampai 9 September 2026 empat penjaga pembaca berkas lain mengecualikan modul yang sedang
-     * dipindah lewat `ModulSedangDipindah`, karena keadaan yang mereka larang — namespace
+     * dipindah lewat `ModulesBeingMoved`, karena keadaan yang mereka larang — namespace
      * `App\`, query builder mentah, awalan tabel yang belum dinyatakan — memang ikut mendarat
      * bersama subtree-nya dan tidak mungkin dibereskan pada pull request yang sama.
      *

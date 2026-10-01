@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Platform\Modules\Support\CoreServices;
 use App\Platform\Modules\Support\ModuleRegistry;
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -67,10 +67,10 @@ final class ModuleServiceProvider extends ServiceProvider
         // jadi tabelnya tidak punya cara lain untuk ada — dan tanpa tabel, tidak satu pun
         // testnya bisa berjalan.
         //
-        // Ini berakhir sendiri: begitu module keluar dari daftar `ModulSedangDipindah`, ia
+        // Ini berakhir sendiri: begitu module keluar dari daftar `ModulesBeingMoved`, ia
         // dipasang lewat jalur yang sama seperti module lain dan baris ini berhenti berlaku
         // untuknya.
-        $moved = ModulSedangDipindah::default();
+        $moved = ModulesBeingMoved::default();
 
         foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
             if ($moved->marks(basename($module->folder))) {

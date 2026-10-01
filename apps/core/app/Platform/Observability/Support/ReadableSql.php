@@ -28,7 +28,7 @@ use Throwable;
  * ada rekonstruksi sama sekali: yang pertama mengirim orang menelusuri baris data yang
  * tidak pernah terlibat.
  */
-final class SqlTerbaca
+final class ReadableSql
 {
     /**
      * Panjang maksimum hasil. Query yang lebih panjang dari ini hampir selalu berupa

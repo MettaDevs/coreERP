@@ -178,7 +178,7 @@ dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta
 - [x] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur. Tujuh fitur Foundation
       (Currency, FinancePosting, FiscalCalendar, NumberSequence, UnitOfMeasure, Vendor, Workflow)
       kini punya `<Fitur>ServiceProvider` di `bootstrap/providers.php`, dengan umur ikatan yang sama
-      (`bind`, `singleton` untuk `PostingAccountResolvers`, `scoped` untuk `ParameterWorkflow`).
+      (`bind`, `singleton` untuk `PostingAccountResolvers`, `scoped` untuk `WorkflowParameters`).
       Ikut dibereskan: docblock `ConvertEnvironment`/`CopyEnvironment` dan `IntegrationClientAccounts`.
       `ALLOWED` turun dari 26 menjadi 12 baris
 - [ ] **Pembalikan arah pemasangan dan onboarding:** `InstallModule`, `RegisterAppCatalog`, dan
@@ -205,9 +205,9 @@ dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta
         module lewat argumen bernama;
       - pembungkus facade di module, misalnya `PenerbitNomorAset`, `DaftarSatuanAset`, dan
         `PenerbitNomorHr`;
-      - kelas Platform dan Foundation, misalnya `PelaporKesalahan`, `JejakAktif`,
-        `LampirkanKonteksJejak`, `WajibGantiSandi`, `StatusPostingBerubah`, `ModulSedangDipindah`, dan
-        `ModulTanpaAnalisaTipe`.
+      - kelas Platform dan Foundation, misalnya `ErrorReporter`, `ActiveSpan`,
+        `AttachTraceContext`, `RequirePasswordChange`, `PostingStatusChanged`, `ModulesBeingMoved`, dan
+        `ModulesWithoutTypeAnalysis`.
 
       Mengganti nama kelas yang disebut di docs, `phpstan-baseline.neon`, atau test mengikuti aturan
       yang sama dengan pemindahan: satu PR per kelompok, isi kelas tidak berubah

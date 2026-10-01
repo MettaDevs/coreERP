@@ -26,7 +26,7 @@ Yang dibuang:
   `BootstrapLocalAppRuntimeCommand.php`
 - `apps/core/app/Jobs/DeployAppPlacement.php`
 - `apps/core/app/Support/Reporting/AppReportClient.php` beserta cabang HTTP pada
-  `SumberLaporan` — tidak ada lagi app di luar proses yang menyiapkan dataset laporan
+  `ReportSource` — tidak ada lagi app di luar proses yang menyiapkan dataset laporan
 - pendaftaran rilis penyedia: `AppReleaseController`, `AppReleaseRequest`, model `AppRelease`,
   rutenya, dan entri OpenAPI-nya
 - `apps/core/resources/js/pages/apps/host.tsx` beserta pemeriksa pesan iframe pada

@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 class WorkflowRuntime
 {
     public function __construct(
-        private readonly ParameterWorkflow $parameter,
+        private readonly WorkflowParameters $parameter,
         private readonly PengirimEventModul $dispatcher,
     ) {}
 
@@ -72,7 +72,7 @@ class WorkflowRuntime
             // tidak pernah masuk daftar penerima ketika tenant melarangnya, sehingga tugas yang
             // tidak bisa diklik tidak pernah terbentuk.
             $bySubmitter = $instance->initiator_membership_id !== null && $instance->initiator_membership_id === $actor->id;
-            $forbidden = $this->parameter->boolean((string) $actor->tenant_id, DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
+            $forbidden = $this->parameter->boolean((string) $actor->tenant_id, WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
             abort_if($bySubmitter && $forbidden, 403, 'Pengaju tidak dapat menyetujui dokumennya sendiri.');
 
             $element = DB::table('workflow_elements')->where('id', $workItem->element_id)->where('version_id', $instance->configuration_version_id)->first();
@@ -315,7 +315,7 @@ class WorkflowRuntime
         // "larang", sedangkan kondisi di sini menanyakan "lewati penyaringan" — menuliskannya
         // sebagai satu negasi di tengah `||` adalah bentuk yang paling mudah dibalik keliru
         // oleh orang berikutnya.
-        $forbidden = $this->parameter->boolean($tenantId, DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
+        $forbidden = $this->parameter->boolean($tenantId, WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
 
         if ($candidates->isEmpty() || ! $forbidden) {
             return $candidates;

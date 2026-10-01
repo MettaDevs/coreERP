@@ -36,7 +36,7 @@ use Symfony\Component\HttpFoundation\Response;
  * mandiri, dan setiap akun yang sudah ada melewati kelas ini tanpa satu pemeriksaan pun — bukan
  * "diizinkan setelah diperiksa", melainkan tidak pernah diperiksa sama sekali.
  */
-final class WajibGantiSandi
+final class RequirePasswordChange
 {
     /**
      * Rute yang tetap dapat dicapai selama penandanya menyala.

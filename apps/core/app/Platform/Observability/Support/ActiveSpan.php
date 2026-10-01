@@ -31,7 +31,7 @@ use Throwable;
  * sebetulnya hidup. Yang benar-benar menjawab "apakah ada yang mendengarkan" adalah
  * `isRecording()`, dan itu yang dipakai.
  */
-final class JejakAktif
+final class ActiveSpan
 {
     /**
      * Menempelkan atribut ke span yang sedang aktif, kalau memang ada yang merekam.

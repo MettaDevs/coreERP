@@ -670,7 +670,7 @@ class ReportingTest extends TestCase
      * penyimpangannya baru terlihat sebagai ekspor gagal di tangan pengguna.
      *
      * Sampai 9 September 2026 manifestnya harus disalin lebih dulu ke folder bernama lain,
-     * karena `management-aset` masih terdaftar di `ModulSedangDipindah` dan module yang
+     * karena `management-aset` masih terdaftar di `ModulesBeingMoved` dan module yang
      * ditandai memang sengaja tidak didaftarkan ke katalog. Salinan itu dibuang pada F3-30:
      * modulnya kini dilayani, jadi registry yang sungguhan sudah memulangkannya.
      */

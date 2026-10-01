@@ -40,7 +40,7 @@ use Throwable;
  * adalah peringatan yang berikutnya tidak dibaca. Laporannya tetap utuh di berkas log dan di
  * SigNoz; yang hilang hanya dering notifikasinya.
  */
-final class PengirimDiscord
+final class DiscordNotifier
 {
     /** Batas Discord untuk `content` adalah 2000 karakter. */
     private const CONTENT_LIMIT = 1900;
@@ -50,7 +50,7 @@ final class PengirimDiscord
 
     /**
      * Atribut laporan yang boleh sampai ke Discord (K-18), beserta labelnya. Ini daftar izin, bukan
-     * daftar larangan: atribut baru di {@see LaporanKesalahan} tidak ikut terkirim sebelum ditambahkan
+     * daftar larangan: atribut baru di {@see ErrorReport} tidak ikut terkirim sebelum ditambahkan
      * di sini, dan hanya data teknis yang boleh ditambahkan.
      */
     private const SENT_ATTRIBUTES = [
@@ -64,7 +64,7 @@ final class PengirimDiscord
         'trace_id' => 'jejak',
     ];
 
-    public static function send(LaporanKesalahan $report): void
+    public static function send(ErrorReport $report): void
     {
         try {
             $webhook = self::webhook();
@@ -84,7 +84,7 @@ final class PengirimDiscord
                 return;
             }
 
-            if (! PenjedaKiriman::allows($report)) {
+            if (! NotificationThrottle::allows($report)) {
                 return;
             }
 
@@ -104,7 +104,7 @@ final class PengirimDiscord
     /**
      * @return array<string, mixed>
      */
-    private static function payload(LaporanKesalahan $report): array
+    private static function payload(ErrorReport $report): array
     {
         $mention = (string) config('coreerp.discord.mention', '');
         $attributes = $report->toAttributes();

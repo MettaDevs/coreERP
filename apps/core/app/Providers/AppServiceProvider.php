@@ -13,7 +13,7 @@ use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
 use App\Platform\License\Support\SiteLicense;
-use App\Platform\Observability\Support\PelaporKesalahan;
+use App\Platform\Observability\Support\ErrorReporter;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\Events\Authenticated;
@@ -232,7 +232,7 @@ class AppServiceProvider extends ServiceProvider
      * Paket itu memasang `LogWatcher`, yang mendengarkan `MessageLogged` dan mengubah setiap
      * catatan log menjadi satu catatan OTLP. Akibatnya satu kesalahan tiba di SigNoz sebagai
      * **dua** catatan: log exception bawaan Laravel, dan laporan yang dikirim
-     * {@see PelaporKesalahan} dengan sengaja.
+     * {@see ErrorReporter} dengan sengaja.
      *
      * Yang dipertahankan adalah yang kedua, dan itu bukan sekadar soal jumlah. Laporan terkurasi
      * membawa tenant, module, pengguna, batas organisasi, SQL yang gagal, dan `trace_id` sebagai
