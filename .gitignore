@@ -5,6 +5,11 @@
 node_modules/
 dist/
 vendor/
+# `vendor/` di atas juga cocok dengan folder fitur `Vendor` di Windows, karena git di sana tidak
+# membedakan huruf besar; berkas baru di fitur itu akan diam-diam tidak ikut ter-commit.
+!apps/core/app/Foundation/Vendor/
+!apps/core/resources/js/pages/foundation/vendor/
+!apps/core/tests/Feature/Foundation/Vendor/
 public/build/
 public/hot
 storage/*.key
