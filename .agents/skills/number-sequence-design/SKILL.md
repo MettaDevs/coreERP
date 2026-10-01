@@ -53,7 +53,7 @@ Map that model to CoreERP:
 
 Keep intentional differences visible:
 
-- CoreERP's product default is active `0-19999` with a five-digit numeric segment; do not claim that this exact range is a Dynamics 365 default.
+- CoreERP's product default is active `1-19999` with a five-digit numeric segment; do not claim that this exact range is a Dynamics 365 default.
 - CoreERP forbids continuous numbering together with manual entry.
 - Dynamics 365 supports incrementing alphabetic `&` segments; CoreERP does not currently promise that behavior. Report the gap instead of emulating it with a prefix.
 - CoreERP keeps tenant configuration and counters in Control Plane and uses durable database allocation; do not copy Dynamics 365's in-memory non-continuous cache design.
@@ -70,7 +70,7 @@ allow_manual: false
 reset_period: never
 preallocation_enabled: true
 preallocation_quantity: 20
-minimum_number: 0
+minimum_number: 1
 maximum_number: 19999
 segments:
   - type: number
@@ -87,7 +87,7 @@ segments:
     length: 5
 ```
 
-Require the UI preview to show both endpoints, for example `ENTA00000 - ENTA19999`, before saving. Ensure the maximum fits the numeric width.
+Require the UI preview to show both endpoints, for example `ENTA00001 - ENTA19999`, before saving. Ensure the maximum fits the numeric width.
 
 ## Scope, reset, and lifecycle
 

@@ -121,7 +121,9 @@ Seluruh blok `number_sequences` bersifat opsional — app yang memang tidak mene
 
 Core tidak men-seed reference bisnis dari app yang belum terpasang.
 
-`default_prefix` adalah singkatan uppercase yang disetujui pemilik domain. Saat app sudah siap untuk tenant, konfigurasi awal langsung aktif dengan rentang `0`–`19999` dan preview prefix + lima digit. Prefix tidak diturunkan otomatis dari nama karena singkatan bisnis tidak selalu sama dengan huruf awal.
+`default_prefix` adalah singkatan uppercase yang disetujui pemilik domain. Saat app sudah siap untuk tenant, konfigurasi awal langsung aktif dengan rentang `1`–`19999` dan preview prefix + lima digit, jadi dokumen pertama bernomor `XXXX00001`, sama seperti `Starting No.` di Business Central. Admin tetap boleh memilih nomor awal 0 lewat **Atur nomor** sebelum nomor pertama terbit.
+
+Sampai 1 Oktober 2026 bawaannya `0`, sehingga dokumen pertama bernomor `XXXX00000`. Migration `start_unused_module_number_sequences_at_one` memindahkan urutan module yang belum pernah menerbitkan atau mereservasi nomor ke `1`; urutan yang sudah menerbitkan nomor 0 dibiarkan karena nomor itu sudah tercatat di dokumen. Prefix tidak diturunkan otomatis dari nama karena singkatan bisnis tidak selalu sama dengan huruf awal.
 
 ## Reference milik Core sendiri
 
