@@ -312,7 +312,7 @@ class NumberSequenceTest extends TestCase
         $created = TenantNumberSequence::query()->where('tenant_id', $context['tenant_id'])->firstOrFail();
         $this->assertSame('active', $created->status);
         $this->assertSame('tenant', $created->scope_type);
-        $this->assertSame(0, $created->minimum_number);
+        $this->assertSame(1, $created->minimum_number);
         $this->assertSame(19999, $created->maximum_number);
         $this->assertSame([
             ['type' => 'constant', 'value' => 'DOC'],
@@ -361,7 +361,7 @@ class NumberSequenceTest extends TestCase
         ])->postJson('/api/internal/v1/number-sequences/sample-app.document/issue', [
             'idempotency_key' => 'seed-before-sequence',
             'legal_entity_id' => $legalEntityId,
-        ])->assertOk()->assertJsonPath('data.number', '00000');
+        ])->assertOk()->assertJsonPath('data.number', '00001');
 
         $this->assertDatabaseHas('tenant_number_sequences', [
             'tenant_id' => $context['tenant_id'],
