@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\Support;
 
-use App\Foundation\Currency\Support\MoneyPrecision;
+use App\Platform\Modules\Contracts\CurrencyRounding;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 
 /**
  * Format tiap placeholder bertipe pada sebuah laporan, untuk satu tenant.
  *
  * Tipe dibaca dari `fields()` definisi laporan (`'type' => 'money'`). Presisi uang dibaca
- * dari setelan mata uang tenant lewat {@see MoneyPrecision} — sumber yang sama dengan yang
+ * dari setelan mata uang tenant lewat {@see CurrencyRounding} — sumber yang sama dengan yang
  * membulatkan jurnal — jadi mengubah presisi IDR di Data referensi ikut mengubah laporan,
  * tanpa satu pun definisi laporan disentuh.
  *
@@ -20,7 +20,7 @@ use App\Platform\Reporting\Support\Rendering\RenderException;
  */
 final class ValueFormats
 {
-    public function __construct(private readonly MoneyPrecision $precision) {}
+    public function __construct(private readonly CurrencyRounding $precision) {}
 
     /**
      * @param  list<array<string, mixed>>  $fields  `fields` dari definisi laporan.

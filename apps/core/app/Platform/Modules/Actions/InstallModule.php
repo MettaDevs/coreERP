@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Actions;
 
-use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentConnection;
+use App\Platform\Modules\Events\ModuleInstallationRecorded;
 use App\Platform\Modules\Models\ModuleInstallation;
 use App\Platform\Modules\Support\ModuleManifest;
 use App\Platform\Modules\Support\ModuleMigrator;
@@ -57,7 +57,6 @@ final class InstallModule
         private readonly ModuleRegistry $registry,
         private readonly ModuleMigrator $migrator,
         private readonly ModuleSeeder $seeder,
-        private readonly EnsureNumberSequenceDrafts $numberSequences,
         private readonly EnvironmentConnection $connections,
     ) {}
 
@@ -137,7 +136,9 @@ final class InstallModule
         // dengan "Sequence aktif tidak ditemukan untuk aplikasi dan tenant ini".
         //
         // Letaknya sebelum seed karena seed module menerbitkan nomor sungguhan.
-        $this->numberSequences->forTenantAndApp($tenantId, $module->id);
+        //
+        // Urutannya dibuat listener Foundation (`PrepareNumberSequences`), sinkron di koneksi ini.
+        event(new ModuleInstallationRecorded($tenantId, $module->id));
 
         $this->seeder->jalankan($module, $tenantId);
 

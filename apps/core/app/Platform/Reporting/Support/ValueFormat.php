@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\Support;
 
-use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Platform\Identity\Support\UserClock;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
@@ -141,13 +143,40 @@ final class ValueFormat
     {
         $prefix = $this->symbol === '' ? '' : $this->symbol.' ';
 
-        return $this->grouped(MoneyPrecision::round($value, $this->decimals), $prefix);
+        return $this->grouped(self::round($value, $this->decimals), $prefix);
     }
 
     /** Angka dan persen sampai dua desimal, tanpa nol di belakang koma: 4, 2,5, 1.234,75. */
     private function number(string|int|float $value): string
     {
-        return $this->grouped(rtrim(rtrim(MoneyPrecision::round($value, 2), '0'), '.'));
+        return $this->grouped(rtrim(rtrim(self::round($value, 2), '0'), '.'));
+    }
+
+    /**
+     * Pembulatan tampilan: terdekat, yang tepat di tengah menjauhi nol, berskala persis `$decimals`.
+     *
+     * Aturan ini salinan `MoneyPrecision::round` milik Foundation, yang membulatkan jurnal, dan
+     * `tests/Unit/Platform/Reporting/ValueFormatRoundingTest` yang menjaga keduanya tetap identik.
+     * Desimal pasti (`brick/math`), float dibaca dari representasi terpendeknya, supaya laporan dan
+     * jurnal tidak pernah berselisih satu sen. Disalin karena Reporting di lapis Platform tidak boleh
+     * memanggil Foundation.
+     */
+    private static function round(string|int|float $value, int $decimals): string
+    {
+        if ($decimals < 0) {
+            throw new InvalidArgumentException('Jumlah desimal tidak boleh negatif.');
+        }
+
+        if (is_float($value)) {
+            if (! is_finite($value)) {
+                throw new InvalidArgumentException('Nilai uang harus berhingga.');
+            }
+            // Representasi terpendek yang kembali ke float yang sama, bukan `(string)` yang
+            // memotong di 14 digit.
+            $value = var_export($value, true);
+        }
+
+        return (string) BigDecimal::of(is_string($value) ? trim($value) : $value)->toScale($decimals, RoundingMode::HalfUp);
     }
 
     /** Desimal bertitik (`-1234567.50`) menjadi tulisan Indonesia (`-Rp 1.234.567,50`). */

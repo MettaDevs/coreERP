@@ -2,8 +2,6 @@
 
 namespace App\Platform\Tenant\Actions;
 
-use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
-use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
 use App\Platform\Access\Models\AppDataPolicy;
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\RoleAssignment;
@@ -17,6 +15,8 @@ use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Modules\Support\AppDependencyGraph;
 use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Modules\Support\PengirimEventModul;
+use App\Platform\Tenant\Events\TenantCreated;
+use App\Platform\Tenant\Events\TenantModulesInstalled;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +103,9 @@ class RegisterBusiness
                 $tenant->id = $data['tenant_id'];
             }
             $tenant->save();
-            app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenant->id);
+            // Data awal Foundation (satuan bawaan) disiapkan listener-nya, sinkron dan di dalam
+            // transaksi ini: gagal di sana membatalkan seluruh pendaftaran.
+            event(new TenantCreated($tenant->id));
             // Tenant provisioning adalah fakta lintas app. Payload starter sengaja
             // kosong: setiap app memilih template versinya sendiri dari konfigurasi,
             // sedangkan Core hanya meneruskan tenant context yang tepercaya.
@@ -300,7 +302,7 @@ class RegisterBusiness
                     );
                 }
 
-                app(EnsureNumberSequenceDrafts::class)->forReadyTenant($tenant->id);
+                event(new TenantModulesInstalled($tenant->id));
 
             });
 
