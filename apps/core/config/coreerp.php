@@ -8,7 +8,7 @@ return [
      * environment, akses operator. Kosong berarti "ikut koneksi bawaan", dan itulah bawaannya.
      *
      * On-prem kosong selamanya: di sana tidak ada sisi pusat yang terpisah, dan Core memang harus
-     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Support\ControlPlane\OwnedByControlPlane.
+     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Platform\ControlPlane\OwnedByControlPlane.
      */
     'control_connection' => env('COREERP_CONTROL_CONNECTION'),
 
@@ -66,7 +66,7 @@ return [
      *
      * Arah pusat → Core tidak dapat memakai kredensial app: penjaganya menuntut app yang terpasang
      * pada sebuah tenant, sedangkan pusat admin tidak terpasang di mana pun dan justru bekerja pada
-     * tenant yang belum ada. Lihat App\Http\Middleware\ControlPlaneOnly.
+     * tenant yang belum ada. Lihat App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly.
      *
      * Kosong berarti pemasangan ini **tidak menerima perintah pusat admin sama sekali** — bukan
      * menerima semuanya. Itu bawaan yang benar untuk on-prem dan lingkungan lokal, yang memang

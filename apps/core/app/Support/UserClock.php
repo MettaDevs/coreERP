@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\LegalEntity;
 use App\Models\User;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DateTimeZone;

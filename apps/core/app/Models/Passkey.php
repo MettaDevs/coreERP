@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Providers\AppServiceProvider;
-use App\Support\ControlPlane\OwnedByControlPlane;
 use Laravel\Passkeys\Passkey as BasePasskey;
 
 /**

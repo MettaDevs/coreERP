@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\DocumentAttachment;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\AttachmentRecordType;
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use Closure;

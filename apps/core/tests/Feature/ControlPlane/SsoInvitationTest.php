@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\ControlPlane;
 
 use App\Http\Controllers\Auth\SsoLoginController;
-use App\Models\Client;
-use App\Models\Environment;
 use App\Models\ExternalIdentity;
 use App\Models\InvitationCode;
 use App\Models\SsoLoginAttempt;
@@ -14,6 +12,8 @@ use App\Models\Tenant;
 use App\Models\TenantIdentityProvider;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Environment\Models\Environment;
 use Firebase\JWT\JWT;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;

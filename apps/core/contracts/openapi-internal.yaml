@@ -1625,7 +1625,7 @@ paths:
         yang tidak memakai kredensial app, dan satu-satunya yang bekerja pada tenant yang
         belum ada — jadi tiga header kredensial itu memang tidak dapat dipakai di sini.
         Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
-        `App\Http\Middleware\ControlPlaneOnly`.
+        `App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly`.
 
         Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
         persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena

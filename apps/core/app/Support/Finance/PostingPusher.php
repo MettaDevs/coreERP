@@ -8,7 +8,7 @@ use App\Models\FinancePosting;
 use App\Models\FinancePostingDelivery;
 use App\Models\FinancePostingEvent;
 use App\Models\IntegrationClient;
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Database\AuditActor;
 use App\Support\Integration\SignedPush;
 use Illuminate\Http\Client\ConnectionException;

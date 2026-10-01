@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Reporting\ExportQueue;
 use App\Support\Reporting\ExportStatus;
 use App\Support\Reporting\RelativeDates;

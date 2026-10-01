@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
 use App\Models\TenantMembership;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\ReportOptions;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Observabilitas;
 
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 

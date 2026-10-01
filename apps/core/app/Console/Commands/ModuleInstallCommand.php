@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Modules\InstallModule;
-use App\Models\Environment;
+use App\Platform\Environment\Models\Environment;
 use Illuminate\Console\Command;
 use RuntimeException;
 

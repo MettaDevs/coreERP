@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\DateTimeSettingsRequest;
 use App\Models\User;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\UserClock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

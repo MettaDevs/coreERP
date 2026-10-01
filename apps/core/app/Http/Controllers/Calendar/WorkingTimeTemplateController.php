@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

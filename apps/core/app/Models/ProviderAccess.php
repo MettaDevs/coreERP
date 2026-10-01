@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\ControlPlane\OwnedByControlPlane;
+use App\Platform\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

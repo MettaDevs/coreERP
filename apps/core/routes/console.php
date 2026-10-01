@@ -1,6 +1,6 @@
 <?php
 
-use App\Console\Commands\PurgeEnvironment;
+use App\Platform\ControlPlane\Console\PurgeEnvironment;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;

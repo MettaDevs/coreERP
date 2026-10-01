@@ -79,8 +79,8 @@ class CatchTidakMemalsukanHasilTest extends TestCase
         'apps/core/app/Support/Observabilitas/SqlTerbaca.php' => 'Query yang gagal dirapikan dipulangkan apa adanya oleh pemanggilnya; tidak ada fakta yang dinyatakan.',
         'apps/core/app/Support/Observabilitas/TersangkaPemotongan.php' => 'Tebakan penyebab pemotongan yang gagal disusun hanya menghilangkan petunjuk tambahan pada laporan.',
         'apps/control-plane/app/Environments/InstalledModules.php' => 'Hanya pada pembacaan nama katalog: namanya jatuh ke id module, jadi katalog yang gagal dibaca menghasilkan tabel berisi id — terlihat, dan tidak mengaku apa pun. Pembacaan daftar pemasangannya sendiri memulangkan null.',
-        'apps/core/app/Console/Commands/Concerns/HoldsEnvironmentOperation.php' => '`null` di sini berarti operasinya tidak jadi dibuka, dan jalur suksesnya tidak pernah memulangkan null. Sebabnya juga sudah dicetak ke operator sebelum baris itu.',
-        'apps/core/app/Http/Controllers/Internal/EnvironmentProvisioningController.php' => '`null` justru dipakai sebagai "tidak tahu": jalur suksesnya selalu memulangkan larik, dan pemanggilnya menerjemahkan null menjadi `modules_unreadable` pada jawabannya.',
+        'apps/core/app/Platform/ControlPlane/Console/Concerns/HoldsEnvironmentOperation.php' => '`null` di sini berarti operasinya tidak jadi dibuka, dan jalur suksesnya tidak pernah memulangkan null. Sebabnya juga sudah dicetak ke operator sebelum baris itu.',
+        'apps/core/app/Platform/ControlPlane/Http/Controllers/Internal/EnvironmentProvisioningController.php' => '`null` justru dipakai sebagai "tidak tahu": jalur suksesnya selalu memulangkan larik, dan pemanggilnya menerjemahkan null menjadi `modules_unreadable` pada jawabannya.',
     ];
 
     /**

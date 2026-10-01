@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Modules;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\Environment;
 use App\Models\TenantAppEntitlement;
+use App\Platform\Environment\Models\Environment;
 use App\Support\AppDependencyGraph;
 use App\Support\Modules\ModuleRegistry;
 use Throwable;

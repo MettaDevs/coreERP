@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sso;
 
 use App\Models\InvitationCode;
-use App\Support\ControlPlane\EnvironmentAddress;
+use App\Platform\Environment\Support\EnvironmentAddress;
 use Illuminate\Support\Facades\Log;
 
 /**

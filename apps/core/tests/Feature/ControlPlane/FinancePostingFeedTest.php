@@ -3,7 +3,6 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\Environment;
 use App\Models\FinancePosting;
 use App\Models\FinancePostingDelivery;
 use App\Models\FinancePostingSetting;
@@ -13,7 +12,8 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Database\AuditActor;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingPusher;

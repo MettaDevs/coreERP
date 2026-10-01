@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Environment;
 use App\Models\IntegrationClient;
-use App\Support\ControlPlane\ActiveEnvironment;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Database\AuditActor;
 use App\Support\Finance\IntegrationClientAccounts;
 use App\Support\Modules\TenantScope;

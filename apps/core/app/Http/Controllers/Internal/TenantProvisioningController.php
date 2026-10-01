@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Internal;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Internal\TenantProvisioningRequest;
-use App\Models\Environment;
 use App\Models\TenantMembership;
+use App\Platform\Environment\Models\Environment;
 use App\Support\ControlPlane\TemporaryPassword;
 use Illuminate\Http\JsonResponse;
 

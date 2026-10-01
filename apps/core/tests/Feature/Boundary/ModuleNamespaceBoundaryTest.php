@@ -92,11 +92,11 @@ class ModuleNamespaceBoundaryTest extends TestCase
             'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
             'use App\\Support\\Modules\\Contracts\\MilikTenant;',
             'use App\\Models\\Tenant;',
-            'use App\\Support\\CurrentWorkspace;',
+            'use App\\Platform\\Environment\\Support\\CurrentWorkspace;',
         ]);
 
         $this->assertSame(
-            ['App\\Models\\Tenant', 'App\\Support\\CurrentWorkspace'],
+            ['App\\Models\\Tenant', 'App\\Platform\\Environment\\Support\\CurrentWorkspace'],
             PemindaiModul::kelasCoreYangDisebut($contoh),
             'Hanya isi Contracts yang boleh; model Core dan kelas Support lain tidak.',
         );

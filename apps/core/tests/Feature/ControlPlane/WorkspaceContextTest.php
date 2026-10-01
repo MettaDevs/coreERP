@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\ControlPlane\Models\Client;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

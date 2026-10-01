@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\ReportCatalog;
 use App\Support\Reporting\SumberLaporan;

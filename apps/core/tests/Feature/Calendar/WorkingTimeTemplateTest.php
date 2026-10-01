@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Calendar;
 
-use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\WorkingTimeTemplate;
+use App\Platform\ControlPlane\Models\Client;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\GrantsCoreRoles;

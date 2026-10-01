@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TenantMembership;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use Illuminate\Http\Request;
 
 abstract class Controller

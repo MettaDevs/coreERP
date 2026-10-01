@@ -4,7 +4,7 @@ namespace App\Http\Controllers\ReferenceData;
 
 use App\Http\Controllers\Controller;
 use App\Models\UnitOfMeasure;
-use App\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
