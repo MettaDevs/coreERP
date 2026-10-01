@@ -80,13 +80,39 @@
       ke database Core; daftar ini dibaca lewat kontrak `OrganizationDirectory` di dalam
       proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
 
-      Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
-      pemeliharaan — sama seperti daftar satuan.
+      Izinnya menumpang izin layar yang memakainya — mutasi, register aset, pemeliharaan,
+      monitoring, atau lokasi aset — sama seperti daftar satuan.
     responses:
       '200':
         description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
       '403':
         description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+/api/v1/reference-data/alamat:
+  get:
+    tags:
+    - Reference data
+    operationId: listAddresses
+    summary: Alamat dari buku alamat Core, untuk dipilih pada lokasi aset
+    description: |
+      Tempat beralamat pos milik tenant aktif, dibaca lewat kontrak `AddressDirectory`. Modul
+      menyimpan id tempatnya saja; nama dan alamat diterjemahkan saat dibaca. Butuh
+      `management-aset.lokasi-aset.read`.
+
+      Dengan `unit_kerja_id`, yang dipulangkan hanya alamat utama unit kerja itu (nol atau satu
+      baris) — saran alamat saat lokasi diberi unit kerja bawaan.
+    parameters:
+    - name: unit_kerja_id
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    responses:
+      '200':
+        description: Daftar alamat dengan `id`, `kode` (= nama), `nama`, `alamat`, dan `display_label`
+      '403':
+        description: Pengguna tidak memegang izin lihat lokasi aset
+      '422':
+        $ref: '#/components/responses/ValidationError'
 /api/v1/reference-data/anggota:
   get:
     tags:

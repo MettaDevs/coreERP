@@ -3,13 +3,32 @@ security:
     - code: management-aset.fixed-asset-parameters.form
       name: Layar parameter aset tetap
       type: form
+    - code: management-aset.fixed-asset-parameters.api
+      name: API parameter aset tetap
+      type: api
   permissions:
     - code: management-aset.fixed-asset-parameters.read
       name: Lihat parameter aset tetap
       entry_point: management-aset.fixed-asset-parameters.form
       access: read
+    - code: management-aset.fixed-asset-parameters.update
+      name: Ubah parameter aset tetap
+      entry_point: management-aset.fixed-asset-parameters.api
+      access: update
   privileges:
     - code: management-aset.fixed-asset-parameters.view
       name: Lihat parameter aset tetap
       permissions:
         - management-aset.fixed-asset-parameters.read
+    - code: management-aset.fixed-asset-parameters.maintain
+      name: Pelihara parameter aset tetap
+      permissions:
+        - management-aset.fixed-asset-parameters.read
+        - management-aset.fixed-asset-parameters.update
+  duties:
+    # Duty tersendiri, bukan tambahan pada `fixed-assets-setup.view`: role yang sudah memegang duty
+    # lihat tidak boleh diam-diam dapat mengubah pengaturan — pola yang sama dengan posting group aset.
+    - code: management-aset.fixed-asset-parameters.manage
+      name: Kelola parameter aset tetap
+      privileges:
+        - management-aset.fixed-asset-parameters.maintain

@@ -84,6 +84,9 @@ dapat diturunkan ke aset yang dipasang di sana, Site/Warehouse, dan Workers. BC 
   dan tetap dapat diubah;
 - alamat departemen hanya menjadi saran saat membuat lokasi, bukan sumber datanya.
 
+Sudah dikerjakan 1 Oktober 2026 (`alamat_id`, `departemen_bawaan_id`, kontrak `AddressDirectory`);
+aturan dan perbedaannya dengan D365 ada di [Lokasi aset](/apps/management-aset/master/lokasi/).
+
 ## K-W: identitas Worker pindah ke Foundation
 
 Hari ini Worker milik modul HR. Core hanya bertanya lewat `LinkedWorkerResolver`, dan modul aset belum

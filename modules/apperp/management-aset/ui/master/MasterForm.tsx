@@ -24,6 +24,7 @@ import { api, errorMessage, newIdempotencyKey } from '../api';
 import DynamicField from './DynamicField';
 import type { FieldValue } from './fields';
 import { isVisible, payloadValue, valueFrom } from './fields';
+import LokasiAsetFields from './LokasiAsetFields';
 import type {
     MasterConfig,
     MasterParentConfig,
@@ -280,6 +281,21 @@ export default function MasterForm({
                             {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
                             {parents.map(parentField)}
                             {isAsetLocation && (
+                                <LokasiAsetFields
+                                    fields={extraFields}
+                                    value={value}
+                                    extra={extra}
+                                    parentId={parentIds.parent_id ?? ''}
+                                    onChange={(name, next) =>
+                                        setExtra((current) => ({
+                                            ...current,
+                                            [name]: next,
+                                        }))
+                                    }
+                                    portalContainer={sheetContentRef}
+                                />
+                            )}
+                            {isAsetLocation && (
                                 <Field>
                                     <FieldTitle>Dimensi keuangan</FieldTitle>
                                     <div
@@ -298,7 +314,11 @@ export default function MasterForm({
                                 </Field>
                             )}
                             {extraFields
-                                .filter((field) => isVisible(field, extra))
+                                .filter(
+                                    (field) =>
+                                        !isAsetLocation &&
+                                        isVisible(field, extra),
+                                )
                                 .map((field) =>
                                     value?.data_type_locked &&
                                     field.name === 'data_type' ? (
