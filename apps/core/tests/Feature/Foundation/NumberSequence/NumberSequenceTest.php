@@ -10,7 +10,7 @@ use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Models\AppServiceCredential;
 use App\Models\ModuleInstallation;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;

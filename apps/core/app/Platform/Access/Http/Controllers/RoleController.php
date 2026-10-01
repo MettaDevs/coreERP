@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Platform\Access\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Platform\Access\Actions\UpsertRole;
+use App\Platform\Access\Http\Requests\RoleRequest;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Support\AccessGuards;
+use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Support\Modules\Contracts\RowVersion;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class RoleController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
+
+        return response()->json(['data' => Role::query()
+            ->where('tenant_id', $membership->tenant_id)
+            ->where('is_active', true)
+            ->with('duties', 'children:id,name')
+            ->get()]);
+    }
+
+    public function store(RoleRequest $request, UpsertRole $action): JsonResponse|RedirectResponse
+    {
+        $role = $action->handle($this->currentMembership($request), $request->payload());
+
+        return $this->response($request, $role, 201);
+    }
+
+    public function show(Request $request, Role $role): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($role->tenant_id === $membership->tenant_id, 404);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_READ), 403);
+
+        return response()->json(['data' => $role->load('duties', 'children:id,name')])
+            ->header('ETag', RowVersion::etag($role->version));
+    }
+
+    public function update(RoleRequest $request, Role $role, UpsertRole $action): JsonResponse|RedirectResponse
+    {
+        return $this->response($request, $action->handle($this->currentMembership($request), $request->payload(), $role, RowVersion::expected($request)));
+    }
+
+    public function destroy(Request $request, Role $role): JsonResponse|RedirectResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE) && $role->tenant_id === $membership->tenant_id, 403);
+        if ($role->is_owner) {
+            throw ValidationException::withMessages(['role' => 'Role Owner tidak dapat dihapus.']);
+        }
+        DB::transaction(function () use ($request, $role, $membership): void {
+            RowVersion::claim($role, RowVersion::expected($request));
+            $role->delete();
+            AccessGuards::assertNotLockedOut($membership->tenant_id);
+        });
+
+        return $request->is('api/*') ? response()->json(null, 204) : back();
+    }
+
+    private function response(Request $request, Role $role, int $status = 200): JsonResponse|RedirectResponse
+    {
+        return $request->is('api/*')
+            ? response()->json(['data' => $role], $status)
+            : back()->with('status', 'Role saved.');
+    }
+}

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Provider;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

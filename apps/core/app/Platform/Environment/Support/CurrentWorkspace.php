@@ -2,10 +2,10 @@
 
 namespace App\Platform\Environment\Support;
 
+use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\DataPolicyAccessResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 

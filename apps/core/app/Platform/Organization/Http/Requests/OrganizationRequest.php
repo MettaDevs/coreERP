@@ -2,8 +2,8 @@
 
 namespace App\Platform\Organization\Http\Requests;
 
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Organization\Models\OperatingUnit;
-use App\Support\Access\CoreSecurityCatalog;
 use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

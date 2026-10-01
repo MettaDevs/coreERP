@@ -2,17 +2,17 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\Role;
-use App\Models\User;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Support\AccessGuards;
+use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Access\Support\DataPolicyAccessResolver;
+use App\Platform\Access\Support\TenantProducts;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\AccessGuards;
-use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Access\TenantProducts;
-use App\Support\DataPolicyAccessResolver;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

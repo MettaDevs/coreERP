@@ -1,14 +1,14 @@
 <?php
 
 return [
-    'login' => 'resources/js/pages/auth/login.tsx',
+    'login' => 'resources/js/pages/platform/identity/auth/login.tsx',
     'register' => 'resources/js/pages/auth/register.tsx',
     'welcome' => 'resources/js/pages/welcome.tsx',
-    'profile' => 'resources/js/pages/settings/profile.tsx',
-    'security' => 'resources/js/pages/settings/security.tsx',
-    'verify_email' => 'resources/js/pages/auth/verify-email.tsx',
-    'two_factor_challenge' => 'resources/js/pages/auth/two-factor-challenge.tsx',
-    'confirm_password' => 'resources/js/pages/auth/confirm-password.tsx',
+    'profile' => 'resources/js/pages/platform/identity/profile.tsx',
+    'security' => 'resources/js/pages/platform/identity/security.tsx',
+    'verify_email' => 'resources/js/pages/platform/identity/auth/verify-email.tsx',
+    'two_factor_challenge' => 'resources/js/pages/platform/identity/auth/two-factor-challenge.tsx',
+    'confirm_password' => 'resources/js/pages/platform/identity/auth/confirm-password.tsx',
     'auth_types' => 'resources/js/types/auth.ts',
 
     'two_factor_files' => [

@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\AppServiceCredential;
 use App\Models\ModuleInstallation;
-use App\Support\License\SiteLicense;
+use App\Platform\License\Support\SiteLicense;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

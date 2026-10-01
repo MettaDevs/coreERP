@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Settings\DateTimeSettingsController;
-use App\Http\Controllers\Settings\ProfileController;
-use App\Http\Controllers\Settings\SecurityController;
+use App\Platform\Identity\Http\Controllers\DateTimeSettingsController;
+use App\Platform\Identity\Http\Controllers\ProfileController;
+use App\Platform\Identity\Http\Controllers\SecurityController;
 /* @chisel-password-confirmation */
 use Illuminate\Auth\Middleware\RequirePassword;
 /* @end-chisel-password-confirmation */
@@ -32,7 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('throttle:6,1')
         ->name('user-password.update');
 
-    Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+    Route::inertia('settings/appearance', 'platform/identity/appearance')->name('appearance.edit');
 });
 
 /* @chisel-passkeys */

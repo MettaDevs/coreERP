@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules;
 
 use App\Models\CoreApp;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\LaunchableAppCatalog;

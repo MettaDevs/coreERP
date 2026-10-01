@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\ProviderAccess;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 

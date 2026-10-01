@@ -6,10 +6,10 @@ namespace App\Platform\Tenant\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Support\TemporaryPassword;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Http\Requests\Internal\TenantProvisioningRequest;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\ControlPlane\TemporaryPassword;
 use Illuminate\Http\JsonResponse;
 
 /**

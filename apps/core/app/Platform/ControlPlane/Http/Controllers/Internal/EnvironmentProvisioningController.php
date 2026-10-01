@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Platform\ControlPlane\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Environment\Support\EnvironmentConnection;
+use App\Platform\Identity\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;

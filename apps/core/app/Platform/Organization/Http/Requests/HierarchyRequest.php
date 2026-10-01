@@ -2,8 +2,8 @@
 
 namespace App\Platform\Organization\Http\Requests;
 
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

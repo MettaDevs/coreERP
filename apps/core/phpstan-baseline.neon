@@ -1,22 +1,22 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Parameter \#1 \$scopes of method App\\Support\\DataPolicyScopeResolver\:\:assertNoRedundantGrants\(\) expects list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}\>, list\<array\<string, mixed\>\> given\.$#'
+			message: '#^Parameter \#1 \$scopes of method App\\Platform\\Access\\Support\\DataPolicyScopeResolver\:\:assertNoRedundantGrants\(\) expects list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}\>, list\<array\<string, mixed\>\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Actions/Access/UpdateMembership.php
+			path: app/Platform/Access/Actions/UpdateMembership.php
 
 		-
-			message: '#^Parameter \#2 \$manualRoleIds of method App\\Support\\SodConflictEvaluator\:\:assertManualAssignmentAllowed\(\) expects list\<string\>, array\<int, mixed\> given\.$#'
+			message: '#^Parameter \#2 \$manualRoleIds of method App\\Platform\\Access\\Support\\SodConflictEvaluator\:\:assertManualAssignmentAllowed\(\) expects list\<string\>, array\<int, mixed\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Actions/Access/UpdateMembership.php
+			path: app/Platform/Access/Actions/UpdateMembership.php
 
 		-
-			message: '#^Parameter \#3 \$data of method App\\Support\\DataPolicyScopeResolver\:\:resolve\(\) expects array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}, array\<string, mixed\> given\.$#'
+			message: '#^Parameter \#3 \$data of method App\\Platform\\Access\\Support\\DataPolicyScopeResolver\:\:resolve\(\) expects array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}, array\<string, mixed\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Actions/Access/UpdateMembership.php
+			path: app/Platform/Access/Actions/UpdateMembership.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<array\{name\: string, starts_on\: Carbon\\CarbonInterface\|string, ends_on\: Carbon\\CarbonInterface\|string\}\>\) of array_values is already a list, call has no effect\.$#'
@@ -76,97 +76,97 @@ parameters:
 			message: '#^Anonymous function should return array\{role_id\: string, role_name\: string, source\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, policy_name\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: mixed, unrestricted\: bool, valid_from\: mixed, \.\.\.\}\>\} but returns array\{role_id\: string, role_name\: string, source\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, policy_name\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: mixed, unrestricted\: bool, valid_from\: mixed, \.\.\.\}\>\}\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
 			message: '#^Cannot call method toDateTimeString\(\) on string\.$#'
 			identifier: method.nonObject
 			count: 2
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
 			message: '#^Parameter \#1 \$array of function array_intersect expects array, string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
-			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
 			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
 			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
+			path: app/Platform/Access/Http/Controllers/AccessController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\SecurityDuty\:\:\$source\.$#'
+			message: '#^Access to an undefined property App\\Platform\\Access\\Models\\SecurityDuty\:\:\$source\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\SecurityDuty\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\SecurityPrivilege\:\:\$source\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\SecurityPrivilege\:\:\$status\.$#'
+			message: '#^Access to an undefined property App\\Platform\\Access\\Models\\SecurityDuty\:\:\$status\.$#'
 			identifier: property.notFound
 			count: 4
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Access to an undefined property App\\Platform\\Access\\Models\\SecurityPrivilege\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Platform\\Access\\Models\\SecurityPrivilege\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
 			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
 			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
-			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
-			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Platform\\Access\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 1
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
 			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
 			count: 2
-			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+			path: app/Platform/Access/Http/Controllers/SecurityConfigurationController.php
 
 		-
 			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Platform\\Tenant\\Models\\TenantMembership\|null given\.$#'
@@ -310,25 +310,25 @@ parameters:
 			message: '#^Unable to resolve the template type TKey in call to function collect$#'
 			identifier: argument.templateType
 			count: 2
-			path: app/Http/Requests/Access/InvitationRequest.php
+			path: app/Platform/Access/Http/Requests/InvitationRequest.php
 
 		-
 			message: '#^Unable to resolve the template type TValue in call to function collect$#'
 			identifier: argument.templateType
 			count: 2
-			path: app/Http/Requests/Access/InvitationRequest.php
+			path: app/Platform/Access/Http/Requests/InvitationRequest.php
 
 		-
 			message: '#^Unable to resolve the template type TKey in call to function collect$#'
 			identifier: argument.templateType
 			count: 1
-			path: app/Http/Requests/Access/MembershipRequest.php
+			path: app/Platform/Access/Http/Requests/MembershipRequest.php
 
 		-
 			message: '#^Unable to resolve the template type TValue in call to function collect$#'
 			identifier: argument.templateType
 			count: 1
-			path: app/Http/Requests/Access/MembershipRequest.php
+			path: app/Platform/Access/Http/Requests/MembershipRequest.php
 
 		-
 			message: '#^Method App\\Platform\\Organization\\Http\\Requests\\UpdateOrganizationRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
@@ -358,49 +358,49 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$hierarchy_version_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$include_descendants\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$legal_entity_id\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$organization_id\.$#'
 			identifier: property.notFound
 			count: 3
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
-			message: '#^Method App\\Support\\DataPolicyAccessResolver\:\:resolveGrant\(\) should return array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\} but returns array\{legal_entity_id\: mixed, operating_unit_ids\: array\<int, mixed\>\}\.$#'
+			message: '#^Method App\\Platform\\Access\\Support\\DataPolicyAccessResolver\:\:resolveGrant\(\) should return array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\} but returns array\{legal_entity_id\: mixed, operating_unit_ids\: array\<int, mixed\>\}\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
-			message: '#^Method App\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) should return array\{all\: bool, scope_grants\: list\<array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\} but returns array\{all\: false, scope_grants\: array\<int, array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\}\.$#'
+			message: '#^Method App\\Platform\\Access\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) should return array\{all\: bool, scope_grants\: list\<array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\} but returns array\{all\: false, scope_grants\: array\<int, array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\}\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
-			message: '#^Parameter \#2 \$scopes of method App\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			message: '#^Parameter \#2 \$scopes of method App\\Platform\\Access\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
 			message: '#^Unable to resolve the template type TValue in call to function collect$#'
 			identifier: argument.templateType
 			count: 1
-			path: app/Support/DataPolicyAccessResolver.php
+			path: app/Platform/Access/Support/DataPolicyAccessResolver.php
 
 		-
 			message: '#^Method App\\Support\\LaunchableAppCatalog\:\:permissionsFor\(\) should return list\<string\> but returns array\<mixed\>\.$#'
@@ -409,7 +409,7 @@ parameters:
 			path: app/Support/LaunchableAppCatalog.php
 
 		-
-			message: '#^Parameter \#2 \$roleIds of method App\\Support\\RoleHierarchy\:\:effectiveRoleIds\(\) expects list\<string\>, array\<string\> given\.$#'
+			message: '#^Parameter \#2 \$roleIds of method App\\Platform\\Access\\Support\\RoleHierarchy\:\:effectiveRoleIds\(\) expects list\<string\>, array\<string\> given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Support/LaunchableAppCatalog.php
@@ -658,7 +658,7 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$role_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/RoleHierarchy.php
+			path: app/Platform/Access/Support/RoleHierarchy.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$id\.$#'

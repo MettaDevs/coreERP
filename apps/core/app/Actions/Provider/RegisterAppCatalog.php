@@ -4,12 +4,12 @@ namespace App\Actions\Provider;
 
 use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
-use App\Models\AppDataPolicy;
 use App\Models\CoreApp;
-use App\Models\Permission;
-use App\Models\SecurityDuty;
-use App\Models\SecurityPrivilege;
-use App\Support\Access\OwnerRoleDuties;
+use App\Platform\Access\Models\AppDataPolicy;
+use App\Platform\Access\Models\Permission;
+use App\Platform\Access\Models\SecurityDuty;
+use App\Platform\Access\Models\SecurityPrivilege;
+use App\Platform\Access\Support\OwnerRoleDuties;
 use App\Support\AppDependencyGraph;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

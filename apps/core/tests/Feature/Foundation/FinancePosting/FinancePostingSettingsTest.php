@@ -5,7 +5,7 @@ namespace Tests\Feature\Foundation\FinancePosting;
 use App\Foundation\Currency\Models\CurrencyPrecision;
 use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Foundation\FinancePosting\Models\FinanceSettlementMode;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\PresisiMataUang;

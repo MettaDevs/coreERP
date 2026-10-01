@@ -117,7 +117,7 @@ return [
      * Pengiriman laporan kesalahan ke Discord.
      *
      * Kosong berarti mati, dan itulah bawaannya — termasuk pada pemasangan on-prem, yang
-     * channel Discord-nya bukan milik kita. Lihat App\Support\Observabilitas\PengirimDiscord.
+     * channel Discord-nya bukan milik kita. Lihat App\Platform\Observability\Support\PengirimDiscord.
      */
     'discord' => [
         'webhook_url' => env('COREERP_DISCORD_WEBHOOK_URL'),
@@ -191,7 +191,7 @@ return [
      * pelanggan. Isinya menyebut app mana yang dibeli dan sampai kapan. Bila `required` menyala,
      * lisensi yang habis, hilang, atau bertanda tangan salah mengunci pengguna tenant, dan app yang
      * tidak tercantum tidak dapat dibuka. Alasan kenapa ia berubah dari tanda menjadi kunci, beserta
-     * apa yang tetap terbuka, ada di App\Support\License\SiteLicense dan `docs/todo/lisensi-mengunci`.
+     * apa yang tetap terbuka, ada di App\Platform\License\Support\SiteLicense dan `docs/todo/lisensi-mengunci`.
      *
      * `required` berbawaan mati, dan itu disengaja: SaaS dan pemasangan beli-putus tidak pernah
      * terkunci. Yang menyalakannya `.env` server on-prem dikelola, ditulis agen saat pemasangan.

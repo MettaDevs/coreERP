@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Tenant\Http\Requests\Internal;
 
 use App\Platform\Environment\Models\Environment;
-use App\Support\ControlPlane\TemporaryPassword;
+use App\Platform\Identity\Support\TemporaryPassword;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;

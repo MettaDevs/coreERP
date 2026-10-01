@@ -3,8 +3,8 @@
 namespace App\Platform\Organization\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Organization\Models\Organization;
-use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Reporting\PrintIdentityStore;
 use Illuminate\Http\JsonResponse;

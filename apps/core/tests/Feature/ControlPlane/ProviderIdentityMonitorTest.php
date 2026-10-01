@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\ProviderAdminSeeder;

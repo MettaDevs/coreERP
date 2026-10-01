@@ -2,11 +2,11 @@
 
 namespace Tests\Concerns;
 
-use App\Models\Role;
-use App\Models\RoleAssignment;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Models\RoleAssignment;
+use App\Platform\Access\Support\CorePermissions;
+use App\Platform\Access\Support\OwnerRoleDuties;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CorePermissions;
-use App\Support\Access\OwnerRoleDuties;
 use Illuminate\Support\Str;
 
 /**

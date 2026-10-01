@@ -3,7 +3,7 @@
 namespace Tests\Feature\Http;
 
 use App\Http\Middleware\ThrottleRequestsPerRoute;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;

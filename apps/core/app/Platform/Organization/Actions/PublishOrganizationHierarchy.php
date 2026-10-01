@@ -2,9 +2,9 @@
 
 namespace App\Platform\Organization\Actions;
 
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Access\CoreSecurityCatalog;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;

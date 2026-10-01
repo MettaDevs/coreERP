@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\DataPolicyAccessResolver;
+use App\Platform\License\Support\SiteLicense;
+use App\Platform\Observability\Support\LaporanKesalahan;
 use App\Support\LaunchableAppCatalog;
-use App\Support\License\SiteLicense;
 use App\Support\Modules\ModuleRequestContext;
 use App\Support\Modules\TenantScope;
-use App\Support\Observabilitas\LaporanKesalahan;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;

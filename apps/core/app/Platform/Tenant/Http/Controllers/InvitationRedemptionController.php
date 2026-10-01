@@ -2,14 +2,14 @@
 
 namespace App\Platform\Tenant\Http\Controllers;
 
-use App\Actions\Access\CreateInvitation;
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Platform\Access\Actions\CreateInvitation;
+use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\Sso\SsoFailure;
 use App\Platform\Tenant\Actions\RedeemInvitation;
 use App\Platform\Tenant\Http\Requests\JoinInvitationRequest;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\Tenant;
-use App\Support\Sso\SsoFailure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

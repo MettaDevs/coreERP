@@ -74,7 +74,7 @@ class FkMenyeberangBatasTest extends TestCase
      *   angkanya wajib diturunkan.
      *
      * `users` turun dari 4 menjadi 3 pada tanggal yang sama, dan itu persis mekanisme yang
-     * diramalkan catatan di atas. `passkeys` memperoleh model bertanda — `App\Models\Passkey`,
+     * diramalkan catatan di atas. `passkeys` memperoleh model bertanda — `App\Platform\Identity\Models\Passkey`,
      * yang ada supaya relasi `User::passkeys()` tidak jatuh ke database lingkungan begitu
      * `ResolveEnvironment` menggeser koneksinya. Dengan itu ia berhenti terhitung sisi environment,
      * dan foreign keynya ke `users` berhenti menyeberang batas. Penjaga ini yang

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Platform\ControlPlane\OwnedByControlPlane;
+use App\Platform\Identity\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

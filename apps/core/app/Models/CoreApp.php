@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Platform\Access\Models\Permission;
+use App\Platform\Access\Models\SecurityDuty;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;

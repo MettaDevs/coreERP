@@ -2,7 +2,7 @@
 
 namespace App\Foundation\FinancePosting\Support;
 
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
 use Illuminate\Support\Str;
 

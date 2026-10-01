@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use App\Models\ProviderAccess;
-use App\Models\TenantIdentityProvider;
-use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\ControlPlane\Models\ConsoleSetting;
 use App\Platform\ControlPlane\Models\OperatorAuditEvent;
@@ -18,6 +16,8 @@ use App\Platform\ControlPlane\Models\SiteReport;
 use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Identity\Models\TenantIdentityProvider;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;

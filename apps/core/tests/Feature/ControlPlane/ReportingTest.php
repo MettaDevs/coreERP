@@ -3,13 +3,13 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Jobs\RunReportExport;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
+use App\Platform\Retention\Support\RetentionPolicies;
+use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Reporting\DaftarLaporanModul;
-use App\Support\Retention\RetentionPolicies;
-use App\Support\Retention\RetentionService;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;

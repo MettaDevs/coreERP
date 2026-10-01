@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Retention\RetentionService;
+use App\Platform\Retention\Support\RetentionService;
 use Illuminate\Console\Command;
 
 /**

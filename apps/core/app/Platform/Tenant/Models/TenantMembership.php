@@ -2,10 +2,10 @@
 
 namespace App\Platform\Tenant\Models;
 
-use App\Models\RoleAssignment;
-use App\Models\User;
+use App\Platform\Access\Models\RoleAssignment;
+use App\Platform\Access\Support\CorePermissions;
 use App\Platform\ControlPlane\OwnedByControlPlane;
-use App\Support\Access\CorePermissions;
+use App\Platform\Identity\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

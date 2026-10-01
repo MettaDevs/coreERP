@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\Role;
-use App\Models\SecurityPrivilege;
-use App\Models\User;
+use App\Platform\Access\Models\Role;
+use App\Platform\Access\Models\SecurityPrivilege;
+use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;

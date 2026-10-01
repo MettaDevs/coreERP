@@ -3,7 +3,7 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Models\CoreApp;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Support\Modules\ModuleRegistry;
 use Database\Seeders\ProviderAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

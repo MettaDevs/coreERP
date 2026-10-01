@@ -3,7 +3,7 @@
 namespace Tests\Feature\Foundation\FinancePosting;
 
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
-use App\Models\User;
+use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DaftarAkun;
