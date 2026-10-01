@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\Support;
 
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Reporting\Support\Rendering\RenderedFile;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 use App\Platform\Reporting\Support\Rendering\TypedSheetWriter;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\Contracts\ListExportSource;
 use Illuminate\Validation\ValidationException;
 use stdClass;

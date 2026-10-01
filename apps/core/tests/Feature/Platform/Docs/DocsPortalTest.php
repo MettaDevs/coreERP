@@ -3,8 +3,8 @@
 namespace Tests\Feature\Platform\Docs;
 
 use App\Foundation\Currency\Support\MoneyPrecision;
-use App\Models\ProviderAccess;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\ProviderAccess;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;

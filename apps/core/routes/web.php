@@ -15,11 +15,6 @@ use App\Foundation\Workflow\Http\Controllers\WorkflowConfigurationController;
 use App\Foundation\Workflow\Http\Controllers\WorkflowInboxController;
 use App\Foundation\WorkingCalendar\Http\Controllers\WorkingTimeCalendarController;
 use App\Foundation\WorkingCalendar\Http\Controllers\WorkingTimeTemplateController;
-use App\Http\Controllers\AppLaunchManifestController;
-use App\Http\Controllers\Provider\AppCatalogController;
-use App\Http\Controllers\Provider\AppServiceCredentialController;
-use App\Http\Controllers\Provider\IdentityMonitorController;
-use App\Models\CoreApp;
 use App\Platform\Access\Http\Controllers\AccessController;
 use App\Platform\Access\Http\Controllers\InvitationCodeController;
 use App\Platform\Access\Http\Controllers\MembershipController;
@@ -31,9 +26,15 @@ use App\Platform\Attachments\Http\Middleware\ResolveAttachmentContext;
 use App\Platform\ChangeLog\Http\Controllers\ChangeLogController;
 use App\Platform\Docs\Http\Controllers\DocsPortalController;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Identity\Http\Controllers\IdentityMonitorController;
 use App\Platform\Identity\Http\Controllers\SsoBackchannelLogoutController;
 use App\Platform\Identity\Http\Controllers\SsoLoginController;
 use App\Platform\Integration\Http\Controllers\IntegrationClientController;
+use App\Platform\Modules\Http\Controllers\AppCatalogController;
+use App\Platform\Modules\Http\Controllers\AppLaunchManifestController;
+use App\Platform\Modules\Http\Controllers\AppServiceCredentialController;
+use App\Platform\Modules\Models\CoreApp;
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Organization\Http\Controllers\OrganizationController;
 use App\Platform\Organization\Http\Controllers\PrintIdentityController;
 use App\Platform\Organization\Http\Controllers\WorkspaceContextController;
@@ -46,7 +47,6 @@ use App\Platform\Retention\Http\Controllers\RetentionController;
 use App\Platform\Tenant\Http\Controllers\BusinessRegistrationController;
 use App\Platform\Tenant\Http\Controllers\InvitationLandingController;
 use App\Platform\Tenant\Http\Controllers\InvitationRedemptionController;
-use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\Request;
@@ -297,7 +297,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'destroy'])
         ->name('access.invitations.destroy');
 
-    Route::get('control/apps', fn () => Inertia::render('control/apps', [
+    Route::get('control/apps', fn () => Inertia::render('platform/modules/apps', [
         'apps' => CoreApp::query()->orderBy('name')->get()->map(fn (CoreApp $app): array => [
             'id' => $app->id,
             'name' => $app->name,

@@ -3,7 +3,6 @@
 namespace App\Platform\Access\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\CoreApp;
 use App\Platform\Access\Models\Permission;
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\SecurityDuty;
@@ -11,6 +10,7 @@ use App\Platform\Access\Models\SecurityPrivilege;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\OwnerRoleDuties;
 use App\Platform\Access\Support\TenantProducts;
+use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\RedirectResponse;

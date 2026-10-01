@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\License;
 
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Models\ProviderAccess;
 use App\Platform\Identity\Models\User;
 use App\Platform\License\Support\SiteLicenseState;
+use App\Platform\Modules\Models\ProviderAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia;

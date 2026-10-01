@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulSedangDipindah;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;

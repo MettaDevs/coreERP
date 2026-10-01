@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\ControlPlane;
 
 use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
-use App\Models\ModuleInstallation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Modules\Support\ModuleManifest;
+use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\ModuleManifest;
-use App\Support\Modules\ModuleRegistry;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Console\Command;

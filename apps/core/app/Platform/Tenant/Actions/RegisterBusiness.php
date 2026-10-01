@@ -2,7 +2,6 @@
 
 namespace App\Platform\Tenant\Actions;
 
-use App\Actions\Modules\InstallModule;
 use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
 use App\Platform\Access\Models\AppDataPolicy;
@@ -13,12 +12,13 @@ use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Actions\InstallModule;
+use App\Platform\Modules\Support\AppDependencyGraph;
+use App\Platform\Modules\Support\ModuleRegistry;
+use App\Platform\Modules\Support\PengirimEventModul;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\AppDependencyGraph;
 use App\Support\Modules\Contracts\TenantDisiapkan;
-use App\Support\Modules\ModuleRegistry;
-use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;

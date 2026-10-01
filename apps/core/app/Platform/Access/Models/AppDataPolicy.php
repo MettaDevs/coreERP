@@ -2,7 +2,7 @@
 
 namespace App\Platform\Access\Models;
 
-use App\Models\CoreApp;
+use App\Platform\Modules\Models\CoreApp;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

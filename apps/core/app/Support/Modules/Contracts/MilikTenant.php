@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules\Contracts;
 
-use App\Support\Modules\TenantScope;
+use App\Platform\Modules\Support\TenantScope;
 use RuntimeException;
 
 /**

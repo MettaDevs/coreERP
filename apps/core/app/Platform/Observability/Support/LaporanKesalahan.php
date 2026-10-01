@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Platform\Observability\Support;
 
-use App\Http\Middleware\ResolveModuleContext;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\Modules\ModuleRequestContext;
-use App\Support\Modules\TenantScope;
+use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
+use App\Platform\Modules\Support\ModuleRequestContext;
+use App\Platform\Modules\Support\TenantScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;

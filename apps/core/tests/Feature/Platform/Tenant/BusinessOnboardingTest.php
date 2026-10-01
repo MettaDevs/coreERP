@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Platform\Tenant;
 
-use App\Models\CoreApp;
-use App\Models\ModuleInstallation;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\EnvironmentAddress;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\CoreApp;
+use App\Platform\Modules\Models\ModuleInstallation;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;

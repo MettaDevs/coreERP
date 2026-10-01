@@ -3,7 +3,7 @@
 namespace App\Platform\Docs\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\CoreApp;
+use App\Platform\Modules\Models\CoreApp;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;

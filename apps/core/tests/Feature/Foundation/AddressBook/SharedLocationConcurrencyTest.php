@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Foundation\AddressBook;
 
-use App\Support\Modules\ModuleMigrator;
+use App\Platform\Modules\Support\ModuleMigrator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;

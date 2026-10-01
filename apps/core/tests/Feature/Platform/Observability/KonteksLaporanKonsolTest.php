@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Observability;
 
+use App\Platform\Modules\Support\PelaksanaTenant;
+use App\Platform\Modules\Support\TenantScope;
 use App\Platform\Observability\Support\LaporanKesalahan;
-use App\Support\Modules\PelaksanaTenant;
-use App\Support\Modules\TenantScope;
 use RuntimeException;
 use Tests\TestCase;
 

@@ -1,6 +1,6 @@
 """Validate the module manifest (app.yaml plus manifest/**/*.yaml) against the catalog contract.
 
-Mirrors apps/core/app/Http/Requests/Provider/AppCatalogRequest.php, including the
+Mirrors apps/core/app/Platform/Modules/Http/Requests/AppCatalogRequest.php, including the
 four Dynamics 365 layers (entry point -> permission -> privilege -> duty) and the rule that
 privilege codes must never collide with permission codes. Manifest keys mirror the endpoint payload
 exactly (snake_case), so CI forwards them without renaming.
@@ -24,7 +24,7 @@ with open(path, encoding="utf-8") as handle:
     manifest = yaml.safe_load(handle)
 
 # Daftar berkode module ini ditulis di manifest/<area>/<fitur>.yaml, bukan di app.yaml. Core
-# menggabungkannya dengan cara yang sama (App\Support\Modules\ModuleManifestFiles): daftar
+# menggabungkannya dengan cara yang sama (App\Platform\Modules\Support\ModuleManifestFiles): daftar
 # disambung, app.yaml lebih dulu, lalu berkas menurut jalurnya. Kode ganda tertangkap pemeriksaan
 # duplikat di bawah.
 LISTS = [

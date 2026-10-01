@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Tenant;
 
-use App\Models\CoreApp;
 use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

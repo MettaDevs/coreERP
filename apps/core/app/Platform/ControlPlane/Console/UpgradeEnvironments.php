@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Console;
 
-use App\Actions\Modules\InstallEntitledModules;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Environment\Support\EnvironmentConnection;
+use App\Platform\Modules\Actions\InstallEntitledModules;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;

@@ -5,7 +5,7 @@ namespace Tests\Feature\Foundation\NumberSequence;
 use App\Foundation\NumberSequence\Actions\NumberSequenceService;
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
-use App\Support\Modules\ModuleMigrator;
+use App\Platform\Modules\Support\ModuleMigrator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Tenant\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Models\TenantAppEntitlement;
+use App\Platform\Modules\Models\TenantAppEntitlement;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 

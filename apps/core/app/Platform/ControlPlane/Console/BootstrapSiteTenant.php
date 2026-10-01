@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Console;
 
-use App\Models\CoreApp;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Identity\Support\TemporaryPassword;
+use App\Platform\Modules\Models\CoreApp;
+use App\Platform\Modules\Support\ModuleManifest;
+use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\ModuleManifest;
-use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;

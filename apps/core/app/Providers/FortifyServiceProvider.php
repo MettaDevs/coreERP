@@ -4,12 +4,12 @@ namespace App\Providers;
 
 /* @chisel-registration */
 
-use App\Models\CoreApp;
 use App\Platform\Identity\Actions\CreateNewUser;
 use App\Platform\Identity\Actions\ResetUserPassword;
-/* @end-chisel-registration */
 use App\Platform\Identity\Support\Sso\SsoFailure;
+/* @end-chisel-registration */
 use App\Platform\Identity\Support\Sso\TenantSso;
+use App\Platform\Modules\Models\CoreApp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;

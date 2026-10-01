@@ -2,8 +2,8 @@
 
 namespace Tests;
 
-use App\Support\Modules\ModuleMigrator;
-use App\Support\Modules\ModuleRegistry;
+use App\Platform\Modules\Support\ModuleMigrator;
+use App\Platform\Modules\Support\ModuleRegistry;
 use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Fortify\Features;

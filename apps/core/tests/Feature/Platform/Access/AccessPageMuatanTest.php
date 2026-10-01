@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Platform\Access;
 
-use App\Models\CoreApp;
 use App\Platform\Access\Models\Role;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;

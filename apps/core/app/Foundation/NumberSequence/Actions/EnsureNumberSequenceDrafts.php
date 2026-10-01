@@ -4,7 +4,7 @@ namespace App\Foundation\NumberSequence\Actions;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Support\Facades\DB;
 
 class EnsureNumberSequenceDrafts

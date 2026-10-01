@@ -6,7 +6,7 @@ use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Foundation\NumberSequence\Actions\NumberSequenceService;
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
