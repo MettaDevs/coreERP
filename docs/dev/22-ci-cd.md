@@ -173,10 +173,10 @@ salah tanpa ada yang berbunyi. Karena itu aturan `import/order` dimatikan pada b
 tersebut di `apps/core/eslint.config.js`, dan urutan impornya dijaga tangan sampai
 penandanya tidak lagi dipakai. Daftar berkasnya ada di berkas konfigurasi itu, bukan di sini.
 
-Yang membuat penanda itu bergerak adalah `composer update`: ia memicu `install:features` lewat
-`post-update-cmd` di `apps/core/composer.json` dan mengubah berkas di luar perubahan
-yang sedang dikerjakan. Jangan menjalankan `composer update` di repo ini tanpa memeriksa berkas
-apa saja yang ikut berubah.
+Yang dulu membuat penanda itu bergerak adalah `composer update`, yang memicu `install:features`
+lewat `post-update-cmd`. Sejak 1 Oktober 2026 pemicu itu dilepas, dan `install:features` hanya
+berjalan sekali saat proyek dibuat. Tetap periksa berkas apa saja yang ikut berubah setelah
+`composer update`, karena `vendor:publish` masih menulis aset Laravel.
 
 ### Pemangkasan per edisi dibuat skrip, dan CI yang membuktikannya
 
