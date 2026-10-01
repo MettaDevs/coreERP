@@ -146,10 +146,10 @@ Padanan "+ Filter" di request page Business Central (K-30). Setiap laporan punya
 | BC | CoreERP |
 | --- | --- |
 | `dataitem` laporan, satu bagian filter per data item | `ReportDefinition::dataItems()` di module: data item (misalnya Aset, atau Dokumen lalu Baris) dengan model tabelnya dan alias tabel itu di query laporan |
-| Field tabel beserta Caption | Katalog field per model: konstanta `FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, dan `FIELD_HIDDEN` dibaca `App\Support\Modules\Contracts\TableFields`; tipe kolom dibaca dari database |
+| Field tabel beserta Caption | Katalog field per model: konstanta `FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, dan `FIELD_HIDDEN` dibaca `App\Platform\Modules\Contracts\TableFields`; tipe kolom dibaca dari database |
 | `RequestFilterFields` | Kolom bawaan data item (`defaultFields`), langsung tampil tanpa ditambahkan |
 | `DataItemTableView` | Batasan di query laporan dan kebijakan data organisasi; filter tambahan hanya mempersempit |
-| Sintaks filter | `App\Support\Modules\Contracts\FieldFilterExpression`: `..`, `\|`, `&`, `<>`, `<`, `<=`, `>`, `>=`, `*`, `?`, `@`, `''`, dan `t` untuk hari ini |
+| Sintaks filter | `App\Platform\Modules\Contracts\FieldFilterExpression`: `..`, `\|`, `&`, `<>`, `<`, `<=`, `>`, `>=`, `*`, `?`, `@`, `''`, dan `t` untuk hari ini |
 | Field Option dan TableRelation | Kolom pilihan dan rujukan dipilih dari daftar; beberapa pilihan berarti *atau* |
 
 - **Semua kolom.** Kolom teknis (`id`, `tenant_id`, `version`, `deleted_at`, `creation_key`, jejak pengguna) dan kolom berkelas `AccountData` tidak pernah ditawarkan. Kolom lain wajib diberi nama tampilan atau disembunyikan dengan alasannya; penjaganya `ReportFieldCatalogTest` di module aset, sehingga kolom baru di tabel data item tidak diam-diam hilang dari "+ Tambah filter".

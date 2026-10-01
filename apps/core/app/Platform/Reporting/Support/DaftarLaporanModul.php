@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\Support;
 
-use App\Support\Modules\Contracts\DaftarLaporan;
-use App\Support\Modules\Contracts\PenyediaLaporanModul;
+use App\Platform\Modules\Contracts\DaftarLaporan;
+use App\Platform\Modules\Contracts\PenyediaLaporanModul;
 
 /**
  * Module mana yang menyediakan laporannya sendiri di dalam proses ini.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\Workflow\ModuleServices;
 
 use App\Foundation\Workflow\Support\WorkflowRuntime;
-use App\Support\Modules\Contracts\MesinWorkflow;
+use App\Platform\Modules\Contracts\MesinWorkflow;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;

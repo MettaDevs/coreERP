@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\ReportFormatter;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\ReportFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;

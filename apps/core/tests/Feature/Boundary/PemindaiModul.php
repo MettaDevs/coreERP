@@ -321,7 +321,7 @@ final class PemindaiModul
     public static function namespaceYangDisebut(string $isi): array
     {
         // Lookbehind-nya penting. Tanpa itu, pola ini juga cocok di tengah
-        // App\\Support\\Modules\\Contracts\\..., lalu membaca "Contracts" sebagai nama
+        // App\\Platform\\Modules\\Contracts\\..., lalu membaca "Contracts" sebagai nama
         // publisher — sebuah module yang tidak pernah ada. Yang dicari hanya `Modules` di
         // awal sebuah nama, bukan sebagai potongan di tengahnya. Nama yang diawali satu
         // garis miring — bentuk lengkap seperti \\Modules\\Apperp\\... — tetap ditangkap,
@@ -342,7 +342,7 @@ final class PemindaiModul
     /**
      * Kelas Core yang disebut sebuah isi berkas, kecuali yang memang dikontrakkan.
      *
-     * Yang diizinkan hanya `App\\Support\\Modules\\Contracts`, dan itu satu-satunya
+     * Yang diizinkan hanya `App\\Platform\\Modules\\Contracts`, dan itu satu-satunya
      * kalimat aturannya. Sebelumnya seluruh `App\\Support\\Modules` diizinkan supaya model
      * module bisa menyebut `TenantScope` — dan itu berarti kelas apa pun yang kelak ditaruh
      * di folder itu ikut boleh disentuh module, tanpa ada yang menahan dan tanpa ada yang
@@ -360,7 +360,7 @@ final class PemindaiModul
         foreach ($cocok[0] as $nama) {
             $rapi = str_replace('\\\\', '\\', $nama);
 
-            if (str_starts_with($rapi, 'App\\Support\\Modules\\Contracts\\')) {
+            if (str_starts_with($rapi, 'App\\Platform\\Modules\\Contracts\\')) {
                 continue;
             }
 

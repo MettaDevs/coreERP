@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\AttachmentRecordType;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Apperp\HumanResources\Models\Worker;
 

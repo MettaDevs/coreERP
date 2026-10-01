@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
-use App\Support\Modules\Contracts\ReportFormatter;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\ReportFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

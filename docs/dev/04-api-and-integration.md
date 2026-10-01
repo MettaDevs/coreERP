@@ -7,7 +7,7 @@ bergantung pada batas mana yang dilewati:
 
 | Batas | Bentuk |
 | --- | --- |
-| Module ke Core, di satu runtime | Pemanggilan fungsi lewat antarmuka di `App\Support\Modules\Contracts` |
+| Module ke Core, di satu runtime | Pemanggilan fungsi lewat antarmuka di `App\Platform\Modules\Contracts` |
 | Module ke module, di satu runtime | Event Laravel yang dikirim di dalam proses, dengan nama dan envelope yang sama seperti event terbit |
 | Addon pihak ketiga ke Core | REST `internal/v1` dengan token layanan |
 | Sistem eksternal milik tenant | REST/OpenAPI, lihat [integrasi sistem eksternal](12-external-module-integration.md) |
@@ -26,7 +26,7 @@ sekali — tetapi ia juga berarti listener yang lambat menahan transaksi.
 
 ### Satu namespace, dan hanya satu
 
-Module hanya boleh menyebut **`App\Support\Modules\Contracts`**. Bukan `App\Support\Modules`,
+Module hanya boleh menyebut **`App\Platform\Modules\Contracts`**. Bukan `App\Support\Modules`,
 bukan `App\Models`, bukan apa pun yang lain di dalam Core. Kelonggaran ke seluruh
 `App\Support\Modules` sudah dicoba dan dibuang: begitu satu folder pembantu ikut terbuka, batasnya
 berhenti bisa dijelaskan dalam satu kalimat, dan batas yang tidak bisa dijelaskan dalam satu kalimat

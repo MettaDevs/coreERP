@@ -6,7 +6,7 @@ namespace App\Foundation\UnitOfMeasure\ModuleServices;
 
 use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
-use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Platform\Modules\Contracts\DaftarSatuan;
 
 /**
  * Meneruskan pertanyaan satuan ke layanan Core.

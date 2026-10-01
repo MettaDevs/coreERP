@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Foundation\FiscalCalendar\ModuleServices;
 
 use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
+use App\Platform\Modules\Contracts\KalenderFiskal;
 use App\Platform\Organization\Models\LegalEntity;
-use App\Support\Modules\Contracts\KalenderFiskal;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 

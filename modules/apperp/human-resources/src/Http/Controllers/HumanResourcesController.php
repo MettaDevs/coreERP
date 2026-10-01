@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Http\Controllers;
 
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;

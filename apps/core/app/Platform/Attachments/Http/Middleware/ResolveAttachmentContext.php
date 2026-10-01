@@ -6,9 +6,9 @@ namespace App\Platform\Attachments\Http\Middleware;
 
 use App\Platform\Attachments\Models\DocumentAttachment;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
-use App\Support\Modules\Contracts\AttachmentRecordType;
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

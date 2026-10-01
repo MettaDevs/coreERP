@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\LinkedWorkerResolver;
+use App\Platform\Modules\Contracts\LinkedWorkerResolver;
 use Modules\Apperp\HumanResources\Models\Worker;
 
 /**

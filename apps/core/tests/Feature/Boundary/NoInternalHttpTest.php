@@ -82,7 +82,7 @@ class NoInternalHttpTest extends TestCase
             'percobaan ulang, token service yang tidak sinkron, dan 503 yang harus dijelaskan ke',
             'pengguna. Yang paling mahal: permintaan itu berjalan di luar transaksi database module,',
             'sehingga nomor yang sudah terbit tidak ikut batal ketika dokumennya gagal disimpan.',
-            'Pakai antarmuka di App\\Support\\Modules\\Contracts.',
+            'Pakai antarmuka di App\\Platform\\Modules\\Contracts.',
         ]));
     }
 

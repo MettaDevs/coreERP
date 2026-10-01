@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Platform\Modules\Contracts\DaftarSatuan;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 

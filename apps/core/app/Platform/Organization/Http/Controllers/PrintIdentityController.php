@@ -4,9 +4,9 @@ namespace App\Platform\Organization\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Reporting\Support\PrintIdentityStore;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

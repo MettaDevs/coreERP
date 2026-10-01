@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting;
 
-use App\Support\Modules\Contracts\FieldFilterExpression;
-use App\Support\Modules\Contracts\FieldType;
-use App\Support\Modules\Contracts\FilterField;
-use App\Support\Modules\Contracts\InvalidFilterExpression;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+use App\Platform\Modules\Contracts\FieldType;
+use App\Platform\Modules\Contracts\FilterField;
+use App\Platform\Modules\Contracts\InvalidFilterExpression;
 use Illuminate\Contracts\Database\Query\Builder;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;

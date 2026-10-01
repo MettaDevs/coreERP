@@ -6,7 +6,7 @@ Ada dua pintu, dan yang menentukan bukan selera melainkan tempat pemanggilnya be
 
 | Pemanggil | Pintu |
 | --- | --- |
-| Module di runtime Core | Kontrak `App\Support\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
+| Module di runtime Core | Kontrak `App\Platform\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
 | Addon pihak ketiga di luar runtime | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
 
 ## Pemilik kebenaran
@@ -154,7 +154,7 @@ bukan objek Core: module yang harus mengambil objek sequence lebih dulu justru m
 antarmuka itu buat ada.
 
 ```php
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\PenerbitNomor;
 
 $nomor = $penerbit->terbitkan(
     ['tenant_id' => $tenantId, 'app_id' => 'management-aset', 'legal_entity_id' => $legalEntityId],

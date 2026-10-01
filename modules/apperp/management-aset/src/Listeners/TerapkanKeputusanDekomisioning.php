@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Listeners;
 
-use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Platform\Modules\Contracts\KeputusanWorkflowDiambil;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Models\support\ProcessedCoreEvent;

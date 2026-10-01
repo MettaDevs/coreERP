@@ -99,7 +99,7 @@ Hasil pemetaan 426 berkas PHP di `apps/core/app` pada `origin/main` 1 Oktober 20
 | Foundation/AddressBook | 13 | model `Party*`, `PostalAddress`, `ElectronicAddress`, `Location*`, `Support/AddressBook`, `Http/Controllers/GlobalAddressBook` |
 | Foundation/FiscalCalendar, WorkingCalendar, Workflow | 9 + 8 + 9 | nama sama |
 | Foundation/Vendor, UnitOfMeasure, Currency | 6 + 5 + 4 | nama sama; `MoneyPrecision` ke Currency |
-| Facade (`Support/Modules/Contracts`) | 38 | lihat [Facade module](#facade-module) |
+| Facade (`Platform/Modules/Contracts`) | 38 | lihat [Facade module](#facade-module) |
 
 Sebelum setiap PR, jalankan ulang pemetaan atas `origin/main`. Berkas baru yang lahir sesudah
 tanggal di atas harus ikut dipetakan.
@@ -128,7 +128,7 @@ memperpendek daftar itu, tidak boleh memperpanjangnya.
 
 ## Facade module
 
-Isi `App\Support\Modules\Contracts` adalah API publik Core bagi module. Sebagian besar masih
+Isi `App\Platform\Modules\Contracts` adalah API publik Core bagi module. Sebagian besar masih
 bernama Indonesia (`PenerbitNomor`, `DaftarVendor`, `MesinWorkflow`, `KalenderFiskal`,
 `PenyediaLaporanModul`, …), begitu pula implementasinya di `Services/Modules` (`PenerbitNomorCore`,
 `DaftarAkunCore`, …). Semuanya diganti ke nama Inggris dalam pekerjaan ini. Biayanya naik dengan
@@ -143,7 +143,7 @@ setiap module dan kontrak baru, dan saat ini baru dua module yang memakainya.
    internal. Pemilik kontrak jelas.
 
 Rekomendasi: **pilihan 2**. Kontrak baru yang lahir sebelum K-1 diputuskan tetap ditaruh di
-`App\Support\Modules\Contracts`, **dengan nama Inggris**.
+`App\Platform\Modules\Contracts`, **dengan nama Inggris**.
 
 ## Urutan pekerjaan
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Platform\Organization;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 use App\Platform\Modules\Models\AppServiceCredential;
 use App\Platform\Modules\Models\ModuleInstallation;
 use App\Platform\Organization\Models\Organization;
@@ -10,7 +11,6 @@ use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;

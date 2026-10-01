@@ -163,7 +163,7 @@ Tiga hal yang paling sering salah pada modul pertama seseorang:
   ditemukan pada permintaan pertama di runtime.
 - **Penyedia layanan module** yang memuat rute dan halaman adalah satu-satunya pintu masuknya ke
   runtime. Ia tidak didaftarkan di `config/app.php`; Core menemukannya dari manifest.
-- **Module hanya boleh menyebut `App\Support\Modules\Contracts`.** Kelas Core lain di luar namespace
+- **Module hanya boleh menyebut `App\Platform\Modules\Contracts`.** Kelas Core lain di luar namespace
   itu terlarang, dan ada penjaga batas yang memeriksanya.
 
 ::: tip Gate keluar
@@ -263,7 +263,7 @@ Yang perlu ditulis bergantung pada batas mana yang dilewati:
 
 | Batas | Bentuk | Perlu berkas kontrak? |
 | --- | --- | --- |
-| Module ke Core | Antarmuka di `App\Support\Modules\Contracts` | Tidak — kontraknya sudah ada di Core |
+| Module ke Core | Antarmuka di `App\Platform\Modules\Contracts` | Tidak — kontraknya sudah ada di Core |
 | Module ke module, di satu runtime | Event Laravel in-process | Ya bila event itu juga akan diterbitkan ke luar |
 | Permukaan yang dipanggil dari luar runtime | REST/OpenAPI atau AsyncAPI | Ya |
 | Rute yang hanya dipanggil halaman module sendiri | Rute biasa di `routes/api.php` | Tidak |

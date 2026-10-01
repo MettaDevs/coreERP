@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Foundation\FinancePosting\ModuleServices;
 
 use App\Foundation\FinancePosting\Support\PostingSettings;
+use App\Platform\Modules\Contracts\SetelanPostingFinance;
 use App\Platform\Organization\Models\LegalEntity;
-use App\Support\Modules\Contracts\SetelanPostingFinance;
 use RuntimeException;
 
 /**

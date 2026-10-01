@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;

@@ -19,7 +19,7 @@ konteks modul, **tidak pernah** dari isi permintaan.
 Model modul memakai trait `MilikTenant` dan **tidak menulis penyaringan tenant sendiri**:
 
 ```php
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\MilikTenant;
 
 final class Asset extends Model
 {
@@ -114,7 +114,7 @@ siapa yang menegakkannya: dulu database terpisah, sekarang penjaga batas di
 | Berkas | Isinya |
 | --- | --- |
 | `modules/apperp/management-aset/src/Support/OrganizationScope.php` | Penyaringan dan pemeriksaan hak |
-| `apps/core/app/Support/Modules/Contracts/KonteksTenant.php`, `KonteksPermintaan.php` | Pintu tempat modul membaca konteksnya |
+| `apps/core/app/Platform/Modules/Contracts/KonteksTenant.php`, `KonteksPermintaan.php` | Pintu tempat modul membaca konteksnya |
 | `apps/core/app/Support/Modules/TenantScope.php` | Penegakan `MilikTenant` pada sisi baca dan sisi tulis |
 | [Rancangan scope data aset](/apps/management-aset/arsitektur/rancangan-scope-data-aset) | Rancangan pemisahan data per organisasi |
 

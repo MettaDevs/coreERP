@@ -6,8 +6,8 @@ namespace Tests\Feature\Foundation\NumberSequence;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Platform\Modules\Contracts\PenerbitNomor;
 use App\Platform\Modules\Support\ModuleMigrator;
-use App\Support\Modules\Contracts\PenerbitNomor;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

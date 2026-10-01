@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 use Modules\Apperp\HumanResources\Models\Worker;
 
 /**

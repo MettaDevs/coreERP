@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;

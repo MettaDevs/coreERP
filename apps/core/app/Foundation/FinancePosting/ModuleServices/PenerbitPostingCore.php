@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\FinancePosting\ModuleServices;
 
 use App\Foundation\FinancePosting\Support\PostingPublisher;
-use App\Support\Modules\Contracts\PenerbitPosting;
+use App\Platform\Modules\Contracts\PenerbitPosting;
 
 /**
  * Pintu module ke penerbit posting Core. Seluruh aturannya tinggal di `PostingPublisher`, yang juga

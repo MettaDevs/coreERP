@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 
 /**
  * Unit kerja dan orang milik Core, diterjemahkan menjadi nama yang dikenali pengguna.

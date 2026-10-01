@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 
 /**
  * Anggota dan unit kerja tenant lewat kontrak Core, bukan lewat HTTP.

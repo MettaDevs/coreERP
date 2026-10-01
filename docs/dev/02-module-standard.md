@@ -311,7 +311,7 @@ Di dalam kumpulan tabel miliknya sendiri, sebuah app boleh memakai transaksi, fo
 Model module memakai trait `MilikTenant` dan tidak menulis penyaringan tenant sendiri:
 
 ```php
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\MilikTenant;
 
 final class Barang extends Model
 {
@@ -359,7 +359,7 @@ mengisinya dari pengguna yang sedang login, termasuk update lewat query builder 
 event model. Pembuat tidak dapat ditimpa; pengubah yang kosong berarti baris itu diubah sistem.
 
 Tabel baru memanggil `AuditColumns::add($table)` di dalam `Schema::create`, lalu
-`AuditColumns::attach('<tabel>')` sesudahnya (`App\Support\Modules\Contracts\AuditColumns`).
+`AuditColumns::attach('<tabel>')` sesudahnya (`App\Platform\Modules\Contracts\AuditColumns`).
 `AuditColumnsBoundaryTest` dan `ModuleTableBoundaryTest` menolak tabel tenant yang lupa. Job antrean
 yang menulis data atas nama pengguna membungkus pekerjaannya dengan `AuditActor::runAs()`, seperti
 `RunReportExport`.
@@ -386,7 +386,7 @@ sendiri:
 
 Setiap tabel ber-`tenant_id`, di Core maupun module, menyatakan jenis data yang disimpannya, padanan
 properti `DataClassification` di Business Central ([analisa gap BC, gap 5](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-5)).
-Nilainya `DataClass` dari `App\Support\Modules\Contracts`, sama dengan BC. Model menulis bawaan tabel
+Nilainya `DataClass` dari `App\Platform\Modules\Contracts`, sama dengan BC. Model menulis bawaan tabel
 sebagai atribut, lalu kolom yang berbeda di konstanta `COLUMN_CLASSIFICATION`:
 
 ```php
@@ -487,7 +487,7 @@ menyimpan berkas sendiri. Yang dikerjakan module hanya satu: **mendaftarkan tabe
 lampiran, beserta jawaban atas hak record-nya.**
 
 ```php
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 
 // Di boot() penyedia layanan module.
 $this->app->make(AttachmentRecordTypes::class)->register(new WorkerAttachments);
@@ -775,7 +775,7 @@ lain demi sebuah master. Aturan ini berlaku untuk setiap master dan modul baru:
 Bagian halaman per modul dan entri menu yang menunjuk halaman Core **belum dibangun**. Rencananya,
 inventaris master hari ini, dan keputusan yang masih terbuka ada di
 [master bersama](../todo/master-bersama/README.md). Sampai mekanismenya ada, master bersama dikelola
-di halaman Core-nya, dan modul memilihnya lewat kontrak di `App\Support\Modules\Contracts`.
+di halaman Core-nya, dan modul memilihnya lewat kontrak di `App\Platform\Modules\Contracts`.
 
 ## Contract dan dependency
 

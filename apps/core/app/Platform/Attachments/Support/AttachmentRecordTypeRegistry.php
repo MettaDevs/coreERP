@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Attachments\Support;
 
-use App\Support\Modules\Contracts\AttachmentRecordType;
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
+use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use LogicException;
 
 /**

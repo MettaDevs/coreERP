@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources;
 
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\LinkedWorkerResolvers;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Apperp\HumanResources\Services\LinkedWorkers;

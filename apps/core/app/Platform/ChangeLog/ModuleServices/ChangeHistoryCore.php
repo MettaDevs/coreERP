@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Platform\ChangeLog\ModuleServices;
 
 use App\Platform\Identity\Models\User;
-use App\Support\Modules\Contracts\ChangeHistory;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\ChangeHistory;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Support\Facades\DB;
 
 /**

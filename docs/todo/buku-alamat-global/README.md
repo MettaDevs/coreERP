@@ -344,7 +344,7 @@ container**, bukan HTTP. Polanya sudah dipakai di dua tempat: `PenerbitNomor` un
 `apps/core/app/Services/Modules/`, dan contoh pemakaiannya di
 `modules/apperp/human-resources/src/Services/DirektoriHr.php:33`.
 
-Buku alamat menyusul dengan bentuk yang sama: kontrak `App\Support\Modules\Contracts\BukuAlamat`,
+Buku alamat menyusul dengan bentuk yang sama: kontrak `App\Platform\Modules\Contracts\BukuAlamat`,
 implementasi `App\Services\Modules\BukuAlamatCore`, didaftarkan di `CoreServices::PEMETAAN`. Karena
 sekoneksi dan seproses, pendaftaran peran ikut transaksi pemanggilnya: worker yang gagal disimpan tidak
 meninggalkan peran menggantung.

@@ -2,10 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\DaftarVendor;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PostingTidakSah;
-use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Platform\Modules\Contracts\DaftarVendor;
+use App\Platform\Modules\Contracts\PenerbitPosting;
+use App\Platform\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\PresisiMataUang;
 use Brick\Math\BigDecimal;
 use InvalidArgumentException;
 use Modules\Apperp\ManagementAset\Models\master\AssetPostingGroup;

@@ -91,7 +91,7 @@ dari sebuah department bisa ditemukan (K-07).
   - [x] 1.3.4 Verifikasi di browser: buat unit bernomor, ubah nomor, dan lihat tanda di daftar dan pohon hierarki.
     Diverifikasi 23 September 2026: nomor berspasi ditolak, nomor bisa diubah, dan tanda "Belum bernomor" tampil di
     daftar dan pohon. Satu cacat diperbaiki: pohon hierarki menampilkan kode tipe (`business_unit`), bukan labelnya.
-- [x] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Support/Modules/Contracts/`).
+- [x] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Platform/Modules/Contracts/`).
   - [x] 1.4.1 `unitOperasi()` mengembalikan `tipe` dan `nomor` selain `id` dan `nama`.
   - [x] 1.4.2 Metode baru `unitBisnisInduk(tenant, orgUnitIds, tanggal)`: BU induk dari org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
   - [x] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`. Dua hierarki manajemen yang tidak sepakat juga `null`.
@@ -253,7 +253,7 @@ tidak ada posting yang hilang atau dobel.
 - [x] 6.1 Migration `finance_postings`.
   - [x] 6.1.1 Kolom: `id`, `tenant_id`, `legal_entity_id`, `posting_id` (unik per tenant), `posting_type`, `source_module`, `source_type`, `source_number`, `posting_date`, `settlement_mode` (nullable), `status`, `held_reason`, `payload` (json, bentuk kontrak lengkap), `total_debit`, `total_credit`, `reverses_posting_id`, `adjusts_posting_id`, `external_reference`, `reason_code`, `reason`, `acknowledged_at`, `served_count`, `last_served_at`, timestamps. `held_reason` menjadi `hold_reasons` (daftar masalah per baris), ditambah `manual_reason`, `input` (permintaan asli module, untuk membentuk ulang posting yang tertahan), dan `input_hash`. Tiga tabel pendamping: `finance_posting_lines`, `finance_posting_deliveries` (mode push), `finance_posting_events` (riwayat).
   - [x] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk pull, ditambah `published_at` sesuai urutan pull.
-- [x] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Support/Modules/Contracts/`.
+- [x] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Platform/Modules/Contracts/`.
   - [x] 6.2.1 `terbitkan(array $posting)` menerima jenis, entitas legal, tanggal, dokumen sumber, vendor, dan baris jurnal dengan `account_id` referensi + `org_unit_id` sumber dimensi. Ditambah `pratinjau()` (pemeriksaan sama tanpa menyimpan, untuk K-22) dan `status()`.
   - [x] 6.2.2 Dipanggil **di dalam** transaksi pemanggil. Tidak membuka transaksi sendiri; dipanggil di luar transaksi dilempar sebagai `LogicException`.
   - [x] 6.2.3 Idempoten: `posting_id` yang sama mengembalikan posting yang sudah ada. `posting_id` sama dengan isi jurnal berbeda dilempar sebagai `PostingTidakSah`.

@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use App\Support\Modules\Contracts\DaftarAkun;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\DaftarAkun;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;

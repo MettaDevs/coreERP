@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Models;
 
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;

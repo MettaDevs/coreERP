@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\DaftarLaporan;
-use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
-use App\Support\Modules\Contracts\ListExportSources;
-use App\Support\Modules\Contracts\PostingAccountResolvers;
-use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\DaftarLaporan;
+use App\Platform\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Platform\Modules\Contracts\ListExportSources;
+use App\Platform\Modules\Contracts\PostingAccountResolvers;
+use App\Platform\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;

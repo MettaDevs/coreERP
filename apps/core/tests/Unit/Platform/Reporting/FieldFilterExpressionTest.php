@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Platform\Reporting;
 
-use App\Support\Modules\Contracts\FieldFilterExpression;
-use App\Support\Modules\Contracts\FieldType;
-use App\Support\Modules\Contracts\FilterField;
-use App\Support\Modules\Contracts\InvalidFilterExpression;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+use App\Platform\Modules\Contracts\FieldType;
+use App\Platform\Modules\Contracts\FilterField;
+use App\Platform\Modules\Contracts\InvalidFilterExpression;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Query\Builder;

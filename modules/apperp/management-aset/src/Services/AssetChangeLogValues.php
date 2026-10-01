@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;

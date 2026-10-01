@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;

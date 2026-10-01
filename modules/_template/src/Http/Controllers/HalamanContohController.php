@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\PenerbitContoh\ChangeMe\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\PenerbitContoh\ChangeMe\Models\Contoh;

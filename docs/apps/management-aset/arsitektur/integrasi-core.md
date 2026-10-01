@@ -7,7 +7,7 @@ Core memakai database tenant yang sama, jadi yang menolak di sini bukan database
 akan berhasil menjangkaunya. Yang menolak adalah penjaga batas di
 `apps/core/tests/Feature/Boundary/`, dan itu tetap batas.
 
-Pintunya satu: antarmuka di `App\Support\Modules\Contracts`. Itu **satu-satunya** namespace Core yang
+Pintunya satu: antarmuka di `App\Platform\Modules\Contracts`. Itu **satu-satunya** namespace Core yang
 boleh disebut modul ini.
 
 ::: tip Yang berubah, dan kenapa halaman ini ditulis ulang

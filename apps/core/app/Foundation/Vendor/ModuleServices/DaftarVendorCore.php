@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\Vendor\ModuleServices;
 
 use App\Foundation\Vendor\Models\Vendor;
-use App\Support\Modules\Contracts\DaftarVendor;
+use App\Platform\Modules\Contracts\DaftarVendor;
 use Illuminate\Database\Eloquent\Builder;
 
 /**

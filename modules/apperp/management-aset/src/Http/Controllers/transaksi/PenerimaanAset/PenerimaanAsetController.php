@@ -2,11 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset;
 
-use App\Support\Modules\Contracts\DaftarVendor;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PresisiMataUang;
-use App\Support\Modules\Contracts\RowVersion;
-use App\Support\Modules\Contracts\SetelanPostingFinance;
+use App\Platform\Modules\Contracts\DaftarVendor;
+use App\Platform\Modules\Contracts\PenerbitPosting;
+use App\Platform\Modules\Contracts\PresisiMataUang;
+use App\Platform\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\SetelanPostingFinance;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;

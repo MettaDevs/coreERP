@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\TenantDisiapkan;
 use App\Platform\Reporting\Models\ReportPreset;
 use App\Platform\Reporting\Support\LayoutRef;
 use App\Platform\Reporting\Support\RelativeDates;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Carbon\CarbonImmutable;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

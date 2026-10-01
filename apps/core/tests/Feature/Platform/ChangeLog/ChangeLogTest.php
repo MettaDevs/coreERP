@@ -6,13 +6,13 @@ namespace Tests\Feature\Platform\ChangeLog;
 
 use App\Platform\ChangeLog\Support\ChangeLogSwitch;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\ChangeLogDefaults;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\AuditColumns;
-use App\Support\Modules\Contracts\ChangeLogDefaults;
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\RowVersion;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;

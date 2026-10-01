@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Apperp\HumanResources\Tests\Feature;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Closure;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;

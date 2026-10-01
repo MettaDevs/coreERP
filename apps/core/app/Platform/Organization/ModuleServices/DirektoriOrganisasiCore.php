@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Organization\ModuleServices;
 
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
 use App\Platform\Organization\Support\BusinessUnitResolver;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use Illuminate\Support\Facades\DB;
 
 /**

@@ -3,13 +3,13 @@
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\TenantDisiapkan;
 use App\Platform\Reporting\Jobs\RunReportExport;
 use App\Platform\Reporting\Support\DaftarLaporanModul;
 use App\Platform\Retention\Support\RetentionPolicies;
 use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;

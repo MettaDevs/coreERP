@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\ChangeLog\Support;
 
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
 
 /**
  * Penerjemah nilai log perubahan yang terdaftar di proses ini, berkunci nama tabel.

@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

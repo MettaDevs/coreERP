@@ -6,10 +6,10 @@ namespace Tests\Feature\Platform\Modules;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Platform\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\KalenderFiskal;
+use App\Platform\Modules\Contracts\PenerbitNomor;
 use App\Platform\Modules\Support\CoreServices;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
-use App\Support\Modules\Contracts\KalenderFiskal;
-use App\Support\Modules\Contracts\PenerbitNomor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

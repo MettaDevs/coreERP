@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\NumberSequence\ModuleServices;
 
 use App\Foundation\NumberSequence\Actions\NumberSequenceService;
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\PenerbitNomor;
 
 /**
  * Meneruskan penerbitan nomor ke layanan Core, di proses yang sama.

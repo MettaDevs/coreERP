@@ -2,8 +2,8 @@
 
 namespace App\Platform\Tenant\Console;
 
+use App\Platform\Modules\Contracts\TenantDisiapkan;
 use App\Platform\Modules\Support\PengirimEventModul;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

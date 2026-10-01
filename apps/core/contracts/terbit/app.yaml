@@ -9,7 +9,7 @@ info:
     `serviceToken` + `tenantHeader`), diverifikasi `AuthenticateAppService`.
 
     Module yang berjalan di dalam runtime Core memanggil Core lewat kontrak in-process di
-    `App\Support\Modules\Contracts`, bukan lewat endpoint ini. Yang tersisa di sini adalah pintu
+    `App\Platform\Modules\Contracts`, bukan lewat endpoint ini. Yang tersisa di sini adalah pintu
     untuk app yang masih berjalan sebagai proses tersendiri dan addon pihak ketiga.
 
     - `tenant_id` **tidak pernah** diterima dari URL, query, atau body; ia berasal dari header

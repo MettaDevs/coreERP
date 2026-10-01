@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\KonteksTenant;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\KonteksTenant;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Apperp\ContohA\Models\Barang;

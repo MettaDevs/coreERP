@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Listeners;
 
-use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\TenantDisiapkan;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 
 /**

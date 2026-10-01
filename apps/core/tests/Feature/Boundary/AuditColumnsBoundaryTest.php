@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

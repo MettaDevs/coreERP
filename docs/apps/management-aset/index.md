@@ -65,7 +65,7 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 
 Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
-**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat kontrak di `App\Support\Modules\Contracts`, bukan lewat jaringan.
+**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat kontrak di `App\Platform\Modules\Contracts`, bukan lewat jaringan.
 
 ## Kontrak
 

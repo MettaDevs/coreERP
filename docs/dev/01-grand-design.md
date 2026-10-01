@@ -14,7 +14,7 @@ sejak hari itu hanya ada satu. Bentuk yang berlaku adalah **module di `modules/`
 | Proses | ikut runtime Core |
 | Database | database tenant yang sama dengan Core |
 | Pemisah tabel | awalan nama tabel dan `MilikTenant` |
-| Memanggil Core | pemanggilan fungsi lewat `App\Support\Modules\Contracts\*` |
+| Memanggil Core | pemanggilan fungsi lewat `App\Platform\Modules\Contracts\*` |
 | UI | halaman React yang ikut build shell |
 | Rilis | ikut image edisi Core |
 
@@ -241,7 +241,7 @@ Versi diagram yang dapat diedit di draw.io: [coreerp-saas-grand-design.drawio](.
 1. Sebuah module tidak membaca atau menulis data module lain. Yang menolaknya adalah penjaga batas dan analisa statis. Batas yang dijaga pemeriksaan tetap batas.
 2. Semua request business API membawa `TenantContext` yang diterbitkan identity service; `tenant_id` dari body request tidak dipercaya. Pada module, konteks itu dibaca dari kontrak `KonteksTenant` dan `KonteksPermintaan`, bukan dari isi permintaan.
 3. Database credential hanya tersedia untuk service pemiliknya. Control plane menyimpan `secret_ref`, bukan password database.
-4. Semua integrasi antar-app memakai OpenAPI, event contract, atau extension point yang dipublikasikan. Permukaan module yang hanya dipanggil di dalam runtime yang sama dikontrakkan sebagai antarmuka PHP di `App\Support\Modules\Contracts`.
+4. Semua integrasi antar-app memakai OpenAPI, event contract, atau extension point yang dipublikasikan. Permukaan module yang hanya dipanggil di dalam runtime yang sama dikontrakkan sebagai antarmuka PHP di `App\Platform\Modules\Contracts`.
 5. Server customer tidak memuat berkas module yang tidak dilisensikan pada deployment on-prem.
 6. On-prem perpetual tidak memiliki telemetry, heartbeat, atau validasi lisensi online yang wajib. Server customer boleh online untuk penggunanya tanpa membuka koneksi ke vendor.
 7. Silo bukan izin fork source. Semua profile menjalankan image edisi yang kompatibel dengan matriks versi yang sama.

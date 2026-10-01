@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Support\Facades\Artisan;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 

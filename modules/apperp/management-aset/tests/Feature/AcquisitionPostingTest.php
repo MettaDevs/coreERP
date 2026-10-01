@@ -3,8 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Foundation\FinancePosting\Models\FinancePosting;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\PenerbitPosting;
+use App\Platform\Modules\Contracts\PostingTidakSah;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;

@@ -6,10 +6,10 @@ namespace App\Platform\Reporting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Reporting\Support\ReportCatalog;
 use App\Platform\Reporting\Support\ReportOptions;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;

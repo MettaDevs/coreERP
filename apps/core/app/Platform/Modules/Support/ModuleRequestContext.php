@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\Identity\Support\UserClock;
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use Illuminate\Http\Request;
 use RuntimeException;
 

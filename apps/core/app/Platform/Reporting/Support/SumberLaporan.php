@@ -6,11 +6,11 @@ namespace App\Platform\Reporting\Support;
 
 use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Identity\Support\UserClock;
+use App\Platform\Modules\Contracts\PenyediaLaporanModul;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Modules\Support\PelaksanaTenant;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use RuntimeException;
 use stdClass;
 use Throwable;

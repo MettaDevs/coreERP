@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\KalenderFiskal;
+use App\Platform\Modules\Contracts\KalenderFiskal;
 use Illuminate\Validation\ValidationException;
 
 /**

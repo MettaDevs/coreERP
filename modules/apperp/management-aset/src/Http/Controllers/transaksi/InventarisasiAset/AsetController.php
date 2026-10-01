@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
-use App\Support\Modules\Contracts\ChangeHistory;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\ChangeHistory;
+use App\Platform\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

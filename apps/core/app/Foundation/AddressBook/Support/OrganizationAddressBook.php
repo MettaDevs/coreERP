@@ -9,9 +9,9 @@ use App\Foundation\AddressBook\Models\Party;
 use App\Foundation\AddressBook\Models\PartyLocation;
 use App\Foundation\AddressBook\Models\PartyLocationPurpose;
 use App\Foundation\AddressBook\Models\PostalAddress;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationParty;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 

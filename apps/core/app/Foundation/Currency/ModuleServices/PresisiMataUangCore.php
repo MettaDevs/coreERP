@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\Currency\ModuleServices;
 
 use App\Foundation\Currency\Support\MoneyPrecision;
-use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Platform\Modules\Contracts\PresisiMataUang;
 
 /**
  * Meneruskan presisi dan pembulatan uang dari module ke Core, di proses yang sama.

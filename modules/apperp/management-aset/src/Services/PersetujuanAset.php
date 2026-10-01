@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\MesinWorkflow;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\MesinWorkflow;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 

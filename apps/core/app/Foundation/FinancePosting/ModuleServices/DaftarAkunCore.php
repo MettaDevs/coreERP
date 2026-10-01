@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\FinancePosting\ModuleServices;
 
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
-use App\Support\Modules\Contracts\DaftarAkun;
+use App\Platform\Modules\Contracts\DaftarAkun;
 use Illuminate\Database\Eloquent\Builder;
 
 /**

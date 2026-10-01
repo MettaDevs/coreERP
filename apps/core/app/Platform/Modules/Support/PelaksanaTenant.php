@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Support;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Contracts\Container\Container;
 
 /**

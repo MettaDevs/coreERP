@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\PenerbitNomor;
 use RuntimeException;
 use Throwable;
 

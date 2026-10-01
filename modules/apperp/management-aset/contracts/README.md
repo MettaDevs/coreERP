@@ -21,7 +21,7 @@ bukan ke berkas YAML:
 - Keputusan workflow dan penerimaan event sudah menjadi event Laravel in-process (F3-09;
   penyediaan tenant menyusul di F3-11). Sisi penerbit tetap dikontrakkan pada
   `apps/core/contracts/asyncapi.yaml`, dan **itulah** salinan yang berwenang.
-- Laporan dibaca Core lewat `App\Support\Modules\Contracts\PenyediaLaporanModul`, bukan
+- Laporan dibaca Core lewat `App\Platform\Modules\Contracts\PenyediaLaporanModul`, bukan
   lewat `internal/v1/laporan/...` (F3-12).
 
 ## Pemeriksa cakupan sudah dihapus, dan ia memang tidak pernah berjalan di sini

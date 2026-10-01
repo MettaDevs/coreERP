@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\KonteksPermintaan;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

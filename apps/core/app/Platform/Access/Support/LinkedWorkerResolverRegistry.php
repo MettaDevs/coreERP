@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Platform\Access\Support;
 
+use App\Platform\Modules\Contracts\LinkedWorkerResolver;
+use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use App\Platform\Modules\Models\ModuleInstallation;
-use App\Support\Modules\Contracts\LinkedWorkerResolver;
-use App\Support\Modules\Contracts\LinkedWorkerResolvers;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 
 /**
  * Penjawab pekerja tertaut yang terdaftar di proses ini, berkunci id module.

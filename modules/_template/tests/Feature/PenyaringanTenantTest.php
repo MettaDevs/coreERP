@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\PenerbitContoh\ChangeMe\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;

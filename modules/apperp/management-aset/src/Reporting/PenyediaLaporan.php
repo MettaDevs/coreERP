@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting;
 
-use App\Support\Modules\Contracts\PenyediaLaporanModul;
+use App\Platform\Modules\Contracts\PenyediaLaporanModul;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use RuntimeException;

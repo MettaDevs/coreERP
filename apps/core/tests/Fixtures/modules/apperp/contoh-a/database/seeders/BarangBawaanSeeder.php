@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Database\Seeders;
 
-use App\Support\Modules\Contracts\SeederModule;
+use App\Platform\Modules\Contracts\SeederModule;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohA\Models\Barang;
 

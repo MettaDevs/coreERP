@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\KonteksPermintaan;
 use Illuminate\Http\JsonResponse;
 use Modules\Apperp\ContohB\Models\Rak;
 

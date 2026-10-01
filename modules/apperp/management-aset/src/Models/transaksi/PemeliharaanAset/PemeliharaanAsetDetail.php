@@ -2,10 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\MilikTenant;
-use App\Support\Modules\Contracts\TableFields;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
+use App\Platform\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

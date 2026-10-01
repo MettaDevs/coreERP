@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Models;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 
 /**

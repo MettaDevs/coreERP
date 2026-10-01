@@ -6,7 +6,7 @@ namespace Tests\Feature\Platform\ChangeLog;
 
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\Identity\Models\User;
-use App\Support\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;

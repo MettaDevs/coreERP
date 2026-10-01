@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use App\Platform\ControlPlane\OwnedByControlPlane;
-use App\Support\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 

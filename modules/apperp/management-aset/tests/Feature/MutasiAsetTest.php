@@ -3,8 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;

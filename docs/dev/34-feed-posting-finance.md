@@ -386,7 +386,7 @@ Satu endpoint melayani semua jenis (K-23). Menambah jenis tidak membutuhkan tabe
 
 ### 2. Susun masukan di pembungkus sisi module
 
-Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, seperti `modules/apperp/management-aset/src/Services/AcquisitionPosting.php` untuk penerimaan aset: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `PostingTidakSah` menjadi pesan untuk pengguna (TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php`. Yang perlu diperhatikan:
+Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, seperti `modules/apperp/management-aset/src/Services/AcquisitionPosting.php` untuk penerimaan aset: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `PostingTidakSah` menjadi pesan untuk pengguna (TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Platform/Modules/Contracts/PenerbitPosting.php`. Yang perlu diperhatikan:
 
 - **`tenant_id`** dari `KonteksTenant::tenantId()`, tidak pernah dari permintaan.
 - **`posting_id` deterministik dari dokumen sumbernya**, misalnya kode singkat jenisnya ditambah id dokumen, seperti `AST-ACQ-…` pada contoh kontrak. Menyelesaikan dokumen yang sama dua kali harus menghasilkan `posting_id` yang sama, supaya idempotensi bekerja. Proses yang boleh dijalankan berulang untuk periode yang sama membutuhkan nomor urut proses di dalam `posting_id`, seperti rencana "Post penyusutan" (TODO 11.2.4). Paling panjang 120 karakter.
@@ -523,9 +523,9 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php` | Kontrak module: bentuk masukan dan hasil |
-| `apps/core/app/Support/Modules/Contracts/PostingTidakSah.php` | Exception untuk bug penerbit |
-| `apps/core/app/Support/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
+| `apps/core/app/Platform/Modules/Contracts/PenerbitPosting.php` | Kontrak module: bentuk masukan dan hasil |
+| `apps/core/app/Platform/Modules/Contracts/PostingTidakSah.php` | Exception untuk bug penerbit |
+| `apps/core/app/Platform/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
 | `apps/core/app/Support/Finance/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
 | `apps/core/app/Services/Modules/PenerbitPostingCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Support/Modules/CoreServices.php` |
 | `apps/core/app/Support/Finance/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |

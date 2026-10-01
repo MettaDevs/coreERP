@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Foundation\FinancePosting\Support;
 
-use App\Support\Modules\Contracts\PostingAccountResolver;
-use App\Support\Modules\Contracts\PostingAccountResolvers;
+use App\Platform\Modules\Contracts\PostingAccountResolver;
+use App\Platform\Modules\Contracts\PostingAccountResolvers;
 
 /**
  * Pemeta akun module yang terdaftar di proses ini, berkunci id module.

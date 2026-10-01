@@ -3,8 +3,8 @@
 namespace App\Foundation\Vendor\Models;
 
 use App\Foundation\AddressBook\Models\Party;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

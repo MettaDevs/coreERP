@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PermintaanPengadaanAset;
 
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

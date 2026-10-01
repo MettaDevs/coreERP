@@ -11,7 +11,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | Kode | Dokumen |
 | --- | --- |
 | `modules/` (root repo) — satu folder per module | [Standar module](/dev/02-module-standard), dan `modules/README.md` untuk bentuk foldernya |
-| `app/Support/Modules/Contracts/` | [API dan integrasi](/dev/04-api-and-integration) — satu-satunya namespace Core yang boleh disebut module |
+| `app/Platform/Modules/Contracts/` | [API dan integrasi](/dev/04-api-and-integration) — satu-satunya namespace Core yang boleh disebut module |
 | `app/Support/Modules/ModuleRegistry.php`, `ModuleManifest.php`, `ModuleManifestFiles.php` | [Standar module](/dev/02-module-standard) — pembacaan `app.yaml` dan penggabungannya dengan folder `manifest/` |
 | `app/Support/Modules/ModuleMigrator.php`, `ModuleMigrationRepository.php` | [Development stack lokal](/dev/11-local-docker-development) |
 | `app/Support/Modules/TenantScope.php` dan trait `MilikTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
@@ -99,7 +99,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | "Saya harus bikin app baru atau menambah ke app yang ada?" | [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) |
 | "Saya ditugaskan ke app X, mulai dari mana?" | [Katalog app](/apps/) lalu hub app-nya |
 | "Langkah membangun modul dari nol apa saja?" | [Membangun modul baru](/apps/membangun-app-baru) |
-| "Kenapa module saya tidak boleh menyebut kelas Core ini?" | [Standar module](/dev/02-module-standard) — hanya `App\Support\Modules\Contracts` yang boleh disebut |
+| "Kenapa module saya tidak boleh menyebut kelas Core ini?" | [Standar module](/dev/02-module-standard) — hanya `App\Platform\Modules\Contracts` yang boleh disebut |
 | "Hak akses apa saja yang harus saya rancang untuk satu transaksi?" | [Rantai keamanan modul transaksi](/dev/19-transaction-security-chain) |
 | "Fondasi ini belum ada, boleh saya bikin?" | [Gate fondasi Core](/dev/10-core-foundation-gates) |
 | "Kapan module saya boleh disebut selesai?" | [Definition of done](/onboarding/definition-of-done) |
