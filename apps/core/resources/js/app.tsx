@@ -95,7 +95,7 @@ createInertiaApp({
                 return AuthLayout;
             // Halaman kunci lisensi memakai tata letak halaman masuk, bukan kerangka aplikasi.
             // Kerangka aplikasi menampilkan menu dan peluncur yang seluruh tujuannya sedang terkunci.
-            case name === 'license-locked':
+            case name === 'platform/license/license-locked':
                 return AuthLayout;
             default:
                 return AppLayout;

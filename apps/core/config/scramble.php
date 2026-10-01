@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Docs\KeamananSesiCore;
+use App\Platform\Docs\Support\KeamananSesiCore;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
 return [

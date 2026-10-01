@@ -1,5 +1,5 @@
 /**
- * Keadaan lisensi situs sebagaimana dikirim server — lihat `App\Support\License\SiteLicenseState`.
+ * Keadaan lisensi situs sebagaimana dikirim server — lihat `App\Platform\License\Support\SiteLicenseState`.
  *
  * Peramban tidak memutuskan apa pun dari nilai ini. Yang mengunci dan menyaring app adalah server;
  * yang di sini hanya bahan kalimat.

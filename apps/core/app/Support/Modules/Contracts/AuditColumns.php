@@ -2,7 +2,7 @@
 
 namespace App\Support\Modules\Contracts;
 
-use App\Support\Database\AuditActor;
+use App\Platform\ChangeLog\Support\AuditActor;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

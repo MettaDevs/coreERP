@@ -73,11 +73,11 @@ class CatchTidakMemalsukanHasilTest extends TestCase
      * @var array<string, string>
      */
     private const DIKECUALIKAN = [
-        'apps/core/app/Support/Observabilitas/JejakAktif.php' => 'Pelapor kesalahan tidak boleh melempar dari dalam penanganan kesalahan; jejak yang tidak terbaca membuat laporannya kehilangan tautan, bukan membuat laporannya berbohong.',
-        'apps/core/app/Support/Observabilitas/LaporanKesalahan.php' => 'Sama: satu bagian laporan yang gagal disusun tidak boleh menghapus kesalahan asli yang sedang dilaporkan.',
-        'apps/core/app/Support/Observabilitas/PelaporKesalahan.php' => 'Sama, dan paling keras: kelas ini dipanggil dari penangan kesalahan Laravel itu sendiri.',
-        'apps/core/app/Support/Observabilitas/SqlTerbaca.php' => 'Query yang gagal dirapikan dipulangkan apa adanya oleh pemanggilnya; tidak ada fakta yang dinyatakan.',
-        'apps/core/app/Support/Observabilitas/TersangkaPemotongan.php' => 'Tebakan penyebab pemotongan yang gagal disusun hanya menghilangkan petunjuk tambahan pada laporan.',
+        'apps/core/app/Platform/Observability/Support/JejakAktif.php' => 'Pelapor kesalahan tidak boleh melempar dari dalam penanganan kesalahan; jejak yang tidak terbaca membuat laporannya kehilangan tautan, bukan membuat laporannya berbohong.',
+        'apps/core/app/Platform/Observability/Support/LaporanKesalahan.php' => 'Sama: satu bagian laporan yang gagal disusun tidak boleh menghapus kesalahan asli yang sedang dilaporkan.',
+        'apps/core/app/Platform/Observability/Support/PelaporKesalahan.php' => 'Sama, dan paling keras: kelas ini dipanggil dari penangan kesalahan Laravel itu sendiri.',
+        'apps/core/app/Platform/Observability/Support/SqlTerbaca.php' => 'Query yang gagal dirapikan dipulangkan apa adanya oleh pemanggilnya; tidak ada fakta yang dinyatakan.',
+        'apps/core/app/Platform/Observability/Support/TersangkaPemotongan.php' => 'Tebakan penyebab pemotongan yang gagal disusun hanya menghilangkan petunjuk tambahan pada laporan.',
         'apps/control-plane/app/Environments/InstalledModules.php' => 'Hanya pada pembacaan nama katalog: namanya jatuh ke id module, jadi katalog yang gagal dibaca menghasilkan tabel berisi id — terlihat, dan tidak mengaku apa pun. Pembacaan daftar pemasangannya sendiri memulangkan null.',
         'apps/core/app/Platform/ControlPlane/Console/Concerns/HoldsEnvironmentOperation.php' => '`null` di sini berarti operasinya tidak jadi dibuka, dan jalur suksesnya tidak pernah memulangkan null. Sebabnya juga sudah dicetak ke operator sebelum baris itu.',
         'apps/core/app/Platform/ControlPlane/Http/Controllers/Internal/EnvironmentProvisioningController.php' => '`null` justru dipakai sebagai "tidak tahu": jalur suksesnya selalu memulangkan larik, dan pemanggilnya menerjemahkan null menjadi `modules_unreadable` pada jawabannya.',

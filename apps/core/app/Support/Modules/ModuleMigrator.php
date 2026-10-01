@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
-use App\Support\Database\ChangeLogSwitch;
+use App\Platform\ChangeLog\Support\ChangeLogSwitch;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Filesystem\Filesystem;

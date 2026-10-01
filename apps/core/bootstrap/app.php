@@ -1,10 +1,8 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAppService;
-use App\Http\Middleware\EnforceSiteLicense;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\LampirkanKonteksJejak;
 use App\Http\Middleware\ResolveModuleContext;
 use App\Http\Middleware\ThrottleRequestsPerRoute;
 use App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly;
@@ -13,9 +11,11 @@ use App\Platform\Identity\Http\Middleware\ResolvePasskeyOrigin;
 use App\Platform\Identity\Http\Middleware\WajibGantiSandi;
 use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
 use App\Platform\Integration\Http\Middleware\AuthenticateInternalCaller;
+use App\Platform\License\Http\Middleware\EnforceSiteLicense;
+use App\Platform\Observability\Http\Middleware\LampirkanKonteksJejak;
+use App\Platform\Observability\Support\JejakAktif;
+use App\Platform\Observability\Support\PelaporKesalahan;
 use App\Platform\Tenant\Http\Middleware\RequireTenantMembershipAtAddress;
-use App\Support\Observabilitas\JejakAktif;
-use App\Support\Observabilitas\PelaporKesalahan;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;

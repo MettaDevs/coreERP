@@ -8,9 +8,9 @@ use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Identity\Support\UserClock;
+use App\Platform\License\Support\SiteLicense;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\LaunchableAppCatalog;
-use App\Support\License\SiteLicense;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
