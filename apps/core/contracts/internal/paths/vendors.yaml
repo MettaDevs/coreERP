@@ -65,8 +65,8 @@ get:
                   next_cursor:
                     type: [string, 'null']
                     description: '`null` berarti halaman terakhir.'
-    '401': { $ref: '#/components/responses/Unauthenticated' }
-    '403': { $ref: '#/components/responses/Forbidden' }
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/IntegrationForbidden' }
     '422': { $ref: '#/components/responses/ValidationError' }
-    '429': { $ref: '#/components/responses/RateLimited' }
+    '429': { $ref: '#/components/responses/IntegrationRateLimited' }
     '503': { $ref: '#/components/responses/OutboundRefused' }

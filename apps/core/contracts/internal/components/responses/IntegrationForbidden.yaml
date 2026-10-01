@@ -1,0 +1,19 @@
+description: |
+  Token sah, tetapi permintaan ditolak. Pemeriksaannya berurutan, dan yang pertama gagal yang
+  menjawab:
+
+  1. Alamat asal di luar allowlist IP klien.
+  2. Scope yang dibutuhkan endpoint ini tidak dimiliki klien. `message` menyebut scope-nya.
+
+  Allowlist diperiksa lebih dulu dari scope, dan keduanya lebih dulu dari penolakan salinan
+  sandbox (`503`).
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }
+    examples:
+      allowlist:
+        summary: Alamat asal di luar allowlist
+        value: { message: Alamat asal permintaan tidak termasuk alamat yang diizinkan untuk klien integrasi ini. }
+      scope:
+        summary: Scope kurang (contoh pada pull)
+        value: { message: Klien integrasi ini tidak punya izin finance-postings.read. }

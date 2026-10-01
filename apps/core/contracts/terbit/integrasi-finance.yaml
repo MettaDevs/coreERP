@@ -113,6 +113,15 @@ info:
     | `409` | Bertentangan dengan status yang tercatat, misalnya nomor voucher berbeda |
     | `422` | Isi ack tidak lengkap |
 
+    - Ack ulang dijawab `200` dengan ack yang tercatat pertama kali. `posted` dianggap sama bila
+      `external_reference`-nya sama setelah spasi di awal dan akhir dibuang. `rejected` dianggap
+      sama bila `reason_code`-nya sama; `reason` yang berbeda tetap dijawab `200`, dan teks yang
+      tersimpan **tidak** diganti.
+    - Posting dicari sebelum body diperiksa: `posting_id` yang tidak dikenal dijawab `404`
+      walaupun body-nya juga salah.
+    - Ack boleh dikirim klien lain di tenant yang sama, asal punya scope `finance-postings.ack`
+      dan prefix jenisnya mencakup posting itu.
+
     | Kode penolakan | Pakai bila |
     | --- | --- |
     | `PERIOD_CLOSED` | Periode `posting_date` sudah ditutup |
@@ -128,13 +137,20 @@ info:
     ## Mode push
 
     Bila klien Anda memakai mode push, CoreERP mengirim setiap posting `pending` sebagai
-    `POST` ke URL HTTPS Anda. Body-nya sama persis dengan satu posting pada `GET
-    /finance-postings`, urutannya sama, dan kiriman ulang bisa terjadi — tetap jaga
-    `UNIQUE(posting_id)`. Bentuk lengkapnya ada di bagian **Webhooks** (`financePosting`).
+    `POST` ke URL HTTPS Anda, satu posting per kiriman, dengan header `Content-Type:
+    application/json` dan `Accept: application/json`. Urutannya sama dengan pull, dan kiriman
+    ulang bisa terjadi — tetap jaga `UNIQUE(posting_id)`. Bentuk lengkapnya ada di bagian
+    **Webhooks** (`financePosting`).
+
+    Body push berisi **nilai** JSON yang sama dengan satu posting pada `GET /finance-postings`,
+    tetapi byte-nya tidak sama: push menulis `/` dan karakter non-ASCII seperti `·` apa adanya,
+    sedangkan pull menulisnya sebagai escape. Jangan membandingkan keduanya sebagai teks.
 
     Verifikasi signature sebelum memproses. `X-CoreERP-Event-Signature` adalah HMAC-SHA256
-    heksadesimal atas `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien —
-    ditampilkan sekali saat klien dibuat — sebagai key:
+    heksadesimal huruf kecil atas `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing
+    secret klien — ditampilkan sekali saat klien dibuat — sebagai key. Hitung atas raw body
+    **persis seperti yang diterima**, sebelum di-parse; body yang di-parse lalu dikodekan ulang
+    tidak menghasilkan byte yang sama:
 
     ```php
     $timestamp = $_SERVER['HTTP_X_COREERP_EVENT_TIMESTAMP'] ?? '';
@@ -148,12 +164,22 @@ info:
     }
     ```
 
+    Untuk menguji kode verifikasi Anda: signing secret `rahasia-uji`, timestamp `1790614204`,
+    dan raw body `{"posting_id":"AST-ACQ-0001"}` menghasilkan signature
+    `c63f1fa7160d6ec490501632bbecebaad1703ad834154f6a5c6ec8463b4e32ee`.
+
+    CoreERP menunggu sambungan paling lama 3 detik dan jawaban paling lama 10 detik. Waktu yang
+    habis diperlakukan seperti tidak menjawab.
+
     | Jawaban Anda | Yang dilakukan CoreERP |
     | --- | --- |
-    | `2xx` dengan body ack | Ack diterapkan, posting selesai |
-    | `2xx` tanpa body ack | Dianggap terkirim; posting tetap `pending` sampai Anda meng-ack lewat API |
-    | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, selama 24 jam |
-    | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
+    | `2xx` apa pun (termasuk `202` dan `204`) dengan body ack yang sah | Terkirim, ack diterapkan, posting selesai |
+    | `2xx` apa pun tanpa body ack yang sah | Dianggap terkirim; posting tetap `pending` sampai Anda meng-ack lewat API. Body yang bukan ack sah, misalnya `posted` tanpa `external_reference`, diabaikan tanpa pemberitahuan |
+    | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, 8, 16, 32, lalu 60 menit, sampai 24 jam sejak percobaan pertama; sesudahnya ditandai gagal kirim |
+    | `4xx` lain atau `3xx` | Ditandai gagal kirim, tidak dikirim ulang, dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
+
+    Selama satu posting menunggu jeda kirim ulang, posting sesudahnya tidak dikirim ke klien Anda.
+    Posting yang sudah ditandai gagal kirim tidak menahan antrean.
 
     ## Jenis posting (posting_type)
 
@@ -240,6 +266,8 @@ info:
       `occurred_at` dan `published_at` lengkap dengan offset zona waktu; simpan apa adanya.
     - **`details`** hanya informasi untuk pelacakan, misalnya rincian per aset. Jangan menjurnal
       dari sana.
+    - **Urutan field tidak dijamin.** Kunci di dalam posting tidak terkirim dalam urutan skema
+      dan bisa berubah tanpa versi baru. Baca menurut nama kunci, jangan menurut posisi atau teks.
     - **Koreksi** membawa `adjusts_posting_id`, dan **pembalikan** membawa `reverses_posting_id`,
       yaitu `posting_id` posting yang dikoreksi atau dibalik.
 
@@ -248,10 +276,15 @@ info:
     | Status | Arti |
     | --- | --- |
     | `401` | Token salah, belum dikirim, atau sudah dicabut |
-    | `403` | Scope klien kurang, atau alamat asal di luar allowlist |
-    | `422` | Parameter tidak sah; `errors` menyebut field-nya |
-    | `429` | Rate limit terlampaui (bawaan 120 permintaan per menit per klien) |
+    | `403` | Alamat asal di luar allowlist (diperiksa lebih dulu), atau scope klien kurang |
+    | `422` | Parameter tidak sah; `errors` menyebut field-nya. Teks pesannya tidak dijamin tetap |
+    | `429` | Rate limit terlampaui |
     | `503` | Salinan sandbox, yang tidak menyajikan data ke sistem luar |
+
+    **Rate limit** 120 permintaan per menit per klien integrasi, dihitung per `client_id`, bukan
+    per alamat IP. Satu jatah dipakai bersama oleh pull, ack, dan `GET /vendors`. Setiap jawaban
+    membawa `X-RateLimit-Limit` dan `X-RateLimit-Remaining`; jawaban `429` juga membawa
+    `Retry-After` dalam detik.
 
     ## Versi kontrak
 
@@ -293,6 +326,31 @@ paths:
         dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
         vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
         tidak pernah dijurnal ke akun cadangan (K-18).
+
+        **Tidak ada cursor.** Parameter `cursor`, `after`, `page`, atau parameter lain yang tidak
+        tercantum di bawah diabaikan; tanpa ack, pull berikutnya menyajikan halaman yang sama lagi.
+
+        **Penyaringan.** Prefix klien diterapkan lebih dulu, dan parameter tidak dapat memperluasnya:
+        klien berprefix `asset.` yang mengirim `posting_type=cashier.receipt` menerima daftar kosong,
+        bukan `403`. Prefix klien `asset.` dan `asset.*` sama artinya. `posting_type` tanpa `.*`
+        dicocokkan persis, jadi `posting_type=asset` tidak cocok dengan jenis apa pun. `legal_entity`
+        yang tidak dikenal menghasilkan daftar kosong, bukan `422`.
+
+        **Feed yang dimatikan bukan kesalahan.** Posting entitas legal yang feed-nya tidak aktif,
+        atau yang bertanggal sebelum cutover, berstatus `manual` dan tidak pernah disajikan;
+        jawabannya tetap `200`.
+
+        **Urutan field tidak dijamin.** Kunci di dalam setiap posting tidak terkirim dalam urutan
+        properti skema `FinancePosting`, dan urutannya bisa berubah tanpa versi kontrak baru. Baca
+        sebagai objek JSON menurut nama kunci; jangan membandingkan teksnya. Yang dijamin hanya
+        urutan **posting** di `data`, seperti di atas.
+
+        **Urutan pemeriksaan.** Rate limit (`429`), lalu token (`401`), allowlist IP (`403`), scope
+        (`403`), salinan sandbox (`503`), lalu parameter (`422`).
+
+        **Pesan `422`.** Field yang salah ada di kunci `errors`. Teks `message` dan isi `errors`
+        sebagian berbahasa Inggris dan sebagian Indonesia, dan tidak dijamin tetap; jangan
+        mencocokkan teksnya.
       parameters:
       - name: status
         in: query
@@ -330,7 +388,8 @@ paths:
         schema:
           type: string
           maxLength: 50
-        description: Kode perusahaan (`company_code`) atau id entitas legal.
+        description: Kode perusahaan (`company_code`) atau id entitas legal. Nilai yang tidak dikenal
+          menghasilkan daftar kosong.
       - name: limit
         in: query
         required: false
@@ -342,6 +401,11 @@ paths:
       responses:
         '200':
           description: Posting yang belum di-ack, dalam urutan pembukuan.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -875,13 +939,13 @@ paths:
                       count: 1
                       has_more: false
         '401':
-          $ref: '#/components/responses/Unauthenticated'
+          $ref: '#/components/responses/IntegrationUnauthenticated'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          $ref: '#/components/responses/IntegrationForbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/IntegrationRateLimited'
         '503':
           $ref: '#/components/responses/OutboundRefused'
   /finance-postings/{posting_id}/ack:
@@ -896,12 +960,32 @@ paths:
         Scope `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
         finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
 
-        Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
-        tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
-        pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
-        posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
+        Idempoten: ack yang sama diulang menjawab 200 tanpa perubahan, dan `data` membawa ack yang
+        tercatat pertama kali, termasuk `acknowledged_at`-nya. "Sama" berarti:
 
-        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404.
+        - `posted` dengan `external_reference` yang sama. Spasi di awal dan akhir dibuang sebelum
+          dibandingkan dan disimpan, jadi `"  JV-2026-0001  "` sama dengan `"JV-2026-0001"`.
+        - `rejected` dengan `reason_code` yang sama. Teks `reason` **tidak** ikut dibandingkan: ack
+          ulang dengan `reason` berbeda tetap dijawab 200, dan teks yang tersimpan tidak diganti.
+
+        Ack yang bertentangan dengan status akhir (nomor voucher lain, kode alasan lain, atau status
+        lain), atau ack atas posting yang tidak pernah disajikan (`held` atau `manual`), menjawab 409.
+        Posting yang ditolak diperbaiki dengan posting koreksi di periode yang masih terbuka, tidak
+        diberi tanggal ulang (K-17).
+
+        Pada `rejected`, `external_reference` yang ikut dikirim diabaikan dan tidak disimpan.
+
+        Ack tidak harus dikirim klien yang melakukan pull atau menerima push. Klien mana pun di tenant
+        yang sama dengan scope `finance-postings.ack`, dan yang prefix jenisnya mencakup posting itu,
+        boleh mengirimnya.
+
+        **Urutan pemeriksaan.** Rate limit (`429`), token (`401`), allowlist IP dan scope (`403`),
+        salinan sandbox (`503`), lalu posting dicari (`404`), baru body divalidasi (`422`). Posting
+        yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404 walaupun
+        body-nya juga tidak sah.
+
+        Teks `message` pada `409` dan `422` hanya untuk dibaca orang dan tidak dijamin tetap. Baca
+        `data.status` pada `409`, dan kunci `errors` pada `422`.
       parameters:
       - name: posting_id
         in: path
@@ -918,6 +1002,11 @@ paths:
       responses:
         '200':
           description: Ack diterapkan, atau ack yang sama sudah tercatat.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -928,11 +1017,19 @@ paths:
                   data:
                     $ref: '#/components/schemas/FinancePostingAckResult'
         '401':
-          $ref: '#/components/responses/Unauthenticated'
+          $ref: '#/components/responses/IntegrationUnauthenticated'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          $ref: '#/components/responses/IntegrationForbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: |
+            Posting tidak ada, milik tenant lain, atau jenisnya di luar prefix klien. Ketiganya
+            sengaja tidak dibedakan. Dijawab sebelum body divalidasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: Posting tidak ditemukan.
         '409':
           description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
           content:
@@ -950,7 +1047,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/IntegrationRateLimited'
         '503':
           $ref: '#/components/responses/OutboundRefused'
   /vendors:
@@ -1041,13 +1138,13 @@ paths:
                         - 'null'
                         description: '`null` berarti halaman terakhir.'
         '401':
-          $ref: '#/components/responses/Unauthenticated'
+          $ref: '#/components/responses/IntegrationUnauthenticated'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          $ref: '#/components/responses/IntegrationForbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/IntegrationRateLimited'
         '503':
           $ref: '#/components/responses/OutboundRefused'
   /operating-units:
@@ -1115,31 +1212,61 @@ webhooks:
       operationId: webhook.finance-posting
       summary: Posting finance yang dikirim ke klien mode push
       description: |
-        CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
-        body yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
-        dengan urutan pull, per klien.
+        CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push sebagai
+        `POST` dengan `Content-Type: application/json` dan `Accept: application/json`. Satu kiriman
+        berisi satu posting.
 
-        **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
-        `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Pembaca
-        wajib memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
+        **Body.** Nilai JSON-nya sama dengan satu elemen `data` pada `GET /finance-postings`, tetapi
+        byte-nya tidak: body push menulis `/` dan karakter non-ASCII (misalnya `·`) apa adanya,
+        sedangkan pull menulisnya sebagai `\/` dan `\u00b7`. Urutan kunci di dalam posting juga tidak
+        dijamin. Bandingkan push dan pull sebagai nilai JSON, bukan sebagai teks.
+
+        **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal huruf kecil atas
+        `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Hitung
+        atas **raw body persis seperti yang diterima**, sebelum di-parse; body yang di-parse lalu
+        dikodekan ulang menghasilkan byte lain dan signature yang tidak cocok. Pembaca wajib
+        memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
         `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
 
-        **Jawaban.** 2xx dihitung terkirim; bila body-nya `FinancePostingAck` yang sah, ack itu
-        diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
-        `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
-        jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
-        4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
+        Contoh yang dapat diulang di bahasa apa pun: signing secret `rahasia-uji`, timestamp
+        `1790614204`, dan raw body `{"posting_id":"AST-ACQ-0001"}` menghasilkan signature
+        `c63f1fa7160d6ec490501632bbecebaad1703ad834154f6a5c6ec8463b4e32ee`.
+
+        **Batas waktu.** Sambungan 3 detik, jawaban 10 detik. Waktu yang habis diperlakukan seperti
+        tidak terjangkau, jadi dicoba lagi. Redirect tidak diikuti.
+
+        **Tujuan.** `push_url` wajib `https://`. Di layanan SaaS, alamat yang menunjuk jaringan
+        privat ditolak saat akan mengirim (alamatnya diperiksa ulang setiap kali), dan kiriman itu
+        langsung ditandai gagal tanpa dicoba lagi. CoreERP di server pelanggan boleh mengirim ke
+        jaringan privat.
+
+        **Jawaban.**
+
+        | Jawaban Anda | Yang dilakukan CoreERP |
+        | --- | --- |
+        | `2xx` apa pun (termasuk `201`, `202`, `204`) dengan body `FinancePostingAck` yang sah | Terkirim, dan ack diterapkan seperti `POST /finance-postings/{posting_id}/ack` atas nama klien ini |
+        | `2xx` apa pun tanpa body, atau dengan body yang bukan ack sah (misalnya bukan JSON, atau `posted` tanpa `external_reference`) | Terkirim tanpa ack. Posting tetap `pending` sampai di-ack lewat API. Tidak ada kesalahan yang dilaporkan ke Anda |
+        | `408`, `429`, `5xx`, sambungan gagal, atau waktu habis | Dicoba lagi dengan jeda 1, 2, 4, 8, 16, 32, lalu 60 menit setiap kali, sampai 24 jam sejak percobaan pertama. Sesudahnya ditandai gagal |
+        | `3xx` dan `4xx` lain | Ditandai gagal kirim, tidak dicoba lagi, dan tampil di layar pantau CoreERP |
+
+        **Urutan.** Urutan kirim per klien sama dengan urutan pull. Selama satu posting menunggu
+        jeda percobaan ulang, posting sesudahnya tidak dikirim ke klien itu; klien lain tidak ikut
+        tertahan. Posting yang sudah ditandai gagal tidak menahan antrean.
+
         Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
       parameters:
       - name: X-CoreERP-Event-Timestamp
         in: header
         required: true
-        description: Detik Unix saat dikirim.
+        description: Detik Unix saat dikirim, sebagai teks angka.
         schema:
           type: string
+          pattern: ^[0-9]+$
+          example: '1790614204'
       - name: X-CoreERP-Event-Signature
         in: header
         required: true
+        description: HMAC-SHA256 heksadesimal huruf kecil atas `<timestamp>.<raw body>`.
         schema:
           type: string
           pattern: ^[0-9a-f]{64}$
@@ -1156,12 +1283,24 @@ webhooks:
             schema:
               $ref: '#/components/schemas/FinancePosting'
       responses:
-        '200':
-          description: Diterima. Body opsional; bila berupa ack yang sah, posting berstatus akhir.
+        2XX:
+          description: |
+            Terkirim. Kode 2xx apa pun dihitung sama, termasuk `204` tanpa body. Bila body-nya
+            `FinancePostingAck` yang sah, posting berstatus akhir; body lain diabaikan tanpa pemberitahuan.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FinancePostingAck'
+        '408':
+          description: Dicoba lagi dengan jeda yang sama seperti `5XX`.
+        '429':
+          description: Dicoba lagi dengan jeda yang sama seperti `5XX`.
+        5XX:
+          description: Dicoba lagi dengan jeda 1, 2, 4, 8, 16, 32, lalu 60 menit, sampai 24 jam sejak
+            percobaan pertama.
+        default:
+          description: '`3xx` dan `4xx` lain: ditandai gagal kirim dan tidak dicoba lagi. Redirect tidak
+            diikuti.'
 components:
   securitySchemes:
     integrationClient:
@@ -1173,6 +1312,22 @@ components:
         header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
         allowlist, atau scope yang kurang ditolak. Rate limit per klien
         (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
+  headers:
+    RateLimitLimit:
+      description: Jatah permintaan per menit untuk klien ini.
+      schema:
+        type: integer
+        example: 120
+    RateLimitRemaining:
+      description: Sisa jatah pada menit berjalan. `0` pada jawaban `429`.
+      schema:
+        type: integer
+        example: 119
+    RetryAfter:
+      description: Detik sampai jatah pulih. Tunggu selama itu sebelum mengirim permintaan berikutnya.
+      schema:
+        type: integer
+        example: 60
   responses:
     Forbidden:
       description: |
@@ -1183,12 +1338,63 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    NotFound:
-      description: Resource tidak ada dalam scope tenant ini.
+    IntegrationForbidden:
+      description: |
+        Token sah, tetapi permintaan ditolak. Pemeriksaannya berurutan, dan yang pertama gagal yang
+        menjawab:
+
+        1. Alamat asal di luar allowlist IP klien.
+        2. Scope yang dibutuhkan endpoint ini tidak dimiliki klien. `message` menyebut scope-nya.
+
+        Allowlist diperiksa lebih dulu dari scope, dan keduanya lebih dulu dari penolakan salinan
+        sandbox (`503`).
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+          examples:
+            allowlist:
+              summary: Alamat asal di luar allowlist
+              value:
+                message: Alamat asal permintaan tidak termasuk alamat yang diizinkan untuk klien integrasi
+                  ini.
+            scope:
+              summary: Scope kurang (contoh pada pull)
+              value:
+                message: Klien integrasi ini tidak punya izin finance-postings.read.
+    IntegrationRateLimited:
+      description: |
+        Rate limit terlampaui. Jatahnya 120 permintaan per menit **per klien integrasi**, dihitung dari
+        `client_id` di depan token, bukan per alamat IP: klien lain dari alamat yang sama tidak ikut
+        terbatas. Permintaan tanpa token dihitung per alamat IP.
+
+        Satu jatah dipakai bersama oleh `GET /finance-postings`, `POST /finance-postings/{posting_id}/ack`,
+        dan `GET /vendors`. Permintaan yang ditolak dengan `404` atau `422` tetap menghabiskan jatah.
+        Rate limit diperiksa sebelum token, jadi jawaban `429` bisa datang lebih dulu dari `401`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/RateLimitLimit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Too Many Attempts.
+    IntegrationUnauthenticated:
+      description: |
+        Token klien integrasi tidak dikirim, tidak berbentuk `<client_id>.<secret>`, secret-nya salah,
+        atau kliennya sudah dicabut. Keempatnya dijawab dengan pesan yang sama dan sengaja tidak
+        dibedakan.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Token klien integrasi tidak sah atau sudah dicabut.
     OutboundRefused:
       description: |
         Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
@@ -1252,6 +1458,9 @@ components:
       description: |
         Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai mode pull dan
         mode push (`webhooks.financePosting`).
+
+        Urutan kunci di dalam objek ini tidak dijamin dan tidak mengikuti urutan properti di bawah.
+        Pull dan push membawa nilai yang sama, tetapi byte body push tidak sama dengan teks pull.
       properties:
         contract_version:
           type: integer

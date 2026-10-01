@@ -3,30 +3,58 @@ post:
   operationId: webhook.finance-posting
   summary: Posting finance yang dikirim ke klien mode push
   description: |
-    CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
-    body yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
-    dengan urutan pull, per klien.
+    CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push sebagai
+    `POST` dengan `Content-Type: application/json` dan `Accept: application/json`. Satu kiriman
+    berisi satu posting.
 
-    **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
-    `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Pembaca
-    wajib memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
+    **Body.** Nilai JSON-nya sama dengan satu elemen `data` pada `GET /finance-postings`, tetapi
+    byte-nya tidak: body push menulis `/` dan karakter non-ASCII (misalnya `·`) apa adanya,
+    sedangkan pull menulisnya sebagai `\/` dan `\u00b7`. Urutan kunci di dalam posting juga tidak
+    dijamin. Bandingkan push dan pull sebagai nilai JSON, bukan sebagai teks.
+
+    **Signature.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal huruf kecil atas
+    `<X-CoreERP-Event-Timestamp>.<raw body>`, dengan signing secret klien sebagai key. Hitung
+    atas **raw body persis seperti yang diterima**, sebelum di-parse; body yang di-parse lalu
+    dikodekan ulang menghasilkan byte lain dan signature yang tidak cocok. Pembaca wajib
+    memverifikasinya dan menolak timestamp yang terlalu jauh dari jamnya sendiri.
     `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
 
-    **Jawaban.** 2xx dihitung terkirim; bila body-nya `FinancePostingAck` yang sah, ack itu
-    diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
-    `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
-    jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
-    4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
+    Contoh yang dapat diulang di bahasa apa pun: signing secret `rahasia-uji`, timestamp
+    `1790614204`, dan raw body `{"posting_id":"AST-ACQ-0001"}` menghasilkan signature
+    `c63f1fa7160d6ec490501632bbecebaad1703ad834154f6a5c6ec8463b4e32ee`.
+
+    **Batas waktu.** Sambungan 3 detik, jawaban 10 detik. Waktu yang habis diperlakukan seperti
+    tidak terjangkau, jadi dicoba lagi. Redirect tidak diikuti.
+
+    **Tujuan.** `push_url` wajib `https://`. Di layanan SaaS, alamat yang menunjuk jaringan
+    privat ditolak saat akan mengirim (alamatnya diperiksa ulang setiap kali), dan kiriman itu
+    langsung ditandai gagal tanpa dicoba lagi. CoreERP di server pelanggan boleh mengirim ke
+    jaringan privat.
+
+    **Jawaban.**
+
+    | Jawaban Anda | Yang dilakukan CoreERP |
+    | --- | --- |
+    | `2xx` apa pun (termasuk `201`, `202`, `204`) dengan body `FinancePostingAck` yang sah | Terkirim, dan ack diterapkan seperti `POST /finance-postings/{posting_id}/ack` atas nama klien ini |
+    | `2xx` apa pun tanpa body, atau dengan body yang bukan ack sah (misalnya bukan JSON, atau `posted` tanpa `external_reference`) | Terkirim tanpa ack. Posting tetap `pending` sampai di-ack lewat API. Tidak ada kesalahan yang dilaporkan ke Anda |
+    | `408`, `429`, `5xx`, sambungan gagal, atau waktu habis | Dicoba lagi dengan jeda 1, 2, 4, 8, 16, 32, lalu 60 menit setiap kali, sampai 24 jam sejak percobaan pertama. Sesudahnya ditandai gagal |
+    | `3xx` dan `4xx` lain | Ditandai gagal kirim, tidak dicoba lagi, dan tampil di layar pantau CoreERP |
+
+    **Urutan.** Urutan kirim per klien sama dengan urutan pull. Selama satu posting menunggu
+    jeda percobaan ulang, posting sesudahnya tidak dikirim ke klien itu; klien lain tidak ikut
+    tertahan. Posting yang sudah ditandai gagal tidak menahan antrean.
+
     Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
   parameters:
     - name: X-CoreERP-Event-Timestamp
       in: header
       required: true
-      description: Detik Unix saat dikirim.
-      schema: { type: string }
+      description: Detik Unix saat dikirim, sebagai teks angka.
+      schema: { type: string, pattern: '^[0-9]+$', example: '1790614204' }
     - name: X-CoreERP-Event-Signature
       in: header
       required: true
+      description: HMAC-SHA256 heksadesimal huruf kecil atas `<timestamp>.<raw body>`.
       schema: { type: string, pattern: '^[0-9a-f]{64}$' }
     - name: X-CoreERP-Client-Id
       in: header
@@ -38,8 +66,18 @@ post:
       application/json:
         schema: { $ref: '#/components/schemas/FinancePosting' }
   responses:
-    '200':
-      description: Diterima. Body opsional; bila berupa ack yang sah, posting berstatus akhir.
+    '2XX':
+      description: |
+        Terkirim. Kode 2xx apa pun dihitung sama, termasuk `204` tanpa body. Bila body-nya
+        `FinancePostingAck` yang sah, posting berstatus akhir; body lain diabaikan tanpa pemberitahuan.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/FinancePostingAck' }
+    '408':
+      description: Dicoba lagi dengan jeda yang sama seperti `5XX`.
+    '429':
+      description: Dicoba lagi dengan jeda yang sama seperti `5XX`.
+    '5XX':
+      description: Dicoba lagi dengan jeda 1, 2, 4, 8, 16, 32, lalu 60 menit, sampai 24 jam sejak percobaan pertama.
+    default:
+      description: '`3xx` dan `4xx` lain: ditandai gagal kirim dan tidak dicoba lagi. Redirect tidak diikuti.'

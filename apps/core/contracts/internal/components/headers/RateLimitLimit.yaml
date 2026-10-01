@@ -1,0 +1,2 @@
+description: Jatah permintaan per menit untuk klien ini.
+schema: { type: integer, example: 120 }

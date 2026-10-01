@@ -1,0 +1,2 @@
+description: Sisa jatah pada menit berjalan. `0` pada jawaban `429`.
+schema: { type: integer, example: 119 }

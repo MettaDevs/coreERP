@@ -8,12 +8,32 @@ post:
     Scope `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
     finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
 
-    Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
-    tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
-    pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
-    posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
+    Idempoten: ack yang sama diulang menjawab 200 tanpa perubahan, dan `data` membawa ack yang
+    tercatat pertama kali, termasuk `acknowledged_at`-nya. "Sama" berarti:
 
-    Posting yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404.
+    - `posted` dengan `external_reference` yang sama. Spasi di awal dan akhir dibuang sebelum
+      dibandingkan dan disimpan, jadi `"  JV-2026-0001  "` sama dengan `"JV-2026-0001"`.
+    - `rejected` dengan `reason_code` yang sama. Teks `reason` **tidak** ikut dibandingkan: ack
+      ulang dengan `reason` berbeda tetap dijawab 200, dan teks yang tersimpan tidak diganti.
+
+    Ack yang bertentangan dengan status akhir (nomor voucher lain, kode alasan lain, atau status
+    lain), atau ack atas posting yang tidak pernah disajikan (`held` atau `manual`), menjawab 409.
+    Posting yang ditolak diperbaiki dengan posting koreksi di periode yang masih terbuka, tidak
+    diberi tanggal ulang (K-17).
+
+    Pada `rejected`, `external_reference` yang ikut dikirim diabaikan dan tidak disimpan.
+
+    Ack tidak harus dikirim klien yang melakukan pull atau menerima push. Klien mana pun di tenant
+    yang sama dengan scope `finance-postings.ack`, dan yang prefix jenisnya mencakup posting itu,
+    boleh mengirimnya.
+
+    **Urutan pemeriksaan.** Rate limit (`429`), token (`401`), allowlist IP dan scope (`403`),
+    salinan sandbox (`503`), lalu posting dicari (`404`), baru body divalidasi (`422`). Posting
+    yang tidak ada, milik tenant lain, atau jenisnya di luar prefix klien menjawab 404 walaupun
+    body-nya juga tidak sah.
+
+    Teks `message` pada `409` dan `422` hanya untuk dibaca orang dan tidak dijamin tetap. Baca
+    `data.status` pada `409`, dan kunci `errors` pada `422`.
   parameters:
     - name: posting_id
       in: path
@@ -27,6 +47,9 @@ post:
   responses:
     '200':
       description: Ack diterapkan, atau ack yang sama sudah tercatat.
+      headers:
+        X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+        X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
       content:
         application/json:
           schema:
@@ -34,9 +57,16 @@ post:
             required: [data]
             properties:
               data: { $ref: '#/components/schemas/FinancePostingAckResult' }
-    '401': { $ref: '#/components/responses/Unauthenticated' }
-    '403': { $ref: '#/components/responses/Forbidden' }
-    '404': { $ref: '#/components/responses/NotFound' }
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/IntegrationForbidden' }
+    '404':
+      description: |
+        Posting tidak ada, milik tenant lain, atau jenisnya di luar prefix klien. Ketiganya
+        sengaja tidak dibedakan. Dijawab sebelum body divalidasi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { message: Posting tidak ditemukan. }
     '409':
       description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
       content:
@@ -48,5 +78,5 @@ post:
               message: { type: string }
               data: { $ref: '#/components/schemas/FinancePostingAckResult' }
     '422': { $ref: '#/components/responses/ValidationError' }
-    '429': { $ref: '#/components/responses/RateLimited' }
+    '429': { $ref: '#/components/responses/IntegrationRateLimited' }
     '503': { $ref: '#/components/responses/OutboundRefused' }
