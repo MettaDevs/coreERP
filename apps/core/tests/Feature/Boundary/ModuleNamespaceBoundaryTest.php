@@ -93,12 +93,21 @@ class ModuleNamespaceBoundaryTest extends TestCase
             'use App\\Platform\\Modules\\Contracts\\BelongsToTenant;',
             'use App\\Platform\\Tenant\\Models\\Tenant;',
             'use App\\Platform\\Environment\\Support\\CurrentWorkspace;',
+            // Tetangga Contracts di fitur yang sama tetap kelas Core biasa.
+            'use App\\Platform\\Modules\\Support\\TenantScope;',
+            // Namespace kontrak sebelum pemindahan lapis-core (K-1) sudah tidak berlaku.
+            'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
         ]);
 
         $this->assertSame(
-            ['App\\Platform\\Environment\\Support\\CurrentWorkspace', 'App\\Platform\\Tenant\\Models\\Tenant'],
+            [
+                'App\\Platform\\Environment\\Support\\CurrentWorkspace',
+                'App\\Platform\\Modules\\Support\\TenantScope',
+                'App\\Platform\\Tenant\\Models\\Tenant',
+                'App\\Support\\Modules\\Contracts\\PenerbitNomor',
+            ],
             PemindaiModul::kelasCoreYangDisebut($contoh),
-            'Hanya isi Contracts yang boleh; model Core dan kelas Support lain tidak.',
+            'Hanya isi App\\Platform\\Modules\\Contracts yang boleh; model Core, kelas Support lain, dan namespace kontrak lama tidak.',
         );
     }
 

@@ -349,6 +349,9 @@ final class PemindaiModul
      * memutuskan. Sekarang model memakai trait `BelongsToTenant` dan seeder mewarisi
      * `TenantSeeder`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
      *
+     * Namespace lama `App\\Support\\Modules\\Contracts` (sampai pemindahan lapis-core, K-1)
+     * tidak lagi diizinkan: yang dicocokkan adalah awalan baru, bukan kata `Contracts`.
+     *
      * @return list<string>
      */
     public static function kelasCoreYangDisebut(string $isi): array

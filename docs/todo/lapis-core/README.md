@@ -128,22 +128,20 @@ memperpendek daftar itu, tidak boleh memperpanjangnya.
 
 ## Facade module
 
-Isi `App\Platform\Modules\Contracts` adalah API publik Core bagi module. Sebagian besar masih
-bernama Indonesia (`NumberSequenceIssuer`, `VendorDirectory`, `WorkflowEngine`, `FiscalCalendarDirectory`,
-`ModuleReportProvider`, …), begitu pula implementasinya di `Services/Modules` (`NumberSequenceIssuerCore`,
-`AccountDirectoryCore`, …). Semuanya diganti ke nama Inggris dalam pekerjaan ini. Biayanya naik dengan
-setiap module dan kontrak baru, dan saat ini baru dua module yang memakainya.
+Isi `App\Platform\Modules\Contracts` adalah API publik Core bagi module. Sampai PR facade isinya
+tinggal di `App\Support\Modules\Contracts` dan sebagian besar bernama Indonesia (`PenerbitNomor`,
+`DaftarVendor`, `MesinWorkflow`, `KalenderFiskal`, `PenyediaLaporanModul`, …), begitu pula
+pelaksananya (`PenerbitNomorCore`, `DaftarAkunCore`, …). PR facade memindahkannya dan mengganti
+semuanya ke nama Inggris (`NumberSequenceIssuer`, `VendorDirectory`, `WorkflowEngine`,
+`FiscalCalendarDirectory`, `ModuleReportProvider`, …); tabel pemetaan lengkapnya ada di deskripsi
+pull request itu.
 
-**Keputusan terbuka K-1: letak facade.** Pilihannya:
-
-1. Tetap satu namespace publik, misalnya `App\Platform\Modules\Contracts\…`. Test Boundary paling
-   sederhana, tapi pemilik kontrak tidak terlihat dari letaknya.
-2. Per fitur: `App\Foundation\NumberSequence\Contracts\NumberSequenceIssuer`, dan module hanya
-   boleh memakai `App\*\*\Contracts\*`. Ini pola BC: tiap module punya facade sendiri, sisanya
-   internal. Pemilik kontrak jelas.
-
-Rekomendasi: **pilihan 2**. Kontrak baru yang lahir sebelum K-1 diputuskan tetap ditaruh di
-`App\Platform\Modules\Contracts`, **dengan nama Inggris**.
+**K-1: letak facade — diputuskan pemilik produk: tetap satu namespace,
+`App\Platform\Modules\Contracts`, dengan nama Inggris.** Bukan per fitur. Aturan "module hanya boleh
+menyebut satu namespace" tetap berlaku; hanya namespacenya yang berganti, dan
+`ModuleNamespaceBoundaryTest` menolak namespace lama. Pelaksana tiap kontrak tetap tinggal di
+`ModuleServices` fitur pemiliknya. Pilihan yang tidak diambil: facade per fitur
+(`App\Foundation\NumberSequence\Contracts\…`, module memakai `App\*\*\Contracts\*`).
 
 ## Urutan pekerjaan
 
@@ -164,9 +162,9 @@ Satu domain per PR. Reporting paling akhir karena sesi analisa gap masih mengerj
 - [ ] **PR 7 — Platform/Identity, Platform/Access,** dan fitur Platform kecil (ChangeLog,
       Observability, Integration, License, Docs, Attachments, Retention). Pecah `access.tsx` dan
       `security-configuration.tsx`
-- [ ] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/`, dan
-      bongkar `CoreServices` menjadi pendaftaran per fitur. **Kabari sesi analisa gap sebelum
-      mulai**
+- [x] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/`
+- [ ] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur (sengaja dipisah dari PR 8;
+      sampai saat itu sepuluh baris `CoreServices -> …Core` tetap di `ALLOWED`)
 - [ ] **PR 9 — Platform/Reporting,** setelah K-30 masuk main. **Kabari sesi analisa gap sebelum
       mulai**
 - [ ] **Penutup:** daftar pengecualian Boundary kosong. Perbarui `docs/dev` (peta kode, grand

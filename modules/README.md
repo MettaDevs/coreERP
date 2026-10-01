@@ -115,7 +115,7 @@ berlaku; awalan module ditulis di depannya, misalnya `aset_m_group` dan `aset_tr
 - **Tidak ada baris yang dihapus fisik.** Lihat [penghapusan lunak](../docs/dev/02-module-standard.md#penghapusan-lunak),
   termasuk kewajiban indeks unik parsial pada kode bisnis.
 - **Module memanggil Core lewat pemanggilan fungsi biasa,** bukan HTTP, dan hanya lewat satu namespace:
-  `App\Platform\Modules\Contracts`. Isinya enam antarmuka layanan, trait `BelongsToTenant` untuk model, dan
+  `App\Platform\Modules\Contracts`. Isinya antarmuka layanan, trait `BelongsToTenant` untuk model, dan
   kelas induk `TenantSeeder` untuk data awal. Butuh sesuatu yang belum ada di sana? Usulkan antarmuka
   baru; jangan mengambil jalan pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module
   akan ikut pecah tanpa peringatan.
