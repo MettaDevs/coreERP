@@ -19,13 +19,13 @@ use RuntimeException;
 final class TenantContextCore implements TenantContext
 {
     public function __construct(
-        private readonly Request $permintaan,
+        private readonly Request $request,
         private readonly CurrentWorkspace $workspace,
     ) {}
 
     public function tenantId(): string
     {
-        $membership = $this->workspace->membership($this->permintaan);
+        $membership = $this->workspace->membership($this->request);
 
         if ($membership === null) {
             throw new RuntimeException('Tidak ada tenant aktif pada permintaan ini.');
@@ -36,26 +36,26 @@ final class TenantContextCore implements TenantContext
 
     public function legalEntityId(): ?string
     {
-        $membership = $this->workspace->membership($this->permintaan);
+        $membership = $this->workspace->membership($this->request);
 
         if ($membership === null) {
             return null;
         }
 
-        $legalEntity = $this->workspace->legalEntity($this->permintaan, $membership);
+        $legalEntity = $this->workspace->legalEntity($this->request, $membership);
 
         return $legalEntity === null ? null : (string) $legalEntity->id;
     }
 
     public function orgUnitId(): ?string
     {
-        $membership = $this->workspace->membership($this->permintaan);
+        $membership = $this->workspace->membership($this->request);
 
         if ($membership === null) {
             return null;
         }
 
-        $unit = $this->workspace->operatingUnit($this->permintaan, $membership);
+        $unit = $this->workspace->operatingUnit($this->request, $membership);
 
         return $unit === null ? null : (string) $unit->id;
     }

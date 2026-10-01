@@ -33,7 +33,7 @@ final class ModuleMigrator
      *
      * @return list<string> nama migration yang baru saja dijalankan; kosong berarti sudah mutakhir
      */
-    public function naik(ModuleManifest $module, ?string $connection = null): array
+    public function migrate(ModuleManifest $module, ?string $connection = null): array
     {
         $migrator = $this->migrator($module, $connection);
 

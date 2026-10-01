@@ -13,41 +13,41 @@ use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
  */
 final class UnitOfMeasureDirectoryCore implements UnitOfMeasureDirectory
 {
-    public function __construct(private readonly UnitOfMeasureService $layanan) {}
+    public function __construct(private readonly UnitOfMeasureService $service) {}
 
     public function active(string $tenantId): array
     {
         // Query yang sama dengan `UnitOfMeasureDirectoryController::index()`, yang selama ini
         // melayaninya lewat HTTP. Keduanya harus memberi jawaban yang sama sampai controller itu
         // dibuang; disatukan pada F3-20.
-        $satuan = UnitOfMeasure::query()
+        $units = UnitOfMeasure::query()
             ->where('tenant_id', $tenantId)
             ->where('active', true)
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'symbol', 'decimal_places']);
 
-        $hasil = [];
+        $result = [];
 
-        foreach ($satuan as $baris) {
-            $hasil[] = [
-                'id' => $baris->id,
-                'code' => $baris->code,
-                'name' => $baris->name,
-                'symbol' => $baris->symbol,
-                'decimal_places' => $baris->decimal_places,
+        foreach ($units as $row) {
+            $result[] = [
+                'id' => $row->id,
+                'code' => $row->code,
+                'name' => $row->name,
+                'symbol' => $row->symbol,
+                'decimal_places' => $row->decimal_places,
             ];
         }
 
-        return $hasil;
+        return $result;
     }
 
     public function resolve(string $tenantId, array $id): array
     {
-        return $this->layanan->resolve($tenantId, $id);
+        return $this->service->resolve($tenantId, $id);
     }
 
-    public function convert(string $tenantId, string $dari, string $ke, string $nilai): array
+    public function convert(string $tenantId, string $from, string $to, string $value): array
     {
-        return $this->layanan->convert($tenantId, $dari, $ke, $nilai);
+        return $this->service->convert($tenantId, $from, $to, $value);
     }
 }

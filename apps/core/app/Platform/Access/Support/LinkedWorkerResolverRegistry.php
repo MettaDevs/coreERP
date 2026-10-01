@@ -12,7 +12,7 @@ use App\Platform\Modules\Models\ModuleInstallation;
 /**
  * Penjawab pekerja tertaut yang terdaftar di proses ini, berkunci id module.
  *
- * Diikat sebagai satu benda (`CoreServices::PEMETAAN_TUNGGAL`). Yang ditanya hanya module yang terpasang
+ * Diikat sebagai satu benda (`CoreServices::SINGLETON_BINDINGS`). Yang ditanya hanya module yang terpasang
  * untuk tenant itu menurut `core_module_installations`: pada tenant berdatabase sendiri, tabel module yang
  * belum dipasang memang belum ada. Pertanyaannya dijalankan dengan tenant itu sebagai tenant aktif, supaya
  * penyaringan tenant model module berlaku di luar rute module.

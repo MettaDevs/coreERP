@@ -219,7 +219,7 @@ class HandleInertiaRequests extends Middleware
     {
         $environment = $request->attributes->get('coreerp.environment');
 
-        if (! $environment instanceof Environment || $environment->produksi()) {
+        if (! $environment instanceof Environment || $environment->isProduction()) {
             return null;
         }
 

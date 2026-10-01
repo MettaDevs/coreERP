@@ -39,12 +39,23 @@ class SharedLocationConcurrencyTest extends TestCase
         ModuleMigrator::HISTORY_TABLE,
     ];
 
+    /**
+     * Baris yang di-commit test ini wajib hilang sebelum kelas berikutnya di proses yang sama berjalan:
+     * `RefreshDatabase` tidak mengulang `migrate:fresh` dan langsung membaca isi schema apa adanya.
+     *
+     * `locations` disebut sendiri karena sengaja tidak punya foreign key ke `tenants` (lihat migration-nya),
+     * sehingga CASCADE dari `clients` tidak menjangkaunya. Tanpanya tempat "Gudang" dari test terakhir
+     * tertinggal dan `SharedLocationTest` menghitung dua tempat alih-alih satu. CASCADE dari `locations`
+     * ikut membersihkan tautan, alamat pos, dan kontak yang menunjuknya.
+     */
     protected function tearDown(): void
     {
-        DB::statement('TRUNCATE TABLE clients, apps RESTART IDENTITY CASCADE');
-        self::reinstallCoreSecurityCatalog();
-
-        parent::tearDown();
+        try {
+            DB::statement('TRUNCATE TABLE clients, apps, locations RESTART IDENTITY CASCADE');
+            self::reinstallCoreSecurityCatalog();
+        } finally {
+            parent::tearDown();
+        }
     }
 
     public function test_two_instances_cannot_both_make_their_address_the_primary_one(): void

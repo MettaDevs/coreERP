@@ -3,7 +3,7 @@
 namespace App\Foundation\Workflow\Support;
 
 use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
-use App\Platform\Modules\Support\PengirimEventModul;
+use App\Platform\Modules\Support\ModuleEventDispatcher;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +14,7 @@ class WorkflowRuntime
 {
     public function __construct(
         private readonly WorkflowParameters $parameter,
-        private readonly PengirimEventModul $dispatcher,
+        private readonly ModuleEventDispatcher $dispatcher,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -285,11 +285,11 @@ class WorkflowRuntime
         // tidak pernah berpasangan dengan dokumen yang masih `submitted`. Konsekuensinya
         // seimbang dan diterima: listener yang melempar membatalkan keputusannya juga.
         //
-        // Dipancarkan lewat `PengirimEventModul`, bukan `event()`, supaya tenant aktif terikat
+        // Dipancarkan lewat `ModuleEventDispatcher`, bukan `event()`, supaya tenant aktif terikat
         // selama listener berjalan. Keputusan diambil di controller Core, yang tidak melewati
         // middleware rute module — jadi tanpa ini setiap query model module di dalam listener
         // melempar "tanpa tenant aktif", dan kegagalannya membatalkan keputusan yang sah.
-        $this->dispatcher->kirim(
+        $this->dispatcher->dispatch(
             new WorkflowDecisionTaken($eventId, $tenantId, $correlationId, $legalEntityId === null ? null : (string) $legalEntityId, $content),
             $tenantId,
         );

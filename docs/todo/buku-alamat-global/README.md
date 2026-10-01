@@ -142,7 +142,7 @@ tiruan.
 | Tabel negara | **Satu**: `country_regions` menang sebagai identitas negara; kolom tambahan `ref_countries` dipindahkan ke sana | Alamat pos dan master wilayah akhirnya menunjuk negara yang sama | Master wilayah, importer, dan halaman Address setup ikut berubah — kode yang ditulis orang lain |
 | Siapa boleh mengubah negara | **Bukan tenant.** Daftar negara adalah data bersama: isinya dari migrasi dan seeder, perubahannya lewat admin | Satu tenant tidak dapat mengubah pilihan alamat milik tenant lain | Menambah negara menuntut rilis atau tindakan admin, bukan swalayan di layar tenant |
 | Alamat terstruktur | Alamat Indonesia **menunjuk baris wilayah** (`ref_provinces` … `ref_villages`) dan tetap menyimpan namanya untuk dicetak | Kode pos dan ejaan berhenti jadi tebakan pengetik | Alamat luar negeri tetap teks bebas, jadi kode menangani dua bentuk |
-| Cara modul memakainya | **Kontrak PHP dalam satu proses**, didaftarkan di `CoreServices::PEMETAAN`, seperti `NumberSequenceIssuer` dan `OrganizationDirectory` | Pola yang sudah dipakai HR dan Management Aset; tanpa token, tanpa HTTP, ikut transaksi pemanggilnya | Modul di luar runtime tidak terlayani sampai ada yang memintanya |
+| Cara modul memakainya | **Kontrak PHP dalam satu proses**, didaftarkan di `CoreServices::BINDINGS`, seperti `NumberSequenceIssuer` dan `OrganizationDirectory` | Pola yang sudah dipakai HR dan Management Aset; tanpa token, tanpa HTTP, ikut transaksi pemanggilnya | Modul di luar runtime tidak terlayani sampai ada yang memintanya |
 | `internal/v1` untuk party | **Belum**, sampai ada pemanggil di luar runtime | Kontrak tidak ditulis untuk pemanggil yang belum ada | Integrator luar menunggu; dicatat di [API untuk sistem pelanggan](../api-untuk-integrator/) |
 | Address book (grup) | **Tahap terakhir, boleh tidak pernah dikerjakan** | — | Tanpa ini, seluruh party terlihat oleh siapa pun yang boleh membuka buku alamat |
 | Nomor party | Lewat **Number Sequence** Core: referensi `core.party`, awalan `PIHK`, non-continuous, lingkup tenant, tanpa reset | Nomor yang dapat diucapkan dan dicari, seperti `PartyNumber` di D365 | Referensi number sequence menuntut baris `apps` untuk Core — dikerjakan bersama izin di bawah |
@@ -345,7 +345,7 @@ container**, bukan HTTP. Polanya sudah dipakai di dua tempat: `NumberSequenceIss
 `modules/apperp/human-resources/src/Services/HrOrganizationDirectory.php:33`.
 
 Buku alamat menyusul dengan bentuk yang sama: kontrak `App\Platform\Modules\Contracts\BukuAlamat`,
-implementasi `App\Services\Modules\BukuAlamatCore`, didaftarkan di `CoreServices::PEMETAAN`. Karena
+implementasi `App\Services\Modules\BukuAlamatCore`, didaftarkan di `CoreServices::BINDINGS`. Karena
 sekoneksi dan seproses, pendaftaran peran ikut transaksi pemanggilnya: worker yang gagal disimpan tidak
 meninggalkan peran menggantung.
 
@@ -459,7 +459,7 @@ peran berlaku per legal entity, dan tidak ada modul yang memegang legal entity h
 | ID | Pekerjaan | Selesai bila | Setelah |
 | --- | --- | --- | --- |
 | GAB-10 | Baca jalur master lokasi aset dan pabrikan di modul aset, tulis daftar kebutuhan konkretnya sebelum kontrak ditulis | Daftar kebutuhan ada di PR; setiap metode kontrak dapat ditunjuk pemanggilnya | GAB-09 |
-| GAB-11 | Kontrak `BukuAlamat` + `BukuAlamatCore` + pendaftaran di `CoreServices::PEMETAAN` | Modul dapat resolve lewat container; test membuktikan panggilan dari modul ikut transaksi pemanggil | GAB-10 |
+| GAB-11 | Kontrak `BukuAlamat` + `BukuAlamatCore` + pendaftaran di `CoreServices::BINDINGS` | Modul dapat resolve lewat container; test membuktikan panggilan dari modul ikut transaksi pemanggil | GAB-10 |
 | GAB-12 | Tempat tidak lagi dihapus saat tautan party terakhir dilepas | Test: tempat yang masih ditunjuk modul tetap ada sesudah organisasi melepas alamatnya | — |
 | AST-01 | `m_lokasi_aset` menunjuk tempat di Core, dan layarnya menyimpan alamat lewat kontrak | Lokasi aset punya alamat; tidak ada kolom alamat baru di modul aset | GAB-11, GAB-12 |
 | AST-02 | Alamat lokasi aset diwariskan dari induknya bila kosong, mengikuti aturan functional location Dynamics 365 | Test: sub-lokasi tanpa alamat menampilkan alamat induknya; yang punya alamat sendiri tidak tertimpa | AST-01 |

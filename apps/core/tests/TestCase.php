@@ -271,7 +271,7 @@ abstract class TestCase extends BaseTestCase
 
             $migrator = $this->app->make(ModuleMigrator::class);
             foreach ((new ModuleRegistry($roots))->all() as $module) {
-                $migrator->naik($module);
+                $migrator->migrate($module);
             }
         });
     }

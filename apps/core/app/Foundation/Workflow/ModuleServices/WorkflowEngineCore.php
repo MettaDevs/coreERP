@@ -40,7 +40,7 @@ use stdClass;
  */
 final class WorkflowEngineCore implements WorkflowEngine
 {
-    public function __construct(private readonly WorkflowRuntime $mesin) {}
+    public function __construct(private readonly WorkflowRuntime $runtime) {}
 
     /**
      * @param  array{legal_entity_id?: ?string, source_document_type: string, source_document_id: string, decision_context: array<string, mixed>}  $data
@@ -49,22 +49,22 @@ final class WorkflowEngineCore implements WorkflowEngine
     public function submit(
         string $tenantId,
         string $appId,
-        string $kodeTipe,
-        string $idPenggunaPengaju,
-        string $idKorelasi,
-        string $kunciIdempoten,
+        string $typeCode,
+        string $submitterUserId,
+        string $correlationId,
+        string $idempotencyKey,
         array $data,
     ): array {
-        $tipe = DB::table('workflow_types')->where('code', $kodeTipe)->where('app_id', $appId)->first();
+        $type = DB::table('workflow_types')->where('code', $typeCode)->where('app_id', $appId)->first();
 
-        if ($tipe === null) {
-            throw new RuntimeException(sprintf('Jenis workflow "%s" tidak terdaftar untuk app %s.', $kodeTipe, $appId));
+        if ($type === null) {
+            throw new RuntimeException(sprintf('Jenis workflow "%s" tidak terdaftar untuk app %s.', $typeCode, $appId));
         }
 
-        $lingkup = $tipe->scope ?? 'legal_entity';
+        $scope = $type->scope ?? 'legal_entity';
         $legalEntityId = $data['legal_entity_id'] ?? null;
 
-        if ($lingkup === 'legal_entity' && ($legalEntityId === null || $legalEntityId === '')) {
+        if ($scope === 'legal_entity' && ($legalEntityId === null || $legalEntityId === '')) {
             // Tanpa pemeriksaan ini, pencarian versi di bawah mencari konfigurasi dengan
             // `legal_entity_id` null, tidak menemukannya, lalu gagal dengan "belum ada
             // workflow aktif" — pesan yang menyuruh admin membuat workflow yang sebenarnya
@@ -74,45 +74,45 @@ final class WorkflowEngineCore implements WorkflowEngine
             ]);
         }
 
-        $idKeanggotaan = DB::table('tenant_memberships')
+        $membershipId = DB::table('tenant_memberships')
             ->where('tenant_id', $tenantId)
-            ->where('user_id', $idPenggunaPengaju)
+            ->where('user_id', $submitterUserId)
             ->where('status', 'active')
             ->value('id');
 
-        if (! is_string($idKeanggotaan) || $idKeanggotaan === '') {
+        if (! is_string($membershipId) || $membershipId === '') {
             throw ValidationException::withMessages(['pengaju' => 'Pengaju workflow tidak valid.']);
         }
 
-        $this->periksaKonteksKeputusan($tipe, $data['decision_context']);
+        $this->checkDecisionContext($type, $data['decision_context']);
 
-        $terdahulu = $this->instance($tenantId, (string) $tipe->id, $kunciIdempoten);
+        $previous = $this->instance($tenantId, (string) $type->id, $idempotencyKey);
 
-        if ($terdahulu !== null) {
-            return ['id' => (string) $terdahulu->id, 'status' => (string) $terdahulu->status, 'terulang' => true];
+        if ($previous !== null) {
+            return ['id' => (string) $previous->id, 'status' => (string) $previous->status, 'terulang' => true];
         }
 
-        $versi = $this->versiBerlaku($tenantId, $tipe, $lingkup, $legalEntityId);
+        $version = $this->effectiveVersion($tenantId, $type, $scope, $legalEntityId);
 
-        $isi = $data + [
-            'initiator_membership_id' => $idKeanggotaan,
-            'correlation_id' => $idKorelasi,
+        $payload = $data + [
+            'initiator_membership_id' => $membershipId,
+            'correlation_id' => $correlationId,
         ];
 
         try {
             /** @var object{id: string, status: string} $instance */
-            $instance = $this->mesin->submit($tenantId, $tipe, $versi, $kunciIdempoten, $isi);
-        } catch (QueryException $kegagalan) {
+            $instance = $this->runtime->submit($tenantId, $type, $version, $idempotencyKey, $payload);
+        } catch (QueryException $exception) {
             // Dua permintaan dengan kunci idempoten yang sama bisa lolos pemeriksaan di atas
             // bersama-sama; yang kalah dijawab indeks unik. Membacanya kembali di sini
             // membuat keduanya memulangkan instance yang sama, bukan satu jawaban dan satu
             // kegagalan yang tidak bisa dijelaskan ke pemanggil.
-            if ($kegagalan->getCode() !== '23505') {
-                throw $kegagalan;
+            if ($exception->getCode() !== '23505') {
+                throw $exception;
             }
 
-            $instance = $this->instance($tenantId, (string) $tipe->id, $kunciIdempoten)
-                ?? throw $kegagalan;
+            $instance = $this->instance($tenantId, (string) $type->id, $idempotencyKey)
+                ?? throw $exception;
 
             return ['id' => (string) $instance->id, 'status' => (string) $instance->status, 'terulang' => true];
         }
@@ -120,10 +120,10 @@ final class WorkflowEngineCore implements WorkflowEngine
         return ['id' => (string) $instance->id, 'status' => (string) $instance->status, 'terulang' => false];
     }
 
-    private function instance(string $tenantId, string $tipeId, string $kunciIdempoten): ?stdClass
+    private function instance(string $tenantId, string $typeId, string $idempotencyKey): ?stdClass
     {
         return DB::table('workflow_instances')
-            ->where(['tenant_id' => $tenantId, 'workflow_type_id' => $tipeId, 'idempotency_key' => $kunciIdempoten])
+            ->where(['tenant_id' => $tenantId, 'workflow_type_id' => $typeId, 'idempotency_key' => $idempotencyKey])
             ->first();
     }
 
@@ -135,20 +135,20 @@ final class WorkflowEngineCore implements WorkflowEngine
      * kondisi itu dievaluasi terhadap `null`, dan cabangnya diambil karena kebetulan, bukan
      * karena datanya.
      *
-     * @param  array<string, mixed>  $konteks
+     * @param  array<string, mixed>  $context
      */
-    private function periksaKonteksKeputusan(stdClass $tipe, array $konteks): void
+    private function checkDecisionContext(stdClass $type, array $context): void
     {
-        /** @var array<mixed> $skema */
-        $skema = json_decode((string) $tipe->decision_context_schema, true, 512, JSON_THROW_ON_ERROR);
-        $wajib = $skema['required'] ?? [];
+        /** @var array<mixed> $schema */
+        $schema = json_decode((string) $type->decision_context_schema, true, 512, JSON_THROW_ON_ERROR);
+        $required = $schema['required'] ?? [];
 
-        foreach (is_array($wajib) ? $wajib : [] as $field) {
+        foreach (is_array($required) ? $required : [] as $field) {
             if (! is_string($field)) {
                 continue;
             }
 
-            if (! array_key_exists($field, $konteks) || $konteks[$field] === null) {
+            if (! array_key_exists($field, $context) || $context[$field] === null) {
                 throw ValidationException::withMessages([
                     'decision_context' => sprintf('Data %s wajib dikirim untuk workflow ini.', $field),
                 ]);
@@ -156,14 +156,14 @@ final class WorkflowEngineCore implements WorkflowEngine
         }
     }
 
-    private function versiBerlaku(string $tenantId, stdClass $tipe, string $lingkup, ?string $legalEntityId): stdClass
+    private function effectiveVersion(string $tenantId, stdClass $type, string $scope, ?string $legalEntityId): stdClass
     {
-        $versi = DB::table('workflow_configuration_versions as versions')
+        $version = DB::table('workflow_configuration_versions as versions')
             ->join('workflow_configurations as configurations', 'configurations.id', '=', 'versions.configuration_id')
             ->where('configurations.tenant_id', $tenantId)
-            ->where('configurations.workflow_type_id', $tipe->id)
-            ->when($lingkup === 'legal_entity', fn ($query) => $query->where('configurations.legal_entity_id', $legalEntityId))
-            ->when($lingkup === 'tenant', fn ($query) => $query->whereNull('configurations.legal_entity_id'))
+            ->where('configurations.workflow_type_id', $type->id)
+            ->when($scope === 'legal_entity', fn ($query) => $query->where('configurations.legal_entity_id', $legalEntityId))
+            ->when($scope === 'tenant', fn ($query) => $query->whereNull('configurations.legal_entity_id'))
             ->where('configurations.enabled', true)
             ->where('versions.status', 'published')
             ->where(fn ($query) => $query->whereNull('versions.effective_from')->orWhere('versions.effective_from', '<=', today()))
@@ -178,10 +178,10 @@ final class WorkflowEngineCore implements WorkflowEngine
             // jalur itu memalsukan jawaban Core.
             ->first(['versions.*']);
 
-        if ($versi === null) {
+        if ($version === null) {
             throw new RuntimeException('Belum ada workflow aktif untuk dokumen ini.');
         }
 
-        return $versi;
+        return $version;
     }
 }

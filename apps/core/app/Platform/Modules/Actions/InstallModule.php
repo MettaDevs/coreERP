@@ -102,7 +102,7 @@ final class InstallModule
 
     private function install(string $moduleId, string $tenantId): ModuleInstallation
     {
-        $module = $this->registry->cari($moduleId);
+        $module = $this->registry->find($moduleId);
 
         if ($module === null) {
             throw new RuntimeException(sprintf('Module "%s" tidak ditemukan di folder modules/.', $moduleId));
@@ -110,12 +110,12 @@ final class InstallModule
 
         $this->ensureDependenciesInstalled($module, $tenantId);
 
-        $this->migrator->naik($module);
+        $this->migrator->migrate($module);
 
         DB::table('core_module_installations')->upsert([[
             'tenant_id' => $tenantId,
             'module_id' => $module->id,
-            'version' => $module->versi,
+            'version' => $module->version,
             'status' => ModuleInstallation::STATUS_INSTALLED,
             'installed_at' => now(),
             'disabled_at' => null,
@@ -140,7 +140,7 @@ final class InstallModule
         // Urutannya dibuat listener Foundation (`PrepareNumberSequences`), sinkron di koneksi ini.
         event(new ModuleInstallationRecorded($tenantId, $module->id));
 
-        $this->seeder->jalankan($module, $tenantId);
+        $this->seeder->run($module, $tenantId);
 
         /** @var ModuleInstallation $installation */
         $installation = ModuleInstallation::query()

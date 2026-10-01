@@ -7,7 +7,7 @@ namespace App\Platform\Modules\Contracts;
 /**
  * Daftar penjawab pekerja tertaut, diisi penyedia layanan tiap module saat boot.
  *
- * Satu benda untuk seluruh proses (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran module dan layar
+ * Satu benda untuk seluruh proses (`CoreServices::SINGLETON_BINDINGS`), supaya pendaftaran module dan layar
  * anggota Core memegang daftar yang sama. Tanpa penjawab, atau tanpa module pemiliknya terpasang, layar
  * anggota tidak menampilkan pekerja.
  */

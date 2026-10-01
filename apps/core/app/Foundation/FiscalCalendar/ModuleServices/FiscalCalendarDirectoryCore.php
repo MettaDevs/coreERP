@@ -29,9 +29,9 @@ use RuntimeException;
  */
 final class FiscalCalendarDirectoryCore implements FiscalCalendarDirectory
 {
-    public function period(string $legalEntityId, string $tanggal): array
+    public function period(string $legalEntityId, string $date): array
     {
-        $entitas = LegalEntity::query()
+        $legalEntity = LegalEntity::query()
             ->whereKey($legalEntityId)
             ->first(['organization_id', 'fiscal_calendar_id']);
 
@@ -43,24 +43,24 @@ final class FiscalCalendarDirectoryCore implements FiscalCalendarDirectory
         // Entitas legal yang ada tetapi **belum punya kalender** adalah keadaan data yang wajar
         // pada tenant yang belum selesai disiapkan. Itu `ValidationException`, dan pembungkus
         // module menerjemahkannya menjadi `null` — persis seperti 404 dari endpoint dulu.
-        if ($entitas === null) {
+        if ($legalEntity === null) {
             throw new RuntimeException(sprintf('Entitas legal %s tidak ditemukan.', $legalEntityId));
         }
 
-        if ($entitas->fiscal_calendar_id === null) {
+        if ($legalEntity->fiscal_calendar_id === null) {
             throw ValidationException::withMessages([
                 'scope' => 'Entitas legal ini belum memiliki kalender fiskal.',
             ]);
         }
 
-        $periode = FiscalPeriod::query()
-            ->whereHas('year', fn ($query) => $query->where('fiscal_calendar_id', $entitas->fiscal_calendar_id))
-            ->whereDate('starts_on', '<=', $tanggal)
-            ->whereDate('ends_on', '>=', $tanggal)
+        $period = FiscalPeriod::query()
+            ->whereHas('year', fn ($query) => $query->where('fiscal_calendar_id', $legalEntity->fiscal_calendar_id))
+            ->whereDate('starts_on', '<=', $date)
+            ->whereDate('ends_on', '>=', $date)
             ->with('year.calendar:id,code,name')
             ->first();
 
-        if ($periode === null) {
+        if ($period === null) {
             throw ValidationException::withMessages([
                 'scope' => 'Tanggal tersebut belum tercakup pada kalender tahun buku perusahaan ini.',
             ]);
@@ -68,22 +68,22 @@ final class FiscalCalendarDirectoryCore implements FiscalCalendarDirectory
 
         return [
             'calendar' => [
-                'id' => $periode->year->calendar->id,
-                'code' => $periode->year->calendar->code,
-                'name' => $periode->year->calendar->name,
+                'id' => $period->year->calendar->id,
+                'code' => $period->year->calendar->code,
+                'name' => $period->year->calendar->name,
             ],
             'year' => [
-                'id' => $periode->year->id,
-                'name' => $periode->year->name,
-                'starts_on' => $periode->year->starts_on->toDateString(),
-                'ends_on' => $periode->year->ends_on->toDateString(),
+                'id' => $period->year->id,
+                'name' => $period->year->name,
+                'starts_on' => $period->year->starts_on->toDateString(),
+                'ends_on' => $period->year->ends_on->toDateString(),
             ],
             'period' => [
-                'id' => $periode->id,
-                'ordinal' => $periode->ordinal,
-                'name' => $periode->name,
-                'starts_on' => $periode->starts_on->toDateString(),
-                'ends_on' => $periode->ends_on->toDateString(),
+                'id' => $period->id,
+                'ordinal' => $period->ordinal,
+                'name' => $period->name,
+                'starts_on' => $period->starts_on->toDateString(),
+                'ends_on' => $period->ends_on->toDateString(),
             ],
         ];
     }
