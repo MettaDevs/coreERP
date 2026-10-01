@@ -2,6 +2,6 @@ resources/js/components/ui/*
 resources/views/mail/*
 
 # Module yang sedang dipindah masuk dan belum dibentuk ulang ditulis di sini, satu baris per
-# module. Daftar ini dijaga tetap sama dengan ModulSedangDipindah oleh ModulSedangDipindahTest:
+# module. Daftar ini dijaga tetap sama dengan ModulesBeingMoved oleh ModulesBeingMovedTest:
 # entri yang tertinggal setelah modulnya selesai dipindah membuat alur merah. Kosong sejak
 # modul aset selesai dipindah pada 9 September 2026.

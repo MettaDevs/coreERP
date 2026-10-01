@@ -75,7 +75,7 @@ class CreateInvitation
         $expiresAt = $invited === null ? null : now()->addDays($this->invitationDays());
 
         try {
-            $hasil = DB::transaction(function () use ($actor, $data, $roleIds, $plain, $scopes, $invited, $expiresAt): array {
+            $result = DB::transaction(function () use ($actor, $data, $roleIds, $plain, $scopes, $invited, $expiresAt): array {
                 $invitation = InvitationCode::create([
                     'tenant_id' => $actor->tenant_id,
                     'code_hash' => self::hash($plain),
@@ -127,16 +127,16 @@ class CreateInvitation
         // karena penyedia sedang tidak dapat mengirim surat; yang tersisa adalah `sso_notified_at`
         // yang kosong, dan layar yang menawarkan kirim ulang.
         if ($invited !== null) {
-            $terkirim = $this->mailer->send($hasil['invitation'], $hasil['code']);
+            $sent = $this->mailer->send($result['invitation'], $result['code']);
 
             self::audit($actor, 'access.invitation.sso.dikirim', [
-                'invitation_id' => $hasil['invitation']->id,
+                'invitation_id' => $result['invitation']->id,
                 'email' => $invited->email,
-                'terkirim' => $terkirim,
+                'terkirim' => $sent,
             ]);
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -182,7 +182,7 @@ class CreateInvitation
 
         $issuer = $this->provider->issuer();
 
-        $sudahAnggota = ExternalIdentity::query()
+        $alreadyMember = ExternalIdentity::query()
             ->where('issuer', $issuer)
             ->where('subject', $invited->subject)
             ->whereIn('user_id', TenantMembership::query()
@@ -191,13 +191,13 @@ class CreateInvitation
                 ->select('user_id'))
             ->exists();
 
-        if ($sudahAnggota) {
+        if ($alreadyMember) {
             self::audit($actor, 'access.invitation.sso.ditolak', ['email' => $email, 'sebab' => 'sudah-anggota', 'subject' => $invited->subject]);
 
             throw ValidationException::withMessages(['sso_email' => 'Orang ini sudah menjadi anggota tenant ini. Ubah perannya di daftar anggota, bukan lewat undangan baru.']);
         }
 
-        $sudahDiundang = InvitationCode::query()
+        $alreadyInvited = InvitationCode::query()
             ->where('tenant_id', $actor->tenant_id)
             ->where('sso_issuer', $issuer)
             ->where('sso_subject', $invited->subject)
@@ -205,7 +205,7 @@ class CreateInvitation
             ->whereNull('sso_redeemed_at')
             ->exists();
 
-        if ($sudahDiundang) {
+        if ($alreadyInvited) {
             throw ValidationException::withMessages(['sso_email' => $this->duplicateSentence()]);
         }
 

@@ -81,7 +81,7 @@ Business unit baris akumulasi dibaca lewat kontrak `OrganizationDirectory` — r
 | `src/Http/Controllers/transaksi/InventarisasiAset/DepreciationController.php` | Proposal, finalisasi, pembalikan, pratinjau dan proses post |
 | `src/Services/DepreciationCalculator.php` | Hitungan per periode |
 | `src/Services/DepreciationPosting.php` | "Post penyusutan" dan jurnal pembaliknya |
-| `src/Services/KalenderFiskalAset.php` | Tahun buku dari Core |
+| `src/Services/AssetFiscalCalendar.php` | Tahun buku dari Core |
 | `ui/transactions/inventarisasi-aset/DepreciationPage.tsx` | Layar |
 | `ui/transactions/inventarisasi-aset/DepreciationPostingSheet.tsx` | Lembar "Post penyusutan" beserta pratinjau jurnalnya |
 | `loadtest/k6/depreciation.js` | Uji beban proposal, finalisasi, dan post, termasuk balapannya |

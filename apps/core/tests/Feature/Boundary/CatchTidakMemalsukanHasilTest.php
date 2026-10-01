@@ -73,11 +73,11 @@ class CatchTidakMemalsukanHasilTest extends TestCase
      * @var array<string, string>
      */
     private const DIKECUALIKAN = [
-        'apps/core/app/Platform/Observability/Support/JejakAktif.php' => 'Pelapor kesalahan tidak boleh melempar dari dalam penanganan kesalahan; jejak yang tidak terbaca membuat laporannya kehilangan tautan, bukan membuat laporannya berbohong.',
-        'apps/core/app/Platform/Observability/Support/LaporanKesalahan.php' => 'Sama: satu bagian laporan yang gagal disusun tidak boleh menghapus kesalahan asli yang sedang dilaporkan.',
-        'apps/core/app/Platform/Observability/Support/PelaporKesalahan.php' => 'Sama, dan paling keras: kelas ini dipanggil dari penangan kesalahan Laravel itu sendiri.',
-        'apps/core/app/Platform/Observability/Support/SqlTerbaca.php' => 'Query yang gagal dirapikan dipulangkan apa adanya oleh pemanggilnya; tidak ada fakta yang dinyatakan.',
-        'apps/core/app/Platform/Observability/Support/TersangkaPemotongan.php' => 'Tebakan penyebab pemotongan yang gagal disusun hanya menghilangkan petunjuk tambahan pada laporan.',
+        'apps/core/app/Platform/Observability/Support/ActiveSpan.php' => 'Pelapor kesalahan tidak boleh melempar dari dalam penanganan kesalahan; jejak yang tidak terbaca membuat laporannya kehilangan tautan, bukan membuat laporannya berbohong.',
+        'apps/core/app/Platform/Observability/Support/ErrorReport.php' => 'Sama: satu bagian laporan yang gagal disusun tidak boleh menghapus kesalahan asli yang sedang dilaporkan.',
+        'apps/core/app/Platform/Observability/Support/ErrorReporter.php' => 'Sama, dan paling keras: kelas ini dipanggil dari penangan kesalahan Laravel itu sendiri.',
+        'apps/core/app/Platform/Observability/Support/ReadableSql.php' => 'Query yang gagal dirapikan dipulangkan apa adanya oleh pemanggilnya; tidak ada fakta yang dinyatakan.',
+        'apps/core/app/Platform/Observability/Support/TruncationSuspects.php' => 'Tebakan penyebab pemotongan yang gagal disusun hanya menghilangkan petunjuk tambahan pada laporan.',
         'apps/control-plane/app/Environments/InstalledModules.php' => 'Hanya pada pembacaan nama katalog: namanya jatuh ke id module, jadi katalog yang gagal dibaca menghasilkan tabel berisi id — terlihat, dan tidak mengaku apa pun. Pembacaan daftar pemasangannya sendiri memulangkan null.',
         'apps/core/app/Platform/ControlPlane/Console/Concerns/HoldsEnvironmentOperation.php' => '`null` di sini berarti operasinya tidak jadi dibuka, dan jalur suksesnya tidak pernah memulangkan null. Sebabnya juga sudah dicetak ke operator sebelum baris itu.',
         'apps/core/app/Platform/ControlPlane/Http/Controllers/Internal/EnvironmentProvisioningController.php' => '`null` justru dipakai sebagai "tidak tahu": jalur suksesnya selalu memulangkan larik, dan pemanggilnya menerjemahkan null menjadi `modules_unreadable` pada jawabannya.',
@@ -95,7 +95,7 @@ class CatchTidakMemalsukanHasilTest extends TestCase
      * @var array<string, string>
      */
     private const GAP_DIKETAHUI = [
-        'modules/apperp/management-aset/src/Services/KalenderFiskalAset.php' => 'Kalender fiskal yang gagal dibaca jatuh ke tahun kalender tanpa satu pun kesalahan yang terlihat, dan seluruh jadwal penyusutan aset bergeser lima bulan. Akibatnya sudah dipaku angkanya di NoInternalHttpTest. Menutupnya berarti memutuskan apa yang harus terjadi pada dokumen yang terlanjur memakai tanggal yang salah — keputusan pemilik module, bukan keputusan penjaga ini.',
+        'modules/apperp/management-aset/src/Services/AssetFiscalCalendar.php' => 'Kalender fiskal yang gagal dibaca jatuh ke tahun kalender tanpa satu pun kesalahan yang terlihat, dan seluruh jadwal penyusutan aset bergeser lima bulan. Akibatnya sudah dipaku angkanya di NoInternalHttpTest. Menutupnya berarti memutuskan apa yang harus terjadi pada dokumen yang terlanjur memakai tanggal yang salah — keputusan pemilik module, bukan keputusan penjaga ini.',
         'modules/apperp/management-aset/src/Services/PembuatAset.php' => 'Lapis kedua dari gap yang sama, pada jalur yang memanggil kalender itu. Ditutup bersama yang di atas, bukan sendiri. Sampai 18 September 2026 ia berada di AssetController; register aset dipecah pada hari itu dan pembentukan asetnya pindah ke service ini.',
         'apps/core/app/Platform/Modules/Support/ModuleRegistry.php' => 'Manifest yang tidak terurai membuat modulenya lenyap dari registry, jadi rutenya 404 tanpa ada yang menyebut sebabnya. Melewatinya adalah keputusan yang sudah dipaku ModuleRegistryTest::test_manifest_rusak_dilewati_tanpa_menjatuhkan_runtime; membalikkannya berarti memutuskan apakah satu manifest rusak boleh menahan seluruh runtime menyala.',
         'apps/control-plane/app/Dns/CloudflareSettings.php' => 'Bentuk yang sama dengan InvitationCode di bawah: APP_KEY yang berganti sesudah token disimpan membuat token yang ada berbunyi persis sama dengan token yang memang belum disetel, dan `configured()` menjawab false untuk keduanya. Memisahkannya berarti memutuskan apa yang harus dilihat operator ketika kredensial yang tersimpan tidak lagi dapat dibuka.',

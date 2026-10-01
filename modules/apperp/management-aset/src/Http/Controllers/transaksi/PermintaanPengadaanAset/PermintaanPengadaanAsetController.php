@@ -11,7 +11,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use stdClass;
 
@@ -43,7 +43,7 @@ class PermintaanPengadaanAsetController extends Controller
         return response()->json(['data' => $record], 200, ['ETag' => RowVersion::etag((int) $record->version)]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->key($request);

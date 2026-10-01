@@ -105,7 +105,7 @@ Ia hanya referensi: menentukan kelompok mana yang berlaku, bukan menghitung apa 
 | `src/Http/Controllers/master/BukuPenyusutanController.php` | Master buku |
 | `src/Http/Controllers/master/GroupBukuPenyusutanController.php` | Matriks group × buku |
 | `src/Services/DepreciationCalculator.php` | Hitungan |
-| `src/Services/KalenderFiskalAset.php` | Tahun buku dari Core |
+| `src/Services/AssetFiscalCalendar.php` | Tahun buku dari Core |
 | `database/migrations/2026_07_28_090000_create_asset_register_and_depreciation_tables.php` | Tabel profil, buku, dan periode |
 | `ui/master/GroupBookMatrix.tsx` | Layar matriks |
 

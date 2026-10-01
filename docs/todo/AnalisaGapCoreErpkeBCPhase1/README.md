@@ -643,10 +643,10 @@ final class Worker extends Model
   `address`, `alamat` ikut bawaan `CustomerContent`/`SystemMetadata` tanpa ditulis eksplisit. Kolom yang
   namanya menyesatkan (`table_name`, `field_name`, `report_name`, `layout_name`, `file_name`) dikecualikan
   di test itu dengan alasannya. Satu test lain membuktikan pemeriksanya menangkap tabel tanpa klasifikasi.
-- **Discord dibersihkan (K-18).** `PengirimDiscord` mengirim daftar izin atribut: kelas exception, sumber,
+- **Discord dibersihkan (K-18).** `DiscordNotifier` mengirim daftar izin atribut: kelas exception, sumber,
   method, nama rute, status, `tenant_id`, id laporan, `trace_id`, dan tautan ke SigNoz. Pesan exception,
   SQL beserta nilainya, nama tenant, nama pengguna, alamat IP, dan user agent tidak lagi dikirim.
-  `LaporanKesalahan`, berkas log, dan SigNoz tidak berubah. Test di `PengirimDiscordTest` memakai laporan
+  `ErrorReport`, berkas log, dan SigNoz tidak berubah. Test di `DiscordNotifierTest` memakai laporan
   berisi nama orang, email, nama tenant, dan SQL bernilai, lalu memastikan tidak ada yang sampai ke
   Discord sementara atribut untuk SigNoz tetap utuh.
 

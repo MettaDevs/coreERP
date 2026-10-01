@@ -26,7 +26,7 @@ class CreateOrganization
         }
         $number = $data['classification'] === 'operating_unit' ? ($data['operating_unit_number'] ?? null) : null;
         if ($number !== null && OperatingUnit::query()->where('tenant_id', $actor->tenant_id)->where('number', $number)->exists()) {
-            throw self::nomorDipakai();
+            throw self::numberInUse();
         }
 
         try {
@@ -60,14 +60,14 @@ class CreateOrganization
             // Dua permintaan yang lolos pemeriksaan di atas bersamaan: indeks unik yang memutuskan.
             // Transaksinya sudah dibatalkan seluruhnya, jadi tidak ada organisasi setengah jadi.
             if (str_contains($exception->getMessage(), 'operating_units_tenant_number_unique')) {
-                throw self::nomorDipakai();
+                throw self::numberInUse();
             }
 
             throw $exception;
         }
     }
 
-    public static function nomorDipakai(): ValidationException
+    public static function numberInUse(): ValidationException
     {
         return ValidationException::withMessages([
             'operating_unit_number' => 'Nomor unit sudah dipakai operating unit lain pada tenant ini.',

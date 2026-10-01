@@ -18,8 +18,8 @@ namespace App\Platform\Modules\Contracts;
  */
 interface FinancePostingSettings
 {
-    /** `direct_payable` atau `clearing` yang berlaku pada `$tanggal` (`Y-m-d`). */
-    public function settlementMode(string $legalEntityId, string $tanggal): string;
+    /** `direct_payable` atau `clearing` yang berlaku pada `$date` (`Y-m-d`). */
+    public function settlementMode(string $legalEntityId, string $date): string;
 
     /** Tanggal cutover (`Y-m-d`), atau `null` bila belum disetel. */
     public function cutover(string $legalEntityId): ?string;

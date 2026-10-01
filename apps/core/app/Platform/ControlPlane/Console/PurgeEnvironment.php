@@ -444,9 +444,9 @@ final class PurgeEnvironment extends Command
      */
     private function markPurged(Environment $environment): void
     {
-        $koneksi = DB::connection($environment->getConnectionName());
+        $connection = DB::connection($environment->getConnectionName());
 
-        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+        $affected = (int) $connection->transaction(fn (): int => Environment::query()
             ->whereKey($environment->id)
             ->whereNotNull('deleted_at')
             ->whereNull('purged_at')
@@ -483,13 +483,13 @@ final class PurgeEnvironment extends Command
     private function baseConfig(): array
     {
         $default = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$default);
+        $configuration = config('database.connections.'.$default);
 
-        if (! is_array($konfigurasi)) {
+        if (! is_array($configuration)) {
             throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
-        /** @var array<string, mixed> $konfigurasi */
-        return $konfigurasi;
+        /** @var array<string, mixed> $configuration */
+        return $configuration;
     }
 }

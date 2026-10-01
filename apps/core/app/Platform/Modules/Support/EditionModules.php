@@ -40,16 +40,16 @@ final readonly class EditionModules
      *
      * @return list<string>
      */
-    public function daftar(): array
+    public function list(): array
     {
-        $semua = $this->registry->semuaTermasukYangSedangDipindah();
+        $all = $this->registry->allIncludingMoved();
 
         // Nol manifest berarti pemindaiannya salah alamat — folder `modules/` bergeser, pola
         // globnya meleset, atau perintahnya dijalankan dari akar yang bukan repo. Daftar kosong
         // yang dipulangkan diam-diam akan membangun image berisi Core saja, dan image itu lulus
         // setiap pemeriksaan kebocoran karena memang tidak ada yang bocor. Kegagalannya baru
         // terlihat sebagai menu yang hilang di layar klien.
-        if ($semua === []) {
+        if ($all === []) {
             throw new RuntimeException(
                 'Tidak satu pun manifest modul terbaca di folder `modules/`. '.
                 'Pemindaiannya salah alamat, dan daftar kosong yang dipulangkan diam-diam akan '.
@@ -57,18 +57,18 @@ final readonly class EditionModules
             );
         }
 
-        $hasil = [];
+        $result = [];
 
-        foreach ($semua as $manifest) {
-            if ($manifest->bahanUjiInternal()) {
+        foreach ($all as $manifest) {
+            if ($manifest->internalTestFixtures()) {
                 continue;
             }
 
-            $hasil[] = $manifest->id;
+            $result[] = $manifest->id;
         }
 
-        sort($hasil);
+        sort($result);
 
-        return $hasil;
+        return $result;
     }
 }

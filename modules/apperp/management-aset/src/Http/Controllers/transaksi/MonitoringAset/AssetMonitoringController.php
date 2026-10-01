@@ -24,9 +24,9 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanA
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoringLine;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AssetMonitoringStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -99,7 +99,7 @@ class AssetMonitoringController extends Controller
         return $this->document($request, $id);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
@@ -662,9 +662,9 @@ class AssetMonitoringController extends Controller
      */
     private function withNames(string $tenantId, stdClass $row): stdClass
     {
-        $directory = app(DirektoriAset::class);
-        $row->responsible_org_unit_nama = $directory->namaUnit($tenantId, $row->responsible_org_unit_id ?? null);
-        $row->penanggung_jawab_nama = $directory->namaOrang($tenantId, $row->penanggung_jawab_user_id ?? null);
+        $directory = app(AssetOrganizationDirectory::class);
+        $row->responsible_org_unit_nama = $directory->unitName($tenantId, $row->responsible_org_unit_id ?? null);
+        $row->penanggung_jawab_nama = $directory->personName($tenantId, $row->penanggung_jawab_user_id ?? null);
 
         return $row;
     }
@@ -680,7 +680,7 @@ class AssetMonitoringController extends Controller
      */
     private function lines(string $monitoringId, string $tenantId, string $checkedLocationId, bool $frozen): Collection
     {
-        $directory = app(DirektoriAset::class);
+        $directory = app(AssetOrganizationDirectory::class);
         $rows = AssetMonitoringLine::query()
             ->leftJoin('aset_tr_aset as aset', function (JoinClause $join): void {
                 $join->on('aset.id', '=', self::LINES.'.aset_id')->on('aset.tenant_id', '=', self::LINES.'.tenant_id');
@@ -728,8 +728,8 @@ class AssetMonitoringController extends Controller
             }
             $row->sistem_lifecycle_label = StatusAset::label($row->sistem_lifecycle_state);
             $row->sistem_lokasi_nama = $locations[(string) $row->sistem_lokasi_id] ?? null;
-            $row->sistem_org_unit_nama = $directory->namaUnit($tenantId, $row->sistem_org_unit_id);
-            $row->sistem_custodian_nama = $directory->namaOrang($tenantId, $row->sistem_custodian_user_id);
+            $row->sistem_org_unit_nama = $directory->unitName($tenantId, $row->sistem_org_unit_id);
+            $row->sistem_custodian_nama = $directory->personName($tenantId, $row->sistem_custodian_user_id);
 
             return $row;
         });

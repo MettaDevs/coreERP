@@ -21,7 +21,7 @@ dalam proses yang sama. Alasannya ada di [grand design](/dev/01-grand-design).
 ### Nomor dokumen
 
 Setiap `kode` — master maupun transaksi — diterbitkan Number Sequence Core lewat kontrak
-`NumberSequenceIssuer`, dibungkus `PenerbitNomorAset` yang menerjemahkan kegagalan Core menjadi kegagalan
+`NumberSequenceIssuer`, dibungkus `AssetNumberSequenceIssuer` yang menerjemahkan kegagalan Core menjadi kegagalan
 yang berarti bagi pemanggil modul.
 
 Yang perlu dipahami:
@@ -36,13 +36,13 @@ Yang perlu dipahami:
 
 ### Tahun buku
 
-`KalenderFiskalAset` menanyakan periode fiskal ke Core lewat kontrak `FiscalCalendarDirectory`. Modul tidak
+`AssetFiscalCalendar` menanyakan periode fiskal ke Core lewat kontrak `FiscalCalendarDirectory`. Modul tidak
 menyimpan kalender fiskalnya sendiri, karena kalender itu milik badan hukum dan dipakai bersama
 modul lain.
 
 ### Satuan
 
-`DaftarSatuanAset` mengambil daftar satuan lewat kontrak `UnitOfMeasureDirectory`, untuk dipakai rencana
+`AssetUnitOfMeasureDirectory` mengambil daftar satuan lewat kontrak `UnitOfMeasureDirectory`, untuk dipakai rencana
 pengadaan. Kalau daftar satuan belum bisa diambil, endpointnya menjawab galat, bukan daftar kosong —
 daftar kosong akan terbaca sebagai "tidak ada satuan", padahal yang terjadi adalah "belum tahu".
 
@@ -157,10 +157,10 @@ belum dibersihkan, bukan konfigurasi yang perlu diisi.
 
 | Berkas | Isinya |
 | --- | --- |
-| `src/Services/PenerbitNomorAset.php` | Permintaan nomor lewat kontrak Core |
-| `src/Services/KalenderFiskalAset.php` | Tahun buku |
-| `src/Services/DaftarSatuanAset.php` | Satuan |
-| `src/Services/PersetujuanAset.php` | Pengajuan persetujuan |
+| `src/Services/AssetNumberSequenceIssuer.php` | Permintaan nomor lewat kontrak Core |
+| `src/Services/AssetFiscalCalendar.php` | Tahun buku |
+| `src/Services/AssetUnitOfMeasureDirectory.php` | Satuan |
+| `src/Services/AssetApprovalWorkflow.php` | Pengajuan persetujuan |
 | `src/Listeners/SiapkanDataAwalTenant.php` | Penyiapan tenant baru |
 | `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan persetujuan |
 | `src/Http/Controllers/ReferenceDataController.php` | Endpoint referensi yang meneruskan satuan dan kelompok fiskal |

@@ -28,7 +28,7 @@ final class OrganizationDirectoryController extends Controller
         // `operating-units.read`-nya sudah diperiksa middleware sebelum sampai ke sini.
         abort_unless(
             $request->attributes->get('coreerp.app_id') === 'human-resources'
-                || $request->attributes->has(AuthenticateIntegrationClient::ATRIBUT),
+                || $request->attributes->has(AuthenticateIntegrationClient::ATTRIBUTE),
             403,
         );
         $filter = $request->validate(['updated_since' => ['nullable', 'date']]);
@@ -46,10 +46,10 @@ final class OrganizationDirectoryController extends Controller
             // `>=`, bukan `>`: kolomnya berpresisi detik, jadi dua perubahan pada detik yang sama
             // dengan batas tarikan sebelumnya tidak boleh terlewat. Baris yang terkirim dua kali
             // tidak merugikan pembaca yang menyimpan dengan upsert.
-            $sejak = Carbon::parse($filter['updated_since'])->setTimezone((string) config('app.timezone'));
+            $since = Carbon::parse($filter['updated_since'])->setTimezone((string) config('app.timezone'));
             $query->where(fn ($inner) => $inner
-                ->where('organizations.updated_at', '>=', $sejak)
-                ->orWhere('unit.updated_at', '>=', $sejak));
+                ->where('organizations.updated_at', '>=', $since)
+                ->orWhere('unit.updated_at', '>=', $since));
         } else {
             $query->where('organizations.status', 'active');
         }
@@ -70,7 +70,7 @@ final class OrganizationDirectoryController extends Controller
             // sebagai `updated_since` tarikan berikutnya tanpa melewatkan perubahan apa pun.
             'updated_at' => collect([$unit->organization_updated_at, $unit->unit_updated_at])
                 ->filter()
-                ->map(static fn (string $waktu): Carbon => Carbon::parse($waktu))
+                ->map(static fn (string $time): Carbon => Carbon::parse($time))
                 ->max()
                 ?->toIso8601String(),
         ])->values()]);

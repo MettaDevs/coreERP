@@ -23,5 +23,5 @@ namespace App\Platform\Modules\Contracts;
  */
 interface ModuleReportProviders
 {
-    public function register(ModuleReportProvider $penyedia): void;
+    public function register(ModuleReportProvider $provider): void;
 }

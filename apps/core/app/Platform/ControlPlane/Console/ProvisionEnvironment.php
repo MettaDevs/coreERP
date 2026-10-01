@@ -255,9 +255,9 @@ final class ProvisionEnvironment extends Command
         $maintenance = $this->connections->maintenance();
 
         try {
-            $koneksi = DB::connection($maintenance);
+            $connection = DB::connection($maintenance);
 
-            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
+            if ($connection->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
                 return false;
             }
 
@@ -266,7 +266,7 @@ final class ProvisionEnvironment extends Command
             // transaksi implisit — persis yang dilarang untuk `CREATE DATABASE`. Yang kedua
             // menuntut literal-string, dan nama database di sini memang tidak pernah literal;
             // yang menjaganya adalah pemeriksaan bentuk identifier di awal method ini.
-            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
+            $connection->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
 
             return true;
         } catch (PDOException $e) {

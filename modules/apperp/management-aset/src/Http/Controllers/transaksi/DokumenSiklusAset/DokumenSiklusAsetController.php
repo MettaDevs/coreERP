@@ -11,9 +11,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
+use Modules\Apperp\ManagementAset\Services\AssetApprovalWorkflow;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
-use Modules\Apperp\ManagementAset\Services\PersetujuanAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
 use RuntimeException;
@@ -34,7 +34,7 @@ class DokumenSiklusAsetController extends Controller
         return $this->index($request, $this->typeFromRequest($request));
     }
 
-    public function storeByRoute(Request $request, PenerbitNomorAset $numbers, PersetujuanAset $workflow): JsonResponse
+    public function storeByRoute(Request $request, AssetNumberSequenceIssuer $numbers, AssetApprovalWorkflow $workflow): JsonResponse
     {
         return $this->store($request, $this->typeFromRequest($request), $numbers, $workflow);
     }
@@ -48,7 +48,7 @@ class DokumenSiklusAsetController extends Controller
         return response()->json(['data' => $query->toBase()->latest('created_at')->get()]);
     }
 
-    public function store(Request $request, string $type, PenerbitNomorAset $numbers, PersetujuanAset $workflow): JsonResponse
+    public function store(Request $request, string $type, AssetNumberSequenceIssuer $numbers, AssetApprovalWorkflow $workflow): JsonResponse
     {
         $this->guard($request, $type, 'create');
         $key = (string) $request->header('Idempotency-Key');
@@ -154,10 +154,10 @@ class DokumenSiklusAsetController extends Controller
      * `$record` adalah baris mentah hasil `toBase()` — sebuah `stdClass`, bukan model —
      * baik yang baru dirakit di sini maupun yang dibaca ulang saat replay idempoten.
      */
-    private function submitWorkflow(stdClass $record, string $tenant, string $legalEntityId, string $key, PersetujuanAset $workflow): void
+    private function submitWorkflow(stdClass $record, string $tenant, string $legalEntityId, string $key, AssetApprovalWorkflow $workflow): void
     {
         try {
-            $workflowId = $workflow->ajukanDekomisioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->aset_id);
+            $workflowId = $workflow->submitDecommissioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->aset_id);
         } catch (RuntimeException $exception) {
             // 422, bukan 503. Core berada di proses yang sama, jadi "layanan persetujuan belum
             // dapat dihubungi" tidak pernah lagi benar. Yang tersisa adalah permintaan yang

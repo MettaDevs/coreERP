@@ -19,7 +19,7 @@ namespace App\Platform\Modules\Contracts;
  *
  * Dipakai begini:
  *
- *     $pelaksana->runFor($tenantId, fn () => $penyedia->forTenant($tenantId));
+ *     $runner->runFor($tenantId, fn () => $provider->forTenant($tenantId));
  *
  * **Tenant sebelumnya dikembalikan setelah selesai, termasuk bila pekerjaannya melempar.**
  * Itu bukan kerapian: satu perintah yang memproses dua tenant berturut-turut akan memakai
@@ -31,8 +31,8 @@ interface TenantRunner
     /**
      * @template T
      *
-     * @param  callable(): T  $aksi
+     * @param  callable(): T  $action
      * @return T
      */
-    public function runFor(string $tenantId, callable $aksi): mixed;
+    public function runFor(string $tenantId, callable $action): mixed;
 }

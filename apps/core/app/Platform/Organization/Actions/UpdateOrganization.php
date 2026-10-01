@@ -29,18 +29,18 @@ class UpdateOrganization
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE) || $organization->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
-        $gantiNomor = $organization->classification === 'operating_unit' && array_key_exists('operating_unit_number', $data);
-        $number = $gantiNomor ? $data['operating_unit_number'] : null;
+        $renumber = $organization->classification === 'operating_unit' && array_key_exists('operating_unit_number', $data);
+        $number = $renumber ? $data['operating_unit_number'] : null;
         if ($number !== null && OperatingUnit::query()
             ->where('tenant_id', $organization->tenant_id)
             ->where('number', $number)
             ->where('organization_id', '!=', $organization->id)
             ->exists()) {
-            throw CreateOrganization::nomorDipakai();
+            throw CreateOrganization::numberInUse();
         }
 
         try {
-            return DB::transaction(function () use ($organization, $data, $gantiNomor, $number, $expectedVersion): Organization {
+            return DB::transaction(function () use ($organization, $data, $renumber, $number, $expectedVersion): Organization {
                 RowVersion::claim($organization, $expectedVersion);
                 $organization->update(['name' => $data['name']]);
 
@@ -56,7 +56,7 @@ class UpdateOrganization
                     $organization->operatingUnit()->update([
                         'tenant_id' => $organization->tenant_id,
                         'type' => $data['operating_unit_type'],
-                        ...($gantiNomor ? ['number' => $number] : []),
+                        ...($renumber ? ['number' => $number] : []),
                     ]);
                 }
 
@@ -64,7 +64,7 @@ class UpdateOrganization
             });
         } catch (UniqueConstraintViolationException $exception) {
             if (str_contains($exception->getMessage(), 'operating_units_tenant_number_unique')) {
-                throw CreateOrganization::nomorDipakai();
+                throw CreateOrganization::numberInUse();
             }
 
             throw $exception;

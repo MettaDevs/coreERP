@@ -42,7 +42,7 @@ class ModuleMigratorTest extends TestCase
 
         $this->assertNotEmpty($pertama, 'Jalan pertama harus benar-benar menjalankan sesuatu.');
         $this->assertSame([], $kedua, 'Jalan kedua tidak boleh mengulang migration yang sudah tercatat.');
-        $this->assertCount(count($pertama), $migrator->sudahJalan($module));
+        $this->assertCount(count($pertama), $migrator->ran($module));
     }
 
     public function test_riwayat_module_tidak_menambah_tabel_migrations_milik_core(): void
@@ -55,7 +55,7 @@ class ModuleMigratorTest extends TestCase
         $sesudah = DB::table('migrations')->count();
 
         $this->assertSame($sebelum, $sesudah, 'Migration module tidak boleh tercatat di riwayat milik Core.');
-        $this->assertTrue($this->tabelAda(ModuleMigrator::TABEL_RIWAYAT));
+        $this->assertTrue($this->tabelAda(ModuleMigrator::HISTORY_TABLE));
     }
 
     public function test_riwayat_dua_module_tidak_saling_menutupi(): void
@@ -78,7 +78,7 @@ class ModuleMigratorTest extends TestCase
         // yang satu tercatat atas nama yang lain, hasilnya tinggal satu nama dan test ini merah.
         $this->assertSame(
             ['contoh-a', 'contoh-b'],
-            DB::table(ModuleMigrator::TABEL_RIWAYAT)
+            DB::table(ModuleMigrator::HISTORY_TABLE)
                 ->whereIn('module_id', ['contoh-a', 'contoh-b'])
                 ->distinct()->orderBy('module_id')->pluck('module_id')->all(),
         );

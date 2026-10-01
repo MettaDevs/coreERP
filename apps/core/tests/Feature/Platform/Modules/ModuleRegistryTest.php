@@ -35,7 +35,7 @@ class ModuleRegistryTest extends TestCase
      *
      * Daftarnya ditulis lengkap dan bukan sekadar "berisi", supaya module yang **hilang** dari
      * runtime ikut terlihat. `management-aset` masuk sejak F3-30: selama entrinya ada di
-     * `ModulSedangDipindah` ia dimuat tetapi tidak dilayani, dan test ini yang menandai
+     * `ModulesBeingMoved` ia dimuat tetapi tidak dilayani, dan test ini yang menandai
      * perpindahannya.
      */
     public function test_registry_menemukan_seluruh_module_di_repo(): void
@@ -44,7 +44,7 @@ class ModuleRegistryTest extends TestCase
 
         $this->assertSame(
             ['contoh-a', 'contoh-b', 'human-resources', 'management-aset'],
-            array_map(static fn ($m): string => $m->id, $registry->semua()),
+            array_map(static fn ($m): string => $m->id, $registry->all()),
         );
     }
 
@@ -55,7 +55,7 @@ class ModuleRegistryTest extends TestCase
 
         $registry = new ModuleRegistry($this->akarSementara);
 
-        $this->assertSame(['sudah-jadi'], array_map(static fn ($m): string => $m->id, $registry->semua()));
+        $this->assertSame(['sudah-jadi'], array_map(static fn ($m): string => $m->id, $registry->all()));
     }
 
     public function test_module_tanpa_awalan_tabel_dilewati(): void
@@ -76,7 +76,7 @@ publisher: apperp
 
         $this->assertSame(
             ['berawalan'],
-            array_map(static fn ($m): string => $m->id, $registry->semua()),
+            array_map(static fn ($m): string => $m->id, $registry->all()),
             'Module tanpa table_prefix tidak boleh dilayani: tabelnya akan memakai nama apa adanya '.
             'dan bertabrakan dengan milik Core. Ini keadaan modul yang baru ditarik masuk dan belum '.
             'dibentuk ulang.'
@@ -92,7 +92,7 @@ publisher: apperp
 
         $this->assertSame(
             ['sehat'],
-            array_map(static fn ($m): string => $m->id, $registry->semua()),
+            array_map(static fn ($m): string => $m->id, $registry->all()),
             'Satu manifest yang rusak tidak boleh membuat seluruh runtime gagal menyala.'
         );
     }
@@ -104,7 +104,7 @@ publisher: apperp
 
         $this->assertNotNull($contohA);
         $this->assertTrue(
-            $contohA->bahanUjiInternal(),
+            $contohA->internalTestFixtures(),
             'Module contoh wajib bertanda internal-fixture; tanda itulah yang menahannya masuk ke edisi pelanggan.'
         );
     }

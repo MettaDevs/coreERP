@@ -47,7 +47,7 @@ final class PostingFeedSummary
      */
     public function read(): array
     {
-        $jumlah = FinancePosting::query()
+        $count = FinancePosting::query()
             ->toBase()
             ->selectRaw('status, count(*) as jumlah')
             ->groupBy('status')
@@ -55,7 +55,7 @@ final class PostingFeedSummary
 
         $counts = [];
         foreach (self::STATUSES as $status) {
-            $counts[$status] = (int) ($jumlah[$status] ?? 0);
+            $counts[$status] = (int) ($count[$status] ?? 0);
         }
 
         return [

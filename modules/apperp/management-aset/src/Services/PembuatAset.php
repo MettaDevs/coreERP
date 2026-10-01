@@ -177,7 +177,7 @@ class PembuatAset
         }
 
         try {
-            $fiscal = app(KalenderFiskalAset::class)->resolve($tenantId, $legalEntityId, $placedInService);
+            $fiscal = app(AssetFiscalCalendar::class)->resolve($tenantId, $legalEntityId, $placedInService);
         } catch (RuntimeException) {
             return null;
         }

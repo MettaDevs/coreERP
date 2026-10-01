@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Platform\Modules\Support\CoreServices;
 use App\Platform\Modules\Support\ModuleRegistry;
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -47,12 +47,12 @@ final class ModuleServiceProvider extends ServiceProvider
         // dimuat": module yang kodenya tidak dimuat tidak punya satu pun test yang bisa
         // berjalan, dan pemindahannya jadi dikerjakan tanpa jaring pengaman sampai hari
         // terakhir. Katalog, pemasangan, dan segala yang menyentuh data tenant tetap memakai
-        // `semua()`, yang melewatkan module yang sedang dipindah.
-        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
-            $penyedia = $module->penyediaLayanan();
+        // `all()`, yang melewatkan module yang sedang dipindah.
+        foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
+            $provider = $module->serviceProvider();
 
-            if (class_exists($penyedia)) {
-                $this->app->register($penyedia);
+            if (class_exists($provider)) {
+                $this->app->register($provider);
             }
         }
     }
@@ -67,14 +67,14 @@ final class ModuleServiceProvider extends ServiceProvider
         // jadi tabelnya tidak punya cara lain untuk ada — dan tanpa tabel, tidak satu pun
         // testnya bisa berjalan.
         //
-        // Ini berakhir sendiri: begitu module keluar dari daftar `ModulSedangDipindah`, ia
+        // Ini berakhir sendiri: begitu module keluar dari daftar `ModulesBeingMoved`, ia
         // dipasang lewat jalur yang sama seperti module lain dan baris ini berhenti berlaku
         // untuknya.
-        $dipindah = ModulSedangDipindah::bawaan();
+        $moved = ModulesBeingMoved::default();
 
-        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
-            if ($dipindah->menandai(basename($module->folder))) {
-                $this->loadMigrationsFrom($module->folderMigrasi());
+        foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
+            if ($moved->marks(basename($module->folder))) {
+                $this->loadMigrationsFrom($module->migrationFolder());
             }
         }
     }

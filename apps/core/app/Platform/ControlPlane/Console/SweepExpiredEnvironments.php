@@ -271,9 +271,9 @@ final class SweepExpiredEnvironments extends Command
      */
     private function softDelete(Environment $environment, CarbonInterface $now, CarbonInterface $purgeAfter): void
     {
-        $koneksi = DB::connection($environment->getConnectionName());
+        $connection = DB::connection($environment->getConnectionName());
 
-        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+        $affected = (int) $connection->transaction(fn (): int => Environment::query()
             ->whereKey($environment->id)
             ->whereNull('deleted_at')
             ->update([

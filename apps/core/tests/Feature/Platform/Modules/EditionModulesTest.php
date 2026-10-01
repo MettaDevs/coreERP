@@ -56,7 +56,7 @@ class EditionModulesTest extends TestCase
             'rawat-jalan' => [],
         ]);
 
-        $this->assertSame(['apotek', 'inventori', 'rawat-jalan'], $modul->daftar());
+        $this->assertSame(['apotek', 'inventori', 'rawat-jalan'], $modul->list());
     }
 
     /**
@@ -73,7 +73,7 @@ class EditionModulesTest extends TestCase
             'contoh-b' => ['kind' => 'internal-fixture'],
         ]);
 
-        $this->assertSame(['apotek'], $modul->daftar());
+        $this->assertSame(['apotek'], $modul->list());
     }
 
     /**
@@ -91,7 +91,7 @@ class EditionModulesTest extends TestCase
             'rawat-jalan' => [],
         ]);
 
-        $this->assertSame(['apotek', 'apotek-ke-rawat-jalan', 'rawat-jalan'], $modul->daftar());
+        $this->assertSame(['apotek', 'apotek-ke-rawat-jalan', 'rawat-jalan'], $modul->list());
     }
 
     /**
@@ -112,7 +112,7 @@ class EditionModulesTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Tidak satu pun manifest modul terbaca');
 
-        $modul->daftar();
+        $modul->list();
     }
 
     /**
@@ -125,7 +125,7 @@ class EditionModulesTest extends TestCase
     public function test_repo_apa_adanya_tidak_memuat_bahan_uji(): void
     {
         $akar = dirname(__DIR__, 6);
-        $daftar = (new EditionModules(new ModuleRegistry($akar.'/modules')))->daftar();
+        $daftar = (new EditionModules(new ModuleRegistry($akar.'/modules')))->list();
 
         $this->assertNotEmpty($daftar, 'Repo ini memuat modul bisnis; daftar kosong berarti pemindaiannya salah alamat.');
         $this->assertNotContains('contoh-a', $daftar);

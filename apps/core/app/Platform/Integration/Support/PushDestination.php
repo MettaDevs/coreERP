@@ -32,7 +32,7 @@ final class PushDestination
      * menutup jalan memutar ke IPv4: alamat IPv4-mapped (`::ffff:10.0.0.5`) dan prefix NAT64 dapat
      * menjangkau jaringan privat IPv4 lewat alamat yang tampak seperti IPv6.
      */
-    private const TERLARANG = [
+    private const FORBIDDEN = [
         '0.0.0.0/8', '100.64.0.0/10', '192.0.0.0/24', '198.18.0.0/15', '224.0.0.0/4', '240.0.0.0/4',
         '::/128', '::ffff:0:0/96', '64:ff9b::/96', '64:ff9b:1::/48', '100::/64', '2001:db8::/32', 'ff00::/8',
     ];
@@ -62,8 +62,8 @@ final class PushDestination
      */
     public function inspect(string $url): array
     {
-        $bagian = parse_url($url);
-        if (! is_array($bagian) || ($bagian['scheme'] ?? '') !== 'https' || ($bagian['host'] ?? '') === '') {
+        $parts = parse_url($url);
+        if (! is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || ($parts['host'] ?? '') === '') {
             return ['reason' => 'URL tujuan harus alamat https:// yang lengkap.', 'pin' => []];
         }
 
@@ -71,15 +71,15 @@ final class PushDestination
             return ['reason' => null, 'pin' => []];
         }
 
-        $host = trim($bagian['host'], '[]');
+        $host = trim($parts['host'], '[]');
         $literal = filter_var($host, FILTER_VALIDATE_IP) !== false;
-        $alamat = $literal ? [$host] : ($this->resolver)($host);
-        if ($alamat === []) {
+        $address = $literal ? [$host] : ($this->resolver)($host);
+        if ($address === []) {
             return ['reason' => 'Nama host tujuan tidak dapat diselesaikan.', 'pin' => []];
         }
 
-        foreach ($alamat as $ip) {
-            if (IpUtils::checkIp($ip, [...IpUtils::PRIVATE_SUBNETS, ...self::TERLARANG])) {
+        foreach ($address as $ip) {
+            if (IpUtils::checkIp($ip, [...IpUtils::PRIVATE_SUBNETS, ...self::FORBIDDEN])) {
                 return ['reason' => 'URL tujuan menunjuk jaringan privat. Dari layanan SaaS, aplikasi finance harus dapat dijangkau lewat alamat publik.', 'pin' => []];
             }
         }
@@ -88,9 +88,9 @@ final class PushDestination
             return ['reason' => null, 'pin' => []];
         }
 
-        $daftar = implode(',', array_map(static fn (string $ip): string => str_contains($ip, ':') ? '['.$ip.']' : $ip, $alamat));
+        $list = implode(',', array_map(static fn (string $ip): string => str_contains($ip, ':') ? '['.$ip.']' : $ip, $address));
 
-        return ['reason' => null, 'pin' => [sprintf('%s:%d:%s', $host, $bagian['port'] ?? 443, $daftar)]];
+        return ['reason' => null, 'pin' => [sprintf('%s:%d:%s', $host, $parts['port'] ?? 443, $list)]];
     }
 
     /**
@@ -102,15 +102,15 @@ final class PushDestination
      */
     private static function resolve(string $host): array
     {
-        $alamat = gethostbynamel($host) ?: [];
-        $catatan = @dns_get_record($host, DNS_AAAA);
-        foreach (is_array($catatan) ? $catatan : [] as $baris) {
-            if (isset($baris['ipv6']) && is_string($baris['ipv6'])) {
-                $alamat[] = $baris['ipv6'];
+        $address = gethostbynamel($host) ?: [];
+        $records = @dns_get_record($host, DNS_AAAA);
+        foreach (is_array($records) ? $records : [] as $record) {
+            if (isset($record['ipv6']) && is_string($record['ipv6'])) {
+                $address[] = $record['ipv6'];
             }
         }
 
-        return array_values(array_unique($alamat));
+        return array_values(array_unique($address));
     }
 
     private static function saas(): bool

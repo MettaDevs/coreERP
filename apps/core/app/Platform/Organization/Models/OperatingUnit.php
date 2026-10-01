@@ -23,9 +23,9 @@ class OperatingUnit extends Model
      * mereka. Spasi, huruf kecil, dan tanda hubung di ujung adalah sumber ketidakcocokan yang tidak
      * terlihat mata, jadi ditolak di sini, bukan dirapikan diam-diam di sisi pembaca.
      */
-    public const FORMAT_NOMOR = '/^[A-Z0-9]+(-[A-Z0-9]+)*$/';
+    public const NUMBER_FORMAT = '/^[A-Z0-9]+(-[A-Z0-9]+)*$/';
 
-    public const PANJANG_NOMOR = 30;
+    public const NUMBER_LENGTH = 30;
 
     protected $primaryKey = 'organization_id';
 

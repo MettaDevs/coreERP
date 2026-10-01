@@ -53,18 +53,18 @@ final class PostingPublisher
 
     private const MAX_LINES = 5000;
 
-    private const POLA_POSTING_ID = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/';
+    private const POSTING_ID_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/';
 
-    private const POLA_JENIS = '/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/';
+    private const POSTING_TYPE_PATTERN = '/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/';
 
-    private const POLA_WAKTU = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/';
+    private const TIMESTAMP_PATTERN = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/';
 
     public function __construct(
-        private readonly MoneyPrecision $presisi,
-        private readonly PostingSettings $setelan,
+        private readonly MoneyPrecision $precision,
+        private readonly PostingSettings $settings,
         private readonly BusinessUnitResolver $businessUnits,
-        private readonly PostingAccountResolvers $pemetaAkun,
-        private readonly TenantRunner $pelaksana,
+        private readonly PostingAccountResolvers $accountMapper,
+        private readonly TenantRunner $runner,
     ) {}
 
     /**
@@ -77,26 +77,26 @@ final class PostingPublisher
             throw new LogicException('PostingFeed::publish harus dipanggil di dalam transaksi dokumen sumbernya.');
         }
 
-        $ada = $this->existing($input);
-        $masukan = $this->normalize($input, $ada?->currency_decimals);
-        if ($ada !== null) {
-            return $this->hasilYangAda($ada, $masukan);
+        $exists = $this->existing($input);
+        $postingInput = $this->normalize($input, $exists?->currency_decimals);
+        if ($exists !== null) {
+            return $this->existingResult($exists, $postingInput);
         }
 
-        $nilai = $this->evaluate($masukan, now()->toIso8601String());
+        $value = $this->evaluate($postingInput, now()->toIso8601String());
 
         try {
             // SAVEPOINT di dalam transaksi pemanggil: bentrokan `posting_id` dari permintaan lain
             // tidak boleh membatalkan transaksi dokumennya (PostgreSQL membatalkan seluruhnya).
-            $posting = DB::transaction(fn (): FinancePosting => $this->simpan($input, $masukan, $nilai));
+            $posting = DB::transaction(fn (): FinancePosting => $this->store($input, $postingInput, $value));
         } catch (UniqueConstraintViolationException) {
-            $ada = $this->cari($masukan->tenantId, $masukan->postingId)
-                ?? throw new RuntimeException('Posting '.$masukan->postingId.' bentrok tetapi tidak ditemukan.');
+            $exists = $this->find($postingInput->tenantId, $postingInput->postingId)
+                ?? throw new RuntimeException('Posting '.$postingInput->postingId.' bentrok tetapi tidak ditemukan.');
 
-            return $this->hasilYangAda($ada, $masukan);
+            return $this->existingResult($exists, $postingInput);
         }
 
-        return $this->hasil($posting, true);
+        return $this->result($posting, true);
     }
 
     /**
@@ -105,19 +105,19 @@ final class PostingPublisher
      */
     public function preview(array $input): array
     {
-        $ada = $this->existing($input);
-        $masukan = $this->normalize($input, $ada?->currency_decimals);
-        if ($ada !== null) {
-            return $this->hasilYangAda($ada, $masukan);
+        $exists = $this->existing($input);
+        $postingInput = $this->normalize($input, $exists?->currency_decimals);
+        if ($exists !== null) {
+            return $this->existingResult($exists, $postingInput);
         }
 
-        $nilai = $this->evaluate($masukan, now()->toIso8601String());
+        $value = $this->evaluate($postingInput, now()->toIso8601String());
 
         return [
-            'posting_id' => $masukan->postingId,
-            'status' => $nilai['status'],
-            'problems' => $nilai['status'] === FinancePosting::HELD ? $nilai['problems'] : [],
-            'payload' => $nilai['payload'],
+            'posting_id' => $postingInput->postingId,
+            'status' => $value['status'],
+            'problems' => $value['status'] === FinancePosting::HELD ? $value['problems'] : [],
+            'payload' => $value['payload'],
             'created' => false,
         ];
     }
@@ -127,7 +127,7 @@ final class PostingPublisher
      */
     public function status(string $tenantId, string $postingId): ?array
     {
-        $posting = $this->cari($tenantId, $postingId);
+        $posting = $this->find($tenantId, $postingId);
 
         return $posting === null ? null : [
             'posting_id' => $posting->posting_id,
@@ -152,7 +152,7 @@ final class PostingPublisher
             return $posting;
         }
 
-        return $this->terapkanUlang($posting, 'revalidated', $userId);
+        return $this->reapply($posting, 'revalidated', $userId);
     }
 
     /**
@@ -165,20 +165,20 @@ final class PostingPublisher
      * yang memutuskan, dan layar pantau memperingatkan bahwa pembaca mungkin sudah membukukannya.
      * Ack yang tiba sesudahnya dijawab konflik oleh `PostingAcknowledger`.
      *
-     * @throws StatusPostingBerubah Status posting tidak lagi mengizinkannya.
+     * @throws PostingStatusChanged Status posting tidak lagi mengizinkannya.
      */
     public function markManual(FinancePosting $posting, string $reason, int $userId): FinancePosting
     {
         return DB::transaction(function () use ($posting, $reason, $userId): FinancePosting {
-            $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
-            if (! in_array($terkunci->status, FinancePosting::MARKABLE_MANUAL, true)) {
-                throw new StatusPostingBerubah(sprintf('Posting %s berstatus %s dan tidak dapat ditandai manual.', $terkunci->posting_id, $terkunci->status));
+            $locked = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
+            if (! in_array($locked->status, FinancePosting::MARKABLE_MANUAL, true)) {
+                throw new PostingStatusChanged(sprintf('Posting %s berstatus %s dan tidak dapat ditandai manual.', $locked->posting_id, $locked->status));
             }
-            $dari = $terkunci->status;
-            $terkunci->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_USER, 'hold_reasons' => null])->save();
-            FinancePostingEvent::catat($terkunci, 'marked_manual', $dari, FinancePosting::MANUAL, userId: $userId, data: ['reason' => $reason]);
+            $from = $locked->status;
+            $locked->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_USER, 'hold_reasons' => null])->save();
+            FinancePostingEvent::record($locked, 'marked_manual', $from, FinancePosting::MANUAL, userId: $userId, data: ['reason' => $reason]);
 
-            return $terkunci;
+            return $locked;
         });
     }
 
@@ -192,10 +192,10 @@ final class PostingPublisher
      */
     public function reevaluateCutover(string $tenantId, string $legalEntityId, ?int $userId = null): int
     {
-        $setelan = $this->setelan->setting($legalEntityId);
-        $aktif = $setelan !== null && $setelan->enabled;
-        $cutover = $setelan?->cutover_date?->toDateString();
-        $berubah = 0;
+        $settings = $this->settings->setting($legalEntityId);
+        $active = $settings !== null && $settings->enabled;
+        $cutover = $settings?->cutover_date?->toDateString();
+        $changed = 0;
 
         FinancePosting::query()
             ->where('tenant_id', $tenantId)
@@ -207,37 +207,37 @@ final class PostingPublisher
                 ->orWhere(fn ($inner) => $inner->where('status', FinancePosting::PENDING)
                     ->where('served_count', 0)
                     ->whereDoesntHave('deliveries')))
-            ->chunkById(200, function ($postings) use ($aktif, $cutover, $userId, &$berubah): void {
+            ->chunkById(200, function ($postings) use ($active, $cutover, $userId, &$changed): void {
                 foreach ($postings as $posting) {
                     /** @var FinancePosting $posting */
-                    $alasan = ! $aktif
+                    $reason = ! $active
                         ? FinancePosting::MANUAL_FEED_DISABLED
                         : ($cutover !== null && $posting->posting_date->toDateString() < $cutover ? FinancePosting::MANUAL_BEFORE_CUTOVER : null);
 
-                    if ($alasan !== null) {
-                        if ($posting->status !== FinancePosting::MANUAL || $posting->manual_reason !== $alasan) {
-                            $this->jadikanManual($posting, $alasan, $userId);
-                            $berubah++;
+                    if ($reason !== null) {
+                        if ($posting->status !== FinancePosting::MANUAL || $posting->manual_reason !== $reason) {
+                            $this->makeManual($posting, $reason, $userId);
+                            $changed++;
                         }
 
                         continue;
                     }
 
                     if ($posting->status !== FinancePosting::PENDING) {
-                        $sebelum = $posting->status;
+                        $before = $posting->status;
                         try {
-                            $berubah += $this->terapkanUlang($posting, 'cutover_reevaluated', $userId)->status !== $sebelum ? 1 : 0;
-                        } catch (InvalidPosting $kegagalan) {
+                            $changed += $this->reapply($posting, 'cutover_reevaluated', $userId)->status !== $before ? 1 : 0;
+                        } catch (InvalidPosting $failure) {
                             // Setelan entitasnya sudah tersimpan. Posting yang tidak dapat dibentuk
                             // ulang, misalnya karena vendornya sudah diarsipkan, tetap di statusnya
                             // dan tampil di layar pantau; posting lain tetap dinilai ulang.
-                            report($kegagalan);
+                            report($failure);
                         }
                     }
                 }
             });
 
-        return $berubah;
+        return $changed;
     }
 
     /**
@@ -249,124 +249,124 @@ final class PostingPublisher
      */
     public function normalize(array $input, ?int $amountDecimals = null): PostingInput
     {
-        $tenant = $this->wajib($input, 'tenant_id', 26);
-        $postingId = $this->wajib($input, 'posting_id', 120);
-        if (preg_match(self::POLA_POSTING_ID, $postingId) !== 1) {
+        $tenant = $this->requiredText($input, 'tenant_id', 26);
+        $postingId = $this->requiredText($input, 'posting_id', 120);
+        if (preg_match(self::POSTING_ID_PATTERN, $postingId) !== 1) {
             throw new InvalidPosting('posting_id hanya boleh huruf, angka, titik, titik dua, garis bawah, dan strip.');
         }
-        $jenis = $this->wajib($input, 'posting_type', 80);
-        if (preg_match(self::POLA_JENIS, $jenis) !== 1) {
-            throw new InvalidPosting(sprintf('posting_type "%s" harus berbentuk modul.jenis, misalnya asset.acquisition.', $jenis));
+        $type = $this->requiredText($input, 'posting_type', 80);
+        if (preg_match(self::POSTING_TYPE_PATTERN, $type) !== 1) {
+            throw new InvalidPosting(sprintf('posting_type "%s" harus berbentuk modul.jenis, misalnya asset.acquisition.', $type));
         }
 
-        $legalEntityId = $this->wajib($input, 'legal_entity_id', 26);
-        $entitas = Organization::query()
+        $legalEntityId = $this->requiredText($input, 'legal_entity_id', 26);
+        $legalEntity = Organization::query()
             ->where('tenant_id', $tenant)
             ->where('classification', 'legal_entity')
             ->find($legalEntityId);
-        if ($entitas === null) {
+        if ($legalEntity === null) {
             throw new InvalidPosting('legal_entity_id bukan entitas legal milik tenant ini.');
         }
-        $kodeEntitas = LegalEntity::query()->where('organization_id', $entitas->id)->value('company_code');
+        $legalEntityCode = LegalEntity::query()->where('organization_id', $legalEntity->id)->value('company_code');
 
-        $mataUang = strtoupper($this->wajib($input, 'currency_code', 3));
-        if (preg_match('/^[A-Z]{3}$/', $mataUang) !== 1) {
+        $currency = strtoupper($this->requiredText($input, 'currency_code', 3));
+        if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
             throw new InvalidPosting('currency_code harus kode ISO 4217 tiga huruf.');
         }
         try {
-            $desimal = $amountDecimals ?? $this->presisi->amountDecimals($tenant, $mataUang);
-        } catch (RuntimeException $kegagalan) {
-            throw new InvalidPosting($kegagalan->getMessage(), 0, $kegagalan);
+            $decimals = $amountDecimals ?? $this->precision->amountDecimals($tenant, $currency);
+        } catch (RuntimeException $failure) {
+            throw new InvalidPosting($failure->getMessage(), 0, $failure);
         }
 
-        $tanggalPosting = $this->tanggal($input, 'posting_date');
-        $tanggalDokumen = $this->tanggal($input, 'document_date');
-        $terjadi = $this->wajib($input, 'occurred_at', 40);
-        if (preg_match(self::POLA_WAKTU, $terjadi) !== 1) {
+        $postingDate = $this->date($input, 'posting_date');
+        $documentDate = $this->date($input, 'document_date');
+        $occurred = $this->requiredText($input, 'occurred_at', 40);
+        if (preg_match(self::TIMESTAMP_PATTERN, $occurred) !== 1) {
             throw new InvalidPosting('occurred_at harus waktu ISO 8601 lengkap dengan offset zona waktu, misalnya 2026-09-28T23:50:00+07:00.');
         }
-        $terjadi = Carbon::parse($terjadi)->toIso8601String();
+        $occurred = Carbon::parse($occurred)->toIso8601String();
 
-        $sumber = $input['source_document'] ?? null;
-        if (! is_array($sumber)) {
+        $source = $input['source_document'] ?? null;
+        if (! is_array($source)) {
             throw new InvalidPosting('source_document wajib diisi.');
         }
-        $dokumen = [
-            'module' => $this->wajib($sumber, 'module', 80, 'source_document.module'),
-            'type' => $this->wajib($sumber, 'type', 80, 'source_document.type'),
-            'number' => $this->teks($sumber, 'number', 80, false, 'source_document.number'),
-            'description' => $this->teks($sumber, 'description', 255, false, 'source_document.description'),
-            'id' => $this->teks($sumber, 'id', 64, false, 'source_document.id'),
-            'url' => $this->tautanDokumen($sumber),
+        $document = [
+            'module' => $this->requiredText($source, 'module', 80, 'source_document.module'),
+            'type' => $this->requiredText($source, 'type', 80, 'source_document.type'),
+            'number' => $this->text($source, 'number', 80, false, 'source_document.number'),
+            'description' => $this->text($source, 'description', 255, false, 'source_document.description'),
+            'id' => $this->text($source, 'id', 64, false, 'source_document.id'),
+            'url' => $this->documentLink($source),
         ];
 
-        $membalik = $this->teks($input, 'reverses_posting_id', 120, false);
-        $mengoreksi = $this->teks($input, 'adjusts_posting_id', 120, false);
-        if ($membalik !== null && $mengoreksi !== null) {
+        $reverses = $this->text($input, 'reverses_posting_id', 120, false);
+        $corrects = $this->text($input, 'adjusts_posting_id', 120, false);
+        if ($reverses !== null && $corrects !== null) {
             throw new InvalidPosting('Satu posting hanya boleh membalik atau mengoreksi satu posting lain, tidak keduanya.');
         }
-        $mode = $this->teks($input, 'settlement_mode', 20, false);
+        $mode = $this->text($input, 'settlement_mode', 20, false);
         if ($mode !== null && ! in_array($mode, FinanceSettlementMode::MODES, true)) {
             throw new InvalidPosting(sprintf('settlement_mode "%s" tidak dikenal.', $mode));
         }
-        $asal = $membalik ?? $mengoreksi;
-        if ($asal !== null) {
-            $induk = $this->cari($tenant, $asal);
-            if ($induk === null || $induk->legal_entity_id !== $entitas->id) {
-                throw new InvalidPosting(sprintf('Posting asal %s tidak ditemukan di entitas legal ini.', $asal));
+        $origin = $reverses ?? $corrects;
+        if ($origin !== null) {
+            $parent = $this->find($tenant, $origin);
+            if ($parent === null || $parent->legal_entity_id !== $legalEntity->id) {
+                throw new InvalidPosting(sprintf('Posting asal %s tidak ditemukan di entitas legal ini.', $origin));
             }
             // K-10: koreksi selalu mewarisi mode posting aslinya, walaupun setelan entitas sudah
             // berganti, supaya koreksi masuk ke akun yang sama dengan jurnal aslinya.
             if ($mode === null) {
-                $mode = $induk->settlement_mode;
-            } elseif ($induk->settlement_mode !== null && $induk->settlement_mode !== $mode) {
-                throw new InvalidPosting(sprintf('Koreksi atas %s harus memakai mode %s, sama dengan posting aslinya.', $asal, $induk->settlement_mode));
+                $mode = $parent->settlement_mode;
+            } elseif ($parent->settlement_mode !== null && $parent->settlement_mode !== $mode) {
+                throw new InvalidPosting(sprintf('Koreksi atas %s harus memakai mode %s, sama dengan posting aslinya.', $origin, $parent->settlement_mode));
             }
         }
 
         $vendor = null;
-        $vendorId = $this->teks($input, 'vendor_id', 26, false);
+        $vendorId = $this->text($input, 'vendor_id', 26, false);
         if ($vendorId !== null) {
-            $baris = Vendor::query()->with('party:id,name')->where('tenant_id', $tenant)->find($vendorId);
-            if ($baris === null || $baris->legal_entity_id !== $entitas->id) {
+            $vendorRow = Vendor::query()->with('party:id,name')->where('tenant_id', $tenant)->find($vendorId);
+            if ($vendorRow === null || $vendorRow->legal_entity_id !== $legalEntity->id) {
                 throw new InvalidPosting('vendor_id bukan vendor entitas legal ini.');
             }
-            $vendor = ['id' => $baris->id, 'number' => $baris->number, 'name' => (string) $baris->party->name];
+            $vendor = ['id' => $vendorRow->id, 'number' => $vendorRow->number, 'name' => (string) $vendorRow->party->name];
         } elseif (($input['requires_vendor'] ?? false) === true) {
             throw new InvalidPosting('Posting ini wajib membawa vendor: perolehan lewat pembelian dengan mode direct_payable.');
         }
 
-        [$baris, $total] = $this->barisJurnal($input['lines'] ?? null, $desimal);
+        [$lines, $total] = $this->journalLines($input['lines'] ?? null, $decimals);
 
-        $rincian = $input['details'] ?? [];
-        if (! is_array($rincian) || ($rincian !== [] && array_is_list($rincian))) {
+        $details = $input['details'] ?? [];
+        if (! is_array($details) || ($details !== [] && array_is_list($details))) {
             throw new InvalidPosting('details harus objek (array berkunci), bukan daftar.');
         }
-        /** @var array<string, mixed> $rincian */
+        /** @var array<string, mixed> $details */
         $hash = hash('sha256', (string) json_encode([
-            $jenis, $entitas->id, $mataUang, $tanggalPosting, $tanggalDokumen, $mode, $vendorId, $membalik, $mengoreksi,
-            array_map(static fn (array $line): array => [$line['account_id'], $line['debit'], $line['credit'], $line['org_unit_id']], $baris),
+            $type, $legalEntity->id, $currency, $postingDate, $documentDate, $mode, $vendorId, $reverses, $corrects,
+            array_map(static fn (array $line): array => [$line['account_id'], $line['debit'], $line['credit'], $line['org_unit_id']], $lines),
         ], JSON_THROW_ON_ERROR));
 
         return new PostingInput(
             tenantId: $tenant,
             postingId: $postingId,
-            postingType: $jenis,
-            legalEntityId: $entitas->id,
-            legalEntityCode: is_string($kodeEntitas) ? $kodeEntitas : null,
-            currencyCode: $mataUang,
-            decimals: $desimal,
-            postingDate: $tanggalPosting,
-            documentDate: $tanggalDokumen,
-            occurredAt: $terjadi,
+            postingType: $type,
+            legalEntityId: $legalEntity->id,
+            legalEntityCode: is_string($legalEntityCode) ? $legalEntityCode : null,
+            currencyCode: $currency,
+            decimals: $decimals,
+            postingDate: $postingDate,
+            documentDate: $documentDate,
+            occurredAt: $occurred,
             settlementMode: $mode,
             vendor: $vendor,
-            vendorInvoiceReference: $this->teks($input, 'vendor_invoice_reference', 80, false),
-            sourceDocument: $dokumen,
-            reversesPostingId: $membalik,
-            adjustsPostingId: $mengoreksi,
-            lines: $baris,
-            details: $rincian,
+            vendorInvoiceReference: $this->text($input, 'vendor_invoice_reference', 80, false),
+            sourceDocument: $document,
+            reversesPostingId: $reverses,
+            adjustsPostingId: $corrects,
+            lines: $lines,
+            details: $details,
             total: $total,
             hash: $hash,
         );
@@ -375,25 +375,25 @@ final class PostingPublisher
     /**
      * @return array{status: string, manual_reason: ?string, problems: list<array<string, mixed>>, payload: array<string, mixed>, lines: list<array<string, mixed>>}
      */
-    private function evaluate(PostingInput $masukan, string $terbit): array
+    private function evaluate(PostingInput $postingInput, string $publishedAt): array
     {
-        $bentuk = $this->bentuk($masukan, $terbit);
-        $setelan = $this->setelan->setting($masukan->legalEntityId);
-        $cutover = $setelan?->cutover_date?->toDateString();
+        $shape = $this->shape($postingInput, $publishedAt);
+        $settings = $this->settings->setting($postingInput->legalEntityId);
+        $cutover = $settings?->cutover_date?->toDateString();
 
-        [$status, $alasan] = match (true) {
-            $setelan === null || ! $setelan->enabled => [FinancePosting::MANUAL, FinancePosting::MANUAL_FEED_DISABLED],
-            $cutover !== null && $masukan->postingDate < $cutover => [FinancePosting::MANUAL, FinancePosting::MANUAL_BEFORE_CUTOVER],
-            $bentuk['problems'] !== [] => [FinancePosting::HELD, null],
+        [$status, $reason] = match (true) {
+            $settings === null || ! $settings->enabled => [FinancePosting::MANUAL, FinancePosting::MANUAL_FEED_DISABLED],
+            $cutover !== null && $postingInput->postingDate < $cutover => [FinancePosting::MANUAL, FinancePosting::MANUAL_BEFORE_CUTOVER],
+            $shape['problems'] !== [] => [FinancePosting::HELD, null],
             default => [FinancePosting::PENDING, null],
         };
 
         return [
             'status' => $status,
-            'manual_reason' => $alasan,
-            'problems' => $bentuk['problems'],
-            'payload' => $bentuk['payload'],
-            'lines' => $bentuk['lines'],
+            'manual_reason' => $reason,
+            'problems' => $shape['problems'],
+            'payload' => $shape['payload'],
+            'lines' => $shape['lines'],
         ];
     }
 
@@ -402,204 +402,204 @@ final class PostingPublisher
      *
      * @return array{payload: array<string, mixed>, problems: list<array<string, mixed>>, lines: list<array<string, mixed>>}
      */
-    private function bentuk(PostingInput $masukan, string $terbit): array
+    private function shape(PostingInput $postingInput, string $publishedAt): array
     {
-        $idAkun = array_values(array_unique(array_filter(array_column($masukan->lines, 'account_id'))));
-        $akun = FinanceReferenceAccount::query()
-            ->where('tenant_id', $masukan->tenantId)
-            ->whereIn('id', $idAkun)
+        $accountIds = array_values(array_unique(array_filter(array_column($postingInput->lines, 'account_id'))));
+        $account = FinanceReferenceAccount::query()
+            ->where('tenant_id', $postingInput->tenantId)
+            ->whereIn('id', $accountIds)
             ->get()
             ->keyBy('id');
-        $idUnit = array_values(array_unique(array_filter(array_column($masukan->lines, 'org_unit_id'))));
+        $unitIds = array_values(array_unique(array_filter(array_column($postingInput->lines, 'org_unit_id'))));
         $unit = DB::table('organizations')
             ->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')
-            ->where('organizations.tenant_id', $masukan->tenantId)
-            ->whereIn('organizations.id', $idUnit)
+            ->where('organizations.tenant_id', $postingInput->tenantId)
+            ->whereIn('organizations.id', $unitIds)
             ->get(['organizations.id', 'organizations.name', 'organizations.classification', 'unit.type', 'unit.number'])
             ->keyBy('id');
-        $businessUnit = $this->businessUnits->resolve($masukan->tenantId, $idUnit, $masukan->postingDate);
+        $businessUnit = $this->businessUnits->resolve($postingInput->tenantId, $unitIds, $postingInput->postingDate);
 
-        $masalah = [];
-        $barisPayload = [];
-        $barisTabel = [];
-        foreach ($masukan->lines as $line) {
+        $issues = [];
+        $payloadLines = [];
+        $tableLines = [];
+        foreach ($postingInput->lines as $line) {
             $no = $line['line_no'];
             $label = $line['mapping']['label'] ?? 'Baris '.$no;
-            $perbaikanPemetaan = ($line['mapping']['fix_url'] ?? null) !== null
+            $mappingFix = ($line['mapping']['fix_url'] ?? null) !== null
                 ? ['label' => 'Buka pemetaan akun', 'url' => $line['mapping']['fix_url']]
                 : null;
 
-            /** @var FinanceReferenceAccount|null $akunBaris */
-            $akunBaris = $line['account_id'] === null ? null : $akun->get($line['account_id']);
+            /** @var FinanceReferenceAccount|null $lineAccount */
+            $lineAccount = $line['account_id'] === null ? null : $account->get($line['account_id']);
             if ($line['account_id'] === null) {
-                $masalah[] = $this->masalah($no, 'ACCOUNT_NOT_MAPPED', $label.' belum dipetakan ke akun.', null, $perbaikanPemetaan);
-            } elseif ($akunBaris === null) {
-                $masalah[] = $this->masalah($no, 'ACCOUNT_UNKNOWN', $label.' menunjuk akun yang tidak ada di daftar akun.', ['type' => 'account', 'id' => $line['account_id'], 'label' => $label], $perbaikanPemetaan);
-            } elseif (! $akunBaris->active) {
-                $masalah[] = $this->masalah($no, 'ACCOUNT_INACTIVE', sprintf('Akun %s %s nonaktif.', $akunBaris->code, $akunBaris->name), $this->objekAkun($akunBaris), $perbaikanPemetaan ?? $this->perbaikanAkun($akunBaris));
-            } elseif ($akunBaris->legal_entity_id !== null && $akunBaris->legal_entity_id !== $masukan->legalEntityId) {
-                $masalah[] = $this->masalah($no, 'ACCOUNT_OTHER_LEGAL_ENTITY', sprintf('Akun %s %s khusus entitas legal lain.', $akunBaris->code, $akunBaris->name), $this->objekAkun($akunBaris), $perbaikanPemetaan);
+                $issues[] = $this->issue($no, 'ACCOUNT_NOT_MAPPED', $label.' belum dipetakan ke akun.', null, $mappingFix);
+            } elseif ($lineAccount === null) {
+                $issues[] = $this->issue($no, 'ACCOUNT_UNKNOWN', $label.' menunjuk akun yang tidak ada di daftar akun.', ['type' => 'account', 'id' => $line['account_id'], 'label' => $label], $mappingFix);
+            } elseif (! $lineAccount->active) {
+                $issues[] = $this->issue($no, 'ACCOUNT_INACTIVE', sprintf('Akun %s %s nonaktif.', $lineAccount->code, $lineAccount->name), $this->accountObject($lineAccount), $mappingFix ?? $this->accountFix($lineAccount));
+            } elseif ($lineAccount->legal_entity_id !== null && $lineAccount->legal_entity_id !== $postingInput->legalEntityId) {
+                $issues[] = $this->issue($no, 'ACCOUNT_OTHER_LEGAL_ENTITY', sprintf('Akun %s %s khusus entitas legal lain.', $lineAccount->code, $lineAccount->name), $this->accountObject($lineAccount), $mappingFix);
             }
 
             // K-09: akun neraca hanya membawa business unit; akun laba rugi juga department.
-            $perluDepartemen = $akunBaris !== null && $akunBaris->type === FinanceReferenceAccount::PROFIT_LOSS;
-            $dimensi = [];
-            $kodeBu = null;
-            $kodeDepartemen = null;
-            $unitBaris = $line['org_unit_id'] === null ? null : $unit->get($line['org_unit_id']);
+            $needsDepartment = $lineAccount !== null && $lineAccount->type === FinanceReferenceAccount::PROFIT_LOSS;
+            $dimensions = [];
+            $businessUnitCode = null;
+            $departmentCode = null;
+            $lineUnit = $line['org_unit_id'] === null ? null : $unit->get($line['org_unit_id']);
             if ($line['org_unit_id'] === null) {
-                $masalah[] = $this->masalah($no, 'DIMENSION_SOURCE_MISSING', 'Baris ini tidak menyebut unit organisasi, jadi dimensinya tidak dapat dibentuk.', null, null);
-            } elseif ($unitBaris === null || $unitBaris->classification !== 'operating_unit') {
-                $masalah[] = $this->masalah($no, 'ORG_UNIT_UNKNOWN', 'Unit organisasi baris ini tidak ditemukan.', ['type' => 'organization', 'id' => $line['org_unit_id'], 'label' => $line['org_unit_id']], null);
+                $issues[] = $this->issue($no, 'DIMENSION_SOURCE_MISSING', 'Baris ini tidak menyebut unit organisasi, jadi dimensinya tidak dapat dibentuk.', null, null);
+            } elseif ($lineUnit === null || $lineUnit->classification !== 'operating_unit') {
+                $issues[] = $this->issue($no, 'ORG_UNIT_UNKNOWN', 'Unit organisasi baris ini tidak ditemukan.', ['type' => 'organization', 'id' => $line['org_unit_id'], 'label' => $line['org_unit_id']], null);
             } else {
-                $namaUnit = (string) $unitBaris->name;
+                $unitName = (string) $lineUnit->name;
                 $bu = $businessUnit[$line['org_unit_id']] ?? null;
                 if ($bu === null) {
-                    $masalah[] = $this->masalah($no, 'BUSINESS_UNIT_UNRESOLVED', sprintf('%s tidak berada di bawah tepat satu business unit pada hierarki manajemen yang berlaku %s.', $namaUnit, $masukan->postingDate), $this->objekUnit($line['org_unit_id'], $namaUnit), ['label' => 'Buka hierarki organisasi', 'url' => '/settings/organization?section=hierarchies']);
+                    $issues[] = $this->issue($no, 'BUSINESS_UNIT_UNRESOLVED', sprintf('%s tidak berada di bawah tepat satu business unit pada hierarki manajemen yang berlaku %s.', $unitName, $postingInput->postingDate), $this->unitObject($line['org_unit_id'], $unitName), ['label' => 'Buka hierarki organisasi', 'url' => '/settings/organization?section=hierarchies']);
                 } elseif ($bu['number'] === null) {
-                    $masalah[] = $this->masalah($no, 'BUSINESS_UNIT_NUMBER_MISSING', sprintf('%s belum punya nomor unit.', $bu['name']), $this->objekUnit($bu['id'], $bu['name']), ['label' => 'Buka organisasi', 'url' => '/settings/organization?section=operating-units']);
+                    $issues[] = $this->issue($no, 'BUSINESS_UNIT_NUMBER_MISSING', sprintf('%s belum punya nomor unit.', $bu['name']), $this->unitObject($bu['id'], $bu['name']), ['label' => 'Buka organisasi', 'url' => '/settings/organization?section=operating-units']);
                 } else {
-                    $kodeBu = $bu['number'];
-                    $dimensi[] = $this->dimensi('BUSINESS_UNIT', 'Business unit', $bu['number'], $bu['name'], $bu['id']);
+                    $businessUnitCode = $bu['number'];
+                    $dimensions[] = $this->dimension('BUSINESS_UNIT', 'Business unit', $bu['number'], $bu['name'], $bu['id']);
                 }
 
-                if ($perluDepartemen) {
-                    if ($unitBaris->type !== 'department') {
-                        $masalah[] = $this->masalah($no, 'DEPARTMENT_REQUIRED', sprintf('Akun laba rugi %s membutuhkan department, tetapi %s bukan department.', $akunBaris->code, $namaUnit), $this->objekUnit($line['org_unit_id'], $namaUnit), null);
-                    } elseif ($unitBaris->number === null) {
-                        $masalah[] = $this->masalah($no, 'DEPARTMENT_NUMBER_MISSING', sprintf('%s belum punya nomor unit.', $namaUnit), $this->objekUnit($line['org_unit_id'], $namaUnit), ['label' => 'Buka organisasi', 'url' => '/settings/organization?section=operating-units']);
+                if ($needsDepartment) {
+                    if ($lineUnit->type !== 'department') {
+                        $issues[] = $this->issue($no, 'DEPARTMENT_REQUIRED', sprintf('Akun laba rugi %s membutuhkan department, tetapi %s bukan department.', $lineAccount->code, $unitName), $this->unitObject($line['org_unit_id'], $unitName), null);
+                    } elseif ($lineUnit->number === null) {
+                        $issues[] = $this->issue($no, 'DEPARTMENT_NUMBER_MISSING', sprintf('%s belum punya nomor unit.', $unitName), $this->unitObject($line['org_unit_id'], $unitName), ['label' => 'Buka organisasi', 'url' => '/settings/organization?section=operating-units']);
                     } else {
-                        $kodeDepartemen = (string) $unitBaris->number;
-                        $dimensi[] = $this->dimensi('DEPARTMENT', 'Department', $kodeDepartemen, $namaUnit, $line['org_unit_id']);
+                        $departmentCode = (string) $lineUnit->number;
+                        $dimensions[] = $this->dimension('DEPARTMENT', 'Department', $departmentCode, $unitName, $line['org_unit_id']);
                     }
                 }
             }
 
-            $barisPayload[] = [
+            $payloadLines[] = [
                 'line_no' => $no,
-                'account' => $akunBaris === null ? null : [
-                    'external_id' => $akunBaris->external_id,
-                    'code' => $akunBaris->code,
-                    'name' => $akunBaris->name,
+                'account' => $lineAccount === null ? null : [
+                    'external_id' => $lineAccount->external_id,
+                    'code' => $lineAccount->code,
+                    'name' => $lineAccount->name,
                 ],
                 'debit' => $line['debit'],
                 'credit' => $line['credit'],
                 'description' => $line['description'],
-                'financial_dimensions' => $dimensi,
+                'financial_dimensions' => $dimensions,
             ];
-            $barisTabel[] = [
+            $tableLines[] = [
                 'line_no' => $no,
-                'account_id' => $akunBaris?->id,
-                'account_external_id' => $akunBaris?->external_id,
-                'account_code' => $akunBaris?->code,
+                'account_id' => $lineAccount?->id,
+                'account_external_id' => $lineAccount?->external_id,
+                'account_code' => $lineAccount?->code,
                 'debit' => $line['debit'],
                 'credit' => $line['credit'],
                 'description' => $line['description'],
                 'org_unit_id' => $line['org_unit_id'],
-                'business_unit_code' => $kodeBu,
-                'department_code' => $kodeDepartemen,
+                'business_unit_code' => $businessUnitCode,
+                'department_code' => $departmentCode,
             ];
         }
 
         $payload = [
             'contract_version' => self::CONTRACT_VERSION,
-            'posting_id' => $masukan->postingId,
-            'posting_type' => $masukan->postingType,
-            'settlement_mode' => $masukan->settlementMode,
-            'legal_entity' => ['id' => $masukan->legalEntityId, 'code' => $masukan->legalEntityCode],
-            'currency' => ['code' => $masukan->currencyCode, 'decimals' => $masukan->decimals],
-            'posting_date' => $masukan->postingDate,
-            'document_date' => $masukan->documentDate,
-            'occurred_at' => $masukan->occurredAt,
-            'published_at' => $terbit,
+            'posting_id' => $postingInput->postingId,
+            'posting_type' => $postingInput->postingType,
+            'settlement_mode' => $postingInput->settlementMode,
+            'legal_entity' => ['id' => $postingInput->legalEntityId, 'code' => $postingInput->legalEntityCode],
+            'currency' => ['code' => $postingInput->currencyCode, 'decimals' => $postingInput->decimals],
+            'posting_date' => $postingInput->postingDate,
+            'document_date' => $postingInput->documentDate,
+            'occurred_at' => $postingInput->occurredAt,
+            'published_at' => $publishedAt,
             'source_document' => [
-                'module' => $masukan->sourceDocument['module'],
-                'type' => $masukan->sourceDocument['type'],
-                'number' => $masukan->sourceDocument['number'],
-                'description' => $masukan->sourceDocument['description'],
+                'module' => $postingInput->sourceDocument['module'],
+                'type' => $postingInput->sourceDocument['type'],
+                'number' => $postingInput->sourceDocument['number'],
+                'description' => $postingInput->sourceDocument['description'],
             ],
-            'vendor' => $masukan->vendor,
-            'vendor_invoice_reference' => $masukan->vendorInvoiceReference,
-            'journal_lines' => $barisPayload,
-            'totals' => ['debit' => $masukan->total, 'credit' => $masukan->total],
-            'reverses_posting_id' => $masukan->reversesPostingId,
-            'adjusts_posting_id' => $masukan->adjustsPostingId,
-            'details' => $masukan->details,
+            'vendor' => $postingInput->vendor,
+            'vendor_invoice_reference' => $postingInput->vendorInvoiceReference,
+            'journal_lines' => $payloadLines,
+            'totals' => ['debit' => $postingInput->total, 'credit' => $postingInput->total],
+            'reverses_posting_id' => $postingInput->reversesPostingId,
+            'adjusts_posting_id' => $postingInput->adjustsPostingId,
+            'details' => $postingInput->details,
         ];
 
-        return ['payload' => $payload, 'problems' => $masalah, 'lines' => $barisTabel];
+        return ['payload' => $payload, 'problems' => $issues, 'lines' => $tableLines];
     }
 
     /**
      * @param  array<string, mixed>  $input
-     * @param  array{status: string, manual_reason: ?string, problems: list<array<string, mixed>>, payload: array<string, mixed>, lines: list<array<string, mixed>>}  $nilai
+     * @param  array{status: string, manual_reason: ?string, problems: list<array<string, mixed>>, payload: array<string, mixed>, lines: list<array<string, mixed>>}  $value
      */
-    private function simpan(array $input, PostingInput $masukan, array $nilai): FinancePosting
+    private function store(array $input, PostingInput $postingInput, array $value): FinancePosting
     {
         $posting = FinancePosting::query()->create([
-            'tenant_id' => $masukan->tenantId,
-            'legal_entity_id' => $masukan->legalEntityId,
-            'posting_id' => $masukan->postingId,
-            'posting_type' => $masukan->postingType,
+            'tenant_id' => $postingInput->tenantId,
+            'legal_entity_id' => $postingInput->legalEntityId,
+            'posting_id' => $postingInput->postingId,
+            'posting_type' => $postingInput->postingType,
             'contract_version' => self::CONTRACT_VERSION,
-            'source_module' => $masukan->sourceDocument['module'],
-            'source_type' => $masukan->sourceDocument['type'],
-            'source_number' => $masukan->sourceDocument['number'],
-            'source_id' => $masukan->sourceDocument['id'],
-            'currency_code' => $masukan->currencyCode,
-            'currency_decimals' => $masukan->decimals,
-            'posting_date' => $masukan->postingDate,
-            'document_date' => $masukan->documentDate,
+            'source_module' => $postingInput->sourceDocument['module'],
+            'source_type' => $postingInput->sourceDocument['type'],
+            'source_number' => $postingInput->sourceDocument['number'],
+            'source_id' => $postingInput->sourceDocument['id'],
+            'currency_code' => $postingInput->currencyCode,
+            'currency_decimals' => $postingInput->decimals,
+            'posting_date' => $postingInput->postingDate,
+            'document_date' => $postingInput->documentDate,
             // Kolomnya disimpan dalam zona aplikasi; payload tetap membawa offset aslinya.
-            'occurred_at' => Carbon::parse($masukan->occurredAt)->setTimezone((string) config('app.timezone')),
-            'published_at' => Carbon::parse((string) $nilai['payload']['published_at'])->setTimezone((string) config('app.timezone')),
-            'settlement_mode' => $masukan->settlementMode,
-            'status' => $nilai['status'],
-            'manual_reason' => $nilai['manual_reason'],
-            'hold_reasons' => $nilai['status'] === FinancePosting::HELD ? $nilai['problems'] : null,
-            'vendor_id' => $masukan->vendor['id'] ?? null,
-            'reverses_posting_id' => $masukan->reversesPostingId,
-            'adjusts_posting_id' => $masukan->adjustsPostingId,
-            'total_debit' => $masukan->total,
-            'total_credit' => $masukan->total,
-            'payload' => $nilai['payload'],
+            'occurred_at' => Carbon::parse($postingInput->occurredAt)->setTimezone((string) config('app.timezone')),
+            'published_at' => Carbon::parse((string) $value['payload']['published_at'])->setTimezone((string) config('app.timezone')),
+            'settlement_mode' => $postingInput->settlementMode,
+            'status' => $value['status'],
+            'manual_reason' => $value['manual_reason'],
+            'hold_reasons' => $value['status'] === FinancePosting::HELD ? $value['problems'] : null,
+            'vendor_id' => $postingInput->vendor['id'] ?? null,
+            'reverses_posting_id' => $postingInput->reversesPostingId,
+            'adjusts_posting_id' => $postingInput->adjustsPostingId,
+            'total_debit' => $postingInput->total,
+            'total_credit' => $postingInput->total,
+            'payload' => $value['payload'],
             'input' => $input,
-            'input_hash' => $masukan->hash,
+            'input_hash' => $postingInput->hash,
         ]);
-        $this->simpanBaris($posting, $nilai['lines']);
-        FinancePostingEvent::catat($posting, 'published', null, $posting->status, data: ['problems' => count($posting->hold_reasons ?? [])]);
+        $this->storeLines($posting, $value['lines']);
+        FinancePostingEvent::record($posting, 'published', null, $posting->status, data: ['problems' => count($posting->hold_reasons ?? [])]);
 
         return $posting;
     }
 
-    private function terapkanUlang(FinancePosting $posting, string $peristiwa, ?int $userId): FinancePosting
+    private function reapply(FinancePosting $posting, string $event, ?int $userId): FinancePosting
     {
-        $input = $this->akunTerkini($posting);
-        $masukan = $this->normalize($input, $posting->currency_decimals);
-        $nilai = $this->evaluate($masukan, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String()));
+        $input = $this->currentAccounts($posting);
+        $postingInput = $this->normalize($input, $posting->currency_decimals);
+        $value = $this->evaluate($postingInput, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String()));
 
-        return DB::transaction(function () use ($posting, $input, $masukan, $nilai, $peristiwa, $userId): FinancePosting {
-            $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
-            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci) || $this->markedByUser($terkunci)) {
-                return $terkunci;
+        return DB::transaction(function () use ($posting, $input, $postingInput, $value, $event, $userId): FinancePosting {
+            $locked = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
+            if (in_array($locked->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->alreadyDelivered($locked) || $this->markedByUser($locked)) {
+                return $locked;
             }
-            $dari = $terkunci->status;
-            $terkunci->fill([
-                'status' => $nilai['status'],
-                'manual_reason' => $nilai['manual_reason'],
-                'hold_reasons' => $nilai['status'] === FinancePosting::HELD ? $nilai['problems'] : null,
-                'payload' => $nilai['payload'],
+            $from = $locked->status;
+            $locked->fill([
+                'status' => $value['status'],
+                'manual_reason' => $value['manual_reason'],
+                'hold_reasons' => $value['status'] === FinancePosting::HELD ? $value['problems'] : null,
+                'payload' => $value['payload'],
                 // Akun yang dibaca ulang menjadi bagian masukan posting ini. Tanpa itu, module yang
                 // menerbitkan ulang dokumen yang sama dengan pemetaan terbaru akan ditolak sebagai
                 // "isi jurnal berbeda", padahal isinya persis yang sekarang tersimpan.
                 'input' => $input,
-                'input_hash' => $masukan->hash,
+                'input_hash' => $postingInput->hash,
             ])->save();
-            $terkunci->lines()->delete();
-            $this->simpanBaris($terkunci, $nilai['lines']);
-            FinancePostingEvent::catat($terkunci, $peristiwa, $dari, $terkunci->status, userId: $userId, data: ['problems' => count($terkunci->hold_reasons ?? [])]);
+            $locked->lines()->delete();
+            $this->storeLines($locked, $value['lines']);
+            FinancePostingEvent::record($locked, $event, $from, $locked->status, userId: $userId, data: ['problems' => count($locked->hold_reasons ?? [])]);
 
-            return $terkunci;
+            return $locked;
         });
     }
 
@@ -613,68 +613,68 @@ final class PostingPublisher
      *
      * @return array<string, mixed>
      */
-    private function akunTerkini(FinancePosting $posting): array
+    private function currentAccounts(FinancePosting $posting): array
     {
         $input = $posting->input;
-        $modul = $input['source_document']['module'] ?? null;
-        $pemeta = is_string($modul) ? $this->pemetaAkun->for($modul) : null;
-        $baris = $input['lines'] ?? null;
-        if ($pemeta === null || ! is_array($baris)) {
+        $module = $input['source_document']['module'] ?? null;
+        $mapper = is_string($module) ? $this->accountMapper->for($module) : null;
+        $lines = $input['lines'] ?? null;
+        if ($mapper === null || ! is_array($lines)) {
             return $input;
         }
 
-        $tanggal = $posting->posting_date->toDateString();
-        foreach ($baris as $indeks => $line) {
-            $kunci = is_array($line) ? ($line['mapping']['reference'] ?? null) : null;
-            if (! is_string($kunci) || $kunci === '') {
+        $date = $posting->posting_date->toDateString();
+        foreach ($lines as $index => $line) {
+            $key = is_array($line) ? ($line['mapping']['reference'] ?? null) : null;
+            if (! is_string($key) || $key === '') {
                 continue;
             }
             try {
-                $input['lines'][$indeks]['account_id'] = $this->pelaksana->runFor(
+                $input['lines'][$index]['account_id'] = $this->runner->runFor(
                     $posting->tenant_id,
-                    fn (): ?string => $pemeta->account($posting->tenant_id, $kunci, $tanggal),
+                    fn (): ?string => $mapper->account($posting->tenant_id, $key, $date),
                 );
-            } catch (Throwable $kegagalan) {
-                report($kegagalan);
+            } catch (Throwable $failure) {
+                report($failure);
             }
         }
 
         return $input;
     }
 
-    private function jadikanManual(FinancePosting $posting, string $alasan, ?int $userId): void
+    private function makeManual(FinancePosting $posting, string $reason, ?int $userId): void
     {
-        DB::transaction(function () use ($posting, $alasan, $userId): void {
-            $terkunci = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
-            if (in_array($terkunci->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->sudahSampai($terkunci) || $this->markedByUser($terkunci)) {
+        DB::transaction(function () use ($posting, $reason, $userId): void {
+            $locked = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);
+            if (in_array($locked->status, [FinancePosting::POSTED, FinancePosting::REJECTED], true) || $this->alreadyDelivered($locked) || $this->markedByUser($locked)) {
                 return;
             }
-            $dari = $terkunci->status;
-            $terkunci->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => $alasan, 'hold_reasons' => null])->save();
-            FinancePostingEvent::catat($terkunci, 'cutover_reevaluated', $dari, FinancePosting::MANUAL, userId: $userId, data: ['manual_reason' => $alasan]);
+            $from = $locked->status;
+            $locked->fill(['status' => FinancePosting::MANUAL, 'manual_reason' => $reason, 'hold_reasons' => null])->save();
+            FinancePostingEvent::record($locked, 'cutover_reevaluated', $from, FinancePosting::MANUAL, userId: $userId, data: ['manual_reason' => $reason]);
         });
     }
 
-    /** @param  list<array<string, mixed>>  $baris */
-    private function simpanBaris(FinancePosting $posting, array $baris): void
+    /** @param  list<array<string, mixed>>  $lines */
+    private function storeLines(FinancePosting $posting, array $lines): void
     {
-        $sekarang = now();
-        foreach (array_chunk($baris, 500) as $potongan) {
+        $now = now();
+        foreach (array_chunk($lines, 500) as $fragment) {
             FinancePostingLine::query()->insert(array_map(static fn (array $line): array => [
                 ...$line,
                 'id' => strtolower((string) Str::ulid()),
                 'tenant_id' => $posting->tenant_id,
                 'finance_posting_id' => $posting->id,
-                'created_at' => $sekarang,
-                'updated_at' => $sekarang,
-            ], $potongan));
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $fragment));
         }
     }
 
     /**
      * @return array{0: list<array{line_no: int, account_id: ?string, debit: string, credit: string, description: ?string, org_unit_id: ?string, mapping: ?array{label: string, fix_url: ?string}}>, 1: string}
      */
-    private function barisJurnal(mixed $lines, int $desimal): array
+    private function journalLines(mixed $lines, int $decimals): array
     {
         if (! is_array($lines) || ! array_is_list($lines) || count($lines) < 2) {
             throw new InvalidPosting('lines wajib berisi sedikitnya dua baris jurnal.');
@@ -684,119 +684,119 @@ final class PostingPublisher
         }
 
         $debit = BigDecimal::zero();
-        $kredit = BigDecimal::zero();
-        $hasil = [];
-        foreach ($lines as $indeks => $line) {
-            $no = $indeks + 1;
+        $credit = BigDecimal::zero();
+        $result = [];
+        foreach ($lines as $index => $line) {
+            $no = $index + 1;
             if (! is_array($line)) {
                 throw new InvalidPosting(sprintf('Baris %d bukan objek.', $no));
             }
-            $d = $this->uang($line['debit'] ?? '0', $desimal, sprintf('Baris %d debit', $no));
-            $k = $this->uang($line['credit'] ?? '0', $desimal, sprintf('Baris %d kredit', $no));
+            $d = $this->money($line['debit'] ?? '0', $decimals, sprintf('Baris %d debit', $no));
+            $k = $this->money($line['credit'] ?? '0', $decimals, sprintf('Baris %d kredit', $no));
             if (BigDecimal::of($d)->isZero() === BigDecimal::of($k)->isZero()) {
                 throw new InvalidPosting(sprintf('Baris %d harus berisi debit atau kredit, tepat salah satu.', $no));
             }
             $debit = $debit->plus($d);
-            $kredit = $kredit->plus($k);
+            $credit = $credit->plus($k);
 
             $mapping = $line['mapping'] ?? null;
             if (is_array($mapping)) {
                 // Kunci pemetaan hanya dipakai saat posting dibentuk ulang; di sini cukup dipastikan
                 // bentuknya, supaya masukan yang tersimpan tidak membawa sesuatu yang tidak terbaca.
-                $this->teks($mapping, 'reference', 200, false, sprintf('Baris %d mapping.reference', $no));
+                $this->text($mapping, 'reference', 200, false, sprintf('Baris %d mapping.reference', $no));
             }
-            $hasil[] = [
+            $result[] = [
                 'line_no' => $no,
-                'account_id' => $this->teks($line, 'account_id', 26, false, sprintf('Baris %d account_id', $no)),
+                'account_id' => $this->text($line, 'account_id', 26, false, sprintf('Baris %d account_id', $no)),
                 'debit' => $d,
                 'credit' => $k,
-                'description' => $this->teks($line, 'description', 255, false, sprintf('Baris %d description', $no)),
-                'org_unit_id' => $this->teks($line, 'org_unit_id', 26, false, sprintf('Baris %d org_unit_id', $no)),
+                'description' => $this->text($line, 'description', 255, false, sprintf('Baris %d description', $no)),
+                'org_unit_id' => $this->text($line, 'org_unit_id', 26, false, sprintf('Baris %d org_unit_id', $no)),
                 'mapping' => is_array($mapping) ? [
-                    'label' => $this->wajib($mapping, 'label', 200, sprintf('Baris %d mapping.label', $no)),
-                    'fix_url' => $this->pathInsideApp($this->teks($mapping, 'fix_url', 500, false, sprintf('Baris %d mapping.fix_url', $no)), sprintf('Baris %d mapping.fix_url', $no)),
+                    'label' => $this->requiredText($mapping, 'label', 200, sprintf('Baris %d mapping.label', $no)),
+                    'fix_url' => $this->pathInsideApp($this->text($mapping, 'fix_url', 500, false, sprintf('Baris %d mapping.fix_url', $no)), sprintf('Baris %d mapping.fix_url', $no)),
                 ] : null,
             ];
         }
 
-        if (! $debit->isEqualTo($kredit)) {
-            throw new InvalidPosting(sprintf('Jurnal tidak seimbang: debit %s, kredit %s.', $debit, $kredit));
+        if (! $debit->isEqualTo($credit)) {
+            throw new InvalidPosting(sprintf('Jurnal tidak seimbang: debit %s, kredit %s.', $debit, $credit));
         }
 
-        return [$hasil, MoneyPrecision::round((string) $debit, $desimal)];
+        return [$result, MoneyPrecision::round((string) $debit, $decimals)];
     }
 
-    private function uang(mixed $nilai, int $desimal, string $medan): string
+    private function money(mixed $value, int $decimals, string $field): string
     {
-        if (is_int($nilai)) {
-            $nilai = (string) $nilai;
+        if (is_int($value)) {
+            $value = (string) $value;
         }
-        if (! is_string($nilai) || preg_match('/^\d+(\.\d+)?$/', trim($nilai)) !== 1) {
-            throw new InvalidPosting($medan.' harus string desimal tanpa tanda dan tanpa pemisah ribuan, misalnya "1500000.00".');
+        if (! is_string($value) || preg_match('/^\d+(\.\d+)?$/', trim($value)) !== 1) {
+            throw new InvalidPosting($field.' harus string desimal tanpa tanda dan tanpa pemisah ribuan, misalnya "1500000.00".');
         }
 
         try {
-            $skala = MoneyPrecision::scale($nilai);
-        } catch (MathException $kegagalan) {
-            throw new InvalidPosting($medan.' bukan angka desimal.', 0, $kegagalan);
+            $scale = MoneyPrecision::scale($value);
+        } catch (MathException $failure) {
+            throw new InvalidPosting($field.' bukan angka desimal.', 0, $failure);
         }
-        if ($skala > $desimal) {
-            throw new InvalidPosting(sprintf('%s memakai %d desimal, lebih halus dari presisi mata uang (%d). Bulatkan di sumber lewat CurrencyRounding.', $medan, $skala, $desimal));
+        if ($scale > $decimals) {
+            throw new InvalidPosting(sprintf('%s memakai %d desimal, lebih halus dari presisi mata uang (%d). Bulatkan di sumber lewat CurrencyRounding.', $field, $scale, $decimals));
         }
 
-        return MoneyPrecision::round($nilai, $desimal);
+        return MoneyPrecision::round($value, $decimals);
     }
 
     /** @param  array<array-key, mixed>  $data */
-    private function teks(array $data, string $kunci, int $maks, bool $wajib, ?string $nama = null): ?string
+    private function text(array $data, string $key, int $max, bool $required, ?string $name = null): ?string
     {
-        $nilai = $data[$kunci] ?? null;
-        $nama ??= $kunci;
-        if ($nilai === null || (is_string($nilai) && trim($nilai) === '')) {
-            if ($wajib) {
-                throw new InvalidPosting($nama.' wajib diisi.');
+        $value = $data[$key] ?? null;
+        $name ??= $key;
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            if ($required) {
+                throw new InvalidPosting($name.' wajib diisi.');
             }
 
             return null;
         }
-        if (! is_string($nilai)) {
-            throw new InvalidPosting($nama.' harus teks.');
+        if (! is_string($value)) {
+            throw new InvalidPosting($name.' harus teks.');
         }
-        $nilai = trim($nilai);
-        if (mb_strlen($nilai) > $maks) {
-            throw new InvalidPosting(sprintf('%s paling panjang %d karakter.', $nama, $maks));
+        $value = trim($value);
+        if (mb_strlen($value) > $max) {
+            throw new InvalidPosting(sprintf('%s paling panjang %d karakter.', $name, $max));
         }
 
-        return $nilai;
+        return $value;
     }
 
     /** @param  array<array-key, mixed>  $data */
-    private function wajib(array $data, string $kunci, int $maks, ?string $nama = null): string
+    private function requiredText(array $data, string $key, int $max, ?string $name = null): string
     {
-        return $this->teks($data, $kunci, $maks, true, $nama) ?? throw new LogicException($kunci.' kosong setelah diperiksa.');
+        return $this->text($data, $key, $max, true, $name) ?? throw new LogicException($key.' kosong setelah diperiksa.');
     }
 
     /** @param  array<string, mixed>  $data */
-    private function tanggal(array $data, string $kunci): string
+    private function date(array $data, string $key): string
     {
-        $nilai = $this->wajib($data, $kunci, 10);
+        $value = $this->requiredText($data, $key, 10);
         try {
-            $tanggal = Carbon::createFromFormat('!Y-m-d', $nilai);
+            $date = Carbon::createFromFormat('!Y-m-d', $value);
         } catch (Throwable) {
-            $tanggal = null;
+            $date = null;
         }
-        if ($tanggal === null || $tanggal->format('Y-m-d') !== $nilai) {
-            throw new InvalidPosting($kunci.' harus tanggal Y-m-d, misalnya 2026-09-28.');
+        if ($date === null || $date->format('Y-m-d') !== $value) {
+            throw new InvalidPosting($key.' harus tanggal Y-m-d, misalnya 2026-09-28.');
         }
 
-        return $nilai;
+        return $value;
     }
 
     /**
      * Posting `pending` yang sudah pernah ditarik atau dikirim sudah sampai ke pembaca, dan tidak
      * boleh diubah statusnya diam-diam oleh penilaian ulang.
      */
-    private function sudahSampai(FinancePosting $posting): bool
+    private function alreadyDelivered(FinancePosting $posting): bool
     {
         return $posting->status === FinancePosting::PENDING
             && ($posting->served_count > 0 || $posting->deliveries()->exists());
@@ -826,11 +826,11 @@ final class PostingPublisher
         $postingId = $input['posting_id'] ?? null;
 
         return is_string($tenant) && is_string($postingId) && $tenant !== '' && $postingId !== ''
-            ? $this->cari($tenant, $postingId)
+            ? $this->find($tenant, $postingId)
             : null;
     }
 
-    private function cari(string $tenantId, string $postingId): ?FinancePosting
+    private function find(string $tenantId, string $postingId): ?FinancePosting
     {
         return FinancePosting::query()->where('tenant_id', $tenantId)->where('posting_id', $postingId)->first();
     }
@@ -838,58 +838,58 @@ final class PostingPublisher
     /**
      * @return array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}
      */
-    private function hasilYangAda(FinancePosting $posting, PostingInput $masukan): array
+    private function existingResult(FinancePosting $posting, PostingInput $postingInput): array
     {
-        if (! hash_equals($posting->input_hash, $masukan->hash)) {
+        if (! hash_equals($posting->input_hash, $postingInput->hash)) {
             throw new InvalidPosting(sprintf(
                 'Posting %s sudah terbit dengan isi jurnal berbeda. Dokumen yang sudah terbit dikoreksi lewat posting koreksi, bukan diterbitkan ulang.',
-                $masukan->postingId,
+                $postingInput->postingId,
             ));
         }
 
-        return $this->hasil($posting, false);
+        return $this->result($posting, false);
     }
 
     /**
      * @return array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}
      */
-    private function hasil(FinancePosting $posting, bool $baru): array
+    private function result(FinancePosting $posting, bool $isNew): array
     {
         return [
             'posting_id' => $posting->posting_id,
             'status' => $posting->status,
             'problems' => $posting->hold_reasons ?? [],
             'payload' => $posting->payload,
-            'created' => $baru,
+            'created' => $isNew,
         ];
     }
 
     /**
-     * @param  array{type: string, id: string, label: string}|null  $objek
-     * @param  array{label: string, url: string}|null  $perbaikan
+     * @param  array{type: string, id: string, label: string}|null  $object
+     * @param  array{label: string, url: string}|null  $fix
      * @return array<string, mixed>
      */
-    private function masalah(int $baris, string $kode, string $pesan, ?array $objek, ?array $perbaikan): array
+    private function issue(int $lineNo, string $code, string $message, ?array $object, ?array $fix): array
     {
-        return ['line_no' => $baris, 'code' => $kode, 'message' => $pesan, 'object' => $objek, 'fix' => $perbaikan];
+        return ['line_no' => $lineNo, 'code' => $code, 'message' => $message, 'object' => $object, 'fix' => $fix];
     }
 
     /** @return array{code: string, display_name: string, value_code: string, value_display_name: string, value_id: string} */
-    private function dimensi(string $kode, string $nama, string $nilai, string $namaNilai, string $id): array
+    private function dimension(string $code, string $name, string $value, string $valueName, string $id): array
     {
-        return ['code' => $kode, 'display_name' => $nama, 'value_code' => $nilai, 'value_display_name' => $namaNilai, 'value_id' => $id];
+        return ['code' => $code, 'display_name' => $name, 'value_code' => $value, 'value_display_name' => $valueName, 'value_id' => $id];
     }
 
     /** @return array{type: string, id: string, label: string} */
-    private function objekAkun(FinanceReferenceAccount $akun): array
+    private function accountObject(FinanceReferenceAccount $account): array
     {
-        return ['type' => 'account', 'id' => $akun->id, 'label' => $akun->code.' '.$akun->name];
+        return ['type' => 'account', 'id' => $account->id, 'label' => $account->code.' '.$account->name];
     }
 
     /** @return array{type: string, id: string, label: string} */
-    private function objekUnit(string $id, string $nama): array
+    private function unitObject(string $id, string $name): array
     {
-        return ['type' => 'organization', 'id' => $id, 'label' => $nama];
+        return ['type' => 'organization', 'id' => $id, 'label' => $name];
     }
 
     /**
@@ -898,11 +898,11 @@ final class PostingPublisher
      * jalur relatif di dalam aplikasi: tautan ke host lain dari data posting akan menjadi pintu
      * pengalihan ke luar CoreERP.
      *
-     * @param  array<mixed>  $sumber
+     * @param  array<mixed>  $source
      */
-    private function tautanDokumen(array $sumber): ?string
+    private function documentLink(array $source): ?string
     {
-        $url = $this->teks($sumber, 'url', 255, false, 'source_document.url');
+        $url = $this->text($source, 'url', 255, false, 'source_document.url');
         if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
             throw new InvalidPosting('source_document.url harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /management-aset/inventarisasi-aset/penerimaan/01J….');
         }
@@ -924,8 +924,8 @@ final class PostingPublisher
     }
 
     /** @return array{label: string, url: string} */
-    private function perbaikanAkun(FinanceReferenceAccount $akun): array
+    private function accountFix(FinanceReferenceAccount $account): array
     {
-        return ['label' => 'Buka daftar akun', 'url' => '/settings/finance-accounts?q='.rawurlencode($akun->code)];
+        return ['label' => 'Buka daftar akun', 'url' => '/settings/finance-accounts?q='.rawurlencode($account->code)];
     }
 }

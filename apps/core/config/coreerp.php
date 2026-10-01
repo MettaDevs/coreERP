@@ -117,7 +117,7 @@ return [
      * Pengiriman laporan kesalahan ke Discord.
      *
      * Kosong berarti mati, dan itulah bawaannya — termasuk pada pemasangan on-prem, yang
-     * channel Discord-nya bukan milik kita. Lihat App\Platform\Observability\Support\PengirimDiscord.
+     * channel Discord-nya bukan milik kita. Lihat App\Platform\Observability\Support\DiscordNotifier.
      */
     'discord' => [
         'webhook_url' => env('COREERP_DISCORD_WEBHOOK_URL'),
@@ -126,7 +126,7 @@ return [
         // `<@&id_role>`; boleh digabung. Menulis `@nama` biasa tidak menjadi sebutan.
         'mention' => env('COREERP_DISCORD_MENTION', ''),
 
-        // Jeda minimal antara dua kiriman untuk kesalahan yang sama. Lihat PenjedaKiriman —
+        // Jeda minimal antara dua kiriman untuk kesalahan yang sama. Lihat NotificationThrottle —
         // ini yang memisahkan peringatan dari banjir. Nol mematikan penjedanya.
         'jeda_detik' => env('COREERP_DISCORD_JEDA_DETIK', 60),
     ],

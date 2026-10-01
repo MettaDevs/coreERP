@@ -40,7 +40,7 @@ final class ReferenceAccountController extends Controller
             'scope' => ['nullable', 'string', 'max:26'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
-        $kata = trim((string) ($filter['q'] ?? ''));
+        $keyword = trim((string) ($filter['q'] ?? ''));
         $scope = $filter['scope'] ?? null;
 
         $accounts = FinanceReferenceAccount::query()
@@ -48,27 +48,27 @@ final class ReferenceAccountController extends Controller
             ->when($scope === 'all', fn ($query) => $query->whereNull('legal_entity_id'))
             ->when($scope !== null && $scope !== 'all', fn ($query) => $query->where('legal_entity_id', $scope))
             ->when(($filter['status'] ?? null) !== null, fn ($query) => $query->where('active', $filter['status'] === 'active'))
-            ->when($kata !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
-                ->where('code', 'ilike', '%'.addcslashes($kata, '\\%_').'%')
-                ->orWhere('name', 'ilike', '%'.addcslashes($kata, '\\%_').'%')
-                ->orWhere('external_id', $kata)))
+            ->when($keyword !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
+                ->where('code', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
+                ->orWhere('name', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
+                ->orWhere('external_id', $keyword)))
             ->orderBy('code')
             ->paginate(self::PER_PAGE)
             ->withQueryString()
-            ->through(fn (FinanceReferenceAccount $akun): array => $this->present($akun));
+            ->through(fn (FinanceReferenceAccount $account): array => $this->present($account));
 
         $imports = FinanceReferenceAccountImport::query()
             ->where('tenant_id', $tenant)
             ->latest()
             ->limit(10)
             ->get();
-        $namaPengguna = DB::table('users')
+        $userName = DB::table('users')
             ->whereIn('id', $imports->pluck('imported_by_user_id')->filter()->unique()->values())
             ->pluck('name', 'id');
 
         return Inertia::render('foundation/finance-posting/finance-accounts', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE),
-            'filters' => ['q' => $kata, 'scope' => $scope, 'status' => $filter['status'] ?? null],
+            'filters' => ['q' => $keyword, 'scope' => $scope, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'accounts' => $accounts,
             'imports' => $imports->map(fn (FinanceReferenceAccountImport $import): array => [
@@ -82,7 +82,7 @@ final class ReferenceAccountController extends Controller
                 'missing_count' => $import->missing_count,
                 'rejected_count' => $import->rejected_count,
                 'rejected_rows' => $import->rejected_rows ?? [],
-                'imported_by' => $namaPengguna[$import->imported_by_user_id] ?? null,
+                'imported_by' => $userName[$import->imported_by_user_id] ?? null,
                 'created_at' => $import->created_at?->toIso8601String(),
             ])->values(),
             'header' => ReferenceAccountImporter::HEADER,
@@ -150,12 +150,12 @@ final class ReferenceAccountController extends Controller
             return null;
         }
 
-        $ada = Organization::query()
+        $exists = Organization::query()
             ->where('tenant_id', $tenantId)
             ->where('classification', 'legal_entity')
             ->whereKey($scope)
             ->exists();
-        if (! $ada) {
+        if (! $exists) {
             throw ValidationException::withMessages(['scope' => 'Pilih entitas legal milik tenant ini, atau semua entitas.']);
         }
 
@@ -171,27 +171,27 @@ final class ReferenceAccountController extends Controller
             ->with('legalEntity:organization_id,company_code')
             ->orderBy('name')
             ->get()
-            ->map(static fn (Organization $organisasi): array => [
-                'id' => $organisasi->id,
-                'name' => (string) $organisasi->name,
-                'company_code' => $organisasi->legalEntity?->company_code,
+            ->map(static fn (Organization $organization): array => [
+                'id' => $organization->id,
+                'name' => (string) $organization->name,
+                'company_code' => $organization->legalEntity?->company_code,
             ])
             ->all());
     }
 
     /** @return array<string, mixed> */
-    private function present(FinanceReferenceAccount $akun): array
+    private function present(FinanceReferenceAccount $account): array
     {
         return [
-            'id' => $akun->id,
-            'version' => (int) $akun->version,
-            'external_id' => $akun->external_id,
-            'code' => $akun->code,
-            'name' => $akun->name,
-            'type' => $akun->type,
-            'active' => $akun->active,
-            'legal_entity_id' => $akun->legal_entity_id,
-            'synced_at' => $akun->synced_at?->toIso8601String(),
+            'id' => $account->id,
+            'version' => (int) $account->version,
+            'external_id' => $account->external_id,
+            'code' => $account->code,
+            'name' => $account->name,
+            'type' => $account->type,
+            'active' => $account->active,
+            'legal_entity_id' => $account->legal_entity_id,
+            'synced_at' => $account->synced_at?->toIso8601String(),
         ];
     }
 }

@@ -19,10 +19,10 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\LocationDimension;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -101,7 +101,7 @@ class MutasiAsetController extends Controller
         return response()->json(['data' => $mutasi], 200, ['ETag' => RowVersion::etag((int) $mutasi->version)]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
@@ -471,11 +471,11 @@ class MutasiAsetController extends Controller
      */
     private function denganNama(string $tenantId, stdClass $baris): stdClass
     {
-        $direktori = app(DirektoriAset::class);
-        $baris->tujuan_org_unit_nama = $direktori->namaUnit($tenantId, $baris->tujuan_org_unit_id ?? null);
-        $baris->responsible_org_unit_nama = $direktori->namaUnit($tenantId, $baris->responsible_org_unit_id ?? null);
-        $baris->diserahkan_oleh_nama = $direktori->namaOrang($tenantId, $baris->diserahkan_oleh_user_id ?? null);
-        $baris->diterima_oleh_nama = $direktori->namaOrang($tenantId, $baris->diterima_oleh_user_id ?? null);
+        $direktori = app(AssetOrganizationDirectory::class);
+        $baris->tujuan_org_unit_nama = $direktori->unitName($tenantId, $baris->tujuan_org_unit_id ?? null);
+        $baris->responsible_org_unit_nama = $direktori->unitName($tenantId, $baris->responsible_org_unit_id ?? null);
+        $baris->diserahkan_oleh_nama = $direktori->personName($tenantId, $baris->diserahkan_oleh_user_id ?? null);
+        $baris->diterima_oleh_nama = $direktori->personName($tenantId, $baris->diterima_oleh_user_id ?? null);
 
         return $baris;
     }
@@ -519,7 +519,7 @@ class MutasiAsetController extends Controller
      */
     private function baris(string $mutasiId, string $tenantId): Collection
     {
-        $direktori = app(DirektoriAset::class);
+        $direktori = app(AssetOrganizationDirectory::class);
 
         // Lokasi asal di-join dua kali, bukan sekali dengan `coalesce` di klausa `on`.
         // Ekspresi di dalam `on` tidak dapat memakai indeks, dan perencana query tidak
@@ -584,8 +584,8 @@ class MutasiAsetController extends Controller
                 $row->asal_custodian_efektif_id = $row->asal_custodian_user_id ?? $row->asal_custodian_kini;
                 // Nama, bukan ULID. Tidak ada yang mengenali unit kerja atau rekan kerjanya
                 // dari ULID, jadi id di layar sama saja dengan kolom kosong.
-                $row->asal_org_unit_nama = $direktori->namaUnit($tenantId, $row->asal_org_unit_efektif_id);
-                $row->asal_custodian_nama = $direktori->namaOrang($tenantId, $row->asal_custodian_efektif_id);
+                $row->asal_org_unit_nama = $direktori->unitName($tenantId, $row->asal_org_unit_efektif_id);
+                $row->asal_custodian_nama = $direktori->personName($tenantId, $row->asal_custodian_efektif_id);
 
                 return $row;
             });

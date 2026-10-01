@@ -48,8 +48,8 @@ class ModuleInstallationTest extends TestCase
         $this->pasang($tenantId, 'contoh-a');
 
         $baris = $this->baris($tenantId, 'contoh-a');
-        $this->assertTrue($baris->sedangAktif());
-        $this->assertTrue($baris->sudahDiisiDataAwal(), 'Data awal harus tetap tercatat pernah diisi.');
+        $this->assertTrue($baris->isActive());
+        $this->assertTrue($baris->isSeeded(), 'Data awal harus tetap tercatat pernah diisi.');
         $this->assertTrue(
             $seedPertama->equalTo($baris->seeded_at),
             'seeded_at berubah, jadi data awal akan terisi dua kali saat module diaktifkan lagi.'
@@ -66,9 +66,9 @@ class ModuleInstallationTest extends TestCase
 
         $baris = $this->baris($tenantId, 'contoh-a');
         $this->assertNotNull($baris, 'Baris pemasangan tidak boleh hilang saat module dicabut.');
-        $this->assertFalse($baris->sedangAktif());
+        $this->assertFalse($baris->isActive());
         $this->assertTrue(
-            $baris->sudahDiisiDataAwal(),
+            $baris->isSeeded(),
             'Tanpa jejak ini, berlangganan ulang akan mengisi data awal di atas data lama yang tidak pernah dihapus.'
         );
     }
@@ -82,8 +82,8 @@ class ModuleInstallationTest extends TestCase
         $this->pasang($tenantDua, 'contoh-a');
         $this->ubahStatus($tenantSatu, 'contoh-a', ModuleInstallation::STATUS_DISABLED, 'disabled_at');
 
-        $this->assertFalse($this->baris($tenantSatu, 'contoh-a')->sedangAktif());
-        $this->assertTrue($this->baris($tenantDua, 'contoh-a')->sedangAktif());
+        $this->assertFalse($this->baris($tenantSatu, 'contoh-a')->isActive());
+        $this->assertTrue($this->baris($tenantDua, 'contoh-a')->isActive());
     }
 
     public function test_status_di_luar_tiga_yang_sah_ditolak_database(): void

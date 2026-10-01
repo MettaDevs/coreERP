@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\Workflow;
 
 use App\Foundation\Workflow\ModuleServices\WorkflowEngineCore;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
+use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Platform\Modules\Contracts\WorkflowEngine;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +23,6 @@ final class WorkflowServiceProvider extends ServiceProvider
 
         // Scoped, bukan singleton: jawabannya tidak berubah di tengah satu permintaan, dan sebuah
         // workflow bercabang akan menanyakannya berkali-kali. Ingatannya dibuang di antara permintaan.
-        $this->app->scoped(ParameterWorkflow::class);
+        $this->app->scoped(WorkflowParameters::class);
     }
 }

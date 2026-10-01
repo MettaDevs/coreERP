@@ -9,7 +9,7 @@ use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDataException;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
@@ -125,7 +125,7 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
             throw new ReportDataException('Berita acara hanya dapat dicetak setelah mutasi diselesaikan.');
         }
 
-        $direktori = app(DirektoriAset::class);
+        $direktori = app(AssetOrganizationDirectory::class);
         $lines = MutasiAsetDetail::query()
             ->leftJoin('aset_tr_aset as aset', fn ($join) => $join
                 ->on('aset.id', '=', 'aset_tr_mutasi_aset_details.aset_id')
@@ -157,9 +157,9 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
                 'tujuan_lokasi' => $mutasi->tujuan_lokasi_nama,
                 // Nama, bukan id. Blok tanda tangan yang berbunyi "( 01JQ… )" tidak dapat
                 // dipakai sebagai bukti serah terima oleh siapa pun.
-                'tujuan_unit_kerja' => $direktori->namaUnit($context->tenantId, $mutasi->tujuan_org_unit_id),
-                'diserahkan_oleh' => $direktori->namaOrang($context->tenantId, $mutasi->diserahkan_oleh_user_id) ?? $mutasi->diserahkan_oleh_user_id,
-                'diterima_oleh' => $direktori->namaOrang($context->tenantId, $mutasi->diterima_oleh_user_id) ?? $mutasi->diterima_oleh_user_id,
+                'tujuan_unit_kerja' => $direktori->unitName($context->tenantId, $mutasi->tujuan_org_unit_id),
+                'diserahkan_oleh' => $direktori->personName($context->tenantId, $mutasi->diserahkan_oleh_user_id) ?? $mutasi->diserahkan_oleh_user_id,
+                'diterima_oleh' => $direktori->personName($context->tenantId, $mutasi->diterima_oleh_user_id) ?? $mutasi->diterima_oleh_user_id,
                 'jumlah_aset' => $lines->count(),
                 'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
@@ -170,7 +170,7 @@ final class BeritaAcaraSerahTerima implements ReportDefinition
                     'aset_nama' => $line->aset_nama,
                     'serial_number' => $line->aset_serial_number,
                     'asal_lokasi' => $line->asal_lokasi_nama,
-                    'asal_unit_kerja' => $direktori->namaUnit($context->tenantId, $line->asal_org_unit_id),
+                    'asal_unit_kerja' => $direktori->unitName($context->tenantId, $line->asal_org_unit_id),
                     'kondisi' => $line->kondisi_nama,
                     'catatan' => $line->catatan,
                 ])->all()),

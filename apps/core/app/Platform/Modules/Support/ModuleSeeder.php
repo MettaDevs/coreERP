@@ -22,38 +22,38 @@ use Illuminate\Database\Seeder;
  */
 final class ModuleSeeder
 {
-    public function __construct(private readonly Container $wadah) {}
+    public function __construct(private readonly Container $container) {}
 
     /**
      * @return bool true bila data awal benar-benar diisi pada pemanggilan ini
      */
     public function jalankan(ModuleManifest $module, string $tenantId): bool
     {
-        $pemasangan = ModuleInstallation::query()
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $module->id)
             ->first();
 
-        if ($pemasangan === null || $pemasangan->sudahDiisiDataAwal()) {
+        if ($installation === null || $installation->isSeeded()) {
             return false;
         }
 
-        $kelas = $this->kelasSeeder($module);
+        $class = $this->seederClass($module);
 
         // Tenant aktif dipasang selama seed berjalan supaya model module tersaring seperti
         // biasa. Tanpa ini, TenantScope membatalkan setiap query — dan memang harus begitu.
-        $sebelumnya = $this->wadah->bound(TenantScope::KUNCI) ? $this->wadah->make(TenantScope::KUNCI) : null;
-        $this->wadah->instance(TenantScope::KUNCI, $tenantId);
+        $previous = $this->container->bound(TenantScope::KEY) ? $this->container->make(TenantScope::KEY) : null;
+        $this->container->instance(TenantScope::KEY, $tenantId);
 
         try {
-            foreach ($kelas as $nama) {
+            foreach ($class as $name) {
                 /** @var Seeder $seeder */
-                $seeder = $this->wadah->make($nama);
-                $seeder->setContainer($this->wadah)->__invoke();
+                $seeder = $this->container->make($name);
+                $seeder->setContainer($this->container)->__invoke();
             }
         } finally {
-            if (is_string($sebelumnya)) {
-                $this->wadah->instance(TenantScope::KUNCI, $sebelumnya);
+            if (is_string($previous)) {
+                $this->container->instance(TenantScope::KEY, $previous);
             }
         }
 
@@ -70,7 +70,7 @@ final class ModuleSeeder
      *
      * @return list<class-string<Seeder>>
      */
-    public function kelasSeeder(ModuleManifest $module): array
+    public function seederClass(ModuleManifest $module): array
     {
         $folder = $module->folder.'/database/seeders';
 
@@ -78,29 +78,29 @@ final class ModuleSeeder
             return [];
         }
 
-        $kelas = [];
+        $class = [];
 
-        foreach (glob($folder.'/*.php') ?: [] as $berkas) {
-            $nama = sprintf(
+        foreach (glob($folder.'/*.php') ?: [] as $file) {
+            $name = sprintf(
                 'Modules\\%s\\%s\\Database\\Seeders\\%s',
                 $this->studly($module->penerbit),
                 $this->studly(basename($module->folder)),
-                pathinfo($berkas, PATHINFO_FILENAME),
+                pathinfo($file, PATHINFO_FILENAME),
             );
 
-            if (class_exists($nama) && is_subclass_of($nama, Seeder::class)) {
-                /** @var class-string<Seeder> $nama */
-                $kelas[] = $nama;
+            if (class_exists($name) && is_subclass_of($name, Seeder::class)) {
+                /** @var class-string<Seeder> $name */
+                $class[] = $name;
             }
         }
 
-        sort($kelas);
+        sort($class);
 
-        return $kelas;
+        return $class;
     }
 
-    private function studly(string $nama): string
+    private function studly(string $name): string
     {
-        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $nama)));
+        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $name)));
     }
 }

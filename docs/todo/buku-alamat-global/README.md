@@ -342,7 +342,7 @@ container**, bukan HTTP. Polanya sudah dipakai di dua tempat: `NumberSequenceIss
 `OrganizationDirectory` untuk anggota serta unit operasi. Daftar resminya di
 `apps/core/app/Support/Modules/CoreServices.php:39-57`, implementasinya di
 `apps/core/app/Services/Modules/`, dan contoh pemakaiannya di
-`modules/apperp/human-resources/src/Services/DirektoriHr.php:33`.
+`modules/apperp/human-resources/src/Services/HrOrganizationDirectory.php:33`.
 
 Buku alamat menyusul dengan bentuk yang sama: kontrak `App\Platform\Modules\Contracts\BukuAlamat`,
 implementasi `App\Services\Modules\BukuAlamatCore`, didaftarkan di `CoreServices::PEMETAAN`. Karena

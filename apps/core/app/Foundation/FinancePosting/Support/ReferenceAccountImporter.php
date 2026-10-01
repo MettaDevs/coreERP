@@ -74,7 +74,7 @@ final class ReferenceAccountImporter
             if ($status === FinanceReferenceAccountImport::APPLIED) {
                 $now = now();
                 foreach ($rows as $row) {
-                    $nilai = [
+                    $value = [
                         'external_id' => $row['external_id'],
                         'code' => $row['code'],
                         'name' => $row['name'],
@@ -87,12 +87,12 @@ final class ReferenceAccountImporter
                         FinanceReferenceAccount::query()->create([
                             'tenant_id' => $tenantId,
                             'legal_entity_id' => $legalEntityId,
-                            ...$nilai,
+                            ...$value,
                         ]);
 
                         continue;
                     }
-                    $account->fill($nilai)->save();
+                    $account->fill($value)->save();
                 }
             }
 
@@ -244,7 +244,7 @@ final class ReferenceAccountImporter
 
         // Akun yang sama tidak boleh terdaftar untuk semua entitas sekaligus khusus satu entitas:
         // dropdown satu entitas akan menampilkan keduanya, dan pemetaan bisa menunjuk yang salah.
-        $bentrok = FinanceReferenceAccount::query()
+        $conflict = FinanceReferenceAccount::query()
             ->where('tenant_id', $tenantId)
             ->when(
                 $legalEntityId === null,
@@ -260,7 +260,7 @@ final class ReferenceAccountImporter
         $updated = [];
         $unchanged = 0;
         foreach ($rows as $row) {
-            if (isset($bentrok[$row['external_id']])) {
+            if (isset($conflict[$row['external_id']])) {
                 $rejected[] = [
                     'line' => $row['line'],
                     'external_id' => $row['external_id'],

@@ -37,26 +37,26 @@ final class ModuleMigrateCommand extends Command
             return self::FAILURE;
         }
 
-        if (! is_dir($module->folderMigrasi())) {
+        if (! is_dir($module->migrationFolder())) {
             $this->warn(sprintf('Module "%s" tidak punya folder migration. Tidak ada yang dijalankan.', $id));
 
             return self::SUCCESS;
         }
 
-        $koneksi = $this->option('connection');
-        $baru = $migrator->naik($module, is_string($koneksi) && $koneksi !== '' ? $koneksi : null);
+        $connection = $this->option('connection');
+        $newMigrations = $migrator->naik($module, is_string($connection) && $connection !== '' ? $connection : null);
 
-        if ($baru === []) {
+        if ($newMigrations === []) {
             $this->info(sprintf('Module "%s" sudah mutakhir; tidak ada migration yang dijalankan.', $id));
 
             return self::SUCCESS;
         }
 
-        foreach ($baru as $migration) {
+        foreach ($newMigrations as $migration) {
             $this->line('  dijalankan: '.$migration);
         }
 
-        $this->info(sprintf('%d migration module "%s" dijalankan.', count($baru), $id));
+        $this->info(sprintf('%d migration module "%s" dijalankan.', count($newMigrations), $id));
 
         return self::SUCCESS;
     }

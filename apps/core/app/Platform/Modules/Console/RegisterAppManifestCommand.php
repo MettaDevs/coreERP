@@ -34,7 +34,7 @@ use Symfony\Component\Yaml\Yaml;
  * didaftarkan ke katalog bisa berbeda dari yang dimuat runtime, dan tidak ada yang akan
  * menyadarinya. Registry yang sama dipakai keduanya.
  *
- * **Kenapa `semua()`, bukan `semuaTermasukYangSedangDipindah()`.** Katalog adalah daftar yang
+ * **Kenapa `all()`, bukan `allIncludingMoved()`.** Katalog adalah daftar yang
  * boleh dipasang untuk tenant. Module yang sedang dipindah masuk belum boleh dipasang —
  * kodenya boleh dimuat supaya testnya berjalan, tetapi datanya belum tentu tersaring
  * `tenant_id`. Mendaftarkannya ke katalog berarti membuka pemasangannya.
@@ -58,11 +58,11 @@ class RegisterAppManifestCommand extends Command
         // Ini memungkinkan start.ps1 mendaftarkan app external container yang
         // manifest-nya di-mount ke /workspace/manifests/.
         $arg = $this->argument('module');
-        if (is_string($arg) && $arg !== '' && $this->tampaknyaPath($arg)) {
-            return $this->daftarkanDariPath($arg, $registrar);
+        if (is_string($arg) && $arg !== '' && $this->looksLikePath($arg)) {
+            return $this->registerFromPath($arg, $registrar);
         }
 
-        $module = $this->modulYangDidaftarkan($registry);
+        $module = $this->registeredModule($registry);
 
         if ($module === null) {
             return self::FAILURE;
@@ -74,8 +74,8 @@ class RegisterAppManifestCommand extends Command
             return self::SUCCESS;
         }
 
-        foreach ($module as $satu) {
-            if ($this->daftarkan($satu, $registrar, $reports) === self::FAILURE) {
+        foreach ($module as $item) {
+            if ($this->register($item, $registrar, $reports) === self::FAILURE) {
                 return self::FAILURE;
             }
         }
@@ -86,9 +86,9 @@ class RegisterAppManifestCommand extends Command
     /**
      * Apakah argumen yang diberikan tampak seperti path file, bukan ID module.
      */
-    private function tampaknyaPath(string $nilai): bool
+    private function looksLikePath(string $value): bool
     {
-        return str_contains($nilai, '/') || str_contains($nilai, '\\') || str_ends_with($nilai, '.yaml') || str_ends_with($nilai, '.yml');
+        return str_contains($value, '/') || str_contains($value, '\\') || str_ends_with($value, '.yaml') || str_ends_with($value, '.yml');
     }
 
     /**
@@ -96,7 +96,7 @@ class RegisterAppManifestCommand extends Command
      * Dipakai untuk app container sendiri (app-erp-*) yang manifest-nya
      * di-mount ke /workspace/manifests/ saat development lokal.
      */
-    private function daftarkanDariPath(string $path, RegisterAppCatalog $registrar): int
+    private function registerFromPath(string $path, RegisterAppCatalog $registrar): int
     {
         if (! is_file($path)) {
             $this->components->error("Manifest tidak ditemukan: {$path}");
@@ -173,37 +173,37 @@ class RegisterAppManifestCommand extends Command
      *
      * @return list<ModuleManifest>|null
      */
-    private function modulYangDidaftarkan(ModuleRegistry $registry): ?array
+    private function registeredModule(ModuleRegistry $registry): ?array
     {
         // Module contoh dilewati. Ia hidup di repo sebagai bahan uji penjaga batas, bukan
         // sebagai produk, dan katalog adalah daftar yang dilihat serta dipasang pelanggan.
-        $dilayani = array_values(array_filter(
-            $registry->semua(),
-            static fn (ModuleManifest $m): bool => ! $m->bahanUjiInternal(),
+        $served = array_values(array_filter(
+            $registry->all(),
+            static fn (ModuleManifest $m): bool => ! $m->internalTestFixtures(),
         ));
 
         $id = $this->argument('module');
 
         if (! is_string($id) || $id === '') {
-            return $dilayani;
+            return $served;
         }
 
-        $dipilih = array_values(array_filter($dilayani, static fn (ModuleManifest $m): bool => $m->id === $id));
+        $selected = array_values(array_filter($served, static fn (ModuleManifest $m): bool => $m->id === $id));
 
-        if ($dipilih === []) {
+        if ($selected === []) {
             $this->components->error(sprintf(
                 'Module "%s" tidak ada di repo atau belum boleh dilayani. Yang bisa didaftarkan: %s.',
                 $id,
-                $dilayani === [] ? 'tidak ada' : implode(', ', array_map(static fn (ModuleManifest $m): string => $m->id, $dilayani)),
+                $served === [] ? 'tidak ada' : implode(', ', array_map(static fn (ModuleManifest $m): string => $m->id, $served)),
             ));
 
             return null;
         }
 
-        return $dipilih;
+        return $selected;
     }
 
-    private function daftarkan(ModuleManifest $module, RegisterAppCatalog $registrar, ModuleReportProviderRegistry $reports): int
+    private function register(ModuleManifest $module, RegisterAppCatalog $registrar, ModuleReportProviderRegistry $reports): int
     {
         // `app.yaml` ditambah berkas fitur di `manifest/`; lihat `ModuleManifestFiles`.
         try {
@@ -239,7 +239,7 @@ class RegisterAppManifestCommand extends Command
             return self::FAILURE;
         }
 
-        $manifest['reports'] = $reports->untuk($module->id)?->catalog() ?? [];
+        $manifest['reports'] = $reports->providerFor($module->id)?->catalog() ?? [];
 
         $request = $this->requestFor($this->toPayload($manifest));
         $validator = $this->validatorFor($request);

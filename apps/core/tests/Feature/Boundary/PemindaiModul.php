@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModulesBeingMoved;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -76,7 +76,7 @@ final class PemindaiModul
      *
      * @return list<array{id: string, nama: string, awalan: string, migrations: string}>
      */
-    public function modulDenganMigration(ModulSedangDipindah $dipindah): array
+    public function modulDenganMigration(ModulesBeingMoved $dipindah): array
     {
         $modules = [];
 
@@ -85,7 +85,7 @@ final class PemindaiModul
             $nama = basename($folder);
             $migrations = $folder.'/database/migrations';
 
-            if ($dipindah->menandai($nama) || ! is_dir($migrations)) {
+            if ($dipindah->marks($nama) || ! is_dir($migrations)) {
                 continue;
             }
 
@@ -288,7 +288,7 @@ final class PemindaiModul
      * Seluruh pelanggaran berkas sebuah modul, lintas ketiga pemeriksaan pembaca berkas.
      *
      * `pelanggaranLompatanHttp()` sengaja **tidak** ikut di sini. Daftar ini adalah dasar
-     * pemeriksaan basi `ModulSedangDipindah`, dan pemeriksaan itu hanya boleh menghitung
+     * pemeriksaan basi `ModulesBeingMoved`, dan pemeriksaan itu hanya boleh menghitung
      * dimensi yang memang dikecualikan daftar tersebut. Penjaga lompatan HTTP tidak
      * mengecualikan siapa pun, jadi memasukkannya ke sini akan membuat "modul ini sudah bersih"
      * berarti sesuatu yang lain daripada "pengecualiannya sudah boleh dibuang".

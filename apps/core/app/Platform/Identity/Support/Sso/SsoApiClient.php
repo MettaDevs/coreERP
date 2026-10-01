@@ -76,14 +76,14 @@ class SsoApiClient
      * 404 sengaja **tidak** ditangani di sini: bagi pencarian ia jawaban yang sah ("tidak terdaftar"),
      * dan hanya pemanggil yang tahu artinya.
      *
-     * @param  callable(): Response  $kirim
+     * @param  callable(): Response  $send
      *
      * @throws SsoApiUnavailable
      */
-    private function send(callable $kirim, string $path): Response
+    private function send(callable $send, string $path): Response
     {
         try {
-            $response = $kirim();
+            $response = $send();
         } catch (ConnectionException $e) {
             throw new SsoApiUnavailable('Penyedia SSO tidak dapat dihubungi dari server ini: '.$e->getMessage());
         }

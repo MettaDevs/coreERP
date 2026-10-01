@@ -159,13 +159,13 @@ class HandleInertiaRequests extends Middleware
         // setiap produk di daftar ini — yang belum siap tetap tampil, hanya tidak dapat diklik, dan
         // dihitung sebagai "N lainnya masih dipasang". App yang tidak dibeli tetapi barisnya
         // ditambahkan langsung di database server klien tidak boleh muncul di sana sebagai janji.
-        $lisensi = app(SiteLicense::class);
+        $license = app(SiteLicense::class);
 
         $entitledIds = $membership->tenant->entitlements()
             ->where('status', 'active')
             ->whereRaw('(ends_at is null or ends_at > ?)', [now()])
             ->pluck('app_id')
-            ->filter(fn (mixed $appId): bool => $lisensi->allowsApp((string) $appId));
+            ->filter(fn (mixed $appId): bool => $license->allowsApp((string) $appId));
         /** @var array<int, array<string, mixed>> $catalog */
         $catalog = $this->appCatalog();
 

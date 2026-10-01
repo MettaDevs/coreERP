@@ -122,16 +122,16 @@ class FinancePosting extends Model
      *
      * @param  Builder<self>  $query
      */
-    public static function batasiUntukKlien(Builder $query, IntegrationClient $client): void
+    public static function restrictToClient(Builder $query, IntegrationClient $client): void
     {
-        $awalan = $client->posting_type_prefixes ?? [];
-        if ($awalan === []) {
+        $prefix = $client->posting_type_prefixes ?? [];
+        if ($prefix === []) {
             return;
         }
 
-        $query->where(function (Builder $inner) use ($awalan): void {
-            foreach ($awalan as $satu) {
-                $inner->orWhere('posting_type', 'like', addcslashes($satu, '\\%_').'%');
+        $query->where(function (Builder $inner) use ($prefix): void {
+            foreach ($prefix as $item) {
+                $inner->orWhere('posting_type', 'like', addcslashes($item, '\\%_').'%');
             }
         });
     }

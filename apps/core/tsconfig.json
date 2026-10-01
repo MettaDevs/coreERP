@@ -146,8 +146,8 @@
      * `node_modules` miliknya sendiri, jadi memeriksanya dengan dependensi Core menghasilkan
      * ratusan `TS2307 Cannot find module` yang tidak satu pun menunjuk kesalahan sungguhan.
      *
-     * Daftar ini dijaga tetap sama dengan `ModulSedangDipindah` oleh
-     * `ModulSedangDipindahTest`: entri yang tertinggal setelah modulnya selesai dipindah
+     * Daftar ini dijaga tetap sama dengan `ModulesBeingMoved` oleh
+     * `ModulesBeingMovedTest`: entri yang tertinggal setelah modulnya selesai dipindah
      * membuat alur merah, jadi pengecualian ini tidak bisa hidup lebih lama dari sebabnya.
      * Kosong sejak modul aset selesai dipindah pada 9 September 2026 — 47 berkas UI-nya
      * diperiksa apa adanya di bawah setelan ini.

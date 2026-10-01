@@ -26,20 +26,20 @@ use RuntimeException;
 final class TenantScope implements Scope
 {
     /** Kunci wadah tempat tenant aktif disimpan. Diisi middleware; di test diisi langsung. */
-    public const KUNCI = 'coreerp.module.tenant_id';
+    public const KEY = 'coreerp.module.tenant_id';
 
     public function apply(Builder $builder, Model $model): void
     {
-        $builder->where($model->qualifyColumn('tenant_id'), self::tenantAktif());
+        $builder->where($model->qualifyColumn('tenant_id'), self::activeTenant());
     }
 
-    public static function tenantAktif(): string
+    public static function activeTenant(): string
     {
-        $tenantId = app()->bound(self::KUNCI) ? app(self::KUNCI) : null;
+        $tenantId = app()->bound(self::KEY) ? app(self::KEY) : null;
 
         if (! is_string($tenantId) || $tenantId === '') {
             throw new RuntimeException(
-                'Query module dijalankan tanpa tenant aktif. Setel '.self::KUNCI.' lebih dulu; '.
+                'Query module dijalankan tanpa tenant aktif. Setel '.self::KEY.' lebih dulu; '.
                 'menjalankannya tanpa penyaringan akan membaca data seluruh tenant.'
             );
         }

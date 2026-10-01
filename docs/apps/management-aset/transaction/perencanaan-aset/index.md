@@ -61,7 +61,7 @@ Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-
 | Berkas | Isinya |
 | --- | --- |
 | `src/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php` | Seluruh logika |
-| `src/Services/DaftarSatuanAset.php` | Satuan dari Core |
+| `src/Services/AssetUnitOfMeasureDirectory.php` | Satuan dari Core |
 | `ui/transactions/perencanaan-aset/PlanningPage.tsx` | Layar |
 
 ## Halaman terkait

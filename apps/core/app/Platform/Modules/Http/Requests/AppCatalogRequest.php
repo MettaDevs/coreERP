@@ -37,9 +37,9 @@ class AppCatalogRequest extends FormRequest
             // Hanya app yang berjalan sebagai container sendiri yang punya database
             // sendiri untuk disebutkan. Module berjalan di dalam runtime Core dan memakai
             // database Core, jadi menuntutnya menyebutkan nama database berarti menuntut
-            // sebuah karangan. Lihat `berjalanSebagaiContainer()` untuk cara membedakannya.
+            // sebuah karangan. Lihat `runsAsContainer()` untuk cara membedakannya.
             'database_name' => [
-                Rule::requiredIf(fn (): bool => $this->berjalanSebagaiContainer()),
+                Rule::requiredIf(fn (): bool => $this->runsAsContainer()),
                 'nullable',
                 'string',
                 'max:120',
@@ -323,7 +323,7 @@ class AppCatalogRequest extends FormRequest
      * Id kosong dihitung sebagai container supaya manifest tanpa id tidak diam-diam
      * membebaskan diri dari kewajiban ini; aturan `id` sendiri yang akan melaporkannya.
      */
-    private function berjalanSebagaiContainer(): bool
+    private function runsAsContainer(): bool
     {
         $id = $this->string('id')->toString();
 

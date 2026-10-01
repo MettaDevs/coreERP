@@ -42,7 +42,7 @@ final class PostingPusher
     public function __construct(
         private readonly SignedPush $push,
         private readonly PostingAcknowledger $ack,
-        private readonly ActiveEnvironment $lingkungan,
+        private readonly ActiveEnvironment $environment,
         private readonly IntegrationClientAccounts $accounts,
     ) {}
 
@@ -51,34 +51,34 @@ final class PostingPusher
     {
         // Salinan sandbox tidak mengirim apa pun, dan tidak menandai apa pun: produksi yang
         // disalin tetap memegang antreannya sendiri (TODO 6.10.5).
-        if (! $this->lingkungan->outboundAllowed()) {
-            return ['clients' => 0, 'sent' => 0, 'retrying' => 0, 'failed' => 0, 'skipped' => $this->lingkungan->refusalReason()];
+        if (! $this->environment->outboundAllowed()) {
+            return ['clients' => 0, 'sent' => 0, 'retrying' => 0, 'failed' => 0, 'skipped' => $this->environment->refusalReason()];
         }
 
-        $klien = 0;
-        $hasil = [];
+        $clientCount = 0;
+        $result = [];
         IntegrationClient::query()
             ->where('delivery_mode', IntegrationClient::PUSH)
             ->where('status', IntegrationClient::ACTIVE)
             ->whereNotNull('push_url')
             ->orderBy('id')
-            ->each(function (IntegrationClient $client) use ($limit, &$klien, &$hasil): void {
-                $klien++;
-                array_push($hasil, ...$this->kirimUntuk($client, $limit));
+            ->each(function (IntegrationClient $client) use ($limit, &$clientCount, &$result): void {
+                $clientCount++;
+                array_push($result, ...$this->pushFor($client, $limit));
             });
-        $jumlah = array_count_values($hasil);
+        $count = array_count_values($result);
 
         return [
-            'clients' => $klien,
-            'sent' => $jumlah[self::SENT] ?? 0,
-            'retrying' => $jumlah[self::RETRYING] ?? 0,
-            'failed' => $jumlah[self::FAILED] ?? 0,
+            'clients' => $clientCount,
+            'sent' => $count[self::SENT] ?? 0,
+            'retrying' => $count[self::RETRYING] ?? 0,
+            'failed' => $count[self::FAILED] ?? 0,
             'skipped' => null,
         ];
     }
 
     /** @return list<string> */
-    private function kirimUntuk(IntegrationClient $client, int $limit): array
+    private function pushFor(IntegrationClient $client, int $limit): array
     {
         $query = FinancePosting::query()
             ->where('tenant_id', $client->tenant_id)
@@ -86,10 +86,10 @@ final class PostingPusher
             ->whereDoesntHave('deliveries', fn ($inner) => $inner
                 ->where('integration_client_id', $client->id)
                 ->whereIn('status', [FinancePostingDelivery::DELIVERED, FinancePostingDelivery::FAILED]));
-        FinancePosting::batasiUntukKlien($query, $client);
+        FinancePosting::restrictToClient($query, $client);
         $postings = $query->orderBy('posting_date')->orderBy('published_at')->orderBy('id')->limit($limit)->get();
 
-        $hasil = [];
+        $result = [];
         foreach ($postings as $posting) {
             $delivery = FinancePostingDelivery::query()->firstOrNew(
                 ['finance_posting_id' => $posting->id, 'integration_client_id' => $client->id],
@@ -99,49 +99,49 @@ final class PostingPusher
                 break;
             }
 
-            $hasil[] = $satu = $this->kirim($client, $posting, $delivery);
-            if ($satu === self::RETRYING) {
+            $result[] = $item = $this->push($client, $posting, $delivery);
+            if ($item === self::RETRYING) {
                 break;
             }
         }
 
-        return $hasil;
+        return $result;
     }
 
-    private function kirim(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery): string
+    private function push(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery): string
     {
-        $sekarang = now();
+        $now = now();
         $delivery->fill([
             'attempts' => $delivery->attempts + 1,
-            'first_attempt_at' => $delivery->first_attempt_at ?? $sekarang,
-            'last_attempt_at' => $sekarang,
+            'first_attempt_at' => $delivery->first_attempt_at ?? $now,
+            'last_attempt_at' => $now,
         ]);
-        $badan = json_encode($posting->servedPayload(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $body = json_encode($posting->servedPayload(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         try {
-            $jawaban = $this->push->send($client, $badan);
-        } catch (ConnectionException $kegagalan) {
-            return $this->ulangi($client, $posting, $delivery, null, 'Tidak terjangkau: '.$kegagalan->getMessage());
-        } catch (RuntimeException $kegagalan) {
-            return $this->gagal($client, $posting, $delivery, null, $kegagalan->getMessage());
+            $answer = $this->push->send($client, $body);
+        } catch (ConnectionException $failure) {
+            return $this->retry($client, $posting, $delivery, null, 'Tidak terjangkau: '.$failure->getMessage());
+        } catch (RuntimeException $failure) {
+            return $this->fail($client, $posting, $delivery, null, $failure->getMessage());
         }
 
-        $kode = $jawaban->status();
-        if ($jawaban->successful()) {
+        $code = $answer->status();
+        if ($answer->successful()) {
             $delivery->fill([
                 'status' => FinancePostingDelivery::DELIVERED,
-                'delivered_at' => $sekarang,
+                'delivered_at' => $now,
                 'next_attempt_at' => null,
-                'last_status_code' => $kode,
+                'last_status_code' => $code,
                 'last_error' => null,
             ])->save();
-            FinancePostingEvent::catat($posting, 'push_delivered', $posting->status, $posting->status, $client->id, data: [
-                'attempts' => $delivery->attempts, 'status_code' => $kode,
+            FinancePostingEvent::record($posting, 'push_delivered', $posting->status, $posting->status, $client->id, data: [
+                'attempts' => $delivery->attempts, 'status_code' => $code,
             ]);
 
             // Ack di jawaban push keputusan klien, bukan sistem: dicatat atas nama akun aplikasinya,
             // sama dengan `POST …/ack` lewat API.
-            $ack = PostingAcknowledger::fromPushResponse($jawaban->json());
+            $ack = PostingAcknowledger::fromPushResponse($answer->json());
             if ($ack !== null) {
                 AuditActor::runAs(
                     $client->user_id ?? $this->accounts->ensure($client),
@@ -152,45 +152,45 @@ final class PostingPusher
             return self::SENT;
         }
 
-        $cuplikan = Str::limit(trim($jawaban->body()), 300);
-        if ($kode === 408 || $kode === 429 || $kode >= 500) {
-            return $this->ulangi($client, $posting, $delivery, $kode, $cuplikan);
+        $excerpt = Str::limit(trim($answer->body()), 300);
+        if ($code === 408 || $code === 429 || $code >= 500) {
+            return $this->retry($client, $posting, $delivery, $code, $excerpt);
         }
 
-        return $this->gagal($client, $posting, $delivery, $kode, sprintf('Ditolak pembaca dengan HTTP %d. %s', $kode, $cuplikan));
+        return $this->fail($client, $posting, $delivery, $code, sprintf('Ditolak pembaca dengan HTTP %d. %s', $code, $excerpt));
     }
 
-    private function ulangi(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery, ?int $kode, string $pesan): string
+    private function retry(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery, ?int $code, string $message): string
     {
-        $batasJam = (int) config('coreerp.finance_push_retry_hours', 24);
-        if ($delivery->first_attempt_at !== null && $delivery->first_attempt_at->copy()->addHours($batasJam)->isPast()) {
-            return $this->gagal($client, $posting, $delivery, $kode, sprintf('Batas percobaan %d jam habis. Terakhir: %s', $batasJam, $pesan));
+        $hourLimit = (int) config('coreerp.finance_push_retry_hours', 24);
+        if ($delivery->first_attempt_at !== null && $delivery->first_attempt_at->copy()->addHours($hourLimit)->isPast()) {
+            return $this->fail($client, $posting, $delivery, $code, sprintf('Batas percobaan %d jam habis. Terakhir: %s', $hourLimit, $message));
         }
 
-        $jeda = min(60, 2 ** min($delivery->attempts - 1, 6));
+        $delay = min(60, 2 ** min($delivery->attempts - 1, 6));
         $delivery->fill([
             'status' => FinancePostingDelivery::RETRYING,
-            'next_attempt_at' => now()->addMinutes($jeda),
-            'last_status_code' => $kode,
-            'last_error' => Str::limit($pesan, 490),
+            'next_attempt_at' => now()->addMinutes($delay),
+            'last_status_code' => $code,
+            'last_error' => Str::limit($message, 490),
         ])->save();
-        FinancePostingEvent::catat($posting, 'push_retrying', $posting->status, $posting->status, $client->id, data: [
-            'attempts' => $delivery->attempts, 'status_code' => $kode, 'retry_in_minutes' => $jeda,
+        FinancePostingEvent::record($posting, 'push_retrying', $posting->status, $posting->status, $client->id, data: [
+            'attempts' => $delivery->attempts, 'status_code' => $code, 'retry_in_minutes' => $delay,
         ]);
 
         return self::RETRYING;
     }
 
-    private function gagal(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery, ?int $kode, string $pesan): string
+    private function fail(IntegrationClient $client, FinancePosting $posting, FinancePostingDelivery $delivery, ?int $code, string $message): string
     {
         $delivery->fill([
             'status' => FinancePostingDelivery::FAILED,
             'next_attempt_at' => null,
-            'last_status_code' => $kode,
-            'last_error' => Str::limit($pesan, 490),
+            'last_status_code' => $code,
+            'last_error' => Str::limit($message, 490),
         ])->save();
-        FinancePostingEvent::catat($posting, 'push_failed', $posting->status, $posting->status, $client->id, data: [
-            'attempts' => $delivery->attempts, 'status_code' => $kode,
+        FinancePostingEvent::record($posting, 'push_failed', $posting->status, $posting->status, $client->id, data: [
+            'attempts' => $delivery->attempts, 'status_code' => $code,
         ]);
 
         return self::FAILED;

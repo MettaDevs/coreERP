@@ -22,7 +22,7 @@ use Throwable;
  * Dua jalan, berurutan:
  *
  * 1. **Binding eksplisit.** Siapa pun yang tahu persis environment mana yang sedang dikerjakan —
- *    kelak perintah artisan, job antrean, dan scheduler — mengikatnya pada `KUNCI`. Ini jalan yang
+ *    kelak perintah artisan, job antrean, dan scheduler — mengikatnya pada `TenantScope::KEY`. Ini jalan yang
  *    benar, dan ia yang akan menjadi satu-satunya jalan.
  * 2. **Diturunkan dari tenant aktif.** Selama satu tenant baru punya satu environment, tenant yang
  *    terikat sudah cukup untuk menemukannya.
@@ -141,7 +141,7 @@ class ActiveEnvironment
      * Dipakai ketika konteks berpindah di dalam satu proses yang sama — pekerja antrean yang
      * mengambil job berikutnya, atau perintah yang memutari banyak environment.
      */
-    public function lupakan(): void
+    public function forget(): void
     {
         $this->memo = null;
         $this->resolved = false;
@@ -165,11 +165,11 @@ class ActiveEnvironment
             return is_string($id) ? Environment::query()->hostedByProvider()->find($id) : null;
         }
 
-        if (! $this->container->bound(TenantScope::KUNCI)) {
+        if (! $this->container->bound(TenantScope::KEY)) {
             return null;
         }
 
-        $tenantId = $this->container->get(TenantScope::KUNCI);
+        $tenantId = $this->container->get(TenantScope::KEY);
 
         if (! is_string($tenantId)) {
             return null;

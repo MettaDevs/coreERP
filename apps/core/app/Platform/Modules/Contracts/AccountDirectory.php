@@ -25,7 +25,7 @@ interface AccountDirectory
      *
      * @return list<array{id: string, external_id: string, code: string, name: string, type: string, active: bool, legal_entity_id: ?string}>
      */
-    public function search(string $tenantId, ?string $legalEntityId, string $kata = '', int $batas = 20): array;
+    public function search(string $tenantId, ?string $legalEntityId, string $keyword = '', int $limit = 20): array;
 
     /**
      * Satu akun, termasuk yang sudah nonaktif — pemetaan lama tetap harus bisa ditampilkan.

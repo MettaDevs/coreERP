@@ -24,37 +24,37 @@ final class FinancePostingFeedController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $client = $this->klien($request);
+        $client = $this->client($request);
         $filter = $request->validate([
             'status' => ['nullable', 'in:'.FinancePosting::PENDING],
             'posting_type' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$/'],
             'legal_entity' => ['nullable', 'string', 'max:50'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
         ], ['posting_type.regex' => 'posting_type berupa jenis lengkap (asset.acquisition) atau awalan dengan .* (asset.*).']);
-        $batas = (int) ($filter['limit'] ?? 100);
+        $limit = (int) ($filter['limit'] ?? 100);
 
         $query = FinancePosting::query()
             ->where('tenant_id', $client->tenant_id)
             ->where('status', FinancePosting::PENDING);
-        FinancePosting::batasiUntukKlien($query, $client);
+        FinancePosting::restrictToClient($query, $client);
 
-        $jenis = $filter['posting_type'] ?? null;
-        if ($jenis !== null) {
-            str_ends_with($jenis, '.*')
-                ? $query->where('posting_type', 'like', addcslashes(substr($jenis, 0, -1), '\\%_').'%')
-                : $query->where('posting_type', $jenis);
+        $type = $filter['posting_type'] ?? null;
+        if ($type !== null) {
+            str_ends_with($type, '.*')
+                ? $query->where('posting_type', 'like', addcslashes(substr($type, 0, -1), '\\%_').'%')
+                : $query->where('posting_type', $type);
         }
         if (($filter['legal_entity'] ?? null) !== null) {
-            $entitas = LegalEntity::query()
+            $legalEntity = LegalEntity::query()
                 ->where('tenant_id', $client->tenant_id)
                 ->where(fn (QueryBuilder $inner) => $inner->where('company_code', $filter['legal_entity'])->orWhere('organization_id', $filter['legal_entity']))
                 ->value('organization_id');
-            $query->where('legal_entity_id', $entitas ?? '');
+            $query->where('legal_entity_id', $legalEntity ?? '');
         }
 
-        $postings = $query->orderBy('posting_date')->orderBy('published_at')->orderBy('id')->limit($batas + 1)->get();
-        $masihAda = $postings->count() > $batas;
-        $postings = $postings->take($batas)->values();
+        $postings = $query->orderBy('posting_date')->orderBy('published_at')->orderBy('id')->limit($limit + 1)->get();
+        $stillExists = $postings->count() > $limit;
+        $postings = $postings->take($limit)->values();
 
         if ($postings->isNotEmpty()) {
             FinancePosting::query()->whereIn('id', $postings->pluck('id'))->increment('served_count', 1, ['last_served_at' => now()]);
@@ -63,15 +63,15 @@ final class FinancePostingFeedController extends Controller
 
         return response()->json([
             'data' => $postings->map(fn (FinancePosting $posting): array => $posting->servedPayload())->values(),
-            'meta' => ['count' => $postings->count(), 'has_more' => $masihAda],
+            'meta' => ['count' => $postings->count(), 'has_more' => $stillExists],
         ]);
     }
 
     public function ack(Request $request, string $posting_id, PostingAcknowledger $ack): JsonResponse
     {
-        $client = $this->klien($request);
+        $client = $this->client($request);
         $query = FinancePosting::query()->where('tenant_id', $client->tenant_id)->where('posting_id', $posting_id);
-        FinancePosting::batasiUntukKlien($query, $client);
+        FinancePosting::restrictToClient($query, $client);
         $posting = $query->first();
         if ($posting === null) {
             return response()->json(['message' => 'Posting tidak ditemukan.'], 404);
@@ -82,9 +82,9 @@ final class FinancePostingFeedController extends Controller
             'reason_code.required_if' => 'Ack rejected wajib membawa reason_code.',
             'reason.required_if' => 'Ack rejected wajib membawa reason.',
         ]);
-        $hasil = $ack->acknowledge($posting->id, $client, PostingAcknowledger::bentuk($data));
-        $posting = $hasil['posting'];
-        $isi = ['data' => [
+        $result = $ack->acknowledge($posting->id, $client, PostingAcknowledger::shape($data));
+        $posting = $result['posting'];
+        $content = ['data' => [
             'posting_id' => $posting->posting_id,
             'status' => $posting->status,
             'external_reference' => $posting->external_reference,
@@ -93,18 +93,18 @@ final class FinancePostingFeedController extends Controller
             'acknowledged_at' => $posting->acknowledged_at?->toIso8601String(),
         ]];
 
-        if ($hasil['result'] === PostingAcknowledger::CONFLICT) {
+        if ($result['result'] === PostingAcknowledger::CONFLICT) {
             return response()->json([
                 'message' => sprintf('Posting %s berstatus %s; ack ini bertentangan dengannya.', $posting->posting_id, $posting->status),
-                ...$isi,
+                ...$content,
             ], 409);
         }
 
-        return response()->json($isi);
+        return response()->json($content);
     }
 
-    private function klien(Request $request): IntegrationClient
+    private function client(Request $request): IntegrationClient
     {
-        return IntegrationClient::query()->findOrFail((string) $request->attributes->get(AuthenticateIntegrationClient::ATRIBUT));
+        return IntegrationClient::query()->findOrFail((string) $request->attributes->get(AuthenticateIntegrationClient::ATTRIBUTE));
     }
 }

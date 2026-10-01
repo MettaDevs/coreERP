@@ -107,11 +107,11 @@ class EnvironmentConnection
             return $name;
         }
 
-        $konfigurasi = $this->baseConfig();
-        $konfigurasi['database'] = $database;
-        $konfigurasi['url'] = null;
+        $configuration = $this->baseConfig();
+        $configuration['database'] = $database;
+        $configuration['url'] = null;
 
-        config(['database.connections.'.$name => $konfigurasi]);
+        config(['database.connections.'.$name => $configuration]);
         DB::purge($name);
 
         return $name;
@@ -124,19 +124,19 @@ class EnvironmentConnection
      * `public` dilewati: ia sudah ada di tiap database baru, dan `CREATE SCHEMA` atasnya menuntut
      * hak yang belum tentu dimiliki peran aplikasi.
      */
-    public function createSchemas(string $koneksi): void
+    public function createSchemas(string $connection): void
     {
-        $konfigurasi = config('database.connections.'.$koneksi);
+        $configuration = config('database.connections.'.$connection);
 
-        if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi "%s" tidak terbaca dari config.', $koneksi));
+        if (! is_array($configuration)) {
+            throw new RuntimeException(sprintf('Koneksi "%s" tidak terbaca dari config.', $connection));
         }
 
-        /** @var array<string, mixed> $konfigurasi */
-        $list = $this->schemasFrom($konfigurasi);
+        /** @var array<string, mixed> $configuration */
+        $list = $this->schemasFrom($configuration);
 
         foreach ($list as $schema) {
-            DB::connection($koneksi)->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $schema));
+            DB::connection($connection)->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $schema));
         }
     }
 
@@ -295,23 +295,23 @@ class EnvironmentConnection
     public function baseConfig(): array
     {
         $default = $this->controlPlane();
-        $konfigurasi = config('database.connections.'.$default);
+        $configuration = config('database.connections.'.$default);
 
-        if (! is_array($konfigurasi)) {
+        if (! is_array($configuration)) {
             throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
-        /** @var array<string, mixed> $konfigurasi */
-        return $konfigurasi;
+        /** @var array<string, mixed> $configuration */
+        return $configuration;
     }
 
     /**
-     * @param  array<string, mixed>  $konfigurasi
+     * @param  array<string, mixed>  $configuration
      * @return list<string>
      */
-    private function schemasFrom(array $konfigurasi): array
+    private function schemasFrom(array $configuration): array
     {
-        $search = $konfigurasi['search_path'] ?? 'public';
+        $search = $configuration['search_path'] ?? 'public';
         $list = is_array($search) ? $search : explode(',', (string) $search);
 
         $result = [];

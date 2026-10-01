@@ -51,7 +51,7 @@ interface OrganizationDirectory
      * lewat struktur organisasi, tanpa tabel aturan tambahan. Yang dicari adalah leluhur terdekat
      * bertipe `business_unit` — termasuk unit itu sendiri, jadi business unit memulangkan dirinya.
      *
-     * Hierarkinya adalah versi `published` yang berlaku pada `$tanggal` dari setiap hierarki aktif
+     * Hierarkinya adalah versi `published` yang berlaku pada `$date` dari setiap hierarki aktif
      * bertujuan `management`. Unit yang tidak ada di hierarki mana pun, atau yang di dua hierarki
      * manajemen menunjuk business unit berbeda, memulangkan `null`: menebak di sini berarti jurnal
      * masuk ke klinik yang salah tanpa satu pun kesalahan terlihat.
@@ -59,5 +59,5 @@ interface OrganizationDirectory
      * @param  list<string>  $orgUnitIds
      * @return array<string, array{id: string, nama: string, nomor: ?string}|null> Berkunci id operating unit yang ditanyakan.
      */
-    public function parentBusinessUnits(string $tenantId, array $orgUnitIds, string $tanggal): array;
+    public function parentBusinessUnits(string $tenantId, array $orgUnitIds, string $date): array;
 }

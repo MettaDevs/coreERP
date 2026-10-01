@@ -29,15 +29,15 @@ final class ModuleMigrationRepository extends DatabaseMigrationRepository
     /** @return list<string> */
     public function getRan(): array
     {
-        /** @var list<string> $hasil */
-        $hasil = $this->table()
+        /** @var list<string> $result */
+        $result = $this->table()
             ->where('module_id', $this->moduleId)
             ->orderBy('batch')
             ->orderBy('migration')
             ->pluck('migration')
             ->all();
 
-        return $hasil;
+        return $result;
     }
 
     /**

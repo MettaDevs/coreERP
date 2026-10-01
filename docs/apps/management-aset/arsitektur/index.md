@@ -73,8 +73,8 @@ src/
 └── Support/                              aturan yang dipakai bersama
 ```
 
-`Services/` berisi pembungkus tipis di atas kontrak Core (`PenerbitNomorAset`, `PersetujuanAset`,
-`KalenderFiskalAset`, `DaftarSatuanAset`) dan `DepreciationCalculator`. Keempat pembungkus itu dulu
+`Services/` berisi pembungkus tipis di atas kontrak Core (`AssetNumberSequenceIssuer`, `AssetApprovalWorkflow`,
+`AssetFiscalCalendar`, `AssetUnitOfMeasureDirectory`) dan `DepreciationCalculator`. Keempat pembungkus itu dulu
 klien HTTP; yang tersisa dari perannya sekarang hanya menerjemahkan kegagalan Core menjadi kegagalan
 yang berarti bagi pemanggil modul. `Support/` berisi aturan murni: `OrganizationScope`,
 `WorkOrderStatus`, `AssetAttributeValidator`. `Reporting/` berisi definisi dan dataset laporan yang

@@ -361,7 +361,7 @@ final class BootstrapSiteTenant extends Command
     {
         return array_values(array_map(
             static fn (ModuleManifest $module): string => $module->id,
-            array_filter($registry->semua(), static fn (ModuleManifest $module): bool => ! $module->bahanUjiInternal()),
+            array_filter($registry->all(), static fn (ModuleManifest $module): bool => ! $module->internalTestFixtures()),
         ));
     }
 

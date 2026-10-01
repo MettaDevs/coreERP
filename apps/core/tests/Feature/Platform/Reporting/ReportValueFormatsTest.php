@@ -13,7 +13,7 @@ use App\Platform\Reporting\Support\Rendering\DocxTemplateRenderer;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 use App\Platform\Reporting\Support\Rendering\XlsxTemplateRenderer;
 use App\Platform\Reporting\Support\ReportData;
-use App\Platform\Reporting\Support\SumberLaporan;
+use App\Platform\Reporting\Support\ReportSource;
 use App\Platform\Reporting\Support\ValueFormats;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -138,7 +138,7 @@ class ReportValueFormatsTest extends TestCase
         });
         $report = (object) ['app_id' => 'modul-uji-format', 'code' => 'modul-uji-format.rekap', 'app_name' => 'Modul uji'];
 
-        $data = app(SumberLaporan::class)->dataset($report, $this->membership, null, null, []);
+        $data = app(ReportSource::class)->dataset($report, $this->membership, null, null, []);
 
         $this->assertSame(['total', 'periode', 'baris.nilai', 'baris.tanggal', 'baris.tarif'], array_keys($data->formats));
         // Dataset tetap mentah; yang memformat renderer, menurut keluarannya.
@@ -225,7 +225,7 @@ class ReportValueFormatsTest extends TestCase
         $owner = $this->owner();
         $owner->forceFill(['timezone' => 'Asia/Jakarta'])->save();
 
-        $data = app(SumberLaporan::class)->dataset($report, $this->membership->fresh() ?? $this->membership, null, null, []);
+        $data = app(ReportSource::class)->dataset($report, $this->membership->fresh() ?? $this->membership, null, null, []);
 
         // Module menerima zona pengguna di konteks laporan, untuk "hari ini" miliknya sendiri.
         $this->assertSame(['Asia/Jakarta', 'Asia/Jakarta'], $zones->getArrayCopy());
@@ -256,7 +256,7 @@ class ReportValueFormatsTest extends TestCase
         $colleague = User::factory()->create(['timezone' => 'Asia/Jayapura']);
         $membership = TenantMembership::create(['tenant_id' => $this->tenantId(), 'user_id' => $colleague->id, 'status' => 'active']);
 
-        $data = app(SumberLaporan::class)->dataset($report, $membership, null, null, []);
+        $data = app(ReportSource::class)->dataset($report, $membership, null, null, []);
 
         $this->assertSame('28/09/2026 02:30 WIT', $data->formats['dicetak_pada']->text($data->fields['dicetak_pada']));
     }
@@ -269,7 +269,7 @@ class ReportValueFormatsTest extends TestCase
         $organization->legalEntity()->create(['tenant_id' => $this->tenantId(), 'company_code' => 'MKS', 'country_code' => 'ID', 'timezone' => 'Asia/Makassar']);
 
         // Ekspor dikerjakan worker tanpa permintaan maupun sesi: entitas legalnya dari catatan ekspor.
-        $data = app(SumberLaporan::class)->dataset($report, $this->membership, (string) $organization->id, null, []);
+        $data = app(ReportSource::class)->dataset($report, $this->membership, (string) $organization->id, null, []);
 
         $this->assertSame('Asia/Makassar', $zones->getArrayCopy()[0]);
         $this->assertSame('28/09/2026 01:30 WITA', $data->formats['dicetak_pada']->text($data->fields['dicetak_pada']));

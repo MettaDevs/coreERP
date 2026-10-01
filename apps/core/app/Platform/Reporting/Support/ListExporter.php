@@ -31,7 +31,7 @@ final class ListExporter
     public function __construct(
         private readonly ListExportRegistry $registry,
         private readonly LaunchableAppCatalog $apps,
-        private readonly SumberLaporan $modules,
+        private readonly ReportSource $modules,
         private readonly ValueFormats $formats,
     ) {}
 

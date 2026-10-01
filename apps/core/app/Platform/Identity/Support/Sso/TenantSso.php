@@ -46,13 +46,13 @@ class TenantSso
             return false;
         }
 
-        $setelan = TenantIdentityProvider::query()->where('tenant_id', $tenantId)->first();
+        $settings = TenantIdentityProvider::query()->where('tenant_id', $tenantId)->first();
 
         // Tidak ada baris berarti tenant ini belum pernah memutuskan apa pun, dan yang berlaku
         // adalah keputusan penempatan. Baris yang ada selalu menang — termasuk mode `sendiri`,
         // yang berarti tenant ini memakai penyedianya sendiri dan bukan yang bersama ini.
-        return $setelan === null
-            || ($setelan->mode === 'bersama' && $setelan->aktif);
+        return $settings === null
+            || ($settings->mode === 'bersama' && $settings->aktif);
     }
 
     /** Alamat tombol masuk lewat SSO di halaman masuk, atau null bila alamat ini tidak menawarkannya. */

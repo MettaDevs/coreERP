@@ -42,64 +42,64 @@ final class ModuleRequestContext implements RequestContext
     public const DATA_POLICIES = 'coreerp.data_policies';
 
     public function __construct(
-        private readonly Request $permintaan,
+        private readonly Request $request,
         private readonly UserClock $clock,
     ) {}
 
     public function userId(): string
     {
-        $nilai = $this->permintaan->attributes->get(self::USER_ID);
+        $value = $this->request->attributes->get(self::USER_ID);
 
-        if (! is_string($nilai) || $nilai === '') {
+        if (! is_string($value) || $value === '') {
             // Melempar, bukan mengembalikan string kosong. Id pengguna kosong akan diteruskan
             // ke kolom "dibuat oleh" dan menghasilkan jejak audit yang tidak menunjuk siapa pun.
             throw new RuntimeException('Konteks module belum terpasang pada permintaan ini.');
         }
 
-        return $nilai;
+        return $value;
     }
 
     /** @return list<string> */
     public function permissions(): array
     {
-        $nilai = $this->permintaan->attributes->get(self::PERMISSIONS, []);
+        $value = $this->request->attributes->get(self::PERMISSIONS, []);
 
-        if (! is_array($nilai)) {
+        if (! is_array($value)) {
             return [];
         }
 
-        $kode = [];
+        $code = [];
 
-        foreach ($nilai as $satu) {
-            if (is_string($satu) && $satu !== '') {
-                $kode[] = $satu;
+        foreach ($value as $item) {
+            if (is_string($item) && $item !== '') {
+                $code[] = $item;
             }
         }
 
-        return $kode;
+        return $code;
     }
 
-    public function hasPermission(string $kode): bool
+    public function hasPermission(string $code): bool
     {
-        return in_array($kode, $this->permissions(), true);
+        return in_array($code, $this->permissions(), true);
     }
 
     /** @return array<string, mixed> */
     public function dataPolicies(): array
     {
-        $nilai = $this->permintaan->attributes->get(self::DATA_POLICIES, []);
+        $value = $this->request->attributes->get(self::DATA_POLICIES, []);
 
-        if (! is_array($nilai)) {
+        if (! is_array($value)) {
             return [];
         }
 
-        $kebijakan = [];
+        $policy = [];
 
-        foreach ($nilai as $kode => $lingkup) {
-            $kebijakan[(string) $kode] = $lingkup;
+        foreach ($value as $code => $scope) {
+            $policy[(string) $code] = $scope;
         }
 
-        return $kebijakan;
+        return $policy;
     }
 
     /**
@@ -110,6 +110,6 @@ final class ModuleRequestContext implements RequestContext
      */
     public function timezone(): string
     {
-        return $this->clock->timezone($this->permintaan);
+        return $this->clock->timezone($this->request);
     }
 }

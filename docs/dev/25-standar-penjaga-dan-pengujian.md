@@ -33,7 +33,7 @@ Karena itu setiap penjaga harus pernah dilihat merah, dan pesan merahnya disimpa
 Dua cara membuktikannya, keduanya dipakai di repository ini:
 
 - **Percobaan sekali jalan.** Rusakkan sesuatu dengan sengaja, catat pesannya, kembalikan. Dipakai untuk penjaga yang subjeknya modul sungguhan.
-- **Test pendamping yang permanen.** Penjaga membaca daftar pelanggaran; test kedua memberi daftar itu subjek buatan dan menuntutnya merah. `ModulTanpaAnalisaTipeTest::test_tenggat_yang_lewat_terdeteksi` di `apps/core/tests/Feature/Boundary/ModulTanpaAnalisaTipeTest.php` adalah bentuknya — tanpa test itu, fungsi pemeriksanya bisa saja selalu memulangkan daftar kosong.
+- **Test pendamping yang permanen.** Penjaga membaca daftar pelanggaran; test kedua memberi daftar itu subjek buatan dan menuntutnya merah. `ModulesWithoutTypeAnalysisTest::test_tenggat_yang_lewat_terdeteksi` di `apps/core/tests/Feature/Boundary/ModulesWithoutTypeAnalysisTest.php` adalah bentuknya — tanpa test itu, fungsi pemeriksanya bisa saja selalu memulangkan daftar kosong.
 
 Bentuk kedua lebih baik bila memungkinkan, karena percobaan sekali jalan hanya membuktikan penjaga bisa gagal **pada hari itu**.
 
@@ -88,7 +88,7 @@ PHPStan tetap dipakai, untuk pertanyaan lain: kebenaran tipe. Setelannya ada di 
 
 ## Daftar pengecualian yang boleh kosong tetap harus membuktikan aturannya
 
-`App\Platform\Modules\Support\ModulTanpaAnalisaTipe` di `apps/core/app/Platform/Modules/Support/ModulTanpaAnalisaTipe.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
+`App\Platform\Modules\Support\ModulesWithoutTypeAnalysis` di `apps/core/app/Platform/Modules/Support/ModulesWithoutTypeAnalysis.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
 
 Daftar kosong membuat setiap pemeriksaan yang membacanya hijau **tanpa subjek**. Penjaga tanpa subjek tidak boleh dianggap hijau: ia tidak membuktikan aturannya berlaku, ia hanya membuktikan tidak ada yang diperiksa. Karena itu syarat "alasan menyebut angka terukur" dan "tenggat ditulis `YYYY-MM-DD`" dibuktikan pada entri buatan di dalam test, lewat penyedia data yang memberi entri cacat dan menuntut pemeriksanya merah.
 
@@ -109,7 +109,7 @@ Polanya sudah ada di beberapa tempat dan tinggal diikuti:
 | Berkas | Yang dibuat di folder sementara |
 | --- | --- |
 | `apps/core/tests/Feature/Boundary/PemindaiModul.php` | Modul palsu untuk penjaga batas |
-| `apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Sepasang modul yang identik sampai ke barisnya, beda hanya nama folder |
+| `apps/core/tests/Feature/Boundary/ModulesBeingMovedTest.php` | Sepasang modul yang identik sampai ke barisnya, beda hanya nama folder |
 | `apps/core/tests/Feature/Boundary/SusunanManifestModulTest.php` | Manifest palsu yang membuktikan aturannya bisa merah |
 | `apps/core/tests/Feature/ControlPlane/EditionModulesTest.php` | Folder modul yang dibaca penentu isi image |
 

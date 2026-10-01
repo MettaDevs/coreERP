@@ -38,7 +38,7 @@ class LaunchableAppCatalog
                 ->map(fn (array $item): array => [
                     'id' => $item['id'],
                     'label' => $item['label'],
-                    'href' => $this->tautanMenu($app->id, (string) $item['id']),
+                    'href' => $this->menuLink($app->id, (string) $item['id']),
                 ])->all());
 
             return $items === [] ? null : [
@@ -60,7 +60,7 @@ class LaunchableAppCatalog
      * adalah satu-satunya sumber kebenaran, dan test membuktikan tiap tautan menu
      * benar-benar mendarat pada rute yang terdaftar.
      */
-    private function tautanMenu(string $appId, string $itemId): string
+    private function menuLink(string $appId, string $itemId): string
     {
         return '/'.$appId.'/'.$itemId;
     }
@@ -75,7 +75,7 @@ class LaunchableAppCatalog
      *
      * @return array{id:string,name:string,navigation:array{rails:list<array{id:string,label:string,href:string,items:list<array{id:string,label:string,href:string}>}>,activeItemId:string|null}}|null
      */
-    public function kerangkaModule(TenantMembership $membership, string $moduleId, string $path): ?array
+    public function moduleShell(TenantMembership $membership, string $moduleId, string $path): ?array
     {
         $app = CoreApp::query()->whereKey($moduleId)->first();
 
@@ -84,7 +84,7 @@ class LaunchableAppCatalog
         }
 
         $rails = $this->navigationFor($membership, $app);
-        $aktif = collect($rails)
+        $active = collect($rails)
             ->flatMap(fn (array $rail): array => $rail['items'])
             ->firstWhere('href', $path);
 
@@ -93,7 +93,7 @@ class LaunchableAppCatalog
             'name' => $app->name,
             'navigation' => [
                 'rails' => $rails,
-                'activeItemId' => $aktif['id'] ?? null,
+                'activeItemId' => $active['id'] ?? null,
             ],
         ];
     }
@@ -115,7 +115,7 @@ class LaunchableAppCatalog
         // semuanya membaca daftar ini, jadi saringan di sini menutup ketiganya sekaligus.
         $readyAppIds = array_values(array_filter(
             array_intersect(
-                $this->moduleTerpasang($membership),
+                $this->installedModules($membership),
                 $authorizedAppIds->map(strval(...))->all(),
             ),
             app(SiteLicense::class)->allowsApp(...),
@@ -171,7 +171,7 @@ class LaunchableAppCatalog
      *
      * @return list<string>
      */
-    public function moduleTerpasang(TenantMembership $membership): array
+    public function installedModules(TenantMembership $membership): array
     {
         $id = DB::table('core_module_installations')
             ->where('tenant_id', $membership->tenant_id)
@@ -184,8 +184,8 @@ class LaunchableAppCatalog
     }
 
     /** Apakah app ini dilayani runtime Core sebagai module, bukan oleh container tersendiri. */
-    public function berjalanSebagaiModul(TenantMembership $membership, string $appId): bool
+    public function runsAsModule(TenantMembership $membership, string $appId): bool
     {
-        return in_array($appId, $this->moduleTerpasang($membership), true);
+        return in_array($appId, $this->installedModules($membership), true);
     }
 }

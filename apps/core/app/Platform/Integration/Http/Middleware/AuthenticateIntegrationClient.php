@@ -35,10 +35,10 @@ use Symfony\Component\HttpFoundation\Response;
 final class AuthenticateIntegrationClient
 {
     /** Atribut permintaan tempat id klien yang terautentikasi disimpan. */
-    public const ATRIBUT = 'coreerp.integration_client_id';
+    public const ATTRIBUTE = 'coreerp.integration_client_id';
 
     public function __construct(
-        private readonly ActiveEnvironment $lingkungan,
+        private readonly ActiveEnvironment $environment,
         private readonly IntegrationClientAccounts $accounts,
     ) {}
 
@@ -63,14 +63,14 @@ final class AuthenticateIntegrationClient
             }
         }
 
-        app()->instance(TenantScope::KUNCI, $client->tenant_id);
-        $this->lingkungan->lupakan();
-        if (! $this->lingkungan->outboundAllowed()) {
-            abort(503, $this->lingkungan->refusalReason());
+        app()->instance(TenantScope::KEY, $client->tenant_id);
+        $this->environment->forget();
+        if (! $this->environment->outboundAllowed()) {
+            abort(503, $this->environment->refusalReason());
         }
 
         $request->attributes->set('coreerp.tenant_id', $client->tenant_id);
-        $request->attributes->set(self::ATRIBUT, $client->id);
+        $request->attributes->set(self::ATTRIBUTE, $client->id);
 
         // Klien lama yang lahir sebelum akun aplikasi ada mendapat akunnya pada panggilan pertama.
         AuditActor::set($client->user_id ?? $this->accounts->ensure($client));
@@ -96,8 +96,8 @@ final class AuthenticateIntegrationClient
             return null;
         }
 
-        [$id, $rahasia] = explode('.', $token, 2);
-        if (! Str::isUlid($id) || $rahasia === '') {
+        [$id, $secret] = explode('.', $token, 2);
+        if (! Str::isUlid($id) || $secret === '') {
             return null;
         }
 
@@ -106,7 +106,7 @@ final class AuthenticateIntegrationClient
             ->where('status', IntegrationClient::ACTIVE)
             ->first();
 
-        return $client !== null && hash_equals($client->token_digest, IntegrationClient::digest($rahasia))
+        return $client !== null && hash_equals($client->token_digest, IntegrationClient::digest($secret))
             ? $client
             : null;
     }

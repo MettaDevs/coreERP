@@ -27,12 +27,12 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\OpeningBalance;
 use Modules\Apperp\ManagementAset\Services\OpeningBalanceImport;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
-use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PenerimaanStatus;
@@ -134,7 +134,7 @@ class PenerimaanAsetController extends Controller
         return response()->json(['data' => $penerimaan], 200, ['ETag' => RowVersion::etag((int) $penerimaan->version)]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
+    public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
@@ -331,7 +331,7 @@ class PenerimaanAsetController extends Controller
      * pratinjau jurnal dan penyelesaiannya dilakukan per dokumen, sama seperti yang diketik di layar.
      * Percobaan ulang dengan `Idempotency-Key` yang sama memulangkan draf yang sudah dibuat.
      */
-    public function imporSaldoAwal(Request $request, PenerbitNomorAset $numbers, OpeningBalanceImport $impor): JsonResponse
+    public function imporSaldoAwal(Request $request, AssetNumberSequenceIssuer $numbers, OpeningBalanceImport $impor): JsonResponse
     {
         $this->guard($request, 'create');
         $form = $request->validate([
@@ -528,7 +528,7 @@ class PenerimaanAsetController extends Controller
      * D365 yang menghentikan posting faktur tanpa buku ber-lapisan Current. Pemetaan akun yang
      * kosong tidak menahan: postingnya tertahan di Core, penerimaannya tetap selesai (K-18).
      */
-    public function selesaikan(Request $request, string $id, PenerbitNomorAset $numbers, PembuatAset $pembuat): JsonResponse
+    public function selesaikan(Request $request, string $id, AssetNumberSequenceIssuer $numbers, PembuatAset $pembuat): JsonResponse
     {
         $this->guardAset($request, 'create');
         $penerimaan = $this->dokumen($request, $id);
@@ -1152,11 +1152,11 @@ class PenerimaanAsetController extends Controller
      */
     private function denganNama(string $tenantId, stdClass $baris): stdClass
     {
-        $direktori = app(DirektoriAset::class);
-        $baris->responsible_org_unit_nama = $direktori->namaUnit($tenantId, $baris->responsible_org_unit_id ?? null);
-        $baris->receiving_org_unit_nama = $direktori->namaUnit($tenantId, $baris->receiving_org_unit_id ?? null);
-        $baris->diterima_oleh_nama = $direktori->namaOrang($tenantId, $baris->diterima_oleh_user_id ?? null);
-        $baris->penanggung_jawab_nama = $direktori->namaOrang($tenantId, $baris->penanggung_jawab_user_id ?? null);
+        $direktori = app(AssetOrganizationDirectory::class);
+        $baris->responsible_org_unit_nama = $direktori->unitName($tenantId, $baris->responsible_org_unit_id ?? null);
+        $baris->receiving_org_unit_nama = $direktori->unitName($tenantId, $baris->receiving_org_unit_id ?? null);
+        $baris->diterima_oleh_nama = $direktori->personName($tenantId, $baris->diterima_oleh_user_id ?? null);
+        $baris->penanggung_jawab_nama = $direktori->personName($tenantId, $baris->penanggung_jawab_user_id ?? null);
 
         return $baris;
     }

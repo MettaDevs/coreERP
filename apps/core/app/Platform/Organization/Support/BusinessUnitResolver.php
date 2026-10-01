@@ -29,23 +29,23 @@ final class BusinessUnitResolver
     public function resolve(string $tenantId, array $orgUnitIds, string $date): array
     {
         $ids = array_values(array_unique(array_filter($orgUnitIds, static fn (string $id): bool => $id !== '')));
-        /** @var array<string, array{id: string, name: string, number: ?string}|null> $hasil */
-        $hasil = array_fill_keys($ids, null);
+        /** @var array<string, array{id: string, name: string, number: ?string}|null> $result */
+        $result = array_fill_keys($ids, null);
         if ($ids === []) {
-            return $hasil;
+            return $result;
         }
 
-        $versi = $this->versiManajemenYangBerlaku($tenantId, $date);
-        if ($versi === []) {
-            return $hasil;
+        $version = $this->effectiveManagementVersion($tenantId, $date);
+        if ($version === []) {
+            return $result;
         }
 
         // Leluhur bertipe business unit, termasuk unit itu sendiri (jarak 0). Legal entity tidak
         // punya baris di `operating_units`, jadi join dalam ini sudah menyaringnya.
-        $baris = DB::table('organization_hierarchy_closures as closure')
+        $rows = DB::table('organization_hierarchy_closures as closure')
             ->join('operating_units as unit', 'unit.organization_id', '=', 'closure.ancestor_organization_id')
             ->join('organizations as ancestor', 'ancestor.id', '=', 'closure.ancestor_organization_id')
-            ->whereIn('closure.version_id', $versi)
+            ->whereIn('closure.version_id', $version)
             ->whereIn('closure.descendant_organization_id', $ids)
             ->where('unit.type', 'business_unit')
             ->where('ancestor.tenant_id', $tenantId)
@@ -60,30 +60,30 @@ final class BusinessUnitResolver
 
         // Satu jawaban per hierarki: business unit terdekat. Baris sudah urut jarak, jadi yang
         // pertama untuk tiap pasangan (unit, versi) adalah yang terdekat.
-        $terdekat = [];
-        foreach ($baris as $row) {
-            $terdekat[$row->descendant_organization_id.'|'.$row->version_id] ??= $row;
+        $nearest = [];
+        foreach ($rows as $row) {
+            $nearest[$row->descendant_organization_id.'|'.$row->version_id] ??= $row;
         }
 
         $perUnit = [];
-        foreach ($terdekat as $row) {
+        foreach ($nearest as $row) {
             $perUnit[(string) $row->descendant_organization_id][(string) $row->ancestor_organization_id] = $row;
         }
 
-        foreach ($perUnit as $unitId => $calon) {
+        foreach ($perUnit as $unitId => $candidates) {
             // Dua hierarki manajemen yang tidak sepakat bukan pilihan yang boleh ditebak.
-            if (count($calon) !== 1) {
+            if (count($candidates) !== 1) {
                 continue;
             }
-            $bu = reset($calon);
-            $hasil[$unitId] = [
+            $bu = reset($candidates);
+            $result[$unitId] = [
                 'id' => (string) $bu->ancestor_organization_id,
                 'name' => (string) $bu->name,
                 'number' => $bu->number === null ? null : (string) $bu->number,
             ];
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -94,9 +94,9 @@ final class BusinessUnitResolver
      *
      * @return list<string>
      */
-    private function versiManajemenYangBerlaku(string $tenantId, string $date): array
+    private function effectiveManagementVersion(string $tenantId, string $date): array
     {
-        $calon = DB::table('organization_hierarchy_versions as version')
+        $candidates = DB::table('organization_hierarchy_versions as version')
             ->join('organization_hierarchies as hierarchy', 'hierarchy.id', '=', 'version.hierarchy_id')
             ->join('organization_hierarchy_purposes as link', 'link.hierarchy_id', '=', 'hierarchy.id')
             ->join('hierarchy_purposes as purpose', 'purpose.id', '=', 'link.purpose_id')
@@ -109,11 +109,11 @@ final class BusinessUnitResolver
             ->orderByDesc('version.version_number')
             ->get(['version.id', 'version.hierarchy_id']);
 
-        $perHierarki = [];
-        foreach ($calon as $row) {
-            $perHierarki[(string) $row->hierarchy_id] ??= (string) $row->id;
+        $perHierarchy = [];
+        foreach ($candidates as $row) {
+            $perHierarchy[(string) $row->hierarchy_id] ??= (string) $row->id;
         }
 
-        return array_values($perHierarki);
+        return array_values($perHierarchy);
     }
 }

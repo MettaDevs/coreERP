@@ -61,7 +61,7 @@ Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
  * referensi internal dijaga gate `viewApiDocs`. Alasannya di DocsPortalController.
  */
 Route::get('docs', DocsPortalController::class)->name('docs.portal');
-Route::get('docs/kontrak/{spesifikasi}.yaml', [DocsPortalController::class, 'kontrak'])
+Route::get('docs/kontrak/{spesifikasi}.yaml', [DocsPortalController::class, 'contract'])
     ->where('spesifikasi', '[a-z-]+')
     ->name('docs.kontrak');
 

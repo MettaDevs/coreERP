@@ -6,7 +6,7 @@ use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinancePostingSetting;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Foundation\FinancePosting\Support\PostingPublisher;
-use App\Foundation\FinancePosting\Support\StatusPostingBerubah;
+use App\Foundation\FinancePosting\Support\PostingStatusChanged;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\InvalidPosting;
 use App\Platform\Modules\Contracts\PostingFeed;
@@ -274,7 +274,7 @@ class FinancePostingMonitorTest extends TestCase
             'status' => 'posted', 'external_reference' => 'JV-2026-0002', 'acknowledged_at' => now(),
         ]);
 
-        $this->expectException(StatusPostingBerubah::class);
+        $this->expectException(PostingStatusChanged::class);
         app(PostingPublisher::class)->markManual($diLayar, 'Terlambat', $this->owner->id);
     }
 

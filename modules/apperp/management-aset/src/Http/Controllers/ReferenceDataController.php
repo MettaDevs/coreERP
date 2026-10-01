@@ -7,8 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
-use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
+use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 use RuntimeException;
 
 final class ReferenceDataController extends Controller
@@ -26,7 +26,7 @@ final class ReferenceDataController extends Controller
         'management-aset.maintenance-checklist-templates.read',
     ];
 
-    public function unitsOfMeasure(Request $request, DaftarSatuanAset $units): JsonResponse
+    public function unitsOfMeasure(Request $request, AssetUnitOfMeasureDirectory $units): JsonResponse
     {
         $held = $request->attributes->get('coreerp.permissions', []);
         abort_if(array_intersect(self::UNIT_READERS, $held) === [], 403);
@@ -56,7 +56,7 @@ final class ReferenceDataController extends Controller
         'management-aset.monitoring-aset.read',
     ];
 
-    public function operatingUnits(Request $request, DirektoriAset $direktori): JsonResponse
+    public function operatingUnits(Request $request, AssetOrganizationDirectory $direktori): JsonResponse
     {
         $this->guardDirektori($request);
 
@@ -65,11 +65,11 @@ final class ReferenceDataController extends Controller
             // unit, dan label dropdown modul ini berbentuk `kode — nama`. Tanpa penyamaan
             // itu, pilihannya terbaca sebagai "— Divisi Engineering".
             static fn (array $unit): array => ['id' => $unit['id'], 'kode' => $unit['nama'], 'nama' => $unit['nama'], 'display_label' => $unit['nama']],
-            $direktori->unitKerja((string) $request->attributes->get('coreerp.tenant_id')),
+            $direktori->operatingUnits((string) $request->attributes->get('coreerp.tenant_id')),
         )]);
     }
 
-    public function members(Request $request, DirektoriAset $direktori): JsonResponse
+    public function members(Request $request, AssetOrganizationDirectory $direktori): JsonResponse
     {
         $this->guardDirektori($request);
 
@@ -81,7 +81,7 @@ final class ReferenceDataController extends Controller
                 'display_label' => $anggota['nama'],
                 'email' => $anggota['email'],
             ],
-            $direktori->anggota((string) $request->attributes->get('coreerp.tenant_id')),
+            $direktori->members((string) $request->attributes->get('coreerp.tenant_id')),
         )]);
     }
 

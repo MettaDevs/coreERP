@@ -77,7 +77,7 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
   - `LaunchableAppCatalog::for()` — peluncur, `/apps/{app}`, `launch-manifest`;
   - `HandleInertiaRequests` — daftar produk yang dimiliki;
   - `AuthenticateAppService` — panggilan `internal/v1` antar-app.
-- Middleware kunci di grup `web` sesudah `WajibGantiSandi`, dengan daftar rute yang tetap terbuka yang
+- Middleware kunci di grup `web` sesudah `RequirePasswordChange`, dengan daftar rute yang tetap terbuka yang
   sama polanya. Permintaan JSON mendapat `403 {"error":"license_locked"}`.
 - API internal baru untuk admin.erp: `GET /api/internal/v1/tenants/{tenant}/entitlements` →
   `{"tenant_id": "...", "apps": [...]}`, di grup `control-plane`, didaftarkan di

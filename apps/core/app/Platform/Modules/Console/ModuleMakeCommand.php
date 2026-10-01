@@ -55,7 +55,7 @@ final class ModuleMakeCommand extends Command
      *
      * @var list<string>
      */
-    private const BERKAS_TIDAK_DISALIN = ['README.md'];
+    private const UNCOPIED_FILES = ['README.md'];
 
     /**
      * Kata yang tidak boleh menjadi penggal namespace PHP.
@@ -67,22 +67,22 @@ final class ModuleMakeCommand extends Command
      *
      * @var list<string>
      */
-    private const KATA_TERLARANG = [
+    private const FORBIDDEN_WORDS = [
         'array', 'class', 'default', 'echo', 'exit', 'for', 'foreach', 'function', 'global',
         'if', 'include', 'interface', 'list', 'match', 'namespace', 'new', 'print', 'return',
         'static', 'switch', 'trait', 'use', 'while',
     ];
 
     /** Panjang maksimum awalan tabel, supaya nama indeks tidak melewati batas identifier PostgreSQL. */
-    private const PANJANG_AWALAN_MAKSIMUM = 16;
+    private const MAX_PREFIX_LENGTH = 16;
 
     public function handle(): int
     {
-        $akar = dirname(base_path(), 2);
-        $cetakan = $akar.'/modules/_template';
+        $root = dirname(base_path(), 2);
+        $template = $root.'/modules/_template';
 
-        if (! is_dir($cetakan)) {
-            $this->error(sprintf('Cetakan module tidak ada di %s. Tanpa cetakannya tidak ada yang bisa disalin.', $cetakan));
+        if (! is_dir($template)) {
+            $this->error(sprintf('Cetakan module tidak ada di %s. Tanpa cetakannya tidak ada yang bisa disalin.', $template));
 
             return self::FAILURE;
         }
@@ -92,56 +92,56 @@ final class ModuleMakeCommand extends Command
         // diminta orangnya, dan perbedaan itu baru ketahuan setelah folder, manifest, dan tabel
         // pemetaan sudah ditulis.
         $module = trim((string) $this->argument('module'));
-        $penerbit = trim((string) $this->option('penerbit'));
-        $awalan = trim((string) $this->option('awalan'));
-        $nama = trim((string) $this->option('nama'));
+        $publisher = trim((string) $this->option('penerbit'));
+        $prefix = trim((string) $this->option('awalan'));
+        $name = trim((string) $this->option('nama'));
 
-        $awalan = $awalan === '' ? str_replace('-', '_', $module).'_' : $awalan;
-        $nama = $nama === '' ? self::judul($module) : $nama;
+        $prefix = $prefix === '' ? str_replace('-', '_', $module).'_' : $prefix;
+        $name = $name === '' ? self::title($module) : $name;
 
-        $moduleYangAda = $this->moduleYangAda($akar);
-        $tujuan = $akar.'/modules/'.$penerbit.'/'.$module;
+        $existingModules = $this->existingModules($root);
+        $destination = $root.'/modules/'.$publisher.'/'.$module;
 
-        $keberatan = $this->keberatan($module, $penerbit, $nama, $awalan, $tujuan, $moduleYangAda);
+        $objections = $this->objections($module, $publisher, $name, $prefix, $destination, $existingModules);
 
-        if ($keberatan !== []) {
+        if ($objections !== []) {
             $this->error('Module tidak dibuat. Yang harus dibereskan lebih dulu:');
 
-            foreach ($keberatan as $baris) {
-                $this->line('  - '.$baris);
+            foreach ($objections as $line) {
+                $this->line('  - '.$line);
             }
 
             return self::FAILURE;
         }
 
-        $penanda = [
+        $marker = [
             // Diurutkan dari yang paling panjang supaya mudah dibaca; `strtr` sendiri sudah
             // mencocokkan penanda terpanjang lebih dulu, apa pun urutan penulisannya.
-            'PenerbitContoh' => self::studly($penerbit),
-            'penerbit-contoh' => $penerbit,
-            'change_me_' => $awalan,
+            'PenerbitContoh' => self::studly($publisher),
+            'penerbit-contoh' => $publisher,
+            'change_me_' => $prefix,
             'ChangeMe' => self::studly($module),
-            'Change Me' => $nama,
+            'Change Me' => $name,
             'change-me' => $module,
         ];
 
-        $ditulis = $this->salinCetakan($cetakan, $tujuan, $penanda);
+        $written = $this->copyTemplate($template, $destination, $marker);
 
-        $this->info(sprintf('Module %s/%s dibuat dari cetakan:', $penerbit, $module));
+        $this->info(sprintf('Module %s/%s dibuat dari cetakan:', $publisher, $module));
 
-        foreach ($ditulis as $berkas) {
-            $this->line('  modules/'.$penerbit.'/'.$module.'/'.$berkas);
+        foreach ($written as $file) {
+            $this->line('  modules/'.$publisher.'/'.$module.'/'.$file);
         }
 
-        $this->daftarkanAwalanPadaReadme($akar, $penerbit, $module, $awalan);
-        $paket = $this->daftarkanPadaComposer($penerbit, $module);
+        $this->registerPrefixInReadme($root, $publisher, $module, $prefix);
+        $package = $this->registerInComposer($publisher, $module);
 
         $this->newLine();
         $this->line('Satu langkah tersisa, dan ia tidak bisa dilewati: kelas module belum bisa dimuat');
         $this->line('sampai Composer memasang package-nya dari repository path di composer.json.');
         $this->newLine();
         $this->line('  cd apps/core');
-        $this->line('  composer update '.$paket);
+        $this->line('  composer update '.$package);
         $this->line('  php artisan module:list');
         $this->line('  vendor/bin/phpunit tests/Feature/Boundary');
         $this->newLine();
@@ -157,22 +157,22 @@ final class ModuleMakeCommand extends Command
      * Dikumpulkan, bukan dilaporkan satu per satu lalu berhenti: orang yang salah menulis id
      * **dan** awalan akan menjalankan perintah ini dua kali untuk mengetahui keduanya.
      *
-     * @param  array<string, string>  $moduleYangAda
+     * @param  array<string, string>  $existingModules
      * @return list<string>
      */
-    private function keberatan(
+    private function objections(
         string $module,
-        string $penerbit,
-        string $nama,
-        string $awalan,
-        string $tujuan,
-        array $moduleYangAda,
+        string $publisher,
+        string $name,
+        string $prefix,
+        string $destination,
+        array $existingModules,
     ): array {
-        $keberatan = [];
-        $pola = '/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/';
+        $objections = [];
+        $pattern = '/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/';
 
-        if (preg_match($pola, $module) !== 1 || strlen($module) < 3 || strlen($module) > 40) {
-            $keberatan[] = sprintf(
+        if (preg_match($pattern, $module) !== 1 || strlen($module) < 3 || strlen($module) > 40) {
+            $objections[] = sprintf(
                 'Id module "%s" tidak sah. Yang berlaku: 3 sampai 40 huruf kecil, angka, dan tanda hubung '.
                 'di antaranya, misalnya "kelola-contoh". Id inilah yang menjadi nama folder, awalan tiap '.
                 'kode izin, dan jalur rutenya.',
@@ -180,112 +180,112 @@ final class ModuleMakeCommand extends Command
             );
         }
 
-        if (preg_match($pola, $penerbit) !== 1 || strlen($penerbit) < 3 || strlen($penerbit) > 40) {
-            $keberatan[] = sprintf('Id penerbit "%s" tidak sah; aturannya sama dengan id module.', $penerbit);
+        if (preg_match($pattern, $publisher) !== 1 || strlen($publisher) < 3 || strlen($publisher) > 40) {
+            $objections[] = sprintf('Id penerbit "%s" tidak sah; aturannya sama dengan id module.', $publisher);
         }
 
-        foreach (['module' => $module, 'penerbit' => $penerbit] as $peran => $nilai) {
-            if (in_array($nilai, self::KATA_TERLARANG, true)) {
-                $keberatan[] = sprintf(
+        foreach (['module' => $module, 'penerbit' => $publisher] as $role => $value) {
+            if (in_array($value, self::FORBIDDEN_WORDS, true)) {
+                $objections[] = sprintf(
                     'Id %s "%s" adalah kata yang tidak boleh menjadi penggal namespace PHP; namespace '.
                     'module tidak akan bisa diurai sama sekali.',
-                    $peran,
-                    $nilai,
+                    $role,
+                    $value,
                 );
             }
         }
 
-        if ($module === 'change-me' || $penerbit === 'penerbit-contoh') {
-            $keberatan[] = 'Penanda cetakan tidak boleh dipakai sebagai nama sungguhan; registry menolak module ber-id "change-me".';
+        if ($module === 'change-me' || $publisher === 'penerbit-contoh') {
+            $objections[] = 'Penanda cetakan tidak boleh dipakai sebagai nama sungguhan; registry menolak module ber-id "change-me".';
         }
 
-        if (preg_match('/^[a-z][a-z0-9_]*_$/', $awalan) !== 1 || strlen($awalan) > self::PANJANG_AWALAN_MAKSIMUM) {
-            $keberatan[] = sprintf(
+        if (preg_match('/^[a-z][a-z0-9_]*_$/', $prefix) !== 1 || strlen($prefix) > self::MAX_PREFIX_LENGTH) {
+            $objections[] = sprintf(
                 'Awalan tabel "%s" tidak sah. Yang berlaku: huruf kecil, angka, dan garis bawah, diawali '.
                 'huruf, diakhiri garis bawah, paling panjang %d karakter — misalnya "contoh_".',
-                $awalan,
-                self::PANJANG_AWALAN_MAKSIMUM,
+                $prefix,
+                self::MAX_PREFIX_LENGTH,
             );
         }
 
-        if (preg_match('/^[\p{L}\p{N}][\p{L}\p{N} .\-]*$/u', $nama) !== 1 || mb_strlen($nama) > 60) {
-            $keberatan[] = sprintf(
+        if (preg_match('/^[\p{L}\p{N}][\p{L}\p{N} .\-]*$/u', $name) !== 1 || mb_strlen($name) > 60) {
+            $objections[] = sprintf(
                 'Nama tampilan "%s" tidak sah. Ia ditulis apa adanya ke app.yaml, jadi yang diterima hanya '.
                 'huruf, angka, spasi, titik, dan tanda hubung, paling panjang 60 karakter.',
-                $nama,
+                $name,
             );
         }
 
-        if (is_dir($tujuan)) {
-            $keberatan[] = sprintf(
+        if (is_dir($destination)) {
+            $objections[] = sprintf(
                 '%s sudah ada. Perintah ini tidak pernah menimpa: kehilangan satu percobaan lebih murah '.
                 'daripada kehilangan pekerjaan orang lain.',
-                self::jalurRingkas($tujuan),
+                self::shortPath($destination),
             );
         }
 
-        foreach ($moduleYangAda as $jalur => $awalanTerpakai) {
-            [, $namaFolder] = explode('/', $jalur, 2);
+        foreach ($existingModules as $path => $usedPrefixes) {
+            [, $folderName] = explode('/', $path, 2);
 
-            if ($namaFolder === $module) {
-                $keberatan[] = sprintf('Id module "%s" sudah dipakai modules/%s; id module unik di seluruh runtime.', $module, $jalur);
+            if ($folderName === $module) {
+                $objections[] = sprintf('Id module "%s" sudah dipakai modules/%s; id module unik di seluruh runtime.', $module, $path);
             }
 
             // Bukan hanya kesamaan persis. Kepemilikan tabel diperiksa dengan awalan, jadi
             // "aset_" dan "aset_lama_" saling menelan: tabel milik yang satu terbaca sebagai
             // milik yang lain, dan penjaga batas tabel akan menyalahkan module yang keliru.
-            if ($awalanTerpakai !== '' && (str_starts_with($awalanTerpakai, $awalan) || str_starts_with($awalan, $awalanTerpakai))) {
-                $keberatan[] = sprintf(
+            if ($usedPrefixes !== '' && (str_starts_with($usedPrefixes, $prefix) || str_starts_with($prefix, $usedPrefixes))) {
+                $objections[] = sprintf(
                     'Awalan tabel "%s" bertabrakan dengan "%s" milik modules/%s. Awalan yang saling menelan '.
                     'membuat tabel satu module terbaca sebagai milik module lain.',
-                    $awalan,
-                    $awalanTerpakai,
-                    $jalur,
+                    $prefix,
+                    $usedPrefixes,
+                    $path,
                 );
             }
         }
 
-        return $keberatan;
+        return $objections;
     }
 
     /**
      * Menyalin cetakan ke folder module baru, mengganti tiap penanda di jalur maupun isinya.
      *
-     * @param  array<string, string>  $penanda
+     * @param  array<string, string>  $marker
      * @return list<string> jalur relatif berkas yang ditulis, terurut
      */
-    private function salinCetakan(string $cetakan, string $tujuan, array $penanda): array
+    private function copyTemplate(string $template, string $destination, array $marker): array
     {
-        $ditulis = [];
+        $written = [];
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($cetakan, RecursiveDirectoryIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($template, RecursiveDirectoryIterator::SKIP_DOTS),
         );
 
-        foreach ($iterator as $berkas) {
-            if (! $berkas->isFile()) {
+        foreach ($iterator as $file) {
+            if (! $file->isFile()) {
                 continue;
             }
 
-            $relatif = str_replace('\\', '/', substr($berkas->getPathname(), strlen($cetakan) + 1));
+            $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($template) + 1));
 
-            if (in_array($relatif, self::BERKAS_TIDAK_DISALIN, true)) {
+            if (in_array($relative, self::UNCOPIED_FILES, true)) {
                 continue;
             }
 
-            $tujuanRelatif = $this->jalurTujuan(strtr($relatif, $penanda));
-            $jalur = $tujuan.'/'.$tujuanRelatif;
+            $relativeDestination = $this->destinationPath(strtr($relative, $marker));
+            $path = $destination.'/'.$relativeDestination;
 
-            if (! is_dir(dirname($jalur))) {
-                mkdir(dirname($jalur), 0o755, true);
+            if (! is_dir(dirname($path))) {
+                mkdir(dirname($path), 0o755, true);
             }
 
-            file_put_contents($jalur, strtr((string) file_get_contents($berkas->getPathname()), $penanda));
-            $ditulis[] = $tujuanRelatif;
+            file_put_contents($path, strtr((string) file_get_contents($file->getPathname()), $marker));
+            $written[] = $relativeDestination;
         }
 
-        sort($ditulis);
+        sort($written);
 
-        return $ditulis;
+        return $written;
     }
 
     /**
@@ -296,16 +296,16 @@ final class ModuleMakeCommand extends Command
      * migration di antara mereka ditentukan urutan abjad nama berkas — bukan urutan yang
      * dimaksudkan siapa pun.
      */
-    private function jalurTujuan(string $relatif): string
+    private function destinationPath(string $relative): string
     {
-        if (! str_starts_with($relatif, 'database/migrations/')) {
-            return $relatif;
+        if (! str_starts_with($relative, 'database/migrations/')) {
+            return $relative;
         }
 
-        $nama = basename($relatif);
-        $baru = preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', now()->format('Y_m_d_His').'_', $nama, 1);
+        $name = basename($relative);
+        $newName = preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', now()->format('Y_m_d_His').'_', $name, 1);
 
-        return dirname($relatif).'/'.($baru ?? $nama);
+        return dirname($relative).'/'.($newName ?? $name);
     }
 
     /**
@@ -313,25 +313,25 @@ final class ModuleMakeCommand extends Command
      *
      * @return array<string, string>
      */
-    private function moduleYangAda(string $akar): array
+    private function existingModules(string $root): array
     {
-        $hasil = [];
+        $result = [];
 
-        foreach (glob($akar.'/modules/*/*/app.yaml') ?: [] as $manifest) {
+        foreach (glob($root.'/modules/*/*/app.yaml') ?: [] as $manifest) {
             $folder = dirname($manifest);
-            $jalur = basename(dirname($folder)).'/'.basename($folder);
+            $path = basename(dirname($folder)).'/'.basename($folder);
 
-            $isi = Yaml::parseFile($manifest);
-            $awalan = is_array($isi) && isset($isi['table_prefix']) && is_string($isi['table_prefix'])
-                ? $isi['table_prefix']
+            $content = Yaml::parseFile($manifest);
+            $prefix = is_array($content) && isset($content['table_prefix']) && is_string($content['table_prefix'])
+                ? $content['table_prefix']
                 : '';
 
-            $hasil[$jalur] = $awalan;
+            $result[$path] = $prefix;
         }
 
-        ksort($hasil);
+        ksort($result);
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -342,57 +342,57 @@ final class ModuleMakeCommand extends Command
      * batas merah. Ia ada supaya tabrakan awalan ketahuan saat peninjauan, bukan saat migrasi
      * jalan.
      */
-    private function daftarkanAwalanPadaReadme(string $akar, string $penerbit, string $module, string $awalan): void
+    private function registerPrefixInReadme(string $root, string $publisher, string $module, string $prefix): void
     {
-        $berkas = $akar.'/modules/README.md';
+        $file = $root.'/modules/README.md';
 
-        if (! is_file($berkas)) {
-            $this->warn(sprintf('%s tidak ada; baris awalan tabel harus ditambahkan sendiri.', self::jalurRingkas($berkas)));
+        if (! is_file($file)) {
+            $this->warn(sprintf('%s tidak ada; baris awalan tabel harus ditambahkan sendiri.', self::shortPath($file)));
 
             return;
         }
 
-        $isi = (string) file_get_contents($berkas);
-        $baris = sprintf(
+        $content = (string) file_get_contents($file);
+        $line = sprintf(
             '| `%s/%s` | `Modules\%s\%s\` | `%s` |',
-            $penerbit,
+            $publisher,
             $module,
-            self::studly($penerbit),
+            self::studly($publisher),
             self::studly($module),
-            $awalan,
+            $prefix,
         );
 
-        $garis = preg_split('/\R/', $isi);
+        $lines = preg_split('/\R/', $content);
 
-        if ($garis === false) {
+        if ($lines === false) {
             $this->warn('Isi modules/README.md tidak terbaca; baris awalan tabel harus ditambahkan sendiri.');
 
             return;
         }
 
-        $indeks = $this->indeksBarisTabel($garis);
+        $index = $this->tableRowIndex($lines);
 
-        if ($indeks === []) {
+        if ($index === []) {
             $this->warn('Tabel pemetaan pada modules/README.md tidak ditemukan; barisnya harus ditambahkan sendiri.');
 
             return;
         }
 
-        $kunci = $penerbit.'/'.$module;
-        $sisip = $indeks[count($indeks) - 1] + 1;
+        $key = $publisher.'/'.$module;
+        $insert = $index[count($index) - 1] + 1;
 
-        foreach ($indeks as $nomor) {
-            if (preg_match('/^\|\s*`([^`]+)`/', $garis[$nomor], $cocok) === 1 && strcmp($cocok[1], $kunci) > 0) {
-                $sisip = $nomor;
+        foreach ($index as $number) {
+            if (preg_match('/^\|\s*`([^`]+)`/', $lines[$number], $matches) === 1 && strcmp($matches[1], $key) > 0) {
+                $insert = $number;
 
                 break;
             }
         }
 
-        array_splice($garis, $sisip, 0, [$baris]);
-        file_put_contents($berkas, implode(self::akhirBaris($isi), $garis));
+        array_splice($lines, $insert, 0, [$line]);
+        file_put_contents($file, implode(self::lineEnding($content), $lines));
 
-        $this->line(sprintf('  modules/README.md — baris awalan tabel "%s" ditambahkan', $awalan));
+        $this->line(sprintf('  modules/README.md — baris awalan tabel "%s" ditambahkan', $prefix));
     }
 
     /**
@@ -402,28 +402,28 @@ final class ModuleMakeCommand extends Command
      * karena README memuat tabel lain, dan menyisipkan baris ke tabel yang salah membuat
      * dokumennya salah sekaligus penjaganya tetap merah.
      *
-     * @param  list<string>  $garis
+     * @param  list<string>  $lines
      * @return list<int>
      */
-    private function indeksBarisTabel(array $garis): array
+    private function tableRowIndex(array $lines): array
     {
-        $didalam = false;
-        $indeks = [];
+        $inside = false;
+        $index = [];
 
-        foreach ($garis as $nomor => $baris) {
-            if (str_starts_with($baris, '## ')) {
-                $didalam = str_starts_with($baris, '## Namespace dan awalan tabel');
+        foreach ($lines as $number => $line) {
+            if (str_starts_with($line, '## ')) {
+                $inside = str_starts_with($line, '## Namespace dan awalan tabel');
 
                 continue;
             }
 
             // Hanya baris isi yang dihitung: judul dan garis pemisahnya tidak diapit backtick.
-            if ($didalam && preg_match('/^\|\s*`[^`]+`\s*\|\s*`[^`]+`\s*\|\s*`[^`]+`\s*\|/', $baris) === 1) {
-                $indeks[] = $nomor;
+            if ($inside && preg_match('/^\|\s*`[^`]+`\s*\|\s*`[^`]+`\s*\|\s*`[^`]+`\s*\|/', $line) === 1) {
+                $index[] = $number;
             }
         }
 
-        return $indeks;
+        return $index;
     }
 
     /**
@@ -441,80 +441,80 @@ final class ModuleMakeCommand extends Command
      *
      * @return string nama package yang didaftarkan
      */
-    private function daftarkanPadaComposer(string $penerbit, string $module): string
+    private function registerInComposer(string $publisher, string $module): string
     {
-        $paket = $penerbit.'/'.$module;
-        $berkas = base_path('composer.json');
-        $isi = (string) file_get_contents($berkas);
-        $garis = preg_split('/\R/', $isi);
+        $package = $publisher.'/'.$module;
+        $file = base_path('composer.json');
+        $content = (string) file_get_contents($file);
+        $lines = preg_split('/\R/', $content);
 
-        if ($garis === false) {
+        if ($lines === false) {
             $this->warn('Isi composer.json tidak terbaca; package module harus didaftarkan sendiri.');
 
-            return $paket;
+            return $package;
         }
 
-        $mulai = null;
+        $start = null;
 
-        foreach ($garis as $nomor => $baris) {
-            if (trim($baris) === '"require": {') {
-                $mulai = $nomor;
+        foreach ($lines as $number => $line) {
+            if (trim($line) === '"require": {') {
+                $start = $number;
 
                 break;
             }
         }
 
-        if ($mulai === null) {
+        if ($start === null) {
             $this->warn('Blok "require" pada composer.json tidak ditemukan; package module harus didaftarkan sendiri.');
 
-            return $paket;
+            return $package;
         }
 
-        $sisip = null;
-        $terakhir = null;
+        $insert = null;
+        $last = null;
 
-        for ($nomor = $mulai + 1; $nomor < count($garis); $nomor++) {
-            if (trim($garis[$nomor]) === '},') {
+        for ($number = $start + 1; $number < count($lines); $number++) {
+            if (trim($lines[$number]) === '},') {
                 break;
             }
 
-            if (preg_match('/^\s*"([^"]+)":/', $garis[$nomor], $cocok) !== 1) {
+            if (preg_match('/^\s*"([^"]+)":/', $lines[$number], $matches) !== 1) {
                 continue;
             }
 
-            $terakhir = $nomor;
+            $last = $number;
 
             // `php` selalu di puncak daftar, sesuai `sort-packages` milik Composer sendiri.
-            if ($cocok[1] === 'php') {
+            if ($matches[1] === 'php') {
                 continue;
             }
 
-            if ($sisip === null && strcmp($cocok[1], $paket) > 0) {
-                $sisip = $nomor;
+            if ($insert === null && strcmp($matches[1], $package) > 0) {
+                $insert = $number;
             }
         }
 
-        if ($terakhir === null) {
+        if ($last === null) {
             $this->warn('Daftar "require" pada composer.json kosong; package module harus didaftarkan sendiri.');
 
-            return $paket;
+            return $package;
         }
 
-        if ($sisip === null) {
+        if ($insert === null) {
             // Masuk paling bawah: baris yang tadinya terakhir kini butuh koma di ujungnya.
-            $garis[$terakhir] = rtrim($garis[$terakhir]).',';
-            $sisip = $terakhir + 1;
-            $baris = '        "'.$paket.'": "@dev"';
+            $lines[$last] = rtrim($lines[$last]).',';
+            $insert = $last + 1;
+            $line = '        "'.$package.'": "@dev"';
         } else {
-            $baris = '        "'.$paket.'": "@dev",';
+            $line = '        "'.$package.'": "@dev",';
         }
 
-        array_splice($garis, $sisip, 0, [$baris]);
-        file_put_contents($berkas, implode(self::akhirBaris($isi), $garis));
+        array_splice($lines, $insert, 0, [$line]);
+        file_put_contents($file, implode(self::lineEnding($content), $lines));
 
-        $this->line(sprintf('  apps/core/composer.json — package "%s" ditambahkan ke require', $paket));
+        $this->line(sprintf('  apps/core/composer.json — package "%s" ditambahkan ke require', $package));
 
-        return $paket;
+        return $package;
     }
 
     /**
@@ -524,26 +524,26 @@ final class ModuleMakeCommand extends Command
      * seluruh berkas menjadi diff yang tidak bisa ditinjau di mesin yang mengecek keluar
      * dengan CRLF.
      */
-    private static function akhirBaris(string $isi): string
+    private static function lineEnding(string $content): string
     {
-        return str_contains($isi, "\r\n") ? "\r\n" : "\n";
+        return str_contains($content, "\r\n") ? "\r\n" : "\n";
     }
 
-    private static function studly(string $nama): string
+    private static function studly(string $name): string
     {
-        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $nama)));
+        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $name)));
     }
 
-    private static function judul(string $nama): string
+    private static function title(string $name): string
     {
-        return ucwords(str_replace('-', ' ', $nama));
+        return ucwords(str_replace('-', ' ', $name));
     }
 
-    private static function jalurRingkas(string $jalur): string
+    private static function shortPath(string $path): string
     {
-        $jalur = str_replace('\\', '/', $jalur);
-        $potong = strpos($jalur, '/modules/');
+        $path = str_replace('\\', '/', $path);
+        $cut = strpos($path, '/modules/');
 
-        return $potong === false ? $jalur : substr($jalur, $potong + 1);
+        return $cut === false ? $path : substr($path, $cut + 1);
     }
 }

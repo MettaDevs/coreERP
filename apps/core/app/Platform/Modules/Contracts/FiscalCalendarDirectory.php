@@ -30,5 +30,5 @@ interface FiscalCalendarDirectory
      *     period: array{id: mixed, ordinal: mixed, name: mixed, starts_on: string, ends_on: string},
      * }
      */
-    public function period(string $legalEntityId, string $tanggal): array;
+    public function period(string $legalEntityId, string $date): array;
 }

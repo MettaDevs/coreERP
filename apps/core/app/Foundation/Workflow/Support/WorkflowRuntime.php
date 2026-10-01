@@ -13,8 +13,8 @@ use Illuminate\Validation\ValidationException;
 class WorkflowRuntime
 {
     public function __construct(
-        private readonly ParameterWorkflow $parameter,
-        private readonly PengirimEventModul $pengirim,
+        private readonly WorkflowParameters $parameter,
+        private readonly PengirimEventModul $dispatcher,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -71,9 +71,9 @@ class WorkflowRuntime
             // Penjaga di sini pertahanan lapis kedua. Lapis pertama ada di penugasan: pengaju
             // tidak pernah masuk daftar penerima ketika tenant melarangnya, sehingga tugas yang
             // tidak bisa diklik tidak pernah terbentuk.
-            $olehPengaju = $instance->initiator_membership_id !== null && $instance->initiator_membership_id === $actor->id;
-            $larangan = $this->parameter->boolean((string) $actor->tenant_id, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
-            abort_if($olehPengaju && $larangan, 403, 'Pengaju tidak dapat menyetujui dokumennya sendiri.');
+            $bySubmitter = $instance->initiator_membership_id !== null && $instance->initiator_membership_id === $actor->id;
+            $forbidden = $this->parameter->boolean((string) $actor->tenant_id, WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
+            abort_if($bySubmitter && $forbidden, 403, 'Pengaju tidak dapat menyetujui dokumennya sendiri.');
 
             $element = DB::table('workflow_elements')->where('id', $workItem->element_id)->where('version_id', $instance->configuration_version_id)->first();
             abort_unless($element, 409, 'Langkah workflow tidak ditemukan.');
@@ -88,8 +88,8 @@ class WorkflowRuntime
             // dipertanggungjawabkan bukan izinnya, melainkan jejaknya: pemeriksa harus bisa
             // menemukan dokumen mana saja yang disetujui pengajunya sendiri tanpa membandingkan
             // dua tabel.
-            $rincian = array_filter(['comment' => $comment, 'element' => $element->key]);
-            $this->history($actor->tenant_id, $instance->id, $status, $olehPengaju ? $rincian + ['oleh_pengaju' => true] : $rincian, $actor->id);
+            $details = array_filter(['comment' => $comment, 'element' => $element->key]);
+            $this->history($actor->tenant_id, $instance->id, $status, $bySubmitter ? $details + ['oleh_pengaju' => true] : $details, $actor->id);
 
             $policy = (string) ($config['completion_policy'] ?? 'single');
             $items = DB::table('workflow_work_items')->where('instance_id', $instance->id)->where('element_id', $element->id)->get();
@@ -145,18 +145,18 @@ class WorkflowRuntime
         }
 
         $config = json_decode($element->configuration, true, 512, JSON_THROW_ON_ERROR);
-        $calon = $this->assignees($tenantId, $config);
-        $membershipIds = $this->tanpaPengaju($tenantId, $instanceId, $calon);
+        $candidates = $this->assignees($tenantId, $config);
+        $membershipIds = $this->withoutSubmitter($tenantId, $instanceId, $candidates);
         if ($membershipIds->isEmpty()) {
             // Dua sebab yang berbeda, dan bedanya penting bagi yang membacanya: tidak ada
             // penerima sama sekali adalah konfigurasi yang salah, sedangkan penerima yang habis
             // karena disaring adalah kebijakan yang bertabrakan dengan susunan orangnya. Pesan
             // yang sama untuk keduanya menyuruh admin memperbaiki hal yang tidak rusak.
-            $alasan = $calon->isEmpty()
+            $reason = $candidates->isEmpty()
                 ? 'Tidak ada penerima tugas aktif.'
                 : 'Satu-satunya penerima tugas adalah pengajunya sendiri, dan tenant ini melarang pengaju menyetujui dokumennya sendiri.';
             $instance = DB::table('workflow_instances')->where('id', $instanceId)->first();
-            $this->finish($tenantId, $instance, 'rejected', $alasan, null);
+            $this->finish($tenantId, $instance, 'rejected', $reason, null);
 
             return;
         }
@@ -261,7 +261,7 @@ class WorkflowRuntime
         // persis karena keduanya dibangun dari variabel ini; menyusunnya dua kali adalah cara
         // paling pasti membuat penerima di dalam proses dan penerima di luar proses melihat
         // dua kenyataan yang berbeda.
-        $isi = [
+        $content = [
             'workflow_instance_id' => $instance->id,
             'workflow_type' => $workflowType?->code,
             'decision' => $status,
@@ -269,13 +269,13 @@ class WorkflowRuntime
             'source_document_id' => $instance->source_document_id,
             'decision_context' => json_decode($instance->decision_context, true, 512, JSON_THROW_ON_ERROR),
         ];
-        $idEvent = (string) Str::ulid();
-        $idKorelasi = (string) ($instance->correlation_id ?? $instance->id);
+        $eventId = (string) Str::ulid();
+        $correlationId = (string) ($instance->correlation_id ?? $instance->id);
         DB::table('outbox_events')->insert([
-            'id' => $idEvent, 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v2',
-            'correlation_id' => $idKorelasi,
+            'id' => $eventId, 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v2',
+            'correlation_id' => $correlationId,
             'legal_entity_id' => $legalEntityId,
-            'payload' => json_encode($isi, JSON_THROW_ON_ERROR),
+            'payload' => json_encode($content, JSON_THROW_ON_ERROR),
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->history($tenantId, $instance->id, 'decision_event_emitted', ['status' => $status], $actorMembershipId);
@@ -289,8 +289,8 @@ class WorkflowRuntime
         // selama listener berjalan. Keputusan diambil di controller Core, yang tidak melewati
         // middleware rute module — jadi tanpa ini setiap query model module di dalam listener
         // melempar "tanpa tenant aktif", dan kegagalannya membatalkan keputusan yang sah.
-        $this->pengirim->kirim(
-            new WorkflowDecisionTaken($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi),
+        $this->dispatcher->kirim(
+            new WorkflowDecisionTaken($eventId, $tenantId, $correlationId, $legalEntityId === null ? null : (string) $legalEntityId, $content),
             $tenantId,
         );
     }
@@ -306,28 +306,28 @@ class WorkflowRuntime
      * Idnya baru dicari kalau larangannya memang menyala, jadi jalur bawaan tidak membayar satu
      * query pun untuk aturan yang tidak dipakai tenant tersebut.
      *
-     * @param  Collection<int, string>  $calon
+     * @param  Collection<int, string>  $candidates
      * @return Collection<int, string>
      */
-    private function tanpaPengaju(string $tenantId, string $instanceId, Collection $calon): Collection
+    private function withoutSubmitter(string $tenantId, string $instanceId, Collection $candidates): Collection
     {
         // Dinamai lebih dulu, tidak dibaca langsung di dalam kondisi. Parameternya berbunyi
         // "larang", sedangkan kondisi di sini menanyakan "lewati penyaringan" — menuliskannya
         // sebagai satu negasi di tengah `||` adalah bentuk yang paling mudah dibalik keliru
         // oleh orang berikutnya.
-        $larangan = $this->parameter->boolean($tenantId, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+        $forbidden = $this->parameter->boolean($tenantId, WorkflowParameterDefinitions::PREVENT_SUBMITTER_APPROVAL);
 
-        if ($calon->isEmpty() || ! $larangan) {
-            return $calon;
+        if ($candidates->isEmpty() || ! $forbidden) {
+            return $candidates;
         }
 
-        $pengaju = DB::table('workflow_instances')->where('id', $instanceId)->value('initiator_membership_id');
+        $submitter = DB::table('workflow_instances')->where('id', $instanceId)->value('initiator_membership_id');
 
-        if (! is_string($pengaju) || $pengaju === '') {
-            return $calon;
+        if (! is_string($submitter) || $submitter === '') {
+            return $candidates;
         }
 
-        return $calon->reject(static fn (string $id): bool => $id === $pengaju)->values();
+        return $candidates->reject(static fn (string $id): bool => $id === $submitter)->values();
     }
 
     /** @param array<string, mixed> $config @return Collection<int, string> */

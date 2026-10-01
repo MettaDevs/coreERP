@@ -26,16 +26,16 @@ use App\Platform\Modules\Contracts\ModuleReportProviders;
 final class ModuleReportProviderRegistry implements ModuleReportProviders
 {
     /** @var array<string, ModuleReportProvider> */
-    private array $penyedia = [];
+    private array $provider = [];
 
-    public function register(ModuleReportProvider $penyedia): void
+    public function register(ModuleReportProvider $provider): void
     {
-        $this->penyedia[$penyedia->moduleId()] = $penyedia;
+        $this->provider[$provider->moduleId()] = $provider;
     }
 
-    public function untuk(string $idModule): ?ModuleReportProvider
+    public function providerFor(string $moduleId): ?ModuleReportProvider
     {
-        return $this->penyedia[$idModule] ?? null;
+        return $this->provider[$moduleId] ?? null;
     }
 
     /**
@@ -43,9 +43,9 @@ final class ModuleReportProviderRegistry implements ModuleReportProviders
      *
      * @return list<string>
      */
-    public function idTerdaftar(): array
+    public function registeredIds(): array
     {
-        $id = array_keys($this->penyedia);
+        $id = array_keys($this->provider);
         sort($id);
 
         return $id;

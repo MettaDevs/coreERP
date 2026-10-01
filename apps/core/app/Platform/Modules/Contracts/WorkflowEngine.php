@@ -40,10 +40,10 @@ interface WorkflowEngine
     public function submit(
         string $tenantId,
         string $appId,
-        string $kodeTipe,
-        string $idPenggunaPengaju,
-        string $idKorelasi,
-        string $kunciIdempoten,
+        string $typeCode,
+        string $submitterUserId,
+        string $correlationId,
+        string $idempotencyKey,
         array $data,
     ): array;
 }

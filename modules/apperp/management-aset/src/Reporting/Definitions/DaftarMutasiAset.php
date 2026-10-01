@@ -10,7 +10,7 @@ use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
-use Modules\Apperp\ManagementAset\Services\DirektoriAset;
+use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
@@ -158,7 +158,7 @@ final class DaftarMutasiAset implements ReportDefinition
             $query->whereDate('mutasi.tanggal', '<=', $parameters['sampai']);
         }
 
-        $direktori = app(DirektoriAset::class);
+        $direktori = app(AssetOrganizationDirectory::class);
         $rows = $query
             ->orderBy('mutasi.tanggal')
             ->orderBy('mutasi.kode')
@@ -193,10 +193,10 @@ final class DaftarMutasiAset implements ReportDefinition
                     'tujuan_lokasi' => $row->tujuan_lokasi_nama,
                     // Kolom laporan menyebut nama unit dan nama orang. Sebuah ULID di
                     // lembar Excel tidak dapat disaring, diurutkan, maupun dikenali.
-                    'asal_unit_kerja' => $direktori->namaUnit($context->tenantId, $row->asal_org_unit_id),
-                    'tujuan_unit_kerja' => $direktori->namaUnit($context->tenantId, $row->tujuan_org_unit_id),
-                    'diserahkan_oleh' => $direktori->namaOrang($context->tenantId, $row->diserahkan_oleh_user_id) ?? $row->diserahkan_oleh_user_id,
-                    'diterima_oleh' => $direktori->namaOrang($context->tenantId, $row->diterima_oleh_user_id) ?? $row->diterima_oleh_user_id,
+                    'asal_unit_kerja' => $direktori->unitName($context->tenantId, $row->asal_org_unit_id),
+                    'tujuan_unit_kerja' => $direktori->unitName($context->tenantId, $row->tujuan_org_unit_id),
+                    'diserahkan_oleh' => $direktori->personName($context->tenantId, $row->diserahkan_oleh_user_id) ?? $row->diserahkan_oleh_user_id,
+                    'diterima_oleh' => $direktori->personName($context->tenantId, $row->diterima_oleh_user_id) ?? $row->diterima_oleh_user_id,
                     'kondisi' => $row->kondisi_nama,
                     'alasan' => $row->alasan,
                     'keterangan' => $row->keterangan,

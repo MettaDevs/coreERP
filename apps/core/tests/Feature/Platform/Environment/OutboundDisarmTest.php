@@ -9,8 +9,8 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\OutboundRefused;
 use App\Platform\Modules\Support\TenantScope;
-use App\Platform\Observability\Support\LaporanKesalahan;
-use App\Platform\Observability\Support\PengirimDiscord;
+use App\Platform\Observability\Support\DiscordNotifier;
+use App\Platform\Observability\Support\ErrorReport;
 use App\Platform\Reporting\Support\Rendering\PdfConverter;
 use App\Platform\Reporting\Support\Rendering\RenderedFile;
 use App\Platform\Tenant\Models\Tenant;
@@ -133,11 +133,11 @@ class OutboundDisarmTest extends TestCase
         $this->activate($this->sandbox());
         Http::fake();
 
-        PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
+        DiscordNotifier::send(ErrorReport::from(new RuntimeException('gagal'), null));
 
         Http::assertNothingSent();
         $this->assertSame([], $this->throttleMarker(), 'Penjeda sudah tersentuh, jadi yang menahan '
-            .'kiriman ini bukan penjagaan di dalam PengirimDiscord melainkan sesuatu di hilirnya.');
+            .'kiriman ini bukan penjagaan di dalam DiscordNotifier melainkan sesuatu di hilirnya.');
     }
 
     public function test_the_discord_report_is_still_sent_from_production(): void
@@ -146,7 +146,7 @@ class OutboundDisarmTest extends TestCase
         $this->activate($this->production());
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
+        DiscordNotifier::send(ErrorReport::from(new RuntimeException('gagal'), null));
 
         Http::assertSent(fn ($request) => $request->url() === self::WEBHOOK);
     }
@@ -185,7 +185,7 @@ class OutboundDisarmTest extends TestCase
     {
         $this->sandbox();
         $this->app->forgetInstance(ActiveEnvironment::class);
-        $this->app->instance(TenantScope::KUNCI, $this->tenantId);
+        $this->app->instance(TenantScope::KEY, $this->tenantId);
         Http::fake();
 
         $this->expectException(OutboundRefused::class);

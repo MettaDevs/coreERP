@@ -35,17 +35,17 @@ final class ModuleRegistry
     private ?array $module = null;
 
     /** @var list<ModuleManifest>|null */
-    private ?array $moduleTermasukDipindah = null;
+    private ?array $modulesIncludingMoved = null;
 
     /** @var list<string> */
-    private readonly array $akar;
+    private readonly array $root;
 
     /**
-     * @param  string|list<string>  $akar  Satu folder module, atau beberapa.
+     * @param  string|list<string>  $root  Satu folder module, atau beberapa.
      */
-    public function __construct(string|array $akar)
+    public function __construct(string|array $root)
     {
-        $this->akar = array_values(array_unique(is_string($akar) ? [$akar] : $akar));
+        $this->root = array_values(array_unique(is_string($root) ? [$root] : $root));
     }
 
     /**
@@ -54,34 +54,34 @@ final class ModuleRegistry
      *
      * @return list<ModuleManifest>
      */
-    public function semua(): array
+    public function all(): array
     {
         if ($this->module !== null) {
             return $this->module;
         }
 
-        $ditemukan = [];
+        $found = [];
 
-        foreach ($this->berkasManifest() as $berkas) {
-            $manifest = $this->baca($berkas);
+        foreach ($this->manifestFiles() as $file) {
+            $manifest = $this->read($file);
 
             if ($manifest !== null) {
-                $ditemukan[] = $manifest;
+                $found[] = $manifest;
             }
         }
 
-        usort($ditemukan, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
+        usort($found, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
 
-        return $this->module = $ditemukan;
+        return $this->module = $found;
     }
 
     /**
      * Semua module termasuk yang sedang dipindah masuk.
      *
-     * Bedanya dengan `semua()` penting dan bukan kenyamanan: **"belum boleh dipasang untuk
+     * Bedanya dengan `all()` penting dan bukan kenyamanan: **"belum boleh dipasang untuk
      * tenant" tidak sama dengan "kodenya tidak boleh dimuat".** Module yang sedang dipindah
      * belum boleh muncul di katalog, belum boleh dipasang, dan belum boleh menerima data
-     * tenant — itu yang dijaga `semua()`. Tetapi kodenya harus tetap bisa dimuat, karena
+     * tenant — itu yang dijaga `all()`. Tetapi kodenya harus tetap bisa dimuat, karena
      * kalau tidak, tidak ada satu pun testnya yang bisa berjalan, dan pemindahannya
      * dikerjakan tanpa jaring pengaman sampai hari terakhir.
      *
@@ -90,30 +90,30 @@ final class ModuleRegistry
      *
      * @return list<ModuleManifest>
      */
-    public function semuaTermasukYangSedangDipindah(): array
+    public function allIncludingMoved(): array
     {
-        if ($this->moduleTermasukDipindah !== null) {
-            return $this->moduleTermasukDipindah;
+        if ($this->modulesIncludingMoved !== null) {
+            return $this->modulesIncludingMoved;
         }
 
-        $ditemukan = [];
+        $found = [];
 
-        foreach ($this->berkasManifest() as $berkas) {
-            $manifest = $this->baca($berkas, abaikanDaftarDipindah: true);
+        foreach ($this->manifestFiles() as $file) {
+            $manifest = $this->read($file, ignoreMovedList: true);
 
             if ($manifest !== null) {
-                $ditemukan[] = $manifest;
+                $found[] = $manifest;
             }
         }
 
-        usort($ditemukan, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
+        usort($found, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
 
-        return $this->moduleTermasukDipindah = $ditemukan;
+        return $this->modulesIncludingMoved = $found;
     }
 
     public function cari(string $id): ?ModuleManifest
     {
-        foreach ($this->semua() as $module) {
+        foreach ($this->all() as $module) {
             if ($module->id === $id) {
                 return $module;
             }
@@ -123,32 +123,32 @@ final class ModuleRegistry
     }
 
     /** @return list<string> */
-    private function berkasManifest(): array
+    private function manifestFiles(): array
     {
-        $hasil = [];
+        $result = [];
 
-        foreach ($this->akar as $akar) {
-            $berkas = glob($akar.'/*/*/app.yaml');
+        foreach ($this->root as $root) {
+            $file = glob($root.'/*/*/app.yaml');
 
-            if ($berkas === false) {
+            if ($file === false) {
                 continue;
             }
 
-            foreach ($berkas as $satu) {
-                $hasil[] = $satu;
+            foreach ($file as $item) {
+                $result[] = $item;
             }
         }
 
-        return array_values(array_unique($hasil));
+        return array_values(array_unique($result));
     }
 
     /**
      * Id module lain yang wajib terpasang lebih dulu.
      *
-     * @param  array<mixed>  $isi
+     * @param  array<mixed>  $content
      * @return list<string>
      */
-    private function dependency(array $isi): array
+    private function dependency(array $content): array
     {
         // Kuncinya `dependsOn`, bukan `depends_on`, dan itu koreksi terhadap keadaan sebelumnya.
         //
@@ -164,17 +164,17 @@ final class ModuleRegistry
         // sebuah module benar-benar menyatakan dependency, katalog akan mencatatnya sementara
         // runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya. Tenant memakai
         // module yang kekurangan module lain yang dibutuhkannya, tanpa satu pun kesalahan.
-        $daftar = $isi['dependsOn'] ?? [];
+        $list = $content['dependsOn'] ?? [];
 
         // `??` di atas sudah menyingkirkan null, jadi yang tersisa diperiksa hanya kosongnya.
-        if ($daftar === []) {
+        if ($list === []) {
             return [];
         }
 
         // Bentuk yang salah dilempar, bukan dianggap kosong. Manifest yang dependency-nya tidak
         // terbaca adalah manifest yang prasyaratnya tidak dijaga siapa pun, dan itu lebih buruk
         // daripada module yang menolak dimuat.
-        if (! is_array($daftar) || array_is_list($daftar)) {
+        if (! is_array($list) || array_is_list($list)) {
             throw new \RuntimeException(sprintf(
                 'Manifest module menulis `dependsOn` sebagai daftar; yang benar peta id module ke rentang versi, '.
                 'misalnya `dependsOn:%s  human-resources: ^0.1`. Bentuk daftar terbaca kosong dan membuat '.
@@ -184,35 +184,35 @@ final class ModuleRegistry
         }
 
         return array_values(array_filter(
-            array_map(static fn ($kunci): string => is_string($kunci) ? $kunci : '', array_keys($daftar)),
-            static fn (string $nilai): bool => $nilai !== '',
+            array_map(static fn ($key): string => is_string($key) ? $key : '', array_keys($list)),
+            static fn (string $value): bool => $value !== '',
         ));
     }
 
     /**
      * Awalan tabel yang dinyatakan manifest, atau string kosong bila tidak ada.
      *
-     * @param  array<mixed>  $isi
+     * @param  array<mixed>  $content
      */
-    private function awalanTabel(array $isi): string
+    private function tablePrefixes(array $content): string
     {
-        return isset($isi['table_prefix']) && is_string($isi['table_prefix']) ? $isi['table_prefix'] : '';
+        return isset($content['table_prefix']) && is_string($content['table_prefix']) ? $content['table_prefix'] : '';
     }
 
-    private function baca(string $berkas, bool $abaikanDaftarDipindah = false): ?ModuleManifest
+    private function read(string $file, bool $ignoreMovedList = false): ?ModuleManifest
     {
         try {
-            /** @var mixed $isi */
-            $isi = Yaml::parseFile($berkas);
+            /** @var mixed $content */
+            $content = Yaml::parseFile($file);
         } catch (ParseException) {
             return null;
         }
 
-        if (! is_array($isi)) {
+        if (! is_array($content)) {
             return null;
         }
 
-        $id = isset($isi['id']) && is_string($isi['id']) ? $isi['id'] : '';
+        $id = isset($content['id']) && is_string($content['id']) ? $content['id'] : '';
 
         // Cetakan module baru memakai `change-me` sebagai id. Sebuah cetakan yang belum
         // diisi bukan module, dan memuatnya berarti menyalakan folder contoh yang belum
@@ -230,27 +230,27 @@ final class ModuleRegistry
         // Tandanya daftar yang ditulis sengaja, bukan sifat manifest yang kebetulan. F3-25
         // sempat memakai `table_prefix` yang belum ada sebagai tanda, dan tanda itu runtuh pada
         // F3-04 — task yang justru memberi awalan tabel, dan dengan itu menyalakan module yang
-        // belum siap. Alasan lengkapnya ada di `ModulSedangDipindah`.
-        if (! $abaikanDaftarDipindah && ModulSedangDipindah::bawaan()->menandai(basename(dirname($berkas)))) {
+        // belum siap. Alasan lengkapnya ada di `ModulesBeingMoved`.
+        if (! $ignoreMovedList && ModulesBeingMoved::default()->marks(basename(dirname($file)))) {
             return null;
         }
 
         // Module yang **tidak** sedang dipindah wajib menyatakan awalan tabelnya. Tanpa awalan,
         // tabelnya memakai nama apa adanya dan bertabrakan dengan milik Core. Ini dijaga
-        // `ModulSedangDipindahTest` supaya tidak ada module yang lenyap tanpa suara.
-        if ($this->awalanTabel($isi) === '') {
+        // `ModulesBeingMovedTest` supaya tidak ada module yang lenyap tanpa suara.
+        if ($this->tablePrefixes($content) === '') {
             return null;
         }
 
         return new ModuleManifest(
             id: $id,
-            nama: isset($isi['name']) && is_string($isi['name']) ? $isi['name'] : $id,
-            versi: isset($isi['version']) && is_string($isi['version']) ? $isi['version'] : '0.0.0',
-            penerbit: isset($isi['publisher']) && is_string($isi['publisher']) ? $isi['publisher'] : '',
-            jenis: isset($isi['kind']) && is_string($isi['kind']) ? $isi['kind'] : 'business-app',
-            awalanTabel: $this->awalanTabel($isi),
-            folder: dirname($berkas),
-            dependency: $this->dependency($isi),
+            nama: isset($content['name']) && is_string($content['name']) ? $content['name'] : $id,
+            versi: isset($content['version']) && is_string($content['version']) ? $content['version'] : '0.0.0',
+            penerbit: isset($content['publisher']) && is_string($content['publisher']) ? $content['publisher'] : '',
+            jenis: isset($content['kind']) && is_string($content['kind']) ? $content['kind'] : 'business-app',
+            awalanTabel: $this->tablePrefixes($content),
+            folder: dirname($file),
+            dependency: $this->dependency($content),
         );
     }
 }

@@ -2,9 +2,9 @@
 
 namespace App\Foundation\Workflow\Http\Controllers;
 
-use App\Foundation\Workflow\Support\DefinisiParameterWorkflow;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
 use App\Foundation\Workflow\Support\WorkflowGraph;
+use App\Foundation\Workflow\Support\WorkflowParameterDefinitions;
+use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -22,7 +22,7 @@ use Inertia\Response;
 
 class WorkflowConfigurationController extends Controller
 {
-    public function index(Request $request, ParameterWorkflow $parameter): JsonResponse|Response
+    public function index(Request $request, WorkflowParameters $parameter): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_READ), 403);
@@ -58,7 +58,7 @@ class WorkflowConfigurationController extends Controller
             // Disusun dari registry, bukan ditulis satu per satu. Layarnya merender dirinya
             // dari daftar ini, jadi parameter baru muncul di layar tanpa menyentuh berkas
             // controller maupun berkas halamannya.
-            'parameters' => $this->parameterUntukLayar((string) $membership->tenant_id, $parameter),
+            'parameters' => $this->parametersForScreen((string) $membership->tenant_id, $parameter),
             'workflowTypes' => $types,
             'legalEntities' => Organization::query()->where('tenant_id', $membership->tenant_id)->where('classification', 'legal_entity')->orderBy('name')->get(['id', 'name']),
             'workflows' => $workflows,
@@ -78,7 +78,7 @@ class WorkflowConfigurationController extends Controller
      * Barisnya dibuat saat pertama kali diubah, bukan saat tenant dibuat. Tenant tanpa baris
      * menjawab bawaan, dan bawaannya sama dengan D365: pengaju boleh menyetujui.
      */
-    public function updateParameters(Request $request, ParameterWorkflow $parameter): RedirectResponse
+    public function updateParameters(Request $request, WorkflowParameters $parameter): RedirectResponse
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE), 403);
@@ -87,11 +87,11 @@ class WorkflowConfigurationController extends Controller
         // sini. Daftar kedua akan menyimpang pada hari seseorang menambah parameter, dan yang
         // menyimpang menolak parameter yang sah dengan pesan yang tidak menyebut sebabnya.
         $data = $request->validate([
-            'code' => ['required', 'string', Rule::in(array_keys(DefinisiParameterWorkflow::DAFTAR))],
+            'code' => ['required', 'string', Rule::in(array_keys(WorkflowParameterDefinitions::DEFINITIONS))],
             'value' => ['required', 'boolean'],
         ]);
 
-        $parameter->simpan((string) $membership->tenant_id, $data['code'], (bool) $data['value'], (string) $membership->id);
+        $parameter->save((string) $membership->tenant_id, $data['code'], (bool) $data['value'], (string) $membership->id);
 
         return back()->with('status', 'Parameter workflow diperbarui.');
     }
@@ -101,22 +101,22 @@ class WorkflowConfigurationController extends Controller
      *
      * @return list<array{code: string, tipe: string, label: string, penjelasan: string, value: bool}>
      */
-    private function parameterUntukLayar(string $tenantId, ParameterWorkflow $parameter): array
+    private function parametersForScreen(string $tenantId, WorkflowParameters $parameter): array
     {
-        $nilai = $parameter->semua($tenantId);
-        $daftar = [];
+        $value = $parameter->all($tenantId);
+        $list = [];
 
-        foreach (DefinisiParameterWorkflow::DAFTAR as $kode => $definisi) {
-            $daftar[] = [
-                'code' => $kode,
-                'tipe' => $definisi['tipe'],
-                'label' => $definisi['label'],
-                'penjelasan' => $definisi['penjelasan'],
-                'value' => $nilai[$kode],
+        foreach (WorkflowParameterDefinitions::DEFINITIONS as $code => $definition) {
+            $list[] = [
+                'code' => $code,
+                'tipe' => $definition['tipe'],
+                'label' => $definition['label'],
+                'penjelasan' => $definition['penjelasan'],
+                'value' => $value[$code],
             ];
         }
 
-        return $daftar;
+        return $list;
     }
 
     public function edit(Request $request, string $workflow): JsonResponse|Response

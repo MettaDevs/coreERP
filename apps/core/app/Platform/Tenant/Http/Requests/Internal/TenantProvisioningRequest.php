@@ -41,9 +41,9 @@ final class TenantProvisioningRequest extends FormRequest
      */
     public function firstEnvironment(): string
     {
-        $nilai = $this->string('first_environment', 'production')->toString();
+        $value = $this->string('first_environment', 'production')->toString();
 
-        return match ($nilai) {
+        return match ($value) {
             'demo' => 'demo',
             'none' => 'none',
             default => 'production',
@@ -52,9 +52,9 @@ final class TenantProvisioningRequest extends FormRequest
 
     public function firstEnvironmentExpiresAt(): ?string
     {
-        $nilai = $this->input('first_environment_expires_at');
+        $value = $this->input('first_environment_expires_at');
 
-        return is_string($nilai) && $nilai !== '' ? $nilai : null;
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

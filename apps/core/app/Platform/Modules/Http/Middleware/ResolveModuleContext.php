@@ -10,7 +10,7 @@ use App\Platform\License\Support\SiteLicense;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Modules\Support\ModuleRequestContext;
 use App\Platform\Modules\Support\TenantScope;
-use App\Platform\Observability\Support\LaporanKesalahan;
+use App\Platform\Observability\Support\ErrorReport;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -45,13 +45,13 @@ final class ResolveModuleContext
      * langsung; menambah satu kunci baru ke dalam daftar itu berarti mengubah kontrak yang
      * dijaga demi alasan yang sama sekali berbeda. Yang di sini urusan shell, bukan module.
      */
-    public const MODULE_AKTIF = 'module.id';
+    public const ACTIVE_MODULE = 'module.id';
 
     public function __construct(
         private readonly CurrentWorkspace $workspace,
-        private readonly LaunchableAppCatalog $katalog,
-        private readonly DataPolicyAccessResolver $kebijakan,
-        private readonly SiteLicense $lisensi,
+        private readonly LaunchableAppCatalog $catalog,
+        private readonly DataPolicyAccessResolver $policy,
+        private readonly SiteLicense $license,
     ) {}
 
     public function handle(Request $request, Closure $next, string $moduleId): Response
@@ -69,15 +69,15 @@ final class ResolveModuleContext
         // melewati peluncur. Setiap halaman dan setiap rute JSON module melewati middleware ini,
         // jadi satu pemeriksaan di sini menutup semuanya. Pemasangan tanpa lisensi wajib tidak
         // membaca apa pun dan selalu lolos.
-        abort_unless($this->lisensi->allowsApp($moduleId), 403, 'Lisensi server ini tidak mencakup aplikasi ini.');
+        abort_unless($this->license->allowsApp($moduleId), 403, 'Lisensi server ini tidak mencakup aplikasi ini.');
 
-        $izin = $this->katalog->permissionsFor($membership, $moduleId);
+        $permission = $this->catalog->permissionsFor($membership, $moduleId);
 
         // Nol izin berarti tidak satu pun rantai role -> duty -> privilege -> permission
         // yang berujung ke module ini. Menolak di sini, sekali, lebih aman daripada
         // mengandalkan setiap controller module ingat memeriksa: yang lupa memeriksa akan
         // terbuka diam-diam, dan tidak ada test yang bisa membuktikan ketiadaan lupa.
-        abort_if($izin === [], 403, 'Tidak ada izin untuk module ini.');
+        abort_if($permission === [], 403, 'Tidak ada izin untuk module ini.');
 
         $legalEntity = $this->workspace->legalEntity($request, $membership);
         $orgUnit = $this->workspace->operatingUnit($request, $membership);
@@ -97,14 +97,14 @@ final class ResolveModuleContext
         // tidak melewati middleware ini. Yang membuatnya aman hari ini adalah model
         // penyajiannya, bukan kodenya — jadi pindah ke Octane menuntut ikatan ini dibereskan
         // lebih dulu, bukan sesudahnya.
-        app()->instance(TenantScope::KUNCI, (string) $membership->tenant_id);
+        app()->instance(TenantScope::KEY, (string) $membership->tenant_id);
 
-        $request->attributes->set(self::MODULE_AKTIF, $moduleId);
+        $request->attributes->set(self::ACTIVE_MODULE, $moduleId);
         $request->attributes->set(ModuleRequestContext::TENANT_ID, (string) $membership->tenant_id);
         $request->attributes->set(ModuleRequestContext::LEGAL_ENTITY_ID, $legalEntity?->id);
         $request->attributes->set(ModuleRequestContext::ORG_UNIT_ID, $orgUnit?->id);
         $request->attributes->set(ModuleRequestContext::USER_ID, (string) $membership->user_id);
-        $request->attributes->set(ModuleRequestContext::PERMISSIONS, $izin);
+        $request->attributes->set(ModuleRequestContext::PERMISSIONS, $permission);
 
         /*
          * Nama yang bersanding dengan id di atas, disimpan sekarang karena sekarang gratis.
@@ -118,11 +118,11 @@ final class ResolveModuleContext
          * justru ketika database sedang tidak bisa ditanya — sehingga satu-satunya nama yang
          * aman baginya adalah nama yang sudah berada di memori sebelum kegagalan terjadi.
          */
-        $request->attributes->set(LaporanKesalahan::NAMA_TENANT, $membership->tenant->name);
-        $request->attributes->set(LaporanKesalahan::NAMA_LEGAL_ENTITY, $legalEntity?->name);
-        $request->attributes->set(LaporanKesalahan::NAMA_ORG_UNIT, $orgUnit?->name);
-        $request->attributes->set(LaporanKesalahan::NAMA_PENGGUNA, $request->user()?->name);
-        $request->attributes->set(ModuleRequestContext::DATA_POLICIES, $this->kebijakan->resolve($membership));
+        $request->attributes->set(ErrorReport::TENANT_NAME, $membership->tenant->name);
+        $request->attributes->set(ErrorReport::LEGAL_ENTITY_NAME, $legalEntity?->name);
+        $request->attributes->set(ErrorReport::ORG_UNIT_NAME, $orgUnit?->name);
+        $request->attributes->set(ErrorReport::USER_NAME, $request->user()?->name);
+        $request->attributes->set(ModuleRequestContext::DATA_POLICIES, $this->policy->resolve($membership));
 
         /*
          * Kerangka layar — nama app dan menu sidebar-nya — dibagikan dari sini, bukan dari
@@ -137,7 +137,7 @@ final class ResolveModuleContext
          * query katalog untuk sesuatu yang tidak dipakai; Inertia hanya menyelesaikannya saat
          * benar-benar membangun jawaban Inertia.
          */
-        Inertia::share('app', fn (): ?array => $this->katalog->kerangkaModule(
+        Inertia::share('app', fn (): ?array => $this->catalog->moduleShell(
             $membership,
             $moduleId,
             $request->getPathInfo(),

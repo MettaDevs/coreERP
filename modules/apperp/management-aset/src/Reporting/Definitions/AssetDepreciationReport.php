@@ -19,8 +19,8 @@ use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDataItem;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
+use Modules\Apperp\ManagementAset\Services\AssetFiscalCalendar;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
-use Modules\Apperp\ManagementAset\Services\KalenderFiskalAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use stdClass;
 
@@ -308,7 +308,7 @@ final class AssetDepreciationReport implements ReportDefinition
      */
     private function fiscalYearStarts(string $tenantId, array $legalEntityIds, string $monthEnd): array
     {
-        $calendar = app(KalenderFiskalAset::class);
+        $calendar = app(AssetFiscalCalendar::class);
         $starts = [];
         foreach ($legalEntityIds as $legalEntityId) {
             if (is_string($legalEntityId) && $legalEntityId !== '') {

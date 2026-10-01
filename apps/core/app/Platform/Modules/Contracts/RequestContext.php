@@ -33,7 +33,7 @@ interface RequestContext
     /**
      * Gagal menutup: tanpa konteks, jawabannya `false`, bukan `true`.
      */
-    public function hasPermission(string $kode): bool;
+    public function hasPermission(string $code): bool;
 
     /**
      * Lingkup kebijakan data per kode kebijakan, sebagaimana disusun Core.

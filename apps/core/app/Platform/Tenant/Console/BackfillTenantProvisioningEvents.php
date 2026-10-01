@@ -14,7 +14,7 @@ class BackfillTenantProvisioningEvents extends Command
 
     protected $description = 'Buat event provisioning yang idempoten untuk tenant lama.';
 
-    public function __construct(private readonly PengirimEventModul $pengirim)
+    public function __construct(private readonly PengirimEventModul $dispatcher)
     {
         parent::__construct();
     }
@@ -64,9 +64,9 @@ class BackfillTenantProvisioningEvents extends Command
                 continue;
             }
 
-            $idEvent = (string) Str::ulid();
+            $eventId = (string) Str::ulid();
             DB::table('outbox_events')->insert([
-                'id' => $idEvent,
+                'id' => $eventId,
                 'tenant_id' => $tenant->id,
                 'type' => 'core.tenant.provisioned.v1',
                 'correlation_id' => $tenant->id,
@@ -81,8 +81,8 @@ class BackfillTenantProvisioningEvents extends Command
             // mengirimnya lewat HTTP sengaja melewatkan penerima yang berada di dalam proses.
             // Tanpa pemancaran di sini, backfill hanya menghasilkan baris yang ditandai
             // terkirim tanpa ada yang menyiapkan data awalnya — tenant lama tetap kosong.
-            $this->pengirim->kirim(
-                new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => $appIds]),
+            $this->dispatcher->kirim(
+                new TenantProvisioned($eventId, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => $appIds]),
                 (string) $tenant->id,
             );
             $created++;

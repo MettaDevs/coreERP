@@ -24,7 +24,7 @@ return new class extends Migration
      * satu kolom per parameter. Bentuk itu masuk akal di sana karena generator kode dan
      * perancang formulirnya membuat biaya satu field mendekati nol. Di sini biayanya tiga
      * suntingan — migration, method pembaca, dan satu blok layar — untuk setiap parameter baru.
-     * Baris per kode memindahkan biaya itu ke satu entri pada `DefinisiParameterWorkflow`, dan
+     * Baris per kode memindahkan biaya itu ke satu entri pada `WorkflowParameterDefinitions`, dan
      * dengan begitu penambahan parameter berhenti menyentuh skema sama sekali. Itu penting
      * untuk produk yang pembaruannya dijalankan admin pelanggan sendiri: migration yang tidak
      * ada tidak bisa gagal di server orang lain.

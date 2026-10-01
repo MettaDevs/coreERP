@@ -96,11 +96,11 @@ class ModuleReadinessTest extends TestCase
         $membership = $this->tenantDenganHak('app-uji');
         $katalog = $this->app->make(LaunchableAppCatalog::class);
 
-        $this->assertFalse($katalog->berjalanSebagaiModul($membership, 'app-uji'));
+        $this->assertFalse($katalog->runsAsModule($membership, 'app-uji'));
 
         $this->pasangSebagaiModule($membership->tenant_id, 'app-uji');
 
-        $this->assertTrue($katalog->berjalanSebagaiModul($membership, 'app-uji'));
+        $this->assertTrue($katalog->runsAsModule($membership, 'app-uji'));
     }
 
     private function pasangSebagaiModule(string $tenantId, string $moduleId): void

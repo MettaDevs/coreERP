@@ -5,16 +5,16 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ThrottleRequestsPerRoute;
 use App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly;
 use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
+use App\Platform\Identity\Http\Middleware\RequirePasswordChange;
 use App\Platform\Identity\Http\Middleware\ResolvePasskeyOrigin;
-use App\Platform\Identity\Http\Middleware\WajibGantiSandi;
 use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
 use App\Platform\Integration\Http\Middleware\AuthenticateInternalCaller;
 use App\Platform\License\Http\Middleware\EnforceSiteLicense;
 use App\Platform\Modules\Http\Middleware\AuthenticateAppService;
 use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
-use App\Platform\Observability\Http\Middleware\LampirkanKonteksJejak;
-use App\Platform\Observability\Support\JejakAktif;
-use App\Platform\Observability\Support\PelaporKesalahan;
+use App\Platform\Observability\Http\Middleware\AttachTraceContext;
+use App\Platform\Observability\Support\ActiveSpan;
+use App\Platform\Observability\Support\ErrorReporter;
 use App\Platform\Tenant\Http\Middleware\RequireTenantMembershipAtAddress;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -64,7 +64,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global, bukan per grup: rute `internal/v1` yang dipanggil app lain juga membawa
         // tenant (ditulis `AuthenticateAppService`), dan justru panggilan antar-layanan itu
         // yang paling sulit ditelusuri tanpa atribut tenant pada span-nya.
-        $middleware->append(LampirkanKonteksJejak::class);
+        $middleware->append(AttachTraceContext::class);
 
         /*
          * Global, dan ia berdiri paling awal dengan sengaja.
@@ -99,9 +99,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Global pada grup web dan bukan pada segelintir rute, karena kata sandi yang pernah
             // dilihat orang lain membuat **seluruh** sesi itu meragukan, bukan sebagian. Akun
             // tanpa penandanya tidak tersentuh — kolomnya berbawaan `false`.
-            WajibGantiSandi::class,
+            RequirePasswordChange::class,
             // Paling akhir. Sesudah Inertia, karena yang dikembalikannya halaman Inertia yang
-            // membutuhkan prop bersama. Sesudah `WajibGantiSandi`, dan keduanya tidak dapat saling
+            // membutuhkan prop bersama. Sesudah `RequirePasswordChange`, dan keduanya tidak dapat saling
             // melempar: pengalihan ke layar ganti kata sandi tetap terjadi, lalu layar itu sendiri
             // dijawab halaman kunci yang dirender di tempat — tidak ada pengalihan balik, jadi tidak
             // ada putaran. Pemasangan yang tidak mewajibkan lisensi tidak pernah tertahan di sini.
@@ -118,7 +118,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // yang sama ke span, supaya jejak dan log menunjuk kejadian yang sama alih-alih
         // dua kejadian yang harus dicocokkan manual.
         $exceptions->report(function (Throwable $kesalahan): void {
-            JejakAktif::catatKesalahan($kesalahan);
+            ActiveSpan::recordException($kesalahan);
         });
 
         // Pelapor kedua, sengaja tidak digabung dengan yang di atas. Keduanya menjawab
@@ -126,6 +126,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // yang satu menyusun laporan yang dibaca orang — dan menggabungkannya berarti satu
         // kegagalan menjatuhkan dua hal yang seharusnya berdiri sendiri.
         $exceptions->report(function (Throwable $kesalahan): void {
-            PelaporKesalahan::laporkan($kesalahan, PelaporKesalahan::permintaanSaatIni());
+            ErrorReporter::report($kesalahan, ErrorReporter::currentRequest());
         });
     })->create();

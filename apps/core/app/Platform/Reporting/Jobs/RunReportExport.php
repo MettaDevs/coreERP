@@ -13,7 +13,7 @@ use App\Platform\Reporting\Support\Rendering\DataOnlyWorkbook;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 use App\Platform\Reporting\Support\Rendering\RenderPipeline;
 use App\Platform\Reporting\Support\ReportCatalog;
-use App\Platform\Reporting\Support\SumberLaporan;
+use App\Platform\Reporting\Support\ReportSource;
 use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonInterface;
@@ -101,7 +101,7 @@ final class RunReportExport implements ShouldQueue
         return array_values(array_map(intval(...), (array) config('reporting.export_retry_seconds')));
     }
 
-    public function handle(ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
+    public function handle(ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
     {
         $export = $this->row();
         if ($export === null || ! ExportStatus::isActive($export->status)) {
@@ -149,7 +149,7 @@ final class RunReportExport implements ShouldQueue
         $this->markFailed($message, $exception);
     }
 
-    private function export(stdClass $export, ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
+    private function export(stdClass $export, ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
     {
         $layout = null;
         $rendered = null;

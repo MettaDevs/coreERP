@@ -57,7 +57,7 @@ nilai penyebabnya. Driver hanya berkata data akan terpotong; kolom mana dan nila
 ikut. Pada `insert` dengan delapan belas kolom, itu berarti seseorang harus menghitung tanda
 tanya satu per satu sambil mencocokkannya dengan daftar binding.
 
-`TersangkaPemotongan` mengerjakan penghitungan itu sekali, saat kejadiannya masih segar.
+`TruncationSuspects` mengerjakan penghitungan itu sekali, saat kejadiannya masih segar.
 Nama kolom ditarik dari query, dipasangkan dengan binding pada urutan yang sama, lalu
 diurutkan. Kalau pesan driver menyebut batas kolom — PostgreSQL menyebutkannya, SQL Server
 lewat ODBC tidak — nilai yang melebihi batas ditandai `→`.
@@ -96,7 +96,7 @@ Kenapa ada sama sekali: berkas dan SigNoz hanya menjawab pertanyaan yang sudah d
 Keduanya diam sempurna selama belum ada yang curiga dan membuka.
 
 Tiga hal yang menentukan bentuknya, dan ketiganya sudah menjadi test di
-`PengirimDiscordTest`:
+`DiscordNotifierTest`:
 
 - **Sebutan harus berada di `content`.** Discord tidak pernah menerbitkan notifikasi untuk
   sebutan yang ditulis di dalam embed — di sana ia tampil biru, bisa diklik, dan tidak
@@ -105,7 +105,7 @@ Tiga hal yang menentukan bentuknya, dan ketiganya sudah menjadi test di
 - **`allowed_mentions` dinyatakan dari konfigurasi, bukan disimpulkan dari isi pesan.** Pesan
   kesalahan memuat data pengguna; sebuah nilai yang kebetulan berbunyi `@everyone` tidak boleh
   berubah menjadi sebutan sungguhan hanya karena ia gagal divalidasi.
-- **Ada penjeda per kesalahan** (`PenjedaKiriman`, bawaannya 60 detik). Satu kali membuka
+- **Ada penjeda per kesalahan** (`NotificationThrottle`, bawaannya 60 detik). Satu kali membuka
   halaman daftar sudah menghasilkan dua kegagalan dengan sebab yang sama; database yang mati
   menghasilkan ratusan. Dengan `@everyone` dan tanpa penjeda, yang sampai ke tim bukan
   peringatan melainkan alasan untuk mematikan notifikasi channel itu — dan peringatan yang
@@ -144,7 +144,7 @@ pernah sampai.
 
 **`compositeQuery` adalah urusan dalam SigNoz, bukan antarmuka yang dijanjikan.** Diperiksa
 langsung pada v0.141.1 dan bisa berubah pada versi berikutnya. Kalau suatu saat tautannya
-membuka penjelajah tanpa saringan, `PengirimDiscord::tautanSigNoz()` adalah tempat
+membuka penjelajah tanpa saringan, `DiscordNotifier::sigNozLink()` adalah tempat
 memperbaikinya — dan sementara itu tidak ada yang rusak selain kenyamanan.
 
 Penjedanya memakai berkas di `storage/logs/.penjeda-kiriman`, bukan `Cache::`. Penyimpanan
@@ -230,7 +230,7 @@ menjadi catatan OTLP; `opentelemetry-auto-psr3` melakukan hal yang sama lewat an
 PSR-3. Membiarkan keduanya hidup berarti setiap baris log terkirim dua kali.
 
 Ini juga alasan laporan kesalahan **tidak** ditulis lewat `Log::` melainkan langsung ke
-berkas (`BerkasLaporan`). Sebelum diperbaiki, satu kesalahan tiba di SigNoz sebagai tiga
+berkas (`ErrorReportFile`). Sebelum diperbaiki, satu kesalahan tiba di SigNoz sebagai tiga
 catatan: log bawaan Laravel, laporan yang dikirim sengaja, dan salinan laporan itu lagi tanpa
 atribut apa pun sehingga tidak bisa disaring.
 
@@ -253,8 +253,8 @@ Menyatukan keduanya adalah pekerjaan `LIFE-14`, dan sengaja belum dikerjakan.
 
 ## Aturan untuk kode telemetri
 
-Satu kalimat, dan ia berlaku untuk `JejakAktif`, `LaporanKesalahan`, `PelaporKesalahan`,
-`BerkasLaporan`, dan `SqlTerbaca`:
+Satu kalimat, dan ia berlaku untuk `ActiveSpan`, `ErrorReport`, `ErrorReporter`,
+`ErrorReportFile`, dan `ReadableSql`:
 
 > **Tidak ada jalur yang boleh melempar.**
 
@@ -265,16 +265,16 @@ keterangan tentang apa yang sebenarnya terjadi.
 Yang mengikutinya:
 
 - Seluruh badan dibungkus `catch (Throwable) {}`.
-- **Penjaga masuk-ulang** di `PelaporKesalahan`. Tanpa itu, pelapor yang gagal menulis akan
+- **Penjaga masuk-ulang** di `ErrorReporter`. Tanpa itu, pelapor yang gagal menulis akan
   dilaporkan lagi oleh penangan, berputar sampai memori habis — dan paling mungkin terjadi
   ketika database atau disk bermasalah, yaitu ketika laporan paling dibutuhkan.
 - **`CurrentWorkspace` tidak disentuh ketika kesalahannya menyangkut database.** Method itu
   menjalankan query *dan* menulis sesi. Menanyakan pada database kenapa database mati adalah
   cara satu kesalahan berubah menjadi dua.
 - **`QueryException::getRawSql()` tidak dipakai.** Ia menyelesaikan koneksi lewat container,
-  untuk kesalahan yang mungkin justru kegagalan koneksi. `SqlTerbaca` menggantikannya tanpa
+  untuk kesalahan yang mungkin justru kegagalan koneksi. `ReadableSql` menggantikannya tanpa
   I/O apa pun.
-- **`SqlTerbaca` menolak menebak.** Kalau jumlah tanda tanya tidak sama dengan jumlah binding,
+- **`ReadableSql` menolak menebak.** Kalau jumlah tanda tanya tidak sama dengan jumlah binding,
   ia mengembalikan `null` dan nilainya ditampilkan terpisah. Query hasil rekonstruksi yang
   salah tetapi tampak yakin mengirim orang menelusuri baris data yang tidak pernah terlibat.
 
@@ -342,13 +342,13 @@ Konsekuensinya disadari: image yang diverifikasi saat PR bukan image yang dikiri
 
 | Berkas | Isi |
 |---|---|
-| `app/Platform/Observability/Support/PelaporKesalahan.php` | Pintu masuk, penjaga, tiga tujuan |
-| `app/Platform/Observability/Support/PengirimDiscord.php` | Muatan webhook, sebutan, dan izinnya |
-| `app/Platform/Observability/Support/PenjedaKiriman.php` | Penjeda per kesalahan, berbasis berkas |
-| `app/Platform/Observability/Support/LaporanKesalahan.php` | Pengumpul konteks dan perender |
-| `app/Platform/Observability/Support/BerkasLaporan.php` | Penulisan berkas, rotasi per hari dan peran |
-| `app/Platform/Observability/Support/SqlTerbaca.php` | Penyisipan binding tanpa I/O |
-| `app/Platform/Observability/Support/TersangkaPemotongan.php` | Penunjuk nilai yang tidak muat |
-| `app/Platform/Observability/Support/JejakAktif.php` | Satu-satunya penyentuh span aktif |
+| `app/Platform/Observability/Support/ErrorReporter.php` | Pintu masuk, penjaga, tiga tujuan |
+| `app/Platform/Observability/Support/DiscordNotifier.php` | Muatan webhook, sebutan, dan izinnya |
+| `app/Platform/Observability/Support/NotificationThrottle.php` | Penjeda per kesalahan, berbasis berkas |
+| `app/Platform/Observability/Support/ErrorReport.php` | Pengumpul konteks dan perender |
+| `app/Platform/Observability/Support/ErrorReportFile.php` | Penulisan berkas, rotasi per hari dan peran |
+| `app/Platform/Observability/Support/ReadableSql.php` | Penyisipan binding tanpa I/O |
+| `app/Platform/Observability/Support/TruncationSuspects.php` | Penunjuk nilai yang tidak muat |
+| `app/Platform/Observability/Support/ActiveSpan.php` | Satu-satunya penyentuh span aktif |
 | `resources/js/lib/pelaporan-kesalahan.ts` | Padanannya di peramban |
 | `tests/Feature/Observabilitas/` | Penjaga untuk semua sifat di atas |

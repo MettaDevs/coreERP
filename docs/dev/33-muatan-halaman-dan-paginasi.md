@@ -57,7 +57,7 @@ Yang wajib ditunda:
 
 ```php
 // Katalog izin hanya dibaca di dalam dialog rincian role.
-'apps' => Inertia::defer(fn (): array => $this->katalogIzin($entitledAppIds->all())),
+'apps' => Inertia::defer(fn (): array => $this->permissionCatalog($entitledAppIds->all())),
 ```
 
 Di sisi React, prop itu **tidak ada** pada render pertama. Tipenya karena itu opsional dan diberi

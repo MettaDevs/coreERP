@@ -1,6 +1,6 @@
 <?php
 
-use App\Platform\Docs\Support\KeamananSesiCore;
+use App\Platform\Docs\Support\CoreSessionSecurity;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 
 return [
@@ -179,5 +179,5 @@ return [
      * `__set_state()` dan tidak menyebut berkas ini sama sekali. Skemanya kini disusun di dalam
      * kelasnya, saat runtime; alasan lengkapnya ada di sana.
      */
-    'security_strategy' => KeamananSesiCore::class,
+    'security_strategy' => CoreSessionSecurity::class,
 ];
