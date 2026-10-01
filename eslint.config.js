@@ -202,6 +202,32 @@ export default [
         },
     },
     {
+        // Arah lapis Core berlaku juga di halaman Inertia: Platform boleh dipakai Foundation,
+        // tidak sebaliknya. Sisi PHP dijaga `LayerDirectionBoundaryTest`; aturan ini menjaga
+        // sisi TSX, baik lewat alias `@/pages/foundation/...` maupun lewat jalur relatif
+        // `../foundation/...`.
+        files: ['apps/core/resources/js/pages/platform/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            regex: '^@/pages/foundation(/|$)',
+                            message:
+                                'Halaman Platform tidak boleh meng-import halaman Foundation. Pindahkan bagian bersamanya ke components/ atau ke lapis Platform.',
+                        },
+                        {
+                            regex: '^(\\./|(\\.\\./)+)(pages/)?foundation(/|$)',
+                            message:
+                                'Halaman Platform tidak boleh meng-import halaman Foundation. Pindahkan bagian bersamanya ke components/ atau ke lapis Platform.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         // Skenario k6 berjalan di runtime k6, bukan browser maupun Node. `__ENV` dan
         // kawan-kawannya disediakan runtime itu, jadi tanpa deklarasi ini setiap
         // pembacaan variabel lingkungan dilaporkan sebagai variabel tak dikenal.
