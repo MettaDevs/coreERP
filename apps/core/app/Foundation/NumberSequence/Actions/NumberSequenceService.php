@@ -601,11 +601,13 @@ class NumberSequenceService
             return $this->nextDirectNumber($sequence, $scope);
         }
 
+        // Dibandingkan dengan null, bukan dibaca sebagai benar/salah: 0 nomor yang sah bila admin memilih
+        // nomor awal 0, dan dulu `! $available` membuat reservasi pertama urutan seperti itu selalu gagal.
         $available = $this->availableContinuousNumber($sequence, $scope);
-        if (! $available) {
+        if ($available === null) {
             $counter = $this->counter($sequence, $scope);
             $available = $this->availableContinuousNumber($sequence, $scope);
-            if (! $available) {
+            if ($available === null) {
                 $first = $this->withinMaximum($sequence, (int) $counter->next_number);
                 $last = $this->allocationEnd($sequence, $first);
                 $now = now();
@@ -624,7 +626,7 @@ class NumberSequenceService
             }
         }
 
-        if (! $available) {
+        if ($available === null) {
             $this->fail('reference', 'Nomor sequence belum tersedia.');
         }
 
