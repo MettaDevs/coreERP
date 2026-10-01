@@ -36,7 +36,7 @@ final class FinancePostingSettingController extends Controller
         return response()->json(['data' => $data])->header('ETag', RowVersion::etag($data['version']));
     }
 
-    public function update(Request $request, Organization $organization, PostingPublisher $penerbit): JsonResponse
+    public function update(Request $request, Organization $organization, PostingPublisher $publisher): JsonResponse
     {
         $this->guard($request, $organization, manage: true);
         $data = $request->validate([
@@ -63,22 +63,22 @@ final class FinancePostingSettingController extends Controller
         });
         // Posting yang sudah terbit tetapi belum pernah sampai ke pembaca mengikuti setelan baru:
         // yang kini sesudah cutover diperiksa dan disajikan, yang sebelumnya menjadi manual.
-        $dinilaiUlang = $penerbit->reevaluateCutover($organization->tenant_id, $organization->id, $request->user()?->id);
+        $revalidated = $publisher->reevaluateCutover($organization->tenant_id, $organization->id, $request->user()?->id);
 
-        return response()->json(['data' => $this->present($organization), 'meta' => ['reevaluated_postings' => $dinilaiUlang]]);
+        return response()->json(['data' => $this->present($organization), 'meta' => ['reevaluated_postings' => $revalidated]]);
     }
 
     public function storeMode(Request $request, Organization $organization): JsonResponse
     {
         $this->guard($request, $organization, manage: true);
-        $ganda = 'Sudah ada mode yang berlaku mulai tanggal itu. Pilih tanggal lain.';
+        $duplicates = 'Sudah ada mode yang berlaku mulai tanggal itu. Pilih tanggal lain.';
         $data = $request->validate([
             'mode' => ['required', Rule::in(FinanceSettlementMode::MODES)],
             'effective_from' => [
                 'required', 'date_format:Y-m-d',
                 Rule::unique('finance_settlement_modes', 'effective_from')->where('legal_entity_id', $organization->id),
             ],
-        ], ['effective_from.unique' => $ganda]);
+        ], ['effective_from.unique' => $duplicates]);
 
         try {
             // Transaksi bersarang menjadi SAVEPOINT. Tanpanya, bentrokan indeks unik dari dua
@@ -91,7 +91,7 @@ final class FinancePostingSettingController extends Controller
                 'effective_from' => $data['effective_from'],
             ]));
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['effective_from' => $ganda]);
+            throw ValidationException::withMessages(['effective_from' => $duplicates]);
         }
 
         return response()->json(['data' => $this->present($organization)], 201);
@@ -107,19 +107,19 @@ final class FinancePostingSettingController extends Controller
     public function destroyMode(Request $request, Organization $organization, string $mode): Response
     {
         $this->guard($request, $organization, manage: true);
-        $baris = FinanceSettlementMode::query()
+        $row = FinanceSettlementMode::query()
             ->where('legal_entity_id', $organization->id)
             ->whereKey($mode)
             ->firstOrFail();
-        if (! $baris->effective_from->isAfter(today())) {
+        if (! $row->effective_from->isAfter(today())) {
             throw ValidationException::withMessages([
                 'mode' => 'Mode yang sudah berlaku tidak dapat dihapus. Tambahkan mode baru dengan tanggal berlaku berikutnya.',
             ]);
         }
 
-        DB::transaction(function () use ($request, $baris): void {
-            RowVersion::claim($baris, RowVersion::expected($request));
-            $baris->delete();
+        DB::transaction(function () use ($request, $row): void {
+            RowVersion::claim($row, RowVersion::expected($request));
+            $row->delete();
         });
 
         return response()->noContent();
@@ -141,12 +141,12 @@ final class FinancePostingSettingController extends Controller
                 ->where('legal_entity_id', $organization->id)
                 ->orderByDesc('effective_from')
                 ->get()
-                ->map(static fn (FinanceSettlementMode $baris): array => [
-                    'id' => $baris->id,
-                    'version' => (int) $baris->version,
-                    'mode' => $baris->mode,
-                    'effective_from' => $baris->effective_from->toDateString(),
-                    'removable' => $baris->effective_from->isAfter(today()),
+                ->map(static fn (FinanceSettlementMode $row): array => [
+                    'id' => $row->id,
+                    'version' => (int) $row->version,
+                    'mode' => $row->mode,
+                    'effective_from' => $row->effective_from->toDateString(),
+                    'removable' => $row->effective_from->isAfter(today()),
                 ])
                 ->values()
                 ->all(),

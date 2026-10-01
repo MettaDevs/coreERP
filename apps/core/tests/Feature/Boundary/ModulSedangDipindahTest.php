@@ -52,7 +52,7 @@ class ModulSedangDipindahTest extends TestCase
 
     public function test_folder_tanpa_awalan_tabel_wajib_terdaftar_sedang_dipindah(): void
     {
-        $dipindah = ModulSedangDipindah::bawaan();
+        $dipindah = ModulSedangDipindah::default();
         $akar = dirname(__DIR__, 5).'/modules';
         $manifest = glob($akar.'/*/*/app.yaml');
         $manifest = $manifest === false ? [] : $manifest;
@@ -65,7 +65,7 @@ class ModulSedangDipindahTest extends TestCase
             $isi = (string) file_get_contents($berkas);
             $namaFolder = basename(dirname($berkas));
 
-            if ($dipindah->menandai($namaFolder)) {
+            if ($dipindah->marks($namaFolder)) {
                 continue;
             }
 
@@ -126,7 +126,7 @@ class ModulSedangDipindahTest extends TestCase
     #[DataProvider('berkasPengecualian')]
     public function test_daftar_pengecualian_sama_dengan_daftar_modul_dipindah(string $namaBerkas, string $keterangan, string $penanda): void
     {
-        $dipindah = array_keys(ModulSedangDipindah::bawaan()->semua());
+        $dipindah = array_keys(ModulSedangDipindah::default()->all());
         $berkas = dirname(__DIR__, 3).'/'.$namaBerkas;
 
         $this->assertFileExists($berkas);
@@ -167,7 +167,7 @@ class ModulSedangDipindahTest extends TestCase
 
     public function test_tiap_entri_menyebut_alasan_dan_tenggat(): void
     {
-        $daftar = ModulSedangDipindah::bawaan()->semua();
+        $daftar = ModulSedangDipindah::default()->all();
 
         foreach ($daftar as $nama => $entri) {
             $this->assertNotSame('', trim($entri['alasan']), sprintf(
@@ -190,7 +190,7 @@ class ModulSedangDipindahTest extends TestCase
      */
     public function test_tenggat_tiap_entri_belum_lewat(): void
     {
-        $lewat = ModulSedangDipindah::bawaan()->tenggatYangLewat(new DateTimeImmutable('today'));
+        $lewat = ModulSedangDipindah::default()->overdue(new DateTimeImmutable('today'));
 
         $this->assertSame([], $lewat, implode("\n", [
             'Ada modul yang masih dikecualikan padahal tenggatnya sudah lewat: '.implode(', ', array_keys($lewat)).'.',
@@ -210,7 +210,7 @@ class ModulSedangDipindahTest extends TestCase
     public function test_modul_yang_dikecualikan_masih_benar_benar_melanggar(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::bawaan();
+        $dipindah = ModulSedangDipindah::default();
 
         $basi = $this->entriBasi($pemindai, $dipindah);
 
@@ -231,7 +231,7 @@ class ModulSedangDipindahTest extends TestCase
      */
     public function test_pemblokir_menyebut_task_yang_membuangnya(): void
     {
-        foreach (ModulSedangDipindah::bawaan()->semua() as $nama => $entri) {
+        foreach (ModulSedangDipindah::default()->all() as $nama => $entri) {
             $this->assertPemblokirMenyebutTask($nama, $entri['pemblokir'] ?? '');
         }
 
@@ -283,7 +283,7 @@ class ModulSedangDipindahTest extends TestCase
             'Tanpa penghalang, modul yang sudah bersih harus dilaporkan basi; kalau tidak, pemeriksaan di bawah tidak membuktikan apa pun.',
         );
 
-        $denganPemblokir = ModulSedangDipindah::buatan([
+        $denganPemblokir = ModulSedangDipindah::custom([
             $bersih => [
                 'alasan' => 'Modul palsu milik test ini.',
                 'tenggat' => '2999-12-31',
@@ -334,7 +334,7 @@ class ModulSedangDipindahTest extends TestCase
                 $pemindai->pelanggaranQueryMentah($folder),
             );
 
-            if ($dipindah->menandai($nama)) {
+            if ($dipindah->marks($nama)) {
                 $pelanggaranDitandai = $temuan;
 
                 continue;
@@ -366,7 +366,7 @@ class ModulSedangDipindahTest extends TestCase
         $dirakitPenjaga = [];
 
         foreach ($pemindai->folderModul() as $nama => $folder) {
-            if ($dipindah->menandai($nama)) {
+            if ($dipindah->marks($nama)) {
                 continue;
             }
 
@@ -449,7 +449,7 @@ class ModulSedangDipindahTest extends TestCase
         $folderModul = $pemindai->folderModul();
         $basi = [];
 
-        foreach ($dipindah->semua() as $nama => $entri) {
+        foreach ($dipindah->all() as $nama => $entri) {
             if (! isset($folderModul[$nama])) {
                 continue;
             }
@@ -494,7 +494,7 @@ class ModulSedangDipindahTest extends TestCase
 
     private function daftarBerisi(string $namaFolder): ModulSedangDipindah
     {
-        return ModulSedangDipindah::buatan([
+        return ModulSedangDipindah::custom([
             $namaFolder => [
                 'alasan' => 'Modul palsu milik test ini.',
                 'tenggat' => '2999-12-31',

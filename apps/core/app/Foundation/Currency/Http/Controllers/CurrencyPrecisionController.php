@@ -24,9 +24,9 @@ final class CurrencyPrecisionController extends Controller
      * Mata uang yang dapat disetel beserta nama tampilannya. Master mata uang penuh belum ada
      * (FIN-20); setiap kode di sini harus punya bawaan di `MoneyPrecision::DEFAULTS`.
      */
-    private const NAMA = ['IDR' => 'Rupiah Indonesia'];
+    private const NAMES = ['IDR' => 'Rupiah Indonesia'];
 
-    public function index(Request $request, MoneyPrecision $presisi): Response
+    public function index(Request $request, MoneyPrecision $precision): Response
     {
         $tenant = $this->currentMembership($request)->tenant_id;
         $versions = CurrencyPrecision::query()->where('tenant_id', $tenant)->pluck('version', 'currency_code');
@@ -38,14 +38,14 @@ final class CurrencyPrecisionController extends Controller
                 'unit_amount_decimals' => MoneyPrecision::MAX_UNIT_AMOUNT_DECIMALS,
             ],
             'currencies' => array_map(
-                static fn (string $kode): array => [
-                    'code' => $kode,
-                    'name' => self::NAMA[$kode],
-                    ...$presisi->forCurrency($tenant, $kode),
+                static fn (string $code): array => [
+                    'code' => $code,
+                    'name' => self::NAMES[$code],
+                    ...$precision->forCurrency($tenant, $code),
                     // 0 selama mata uang ini masih memakai bawaan; lihat RowVersion::claimIfExists().
-                    'version' => $versions[$kode] ?? 0,
+                    'version' => $versions[$code] ?? 0,
                 ],
-                array_keys(self::NAMA),
+                array_keys(self::NAMES),
             ),
         ]);
     }
@@ -53,7 +53,7 @@ final class CurrencyPrecisionController extends Controller
     public function update(Request $request, string $currency): RedirectResponse
     {
         abort_unless($request->user()?->can('manage-reference-data'), 403);
-        abort_unless(array_key_exists($currency, self::NAMA), 404);
+        abort_unless(array_key_exists($currency, self::NAMES), 404);
         $tenant = $this->currentMembership($request)->tenant_id;
         $data = $request->validate([
             'amount_decimals' => ['required', 'integer', 'between:0,'.MoneyPrecision::MAX_AMOUNT_DECIMALS],

@@ -56,23 +56,23 @@ final class PostingAcknowledger
             return null;
         }
 
-        return self::bentuk($body);
+        return self::shape($body);
     }
 
     /**
      * @param  array<string, mixed>  $ack
      * @return array{status: string, external_reference: ?string, reason_code: ?string, reason: ?string}
      */
-    public static function bentuk(array $ack): array
+    public static function shape(array $ack): array
     {
-        $teks = static fn (string $kunci): ?string => isset($ack[$kunci]) && is_string($ack[$kunci]) && trim($ack[$kunci]) !== '' ? trim($ack[$kunci]) : null;
+        $text = static fn (string $key): ?string => isset($ack[$key]) && is_string($ack[$key]) && trim($ack[$key]) !== '' ? trim($ack[$key]) : null;
         $posted = ($ack['status'] ?? null) === FinancePosting::POSTED;
 
         return [
             'status' => $posted ? FinancePosting::POSTED : FinancePosting::REJECTED,
-            'external_reference' => $posted ? $teks('external_reference') : null,
-            'reason_code' => $posted ? null : $teks('reason_code'),
-            'reason' => $posted ? null : $teks('reason'),
+            'external_reference' => $posted ? $text('external_reference') : null,
+            'reason_code' => $posted ? null : $text('reason_code'),
+            'reason' => $posted ? null : $text('reason'),
         ];
     }
 
@@ -94,7 +94,7 @@ final class PostingAcknowledger
                     'acknowledged_at' => now(),
                     'acknowledged_by_client_id' => $client->id,
                 ])->save();
-                FinancePostingEvent::catat(
+                FinancePostingEvent::record(
                     $posting,
                     $ack['status'] === FinancePosting::POSTED ? 'acknowledged_posted' : 'acknowledged_rejected',
                     FinancePosting::PENDING,
@@ -109,11 +109,11 @@ final class PostingAcknowledger
                 return ['result' => self::APPLIED, 'posting' => $posting];
             }
 
-            $sama = $posting->status === $ack['status'] && ($ack['status'] === FinancePosting::POSTED
+            $same = $posting->status === $ack['status'] && ($ack['status'] === FinancePosting::POSTED
                 ? $posting->external_reference === $ack['external_reference']
                 : $posting->reason_code === $ack['reason_code']);
 
-            return ['result' => $sama ? self::UNCHANGED : self::CONFLICT, 'posting' => $posting];
+            return ['result' => $same ? self::UNCHANGED : self::CONFLICT, 'posting' => $posting];
         });
     }
 }

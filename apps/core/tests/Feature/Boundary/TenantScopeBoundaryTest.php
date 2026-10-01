@@ -149,14 +149,14 @@ class TenantScopeBoundaryTest extends TestCase
     public function test_module_tidak_memakai_query_builder_mentah_pada_tabelnya(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::bawaan();
+        $dipindah = ModulSedangDipindah::default();
 
         $berkasDiperiksa = 0;
         $moduleDiperiksa = 0;
         $pelanggaran = [];
 
         foreach ($pemindai->folderModul() as $nama => $folder) {
-            if ($dipindah->menandai($nama)) {
+            if ($dipindah->marks($nama)) {
                 continue;
             }
 
@@ -179,6 +179,6 @@ class TenantScopeBoundaryTest extends TestCase
 
     private function jadikanTenantAktif(string $tenantId): void
     {
-        $this->app->instance(TenantScope::KUNCI, $tenantId);
+        $this->app->instance(TenantScope::KEY, $tenantId);
     }
 }

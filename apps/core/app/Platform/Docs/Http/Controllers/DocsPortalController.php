@@ -29,47 +29,47 @@ final class DocsPortalController extends Controller
 {
     public function __invoke(Request $request): View
     {
-        $internal = $this->bolehInternal();
-        $spesifikasi = collect($this->katalog())
-            ->filter(fn (array $kontrak): bool => $kontrak['publik'] || $internal)
-            ->map(fn (array $kontrak): array => [
-                'id' => $kontrak['id'],
-                'name' => $kontrak['judul'],
-                'url' => route('docs.kontrak', $kontrak['id']),
+        $internal = $this->mayReadInternal();
+        $specification = collect($this->catalog())
+            ->filter(fn (array $contract): bool => $contract['publik'] || $internal)
+            ->map(fn (array $contract): array => [
+                'id' => $contract['id'],
+                'name' => $contract['judul'],
+                'url' => route('docs.kontrak', $contract['id']),
             ])
             ->values();
 
         if ($internal) {
-            $spesifikasi->push([
+            $specification->push([
                 'id' => 'control-plane',
                 'name' => 'Layar CoreERP (internal)',
                 'url' => route('scramble.docs.document'),
             ]);
             CoreApp::query()->where('status', 'available')->whereNotNull('contract_url')->orderBy('name')->get()
-                ->each(fn (CoreApp $app) => $spesifikasi->push([
+                ->each(fn (CoreApp $app) => $specification->push([
                     'id' => $app->id,
                     'name' => $app->name,
                     'url' => route('docs.openapi', $app->id),
                 ]));
         }
 
-        abort_if($spesifikasi->isEmpty(), 404);
-        $selected = $spesifikasi->firstWhere('id', $request->query('spec')) ?? $spesifikasi->first();
+        abort_if($specification->isEmpty(), 404);
+        $selected = $specification->firstWhere('id', $request->query('spec')) ?? $specification->first();
 
-        return view('api-portal', ['specifications' => $spesifikasi->all(), 'selected' => $selected]);
+        return view('api-portal', ['specifications' => $specification->all(), 'selected' => $selected]);
     }
 
-    public function kontrak(string $spesifikasi): Response
+    public function contract(string $specification): Response
     {
-        $kontrak = collect($this->katalog())->firstWhere('id', $spesifikasi) ?? abort(404);
-        abort_unless($kontrak['publik'] || $this->bolehInternal(), 403);
-        $berkas = base_path('contracts/terbit/'.$kontrak['berkas']);
-        abort_unless(is_file($berkas), 404);
+        $contract = collect($this->catalog())->firstWhere('id', $specification) ?? abort(404);
+        abort_unless($contract['publik'] || $this->mayReadInternal(), 403);
+        $file = base_path('contracts/terbit/'.$contract['berkas']);
+        abort_unless(is_file($file), 404);
 
-        return response((string) file_get_contents($berkas), 200, [
+        return response((string) file_get_contents($file), 200, [
             'Content-Type' => 'application/yaml; charset=utf-8',
             // Berkasnya ikut rilis dan tidak berubah di antara dua rilis.
-            'Cache-Control' => $kontrak['publik'] ? 'public, max-age=300' : 'private, no-store',
+            'Cache-Control' => $contract['publik'] ? 'public, max-age=300' : 'private, no-store',
         ]);
     }
 
@@ -81,35 +81,35 @@ final class DocsPortalController extends Controller
      *
      * @throws JsonException
      */
-    private function katalog(): array
+    private function catalog(): array
     {
-        $berkas = base_path('contracts/terbit/katalog.json');
-        if (! is_file($berkas)) {
+        $file = base_path('contracts/terbit/katalog.json');
+        if (! is_file($file)) {
             throw new RuntimeException('Katalog kontrak tidak ada: jalankan `python contracts/bundle.py` lalu commit hasilnya.');
         }
-        $isi = json_decode((string) file_get_contents($berkas), true, 8, JSON_THROW_ON_ERROR);
-        if (! is_array($isi)) {
+        $content = json_decode((string) file_get_contents($file), true, 8, JSON_THROW_ON_ERROR);
+        if (! is_array($content)) {
             throw new RuntimeException('Katalog kontrak bukan daftar.');
         }
 
-        $hasil = [];
-        foreach ($isi as $baris) {
-            if (! is_array($baris)
-                || ! is_string($baris['id'] ?? null)
-                || ! is_string($baris['judul'] ?? null)
-                || ! is_bool($baris['publik'] ?? null)
-                || ! is_string($baris['berkas'] ?? null)
-                || preg_match('/^[a-z0-9-]+\.yaml$/', $baris['berkas']) !== 1) {
+        $result = [];
+        foreach ($content as $row) {
+            if (! is_array($row)
+                || ! is_string($row['id'] ?? null)
+                || ! is_string($row['judul'] ?? null)
+                || ! is_bool($row['publik'] ?? null)
+                || ! is_string($row['berkas'] ?? null)
+                || preg_match('/^[a-z0-9-]+\.yaml$/', $row['berkas']) !== 1) {
                 throw new RuntimeException('Katalog kontrak memuat baris yang tidak sah.');
             }
-            $hasil[] = ['id' => $baris['id'], 'judul' => $baris['judul'], 'publik' => $baris['publik'], 'berkas' => $baris['berkas']];
+            $result[] = ['id' => $row['id'], 'judul' => $row['judul'], 'publik' => $row['publik'], 'berkas' => $row['berkas']];
         }
 
-        return $hasil;
+        return $result;
     }
 
     /** Sama dengan penjaga Scramble: mesin pengembang, atau admin penyedia lewat `viewApiDocs`. */
-    private function bolehInternal(): bool
+    private function mayReadInternal(): bool
     {
         return app()->environment('local') || Gate::allows('viewApiDocs');
     }

@@ -18,7 +18,7 @@ class TersangkaPemotonganTest extends TestCase
 {
     public function test_kolom_terpanjang_muncul_paling_atas_dengan_namanya(): void
     {
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "GD_trMutasiDetail" ("Barang_ID", "Kode_Satuan", "No_Batch") values (?, ?, ?)',
             ['52501', 'Vial + Ampul Pelarut', '202506137AX'],
         );
@@ -30,7 +30,7 @@ class TersangkaPemotonganTest extends TestCase
 
     public function test_bentuk_update_juga_dikenali(): void
     {
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'update "aset" set "kode" = ?, "keterangan" = ? where "id" = ?',
             ['AST-1', str_repeat('x', 300), 'id-1'],
         );
@@ -43,7 +43,7 @@ class TersangkaPemotonganTest extends TestCase
     {
         // Menebak nama kolom dari bentuk yang tidak dipahami akan menempelkan nama yang salah
         // pada nilai yang benar — mengirim pembaca ke arah yang keliru dengan penuh keyakinan.
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "aset" select * from "aset_impor" where "kode" = ?',
             ['AST-999'],
         );
@@ -53,7 +53,7 @@ class TersangkaPemotonganTest extends TestCase
 
     public function test_nilai_bukan_string_dilewati(): void
     {
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "aset" ("kode", "jumlah", "aktif") values (?, ?, ?)',
             ['AST-1', 42, true],
         );
@@ -64,7 +64,7 @@ class TersangkaPemotonganTest extends TestCase
 
     public function test_cuplikan_nilai_panjang_dipotong(): void
     {
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "aset" ("catatan") values (?)',
             [str_repeat('a', 500)],
         );
@@ -76,11 +76,11 @@ class TersangkaPemotonganTest extends TestCase
 
     public function test_pengenalan_lewat_sqlstate_maupun_pesan(): void
     {
-        $this->assertTrue(TersangkaPemotongan::cocok('22001', null));
+        $this->assertTrue(TersangkaPemotongan::matches('22001', null));
         // SQL Server lewat ODBC sering datang tanpa SQLSTATE yang rapi.
-        $this->assertTrue(TersangkaPemotongan::cocok(null, 'String or binary data would be truncated.'));
-        $this->assertTrue(TersangkaPemotongan::cocok(null, 'value too long for type character varying(10)'));
-        $this->assertFalse(TersangkaPemotongan::cocok('23505', 'duplicate key value'));
+        $this->assertTrue(TersangkaPemotongan::matches(null, 'String or binary data would be truncated.'));
+        $this->assertTrue(TersangkaPemotongan::matches(null, 'value too long for type character varying(10)'));
+        $this->assertFalse(TersangkaPemotongan::matches('23505', 'duplicate key value'));
     }
 
     public function test_batas_kolom_dari_pesan_driver_menaikkan_penyebab_sebenarnya(): void
@@ -89,10 +89,10 @@ class TersangkaPemotonganTest extends TestCase
         // 320 karakter kalah panjang dari apa pun, tetapi sama sekali sehat. Yang gagal adalah
         // `kode_satuan`, sebuah `varchar(8)` berisi 20 karakter. Mengurutkan sekadar dari yang
         // terpanjang menunjuk kolom yang salah dengan penuh keyakinan.
-        $batas = TersangkaPemotongan::batasDariPesan('value too long for type character varying(8)');
+        $batas = TersangkaPemotongan::limitFromMessage('value too long for type character varying(8)');
         $this->assertSame(8, $batas);
 
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "uji" ("kode", "kode_satuan", "catatan") values (?, ?, ?)',
             ['AST-1', 'Vial + Ampul Pelarut', str_repeat('x', 320)],
             $batas,
@@ -115,9 +115,9 @@ class TersangkaPemotonganTest extends TestCase
     {
         // SQL Server lewat ODBC tidak menyebut batas kolomnya, jadi yang tersisa hanya
         // petunjuk — dan laporan harus tetap memberi petunjuk itu, bukan diam.
-        $this->assertNull(TersangkaPemotongan::batasDariPesan('String or binary data would be truncated.'));
+        $this->assertNull(TersangkaPemotongan::limitFromMessage('String or binary data would be truncated.'));
 
-        $daftar = TersangkaPemotongan::daftar(
+        $daftar = TersangkaPemotongan::list(
             'insert into "uji" ("a", "b") values (?, ?)',
             ['pendek', str_repeat('y', 99)],
             null,

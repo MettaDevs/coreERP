@@ -48,11 +48,11 @@ final class ModuleServiceProvider extends ServiceProvider
         // berjalan, dan pemindahannya jadi dikerjakan tanpa jaring pengaman sampai hari
         // terakhir. Katalog, pemasangan, dan segala yang menyentuh data tenant tetap memakai
         // `semua()`, yang melewatkan module yang sedang dipindah.
-        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
-            $penyedia = $module->penyediaLayanan();
+        foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
+            $provider = $module->serviceProvider();
 
-            if (class_exists($penyedia)) {
-                $this->app->register($penyedia);
+            if (class_exists($provider)) {
+                $this->app->register($provider);
             }
         }
     }
@@ -70,11 +70,11 @@ final class ModuleServiceProvider extends ServiceProvider
         // Ini berakhir sendiri: begitu module keluar dari daftar `ModulSedangDipindah`, ia
         // dipasang lewat jalur yang sama seperti module lain dan baris ini berhenti berlaku
         // untuknya.
-        $dipindah = ModulSedangDipindah::bawaan();
+        $moved = ModulSedangDipindah::default();
 
-        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
-            if ($dipindah->menandai(basename($module->folder))) {
-                $this->loadMigrationsFrom($module->folderMigrasi());
+        foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
+            if ($moved->marks(basename($module->folder))) {
+                $this->loadMigrationsFrom($module->migrationFolder());
             }
         }
     }

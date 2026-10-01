@@ -43,17 +43,17 @@ use Throwable;
 final class PengirimDiscord
 {
     /** Batas Discord untuk `content` adalah 2000 karakter. */
-    private const BATAS_CONTENT = 1900;
+    private const CONTENT_LIMIT = 1900;
 
     /** Merah, menyamai warna yang dipakai Discord sendiri untuk kegagalan. */
-    private const WARNA_MERAH = 0xED4245;
+    private const RED = 0xED4245;
 
     /**
      * Atribut laporan yang boleh sampai ke Discord (K-18), beserta labelnya. Ini daftar izin, bukan
      * daftar larangan: atribut baru di {@see LaporanKesalahan} tidak ikut terkirim sebelum ditambahkan
      * di sini, dan hanya data teknis yang boleh ditambahkan.
      */
-    private const ATRIBUT_TERKIRIM = [
+    private const SENT_ATTRIBUTES = [
         'exception.type' => 'kesalahan',
         'coreerp.sumber_kesalahan' => 'sumber',
         'http.request.method' => 'method',
@@ -64,7 +64,7 @@ final class PengirimDiscord
         'trace_id' => 'jejak',
     ];
 
-    public static function kirim(LaporanKesalahan $laporan): void
+    public static function send(LaporanKesalahan $report): void
     {
         try {
             $webhook = self::webhook();
@@ -84,11 +84,11 @@ final class PengirimDiscord
                 return;
             }
 
-            if (! PenjedaKiriman::boleh($laporan)) {
+            if (! PenjedaKiriman::allows($report)) {
                 return;
             }
 
-            self::kirimKe($webhook, self::muatan($laporan));
+            self::sendTo($webhook, self::payload($report));
         } catch (Throwable) {
             // Lihat catatan kelas. Kegagalan mengirim tidak pernah menjadi kesalahan kedua.
         }
@@ -96,48 +96,48 @@ final class PengirimDiscord
 
     private static function webhook(): ?string
     {
-        $nilai = config('coreerp.discord.webhook_url');
+        $value = config('coreerp.discord.webhook_url');
 
-        return is_string($nilai) && $nilai !== '' ? $nilai : null;
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private static function muatan(LaporanKesalahan $laporan): array
+    private static function payload(LaporanKesalahan $report): array
     {
-        $sebutan = (string) config('coreerp.discord.mention', '');
-        $atribut = $laporan->keAtribut();
-        $tautan = self::tautanSigNoz($atribut);
+        $mention = (string) config('coreerp.discord.mention', '');
+        $attributes = $report->toAttributes();
+        $link = self::sigNozLink($attributes);
 
         return [
-            'content' => self::potong(trim($sebutan.' '.self::ringkasan($atribut)), self::BATAS_CONTENT),
+            'content' => self::truncate(trim($mention.' '.self::summary($attributes)), self::CONTENT_LIMIT),
             // Tanpa blok ini `@everyone` di dalam `content` tetap tercetak tetapi tidak
             // membunyikan notifikasi: Discord menuntut izin itu dinyatakan, bukan disimpulkan
             // dari isi pesan. Dinyatakan eksplisit juga berarti teks lain di pesan yang
             // kebetulan memuat "@everyone" tidak bisa menyulut sebutan yang tidak diniatkan.
-            'allowed_mentions' => self::izinSebutan($sebutan),
+            'allowed_mentions' => self::allowedMentions($mention),
             'embeds' => [array_filter([
-                'title' => self::potong((string) ($atribut['exception.type'] ?? 'Kesalahan'), 250),
-                'url' => $tautan,
-                'description' => self::badan($atribut, $tautan),
-                'color' => self::WARNA_MERAH,
-            ], static fn (mixed $nilai): bool => $nilai !== null)],
+                'title' => self::truncate((string) ($attributes['exception.type'] ?? 'Kesalahan'), 250),
+                'url' => $link,
+                'description' => self::body($attributes, $link),
+                'color' => self::RED,
+            ], static fn (mixed $value): bool => $value !== null)],
         ];
     }
 
     /**
      * Ringkasan satu baris untuk `content`: kelas exception dan tempat kejadiannya, tanpa pesannya.
      *
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function ringkasan(array $atribut): string
+    private static function summary(array $attributes): string
     {
-        $tempat = ($atribut['coreerp.sumber_kesalahan'] ?? null) === 'http'
-            ? trim(((string) ($atribut['http.request.method'] ?? '')).' '.((string) ($atribut['http.route'] ?? '-')))
-            : (string) ($atribut['coreerp.sumber_kesalahan'] ?? '-');
+        $place = ($attributes['coreerp.sumber_kesalahan'] ?? null) === 'http'
+            ? trim(((string) ($attributes['http.request.method'] ?? '')).' '.((string) ($attributes['http.route'] ?? '-')))
+            : (string) ($attributes['coreerp.sumber_kesalahan'] ?? '-');
 
-        return ((string) ($atribut['exception.type'] ?? 'Kesalahan')).' @ '.$tempat;
+        return ((string) ($attributes['exception.type'] ?? 'Kesalahan')).' @ '.$place;
     }
 
     /**
@@ -149,23 +149,23 @@ final class PengirimDiscord
      * **Tautannya berada di luar blok kode** karena di dalamnya ia tidak bisa diklik. Tanpa alamat
      * SigNoz, pembaca diarahkan ke berkas log dengan id laporannya.
      *
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function badan(array $atribut, ?string $tautan): string
+    private static function body(array $attributes, ?string $link): string
     {
-        $baris = [];
-        foreach (self::ATRIBUT_TERKIRIM as $kunci => $label) {
-            $nilai = $atribut[$kunci] ?? null;
-            if ($nilai !== null && $nilai !== '') {
-                $baris[] = sprintf('%-9s: %s', $label, self::potong((string) $nilai, 200));
+        $lines = [];
+        foreach (self::SENT_ATTRIBUTES as $key => $label) {
+            $value = $attributes[$key] ?? null;
+            if ($value !== null && $value !== '') {
+                $lines[] = sprintf('%-9s: %s', $label, self::truncate((string) $value, 200));
             }
         }
 
-        $ekor = $tautan !== null
-            ? "\n".self::ekorTautan($atribut, $tautan)
+        $tail = $link !== null
+            ? "\n".self::linkFooter($attributes, $link)
             : "\n(laporan utuh ada di berkas log)";
 
-        return "```\n".implode("\n", $baris)."\n```".$ekor;
+        return "```\n".implode("\n", $lines)."\n```".$tail;
     }
 
     /**
@@ -176,19 +176,19 @@ final class PengirimDiscord
      * sedangkan jejak memuat **seluruh** rentang permintaan itu — termasuk query yang berhasil
      * sebelum satu yang gagal, yang sering justru itulah yang menjelaskan kenapa.
      *
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function ekorTautan(array $atribut, string $tautanCatatan): string
+    private static function linkFooter(array $attributes, string $noteLink): string
     {
-        $ekor = '[Buka catatannya di SigNoz]('.$tautanCatatan.')';
-        $jejak = $atribut['trace_id'] ?? null;
-        $pangkal = self::pangkalSigNoz();
+        $tail = '[Buka catatannya di SigNoz]('.$noteLink.')';
+        $trace = $attributes['trace_id'] ?? null;
+        $base = self::sigNozBaseUrl();
 
-        if (is_string($jejak) && $jejak !== '' && $pangkal !== null) {
-            $ekor .= ' · [Jejak permintaannya]('.$pangkal.'/trace/'.$jejak.')';
+        if (is_string($trace) && $trace !== '' && $base !== null) {
+            $tail .= ' · [Jejak permintaannya]('.$base.'/trace/'.$trace.')';
         }
 
-        return $ekor;
+        return $tail;
     }
 
     /**
@@ -204,23 +204,23 @@ final class PengirimDiscord
      * saat tautannya membuka penjelajah tanpa saringan, di sinilah tempat memperbaikinya —
      * dan sementara itu tidak ada yang rusak selain kenyamanan.
      *
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function tautanSigNoz(array $atribut): ?string
+    private static function sigNozLink(array $attributes): ?string
     {
-        $pangkal = self::pangkalSigNoz();
+        $base = self::sigNozBaseUrl();
 
-        if ($pangkal === null) {
+        if ($base === null) {
             return null;
         }
 
-        $id = $atribut['coreerp.laporan_id'] ?? null;
+        $id = $attributes['coreerp.laporan_id'] ?? null;
 
         if (! is_string($id) || $id === '') {
-            return $pangkal.'/logs/logs-explorer';
+            return $base.'/logs/logs-explorer';
         }
 
-        $kueri = [
+        $query = [
             'queryType' => 'builder',
             'builder' => [
                 'queryData' => [[
@@ -238,15 +238,15 @@ final class PengirimDiscord
         // Rentangnya sehari, bukan setengah jam seperti bawaan penjelajah. Tautan ini dibuka
         // ketika seseorang sempat membacanya — bisa besok pagi — dan rentang bawaan membuatnya
         // membuka halaman kosong yang terlihat seperti catatannya tidak pernah sampai.
-        return $pangkal.'/logs/logs-explorer?relativeTime=1d&compositeQuery='
-            .rawurlencode((string) json_encode($kueri));
+        return $base.'/logs/logs-explorer?relativeTime=1d&compositeQuery='
+            .rawurlencode((string) json_encode($query));
     }
 
-    private static function pangkalSigNoz(): ?string
+    private static function sigNozBaseUrl(): ?string
     {
-        $pangkal = rtrim((string) config('coreerp.signoz_url', ''), '/');
+        $base = rtrim((string) config('coreerp.signoz_url', ''), '/');
 
-        return $pangkal === '' ? null : $pangkal;
+        return $base === '' ? null : $base;
     }
 
     /**
@@ -254,31 +254,31 @@ final class PengirimDiscord
      *
      * @return array<string, mixed>
      */
-    private static function izinSebutan(string $sebutan): array
+    private static function allowedMentions(string $mention): array
     {
         $parse = [];
 
-        if (str_contains($sebutan, '@everyone') || str_contains($sebutan, '@here')) {
+        if (str_contains($mention, '@everyone') || str_contains($mention, '@here')) {
             $parse[] = 'everyone';
         }
 
         // `<@123>` menyebut orang, `<@&123>` menyebut role. Keduanya dikumpulkan sebagai
         // daftar id, bukan dilepas lewat `parse`, supaya yang berbunyi persis yang ditulis di
         // konfigurasi dan bukan setiap id yang kebetulan muncul di dalam pesan.
-        preg_match_all('/<@!?(\d+)>/', $sebutan, $orang);
-        preg_match_all('/<@&(\d+)>/', $sebutan, $peran);
+        preg_match_all('/<@!?(\d+)>/', $mention, $person);
+        preg_match_all('/<@&(\d+)>/', $mention, $role);
 
         return array_filter([
             'parse' => $parse,
-            'users' => $orang[1],
-            'roles' => $peran[1],
-        ], static fn (array $nilai): bool => $nilai !== []);
+            'users' => $person[1],
+            'roles' => $role[1],
+        ], static fn (array $value): bool => $value !== []);
     }
 
     /**
-     * @param  array<string, mixed>  $muatan
+     * @param  array<string, mixed>  $payload
      */
-    private static function kirimKe(string $webhook, array $muatan): void
+    private static function sendTo(string $webhook, array $payload): void
     {
         // Batas waktunya pendek dengan sengaja. Pengiriman ini berjalan di dalam penangan
         // kesalahan, artinya ada orang yang sedang menunggu jawaban di ujung sana; Discord
@@ -287,11 +287,11 @@ final class PengirimDiscord
         Http::connectTimeout(2)
             ->timeout(4)
             ->asJson()
-            ->post($webhook, $muatan);
+            ->post($webhook, $payload);
     }
 
-    private static function potong(string $teks, int $batas): string
+    private static function truncate(string $text, int $limit): string
     {
-        return mb_strlen($teks) <= $batas ? $teks : mb_substr($teks, 0, $batas - 3).'...';
+        return mb_strlen($text) <= $limit ? $text : mb_substr($text, 0, $limit - 3).'...';
     }
 }

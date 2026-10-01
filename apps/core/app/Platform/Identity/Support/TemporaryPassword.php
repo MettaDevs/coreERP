@@ -27,16 +27,16 @@ namespace App\Platform\Identity\Support;
  */
 final class TemporaryPassword
 {
-    private const HURUF_KECIL = 'abcdefghijkmnopqrstuvwxyz';
+    private const LOWERCASE = 'abcdefghijkmnopqrstuvwxyz';
 
-    private const HURUF_BESAR = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    private const UPPERCASE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-    private const ANGKA = '23456789';
+    private const DIGITS = '23456789';
 
     /** Tanda baca yang selamat melewati shell, URL, dan kolom teks mana pun. */
-    private const TANDA = '!@#$%*-_=+?';
+    private const SYMBOLS = '!@#$%*-_=+?';
 
-    private const PANJANG = 20;
+    private const LENGTH = 20;
 
     public static function generate(): string
     {
@@ -44,14 +44,14 @@ final class TemporaryPassword
         // lalu berharap keempatnya muncul adalah cara membuat sandi yang sesekali ditolak aturan
         // produksi — dan kegagalan itu akan muncul pada pelanggan, bukan pada test.
         $characters = [
-            self::pick(self::HURUF_KECIL),
-            self::pick(self::HURUF_BESAR),
-            self::pick(self::ANGKA),
-            self::pick(self::TANDA),
+            self::pick(self::LOWERCASE),
+            self::pick(self::UPPERCASE),
+            self::pick(self::DIGITS),
+            self::pick(self::SYMBOLS),
         ];
 
-        $alphabet = self::HURUF_KECIL.self::HURUF_BESAR.self::ANGKA.self::TANDA;
-        for ($i = count($characters); $i < self::PANJANG; $i++) {
+        $alphabet = self::LOWERCASE.self::UPPERCASE.self::DIGITS.self::SYMBOLS;
+        for ($i = count($characters); $i < self::LENGTH; $i++) {
             $characters[] = self::pick($alphabet);
         }
 

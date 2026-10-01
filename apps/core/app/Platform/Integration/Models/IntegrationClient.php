@@ -98,9 +98,9 @@ class IntegrationClient extends Model
     /** Tanpa daftar berarti semua alamat; allowlist hanya lapisan tambahan di atas token (K-03). */
     public function allowsIp(?string $ip): bool
     {
-        $daftar = $this->allowed_ips ?? [];
+        $list = $this->allowed_ips ?? [];
 
-        return $daftar === [] || ($ip !== null && IpUtils::checkIp($ip, $daftar));
+        return $list === [] || ($ip !== null && IpUtils::checkIp($ip, $list));
     }
 
     /**
@@ -109,14 +109,14 @@ class IntegrationClient extends Model
      */
     public function allowsPostingType(string $postingType): bool
     {
-        $awalan = $this->posting_type_prefixes ?? [];
+        $prefix = $this->posting_type_prefixes ?? [];
 
-        foreach ($awalan as $satu) {
-            if (str_starts_with($postingType, $satu)) {
+        foreach ($prefix as $item) {
+            if (str_starts_with($postingType, $item)) {
                 return true;
             }
         }
 
-        return $awalan === [];
+        return $prefix === [];
     }
 }

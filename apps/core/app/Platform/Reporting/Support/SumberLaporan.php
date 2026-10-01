@@ -33,10 +33,10 @@ use Throwable;
 final class SumberLaporan
 {
     public function __construct(
-        private readonly ModuleReportProviderRegistry $daftar,
+        private readonly ModuleReportProviderRegistry $list,
         private readonly LaunchableAppCatalog $apps,
-        private readonly DataPolicyAccessResolver $kebijakan,
-        private readonly TenantRunnerCore $pelaksana,
+        private readonly DataPolicyAccessResolver $policy,
+        private readonly TenantRunnerCore $runner,
         private readonly ValueFormats $formats,
         private readonly UserClock $clock,
     ) {}
@@ -46,22 +46,22 @@ final class SumberLaporan
      */
     public function definition(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): array
     {
-        $penyedia = $this->penyedia($report);
+        $provider = $this->provider($report);
 
-        return $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->definition(
-            $this->kodeLokal($report, $penyedia),
-            $konteks,
+        return $this->run($report, $membership, fn (array $context): array => $provider->definition(
+            $this->localCode($report, $provider),
+            $context,
         ), $legalEntityId, $orgUnitId);
     }
 
     public function builtinLayout(stdClass $report, string $key, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): string
     {
-        $penyedia = $this->penyedia($report);
+        $provider = $this->provider($report);
 
-        return $this->jalankan($report, $membership, fn (array $konteks): string => $penyedia->defaultLayout(
-            $this->kodeLokal($report, $penyedia),
+        return $this->run($report, $membership, fn (array $context): string => $provider->defaultLayout(
+            $this->localCode($report, $provider),
             $key,
-            $konteks,
+            $context,
         ), $legalEntityId, $orgUnitId);
     }
 
@@ -77,27 +77,27 @@ final class SumberLaporan
      */
     public function dataset(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $parameters): ReportData
     {
-        $penyedia = $this->penyedia($report);
-        $kode = $this->kodeLokal($report, $penyedia);
+        $provider = $this->provider($report);
+        $code = $this->localCode($report, $provider);
 
-        [$isi, $definisi, $formats] = $this->jalankan($report, $membership, function (array $konteks) use ($penyedia, $kode, $parameters): array {
-            $isi = $penyedia->dataset($kode, $konteks, $parameters);
-            $definisi = $penyedia->definition($kode, $konteks)['fields'];
+        [$content, $definition, $formats] = $this->run($report, $membership, function (array $context) use ($provider, $code, $parameters): array {
+            $content = $provider->dataset($code, $context, $parameters);
+            $definition = $provider->definition($code, $context)['fields'];
 
-            return [$isi, $definisi, $this->formats->forFields((string) $konteks['tenant_id'], $definisi, (string) $konteks['timezone'])];
+            return [$content, $definition, $this->formats->forFields((string) $context['tenant_id'], $definition, (string) $context['timezone'])];
         }, $legalEntityId, $orgUnitId);
 
-        return ReportData::fromArray($isi, $formats, $definisi);
+        return ReportData::fromArray($content, $formats, $definition);
     }
 
-    private function penyedia(stdClass $report): ModuleReportProvider
+    private function provider(stdClass $report): ModuleReportProvider
     {
-        $penyedia = $this->daftar->untuk((string) $report->app_id);
+        $provider = $this->list->providerFor((string) $report->app_id);
 
         // Tidak ada jalur cadangan lagi. Laporan yang app-nya tidak terdaftar sebagai module
         // di runtime ini berarti katalognya menyebut app yang tidak ada di edisi terpasang;
         // dulu keadaan itu tersembunyi di balik panggilan HTTP ke alamat yang tidak menjawab.
-        if ($penyedia === null) {
+        if ($provider === null) {
             throw new RenderException(
                 "Laporan `{$report->code}` milik {$report->app_name}, yang tidak terpasang sebagai module ".
                 'pada runtime ini.'
@@ -107,20 +107,20 @@ final class SumberLaporan
         // Module terdaftar tapi tidak mengenal kode laporannya berarti katalog dan module
         // sudah tidak sepakat — biasanya karena manifest lebih baru daripada kode yang
         // terpasang. Ia gagal dengan sebabnya, bukan dengan kode laporan yang kosong.
-        if (! $penyedia->has($this->kodeLokal($report, $penyedia))) {
+        if (! $provider->has($this->localCode($report, $provider))) {
             throw new RenderException(
                 "Laporan `{$report->code}` terdaftar di katalog tetapi tidak dikenal module {$report->app_name}. ".
                 'Manifest dan kode module tidak sepadan.'
             );
         }
 
-        return $penyedia;
+        return $provider;
     }
 
     /** Kode laporan di sisi module: kode katalog tanpa awalan id module. */
-    private function kodeLokal(stdClass $report, ModuleReportProvider $penyedia): string
+    private function localCode(stdClass $report, ModuleReportProvider $provider): string
     {
-        return substr((string) $report->code, strlen($penyedia->moduleId()) + 1);
+        return substr((string) $report->code, strlen($provider->moduleId()) + 1);
     }
 
     /**
@@ -128,12 +128,12 @@ final class SumberLaporan
      *
      * @template T
      *
-     * @param  callable(array<string, mixed>): T  $panggilan
+     * @param  callable(array<string, mixed>): T  $call
      * @return T
      */
-    private function jalankan(stdClass $report, TenantMembership $membership, callable $panggilan, ?string $legalEntityId, ?string $orgUnitId): mixed
+    private function run(stdClass $report, TenantMembership $membership, callable $call, ?string $legalEntityId, ?string $orgUnitId): mixed
     {
-        return $this->forModule((string) $report->app_id, (string) $report->app_name, $membership, $legalEntityId, $orgUnitId, $panggilan);
+        return $this->forModule((string) $report->app_id, (string) $report->app_name, $membership, $legalEntityId, $orgUnitId, $call);
     }
 
     /**
@@ -143,27 +143,27 @@ final class SumberLaporan
      *
      * @template T
      *
-     * @param  callable(array<string, mixed>): T  $panggilan
+     * @param  callable(array<string, mixed>): T  $call
      * @return T
      */
-    public function forModule(string $appId, string $appName, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, callable $panggilan): mixed
+    public function forModule(string $appId, string $appName, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, callable $call): mixed
     {
-        $konteks = [
+        $context = [
             'tenant_id' => (string) $membership->tenant_id,
             'legal_entity_id' => $legalEntityId,
             'org_unit_id' => $orgUnitId,
             'user_id' => (string) $membership->user_id,
             'permissions' => $this->apps->permissionsFor($membership, $appId),
-            'data_policies' => $this->kebijakan->resolve($membership),
+            'data_policies' => $this->policy->resolve($membership),
             // Zona waktu pengguna yang meminta, untuk "hari ini" di module (periode bawaan, nama berkas)
             // dan untuk waktu di cetakan. Dihitung di sini karena ekspor berjalan di worker tanpa sesi.
             'timezone' => $this->clock->timezoneFor($membership->user, $legalEntityId),
         ];
 
         try {
-            return $this->pelaksana->runFor(
-                (string) $konteks['tenant_id'],
-                static fn (): mixed => $panggilan($konteks),
+            return $this->runner->runFor(
+                (string) $context['tenant_id'],
+                static fn (): mixed => $call($context),
             );
         } catch (RenderException $e) {
             throw $e;

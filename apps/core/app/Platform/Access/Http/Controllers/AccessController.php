@@ -92,7 +92,7 @@ class AccessController extends Controller
              * mengikuti jumlah module, bukan jumlah data tenant, jadi ia memburuk pada setiap
              * module baru yang dijual.
              */
-            'apps' => Inertia::defer(fn (): array => $this->katalogIzin($entitledAppIds)),
+            'apps' => Inertia::defer(fn (): array => $this->permissionCatalog($entitledAppIds)),
             'roles' => $this->roles($tenantId),
             'dataPolicies' => AppDataPolicy::query()
                 ->whereIn('app_id', $entitledAppIds)
@@ -137,13 +137,13 @@ class AccessController extends Controller
      * @param  list<string>  $appIds
      * @return list<array{id:string,name:string,duties:list<array<string,mixed>>}>
      */
-    private function katalogIzin(array $appIds): array
+    private function permissionCatalog(array $appIds): array
     {
         if ($appIds === []) {
             return [];
         }
 
-        $baris = DB::table('security_duties as duty')
+        $row = DB::table('security_duties as duty')
             ->join('apps as app', 'app.id', '=', 'duty.app_id')
             ->join('security_duty_privileges as jembatanPrivilege', 'jembatanPrivilege.duty_code', '=', 'duty.code')
             ->join('security_privileges as privilege', 'privilege.code', '=', 'jembatanPrivilege.privilege_code')
@@ -166,8 +166,8 @@ class AccessController extends Controller
                 'permission.access_level as permission_access_level',
             ]);
 
-        /** @var array<string, string> $namaApp */
-        $namaApp = [];
+        /** @var array<string, string> $appName */
+        $appName = [];
         /** @var array<string, array<string, array{code:string,app_id:string,name:string}>> $dutyPerApp */
         $dutyPerApp = [];
         /** @var array<string, array<string, array{code:string,name:string}>> $privilegePerDuty */
@@ -175,36 +175,36 @@ class AccessController extends Controller
         /** @var array<string, array<string, array{code:string,name:string,access_level:string}>> $permissionPerPrivilege */
         $permissionPerPrivilege = [];
 
-        foreach ($baris as $satu) {
-            $appId = (string) $satu->app_id;
-            $dutyCode = (string) $satu->duty_code;
-            $privilegeCode = (string) $satu->privilege_code;
+        foreach ($row as $item) {
+            $appId = (string) $item->app_id;
+            $dutyCode = (string) $item->duty_code;
+            $privilegeCode = (string) $item->privilege_code;
 
-            $namaApp[$appId] = (string) $satu->app_name;
+            $appName[$appId] = (string) $item->app_name;
             $dutyPerApp[$appId][$dutyCode] = [
                 'code' => $dutyCode,
                 'app_id' => $appId,
-                'name' => (string) $satu->duty_name,
+                'name' => (string) $item->duty_name,
             ];
             $privilegePerDuty[$dutyCode][$privilegeCode] = [
                 'code' => $privilegeCode,
-                'name' => (string) $satu->privilege_name,
+                'name' => (string) $item->privilege_name,
             ];
 
             // `leftJoin` memulangkan privilege tanpa permission sebagai satu baris ber-null.
             // Barisnya tetap dibutuhkan — privilegenya nyata — tetapi permission-nya tidak ada.
-            if ($satu->permission_code !== null) {
-                $permissionPerPrivilege[$privilegeCode][(string) $satu->permission_code] = [
-                    'code' => (string) $satu->permission_code,
-                    'name' => (string) $satu->permission_name,
-                    'access_level' => (string) $satu->permission_access_level,
+            if ($item->permission_code !== null) {
+                $permissionPerPrivilege[$privilegeCode][(string) $item->permission_code] = [
+                    'code' => (string) $item->permission_code,
+                    'name' => (string) $item->permission_name,
+                    'access_level' => (string) $item->permission_access_level,
                 ];
             }
         }
 
-        $hasil = [];
+        $result = [];
 
-        foreach ($namaApp as $appId => $nama) {
+        foreach ($appName as $appId => $name) {
             $duties = [];
 
             foreach ($dutyPerApp[$appId] ?? [] as $dutyCode => $duty) {
@@ -220,10 +220,10 @@ class AccessController extends Controller
                 $duties[] = [...$duty, 'privileges' => $privileges];
             }
 
-            $hasil[] = ['id' => $appId, 'name' => $nama, 'duties' => $duties];
+            $result[] = ['id' => $appId, 'name' => $name, 'duties' => $duties];
         }
 
-        return $hasil;
+        return $result;
     }
 
     /**
@@ -233,12 +233,12 @@ class AccessController extends Controller
      * collection tidak dijamin berurut, sehingga hasilnya bisa bukan list — bentuk yang membuat
      * placeholder `?` pada query di bawah tidak lagi sejajar dengan nilainya.
      *
-     * @param  Collection<int|string, mixed>  $nilai
+     * @param  Collection<int|string, mixed>  $value
      * @return list<string>
      */
-    private static function daftarString(Collection $nilai): array
+    private static function stringList(Collection $value): array
     {
-        return array_values(array_map(static fn (mixed $satu): string => (string) $satu, $nilai->all()));
+        return array_values(array_map(static fn (mixed $item): string => (string) $item, $value->all()));
     }
 
     /**
@@ -392,14 +392,14 @@ class AccessController extends Controller
             return [];
         }
 
-        $turunan = $this->turunanRole($tenantId, self::daftarString($roles->pluck('id')));
-        $permissionPerRole = $this->permissionPerRole(array_values(array_unique(array_merge(...array_values($turunan)))));
+        $descendants = $this->descendantRoles($tenantId, self::stringList($roles->pluck('id')));
+        $permissionPerRole = $this->permissionPerRole(array_values(array_unique(array_merge(...array_values($descendants)))));
 
-        return array_values($roles->map(function (Role $role) use ($policies, $turunan, $permissionPerRole): array {
+        return array_values($roles->map(function (Role $role) use ($policies, $descendants, $permissionPerRole): array {
             $permissionCodes = array_values(array_unique(array_merge(
                 ...array_map(
                     static fn (string $id): array => $permissionPerRole[$id] ?? [],
-                    $turunan[$role->id] ?? [$role->id],
+                    $descendants[$role->id] ?? [$role->id],
                 ),
             )));
 
@@ -427,7 +427,7 @@ class AccessController extends Controller
      * @param  list<string>  $roleIds
      * @return array<string, list<string>>
      */
-    private function turunanRole(string $tenantId, array $roleIds): array
+    private function descendantRoles(string $tenantId, array $roleIds): array
     {
         if ($roleIds === []) {
             return [];
@@ -453,13 +453,13 @@ class AccessController extends Controller
             [$tenantId, ...$roleIds, $tenantId],
         );
 
-        $peta = [];
+        $map = [];
 
         foreach ($rows as $row) {
-            $peta[(string) $row->root_id][] = (string) $row->role_id;
+            $map[(string) $row->root_id][] = (string) $row->role_id;
         }
 
-        return $peta;
+        return $map;
     }
 
     /**
@@ -481,12 +481,12 @@ class AccessController extends Controller
             ->distinct()
             ->get(['role_duties.role_id', 'privilege_permissions.permission_code']);
 
-        $peta = [];
+        $map = [];
 
         foreach ($rows as $row) {
-            $peta[(string) $row->role_id][] = (string) $row->permission_code;
+            $map[(string) $row->role_id][] = (string) $row->permission_code;
         }
 
-        return $peta;
+        return $map;
     }
 }

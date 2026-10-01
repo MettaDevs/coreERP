@@ -60,7 +60,7 @@ class LampirkanKonteksJejakTest extends TestCase
                 function (Request $permintaan): Response {
                     // Ditulis di sini, bukan sebelum middleware dipanggil: inilah tempat
                     // `ResolveModuleContext` yang sesungguhnya berjalan.
-                    $permintaan->attributes->set(ResolveModuleContext::MODULE_AKTIF, 'app-uji');
+                    $permintaan->attributes->set(ResolveModuleContext::ACTIVE_MODULE, 'app-uji');
                     $permintaan->attributes->set(ModuleRequestContext::TENANT_ID, 'tenant-1');
                     $permintaan->attributes->set(ModuleRequestContext::LEGAL_ENTITY_ID, 42);
                     $permintaan->attributes->set(ModuleRequestContext::ORG_UNIT_ID, null);
@@ -121,7 +121,7 @@ class LampirkanKonteksJejakTest extends TestCase
         $lingkup = $span->activate();
 
         try {
-            JejakAktif::catatKesalahan(new RuntimeException('sequence aktif tidak ditemukan'));
+            JejakAktif::recordException(new RuntimeException('sequence aktif tidak ditemukan'));
         } finally {
             $lingkup->detach();
             $span->end();

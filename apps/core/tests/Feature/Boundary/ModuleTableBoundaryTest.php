@@ -55,7 +55,7 @@ class ModuleTableBoundaryTest extends TestCase
         // Daftarnya tidak ditulis ulang di sini melainkan dibaca dari ModulSedangDipindah, satu
         // tempat yang sama dengan dua penjaga lain. Daftar batas modul yang hidup di tiga tempat
         // akan menyimpang, dan yang menyimpang lebih berbahaya daripada yang tidak ada.
-        $modules = PemindaiModul::padaRepo()->modulDenganMigration(ModulSedangDipindah::bawaan());
+        $modules = PemindaiModul::padaRepo()->modulDenganMigration(ModulSedangDipindah::default());
         $this->assertNotEmpty($modules, 'Tidak ada module yang dijalankan; penjaga ini akan lulus tanpa menguji apa pun.');
 
         $inspector = new TableOwnershipInspector;
@@ -72,14 +72,14 @@ class ModuleTableBoundaryTest extends TestCase
             // module itu dibuang lebih dulu — di dalam transaksi test, sehingga rollback
             // mengembalikannya untuk test berikutnya.
             $milikModule = array_values(array_filter(
-                $inspector->tabelSaatIni($connection),
+                $inspector->currentTables($connection),
                 static fn (string $tabel): bool => str_starts_with($tabel, $module['awalan']),
             ));
             if ($milikModule !== []) {
                 $connection->statement('DROP TABLE "'.implode('", "', $milikModule).'" CASCADE');
             }
 
-            $sebelum = $inspector->tabelSaatIni($connection);
+            $sebelum = $inspector->currentTables($connection);
 
             Artisan::call('migrate', [
                 '--path' => $module['migrations'],
@@ -88,8 +88,8 @@ class ModuleTableBoundaryTest extends TestCase
             ]);
             $keluaranMigrate = Artisan::output();
 
-            $sesudah = $inspector->tabelSaatIni($connection);
-            $pelanggaran = $inspector->pelanggaran($sebelum, $sesudah, $module['awalan'], self::PENGECUALIAN);
+            $sesudah = $inspector->currentTables($connection);
+            $pelanggaran = $inspector->violations($sebelum, $sesudah, $module['awalan'], self::PENGECUALIAN);
 
             $this->assertSame([], $pelanggaran, sprintf(
                 'Migration module "%s" membuat tabel yang bukan miliknya: %s. Awalan yang sah: "%s".',
@@ -120,11 +120,11 @@ Keluaran migrate:
 
     public function test_pemeriksanya_menyebut_nama_tabel_yang_melanggar(): void
     {
-        $pelanggaran = (new TableOwnershipInspector)->pelanggaran(
-            sebelum: ['core_tenants'],
-            sesudah: ['core_tenants', 'contoh_a_m_barang', 'core_module_installations', 'contoh_b_m_rak'],
-            awalan: 'contoh_a_',
-            pengecualian: self::PENGECUALIAN,
+        $pelanggaran = (new TableOwnershipInspector)->violations(
+            before: ['core_tenants'],
+            after: ['core_tenants', 'contoh_a_m_barang', 'core_module_installations', 'contoh_b_m_rak'],
+            prefix: 'contoh_a_',
+            exemption: self::PENGECUALIAN,
         );
 
         $this->assertSame(['contoh_b_m_rak', 'core_module_installations'], $pelanggaran);

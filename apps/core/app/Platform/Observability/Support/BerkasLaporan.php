@@ -26,35 +26,35 @@ use Throwable;
  */
 final class BerkasLaporan
 {
-    public static function tulis(string $isi): void
+    public static function write(string $content): void
     {
         try {
-            $berkas = self::jalur();
+            $file = self::path();
 
-            self::siapkanFolder(dirname($berkas));
+            self::prepareFolder(dirname($file));
 
             // `FILE_APPEND | LOCK_EX` bukan hiasan: tiga proses menulis ke satu volume, dan
             // tanpa kunci sebuah blok panjang bisa disisipi blok lain di tengah kalimat.
-            @file_put_contents($berkas, $isi."\n\n", FILE_APPEND | LOCK_EX);
+            @file_put_contents($file, $content."\n\n", FILE_APPEND | LOCK_EX);
 
-            self::sapuBerkasLama(dirname($berkas));
+            self::sweepOldFiles(dirname($file));
         } catch (Throwable) {
             // Lihat catatan pada PelaporKesalahan: pelaporan tidak pernah menjadi sebab gagal.
         }
     }
 
-    public static function jalur(?string $tanggal = null): string
+    public static function path(?string $date = null): string
     {
-        $peran = (string) (getenv('CONTAINER_ROLE') ?: 'web');
+        $role = (string) (getenv('CONTAINER_ROLE') ?: 'web');
 
         return storage_path(sprintf(
             'logs/kesalahan-internal-%s-%s.log',
-            preg_replace('/[^a-z0-9_-]/i', '', $peran) ?: 'web',
-            $tanggal ?? date('Y-m-d'),
+            preg_replace('/[^a-z0-9_-]/i', '', $role) ?: 'web',
+            $date ?? date('Y-m-d'),
         ));
     }
 
-    private static function siapkanFolder(string $folder): void
+    private static function prepareFolder(string $folder): void
     {
         if (! is_dir($folder)) {
             @mkdir($folder, 0o775, true);
@@ -69,19 +69,19 @@ final class BerkasLaporan
      * tanpa batas pada pemasangan yang penjadwalnya mati, yaitu pemasangan yang justru paling
      * mungkin bermasalah.
      */
-    private static function sapuBerkasLama(string $folder): void
+    private static function sweepOldFiles(string $folder): void
     {
-        $hari = (int) (getenv('COREERP_LAPORAN_KESALAHAN_HARI') ?: 30);
+        $day = (int) (getenv('COREERP_LAPORAN_KESALAHAN_HARI') ?: 30);
 
-        if ($hari < 1) {
+        if ($day < 1) {
             return;
         }
 
-        $batas = time() - ($hari * 86400);
+        $limit = time() - ($day * 86400);
 
-        foreach (glob($folder.'/kesalahan-internal-*.log') ?: [] as $berkas) {
-            if (@filemtime($berkas) < $batas) {
-                @unlink($berkas);
+        foreach (glob($folder.'/kesalahan-internal-*.log') ?: [] as $file) {
+            if (@filemtime($file) < $limit) {
+                @unlink($file);
             }
         }
     }

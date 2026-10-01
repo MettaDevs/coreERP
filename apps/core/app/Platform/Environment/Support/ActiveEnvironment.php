@@ -141,7 +141,7 @@ class ActiveEnvironment
      * Dipakai ketika konteks berpindah di dalam satu proses yang sama — pekerja antrean yang
      * mengambil job berikutnya, atau perintah yang memutari banyak environment.
      */
-    public function lupakan(): void
+    public function forget(): void
     {
         $this->memo = null;
         $this->resolved = false;
@@ -165,11 +165,11 @@ class ActiveEnvironment
             return is_string($id) ? Environment::query()->hostedByProvider()->find($id) : null;
         }
 
-        if (! $this->container->bound(TenantScope::KUNCI)) {
+        if (! $this->container->bound(TenantScope::KEY)) {
             return null;
         }
 
-        $tenantId = $this->container->get(TenantScope::KUNCI);
+        $tenantId = $this->container->get(TenantScope::KEY);
 
         if (! is_string($tenantId)) {
             return null;

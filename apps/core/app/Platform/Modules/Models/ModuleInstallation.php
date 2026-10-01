@@ -53,12 +53,12 @@ final class ModuleInstallation extends Model
     ];
 
     /** Data awal hanya boleh diisi sekali seumur hidup pemasangan, walau module dipasang ulang. */
-    public function sudahDiisiDataAwal(): bool
+    public function isSeeded(): bool
     {
         return $this->seeded_at !== null;
     }
 
-    public function sedangAktif(): bool
+    public function isActive(): bool
     {
         return $this->status === self::STATUS_INSTALLED;
     }

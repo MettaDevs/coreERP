@@ -99,13 +99,13 @@ trait HoldsEnvironmentOperation
      */
     protected function openOperation(Environment $environment, string $kind, bool $takeOver = true): ?EnvironmentOperation
     {
-        $koneksi = DB::connection((new EnvironmentOperation)->getConnectionName());
+        $connection = DB::connection((new EnvironmentOperation)->getConnectionName());
 
         try {
             // Savepoint, bukan hiasan. PostgreSQL membatalkan **seluruh** blok transaksi begitu satu
             // perintah di dalamnya ditolak, jadi sisipan yang sejak awal memang boleh ditolak akan
             // menjatuhkan transaksi milik siapa pun yang kebetulan membungkus perintah ini.
-            return $koneksi->transaction(fn (): EnvironmentOperation => EnvironmentOperation::create([
+            return $connection->transaction(fn (): EnvironmentOperation => EnvironmentOperation::create([
                 'environment_id' => $environment->id,
                 'operation' => $kind,
                 'status' => 'running',

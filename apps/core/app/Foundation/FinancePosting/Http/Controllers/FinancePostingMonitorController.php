@@ -56,31 +56,31 @@ final class FinancePostingMonitorController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
-        $kata = trim((string) ($filter['q'] ?? ''));
-        $pola = '%'.addcslashes($kata, '\\%_').'%';
-        $entitas = $this->entitasLegal($tenant);
+        $keyword = trim((string) ($filter['q'] ?? ''));
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+        $legalEntity = $this->legalEntities($tenant);
 
         $postings = FinancePosting::query()
             ->where('tenant_id', $tenant)
-            ->when($kata !== '', fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('posting_id', 'ilike', $pola)
-                ->orWhere('source_number', 'ilike', $pola)))
+            ->when($keyword !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('posting_id', 'ilike', $pattern)
+                ->orWhere('source_number', 'ilike', $pattern)))
             ->when($filter['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
-            ->when($filter['posting_type'] ?? null, fn ($query, $jenis) => $query->where('posting_type', $jenis))
+            ->when($filter['posting_type'] ?? null, fn ($query, $type) => $query->where('posting_type', $type))
             ->when($filter['legal_entity_id'] ?? null, fn ($query, $id) => $query->where('legal_entity_id', $id))
-            ->when($filter['from'] ?? null, fn ($query, $dari) => $query->whereDate('posting_date', '>=', $dari))
-            ->when($filter['to'] ?? null, fn ($query, $sampai) => $query->whereDate('posting_date', '<=', $sampai))
+            ->when($filter['from'] ?? null, fn ($query, $from) => $query->whereDate('posting_date', '>=', $from))
+            ->when($filter['to'] ?? null, fn ($query, $until) => $query->whereDate('posting_date', '<=', $until))
             ->orderByDesc('posting_date')
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE)
             ->withQueryString()
-            ->through(fn (FinancePosting $posting): array => $this->present($posting, $entitas));
+            ->through(fn (FinancePosting $posting): array => $this->present($posting, $legalEntity));
 
         return Inertia::render('foundation/finance-posting/finance-postings', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::FINANCE_POSTING_PROCESS),
             'filters' => [
-                'q' => $kata === '' ? null : $kata,
+                'q' => $keyword === '' ? null : $keyword,
                 'status' => $filter['status'] ?? null,
                 'posting_type' => $filter['posting_type'] ?? null,
                 'legal_entity_id' => $filter['legal_entity_id'] ?? null,
@@ -96,8 +96,8 @@ final class FinancePostingMonitorController extends Controller
                 ->orderBy('posting_type')
                 ->pluck('posting_type')
                 ->all(),
-            'legalEntities' => array_values($entitas),
-            'counts' => $this->jumlahPerStatus($tenant),
+            'legalEntities' => array_values($legalEntity),
+            'counts' => $this->countsByStatus($tenant),
             'postings' => $postings,
         ]);
     }
@@ -105,20 +105,20 @@ final class FinancePostingMonitorController extends Controller
     public function show(Request $request, FinancePosting $financePosting): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_READ);
-        $posting = $this->milik($membership, $financePosting);
+        $posting = $this->ownedPosting($membership, $financePosting);
         $events = $posting->events()->orderBy('created_at')->orderBy('id')->get();
         $deliveries = FinancePostingDelivery::query()->where('finance_posting_id', $posting->id)->orderBy('first_attempt_at')->get();
 
-        $pengguna = User::query()
+        $user = User::query()
             ->whereIn('id', $events->pluck('user_id')->filter()->unique()->values())
             ->pluck('name', 'id');
-        $klien = IntegrationClient::query()
+        $client = IntegrationClient::query()
             ->where('tenant_id', $membership->tenant_id)
             ->whereIn('id', $events->pluck('integration_client_id')->merge($deliveries->pluck('integration_client_id'))->filter()->unique()->values())
             ->pluck('name', 'id');
         $payload = $posting->payload ?? [];
 
-        return response()->json(['data' => $this->present($posting, $this->entitasLegal($membership->tenant_id)) + [
+        return response()->json(['data' => $this->present($posting, $this->legalEntities($membership->tenant_id)) + [
             'source_document' => [
                 'module' => $posting->source_module,
                 // Nama app dari katalog, bukan kodenya; kode app tetap dikirim untuk app yang sudah
@@ -132,19 +132,19 @@ final class FinancePostingMonitorController extends Controller
                 // pembaca tidak membawanya.
                 'url' => is_string($posting->input['source_document']['url'] ?? null) ? $posting->input['source_document']['url'] : null,
             ],
-            'lines' => array_map(static fn (array $baris): array => [
-                'line_no' => (int) $baris['line_no'],
-                'account_code' => $baris['account']['code'] ?? null,
-                'account_name' => $baris['account']['name'] ?? null,
-                'description' => $baris['description'] ?? null,
-                'debit' => (string) $baris['debit'],
-                'credit' => (string) $baris['credit'],
-                'dimensions' => array_map(static fn (array $dimensi): array => [
-                    'code' => (string) $dimensi['code'],
-                    'display_name' => $dimensi['display_name'] ?? null,
-                    'value_code' => $dimensi['value_code'] ?? null,
-                    'value_display_name' => $dimensi['value_display_name'] ?? null,
-                ], $baris['financial_dimensions'] ?? []),
+            'lines' => array_map(static fn (array $row): array => [
+                'line_no' => (int) $row['line_no'],
+                'account_code' => $row['account']['code'] ?? null,
+                'account_name' => $row['account']['name'] ?? null,
+                'description' => $row['description'] ?? null,
+                'debit' => (string) $row['debit'],
+                'credit' => (string) $row['credit'],
+                'dimensions' => array_map(static fn (array $dimensions): array => [
+                    'code' => (string) $dimensions['code'],
+                    'display_name' => $dimensions['display_name'] ?? null,
+                    'value_code' => $dimensions['value_code'] ?? null,
+                    'value_display_name' => $dimensions['value_display_name'] ?? null,
+                ], $row['financial_dimensions'] ?? []),
             ], $payload['journal_lines'] ?? []),
             'problems' => $posting->hold_reasons ?? [],
             'events' => $events->map(static fn (FinancePostingEvent $event): array => [
@@ -154,49 +154,49 @@ final class FinancePostingMonitorController extends Controller
                 // Pelaku dipasangkan namanya: orang untuk tindakan di layar, klien integrasi untuk
                 // ack dan pengiriman, dan kosong untuk tindakan sistem seperti penerbitan.
                 'actor' => $event->user_id !== null
-                    ? ($pengguna[$event->user_id] ?? null)
-                    : ($event->integration_client_id !== null ? ($klien[$event->integration_client_id] ?? null) : null),
+                    ? ($user[$event->user_id] ?? null)
+                    : ($event->integration_client_id !== null ? ($client[$event->integration_client_id] ?? null) : null),
                 'created_at' => $event->created_at?->toIso8601String(),
                 'data' => $event->data ?? (object) [],
             ])->values()->all(),
-            'deliveries' => $deliveries->map(static fn (FinancePostingDelivery $kiriman): array => [
-                'client' => (string) ($klien[$kiriman->integration_client_id] ?? $kiriman->integration_client_id),
-                'status' => $kiriman->status,
-                'attempts' => $kiriman->attempts,
-                'last_status_code' => $kiriman->last_status_code,
-                'last_error' => $kiriman->last_error,
-                'last_attempt_at' => $kiriman->last_attempt_at?->toIso8601String(),
-                'next_attempt_at' => $kiriman->next_attempt_at?->toIso8601String(),
-                'delivered_at' => $kiriman->delivered_at?->toIso8601String(),
+            'deliveries' => $deliveries->map(static fn (FinancePostingDelivery $delivery): array => [
+                'client' => (string) ($client[$delivery->integration_client_id] ?? $delivery->integration_client_id),
+                'status' => $delivery->status,
+                'attempts' => $delivery->attempts,
+                'last_status_code' => $delivery->last_status_code,
+                'last_error' => $delivery->last_error,
+                'last_attempt_at' => $delivery->last_attempt_at?->toIso8601String(),
+                'next_attempt_at' => $delivery->next_attempt_at?->toIso8601String(),
+                'delivered_at' => $delivery->delivered_at?->toIso8601String(),
             ])->values()->all(),
         ]]);
     }
 
-    public function revalidate(Request $request, FinancePosting $financePosting, PostingPublisher $penerbit): JsonResponse
+    public function revalidate(Request $request, FinancePosting $financePosting, PostingPublisher $publisher): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_PROCESS);
-        $posting = $this->milik($membership, $financePosting);
+        $posting = $this->ownedPosting($membership, $financePosting);
         if ($posting->status !== FinancePosting::HELD) {
             throw ValidationException::withMessages(['status' => 'Hanya posting yang tertahan yang dapat divalidasi ulang.']);
         }
 
         try {
-            $hasil = $penerbit->revalidate($posting, (int) $request->user()?->getAuthIdentifier());
-        } catch (InvalidPosting $kesalahan) {
+            $result = $publisher->revalidate($posting, (int) $request->user()?->getAuthIdentifier());
+        } catch (InvalidPosting $error) {
             // Masukan yang dulu sah kini ditolak — misalnya vendornya berpindah entitas legal. Itu
             // bukan kesalahan pengguna di layar ini, jadi dilaporkan ke pemantauan kesalahan juga.
-            report($kesalahan);
+            report($error);
 
-            throw ValidationException::withMessages(['posting' => 'Posting ini tidak dapat dibentuk ulang: '.$kesalahan->getMessage()]);
+            throw ValidationException::withMessages(['posting' => 'Posting ini tidak dapat dibentuk ulang: '.$error->getMessage()]);
         }
 
-        return response()->json(['data' => $this->present($hasil, $this->entitasLegal($membership->tenant_id))]);
+        return response()->json(['data' => $this->present($result, $this->legalEntities($membership->tenant_id))]);
     }
 
-    public function markManual(Request $request, FinancePosting $financePosting, PostingPublisher $penerbit): JsonResponse
+    public function markManual(Request $request, FinancePosting $financePosting, PostingPublisher $publisher): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_POSTING_PROCESS);
-        $posting = $this->milik($membership, $financePosting);
+        $posting = $this->ownedPosting($membership, $financePosting);
         $data = $request->validate(
             ['reason' => ['required', 'string', 'max:500']],
             ['reason.required' => 'Tuliskan alasan posting ini dibukukan manual.'],
@@ -208,12 +208,12 @@ final class FinancePostingMonitorController extends Controller
         }
 
         try {
-            $hasil = $penerbit->markManual($posting, trim((string) $data['reason']), (int) $request->user()?->getAuthIdentifier());
+            $result = $publisher->markManual($posting, trim((string) $data['reason']), (int) $request->user()?->getAuthIdentifier());
         } catch (StatusPostingBerubah) {
             throw ValidationException::withMessages(['status' => 'Status posting ini baru saja berubah. Muat ulang halaman lalu periksa lagi.']);
         }
 
-        return response()->json(['data' => $this->present($hasil, $this->entitasLegal($membership->tenant_id))]);
+        return response()->json(['data' => $this->present($result, $this->legalEntities($membership->tenant_id))]);
     }
 
     /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
@@ -226,7 +226,7 @@ final class FinancePostingMonitorController extends Controller
     }
 
     /** Posting tenant lain dijawab 404, bukan 403: keberadaannya pun tidak boleh terbaca. */
-    private function milik(TenantMembership $membership, FinancePosting $posting): FinancePosting
+    private function ownedPosting(TenantMembership $membership, FinancePosting $posting): FinancePosting
     {
         abort_unless($posting->tenant_id === $membership->tenant_id, 404);
 
@@ -239,7 +239,7 @@ final class FinancePostingMonitorController extends Controller
      *
      * @return array<string, array{id: string, code: ?string, name: string}>
      */
-    private function entitasLegal(string $tenantId): array
+    private function legalEntities(string $tenantId): array
     {
         return Organization::query()
             ->where('tenant_id', $tenantId)
@@ -247,36 +247,36 @@ final class FinancePostingMonitorController extends Controller
             ->with('legalEntity:organization_id,company_code')
             ->orderBy('name')
             ->get()
-            ->mapWithKeys(static fn (Organization $organisasi): array => [$organisasi->id => [
-                'id' => $organisasi->id,
-                'code' => $organisasi->legalEntity?->company_code,
-                'name' => (string) $organisasi->name,
+            ->mapWithKeys(static fn (Organization $organization): array => [$organization->id => [
+                'id' => $organization->id,
+                'code' => $organization->legalEntity?->company_code,
+                'name' => (string) $organization->name,
             ]])
             ->all();
     }
 
     /** @return array<string, int> Setiap status selalu ada, termasuk yang jumlahnya nol. */
-    private function jumlahPerStatus(string $tenantId): array
+    private function countsByStatus(string $tenantId): array
     {
-        $jumlah = FinancePosting::query()
+        $count = FinancePosting::query()
             ->where('tenant_id', $tenantId)
             ->toBase()
             ->selectRaw('status, count(*) as jumlah')
             ->groupBy('status')
             ->pluck('jumlah', 'status')
-            ->map(static fn ($nilai): int => (int) $nilai)
+            ->map(static fn ($value): int => (int) $value)
             ->all();
 
-        return array_merge(array_fill_keys(self::STATUS, 0), $jumlah);
+        return array_merge(array_fill_keys(self::STATUS, 0), $count);
     }
 
     /**
-     * @param  array<string, array{id: string, code: ?string, name: string}>  $entitas
+     * @param  array<string, array{id: string, code: ?string, name: string}>  $legalEntity
      * @return array<string, mixed>
      */
-    private function present(FinancePosting $posting, array $entitas): array
+    private function present(FinancePosting $posting, array $legalEntity): array
     {
-        $legal = $entitas[$posting->legal_entity_id] ?? null;
+        $legal = $legalEntity[$posting->legal_entity_id] ?? null;
 
         return [
             'id' => $posting->id,

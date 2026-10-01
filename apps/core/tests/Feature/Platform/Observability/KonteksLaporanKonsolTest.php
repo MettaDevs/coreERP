@@ -39,7 +39,7 @@ class KonteksLaporanKonsolTest extends TestCase
 
     private function laporan(): string
     {
-        return LaporanKesalahan::dari(new RuntimeException('gagal'), null)->keTeks();
+        return LaporanKesalahan::from(new RuntimeException('gagal'), null)->toText();
     }
 
     public function test_menyebut_perintah_yang_sedang_berjalan(): void
@@ -84,7 +84,7 @@ class KonteksLaporanKonsolTest extends TestCase
     public function test_tanpa_tenant_terikat_dilaporkan_kosong_bukan_ditebak(): void
     {
         $_SERVER['argv'] = ['artisan', 'migrate'];
-        app()->instance(TenantScope::KUNCI, null);
+        app()->instance(TenantScope::KEY, null);
 
         // Perintah lintas tenant memang tidak punya satu tenant. Menuliskan `-` adalah keadaan
         // sebenarnya; menebak akan membuat laporan berbohong dengan percaya diri.

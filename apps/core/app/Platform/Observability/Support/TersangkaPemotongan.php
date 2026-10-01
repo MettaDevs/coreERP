@@ -29,7 +29,7 @@ use Throwable;
 final class TersangkaPemotongan
 {
     /** Berapa banyak kolom teratas yang ditampilkan. Lebih dari ini hanya jadi kebisingan. */
-    private const JUMLAH = 5;
+    private const COUNT = 5;
 
     /** SQLSTATE untuk data string yang terlalu panjang; sama di PostgreSQL dan SQL Server. */
     public const SQLSTATE = '22001';
@@ -40,17 +40,17 @@ final class TersangkaPemotongan
      * Diperiksa lewat dua jalan karena tidak semua driver mengisi SQLSTATE dengan rapi —
      * pesan ODBC SQL Server, misalnya, kerap datang dengan kode yang dibungkus.
      */
-    public static function cocok(?string $sqlstate, ?string $pesan): bool
+    public static function matches(?string $sqlstate, ?string $message): bool
     {
         if ($sqlstate === self::SQLSTATE) {
             return true;
         }
 
-        if ($pesan === null) {
+        if ($message === null) {
             return false;
         }
 
-        return preg_match('/would be truncated|value too long|data right truncated/i', $pesan) === 1;
+        return preg_match('/would be truncated|value too long|data right truncated/i', $message) === 1;
     }
 
     /**
@@ -60,14 +60,14 @@ final class TersangkaPemotongan
      * lewat ODBC tidak — pesannya berhenti pada *"String or binary data would be truncated"*.
      * Karena itu nilainya boleh `null`, dan pemanggilnya harus tetap berguna tanpanya.
      */
-    public static function batasDariPesan(?string $pesan): ?int
+    public static function limitFromMessage(?string $message): ?int
     {
-        if ($pesan === null) {
+        if ($message === null) {
             return null;
         }
 
-        if (preg_match('/(?:character varying|varchar|character|char|nvarchar|nchar)\s*\(\s*(\d+)\s*\)/i', $pesan, $cocok) === 1) {
-            return (int) $cocok[1];
+        if (preg_match('/(?:character varying|varchar|character|char|nvarchar|nchar)\s*\(\s*(\d+)\s*\)/i', $message, $matches) === 1) {
+            return (int) $matches[1];
         }
 
         return null;
@@ -75,29 +75,29 @@ final class TersangkaPemotongan
 
     /**
      * @param  array<array-key, mixed>  $binding
-     * @param  int|null  $batas  panjang maksimum kolom, bila driver menyebutkannya
+     * @param  int|null  $limit  panjang maksimum kolom, bila driver menyebutkannya
      * @return list<array{kolom: string, panjang: int, cuplikan: string, melebihi: bool}>
      */
-    public static function daftar(string $sql, array $binding, ?int $batas = null): array
+    public static function list(string $sql, array $binding, ?int $limit = null): array
     {
         try {
-            $kolom = self::kolomDariSql($sql);
-            $nilai = array_values($binding);
+            $column = self::columnsFromSql($sql);
+            $value = array_values($binding);
 
-            $baris = [];
+            $rows = [];
 
-            foreach ($nilai as $urutan => $isi) {
-                if (! is_string($isi)) {
+            foreach ($value as $sequence => $content) {
+                if (! is_string($content)) {
                     continue;
                 }
 
-                $panjang = mb_strlen($isi);
+                $length = mb_strlen($content);
 
-                $baris[] = [
-                    'kolom' => $kolom[$urutan] ?? ('#'.($urutan + 1)),
-                    'panjang' => $panjang,
-                    'cuplikan' => $panjang > 60 ? mb_substr($isi, 0, 60).'…' : $isi,
-                    'melebihi' => $batas !== null && $panjang > $batas,
+                $rows[] = [
+                    'kolom' => $column[$sequence] ?? ('#'.($sequence + 1)),
+                    'panjang' => $length,
+                    'cuplikan' => $length > 60 ? mb_substr($content, 0, 60).'…' : $content,
+                    'melebihi' => $limit !== null && $length > $limit,
                 ];
             }
 
@@ -116,19 +116,19 @@ final class TersangkaPemotongan
             // Ini tetap dugaan, bukan jawaban; nama kelas ini menyebut "tersangka" karena itu.
             // Jawaban pasti butuh membaca skema, dan membaca skema berarti bertanya ke database
             // dari dalam penangan kesalahan — harga yang belum sepadan untuk satu baris urutan.
-            usort($baris, static function (array $a, array $b) use ($batas): int {
+            usort($rows, static function (array $a, array $b) use ($limit): int {
                 if ($a['melebihi'] !== $b['melebihi']) {
                     return $b['melebihi'] <=> $a['melebihi'];
                 }
 
-                if ($batas !== null && $a['melebihi'] && $b['melebihi']) {
+                if ($limit !== null && $a['melebihi'] && $b['melebihi']) {
                     return $a['panjang'] <=> $b['panjang'];
                 }
 
                 return $b['panjang'] <=> $a['panjang'];
             });
 
-            return array_slice($baris, 0, self::JUMLAH);
+            return array_slice($rows, 0, self::COUNT);
         } catch (Throwable) {
             return [];
         }
@@ -147,41 +147,41 @@ final class TersangkaPemotongan
      *
      * @return list<string>
      */
-    private static function kolomDariSql(string $sql): array
+    private static function columnsFromSql(string $sql): array
     {
-        if (preg_match('/insert\s+into\s+\S+\s*\((?<kolom>[^)]*)\)\s*values/i', $sql, $cocok) === 1) {
-            return self::pecah($cocok['kolom']);
+        if (preg_match('/insert\s+into\s+\S+\s*\((?<kolom>[^)]*)\)\s*values/i', $sql, $matches) === 1) {
+            return self::split($matches['kolom']);
         }
 
-        if (preg_match('/\bset\b(?<set>.+?)(?:\bwhere\b|$)/is', $sql, $cocok) === 1) {
-            $kolom = [];
+        if (preg_match('/\bset\b(?<set>.+?)(?:\bwhere\b|$)/is', $sql, $matches) === 1) {
+            $column = [];
 
-            foreach (explode(',', $cocok['set']) as $bagian) {
-                if (preg_match('/([`"\[]?)([A-Za-z0-9_]+)\1?\s*=\s*\?/', $bagian, $satu) === 1) {
-                    $kolom[] = $satu[2];
+            foreach (explode(',', $matches['set']) as $parts) {
+                if (preg_match('/([`"\[]?)([A-Za-z0-9_]+)\1?\s*=\s*\?/', $parts, $item) === 1) {
+                    $column[] = $item[2];
                 }
             }
 
-            return $kolom;
+            return $column;
         }
 
         return [];
     }
 
     /** @return list<string> */
-    private static function pecah(string $daftar): array
+    private static function split(string $list): array
     {
-        $hasil = [];
+        $result = [];
 
-        foreach (explode(',', $daftar) as $satu) {
-            $bersih = trim($satu);
-            $bersih = trim($bersih, '"`[]\' ');
+        foreach (explode(',', $list) as $item) {
+            $clean = trim($item);
+            $clean = trim($clean, '"`[]\' ');
 
-            if ($bersih !== '') {
-                $hasil[] = $bersih;
+            if ($clean !== '') {
+                $result[] = $clean;
             }
         }
 
-        return $hasil;
+        return $result;
     }
 }

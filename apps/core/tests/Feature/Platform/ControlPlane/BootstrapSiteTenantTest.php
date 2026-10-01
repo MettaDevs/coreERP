@@ -72,7 +72,7 @@ final class BootstrapSiteTenantTest extends TestCase
 
         $modulesInImage = array_values(array_map(
             static fn (ModuleManifest $module): string => $module->id,
-            array_filter(app(ModuleRegistry::class)->semua(), static fn (ModuleManifest $module): bool => ! $module->bahanUjiInternal()),
+            array_filter(app(ModuleRegistry::class)->all(), static fn (ModuleManifest $module): bool => ! $module->internalTestFixtures()),
         ));
         // Kriteria yang tidak dapat gagal tidak membuktikan apa pun: tanpa modul, "semua modul
         // diberikan" benar untuk daftar kosong.
@@ -369,7 +369,7 @@ final class BootstrapSiteTenantTest extends TestCase
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->assertSame(Command::SUCCESS, Artisan::call('app:register-manifest'), Artisan::output());
 
-        $inImage = array_map(static fn (ModuleManifest $module): string => $module->id, app(ModuleRegistry::class)->semua());
+        $inImage = array_map(static fn (ModuleManifest $module): string => $module->id, app(ModuleRegistry::class)->all());
         $this->assertContains('human-resources', $inImage);
         $this->assertContains('management-aset', $inImage, 'Test ini butuh modul kedua di image supaya "hanya yang dibeli" dapat gagal.');
 
@@ -402,7 +402,7 @@ final class BootstrapSiteTenantTest extends TestCase
     {
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->assertSame(Command::SUCCESS, Artisan::call('app:register-manifest'), Artisan::output());
-        $this->assertNotSame([], app(ModuleRegistry::class)->semua(), 'Test ini butuh image yang membawa modul supaya "tidak ada app" dapat gagal.');
+        $this->assertNotSame([], app(ModuleRegistry::class)->all(), 'Test ini butuh image yang membawa modul supaya "tidak ada app" dapat gagal.');
 
         [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 4]));
 

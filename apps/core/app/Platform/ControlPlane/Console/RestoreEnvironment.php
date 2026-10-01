@@ -375,9 +375,9 @@ final class RestoreEnvironment extends Command
             $changes['expires_at'] = $expiresAt;
         }
 
-        $koneksi = DB::connection($environment->getConnectionName());
+        $connection = DB::connection($environment->getConnectionName());
 
-        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+        $affected = (int) $connection->transaction(fn (): int => Environment::query()
             ->whereKey($environment->id)
             ->whereNotNull('deleted_at')
             ->whereNull('purged_at')

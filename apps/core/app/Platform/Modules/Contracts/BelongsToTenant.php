@@ -50,19 +50,19 @@ trait BelongsToTenant
         static::addGlobalScope(new TenantScope);
 
         static::saving(function ($model): void {
-            $aktif = TenantScope::tenantAktif();
-            $tertulis = $model->getAttribute('tenant_id');
+            $active = TenantScope::activeTenant();
+            $writtenOut = $model->getAttribute('tenant_id');
 
-            if ($tertulis === null || $tertulis === '') {
-                $model->setAttribute('tenant_id', $aktif);
+            if ($writtenOut === null || $writtenOut === '') {
+                $model->setAttribute('tenant_id', $active);
 
                 return;
             }
 
-            if ($tertulis !== $aktif) {
+            if ($writtenOut !== $active) {
                 throw new RuntimeException(
-                    'Baris module hendak disimpan dengan tenant_id '.$tertulis.
-                    ' sementara tenant aktif '.$aktif.'. Penyimpanan dibatalkan; '.
+                    'Baris module hendak disimpan dengan tenant_id '.$writtenOut.
+                    ' sementara tenant aktif '.$active.'. Penyimpanan dibatalkan; '.
                     'menyimpannya berarti menulis ke data tenant lain.'
                 );
             }

@@ -27,16 +27,16 @@ use RuntimeException;
  */
 final class SignedPush
 {
-    public function __construct(private readonly PushDestination $tujuan) {}
+    public function __construct(private readonly PushDestination $destination) {}
 
     /** @return array{timestamp: string, signature: string} */
     public static function sign(string $secret, string $body, ?int $timestamp = null): array
     {
-        $stempel = (string) ($timestamp ?? now()->getTimestamp());
+        $issuedAt = (string) ($timestamp ?? now()->getTimestamp());
 
         return [
-            'timestamp' => $stempel,
-            'signature' => hash_hmac('sha256', $stempel.'.'.$body, $secret),
+            'timestamp' => $issuedAt,
+            'signature' => hash_hmac('sha256', $issuedAt.'.'.$body, $secret),
         ];
     }
 
@@ -49,30 +49,30 @@ final class SignedPush
         if ($client->delivery_mode !== IntegrationClient::PUSH || $client->push_url === null || $client->signing_secret === null) {
             throw new RuntimeException('Klien integrasi ini tidak memakai mode push.');
         }
-        $periksa = $this->tujuan->inspect($client->push_url);
-        if ($periksa['reason'] !== null) {
-            throw new RuntimeException($periksa['reason']);
+        $check = $this->destination->inspect($client->push_url);
+        if ($check['reason'] !== null) {
+            throw new RuntimeException($check['reason']);
         }
 
-        $tanda = self::sign($client->signing_secret, $body);
+        $signed = self::sign($client->signing_secret, $body);
 
         // Redirect tidak diikuti: tujuan yang sudah lolos PushDestination bisa mengalihkan ke
         // jaringan privat, dan pengalihan itu tidak pernah diperiksa. Jawaban 3xx dihitung gagal.
-        $opsi = ['allow_redirects' => false];
+        $option = ['allow_redirects' => false];
         // Di SaaS, cURL memakai alamat yang baru saja diperiksa, bukan hasil resolusi DNS keduanya
         // sendiri. Nama host tetap dipakai untuk SNI dan verifikasi sertifikat.
-        if ($periksa['pin'] !== []) {
-            $opsi['curl'] = [CURLOPT_RESOLVE => $periksa['pin']];
+        if ($check['pin'] !== []) {
+            $option['curl'] = [CURLOPT_RESOLVE => $check['pin']];
         }
 
         return Http::acceptJson()
-            ->withOptions($opsi)
+            ->withOptions($option)
             ->connectTimeout(3)
             ->timeout(10)
             ->withBody($body, 'application/json')
             ->withHeaders([
-                'X-CoreERP-Event-Timestamp' => $tanda['timestamp'],
-                'X-CoreERP-Event-Signature' => $tanda['signature'],
+                'X-CoreERP-Event-Timestamp' => $signed['timestamp'],
+                'X-CoreERP-Event-Signature' => $signed['signature'],
                 'X-CoreERP-Client-Id' => $client->id,
             ])
             ->post($client->push_url);

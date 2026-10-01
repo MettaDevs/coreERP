@@ -77,7 +77,7 @@ final class ModulSedangDipindah
      *
      * @var array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
-    private const DAFTAR = [
+    private const MODULES = [
         // Kosong lagi sejak 10 September 2026. Dua module sudah melewati daftar ini — aset pada
         // F3-30, human-resources pada F7-01 — dan yang kedua tinggal di sini kurang dari satu hari.
         // Itu ukuran yang paling berguna dari daftar ini: bukan berapa lama ia kosong, melainkan
@@ -85,16 +85,16 @@ final class ModulSedangDipindah
     ];
 
     /**
-     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $list
      */
-    private function __construct(private readonly array $daftar) {}
+    private function __construct(private readonly array $list) {}
 
     /**
      * Daftar yang sebenarnya dipakai ketiga penjaga.
      */
-    public static function bawaan(): self
+    public static function default(): self
     {
-        return new self(self::DAFTAR);
+        return new self(self::MODULES);
     }
 
     /**
@@ -104,27 +104,27 @@ final class ModulSedangDipindah
      * melonggarkan untuk modul lain" adalah menambah modul sungguhan ke daftar sungguhan,
      * dan itu berarti test-nya ikut berubah setiap kali daftarnya berubah.
      *
-     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $list
      */
-    public static function buatan(array $daftar): self
+    public static function custom(array $list): self
     {
-        return new self($daftar);
+        return new self($list);
     }
 
     /**
      * Apakah folder modul ini sedang dipindah dan belum dibentuk ulang?
      */
-    public function menandai(string $namaFolder): bool
+    public function marks(string $folderName): bool
     {
-        return array_key_exists($namaFolder, $this->daftar);
+        return array_key_exists($folderName, $this->list);
     }
 
     /**
      * @return array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
-    public function semua(): array
+    public function all(): array
     {
-        return $this->daftar;
+        return $this->list;
     }
 
     /**
@@ -132,16 +132,16 @@ final class ModulSedangDipindah
      *
      * @return array<string, string>
      */
-    public function tenggatYangLewat(DateTimeImmutable $hariIni): array
+    public function overdue(DateTimeImmutable $today): array
     {
-        $lewat = [];
+        $overdue = [];
 
-        foreach ($this->daftar as $nama => $entri) {
-            if ($entri['tenggat'] < $hariIni->format('Y-m-d')) {
-                $lewat[$nama] = $entri['tenggat'];
+        foreach ($this->list as $name => $entry) {
+            if ($entry['tenggat'] < $today->format('Y-m-d')) {
+                $overdue[$name] = $entry['tenggat'];
             }
         }
 
-        return $lewat;
+        return $overdue;
     }
 }

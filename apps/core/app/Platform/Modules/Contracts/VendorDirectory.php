@@ -19,7 +19,7 @@ interface VendorDirectory
      *
      * @return list<array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>
      */
-    public function active(string $tenantId, string $legalEntityId, string $cari = '', int $batas = 20): array;
+    public function active(string $tenantId, string $legalEntityId, string $search = '', int $limit = 20): array;
 
     /**
      * Satu vendor, termasuk yang sudah nonaktif — dokumen lama tetap harus bisa menampilkan

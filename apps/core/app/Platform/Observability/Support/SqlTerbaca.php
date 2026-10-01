@@ -12,7 +12,7 @@ use Throwable;
  * binding-nya disisipkan ke tempat tanda tanya.
  *
  * **Kenapa tidak memakai `QueryException::getRawSql()`.** Method bawaan itu memanggil
- * `DB::connection($nama)->getQueryGrammar()`, yang berarti menyelesaikan sebuah koneksi
+ * `DB::connection($name)->getQueryGrammar()`, yang berarti menyelesaikan sebuah koneksi
  * database lewat container — dari dalam penangan kesalahan, untuk sebuah kesalahan yang
  * mungkin justru berupa kegagalan koneksi. Menanyakan pada database kenapa database gagal
  * adalah cara satu kesalahan berubah menjadi dua, dan pada database yang mati ia membayar
@@ -35,12 +35,12 @@ final class SqlTerbaca
      * `insert` massal, dan seluruh isinya tidak menambah apa pun yang belum terlihat pada
      * seribu karakter pertama — sementara ia sanggup membuat satu laporan memenuhi disk.
      */
-    private const BATAS = 8000;
+    private const LIMIT = 8000;
 
     /**
      * @param  array<array-key, mixed>  $binding
      */
-    public static function gabungkan(string $sql, array $binding): ?string
+    public static function interpolate(string $sql, array $binding): ?string
     {
         try {
             if (substr_count($sql, '?') !== count($binding)) {
@@ -48,26 +48,26 @@ final class SqlTerbaca
             }
 
             if ($binding === []) {
-                return self::potong($sql);
+                return self::truncate($sql);
             }
 
-            $hasil = '';
-            $sisa = $sql;
+            $result = '';
+            $remaining = $sql;
 
-            foreach ($binding as $nilai) {
-                $posisi = strpos($sisa, '?');
+            foreach ($binding as $value) {
+                $position = strpos($remaining, '?');
 
                 // Tidak mungkin terjadi setelah pemeriksaan jumlah di atas, tetapi kalau toh
                 // terjadi, menyerah tetap lebih baik daripada menghasilkan potongan query.
-                if ($posisi === false) {
+                if ($position === false) {
                     return null;
                 }
 
-                $hasil .= substr($sisa, 0, $posisi).self::harfiah($nilai);
-                $sisa = substr($sisa, $posisi + 1);
+                $result .= substr($remaining, 0, $position).self::literal($value);
+                $remaining = substr($remaining, $position + 1);
             }
 
-            return self::potong($hasil.$sisa);
+            return self::truncate($result.$remaining);
         } catch (Throwable) {
             return null;
         }
@@ -76,52 +76,52 @@ final class SqlTerbaca
     /**
      * Mengubah satu nilai binding menjadi bentuk harfiah SQL.
      */
-    private static function harfiah(mixed $nilai): string
+    private static function literal(mixed $value): string
     {
-        if ($nilai === null) {
+        if ($value === null) {
             return 'NULL';
         }
 
-        if (is_bool($nilai)) {
-            return $nilai ? 'true' : 'false';
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
         }
 
-        if (is_int($nilai) || is_float($nilai)) {
-            return (string) $nilai;
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
         }
 
-        if ($nilai instanceof DateTimeInterface) {
-            return self::kutip($nilai->format('Y-m-d H:i:s.uP'));
+        if ($value instanceof DateTimeInterface) {
+            return self::quote($value->format('Y-m-d H:i:s.uP'));
         }
 
-        if (is_object($nilai) && method_exists($nilai, '__toString')) {
-            return self::kutip((string) $nilai);
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return self::quote((string) $value);
         }
 
-        if (! is_string($nilai)) {
-            return self::kutip(gettype($nilai));
+        if (! is_string($value)) {
+            return self::quote(gettype($value));
         }
 
         // Binding biner — hasil `bindValue` dengan PDO::PARAM_LOB, atau kolom bytea — tidak
         // punya bentuk terbaca dan menempelkannya apa adanya merusak berkas log yang memuatnya.
-        if (! mb_check_encoding($nilai, 'UTF-8')) {
-            return sprintf('<biner %d bita>', strlen($nilai));
+        if (! mb_check_encoding($value, 'UTF-8')) {
+            return sprintf('<biner %d bita>', strlen($value));
         }
 
-        return self::kutip($nilai);
+        return self::quote($value);
     }
 
-    private static function kutip(string $nilai): string
+    private static function quote(string $value): string
     {
-        return "'".str_replace("'", "''", $nilai)."'";
+        return "'".str_replace("'", "''", $value)."'";
     }
 
-    private static function potong(string $sql): string
+    private static function truncate(string $sql): string
     {
-        if (mb_strlen($sql) <= self::BATAS) {
+        if (mb_strlen($sql) <= self::LIMIT) {
             return $sql;
         }
 
-        return mb_substr($sql, 0, self::BATAS).' … (dipotong)';
+        return mb_substr($sql, 0, self::LIMIT).' … (dipotong)';
     }
 }

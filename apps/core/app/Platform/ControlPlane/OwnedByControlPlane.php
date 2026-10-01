@@ -35,10 +35,10 @@ trait OwnedByControlPlane
 {
     public function getConnectionName(): ?string
     {
-        $koneksi = config('coreerp.control_connection');
+        $connection = config('coreerp.control_connection');
 
-        if (is_string($koneksi) && $koneksi !== '') {
-            return $koneksi;
+        if (is_string($connection) && $connection !== '') {
+            return $connection;
         }
 
         return parent::getConnectionName();

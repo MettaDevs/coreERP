@@ -23,7 +23,7 @@ final class ModuleListCommand extends Command
 
     public function handle(ModuleRegistry $registry): int
     {
-        $module = $registry->semua();
+        $module = $registry->all();
 
         if ($module === []) {
             $this->warn('Tidak ada module yang ditemukan di folder modules/.');
@@ -38,7 +38,7 @@ final class ModuleListCommand extends Command
                 $m->nama,
                 $m->versi,
                 $m->penerbit,
-                $m->bahanUjiInternal() ? $m->jenis.' (tidak ikut ke pelanggan)' : $m->jenis,
+                $m->internalTestFixtures() ? $m->jenis.' (tidak ikut ke pelanggan)' : $m->jenis,
                 $m->awalanTabel,
             ], $module),
         );

@@ -32,12 +32,12 @@ final readonly class ModuleManifest
      * pelanggan mana pun. Sebuah menu bernama "Contoh A" di layar pelanggan adalah
      * kegagalan yang tidak boleh mungkin terjadi.
      */
-    public function bahanUjiInternal(): bool
+    public function internalTestFixtures(): bool
     {
         return $this->jenis === 'internal-fixture';
     }
 
-    public function penyediaLayanan(): string
+    public function serviceProvider(): string
     {
         return sprintf(
             'Modules\\%s\\%s\\ModuleServiceProvider',
@@ -46,7 +46,7 @@ final readonly class ModuleManifest
         );
     }
 
-    public function folderMigrasi(): string
+    public function migrationFolder(): string
     {
         return $this->folder.'/database/migrations';
     }

@@ -65,7 +65,7 @@ class PengirimDiscordTest extends TestCase
 
     private function laporan(string $pesan = 'gagal'): LaporanKesalahan
     {
-        return LaporanKesalahan::dari(new RuntimeException($pesan), null);
+        return LaporanKesalahan::from(new RuntimeException($pesan), null);
     }
 
     public function test_tidak_mengirim_apa_pun_ketika_webhook_kosong(): void
@@ -75,7 +75,7 @@ class PengirimDiscordTest extends TestCase
         config()->set('coreerp.discord.webhook_url', '');
         Http::fake();
 
-        PengirimDiscord::kirim($this->laporan());
+        PengirimDiscord::send($this->laporan());
 
         Http::assertNothingSent();
     }
@@ -84,7 +84,7 @@ class PengirimDiscordTest extends TestCase
     {
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan());
+        PengirimDiscord::send($this->laporan());
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $isi = $permintaan->data();
@@ -103,7 +103,7 @@ class PengirimDiscordTest extends TestCase
     {
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan('kolom tidak ditemukan'));
+        PengirimDiscord::send($this->laporan('kolom tidak ditemukan'));
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $embed = $permintaan->data()['embeds'][0];
@@ -132,9 +132,9 @@ class PengirimDiscordTest extends TestCase
         ]);
         $permintaan->setRouteResolver(fn (): Route => $rute);
         $permintaan->attributes->set(ModuleRequestContext::TENANT_ID, '01kyvaf15a83dn64qp2zfr88pn');
-        $permintaan->attributes->set(LaporanKesalahan::NAMA_TENANT, 'SurYA GrOUP');
+        $permintaan->attributes->set(LaporanKesalahan::TENANT_NAME, 'SurYA GrOUP');
         $permintaan->attributes->set(ModuleRequestContext::USER_ID, '42');
-        $permintaan->attributes->set(LaporanKesalahan::NAMA_PENGGUNA, 'Siti Aminah');
+        $permintaan->attributes->set(LaporanKesalahan::USER_NAME, 'Siti Aminah');
 
         $kesalahan = new QueryException(
             connectionName: 'pgsql',
@@ -142,10 +142,10 @@ class PengirimDiscordTest extends TestCase
             bindings: ['Budi Santoso', 'budi@contoh.test'],
             previous: new PDOException('duplicate key value violates unique constraint: Key (email)=(budi@contoh.test) already exists.'),
         );
-        $laporan = LaporanKesalahan::dari($kesalahan, $permintaan);
-        $atributSebelum = $laporan->keAtribut();
+        $laporan = LaporanKesalahan::from($kesalahan, $permintaan);
+        $atributSebelum = $laporan->toAttributes();
 
-        PengirimDiscord::kirim($laporan);
+        PengirimDiscord::send($laporan);
 
         Http::assertSent(function (PermintaanHttp $kiriman): bool {
             $embed = $kiriman->data()['embeds'][0];
@@ -168,11 +168,11 @@ class PengirimDiscordTest extends TestCase
         });
 
         // SigNoz dan berkas log membaca laporan yang sama, dan laporan itu tetap utuh.
-        $this->assertSame($atributSebelum, $laporan->keAtribut());
+        $this->assertSame($atributSebelum, $laporan->toAttributes());
         $this->assertSame('SurYA GrOUP', $atributSebelum['coreerp.tenant_name']);
         $this->assertSame('Siti Aminah', $atributSebelum['coreerp.user_name']);
         $this->assertStringContainsString('budi@contoh.test', (string) $atributSebelum['coreerp.db.query_terbaca']);
-        $this->assertStringContainsString('Budi Santoso', $laporan->keTeks());
+        $this->assertStringContainsString('Budi Santoso', $laporan->toText());
     }
 
     public function test_garis_pemisah_tidak_ikut_terkirim(): void
@@ -182,7 +182,7 @@ class PengirimDiscordTest extends TestCase
         // tempat pada layar yang sempit.
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan());
+        PengirimDiscord::send($this->laporan());
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $this->assertStringNotContainsString('─', (string) $permintaan->data()['embeds'][0]['description']);
@@ -196,9 +196,9 @@ class PengirimDiscordTest extends TestCase
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
         $laporan = $this->laporan();
-        $id = (string) $laporan->keAtribut()['coreerp.laporan_id'];
+        $id = (string) $laporan->toAttributes()['coreerp.laporan_id'];
 
-        PengirimDiscord::kirim($laporan);
+        PengirimDiscord::send($laporan);
 
         Http::assertSent(function (PermintaanHttp $permintaan) use ($id): bool {
             $embed = $permintaan->data()['embeds'][0];
@@ -222,8 +222,8 @@ class PengirimDiscordTest extends TestCase
         $laporan = $this->laporan();
 
         $this->assertStringContainsString(
-            (string) $laporan->keAtribut()['coreerp.laporan_id'],
-            $laporan->keTeks(),
+            (string) $laporan->toAttributes()['coreerp.laporan_id'],
+            $laporan->toText(),
         );
     }
 
@@ -232,7 +232,7 @@ class PengirimDiscordTest extends TestCase
         config()->set('coreerp.signoz_url', '');
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan());
+        PengirimDiscord::send($this->laporan());
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $embed = $permintaan->data()['embeds'][0];
@@ -248,7 +248,7 @@ class PengirimDiscordTest extends TestCase
     {
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan(str_repeat('nilai yang sangat panjang ', 500)));
+        PengirimDiscord::send($this->laporan(str_repeat('nilai yang sangat panjang ', 500)));
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $isi = (string) $permintaan->data()['embeds'][0]['description'];
@@ -270,7 +270,7 @@ class PengirimDiscordTest extends TestCase
         config()->set('coreerp.discord.mention', '<@&99>');
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim($this->laporan('nilai ditolak: @everyone @here'));
+        PengirimDiscord::send($this->laporan('nilai ditolak: @everyone @here'));
 
         Http::assertSent(function (PermintaanHttp $permintaan): bool {
             $izin = $permintaan->data()['allowed_mentions'];
@@ -289,9 +289,9 @@ class PengirimDiscordTest extends TestCase
 
         $laporan = $this->laporan();
 
-        PengirimDiscord::kirim($laporan);
-        PengirimDiscord::kirim($laporan);
-        PengirimDiscord::kirim($laporan);
+        PengirimDiscord::send($laporan);
+        PengirimDiscord::send($laporan);
+        PengirimDiscord::send($laporan);
 
         // Satu kali membuka halaman daftar sudah menghasilkan dua permintaan yang gagal
         // dengan sebab yang sama; database yang mati menghasilkan ratusan.
@@ -302,7 +302,7 @@ class PengirimDiscordTest extends TestCase
     {
         Http::fake(fn () => throw new RuntimeException('jaringan diblokir'));
 
-        PengirimDiscord::kirim($this->laporan());
+        PengirimDiscord::send($this->laporan());
 
         // Tidak ada assertion selain ketiadaan lemparan: kelas ini berjalan di dalam penangan
         // kesalahan, dan lemparan dari sana menimpa kesalahan asli dengan kesalahan tentang

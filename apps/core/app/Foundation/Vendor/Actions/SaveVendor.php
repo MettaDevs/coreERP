@@ -28,8 +28,8 @@ use Illuminate\Validation\ValidationException;
 final class SaveVendor
 {
     public function __construct(
-        private readonly NumberSequenceService $nomor,
-        private readonly CoreNumberSequences $urutan,
+        private readonly NumberSequenceService $number,
+        private readonly CoreNumberSequences $sequence,
     ) {}
 
     /**
@@ -37,60 +37,60 @@ final class SaveVendor
      */
     public function create(TenantMembership $actor, array $data, string $creationKey): Vendor
     {
-        $this->pastikanAdmin($actor);
+        $this->ensureAdmin($actor);
         $tenant = $actor->tenant_id;
 
-        $ulang = Vendor::query()->where('tenant_id', $tenant)->where('creation_key', $creationKey)->first();
-        if ($ulang !== null) {
-            return $ulang;
+        $retry = Vendor::query()->where('tenant_id', $tenant)->where('creation_key', $creationKey)->first();
+        if ($retry !== null) {
+            return $retry;
         }
 
-        $entitas = Organization::query()
+        $legalEntity = Organization::query()
             ->where('tenant_id', $tenant)
             ->where('classification', 'legal_entity')
             ->find($data['legal_entity_id']);
-        if ($entitas === null) {
+        if ($legalEntity === null) {
             throw ValidationException::withMessages(['legal_entity_id' => 'Pilih entitas legal milik tenant ini.']);
         }
 
         // Di luar transaksi: bentrokan dua vendor pertama yang bersamaan tidak boleh membatalkan
         // transaksi penyimpanan di bawah.
-        $this->urutan->ensure($tenant, Vendor::NUMBER_SEQUENCE);
+        $this->sequence->ensure($tenant, Vendor::NUMBER_SEQUENCE);
 
         try {
-            return DB::transaction(function () use ($actor, $tenant, $data, $creationKey, $entitas): Vendor {
+            return DB::transaction(function () use ($actor, $tenant, $data, $creationKey, $legalEntity): Vendor {
                 $party = $this->party($tenant, $data);
 
-                $sudahAda = Vendor::query()
+                $alreadyExists = Vendor::query()
                     ->where('tenant_id', $tenant)
-                    ->where('legal_entity_id', $entitas->id)
+                    ->where('legal_entity_id', $legalEntity->id)
                     ->where('party_id', $party->id)
                     ->first();
-                if ($sudahAda !== null) {
+                if ($alreadyExists !== null) {
                     throw ValidationException::withMessages([
-                        'party_id' => sprintf('%s sudah menjadi vendor %s di entitas legal ini.', $party->name, $sudahAda->number),
+                        'party_id' => sprintf('%s sudah menjadi vendor %s di entitas legal ini.', $party->name, $alreadyExists->number),
                     ]);
                 }
 
                 try {
-                    $terbit = $this->nomor->issue(
-                        ['tenant_id' => $tenant, 'app_id' => CoreNumberSequences::APP_ID, 'legal_entity_id' => $entitas->id],
+                    $publishedAt = $this->number->issue(
+                        ['tenant_id' => $tenant, 'app_id' => CoreNumberSequences::APP_ID, 'legal_entity_id' => $legalEntity->id],
                         Vendor::NUMBER_SEQUENCE,
                         'vendor:'.$creationKey,
                         $data['number'],
                     );
-                } catch (ValidationException $kegagalan) {
+                } catch (ValidationException $failure) {
                     // Nama field milik layanan nomor tidak boleh bocor ke form vendor.
                     throw ValidationException::withMessages([
-                        'number' => collect($kegagalan->errors())->flatten()->first() ?? 'Nomor vendor belum dapat diterbitkan.',
+                        'number' => collect($failure->errors())->flatten()->first() ?? 'Nomor vendor belum dapat diterbitkan.',
                     ]);
                 }
 
                 $vendor = Vendor::query()->create([
                     'tenant_id' => $tenant,
-                    'legal_entity_id' => $entitas->id,
+                    'legal_entity_id' => $legalEntity->id,
                     'party_id' => $party->id,
-                    'number' => $terbit['number'],
+                    'number' => $publishedAt['number'],
                     'tax_number' => $data['tax_number'],
                     'status' => $data['status'],
                     'creation_key' => $creationKey,
@@ -102,15 +102,15 @@ final class SaveVendor
                         'tenant_id' => $tenant,
                         'party_id' => $party->id,
                         'role_code' => 'vendor',
-                        'legal_entity_id' => $entitas->id,
+                        'legal_entity_id' => $legalEntity->id,
                     ],
                     ['owning_app_id' => CoreNumberSequences::APP_ID],
                 );
 
                 return $vendor;
             });
-        } catch (UniqueConstraintViolationException $bentrok) {
-            if (str_contains($bentrok->getMessage(), 'creation_key')) {
+        } catch (UniqueConstraintViolationException $conflict) {
+            if (str_contains($conflict->getMessage(), 'creation_key')) {
                 return Vendor::query()->where('tenant_id', $tenant)->where('creation_key', $creationKey)->firstOrFail();
             }
 
@@ -132,7 +132,7 @@ final class SaveVendor
      */
     public function update(TenantMembership $actor, Vendor $vendor, array $data, int $expectedVersion): Vendor
     {
-        $this->pastikanAdmin($actor);
+        $this->ensureAdmin($actor);
         if ($vendor->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
@@ -161,18 +161,18 @@ final class SaveVendor
             return $party;
         }
 
-        $nama = trim((string) $data['party_name']);
+        $name = trim((string) $data['party_name']);
 
         return Party::query()->create([
             'tenant_id' => $tenant,
             'type' => $data['party_type'] ?? 'organization',
-            'name' => $nama,
-            'search_name' => Party::searchName($nama),
+            'name' => $name,
+            'search_name' => Party::searchName($name),
             'status' => 'active',
         ]);
     }
 
-    private function pastikanAdmin(TenantMembership $actor): void
+    private function ensureAdmin(TenantMembership $actor): void
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE)) {
             throw new AuthorizationException;

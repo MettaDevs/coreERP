@@ -118,7 +118,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // yang sama ke span, supaya jejak dan log menunjuk kejadian yang sama alih-alih
         // dua kejadian yang harus dicocokkan manual.
         $exceptions->report(function (Throwable $kesalahan): void {
-            JejakAktif::catatKesalahan($kesalahan);
+            JejakAktif::recordException($kesalahan);
         });
 
         // Pelapor kedua, sengaja tidak digabung dengan yang di atas. Keduanya menjawab
@@ -126,6 +126,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // yang satu menyusun laporan yang dibaca orang — dan menggabungkannya berarti satu
         // kegagalan menjatuhkan dua hal yang seharusnya berdiri sendiri.
         $exceptions->report(function (Throwable $kesalahan): void {
-            PelaporKesalahan::laporkan($kesalahan, PelaporKesalahan::permintaanSaatIni());
+            PelaporKesalahan::report($kesalahan, PelaporKesalahan::currentRequest());
         });
     })->create();

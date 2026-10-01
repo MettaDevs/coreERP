@@ -147,7 +147,7 @@ final class ClientServerHostingTest extends TestCase
         // Tanpa saringan, produksi server klien yang terpilih lebih dulu, dan jawabannya "boleh".
         $this->app->forgetInstance(ActiveEnvironment::KEY);
         $this->app->forgetInstance(ActiveEnvironment::class);
-        $this->app->instance(TenantScope::KUNCI, $this->tenant->id);
+        $this->app->instance(TenantScope::KEY, $this->tenant->id);
 
         $active = app(ActiveEnvironment::class);
         $this->assertSame($demo->id, $active->current()?->id);

@@ -112,7 +112,7 @@ class SusunanManifestModulTest extends TestCase
 
         $this->assertNotSame([], $manifest, 'Tidak ada satu pun manifest module yang terbaca; pemindaiannya salah alamat.');
 
-        $this->assertSame([], $this->pelanggaranKunci($akar, ModulSedangDipindah::bawaan()), implode("\n", [
+        $this->assertSame([], $this->pelanggaranKunci($akar, ModulSedangDipindah::default()), implode("\n", [
             'Ada manifest module yang tidak sah.',
             'Ketidakcocokan di sini tidak berbunyi: ModuleRegistry mengisi sendiri kunci yang hilang,',
             'dan module yang id-nya berbeda dari nama foldernya hanya "tidak ditemukan" — tanpa galat,',
@@ -144,7 +144,7 @@ class SusunanManifestModulTest extends TestCase
                 'modules/apperp/modul-cacat/app.yaml: id "modul-lain" tidak sama dengan nama foldernya "modul-cacat".',
                 'modules/apperp/modul-cacat/app.yaml: publisher "penerbit-lain" tidak sama dengan nama folder induknya "apperp".',
             ],
-            $this->pelanggaranKunci($akar, ModulSedangDipindah::bawaan()),
+            $this->pelanggaranKunci($akar, ModulSedangDipindah::default()),
         );
     }
 
@@ -171,7 +171,7 @@ class SusunanManifestModulTest extends TestCase
             ]);
         }
 
-        $dipindah = ModulSedangDipindah::buatan([
+        $dipindah = ModulSedangDipindah::custom([
             $ditandai => ['alasan' => 'Modul palsu milik test ini.', 'tenggat' => '2999-12-31'],
         ]);
 
@@ -183,7 +183,7 @@ class SusunanManifestModulTest extends TestCase
 
         $this->assertCount(
             2,
-            $this->pelanggaranKunci($akar, ModulSedangDipindah::buatan([])),
+            $this->pelanggaranKunci($akar, ModulSedangDipindah::custom([])),
             'Tanpa penandaan, keduanya harus merah; jadi yang membedakan memang penandaannya.',
         );
     }
@@ -508,7 +508,7 @@ class SusunanManifestModulTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('sebagai daftar');
 
-        (new ModuleRegistry($akar))->semuaTermasukYangSedangDipindah();
+        (new ModuleRegistry($akar))->allIncludingMoved();
     }
 
     /**
@@ -644,7 +644,7 @@ class SusunanManifestModulTest extends TestCase
             // Satu-satunya pengecualian yang sah. Daftarnya dibaca dari `ModulSedangDipindah`
             // supaya tidak ada dua daftar yang bisa menyimpang; `ModulSedangDipindahTest`
             // memeriksa hal yang sama dari sisi lain, yaitu bahwa entrinya tidak basi.
-            if (self::teks($isi['table_prefix'] ?? null) === '' && ! $dipindah->menandai($folder)) {
+            if (self::teks($isi['table_prefix'] ?? null) === '' && ! $dipindah->marks($folder)) {
                 $pelanggaran[] = sprintf('modules/%s/app.yaml tidak menyatakan "table_prefix" dan tidak terdaftar sedang dipindah.', $jalur);
             }
 

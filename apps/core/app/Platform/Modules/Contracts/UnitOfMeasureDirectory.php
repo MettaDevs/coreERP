@@ -28,5 +28,5 @@ interface UnitOfMeasureDirectory
     public function resolve(string $tenantId, array $id): array;
 
     /** @return array<string, mixed> */
-    public function convert(string $tenantId, string $dari, string $ke, string $nilai): array;
+    public function convert(string $tenantId, string $from, string $to, string $value): array;
 }

@@ -19,17 +19,17 @@ namespace App\Platform\Modules\Contracts;
 interface NumberSequenceIssuer
 {
     /**
-     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $konteks
+     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $context
      * @return array{id: string, number: string, status: string}
      */
-    public function issue(array $konteks, string $kodeReferensi, string $kunciIdempoten, ?string $nilaiManual = null): array;
+    public function issue(array $context, string $referenceCode, string $idempotencyKey, ?string $manualValue = null): array;
 
     /**
      * Menyiapkan nomor tanpa memakainya. Dipakai layar yang menampilkan nomor sebelum
      * pengguna menekan simpan.
      *
-     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $konteks
+     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $context
      * @return array{id: string, number: string, status: string}
      */
-    public function reserve(array $konteks, string $kodeReferensi, string $kunciIdempoten): array;
+    public function reserve(array $context, string $referenceCode, string $idempotencyKey): array;
 }

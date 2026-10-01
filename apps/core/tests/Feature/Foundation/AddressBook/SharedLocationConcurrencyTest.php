@@ -36,7 +36,7 @@ class SharedLocationConcurrencyTest extends TestCase
         'location_purposes',
         'number_sequence_profiles',
         'party_types',
-        ModuleMigrator::TABEL_RIWAYAT,
+        ModuleMigrator::HISTORY_TABLE,
     ];
 
     protected function tearDown(): void

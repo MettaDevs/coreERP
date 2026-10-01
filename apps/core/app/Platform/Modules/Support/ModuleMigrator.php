@@ -21,11 +21,11 @@ use Illuminate\Filesystem\Filesystem;
  */
 final class ModuleMigrator
 {
-    public const TABEL_RIWAYAT = 'core_module_migrations';
+    public const HISTORY_TABLE = 'core_module_migrations';
 
     public function __construct(
         private readonly DatabaseManager $database,
-        private readonly Filesystem $berkas,
+        private readonly Filesystem $file,
     ) {}
 
     /**
@@ -33,21 +33,21 @@ final class ModuleMigrator
      *
      * @return list<string> nama migration yang baru saja dijalankan; kosong berarti sudah mutakhir
      */
-    public function naik(ModuleManifest $module, ?string $koneksi = null): array
+    public function naik(ModuleManifest $module, ?string $connection = null): array
     {
-        $migrator = $this->migrator($module, $koneksi);
+        $migrator = $this->migrator($module, $connection);
 
         if (! $migrator->repositoryExists()) {
             $migrator->getRepository()->createRepository();
         }
 
-        $sebelum = $migrator->getRepository()->getRan();
+        $before = $migrator->getRepository()->getRan();
         // Migrator ini dibuat tanpa dispatcher, jadi event migrasi yang mematikan log di migrate Core tidak
         // menyala di sini; log perubahan dimatikan langsung.
-        ChangeLogSwitch::pausedOn($koneksi, fn () => $migrator->run([$module->folderMigrasi()]));
-        $sesudah = $migrator->getRepository()->getRan();
+        ChangeLogSwitch::pausedOn($connection, fn () => $migrator->run([$module->migrationFolder()]));
+        $after = $migrator->getRepository()->getRan();
 
-        return array_values(array_diff($sesudah, $sebelum));
+        return array_values(array_diff($after, $before));
     }
 
     /**
@@ -55,30 +55,30 @@ final class ModuleMigrator
      *
      * @return list<string>
      */
-    public function sudahJalan(ModuleManifest $module, ?string $koneksi = null): array
+    public function ran(ModuleManifest $module, ?string $connection = null): array
     {
-        $migrator = $this->migrator($module, $koneksi);
+        $migrator = $this->migrator($module, $connection);
 
         if (! $migrator->repositoryExists()) {
             return [];
         }
 
-        /** @var list<string> $jalan */
-        $jalan = $migrator->getRepository()->getRan();
+        /** @var list<string> $ran */
+        $ran = $migrator->getRepository()->getRan();
 
-        return $jalan;
+        return $ran;
     }
 
-    private function migrator(ModuleManifest $module, ?string $koneksi): Migrator
+    private function migrator(ModuleManifest $module, ?string $connection): Migrator
     {
         $migrator = new Migrator(
-            new ModuleMigrationRepository($this->database, self::TABEL_RIWAYAT, $module->id),
+            new ModuleMigrationRepository($this->database, self::HISTORY_TABLE, $module->id),
             $this->database,
-            $this->berkas,
+            $this->file,
         );
 
-        if ($koneksi !== null) {
-            $migrator->setConnection($koneksi);
+        if ($connection !== null) {
+            $migrator->setConnection($connection);
         }
 
         return $migrator;

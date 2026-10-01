@@ -30,7 +30,7 @@ namespace App\Foundation\Workflow\Support;
  */
 final class DefinisiParameterWorkflow
 {
-    public const LARANG_PERSETUJUAN_PENGAJU = 'disallow_approval_by_submitter';
+    public const PREVENT_SUBMITTER_APPROVAL = 'disallow_approval_by_submitter';
 
     /**
      * @var array<string, array{tipe: 'boolean', bawaan: bool, label: string, penjelasan: string}>
@@ -38,8 +38,8 @@ final class DefinisiParameterWorkflow
      * `tipe` baru mengenal `boolean` karena baru itu yang dibutuhkan. Menambah tipe lain adalah
      * pekerjaan tersendiri: ia menyentuh pembacaan, validasi, dan kendali layarnya sekaligus.
      */
-    public const DAFTAR = [
-        self::LARANG_PERSETUJUAN_PENGAJU => [
+    public const DEFINITIONS = [
+        self::PREVENT_SUBMITTER_APPROVAL => [
             'tipe' => 'boolean',
 
             // Bawaannya sama dengan D365: pengaju **boleh** menyetujui kecuali tenant melarang.
@@ -54,17 +54,17 @@ final class DefinisiParameterWorkflow
         ],
     ];
 
-    public static function dikenal(string $kode): bool
+    public static function known(string $code): bool
     {
-        return array_key_exists($kode, self::DAFTAR);
+        return array_key_exists($code, self::DEFINITIONS);
     }
 
     /** @return array<string, bool> */
-    public static function bawaan(): array
+    public static function default(): array
     {
         return array_map(
-            static fn (array $definisi): bool => $definisi['bawaan'],
-            self::DAFTAR,
+            static fn (array $definition): bool => $definition['bawaan'],
+            self::DEFINITIONS,
         );
     }
 }

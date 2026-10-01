@@ -85,7 +85,7 @@ final class PemindaiModul
             $nama = basename($folder);
             $migrations = $folder.'/database/migrations';
 
-            if ($dipindah->menandai($nama) || ! is_dir($migrations)) {
+            if ($dipindah->marks($nama) || ! is_dir($migrations)) {
                 continue;
             }
 

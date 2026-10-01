@@ -39,30 +39,30 @@ final class PelaporKesalahan
      * memori habis. Kemungkinan terbesarnya justru pada keadaan yang paling butuh laporan —
      * database mati, disk penuh — jadi penjaga ini bukan kehati-hatian teoretis.
      */
-    private static bool $sedangMelapor = false;
+    private static bool $reporting = false;
 
-    public static function laporkan(Throwable $kesalahan, ?Request $permintaan = null): void
+    public static function report(Throwable $error, ?Request $request = null): void
     {
-        if (self::$sedangMelapor) {
+        if (self::$reporting) {
             return;
         }
 
-        self::$sedangMelapor = true;
+        self::$reporting = true;
 
         try {
-            if (! LaporanKesalahan::layakDilaporkan($kesalahan)) {
+            if (! LaporanKesalahan::isReportable($error)) {
                 return;
             }
 
-            $laporan = LaporanKesalahan::dari($kesalahan, $permintaan);
+            $report = LaporanKesalahan::from($error, $request);
 
-            self::keBerkas($laporan);
-            self::keSigNoz($laporan);
-            PengirimDiscord::kirim($laporan);
+            self::toFile($report);
+            self::toSigNoz($report);
+            PengirimDiscord::send($report);
         } catch (Throwable) {
             // Sengaja dibiarkan. Lihat catatan kelas.
         } finally {
-            self::$sedangMelapor = false;
+            self::$reporting = false;
         }
     }
 
@@ -72,7 +72,7 @@ final class PelaporKesalahan
      * Dipasang {@see LampirkanKonteksJejak}, yang terdaftar global dan
      * karena itu dilewati setiap permintaan HTTP — dan hanya permintaan HTTP.
      */
-    public const PENANDA_HTTP = 'observabilitas.permintaan_http';
+    public const HTTP_MARKER = 'observabilitas.permintaan_http';
 
     /**
      * Membentuk permintaan yang pantas dilampirkan pada laporan.
@@ -94,43 +94,43 @@ final class PelaporKesalahan
      * Penanda dipasang pada objek permintaannya sendiri, bukan pada keadaan statis, supaya
      * ia ikut mati bersama permintaan itu dan tidak pernah bocor ke pekerjaan berikutnya.
      */
-    public static function permintaanSaatIni(): ?Request
+    public static function currentRequest(): ?Request
     {
         try {
-            $permintaan = request();
+            $request = request();
 
-            return $permintaan->attributes->get(self::PENANDA_HTTP) === true ? $permintaan : null;
+            return $request->attributes->get(self::HTTP_MARKER) === true ? $request : null;
         } catch (Throwable) {
             return null;
         }
     }
 
-    private static function keBerkas(LaporanKesalahan $laporan): void
+    private static function toFile(LaporanKesalahan $report): void
     {
         try {
-            BerkasLaporan::tulis($laporan->keTeks());
+            BerkasLaporan::write($report->toText());
         } catch (Throwable) {
             // Collector yang mati tidak boleh ikut menghapus berkasnya, dan sebaliknya.
         }
     }
 
-    private static function keSigNoz(LaporanKesalahan $laporan): void
+    private static function toSigNoz(LaporanKesalahan $report): void
     {
         try {
             if (! class_exists(Globals::class)) {
                 return;
             }
 
-            $atribut = array_filter(
-                $laporan->keAtribut(),
-                static fn (mixed $nilai): bool => $nilai !== null && $nilai !== '',
+            $attributes = array_filter(
+                $report->toAttributes(),
+                static fn (mixed $value): bool => $value !== null && $value !== '',
             );
 
             // Badan catatan sengaja satu baris; strukturnya ada di atribut, karena itu yang
             // bisa disaring. Blok utuhnya ikut sebagai satu atribut supaya panel detail di
             // SigNoz menampilkan persis yang tertulis di berkas — dua tujuan, satu isi, tidak
             // ada versi yang berbeda untuk dibandingkan saat insiden.
-            $atribut['coreerp.laporan'] = $laporan->keTeks();
+            $attributes['coreerp.laporan'] = $report->toText();
 
             Globals::loggerProvider()
                 ->getLogger('coreerp.backend')
@@ -138,8 +138,8 @@ final class PelaporKesalahan
                 ->setTimestamp((int) (microtime(true) * 1_000_000_000))
                 ->setSeverityNumber(17)
                 ->setSeverityText('ERROR')
-                ->setBody($laporan->ringkasan())
-                ->setAttributes($atribut)
+                ->setBody($report->summary())
+                ->setAttributes($attributes)
                 ->emit();
         } catch (Throwable) {
             // Ketika SDK mati, `loggerProvider()` mengembalikan penyedia tanpa-operasi dan

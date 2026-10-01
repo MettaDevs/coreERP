@@ -18,15 +18,15 @@ use Illuminate\Contracts\Container\Container;
  */
 final class TenantRunnerCore implements TenantRunner
 {
-    public function __construct(private readonly Container $wadah) {}
+    public function __construct(private readonly Container $container) {}
 
     /**
      * @template T
      *
-     * @param  callable(): T  $aksi
+     * @param  callable(): T  $action
      * @return T
      */
-    public function runFor(string $tenantId, callable $aksi): mixed
+    public function runFor(string $tenantId, callable $action): mixed
     {
         // Ikatan sebelumnya dipersempit ke `string|null`, lalu dipulihkan lewat `instance()`
         // juga ketika sebelumnya memang tidak ada — antarmuka container tidak punya cara
@@ -34,14 +34,14 @@ final class TenantRunnerCore implements TenantRunner
         // menolak apa pun yang bukan string berisi, jadi null dan nilai bertipe lain sama-sama
         // berarti "tidak ada tenant aktif". Menyimpan nilai asing kembali apa adanya hanya
         // memindahkannya ke pekerjaan berikutnya.
-        $terikat = $this->wadah->bound(TenantScope::KUNCI) ? $this->wadah->make(TenantScope::KUNCI) : null;
-        $sebelumnya = is_string($terikat) ? $terikat : null;
-        $this->wadah->instance(TenantScope::KUNCI, $tenantId);
+        $bound = $this->container->bound(TenantScope::KEY) ? $this->container->make(TenantScope::KEY) : null;
+        $previous = is_string($bound) ? $bound : null;
+        $this->container->instance(TenantScope::KEY, $tenantId);
 
         try {
-            return $aksi();
+            return $action();
         } finally {
-            $this->wadah->instance(TenantScope::KUNCI, $sebelumnya);
+            $this->container->instance(TenantScope::KEY, $previous);
         }
     }
 }

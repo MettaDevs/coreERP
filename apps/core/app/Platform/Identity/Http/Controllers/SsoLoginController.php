@@ -107,13 +107,13 @@ class SsoLoginController extends Controller
         // Undangan yang tidak dikenal, anonim, sudah habis, atau milik tenant lain sama-sama
         // dijawab satu kalimat: yang menukarkan tidak perlu — dan tidak boleh — tahu mana di antara
         // keempatnya yang terjadi.
-        $dapatDitukar = $invitation instanceof InvitationCode
+        $redeemable = $invitation instanceof InvitationCode
             && $invitation->isSsoBound()
             && $invitation->isOpen()
             && $invitation->sso_issuer === $this->provider->issuer()
             && $invitation->tenant_id === $environment->tenant_id;
 
-        if (! $dapatDitukar) {
+        if (! $redeemable) {
             return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE);
         }
 
@@ -479,9 +479,9 @@ class SsoLoginController extends Controller
                 }
 
                 $user = $attempt->user_id !== null ? User::query()->find($attempt->user_id) : null;
-                $akunBaru = ! $user instanceof User;
+                $newAccount = ! $user instanceof User;
 
-                if ($akunBaru) {
+                if ($newAccount) {
                     $user = User::create([
                         'name' => $invitation->sso_name_at_invite ?? (string) $invitation->sso_email_at_invite,
                         'email' => Str::lower((string) ($attempt->subject_email ?? $invitation->sso_email_at_invite)),
@@ -511,7 +511,7 @@ class SsoLoginController extends Controller
                         'invitation_id' => $invitation->id,
                         'user_id' => $user->id,
                         'subject' => $attempt->subject,
-                        'akun_baru' => $akunBaru,
+                        'akun_baru' => $newAccount,
                     ], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                     'updated_at' => now(),

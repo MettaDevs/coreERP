@@ -37,18 +37,18 @@ final class VendorController extends Controller
             'legal_entity' => ['nullable', 'string', 'max:26'],
             'status' => ['nullable', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
         ]);
-        $kata = trim((string) ($filter['q'] ?? ''));
-        $pola = '%'.addcslashes($kata, '\\%_').'%';
+        $keyword = trim((string) ($filter['q'] ?? ''));
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
 
         $vendors = Vendor::query()
             ->with('party:id,name,type')
             ->where('tenant_id', $tenant)
             ->when(($filter['legal_entity'] ?? null) !== null, fn ($query) => $query->where('legal_entity_id', $filter['legal_entity']))
             ->when(($filter['status'] ?? null) !== null, fn ($query) => $query->where('status', $filter['status']))
-            ->when($kata !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
-                ->where('number', 'ilike', $pola)
-                ->orWhere('tax_number', 'ilike', $pola)
-                ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pola))))
+            ->when($keyword !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
+                ->where('number', 'ilike', $pattern)
+                ->orWhere('tax_number', 'ilike', $pattern)
+                ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pattern))))
             ->orderBy('number')
             ->paginate(self::PER_PAGE)
             ->withQueryString()
@@ -56,10 +56,10 @@ final class VendorController extends Controller
 
         return Inertia::render('foundation/vendor/vendors', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
-            'filters' => ['q' => $kata, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
+            'filters' => ['q' => $keyword, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'vendors' => $vendors,
-            'manualNumbers' => $this->nomorManualDiizinkan($tenant),
+            'manualNumbers' => $this->manualNumberAllowed($tenant),
         ]);
     }
 
@@ -67,12 +67,12 @@ final class VendorController extends Controller
     public function partyOptions(Request $request): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
-        $kata = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
+        $keyword = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
 
         return response()->json(['data' => Party::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('status', 'active')
-            ->when($kata !== '', fn ($query) => $query->where('search_name', 'like', '%'.addcslashes(Party::searchName($kata), '\\%_').'%'))
+            ->when($keyword !== '', fn ($query) => $query->where('search_name', 'like', '%'.addcslashes(Party::searchName($keyword), '\\%_').'%'))
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'name', 'type'])
@@ -80,7 +80,7 @@ final class VendorController extends Controller
             ->values()]);
     }
 
-    public function store(Request $request, SaveVendor $simpan): JsonResponse
+    public function store(Request $request, SaveVendor $saveVendor): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
         $data = $request->validate([
@@ -96,10 +96,10 @@ final class VendorController extends Controller
             'party_name.required_without' => 'Pilih pihak dari buku alamat atau ketik nama vendor baru.',
             'tax_number.regex' => 'NPWP hanya boleh angka, titik, dan tanda hubung.',
         ]);
-        $kunci = $request->header('Idempotency-Key');
-        $kunci = is_string($kunci) && preg_match('/^[A-Za-z0-9._:-]{8,120}$/', $kunci) === 1 ? $kunci : (string) Str::ulid();
+        $key = $request->header('Idempotency-Key');
+        $key = is_string($key) && preg_match('/^[A-Za-z0-9._:-]{8,120}$/', $key) === 1 ? $key : (string) Str::ulid();
 
-        $vendor = $simpan->create($membership, [
+        $vendor = $saveVendor->create($membership, [
             'legal_entity_id' => $data['legal_entity_id'],
             'party_id' => $data['party_id'] ?? null,
             'party_type' => $data['party_type'] ?? null,
@@ -107,12 +107,12 @@ final class VendorController extends Controller
             'number' => ($data['number'] ?? null) === null ? null : strtoupper(trim((string) $data['number'])),
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => $data['status'] ?? Vendor::ACTIVE,
-        ], $kunci);
+        ], $key);
 
         return response()->json(['data' => $this->present($vendor->refresh()->load('party'))], $vendor->wasRecentlyCreated ? 201 : 200);
     }
 
-    public function update(Request $request, Vendor $vendor, SaveVendor $simpan): JsonResponse
+    public function update(Request $request, Vendor $vendor, SaveVendor $saveVendor): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
         abort_unless($vendor->tenant_id === $membership->tenant_id, 404);
@@ -122,7 +122,7 @@ final class VendorController extends Controller
             'status' => ['required', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
         ], ['tax_number.regex' => 'NPWP hanya boleh angka, titik, dan tanda hubung.']);
 
-        $vendor = $simpan->update($membership, $vendor, [
+        $vendor = $saveVendor->update($membership, $vendor, [
             'name' => trim((string) $data['name']),
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => (string) $data['status'],
@@ -131,31 +131,31 @@ final class VendorController extends Controller
         return response()->json(['data' => $this->present($vendor->load('party'))]);
     }
 
-    private function npwp(?string $nilai): ?string
+    private function npwp(?string $value): ?string
     {
-        $bersih = trim((string) $nilai);
+        $clean = trim((string) $value);
 
-        return $bersih === '' ? null : $bersih;
+        return $clean === '' ? null : $clean;
     }
 
     /**
      * Apakah nomor vendor boleh diketik manual. Urutan yang belum lahir memakai bawaan Core
      * (boleh manual); sesudah lahir, setelan tenant di layar Nomor dokumen yang menentukan.
      */
-    private function nomorManualDiizinkan(string $tenantId): bool
+    private function manualNumberAllowed(string $tenantId): bool
     {
-        $referensi = NumberSequenceReference::query()
+        $reference = NumberSequenceReference::query()
             ->where('app_id', CoreNumberSequences::APP_ID)
             ->where('code', Vendor::NUMBER_SEQUENCE)
             ->value('id');
         // Referensi yang belum ada akan dipasang dengan bawaan Core saat vendor pertama disimpan,
         // dan bawaan itu boleh manual.
-        if ($referensi === null) {
+        if ($reference === null) {
             return true;
         }
-        $urutan = TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $referensi)->first(['allow_manual']);
+        $sequence = TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $reference)->first(['allow_manual']);
 
-        return $urutan === null || $urutan->allow_manual;
+        return $sequence === null || $sequence->allow_manual;
     }
 
     /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
@@ -176,10 +176,10 @@ final class VendorController extends Controller
             ->with('legalEntity:organization_id,company_code')
             ->orderBy('name')
             ->get()
-            ->map(static fn (Organization $organisasi): array => [
-                'id' => $organisasi->id,
-                'name' => (string) $organisasi->name,
-                'company_code' => $organisasi->legalEntity?->company_code,
+            ->map(static fn (Organization $organization): array => [
+                'id' => $organization->id,
+                'name' => (string) $organization->name,
+                'company_code' => $organization->legalEntity?->company_code,
             ])
             ->all());
     }

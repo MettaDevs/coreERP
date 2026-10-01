@@ -27,25 +27,25 @@ final class EditionModulesCommand extends Command
 
     protected $description = 'Cetak daftar modul yang ikut ke dalam image yang dibagikan ke klien';
 
-    public function handle(EditionModules $modul): int
+    public function handle(EditionModules $module): int
     {
         try {
-            $daftar = $modul->daftar();
-        } catch (RuntimeException $kesalahan) {
-            $this->components->error($kesalahan->getMessage());
+            $list = $module->list();
+        } catch (RuntimeException $error) {
+            $this->components->error($error->getMessage());
 
             return self::FAILURE;
         }
 
         if ($this->option('daftar')) {
-            foreach ($daftar as $id) {
+            foreach ($list as $id) {
                 $this->line($id);
             }
 
             return self::SUCCESS;
         }
 
-        if ($daftar === []) {
+        if ($list === []) {
             // Bukan kesalahan, tetapi juga bukan keadaan yang normal hari ini: seluruh modul di
             // repo ternyata bahan uji. Dikatakan, bukan dibiarkan terbaca sebagai daftar kosong.
             $this->components->warn('Tidak satu pun modul ikut ke dalam image; seluruh modul di repo adalah bahan uji internal.');
@@ -53,8 +53,8 @@ final class EditionModulesCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->components->info(sprintf('Image memuat %d modul:', count($daftar)));
-        $this->components->bulletList($daftar);
+        $this->components->info(sprintf('Image memuat %d modul:', count($list)));
+        $this->components->bulletList($list);
 
         return self::SUCCESS;
     }

@@ -133,7 +133,7 @@ class OutboundDisarmTest extends TestCase
         $this->activate($this->sandbox());
         Http::fake();
 
-        PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
+        PengirimDiscord::send(LaporanKesalahan::from(new RuntimeException('gagal'), null));
 
         Http::assertNothingSent();
         $this->assertSame([], $this->throttleMarker(), 'Penjeda sudah tersentuh, jadi yang menahan '
@@ -146,7 +146,7 @@ class OutboundDisarmTest extends TestCase
         $this->activate($this->production());
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
-        PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
+        PengirimDiscord::send(LaporanKesalahan::from(new RuntimeException('gagal'), null));
 
         Http::assertSent(fn ($request) => $request->url() === self::WEBHOOK);
     }
@@ -185,7 +185,7 @@ class OutboundDisarmTest extends TestCase
     {
         $this->sandbox();
         $this->app->forgetInstance(ActiveEnvironment::class);
-        $this->app->instance(TenantScope::KUNCI, $this->tenantId);
+        $this->app->instance(TenantScope::KEY, $this->tenantId);
         Http::fake();
 
         $this->expectException(OutboundRefused::class);

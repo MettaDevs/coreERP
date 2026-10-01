@@ -41,9 +41,9 @@ final class JejakAktif
      * tampil sebagai kolom yang ada tetapi tidak berarti apa-apa — lebih menyesatkan
      * daripada kolom yang tidak ada sama sekali.
      *
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
-    public static function tempelAtribut(array $atribut): void
+    public static function setAttributes(array $attributes): void
     {
         try {
             if (! class_exists(Span::class)) {
@@ -56,14 +56,14 @@ final class JejakAktif
                 return;
             }
 
-            foreach ($atribut as $kunci => $nilai) {
-                if ($kunci === '' || $nilai === null || $nilai === '') {
+            foreach ($attributes as $key => $value) {
+                if ($key === '' || $value === null || $value === '') {
                     continue;
                 }
 
-                $span->setAttribute($kunci, is_bool($nilai) || is_int($nilai) || is_float($nilai)
-                    ? $nilai
-                    : (string) $nilai);
+                $span->setAttribute($key, is_bool($value) || is_int($value) || is_float($value)
+                    ? $value
+                    : (string) $value);
             }
         } catch (Throwable) {
             // Sengaja dibiarkan. Lihat catatan kelas: instrumentasi tidak pernah menjadi
@@ -84,32 +84,32 @@ final class JejakAktif
      * tidak menulis apa-apa: ia tampak seperti id sungguhan, dan orang yang mencarinya akan
      * menemukan setiap laporan sekaligus, yang artinya tidak menemukan apa pun.
      */
-    public static function idJejak(): ?string
+    public static function traceId(): ?string
     {
-        return self::konteks(fn (SpanContextInterface $konteks): string => $konteks->getTraceId());
+        return self::context(fn (SpanContextInterface $context): string => $context->getTraceId());
     }
 
     /**
      * Id span yang sedang aktif. Aturan kesahihannya sama seperti {@see self::idJejak()}.
      */
-    public static function idSpan(): ?string
+    public static function spanId(): ?string
     {
-        return self::konteks(fn (SpanContextInterface $konteks): string => $konteks->getSpanId());
+        return self::context(fn (SpanContextInterface $context): string => $context->getSpanId());
     }
 
     /**
-     * @param  callable(SpanContextInterface): string  $ambil
+     * @param  callable(SpanContextInterface): string  $fetch
      */
-    private static function konteks(callable $ambil): ?string
+    private static function context(callable $fetch): ?string
     {
         try {
             if (! class_exists(Span::class)) {
                 return null;
             }
 
-            $konteks = Span::getCurrent()->getContext();
+            $context = Span::getCurrent()->getContext();
 
-            return $konteks->isValid() ? $ambil($konteks) : null;
+            return $context->isValid() ? $fetch($context) : null;
         } catch (Throwable) {
             return null;
         }
@@ -122,7 +122,7 @@ final class JejakAktif
      * jejak tumpukan sebagai event, tetapi span-nya tetap berstatus "Unset" dan tidak
      * ikut terhitung pada grafik tingkat kesalahan. `setStatus` yang membuatnya terhitung.
      */
-    public static function catatKesalahan(Throwable $kesalahan): void
+    public static function recordException(Throwable $error): void
     {
         try {
             if (! class_exists(Span::class)) {
@@ -135,8 +135,8 @@ final class JejakAktif
                 return;
             }
 
-            $span->recordException($kesalahan);
-            $span->setStatus(StatusCode::STATUS_ERROR, $kesalahan->getMessage());
+            $span->recordException($error);
+            $span->setStatus(StatusCode::STATUS_ERROR, $error->getMessage());
         } catch (Throwable) {
             // Sengaja dibiarkan. Lihat catatan kelas.
         }

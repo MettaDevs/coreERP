@@ -36,14 +36,14 @@ final class KeamananSesiCore extends MiddlewareAuthSecurityStrategy
 {
     public function __construct()
     {
-        $namaCookie = config('session.cookie');
+        $cookieName = config('session.cookie');
 
         parent::__construct(
             ['auth', 'auth:*'],
             SecurityScheme::apiKey(
                 'cookie',
-                is_string($namaCookie) && $namaCookie !== ''
-                    ? $namaCookie
+                is_string($cookieName) && $cookieName !== ''
+                    ? $cookieName
                     : Str::slug((string) config('app.name', 'laravel')).'-session',
             )
                 ->as('sessionCookie')

@@ -18,26 +18,26 @@ final class DataPolicyAccessResolver
      *
      * @var array<string, array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>>
      */
-    private array $ingatan = [];
+    private array $cache = [];
 
     /**
      * @return array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>
      */
     public function resolve(TenantMembership $membership): array
     {
-        $kunci = (string) $membership->id;
+        $key = (string) $membership->id;
 
-        if (array_key_exists($kunci, $this->ingatan)) {
-            return $this->ingatan[$kunci];
+        if (array_key_exists($key, $this->cache)) {
+            return $this->cache[$key];
         }
 
-        return $this->ingatan[$kunci] = $this->hitung($membership);
+        return $this->cache[$key] = $this->compute($membership);
     }
 
     /**
      * @return array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>
      */
-    private function hitung(TenantMembership $membership): array
+    private function compute(TenantMembership $membership): array
     {
         $now = now();
         $scopes = DB::table('role_assignment_data_policy_scopes as scope')

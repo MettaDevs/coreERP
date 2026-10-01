@@ -30,13 +30,13 @@ class PelaporKesalahanTest extends TestCase
         // Berkas laporan dibagi seluruh worker ParaTest yang berjalan pada hari dan peran yang
         // sama. Menghapusnya akan menghapus laporan milik test lain yang sedang berjalan, dan
         // sebaliknya. Yang dicatat karena itu panjangnya, bukan keberadaannya.
-        $this->panjangAwal = is_file(BerkasLaporan::jalur()) ? (int) filesize(BerkasLaporan::jalur()) : 0;
+        $this->panjangAwal = is_file(BerkasLaporan::path()) ? (int) filesize(BerkasLaporan::path()) : 0;
     }
 
     /** Hanya bagian yang ditambahkan test ini. */
     private function tambahan(): string
     {
-        $berkas = BerkasLaporan::jalur();
+        $berkas = BerkasLaporan::path();
 
         if (! is_file($berkas)) {
             return '';
@@ -47,7 +47,7 @@ class PelaporKesalahanTest extends TestCase
 
     public function test_laporan_ditulis_ke_berkasnya_sendiri(): void
     {
-        PelaporKesalahan::laporkan(
+        PelaporKesalahan::report(
             new RuntimeException('gagal menyimpan'),
             Request::create('https://erp.test/x', 'POST'),
         );
@@ -63,7 +63,7 @@ class PelaporKesalahanTest extends TestCase
 
     public function test_kesalahan_4xx_tidak_menghasilkan_berkas(): void
     {
-        PelaporKesalahan::laporkan(new NotFoundHttpException, Request::create('https://erp.test/hilang', 'GET'));
+        PelaporKesalahan::report(new NotFoundHttpException, Request::create('https://erp.test/hilang', 'GET'));
 
         $this->assertSame('', $this->tambahan(), '404 tidak boleh menambah satu baris pun ke berkas laporan.');
     }
@@ -72,8 +72,8 @@ class PelaporKesalahanTest extends TestCase
     {
         // Penjaga masuk-ulang yang tidak pernah dilepas mematikan seluruh pelaporan sesudah
         // kesalahan pertama — kegagalan paling sulit dilihat, karena tandanya adalah ketiadaan.
-        PelaporKesalahan::laporkan(new RuntimeException('pertama'), null);
-        PelaporKesalahan::laporkan(new RuntimeException('kedua'), null);
+        PelaporKesalahan::report(new RuntimeException('pertama'), null);
+        PelaporKesalahan::report(new RuntimeException('kedua'), null);
 
         $isi = $this->tambahan();
         $this->assertStringContainsString('pertama', $isi);
@@ -86,7 +86,7 @@ class PelaporKesalahanTest extends TestCase
         // bukan isinya, melainkan bahwa tidak ada apa pun yang keluar dari pelapor.
         $permintaan = Request::create('https://erp.test/x', 'GET');
 
-        PelaporKesalahan::laporkan(new RuntimeException('kesalahan asli'), $permintaan);
+        PelaporKesalahan::report(new RuntimeException('kesalahan asli'), $permintaan);
 
         $this->assertTrue(true, 'tidak ada lemparan yang lolos dari pelapor');
     }
@@ -96,6 +96,6 @@ class PelaporKesalahanTest extends TestCase
         // Di dalam pekerja antrean `request()` tetap mengembalikan objek — permintaan tiruan
         // yang `fullUrl()`-nya `http://localhost` dan tidak berarti apa-apa. Melaporkannya
         // sebagai permintaan sungguhan menghasilkan baris yang tampak berisi tetapi salah.
-        $this->assertNull(PelaporKesalahan::permintaanSaatIni(), 'test berjalan di konsol');
+        $this->assertNull(PelaporKesalahan::currentRequest(), 'test berjalan di konsol');
     }
 }

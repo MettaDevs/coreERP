@@ -41,7 +41,7 @@ final class MoneyPrecision
     public const MAX_UNIT_AMOUNT_DECIMALS = 6;
 
     /** @var array<string, array{amount_decimals: int, unit_amount_decimals: int, is_default: bool}> */
-    private array $ingatan = [];
+    private array $cache = [];
 
     /**
      * @return array{amount_decimals: int, unit_amount_decimals: int, is_default: bool}
@@ -50,31 +50,31 @@ final class MoneyPrecision
      */
     public function forCurrency(string $tenantId, string $currencyCode): array
     {
-        $kode = strtoupper($currencyCode);
-        $kunci = $tenantId.'|'.$kode;
-        if (isset($this->ingatan[$kunci])) {
-            return $this->ingatan[$kunci];
+        $code = strtoupper($currencyCode);
+        $key = $tenantId.'|'.$code;
+        if (isset($this->cache[$key])) {
+            return $this->cache[$key];
         }
 
-        $baris = CurrencyPrecision::query()
+        $row = CurrencyPrecision::query()
             ->where('tenant_id', $tenantId)
-            ->where('currency_code', $kode)
+            ->where('currency_code', $code)
             ->first(['amount_decimals', 'unit_amount_decimals']);
 
-        if ($baris !== null) {
-            return $this->ingatan[$kunci] = [
-                'amount_decimals' => $baris->amount_decimals,
-                'unit_amount_decimals' => $baris->unit_amount_decimals,
+        if ($row !== null) {
+            return $this->cache[$key] = [
+                'amount_decimals' => $row->amount_decimals,
+                'unit_amount_decimals' => $row->unit_amount_decimals,
                 'is_default' => false,
             ];
         }
 
-        $bawaan = self::DEFAULTS[$kode] ?? throw new RuntimeException(sprintf(
+        $default = self::DEFAULTS[$code] ?? throw new RuntimeException(sprintf(
             'Presisi mata uang %s belum disetel. Atur di Data referensi › Mata uang.',
-            $kode,
+            $code,
         ));
 
-        return $this->ingatan[$kunci] = [...$bawaan, 'is_default' => true];
+        return $this->cache[$key] = [...$default, 'is_default' => true];
     }
 
     public function amountDecimals(string $tenantId, string $currencyCode): int
@@ -96,7 +96,7 @@ final class MoneyPrecision
     /** Melupakan presisi yang sudah dibaca, setelah tenant mengubahnya dalam proses yang sama. */
     public function forget(): void
     {
-        $this->ingatan = [];
+        $this->cache = [];
     }
 
     /**

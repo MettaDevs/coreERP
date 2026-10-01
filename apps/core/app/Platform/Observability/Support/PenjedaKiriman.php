@@ -36,26 +36,26 @@ final class PenjedaKiriman
      * penuh — jawabannya `true`. Peringatan yang dobel masih jauh lebih baik daripada
      * peringatan yang hilang karena mekanisme peredamnya rusak.
      */
-    public static function boleh(LaporanKesalahan $laporan): bool
+    public static function allows(LaporanKesalahan $report): bool
     {
         try {
-            $jeda = self::jedaDetik();
+            $delay = self::pauseSeconds();
 
-            if ($jeda < 1) {
+            if ($delay < 1) {
                 return true;
             }
 
-            $berkas = self::folder().'/'.self::sidikJari($laporan);
+            $file = self::folder().'/'.self::fingerprint($report);
 
-            $terakhir = @filemtime($berkas);
+            $last = @filemtime($file);
 
-            if ($terakhir !== false && (time() - $terakhir) < $jeda) {
+            if ($last !== false && (time() - $last) < $delay) {
                 return false;
             }
 
-            self::siapkanFolder(self::folder());
-            @touch($berkas);
-            self::sapuBerkasLama(self::folder());
+            self::prepareFolder(self::folder());
+            @touch($file);
+            self::sweepOldFiles(self::folder());
 
             return true;
         } catch (Throwable) {
@@ -72,18 +72,18 @@ final class PenjedaKiriman
      * tidak pernah menjeda apa pun. Yang dipakai di sini sengaja lebih tumpul: kalau tempatnya
      * sama, anggap itu bug yang sama.
      */
-    private static function sidikJari(LaporanKesalahan $laporan): string
+    private static function fingerprint(LaporanKesalahan $report): string
     {
-        $atribut = $laporan->keAtribut();
+        $attributes = $report->toAttributes();
 
         return sha1(implode('|', [
-            (string) ($atribut['exception.type'] ?? ''),
-            (string) ($atribut['code.filepath'] ?? ''),
-            (string) ($atribut['code.lineno'] ?? ''),
+            (string) ($attributes['exception.type'] ?? ''),
+            (string) ($attributes['code.filepath'] ?? ''),
+            (string) ($attributes['code.lineno'] ?? ''),
         ]));
     }
 
-    private static function jedaDetik(): int
+    private static function pauseSeconds(): int
     {
         return (int) config('coreerp.discord.jeda_detik', 60);
     }
@@ -93,7 +93,7 @@ final class PenjedaKiriman
         return storage_path('logs/.penjeda-kiriman');
     }
 
-    private static function siapkanFolder(string $folder): void
+    private static function prepareFolder(string $folder): void
     {
         if (! is_dir($folder)) {
             @mkdir($folder, 0o775, true);
@@ -107,13 +107,13 @@ final class PenjedaKiriman
      * atas jeda mana pun yang masuk akal, jadi penyapuan tidak pernah memulihkan sebutan yang
      * mestinya masih tertahan.
      */
-    private static function sapuBerkasLama(string $folder): void
+    private static function sweepOldFiles(string $folder): void
     {
-        $batas = time() - 86400;
+        $limit = time() - 86400;
 
-        foreach (glob($folder.'/*') ?: [] as $berkas) {
-            if (is_file($berkas) && (@filemtime($berkas) ?: 0) < $batas) {
-                @unlink($berkas);
+        foreach (glob($folder.'/*') ?: [] as $file) {
+            if (is_file($file) && (@filemtime($file) ?: 0) < $limit) {
+                @unlink($file);
             }
         }
     }

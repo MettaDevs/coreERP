@@ -35,14 +35,14 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_module_tidak_menyebut_namespace_module_lain(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::bawaan();
+        $dipindah = ModulSedangDipindah::default();
 
         $pelanggaran = [];
         $berkasDiperiksa = 0;
         $moduleDiperiksa = 0;
 
         foreach ($pemindai->folderModul() as $nama => $folder) {
-            if ($dipindah->menandai($nama)) {
+            if ($dipindah->marks($nama)) {
                 continue;
             }
 
@@ -62,13 +62,13 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_module_hanya_menyentuh_kelas_core_yang_dikontrakkan(): void
     {
         $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::bawaan();
+        $dipindah = ModulSedangDipindah::default();
 
         $pelanggaran = [];
         $moduleDiperiksa = 0;
 
         foreach ($pemindai->folderModul() as $nama => $folder) {
-            if ($dipindah->menandai($nama)) {
+            if ($dipindah->marks($nama)) {
                 continue;
             }
 

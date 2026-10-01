@@ -428,7 +428,7 @@ class WorkflowConfigurationTest extends TestCase
     {
         $tenantId = $this->owner->activeMembership()->tenant_id;
 
-        $kode = DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU;
+        $kode = DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL;
 
         $this->actingAs($this->owner)
             ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
@@ -480,7 +480,7 @@ class WorkflowConfigurationTest extends TestCase
                 $parameter = $page->toArray()['props']['parameters'];
             });
 
-        $baris = collect($parameter)->firstWhere('code', DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+        $baris = collect($parameter)->firstWhere('code', DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
 
         $this->assertNotNull($baris, 'Parameter yang terdaftar tidak muncul pada payload layar.');
         $this->assertSame('boolean', $baris['tipe']);
@@ -501,7 +501,7 @@ class WorkflowConfigurationTest extends TestCase
     public function test_changing_a_parameter_leaves_an_audit_trail(): void
     {
         $membership = $this->owner->activeMembership();
-        $kode = DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU;
+        $kode = DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL;
 
         $this->actingAs($this->owner)
             ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
@@ -547,7 +547,7 @@ class WorkflowConfigurationTest extends TestCase
         DB::table('workflow_parameters')->insert([
             'id' => (string) Str::ulid(),
             'tenant_id' => $tenantId,
-            'code' => DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU,
+            'code' => DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL,
             'value' => json_encode('mungkin', JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
@@ -556,14 +556,14 @@ class WorkflowConfigurationTest extends TestCase
         $this->expectException(UnexpectedValueException::class);
         $this->expectExceptionMessage('dijanjikan boolean oleh registry');
 
-        app(ParameterWorkflow::class)->boolean($tenantId, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+        app(ParameterWorkflow::class)->boolean($tenantId, DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL);
     }
 
     private function larangPersetujuanPengaju(string $tenantId): void
     {
-        app(ParameterWorkflow::class)->simpan(
+        app(ParameterWorkflow::class)->save(
             $tenantId,
-            DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU,
+            DefinisiParameterWorkflow::PREVENT_SUBMITTER_APPROVAL,
             true,
             (string) $this->owner->activeMembership()->id,
         );

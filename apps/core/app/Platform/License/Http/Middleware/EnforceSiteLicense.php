@@ -55,7 +55,7 @@ final class EnforceSiteLicense
      * Nama rute, bukan path, dengan alasan yang sama dengan `WajibGantiSandi`: path berubah ketika
      * seseorang merapikan URL, dan penjaga yang memakai path diam-diam berhenti melepaskan apa pun.
      */
-    private const RUTE_TERBUKA = [
+    private const OPEN_ROUTES = [
         'login',
         'login.store',
         'logout',
@@ -66,19 +66,19 @@ final class EnforceSiteLicense
     ];
 
     /** Permintaan yang bukan halaman. */
-    private const JALUR_TERBUKA = ['up', 'build/*', 'storage/*', '.well-known/*'];
+    private const OPEN_PATHS = ['up', 'build/*', 'storage/*', '.well-known/*'];
 
     public function __construct(private readonly SiteLicense $license) {}
 
     public function handle(Request $request, Closure $next): Response
     {
-        $pengguna = $request->user();
+        $user = $request->user();
 
-        if (! $pengguna instanceof User) {
+        if (! $user instanceof User) {
             return $next($request);
         }
 
-        if ($request->routeIs(...self::RUTE_TERBUKA) || $request->is(...self::JALUR_TERBUKA)) {
+        if ($request->routeIs(...self::OPEN_ROUTES) || $request->is(...self::OPEN_PATHS)) {
             return $next($request);
         }
 
@@ -86,7 +86,7 @@ final class EnforceSiteLicense
             return $next($request);
         }
 
-        if ($pengguna->providerAccess()->where('role', 'provider_admin')->exists()) {
+        if ($user->providerAccess()->where('role', 'provider_admin')->exists()) {
             return $next($request);
         }
 
@@ -99,11 +99,11 @@ final class EnforceSiteLicense
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $keadaan = $this->license->state();
+        $state = $this->license->state();
 
         return Inertia::render('platform/license/license-locked', [
-            'status' => $keadaan->status,
-            'validUntil' => $keadaan->validUntil,
+            'status' => $state->status,
+            'validUntil' => $state->validUntil,
         ])->toResponse($request)->setStatusCode(Response::HTTP_FORBIDDEN);
     }
 }

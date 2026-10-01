@@ -53,23 +53,23 @@ final class IntegrationClientController extends Controller
         ]);
     }
 
-    public function store(Request $request, PushDestination $tujuan, IntegrationClientAccounts $accounts): JsonResponse
+    public function store(Request $request, PushDestination $destination, IntegrationClientAccounts $accounts): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
-        $data = $this->validated($request, $membership->tenant_id, $tujuan);
-        $rahasia = Str::random(48);
-        $penanda = $data['delivery_mode'] === IntegrationClient::PUSH ? Str::random(48) : null;
+        $data = $this->validated($request, $membership->tenant_id, $destination);
+        $secret = Str::random(48);
+        $marker = $data['delivery_mode'] === IntegrationClient::PUSH ? Str::random(48) : null;
 
         $client = IntegrationClient::query()->create([
             'tenant_id' => $membership->tenant_id,
             'name' => $data['name'],
-            'token_digest' => IntegrationClient::digest($rahasia),
+            'token_digest' => IntegrationClient::digest($secret),
             'scopes' => $data['scopes'],
             'allowed_ips' => $data['allowed_ips'],
             'posting_type_prefixes' => $data['posting_type_prefixes'],
             'delivery_mode' => $data['delivery_mode'],
             'push_url' => $data['push_url'],
-            'signing_secret' => $penanda,
+            'signing_secret' => $marker,
             'status' => IntegrationClient::ACTIVE,
             'created_by_user_id' => (string) $request->user()?->getAuthIdentifier(),
         ]);
@@ -77,24 +77,24 @@ final class IntegrationClientController extends Controller
 
         return response()->json([
             'data' => $this->present($client->refresh()),
-            'token' => $client->id.'.'.$rahasia,
-            'signing_secret' => $penanda,
+            'token' => $client->id.'.'.$secret,
+            'signing_secret' => $marker,
         ], 201);
     }
 
-    public function update(Request $request, IntegrationClient $integrationClient, PushDestination $tujuan, IntegrationClientAccounts $accounts): JsonResponse
+    public function update(Request $request, IntegrationClient $integrationClient, PushDestination $destination, IntegrationClientAccounts $accounts): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
-        $client = $this->milik($membership, $integrationClient, aktif: true);
-        $data = $this->validated($request, $membership->tenant_id, $tujuan, $client);
+        $client = $this->ownedClient($membership, $integrationClient, active: true);
+        $data = $this->validated($request, $membership->tenant_id, $destination, $client);
 
         // Berpindah ke push menerbitkan signing secret baru; berpindah ke pull membuangnya, supaya
         // klien pull tidak menyimpan secret yang tidak dipakai siapa pun.
-        $penandaBaru = $data['delivery_mode'] === IntegrationClient::PUSH && $client->signing_secret === null
+        $newMarker = $data['delivery_mode'] === IntegrationClient::PUSH && $client->signing_secret === null
             ? Str::random(48)
             : null;
 
-        DB::transaction(function () use ($request, $client, $data, $penandaBaru): void {
+        DB::transaction(function () use ($request, $client, $data, $newMarker): void {
             RowVersion::claim($client, RowVersion::expected($request));
             $client->fill([
                 'name' => $data['name'],
@@ -105,19 +105,19 @@ final class IntegrationClientController extends Controller
                 'push_url' => $data['push_url'],
                 'signing_secret' => $data['delivery_mode'] === IntegrationClient::PULL
                     ? null
-                    : ($penandaBaru ?? $client->signing_secret),
+                    : ($newMarker ?? $client->signing_secret),
             ])->save();
         });
         // Nama akun aplikasinya ikut, supaya riwayat menyebut nama klien yang sekarang.
         $accounts->ensure($client);
 
-        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $penandaBaru]);
+        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $newMarker]);
     }
 
     /** Mencabut berlaku pada permintaan berikutnya. Klien yang dicabut tidak dapat dihidupkan lagi. */
     public function revoke(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
         DB::transaction(function () use ($request, $client): void {
             RowVersion::claim($client, RowVersion::expected($request));
             $client->fill(['status' => IntegrationClient::REVOKED, 'revoked_at' => now()])->save();
@@ -128,66 +128,66 @@ final class IntegrationClientController extends Controller
 
     public function rotateToken(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
-        $rahasia = Str::random(48);
-        $client->fill(['token_digest' => IntegrationClient::digest($rahasia)])->save();
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
+        $secret = Str::random(48);
+        $client->fill(['token_digest' => IntegrationClient::digest($secret)])->save();
 
-        return response()->json(['data' => $this->present($client->refresh()), 'token' => $client->id.'.'.$rahasia]);
+        return response()->json(['data' => $this->present($client->refresh()), 'token' => $client->id.'.'.$secret]);
     }
 
     public function rotateSigningSecret(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Signing secret hanya dipakai klien mode push.']);
         }
-        $penanda = Str::random(48);
-        $client->fill(['signing_secret' => $penanda])->save();
+        $marker = Str::random(48);
+        $client->fill(['signing_secret' => $marker])->save();
 
-        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $penanda]);
+        return response()->json(['data' => $this->present($client->refresh()), 'signing_secret' => $marker]);
     }
 
     /**
      * Mengirim satu kiriman uji dengan signature ke URL push, supaya penerima dapat memastikan
      * verifikasi signature-nya benar sebelum posting sungguhan dikirim.
      */
-    public function testPush(Request $request, IntegrationClient $integrationClient, SignedPush $push, ActiveEnvironment $lingkungan): JsonResponse
+    public function testPush(Request $request, IntegrationClient $integrationClient, SignedPush $push, ActiveEnvironment $environment): JsonResponse
     {
-        $client = $this->milik($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, aktif: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Kirim uji hanya untuk klien mode push.']);
         }
-        if (! $lingkungan->outboundAllowed()) {
-            return response()->json(['data' => ['ok' => false, 'status' => null, 'duration_ms' => 0, 'message' => $lingkungan->refusalReason()]]);
+        if (! $environment->outboundAllowed()) {
+            return response()->json(['data' => ['ok' => false, 'status' => null, 'duration_ms' => 0, 'message' => $environment->refusalReason()]]);
         }
 
-        $badan = json_encode([
+        $body = json_encode([
             'type' => 'coreerp.integration.test',
             'client_id' => $client->id,
             'sent_at' => now()->toIso8601String(),
         ], JSON_THROW_ON_ERROR);
-        $mulai = hrtime(true);
+        $start = hrtime(true);
 
         try {
-            $jawaban = $push->send($client, $badan);
-            $durasi = (int) round((hrtime(true) - $mulai) / 1_000_000);
+            $answer = $push->send($client, $body);
+            $duration = (int) round((hrtime(true) - $start) / 1_000_000);
 
             return response()->json(['data' => [
-                'ok' => $jawaban->successful(),
-                'status' => $jawaban->status(),
-                'duration_ms' => $durasi,
-                'message' => $jawaban->successful()
-                    ? 'Penerima menjawab '.$jawaban->status().'.'
-                    : 'Penerima menjawab '.$jawaban->status().'. Periksa verifikasi signature di sisi penerima.',
+                'ok' => $answer->successful(),
+                'status' => $answer->status(),
+                'duration_ms' => $duration,
+                'message' => $answer->successful()
+                    ? 'Penerima menjawab '.$answer->status().'.'
+                    : 'Penerima menjawab '.$answer->status().'. Periksa verifikasi signature di sisi penerima.',
             ]]);
-        } catch (ConnectionException|RuntimeException $kegagalan) {
+        } catch (ConnectionException|RuntimeException $failure) {
             return response()->json(['data' => [
                 'ok' => false,
                 'status' => null,
-                'duration_ms' => (int) round((hrtime(true) - $mulai) / 1_000_000),
-                'message' => $kegagalan instanceof ConnectionException
-                    ? 'Tujuan tidak dapat dijangkau: '.$this->connectionCause($kegagalan)
-                    : $kegagalan->getMessage(),
+                'duration_ms' => (int) round((hrtime(true) - $start) / 1_000_000),
+                'message' => $failure instanceof ConnectionException
+                    ? 'Tujuan tidak dapat dijangkau: '.$this->connectionCause($failure)
+                    : $failure->getMessage(),
             ]]);
         }
     }
@@ -207,7 +207,7 @@ final class IntegrationClientController extends Controller
     /**
      * @return array{name: string, delivery_mode: string, push_url: ?string, scopes: list<string>, allowed_ips: ?list<string>, posting_type_prefixes: ?list<string>}
      */
-    private function validated(Request $request, string $tenantId, PushDestination $tujuan, ?IntegrationClient $client = null): array
+    private function validated(Request $request, string $tenantId, PushDestination $destination, ?IntegrationClient $client = null): array
     {
         $data = $request->validate([
             'name' => [
@@ -222,7 +222,7 @@ final class IntegrationClientController extends Controller
             'posting_type_prefixes.*' => ['string', 'max:60', 'regex:/^[a-z0-9_-]+(\.[a-z0-9_-]+)*\.?\*?$/'],
             'allowed_ips' => ['nullable', 'array', 'max:50'],
             'allowed_ips.*' => ['string', 'max:64', function (string $attribute, mixed $value, \Closure $fail): void {
-                if (! self::ipAtauCidr((string) $value)) {
+                if (! self::ipOrCidr((string) $value)) {
                     $fail('Alamat IP atau rentang CIDR tidak valid.');
                 }
             }],
@@ -234,8 +234,8 @@ final class IntegrationClientController extends Controller
 
         $mode = (string) $data['delivery_mode'];
         $url = $mode === IntegrationClient::PUSH ? (string) $data['push_url'] : null;
-        if ($url !== null && ($tolak = $tujuan->reject($url)) !== null) {
-            throw ValidationException::withMessages(['push_url' => $tolak]);
+        if ($url !== null && ($reject = $destination->reject($url)) !== null) {
+            throw ValidationException::withMessages(['push_url' => $reject]);
         }
 
         return [
@@ -244,40 +244,40 @@ final class IntegrationClientController extends Controller
             'push_url' => $url,
             'scopes' => array_values(array_unique($data['scopes'])),
             // `asset.*` diterima sebagai ejaan yang lazim untuk awalan `asset.`.
-            'allowed_ips' => self::daftar($data['allowed_ips'] ?? null),
-            'posting_type_prefixes' => self::daftar(array_map(
-                static fn (string $awalan): string => rtrim($awalan, '*'),
+            'allowed_ips' => self::list($data['allowed_ips'] ?? null),
+            'posting_type_prefixes' => self::list(array_map(
+                static fn (string $prefix): string => rtrim($prefix, '*'),
                 $data['posting_type_prefixes'] ?? [],
             )),
         ];
     }
 
     /**
-     * @param  array<int, string>|null  $nilai
+     * @param  array<int, string>|null  $value
      * @return list<string>|null
      */
-    private static function daftar(?array $nilai): ?array
+    private static function list(?array $value): ?array
     {
-        $bersih = array_values(array_unique(array_filter(array_map('trim', $nilai ?? []), static fn (string $v): bool => $v !== '')));
+        $clean = array_values(array_unique(array_filter(array_map('trim', $value ?? []), static fn (string $v): bool => $v !== '')));
 
-        return $bersih === [] ? null : $bersih;
+        return $clean === [] ? null : $clean;
     }
 
-    private static function ipAtauCidr(string $nilai): bool
+    private static function ipOrCidr(string $value): bool
     {
-        if (filter_var($nilai, FILTER_VALIDATE_IP) !== false) {
+        if (filter_var($value, FILTER_VALIDATE_IP) !== false) {
             return true;
         }
-        if (! str_contains($nilai, '/')) {
+        if (! str_contains($value, '/')) {
             return false;
         }
-        [$alamat, $panjang] = explode('/', $nilai, 2);
-        $maksimum = filter_var($alamat, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? 128 : 32;
+        [$address, $length] = explode('/', $value, 2);
+        $maximum = filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? 128 : 32;
 
-        return filter_var($alamat, FILTER_VALIDATE_IP) !== false
-            && ctype_digit($panjang)
-            && (int) $panjang <= $maksimum
-            && IpUtils::checkIp($alamat, $nilai);
+        return filter_var($address, FILTER_VALIDATE_IP) !== false
+            && ctype_digit($length)
+            && (int) $length <= $maximum
+            && IpUtils::checkIp($address, $value);
     }
 
     /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */
@@ -289,10 +289,10 @@ final class IntegrationClientController extends Controller
         return $membership;
     }
 
-    private function milik(TenantMembership $membership, IntegrationClient $client, bool $aktif = false): IntegrationClient
+    private function ownedClient(TenantMembership $membership, IntegrationClient $client, bool $active = false): IntegrationClient
     {
         abort_unless($client->tenant_id === $membership->tenant_id, 404);
-        if ($aktif && $client->status !== IntegrationClient::ACTIVE) {
+        if ($active && $client->status !== IntegrationClient::ACTIVE) {
             throw ValidationException::withMessages(['status' => 'Klien integrasi ini sudah dicabut. Buat klien baru bila masih dibutuhkan.']);
         }
 

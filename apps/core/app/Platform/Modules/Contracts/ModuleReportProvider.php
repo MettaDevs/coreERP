@@ -18,7 +18,7 @@ namespace App\Platform\Modules\Contracts;
  * satu-satunya alternatifnya adalah keadaan global yang benar pada permintaan biasa dan
  * kosong pada worker — persis kegagalan yang paling sulit ditemukan.
  *
- * Bentuk `$konteks` sama dengan yang dulu dibawa token, dan kuncinya sengaja tidak
+ * Bentuk `$context` sama dengan yang dulu dibawa token, dan kuncinya sengaja tidak
  * berubah supaya kode module yang membacanya tidak perlu diubah:
  *
  *     [
@@ -49,7 +49,7 @@ interface ModuleReportProvider
     /** Id module pemilik laporan, sama dengan `id` pada `app.yaml`. */
     public function moduleId(): string;
 
-    public function has(string $kodeLaporan): bool;
+    public function has(string $reportCode): bool;
 
     /**
      * Katalog laporan module, dibaca `app:register-manifest`: kode lengkap berawalan id module,
@@ -83,24 +83,24 @@ interface ModuleReportProvider
      * module yang menerapkannya lewat {@see FieldFilterExpression}. Laporan tanpa data item memulangkan
      * daftar kosong.
      *
-     * @param  array<string, mixed>  $konteks
+     * @param  array<string, mixed>  $context
      * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
-    public function definition(string $kodeLaporan, array $konteks): array;
+    public function definition(string $reportCode, array $context): array;
 
     /**
      * Isi berkas layout bawaan yang ikut module.
      *
-     * @param  array<string, mixed>  $konteks
+     * @param  array<string, mixed>  $context
      */
-    public function defaultLayout(string $kodeLaporan, string $kunci, array $konteks): string;
+    public function defaultLayout(string $reportCode, string $key, array $context): string;
 
     /**
      * Dataset laporan: nilai tunggal pada `fields`, baris berulang pada `tables`.
      *
-     * @param  array<string, mixed>  $konteks
+     * @param  array<string, mixed>  $context
      * @param  array<string, mixed>  $parameter
      * @return array{fields: array<string, mixed>, tables: array<string, mixed>, file_name: string}
      */
-    public function dataset(string $kodeLaporan, array $konteks, array $parameter): array;
+    public function dataset(string $reportCode, array $context, array $parameter): array;
 }

@@ -45,7 +45,7 @@ final class WajibGantiSandi
      * path akan diam-diam berhenti melepaskan apa pun — kegagalan yang bentuknya kurungan tanpa
      * pintu, dan tidak ada test bawaan yang menangkapnya.
      */
-    private const RUTE_TERBUKA = [
+    private const OPEN_ROUTES = [
         'security.edit',
         'user-password.update',
         'logout',
@@ -55,17 +55,17 @@ final class WajibGantiSandi
     ];
 
     /** Permintaan yang bukan halaman, jadi tidak ada gunanya diarahkan ke mana-mana. */
-    private const JALUR_TERBUKA = ['up', 'build/*', 'storage/*', '.well-known/*'];
+    private const OPEN_PATHS = ['up', 'build/*', 'storage/*', '.well-known/*'];
 
     public function handle(Request $request, Closure $next): Response
     {
-        $pengguna = $request->user();
+        $user = $request->user();
 
-        if (! $pengguna instanceof User || ! $pengguna->must_change_password) {
+        if (! $user instanceof User || ! $user->must_change_password) {
             return $next($request);
         }
 
-        if ($request->routeIs(...self::RUTE_TERBUKA) || $request->is(...self::JALUR_TERBUKA)) {
+        if ($request->routeIs(...self::OPEN_ROUTES) || $request->is(...self::OPEN_PATHS)) {
             return $next($request);
         }
 

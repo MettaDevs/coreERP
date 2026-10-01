@@ -44,7 +44,7 @@ final class LampirkanKonteksJejak
      * span ia berdampingan dengan atribut milik framework, HTTP, dan database, dan
      * `module.id` tanpa awalan akan terbaca sebagai milik salah satu dari mereka.
      */
-    private const ATRIBUT_MODULE = 'coreerp.module_id';
+    private const MODULE_ATTRIBUTE = 'coreerp.module_id';
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -57,17 +57,17 @@ final class LampirkanKonteksJejak
         // Keduanya sering disamakan lewat `runningInConsole()`, dan itu keliru justru di tempat
         // yang penting: di dalam test, permintaan yang menembus seluruh middleware tetap
         // berjalan pada SAPI `cli`.
-        $request->attributes->set(PelaporKesalahan::PENANDA_HTTP, true);
+        $request->attributes->set(PelaporKesalahan::HTTP_MARKER, true);
 
         try {
             return $next($request);
         } finally {
-            JejakAktif::tempelAtribut([
-                'coreerp.tenant_id' => $this->teks($request, ModuleRequestContext::TENANT_ID),
-                self::ATRIBUT_MODULE => $this->teks($request, ResolveModuleContext::MODULE_AKTIF),
-                'coreerp.legal_entity_id' => $this->teks($request, ModuleRequestContext::LEGAL_ENTITY_ID),
-                'coreerp.org_unit_id' => $this->teks($request, ModuleRequestContext::ORG_UNIT_ID),
-                'coreerp.user_id' => $this->teks($request, ModuleRequestContext::USER_ID),
+            JejakAktif::setAttributes([
+                'coreerp.tenant_id' => $this->text($request, ModuleRequestContext::TENANT_ID),
+                self::MODULE_ATTRIBUTE => $this->text($request, ResolveModuleContext::ACTIVE_MODULE),
+                'coreerp.legal_entity_id' => $this->text($request, ModuleRequestContext::LEGAL_ENTITY_ID),
+                'coreerp.org_unit_id' => $this->text($request, ModuleRequestContext::ORG_UNIT_ID),
+                'coreerp.user_id' => $this->text($request, ModuleRequestContext::USER_ID),
             ]);
         }
     }
@@ -79,16 +79,16 @@ final class LampirkanKonteksJejak
      * entitas hukum tetap sah — dan id-nya bisa berupa int maupun string tergantung
      * modelnya. Keduanya ditangani di satu tempat supaya pemanggilnya tetap satu baris.
      */
-    private function teks(Request $request, string $kunci): ?string
+    private function text(Request $request, string $key): ?string
     {
-        $nilai = $request->attributes->get($kunci);
+        $value = $request->attributes->get($key);
 
-        if (is_string($nilai)) {
-            return $nilai === '' ? null : $nilai;
+        if (is_string($value)) {
+            return $value === '' ? null : $value;
         }
 
-        if (is_int($nilai) || is_float($nilai)) {
-            return (string) $nilai;
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
         }
 
         return null;

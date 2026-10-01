@@ -25,7 +25,7 @@ class SqlTerbacaTest extends TestCase
 {
     public function test_binding_disisipkan_pada_urutan_yang_benar(): void
     {
-        $hasil = SqlTerbaca::gabungkan(
+        $hasil = SqlTerbaca::interpolate(
             'insert into "aset" ("kode", "nama", "jumlah") values (?, ?, ?)',
             ['AST-001', 'Mesin A', 12],
         );
@@ -40,13 +40,13 @@ class SqlTerbacaTest extends TestCase
     {
         // Dua tanda tanya, satu nilai. Menebak yang kedua berarti menerbitkan query yang
         // salah dengan penuh percaya diri.
-        $this->assertNull(SqlTerbaca::gabungkan(
+        $this->assertNull(SqlTerbaca::interpolate(
             'select * from "aset" where "kode" = ? and "tenant_id" = ?',
             ['AST-001'],
         ));
 
         // Kebalikannya juga ditolak.
-        $this->assertNull(SqlTerbaca::gabungkan(
+        $this->assertNull(SqlTerbaca::interpolate(
             'select * from "aset" where "kode" = ?',
             ['AST-001', 'tenant-1'],
         ));
@@ -54,7 +54,7 @@ class SqlTerbacaTest extends TestCase
 
     public function test_binding_bernama_ditolak_bukan_disisipkan_setengah(): void
     {
-        $this->assertNull(SqlTerbaca::gabungkan(
+        $this->assertNull(SqlTerbaca::interpolate(
             'select * from "aset" where "kode" = :kode',
             ['kode' => 'AST-001'],
         ));
@@ -64,12 +64,12 @@ class SqlTerbacaTest extends TestCase
     {
         $sql = 'select count(*) from "aset"';
 
-        $this->assertSame($sql, SqlTerbaca::gabungkan($sql, []));
+        $this->assertSame($sql, SqlTerbaca::interpolate($sql, []));
     }
 
     public function test_tiap_jenis_nilai_punya_bentuk_harfiahnya(): void
     {
-        $hasil = SqlTerbaca::gabungkan(
+        $hasil = SqlTerbaca::interpolate(
             'values (?, ?, ?, ?, ?)',
             [null, true, false, 3.5, new DateTimeImmutable('2026-09-11 08:30:00+07:00')],
         );
@@ -84,7 +84,7 @@ class SqlTerbacaTest extends TestCase
 
     public function test_kutip_tunggal_di_dalam_nilai_tidak_memecah_query(): void
     {
-        $hasil = SqlTerbaca::gabungkan('values (?)', ["Apotek O'Brien"]);
+        $hasil = SqlTerbaca::interpolate('values (?)', ["Apotek O'Brien"]);
 
         // Tanpa penggandaan kutip, nilai ini menutup string lebih awal dan sisa query
         // terbaca sebagai perintah — bentuk yang sama persis dengan injeksi SQL, meski di
@@ -94,7 +94,7 @@ class SqlTerbacaTest extends TestCase
 
     public function test_nilai_biner_tidak_ikut_masuk_berkas_log(): void
     {
-        $hasil = SqlTerbaca::gabungkan('values (?)', ["\xff\xfe\x00binary"]);
+        $hasil = SqlTerbaca::interpolate('values (?)', ["\xff\xfe\x00binary"]);
 
         $this->assertNotNull($hasil);
         $this->assertStringContainsString('<biner', $hasil);
@@ -103,7 +103,7 @@ class SqlTerbacaTest extends TestCase
 
     public function test_query_sangat_panjang_dipotong(): void
     {
-        $hasil = SqlTerbaca::gabungkan('values (?)', [str_repeat('a', 20000)]);
+        $hasil = SqlTerbaca::interpolate('values (?)', [str_repeat('a', 20000)]);
 
         $this->assertNotNull($hasil);
         $this->assertStringEndsWith('(dipotong)', $hasil);

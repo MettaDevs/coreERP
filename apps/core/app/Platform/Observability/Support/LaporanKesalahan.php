@@ -52,28 +52,28 @@ final class LaporanKesalahan
      * keadaan yang justru melarang laporan menanyakan nama itu ke mana pun. Nama yang dibaca
      * dari memori adalah satu-satunya nama yang aman pada saat itu.
      */
-    public const NAMA_TENANT = 'observabilitas.nama_tenant';
+    public const TENANT_NAME = 'observabilitas.nama_tenant';
 
-    public const NAMA_LEGAL_ENTITY = 'observabilitas.nama_legal_entity';
+    public const LEGAL_ENTITY_NAME = 'observabilitas.nama_legal_entity';
 
-    public const NAMA_ORG_UNIT = 'observabilitas.nama_org_unit';
+    public const ORG_UNIT_NAME = 'observabilitas.nama_org_unit';
 
-    public const NAMA_PENGGUNA = 'observabilitas.nama_pengguna';
+    public const USER_NAME = 'observabilitas.nama_pengguna';
 
-    private const BATAS_JEJAK_TUMPUKAN = 4000;
+    private const STACK_TRACE_LIMIT = 4000;
 
     /**
-     * @param  array<string, scalar|null>  $atribut
+     * @param  array<string, scalar|null>  $attributes
      */
     private function __construct(
-        private readonly string $teks,
-        private readonly string $ringkasan,
-        private readonly array $atribut,
+        private readonly string $text,
+        private readonly string $summary,
+        private readonly array $attributes,
     ) {}
 
-    public static function dari(Throwable $kesalahan, ?Request $permintaan): self
+    public static function from(Throwable $error, ?Request $request): self
     {
-        $baris = [];
+        $lines = [];
 
         /*
          * Satu id yang menandai laporan ini, dicetak sekali dan dipakai di tiga tempat.
@@ -88,105 +88,105 @@ final class LaporanKesalahan
          * ULID dipilih karena terurut menurut waktu: dua laporan berurutan duduk berdampingan
          * ketika diurutkan, dan itu gratis.
          */
-        $atribut = ['coreerp.laporan_id' => (string) Str::ulid()];
+        $attributes = ['coreerp.laporan_id' => (string) Str::ulid()];
 
-        $kueri = self::kesalahanKueri($kesalahan);
+        $query = self::queryException($error);
 
-        self::bagianKepala($kesalahan, $permintaan, $baris, $atribut);
+        self::headerSection($error, $request, $lines, $attributes);
 
-        // Penjaga sesi memakai pemeriksaan yang lebih longgar daripada `$kueri`: sebuah
+        // Penjaga sesi memakai pemeriksaan yang lebih longgar daripada `$query`: sebuah
         // `PDOException` telanjang — koneksi ditolak sebelum satu query pun tersusun — tidak
         // pernah menjadi `QueryException`, padahal justru itu keadaan ketika bertanya ke
         // database adalah hal terakhir yang boleh dilakukan.
-        self::bagianKonteks($permintaan, self::menyangkutDatabase($kesalahan), $baris, $atribut);
-        self::bagianKesalahan($kesalahan, $baris, $atribut);
-        self::bagianDatabase($kueri, $baris, $atribut);
+        self::contextSection($request, self::involvesDatabase($error), $lines, $attributes);
+        self::errorSection($error, $lines, $attributes);
+        self::databaseSection($query, $lines, $attributes);
 
         return new self(
-            teks: implode("\n", $baris),
-            ringkasan: self::ringkasanSatuBaris($kesalahan, $permintaan),
-            atribut: $atribut,
+            text: implode("\n", $lines),
+            summary: self::oneLineSummary($error, $request),
+            attributes: $attributes,
         );
     }
 
     /** Blok utuh untuk berkas log dan untuk panel detail di SigNoz. */
-    public function keTeks(): string
+    public function toText(): string
     {
-        return $this->teks;
+        return $this->text;
     }
 
     /** Satu baris untuk badan catatan log — strukturnya ada di atribut, bukan di sini. */
-    public function ringkasan(): string
+    public function summary(): string
     {
-        return $this->ringkasan;
+        return $this->summary;
     }
 
     /** @return array<string, scalar|null> */
-    public function keAtribut(): array
+    public function toAttributes(): array
     {
-        return $this->atribut;
+        return $this->attributes;
     }
 
     /**
-     * @param  list<string>  $baris
-     * @param  array<string, scalar|null>  $atribut
+     * @param  list<string>  $lines
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function bagianKepala(Throwable $kesalahan, ?Request $permintaan, array &$baris, array &$atribut): void
+    private static function headerSection(Throwable $error, ?Request $request, array &$lines, array &$attributes): void
     {
-        $baris[] = '🔴 CoreERP · KESALAHAN INTERNAL';
-        $baris[] = str_repeat('─', 60);
+        $lines[] = '🔴 CoreERP · KESALAHAN INTERNAL';
+        $lines[] = str_repeat('─', 60);
 
-        if ($permintaan instanceof Request) {
-            $status = self::status($kesalahan);
-            $baris[] = sprintf(
+        if ($request instanceof Request) {
+            $status = self::status($error);
+            $lines[] = sprintf(
                 '%s %s   ·   %d   ·   %s',
-                $permintaan->method(),
-                self::potong((string) $permintaan->fullUrl(), 300),
+                $request->method(),
+                self::truncate((string) $request->fullUrl(), 300),
                 $status,
-                (string) ($permintaan->ip() ?? '-'),
+                (string) ($request->ip() ?? '-'),
             );
 
-            $atribut['http.request.method'] = $permintaan->method();
-            $atribut['http.response.status_code'] = $status;
-            $atribut['url.full'] = self::potong((string) $permintaan->fullUrl(), 300);
-            $atribut['url.path'] = '/'.ltrim($permintaan->path(), '/');
-            $atribut['client.address'] = (string) ($permintaan->ip() ?? '');
-            $atribut['user_agent.original'] = self::potong((string) $permintaan->userAgent(), 300);
-            $atribut['coreerp.sumber_kesalahan'] = 'http';
+            $attributes['http.request.method'] = $request->method();
+            $attributes['http.response.status_code'] = $status;
+            $attributes['url.full'] = self::truncate((string) $request->fullUrl(), 300);
+            $attributes['url.path'] = '/'.ltrim($request->path(), '/');
+            $attributes['client.address'] = (string) ($request->ip() ?? '');
+            $attributes['user_agent.original'] = self::truncate((string) $request->userAgent(), 300);
+            $attributes['coreerp.sumber_kesalahan'] = 'http';
         } else {
-            $baris[] = 'konsol · di luar permintaan HTTP';
-            $atribut['coreerp.sumber_kesalahan'] = app()->runningInConsole() ? 'konsol' : 'tak-diketahui';
+            $lines[] = 'konsol · di luar permintaan HTTP';
+            $attributes['coreerp.sumber_kesalahan'] = app()->runningInConsole() ? 'konsol' : 'tak-diketahui';
         }
 
-        $baris[] = now()->toDateTimeString().' '.now()->format('P');
-        $baris[] = self::pasangan('laporan', self::teks($atribut['coreerp.laporan_id'] ?? null));
+        $lines[] = now()->toDateTimeString().' '.now()->format('P');
+        $lines[] = self::pair('laporan', self::text($attributes['coreerp.laporan_id'] ?? null));
     }
 
     /**
-     * @param  list<string>  $baris
-     * @param  array<string, scalar|null>  $atribut
+     * @param  list<string>  $lines
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function bagianKonteks(?Request $permintaan, bool $kegagalanDatabase, array &$baris, array &$atribut): void
+    private static function contextSection(?Request $request, bool $databaseFailure, array &$lines, array &$attributes): void
     {
-        if (! $permintaan instanceof Request) {
-            self::bagianKonteksLuarHttp($baris, $atribut);
+        if (! $request instanceof Request) {
+            self::nonHttpContextSection($lines, $attributes);
 
             return;
         }
 
-        $tenantId = self::atributPermintaan($permintaan, ModuleRequestContext::TENANT_ID);
-        $moduleId = self::atributPermintaan($permintaan, ResolveModuleContext::MODULE_AKTIF);
-        $entitas = self::atributPermintaan($permintaan, ModuleRequestContext::LEGAL_ENTITY_ID);
-        $unit = self::atributPermintaan($permintaan, ModuleRequestContext::ORG_UNIT_ID);
-        $penggunaId = self::atributPermintaan($permintaan, ModuleRequestContext::USER_ID);
-        $appId = self::atributPermintaan($permintaan, 'coreerp.app_id');
+        $tenantId = self::requestAttribute($request, ModuleRequestContext::TENANT_ID);
+        $moduleId = self::requestAttribute($request, ResolveModuleContext::ACTIVE_MODULE);
+        $legalEntity = self::requestAttribute($request, ModuleRequestContext::LEGAL_ENTITY_ID);
+        $unit = self::requestAttribute($request, ModuleRequestContext::ORG_UNIT_ID);
+        $userId = self::requestAttribute($request, ModuleRequestContext::USER_ID);
+        $appId = self::requestAttribute($request, 'coreerp.app_id');
 
         // Nama yang sudah ditaruh middleware module saat objeknya masih di memori. Dibaca
         // lebih dulu justru karena ia satu-satunya sumber nama yang aman ketika database mati.
-        $namaTenant = self::atributPermintaan($permintaan, self::NAMA_TENANT);
-        $namaEntitas = self::atributPermintaan($permintaan, self::NAMA_LEGAL_ENTITY);
-        $namaUnit = self::atributPermintaan($permintaan, self::NAMA_ORG_UNIT);
-        $namaPengguna = self::atributPermintaan($permintaan, self::NAMA_PENGGUNA);
+        $tenantName = self::requestAttribute($request, self::TENANT_NAME);
+        $legalEntityName = self::requestAttribute($request, self::LEGAL_ENTITY_NAME);
+        $unitName = self::requestAttribute($request, self::ORG_UNIT_NAME);
+        $userName = self::requestAttribute($request, self::USER_NAME);
         $slugTenant = null;
 
         // Rute Core biasa tidak melewati `ResolveModuleContext` maupun
@@ -197,63 +197,63 @@ final class LaporanKesalahan
         // dan menulis sesi. Memanggilnya saat yang gagal justru database berarti menanyakan
         // pada database kenapa database mati, membayar satu batas waktu koneksi, dan berisiko
         // melempar kesalahan kedua dari dalam penangan kesalahan pertama.
-        $bolehTanyaSesi = ! $kegagalanDatabase
-            && $permintaan->hasSession()
-            && $permintaan->user() !== null;
+        $mayAskSession = ! $databaseFailure
+            && $request->hasSession()
+            && $request->user() !== null;
 
-        if ($bolehTanyaSesi) {
+        if ($mayAskSession) {
             try {
-                $keanggotaan = app(CurrentWorkspace::class)->membership($permintaan);
+                $membership = app(CurrentWorkspace::class)->membership($request);
 
-                if ($keanggotaan !== null) {
-                    $tenantId ??= (string) $keanggotaan->tenant_id;
-                    $namaTenant ??= self::teks($keanggotaan->tenant->name);
-                    $slugTenant = self::teks($keanggotaan->tenant->slug);
+                if ($membership !== null) {
+                    $tenantId ??= (string) $membership->tenant_id;
+                    $tenantName ??= self::text($membership->tenant->name);
+                    $slugTenant = self::text($membership->tenant->slug);
                 }
             } catch (Throwable) {
                 // Konteks tenant adalah nilai tambah pada laporan, bukan syaratnya.
             }
         }
 
-        if ($permintaan->user() !== null) {
+        if ($request->user() !== null) {
             try {
-                $pengguna = $permintaan->user();
-                $penggunaId ??= self::teks($pengguna->getAuthIdentifier());
-                $namaPengguna ??= self::teks($pengguna->name ?? null);
+                $user = $request->user();
+                $userId ??= self::text($user->getAuthIdentifier());
+                $userName ??= self::text($user->name ?? null);
             } catch (Throwable) {
                 // Sama seperti di atas.
             }
         }
 
-        $baris[] = self::pasangan('tenant', self::rangkaiTenant($tenantId, $namaTenant, $slugTenant));
-        $baris[] = self::pasangan('pengguna', self::rangkaiPengguna($penggunaId, $namaPengguna));
-        $baris[] = self::pasangan('module', $moduleId);
-        $baris[] = self::pasangan('entitas', self::rangkaiBernama($namaEntitas, $entitas));
-        $baris[] = self::pasangan('unit', self::rangkaiBernama($namaUnit, $unit));
-        $baris[] = self::pasangan('app', $appId);
-        $baris[] = self::pasangan('rute', self::teks($permintaan->route()?->getName()));
-        $baris[] = self::pasangan('korelasi', self::rangkaiKorelasi($permintaan));
+        $lines[] = self::pair('tenant', self::joinTenant($tenantId, $tenantName, $slugTenant));
+        $lines[] = self::pair('pengguna', self::joinUser($userId, $userName));
+        $lines[] = self::pair('module', $moduleId);
+        $lines[] = self::pair('entitas', self::joinNamed($legalEntityName, $legalEntity));
+        $lines[] = self::pair('unit', self::joinNamed($unitName, $unit));
+        $lines[] = self::pair('app', $appId);
+        $lines[] = self::pair('rute', self::text($request->route()?->getName()));
+        $lines[] = self::pair('korelasi', self::joinCorrelation($request));
 
-        $atribut['coreerp.tenant_id'] = $tenantId;
-        $atribut['coreerp.tenant_name'] = $namaTenant;
-        $atribut['coreerp.tenant_slug'] = $slugTenant;
-        $atribut['coreerp.legal_entity_name'] = $namaEntitas;
-        $atribut['coreerp.org_unit_name'] = $namaUnit;
-        $atribut['coreerp.module_id'] = $moduleId;
-        $atribut['coreerp.legal_entity_id'] = $entitas;
-        $atribut['coreerp.org_unit_id'] = $unit;
-        $atribut['coreerp.user_id'] = $penggunaId;
-        $atribut['coreerp.user_name'] = $namaPengguna;
-        $atribut['coreerp.app_id'] = $appId;
-        $atribut['http.route'] = self::teks($permintaan->route()?->getName());
+        $attributes['coreerp.tenant_id'] = $tenantId;
+        $attributes['coreerp.tenant_name'] = $tenantName;
+        $attributes['coreerp.tenant_slug'] = $slugTenant;
+        $attributes['coreerp.legal_entity_name'] = $legalEntityName;
+        $attributes['coreerp.org_unit_name'] = $unitName;
+        $attributes['coreerp.module_id'] = $moduleId;
+        $attributes['coreerp.legal_entity_id'] = $legalEntity;
+        $attributes['coreerp.org_unit_id'] = $unit;
+        $attributes['coreerp.user_id'] = $userId;
+        $attributes['coreerp.user_name'] = $userName;
+        $attributes['coreerp.app_id'] = $appId;
+        $attributes['http.route'] = self::text($request->route()?->getName());
 
         // Nama field ini persis seperti yang dicari SigNoz untuk menyambungkan log ke jejak.
-        $atribut['trace_id'] = JejakAktif::idJejak();
-        $atribut['span_id'] = JejakAktif::idSpan();
+        $attributes['trace_id'] = JejakAktif::traceId();
+        $attributes['span_id'] = JejakAktif::spanId();
 
-        $korelasi = self::korelasiPermintaan($permintaan);
-        if ($korelasi !== null) {
-            $atribut['coreerp.correlation_id'] = $korelasi;
+        $correlation = self::requestCorrelation($request);
+        if ($correlation !== null) {
+            $attributes['coreerp.correlation_id'] = $correlation;
         }
     }
 
@@ -281,25 +281,25 @@ final class LaporanKesalahan
      * migrasi, pekerjaan yang gagal sebelum sempat mengikat — tetap melaporkan `-`. Itu
      * keadaan sebenarnya, bukan kegagalan membaca.
      *
-     * @param  list<string>  $baris
-     * @param  array<string, scalar|null>  $atribut
+     * @param  list<string>  $lines
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function bagianKonteksLuarHttp(array &$baris, array &$atribut): void
+    private static function nonHttpContextSection(array &$lines, array &$attributes): void
     {
-        $perintah = self::perintahBerjalan();
+        $command = self::runningCommand();
 
-        if ($perintah !== null) {
-            $baris[] = self::pasangan('perintah', $perintah);
-            $atribut['coreerp.perintah'] = $perintah;
+        if ($command !== null) {
+            $lines[] = self::pair('perintah', $command);
+            $attributes['coreerp.perintah'] = $command;
         }
 
-        $tenantId = self::tenantTerikat();
+        $tenantId = self::boundTenant();
 
-        $baris[] = self::pasangan('tenant', $tenantId);
-        $atribut['coreerp.tenant_id'] = $tenantId;
+        $lines[] = self::pair('tenant', $tenantId);
+        $attributes['coreerp.tenant_id'] = $tenantId;
     }
 
-    private static function perintahBerjalan(): ?string
+    private static function runningCommand(): ?string
     {
         try {
             $argv = $_SERVER['argv'] ?? null;
@@ -310,163 +310,163 @@ final class LaporanKesalahan
 
             // Nama berkasnya dibuang: `artisan` sama saja untuk setiap baris, dan jalur
             // absolutnya memakan tempat tanpa menambah keterangan.
-            $bagian = array_slice(array_map(strval(...), $argv), 1);
+            $parts = array_slice(array_map(strval(...), $argv), 1);
 
-            return $bagian === [] ? null : self::potong(implode(' ', $bagian), 300);
+            return $parts === [] ? null : self::truncate(implode(' ', $parts), 300);
         } catch (Throwable) {
             return null;
         }
     }
 
-    private static function tenantTerikat(): ?string
+    private static function boundTenant(): ?string
     {
         try {
-            $nilai = app()->bound(TenantScope::KUNCI) ? app(TenantScope::KUNCI) : null;
+            $value = app()->bound(TenantScope::KEY) ? app(TenantScope::KEY) : null;
 
-            return is_string($nilai) && $nilai !== '' ? $nilai : null;
+            return is_string($value) && $value !== '' ? $value : null;
         } catch (Throwable) {
             return null;
         }
     }
 
     /**
-     * @param  list<string>  $baris
-     * @param  array<string, scalar|null>  $atribut
+     * @param  list<string>  $lines
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function bagianKesalahan(Throwable $kesalahan, array &$baris, array &$atribut): void
+    private static function errorSection(Throwable $error, array &$lines, array &$attributes): void
     {
-        $baris[] = str_repeat('─', 60);
-        $baris[] = $kesalahan::class;
-        $baris[] = $kesalahan->getMessage();
-        $baris[] = self::lokasi($kesalahan);
+        $lines[] = str_repeat('─', 60);
+        $lines[] = $error::class;
+        $lines[] = $error->getMessage();
+        $lines[] = self::location($error);
 
-        $atribut['exception.type'] = $kesalahan::class;
-        $atribut['exception.message'] = self::potong($kesalahan->getMessage(), 2000);
-        $atribut['exception.stacktrace'] = self::potong($kesalahan->getTraceAsString(), self::BATAS_JEJAK_TUMPUKAN);
-        $atribut['code.filepath'] = $kesalahan->getFile();
-        $atribut['code.lineno'] = $kesalahan->getLine();
+        $attributes['exception.type'] = $error::class;
+        $attributes['exception.message'] = self::truncate($error->getMessage(), 2000);
+        $attributes['exception.stacktrace'] = self::truncate($error->getTraceAsString(), self::STACK_TRACE_LIMIT);
+        $attributes['code.filepath'] = $error->getFile();
+        $attributes['code.lineno'] = $error->getLine();
     }
 
     /**
-     * @param  list<string>  $baris
-     * @param  array<string, scalar|null>  $atribut
+     * @param  list<string>  $lines
+     * @param  array<string, scalar|null>  $attributes
      */
-    private static function bagianDatabase(?QueryException $kueri, array &$baris, array &$atribut): void
+    private static function databaseSection(?QueryException $query, array &$lines, array &$attributes): void
     {
-        if ($kueri === null) {
+        if ($query === null) {
             return;
         }
 
-        $rincian = [];
+        $details = [];
         try {
-            $rincian = $kueri->getConnectionDetails();
+            $details = $query->getConnectionDetails();
         } catch (Throwable) {
             // Rincian koneksi hilang bukan alasan membuang seluruh bagian database.
         }
 
-        $driver = self::teks($rincian['driver'] ?? null);
-        $database = self::teks($rincian['database'] ?? null);
-        $host = self::teks($rincian['host'] ?? null);
-        $port = self::teks($rincian['port'] ?? null);
-        $sqlstate = self::teks($kueri->errorInfo[0] ?? null);
+        $driver = self::text($details['driver'] ?? null);
+        $database = self::text($details['database'] ?? null);
+        $host = self::text($details['host'] ?? null);
+        $port = self::text($details['port'] ?? null);
+        $sqlstate = self::text($query->errorInfo[0] ?? null);
 
-        $baris[] = str_repeat('─', 60);
-        $baris[] = trim(sprintf(
+        $lines[] = str_repeat('─', 60);
+        $lines[] = trim(sprintf(
             '%s · %s%s%s%s',
             $driver ?? 'database',
             $database ?? '-',
             $host !== null ? ' @ '.$host.($port !== null ? ':'.$port : '') : '',
-            $kueri->readWriteType !== null ? ' ('.$kueri->readWriteType.')' : '',
+            $query->readWriteType !== null ? ' ('.$query->readWriteType.')' : '',
             $sqlstate !== null ? ' · SQLSTATE '.$sqlstate : '',
         ));
 
         // Pesan driver mentah — ini kalimat yang benar-benar menyebut kendala mana yang
         // dilanggar. Pesan `QueryException` sendiri adalah kalimat itu dengan SQL ditempel di
         // belakangnya, jadi keduanya ditampilkan terpisah supaya yang penting tidak tenggelam.
-        $pesanDriver = self::teks($kueri->getPrevious()?->getMessage());
-        if ($pesanDriver !== null) {
-            $baris[] = $pesanDriver;
-            $atribut['db.response.message'] = self::potong($pesanDriver, 2000);
+        $driverMessage = self::text($query->getPrevious()?->getMessage());
+        if ($driverMessage !== null) {
+            $lines[] = $driverMessage;
+            $attributes['db.response.message'] = self::truncate($driverMessage, 2000);
         }
 
         $sql = null;
         $binding = [];
         try {
-            $sql = $kueri->getSql();
-            $binding = $kueri->getBindings();
+            $sql = $query->getSql();
+            $binding = $query->getBindings();
         } catch (Throwable) {
             // Biarkan kosong; bagian di bawah menanganinya.
         }
 
         if ($sql !== null) {
-            $terbaca = SqlTerbaca::gabungkan($sql, $binding);
+            $readable = SqlTerbaca::interpolate($sql, $binding);
 
-            $baris[] = '';
-            $baris[] = 'SQL:';
-            $baris[] = $terbaca ?? $sql;
+            $lines[] = '';
+            $lines[] = 'SQL:';
+            $lines[] = $readable ?? $sql;
 
             // Rekonstruksi gagal berarti jumlah tanda tanya tidak cocok dengan jumlah binding.
             // Nilainya tetap ditampilkan, hanya terpisah — menebak query utuh dari data yang
             // tidak konsisten adalah cara membuat laporan yang percaya diri tetapi salah.
-            if ($terbaca === null && $binding !== []) {
-                $baris[] = 'binding: '.self::potong(json_encode($binding, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: '-', 2000);
+            if ($readable === null && $binding !== []) {
+                $lines[] = 'binding: '.self::truncate(json_encode($binding, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: '-', 2000);
             }
 
             // Bentuk berparameter yang dipakai SigNoz untuk mengelompokkan; bentuk terbaca
             // yang dipakai orang untuk menelusuri.
-            $atribut['db.query.text'] = self::potong($sql, 8000);
-            $atribut['coreerp.db.query_terbaca'] = $terbaca;
+            $attributes['db.query.text'] = self::truncate($sql, 8000);
+            $attributes['coreerp.db.query_terbaca'] = $readable;
 
             // Kesalahan "nilai tidak muat" adalah satu-satunya jenis yang pesannya tidak
             // pernah menyebut nilai penyebabnya. Menghitungnya di sini, saat kejadiannya masih
             // segar, menghemat pekerjaan mencocokkan tanda tanya dengan binding satu per satu.
-            if (TersangkaPemotongan::cocok($sqlstate, $pesanDriver)) {
-                $batas = TersangkaPemotongan::batasDariPesan($pesanDriver);
-                $tersangka = TersangkaPemotongan::daftar($sql, $binding, $batas);
+            if (TersangkaPemotongan::matches($sqlstate, $driverMessage)) {
+                $limit = TersangkaPemotongan::limitFromMessage($driverMessage);
+                $suspects = TersangkaPemotongan::list($sql, $binding, $limit);
 
-                if ($tersangka !== []) {
-                    $baris[] = '';
-                    $baris[] = $batas !== null
-                        ? sprintf('Nilai yang tidak muat (batas kolom %d karakter):', $batas)
+                if ($suspects !== []) {
+                    $lines[] = '';
+                    $lines[] = $limit !== null
+                        ? sprintf('Nilai yang tidak muat (batas kolom %d karakter):', $limit)
                         : 'Nilai terpanjang (tersangka pemotongan):';
 
-                    foreach ($tersangka as $satu) {
-                        $baris[] = sprintf(
+                    foreach ($suspects as $item) {
+                        $lines[] = sprintf(
                             '  %s %-22s %4d karakter   %s',
-                            $satu['melebihi'] ? '→' : ' ',
-                            $satu['kolom'],
-                            $satu['panjang'],
-                            $satu['cuplikan'],
+                            $item['melebihi'] ? '→' : ' ',
+                            $item['kolom'],
+                            $item['panjang'],
+                            $item['cuplikan'],
                         );
                     }
 
-                    $atribut['coreerp.db.tersangka_kolom'] = $tersangka[0]['kolom'];
-                    $atribut['coreerp.db.tersangka_panjang'] = $tersangka[0]['panjang'];
-                    $atribut['coreerp.db.batas_kolom'] = $batas;
+                    $attributes['coreerp.db.tersangka_kolom'] = $suspects[0]['kolom'];
+                    $attributes['coreerp.db.tersangka_panjang'] = $suspects[0]['panjang'];
+                    $attributes['coreerp.db.batas_kolom'] = $limit;
                 }
             }
         }
 
-        $atribut['db.system'] = $driver;
-        $atribut['db.namespace'] = $database;
-        $atribut['db.response.status_code'] = $sqlstate;
-        $atribut['coreerp.db.connection'] = self::teks($kueri->getConnectionName());
+        $attributes['db.system'] = $driver;
+        $attributes['db.namespace'] = $database;
+        $attributes['db.response.status_code'] = $sqlstate;
+        $attributes['coreerp.db.connection'] = self::text($query->getConnectionName());
     }
 
     /**
      * Menemukan `QueryException` pada rantai sebab, bukan hanya di permukaan. Kegagalan
      * database sering sudah dibungkus lapisan lain sebelum sampai ke penangan.
      */
-    private static function kesalahanKueri(Throwable $kesalahan): ?QueryException
+    private static function queryException(Throwable $error): ?QueryException
     {
-        $sekarang = $kesalahan;
+        $now = $error;
 
-        for ($langkah = 0; $langkah < 10 && $sekarang !== null; $langkah++) {
-            if ($sekarang instanceof QueryException) {
-                return $sekarang;
+        for ($step = 0; $step < 10 && $now !== null; $step++) {
+            if ($now instanceof QueryException) {
+                return $now;
             }
 
-            $sekarang = $sekarang->getPrevious();
+            $now = $now->getPrevious();
         }
 
         return null;
@@ -477,80 +477,80 @@ final class LaporanKesalahan
      * bertanya ke sesi. Lebih longgar dari {@see self::kesalahanKueri()}: `PDOException`
      * telanjang pun cukup untuk membuat kita tidak menyentuh database lagi.
      */
-    private static function menyangkutDatabase(Throwable $kesalahan): bool
+    private static function involvesDatabase(Throwable $error): bool
     {
-        $sekarang = $kesalahan;
+        $now = $error;
 
-        for ($langkah = 0; $langkah < 10 && $sekarang !== null; $langkah++) {
-            if ($sekarang instanceof QueryException || $sekarang instanceof PDOException) {
+        for ($step = 0; $step < 10 && $now !== null; $step++) {
+            if ($now instanceof QueryException || $now instanceof PDOException) {
                 return true;
             }
 
-            $sekarang = $sekarang->getPrevious();
+            $now = $now->getPrevious();
         }
 
         return false;
     }
 
-    private static function status(Throwable $kesalahan): int
+    private static function status(Throwable $error): int
     {
         // Diambil dari kesalahannya, bukan dari respons: pelapor berjalan sebelum respons
         // dirender, jadi pada saat ini belum ada status yang bisa dibaca.
-        return $kesalahan instanceof HttpExceptionInterface ? $kesalahan->getStatusCode() : 500;
+        return $error instanceof HttpExceptionInterface ? $error->getStatusCode() : 500;
     }
 
-    private static function ringkasanSatuBaris(Throwable $kesalahan, ?Request $permintaan): string
+    private static function oneLineSummary(Throwable $error, ?Request $request): string
     {
-        $inti = $kesalahan::class.': '.self::potong($kesalahan->getMessage(), 300);
+        $core = $error::class.': '.self::truncate($error->getMessage(), 300);
 
-        if (! $permintaan instanceof Request) {
-            return $inti;
+        if (! $request instanceof Request) {
+            return $core;
         }
 
-        return sprintf('%s @ %s /%s', $inti, $permintaan->method(), ltrim($permintaan->path(), '/'));
+        return sprintf('%s @ %s /%s', $core, $request->method(), ltrim($request->path(), '/'));
     }
 
-    private static function korelasiPermintaan(Request $permintaan): ?string
+    private static function requestCorrelation(Request $request): ?string
     {
         // Hanya dibaca, tidak pernah dibuat. Correlation id yang dicetak sendiri oleh pelapor
         // tidak berhubungan dengan apa pun, dan justru menyesatkan orang pertama yang
         // mencarinya. Yang ada di sini berumur panjang — dipakai alur kerja yang event
         // keputusannya terbit berhari-hari kemudian.
-        $nilai = self::teks($permintaan->header('X-Correlation-Id'));
+        $value = self::text($request->header('X-Correlation-Id'));
 
-        return $nilai !== null && preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/i', $nilai) === 1 ? $nilai : null;
+        return $value !== null && preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/i', $value) === 1 ? $value : null;
     }
 
-    private static function rangkaiKorelasi(Request $permintaan): ?string
+    private static function joinCorrelation(Request $request): ?string
     {
-        $bagian = [];
+        $parts = [];
 
-        $jejak = JejakAktif::idJejak();
-        if ($jejak !== null) {
-            $bagian[] = 'jejak '.$jejak;
+        $trace = JejakAktif::traceId();
+        if ($trace !== null) {
+            $parts[] = 'jejak '.$trace;
         }
 
-        $alur = self::korelasiPermintaan($permintaan);
-        if ($alur !== null) {
-            $bagian[] = 'alur '.$alur;
+        $flow = self::requestCorrelation($request);
+        if ($flow !== null) {
+            $parts[] = 'alur '.$flow;
         }
 
-        return $bagian === [] ? null : implode(' · ', $bagian);
+        return $parts === [] ? null : implode(' · ', $parts);
     }
 
-    private static function rangkaiTenant(?string $id, ?string $nama, ?string $slug): ?string
+    private static function joinTenant(?string $id, ?string $name, ?string $slug): ?string
     {
-        if ($id === null && $nama === null) {
+        if ($id === null && $name === null) {
             return null;
         }
 
-        if ($nama === null) {
+        if ($name === null) {
             return $id;
         }
 
-        $penanda = array_values(array_filter([$slug, $id], static fn (?string $n): bool => $n !== null));
+        $marker = array_values(array_filter([$slug, $id], static fn (?string $n): bool => $n !== null));
 
-        return $penanda === [] ? $nama : $nama.' ('.implode(' / ', $penanda).')';
+        return $marker === [] ? $name : $name.' ('.implode(' / ', $marker).')';
     }
 
     /**
@@ -559,27 +559,27 @@ final class LaporanKesalahan
      * Bentuk ini yang membuat laporan bisa dibaca dan sekaligus ditindaklanjuti: namanya untuk
      * mengerti, id-nya untuk mencari barisnya di database tanpa menebak.
      */
-    private static function rangkaiBernama(?string $nama, ?string $id): ?string
+    private static function joinNamed(?string $name, ?string $id): ?string
     {
-        if ($nama === null) {
+        if ($name === null) {
             return $id;
         }
 
-        return $id === null ? $nama : $nama.' ('.$id.')';
+        return $id === null ? $name : $name.' ('.$id.')';
     }
 
-    private static function rangkaiPengguna(?string $id, ?string $nama): ?string
+    private static function joinUser(?string $id, ?string $name): ?string
     {
-        if ($nama === null) {
+        if ($name === null) {
             return $id;
         }
 
-        return $id === null ? $nama : $nama.' ('.$id.')';
+        return $id === null ? $name : $name.' ('.$id.')';
     }
 
-    private static function lokasi(Throwable $kesalahan): string
+    private static function location(Throwable $error): string
     {
-        return $kesalahan->getFile().':'.$kesalahan->getLine();
+        return $error->getFile().':'.$error->getLine();
     }
 
     /**
@@ -587,48 +587,48 @@ final class LaporanKesalahan
      * laporan perlu bisa membedakan "tidak ada tenant pada permintaan ini" dari "bagian ini
      * lupa ditulis".
      */
-    private static function pasangan(string $label, ?string $nilai): string
+    private static function pair(string $label, ?string $value): string
     {
-        return sprintf('%-9s: %s', $label, $nilai ?? '-');
+        return sprintf('%-9s: %s', $label, $value ?? '-');
     }
 
-    private static function atributPermintaan(Request $permintaan, string $kunci): ?string
+    private static function requestAttribute(Request $request, string $key): ?string
     {
         try {
-            return self::teks($permintaan->attributes->get($kunci));
+            return self::text($request->attributes->get($key));
         } catch (Throwable) {
             return null;
         }
     }
 
-    private static function teks(mixed $nilai): ?string
+    private static function text(mixed $value): ?string
     {
-        if ($nilai === null || is_array($nilai) || is_object($nilai)) {
+        if ($value === null || is_array($value) || is_object($value)) {
             return null;
         }
 
-        $teks = trim((string) $nilai);
+        $text = trim((string) $value);
 
-        return $teks === '' ? null : $teks;
+        return $text === '' ? null : $text;
     }
 
-    private static function potong(string $nilai, int $batas): string
+    private static function truncate(string $value, int $limit): string
     {
-        if (mb_strlen($nilai) <= $batas) {
-            return $nilai;
+        if (mb_strlen($value) <= $limit) {
+            return $value;
         }
 
-        return mb_substr($nilai, 0, $batas).' … (dipotong)';
+        return mb_substr($value, 0, $limit).' … (dipotong)';
     }
 
     /** Dipakai {@see PelaporKesalahan} untuk memutuskan sebuah kesalahan layak dilaporkan. */
-    public static function layakDilaporkan(Throwable $kesalahan): bool
+    public static function isReportable(Throwable $error): bool
     {
         // 404, 419, dan 422 bukan kesalahan internal. Membiarkannya masuk berarti mengubur
         // laporan yang benar-benar berarti di bawah derasnya lalu lintas biasa — dan laporan
         // yang tidak pernah dibaca sama nilainya dengan laporan yang tidak pernah ditulis.
-        if ($kesalahan instanceof HttpExceptionInterface) {
-            $status = $kesalahan->getStatusCode();
+        if ($error instanceof HttpExceptionInterface) {
+            $status = $error->getStatusCode();
 
             return $status < 400 || $status >= 500;
         }
@@ -637,8 +637,8 @@ final class LaporanKesalahan
     }
 
     /** Dipakai {@see self::dari()} dan oleh test; dipublikkan supaya perilakunya bisa diuji. */
-    public static function kegagalanDatabase(Throwable $kesalahan): bool
+    public static function isDatabaseFailure(Throwable $error): bool
     {
-        return self::menyangkutDatabase($kesalahan);
+        return self::involvesDatabase($error);
     }
 }

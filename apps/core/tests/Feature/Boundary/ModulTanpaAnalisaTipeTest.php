@@ -25,7 +25,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      */
     public function test_tenggat_tiap_entri_belum_lewat(): void
     {
-        $lewat = ModulTanpaAnalisaTipe::bawaan()->tenggatYangLewat(new DateTimeImmutable('today'));
+        $lewat = ModulTanpaAnalisaTipe::default()->overdue(new DateTimeImmutable('today'));
 
         $this->assertSame([], $lewat, implode("\n", [
             'Tenggat pengecualian analisa tipe sudah lewat: '.implode(', ', $lewat).'.',
@@ -43,11 +43,11 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      */
     public function test_tenggat_yang_lewat_terdeteksi(): void
     {
-        $daftar = ModulTanpaAnalisaTipe::dariDaftar([
+        $daftar = ModulTanpaAnalisaTipe::fromList([
             'modul-uji' => ['alasan' => 'Bahan uji.', 'tenggat' => '2020-01-01'],
         ]);
 
-        $this->assertSame(['modul-uji'], $daftar->tenggatYangLewat(new DateTimeImmutable('today')));
+        $this->assertSame(['modul-uji'], $daftar->overdue(new DateTimeImmutable('today')));
     }
 
     /**
@@ -77,7 +77,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
         sort($diBerkas);
 
         $this->assertSame(
-            ModulTanpaAnalisaTipe::bawaan()->namaFolder(),
+            ModulTanpaAnalisaTipe::default()->folderNames(),
             $diBerkas,
             implode("\n", [
                 'Daftar module yang dikecualikan analisa tipe (phpstan.neon) tidak sama dengan',
@@ -97,7 +97,7 @@ class ModulTanpaAnalisaTipeTest extends TestCase
      */
     public function test_tiap_entri_menyebut_alasan_terukur_dan_tenggat(): void
     {
-        foreach (ModulTanpaAnalisaTipe::bawaan()->semua() as $nama => $entri) {
+        foreach (ModulTanpaAnalisaTipe::default()->all() as $nama => $entri) {
             $this->assertEntriDapatDitinjau($nama, $entri);
         }
 

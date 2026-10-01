@@ -44,10 +44,10 @@ final class CurrentWorkspace
      *
      * @var array<string, Collection<int, TenantMembership>>
      */
-    private array $ingatanKeanggotaan = [];
+    private array $membershipCache = [];
 
     /** @var array<string, Collection<int, Organization>> */
-    private array $ingatanOrganisasi = [];
+    private array $organizationCache = [];
 
     /** @return Collection<int, TenantMembership> */
     public function memberships(Request $request): Collection
@@ -58,13 +58,13 @@ final class CurrentWorkspace
         }
 
         $tenantOfAddress = $this->tenantOfAddress($request);
-        $kunci = $user->getAuthIdentifier().'|'.($tenantOfAddress ?? '*');
+        $key = $user->getAuthIdentifier().'|'.($tenantOfAddress ?? '*');
 
-        if (array_key_exists($kunci, $this->ingatanKeanggotaan)) {
-            return $this->ingatanKeanggotaan[$kunci];
+        if (array_key_exists($key, $this->membershipCache)) {
+            return $this->membershipCache[$key];
         }
 
-        return $this->ingatanKeanggotaan[$kunci] = $user->memberships()
+        return $this->membershipCache[$key] = $user->memberships()
             ->with('tenant')
             ->where('status', 'active')
             ->when($tenantOfAddress !== null, fn ($query) => $query->where('tenant_id', $tenantOfAddress))
@@ -114,17 +114,17 @@ final class CurrentWorkspace
     /** @return Collection<int, Organization> */
     public function organizations(TenantMembership $membership): Collection
     {
-        $kunci = (string) $membership->id;
+        $key = (string) $membership->id;
 
-        if (array_key_exists($kunci, $this->ingatanOrganisasi)) {
-            return $this->ingatanOrganisasi[$kunci];
+        if (array_key_exists($key, $this->organizationCache)) {
+            return $this->organizationCache[$key];
         }
 
-        return $this->ingatanOrganisasi[$kunci] = $this->bacaOrganisasi($membership);
+        return $this->organizationCache[$key] = $this->readOrganization($membership);
     }
 
     /** @return Collection<int, Organization> */
-    private function bacaOrganisasi(TenantMembership $membership): Collection
+    private function readOrganization(TenantMembership $membership): Collection
     {
         $query = Organization::query()->where('tenant_id', $membership->tenant_id)->where('status', 'active')->orderBy('name');
         $policies = app(DataPolicyAccessResolver::class)->resolve($membership);
@@ -158,8 +158,8 @@ final class CurrentWorkspace
         // Pindah tenant mengubah jawaban seluruh pertanyaan di atas, jadi ingatannya dibuang.
         // Tanpa ini, permintaan yang berganti tenant di tengah jalan akan terus menjawab dengan
         // tenant sebelumnya — persis jenis kesalahan yang tidak pernah gagal, hanya salah.
-        $this->ingatanKeanggotaan = [];
-        $this->ingatanOrganisasi = [];
+        $this->membershipCache = [];
+        $this->organizationCache = [];
 
         // Pindah tenant atau legal entity adalah padanan pindah company di BC, dan di sana tanggal
         // kerja kembali ke hari ini. Pindah unit operasi saja bukan pindah company.

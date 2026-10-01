@@ -22,7 +22,7 @@ final class TableOwnershipInspector
      *
      * @return list<string>
      */
-    public function tabelSaatIni(ConnectionInterface $connection): array
+    public function currentTables(ConnectionInterface $connection): array
     {
         /** @var list<object{table_name: string}> $rows */
         $rows = $connection->select(
@@ -41,23 +41,23 @@ final class TableOwnershipInspector
      * pengecualian baru harus terlihat pada diff pull request, bukan tersembunyi di berkas
      * setelan yang jarang dibuka.
      *
-     * @param  list<string>  $sebelum
-     * @param  list<string>  $sesudah
-     * @param  list<string>  $pengecualian
+     * @param  list<string>  $before
+     * @param  list<string>  $after
+     * @param  list<string>  $exemption
      * @return list<string>
      */
-    public function pelanggaran(array $sebelum, array $sesudah, string $awalan, array $pengecualian = []): array
+    public function violations(array $before, array $after, string $prefix, array $exemption = []): array
     {
-        $baru = array_values(array_diff($sesudah, $sebelum));
+        $newTables = array_values(array_diff($after, $before));
 
-        $melanggar = array_values(array_filter(
-            $baru,
-            static fn (string $tabel): bool => ! str_starts_with($tabel, $awalan)
-                && ! in_array($tabel, $pengecualian, true),
+        $violates = array_values(array_filter(
+            $newTables,
+            static fn (string $table): bool => ! str_starts_with($table, $prefix)
+                && ! in_array($table, $exemption, true),
         ));
 
-        sort($melanggar);
+        sort($violates);
 
-        return $melanggar;
+        return $violates;
     }
 }

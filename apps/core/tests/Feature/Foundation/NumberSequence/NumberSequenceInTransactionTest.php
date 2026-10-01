@@ -45,7 +45,7 @@ class NumberSequenceInTransactionTest extends TestCase
         'party_types',
         // Riwayat migration module, ditulis sekali per database test oleh Tests\TestCase. Tanpanya
         // pemasangan module berikutnya mencoba membuat ulang tabel yang masih berdiri.
-        ModuleMigrator::TABEL_RIWAYAT,
+        ModuleMigrator::HISTORY_TABLE,
     ];
 
     protected function tearDown(): void

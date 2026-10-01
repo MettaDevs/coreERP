@@ -63,7 +63,7 @@ class RegisterAppManifestModuleTest extends TestCase
         // Laporan tidak ditulis di manifest: katalognya dibaca dari definisi laporan module.
         $diManifest = [
             ...$this->countEntriesInManifestFiles(),
-            'reports' => count(app(ModuleReportProviderRegistry::class)->untuk('management-aset')?->catalog() ?? []),
+            'reports' => count(app(ModuleReportProviderRegistry::class)->providerFor('management-aset')?->catalog() ?? []),
         ];
 
         foreach ($diManifest as $kelompok => $jumlah) {
@@ -122,7 +122,7 @@ class RegisterAppManifestModuleTest extends TestCase
 
     public function test_module_yang_sedang_dipindah_masuk_tidak_didaftarkan_ke_katalog(): void
     {
-        $namaFolderDipindah = array_key_first(ModulSedangDipindah::bawaan()->semua());
+        $namaFolderDipindah = array_key_first(ModulSedangDipindah::default()->all());
 
         if ($namaFolderDipindah === null) {
             $this->markTestSkipped('Tidak ada module yang sedang dipindah, jadi tidak ada yang bisa dibuktikan tertahan.');

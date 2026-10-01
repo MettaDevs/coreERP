@@ -29,7 +29,7 @@ final class CoreNumberSequences
     /**
      * @var array<string, array{name: string, default_prefix: string, allowed_scopes: list<string>, profile: string, scope: string, segments: list<array<string, mixed>>, maximum: int}>
      */
-    private const BAWAAN = [
+    private const DEFAULTS = [
         // Boleh diketik manual supaya nomor pemasok lama dapat dipindahkan apa adanya.
         'core.vendor' => [
             'name' => 'Nomor vendor',
@@ -49,39 +49,39 @@ final class CoreNumberSequences
      */
     public function ensureAll(string $tenantId): void
     {
-        foreach (array_keys(self::BAWAAN) as $referenceCode) {
+        foreach (array_keys(self::DEFAULTS) as $referenceCode) {
             $this->ensure($tenantId, $referenceCode);
         }
     }
 
     public function ensure(string $tenantId, string $referenceCode): void
     {
-        $bawaan = self::BAWAAN[$referenceCode] ?? throw new RuntimeException('Referensi nomor Core tidak dikenal: '.$referenceCode);
-        $referensi = $this->referensi($referenceCode, $bawaan);
+        $default = self::DEFAULTS[$referenceCode] ?? throw new RuntimeException('Referensi nomor Core tidak dikenal: '.$referenceCode);
+        $reference = $this->references($referenceCode, $default);
 
-        if (TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $referensi->id)->exists()) {
+        if (TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $reference->id)->exists()) {
             return;
         }
 
-        $profil = DB::table('number_sequence_profiles')->where('code', $bawaan['profile'])->first();
-        if ($profil === null) {
-            throw new RuntimeException('Profil nomor '.$bawaan['profile'].' belum tersedia.');
+        $profile = DB::table('number_sequence_profiles')->where('code', $default['profile'])->first();
+        if ($profile === null) {
+            throw new RuntimeException('Profil nomor '.$default['profile'].' belum tersedia.');
         }
 
         try {
             DB::transaction(fn () => TenantNumberSequence::query()->create([
                 'tenant_id' => $tenantId,
-                'reference_id' => $referensi->id,
-                'profile_code' => $profil->code,
-                'scope_type' => $bawaan['scope'],
+                'reference_id' => $reference->id,
+                'profile_code' => $profile->code,
+                'scope_type' => $default['scope'],
                 'status' => 'active',
-                'is_continuous' => (bool) $profil->is_continuous,
-                'allow_manual' => (bool) $profil->allow_manual,
-                'preallocation_enabled' => (bool) $profil->preallocation_enabled,
-                'preallocation_quantity' => (int) $profil->preallocation_quantity,
+                'is_continuous' => (bool) $profile->is_continuous,
+                'allow_manual' => (bool) $profile->allow_manual,
+                'preallocation_enabled' => (bool) $profile->preallocation_enabled,
+                'preallocation_quantity' => (int) $profile->preallocation_quantity,
                 'minimum_number' => 1,
-                'maximum_number' => $bawaan['maximum'],
-                'segments' => $bawaan['segments'],
+                'maximum_number' => $default['maximum'],
+                'segments' => $default['segments'],
             ]));
         } catch (UniqueConstraintViolationException) {
             // Permintaan lain membuatnya lebih dulu; itulah yang dipakai.
@@ -98,16 +98,16 @@ final class CoreNumberSequences
      * kelas ini, kelas ini pula yang memasangnya kembali. `insertOrIgnore` tidak membatalkan
      * transaksi pemanggil bila permintaan lain memasangnya lebih dulu.
      *
-     * @param  array{name: string, default_prefix: string, allowed_scopes: list<string>}  $bawaan
+     * @param  array{name: string, default_prefix: string, allowed_scopes: list<string>}  $default
      */
-    private function referensi(string $referenceCode, array $bawaan): NumberSequenceReference
+    private function references(string $referenceCode, array $default): NumberSequenceReference
     {
-        $ada = NumberSequenceReference::query()->where('app_id', self::APP_ID)->where('code', $referenceCode)->first();
-        if ($ada !== null) {
-            return $ada;
+        $exists = NumberSequenceReference::query()->where('app_id', self::APP_ID)->where('code', $referenceCode)->first();
+        if ($exists !== null) {
+            return $exists;
         }
 
-        $sekarang = now();
+        $now = now();
         DB::table('apps')->insertOrIgnore([
             'id' => self::APP_ID,
             'name' => 'CoreERP',
@@ -115,18 +115,18 @@ final class CoreNumberSequences
             'status' => 'internal',
             'database_name' => null,
             'description' => 'Pemilik referensi nomor milik Core sendiri, misalnya nomor vendor. Bukan produk yang dipasang.',
-            'created_at' => $sekarang,
-            'updated_at' => $sekarang,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         DB::table('app_number_sequence_references')->insertOrIgnore([
             'id' => strtolower((string) Str::ulid()),
             'app_id' => self::APP_ID,
             'code' => $referenceCode,
-            'name' => $bawaan['name'],
-            'default_prefix' => $bawaan['default_prefix'],
-            'allowed_scopes' => json_encode($bawaan['allowed_scopes'], JSON_THROW_ON_ERROR),
-            'created_at' => $sekarang,
-            'updated_at' => $sekarang,
+            'name' => $default['name'],
+            'default_prefix' => $default['default_prefix'],
+            'allowed_scopes' => json_encode($default['allowed_scopes'], JSON_THROW_ON_ERROR),
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
 
         return NumberSequenceReference::query()->where('app_id', self::APP_ID)->where('code', $referenceCode)->firstOrFail();

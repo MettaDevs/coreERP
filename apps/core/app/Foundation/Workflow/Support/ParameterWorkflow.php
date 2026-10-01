@@ -25,7 +25,7 @@ use UnexpectedValueException;
 final class ParameterWorkflow
 {
     /** @var array<string, array<string, bool>> */
-    private array $ingatan = [];
+    private array $cache = [];
 
     /**
      * Nilai sebuah parameter boolean.
@@ -34,13 +34,13 @@ final class ParameterWorkflow
      * parameter akan selalu terbaca sebagai "tidak dilarang", dan sebuah penjaga yang mati
      * karena salah ketik adalah kegagalan yang tidak pernah terlihat.
      */
-    public function boolean(string $tenantId, string $kode): bool
+    public function boolean(string $tenantId, string $code): bool
     {
-        if (! DefinisiParameterWorkflow::dikenal($kode)) {
-            throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $kode));
+        if (! DefinisiParameterWorkflow::known($code)) {
+            throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $code));
         }
 
-        return $this->semua($tenantId)[$kode];
+        return $this->all($tenantId)[$code];
     }
 
     /**
@@ -51,26 +51,26 @@ final class ParameterWorkflow
      *
      * @return array<string, bool>
      */
-    public function semua(string $tenantId): array
+    public function all(string $tenantId): array
     {
-        if (isset($this->ingatan[$tenantId])) {
-            return $this->ingatan[$tenantId];
+        if (isset($this->cache[$tenantId])) {
+            return $this->cache[$tenantId];
         }
 
-        $tersimpan = [];
+        $stored = [];
 
-        foreach (DB::table('workflow_parameters')->where('tenant_id', $tenantId)->get(['code', 'value']) as $baris) {
+        foreach (DB::table('workflow_parameters')->where('tenant_id', $tenantId)->get(['code', 'value']) as $row) {
             // Kode yang tidak lagi terdaftar dilewati. Baris yatim boleh tertinggal di database
             // — lihat alasannya pada `DefinisiParameterWorkflow` — tetapi ia tidak boleh ikut
             // menjawab pertanyaan siapa pun.
-            if (! DefinisiParameterWorkflow::dikenal((string) $baris->code)) {
+            if (! DefinisiParameterWorkflow::known((string) $row->code)) {
                 continue;
             }
 
-            $tersimpan[(string) $baris->code] = $this->sesuaiTipe((string) $baris->code, (string) $baris->value);
+            $stored[(string) $row->code] = $this->matchesType((string) $row->code, (string) $row->value);
         }
 
-        return $this->ingatan[$tenantId] = $tersimpan + DefinisiParameterWorkflow::bawaan();
+        return $this->cache[$tenantId] = $stored + DefinisiParameterWorkflow::default();
     }
 
     /**
@@ -92,19 +92,19 @@ final class ParameterWorkflow
      * dibutuhkan orang yang membaca log adalah parameter mana yang rusak dan apa yang dijanjikan
      * registry untuknya.
      */
-    private function sesuaiTipe(string $kode, string $mentah): bool
+    private function matchesType(string $code, string $raw): bool
     {
-        $nilai = json_decode($mentah, true, 512, JSON_THROW_ON_ERROR);
+        $value = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
 
-        if (! is_bool($nilai)) {
+        if (! is_bool($value)) {
             throw new UnexpectedValueException(sprintf(
                 'Parameter workflow "%s" dijanjikan boolean oleh registry, tetapi yang tersimpan %s.',
-                $kode,
-                get_debug_type($nilai),
+                $code,
+                get_debug_type($value),
             ));
         }
 
-        return $nilai;
+        return $value;
     }
 
     /**
@@ -124,20 +124,20 @@ final class ParameterWorkflow
      * pemanggil yang lupa melupakan akan membaca nilai lama pada permintaan yang sama — dan itu
      * muncul sebagai layar yang menampilkan setelan lama sesaat setelah pengguna mengubahnya.
      */
-    public function simpan(string $tenantId, string $kode, bool $nilai, string $idKeanggotaanAktor): void
+    public function save(string $tenantId, string $code, bool $value, string $actorMembershipId): void
     {
-        if (! DefinisiParameterWorkflow::dikenal($kode)) {
-            throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $kode));
+        if (! DefinisiParameterWorkflow::known($code)) {
+            throw new InvalidArgumentException(sprintf('Parameter workflow "%s" tidak terdaftar.', $code));
         }
 
-        $sebelumnya = $this->semua($tenantId)[$kode];
+        $previous = $this->all($tenantId)[$code];
 
         DB::table('workflow_parameters')->upsert(
             [[
                 'id' => (string) Str::ulid(),
                 'tenant_id' => $tenantId,
-                'code' => $kode,
-                'value' => json_encode($nilai, JSON_THROW_ON_ERROR),
+                'code' => $code,
+                'value' => json_encode($value, JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]],
@@ -147,12 +147,12 @@ final class ParameterWorkflow
             ['value', 'updated_at'],
         );
 
-        unset($this->ingatan[$tenantId]);
+        unset($this->cache[$tenantId]);
 
         // Hanya perubahan yang dicatat. Sebuah sakelar yang ditekan ke posisi yang sudah
         // ditempatinya bukan peristiwa, dan jejak audit yang penuh baris tanpa peristiwa adalah
         // jejak yang berhenti dibaca orang.
-        if ($sebelumnya === $nilai) {
+        if ($previous === $value) {
             return;
         }
 
@@ -165,10 +165,10 @@ final class ParameterWorkflow
             'membership_id' => null,
             'action' => 'workflow.parameter.updated',
             'payload' => json_encode([
-                'actor_membership_id' => $idKeanggotaanAktor,
-                'code' => $kode,
-                'from' => $sebelumnya,
-                'to' => $nilai,
+                'actor_membership_id' => $actorMembershipId,
+                'code' => $code,
+                'from' => $previous,
+                'to' => $value,
             ], JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),

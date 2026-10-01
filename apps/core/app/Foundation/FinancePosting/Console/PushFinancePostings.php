@@ -19,20 +19,20 @@ class PushFinancePostings extends Command
 
     public function handle(PostingPusher $pusher): int
     {
-        $hasil = $pusher->run(max(1, (int) $this->option('limit')));
+        $result = $pusher->run(max(1, (int) $this->option('limit')));
 
-        if ($hasil['skipped'] !== null) {
-            $this->info('Tidak mengirim apa pun. '.$hasil['skipped']);
+        if ($result['skipped'] !== null) {
+            $this->info('Tidak mengirim apa pun. '.$result['skipped']);
 
             return self::SUCCESS;
         }
 
         $this->info(sprintf(
             '%d klien: %d terkirim, %d menunggu dicoba lagi, %d gagal.',
-            $hasil['clients'],
-            $hasil['sent'],
-            $hasil['retrying'],
-            $hasil['failed'],
+            $result['clients'],
+            $result['sent'],
+            $result['retrying'],
+            $result['failed'],
         ));
 
         return self::SUCCESS;

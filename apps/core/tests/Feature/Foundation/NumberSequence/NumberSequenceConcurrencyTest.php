@@ -50,7 +50,7 @@ class NumberSequenceConcurrencyTest extends TestCase
         'party_types',
         // Module migration history, written once per test database by Tests\TestCase. Without it the next
         // module install tries to create tables that are still there.
-        ModuleMigrator::TABEL_RIWAYAT,
+        ModuleMigrator::HISTORY_TABLE,
     ];
 
     /**

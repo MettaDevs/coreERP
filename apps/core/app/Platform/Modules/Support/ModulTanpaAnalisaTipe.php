@@ -30,7 +30,7 @@ final class ModulTanpaAnalisaTipe
      *
      * @var array<string, array{alasan: string, tenggat: string}>
      */
-    private const DAFTAR = [
+    private const MODULES = [
         // Kosong sejak 9 September 2026. Modul aset — satu-satunya yang pernah terdaftar di
         // sini — selesai dianotasi pada F3-29, dan sejak itu seluruh modul ikut analisa tipe
         // tanpa kecuali. Kelasnya tetap ada karena modul berikutnya akan mendarat dengan
@@ -38,36 +38,36 @@ final class ModulTanpaAnalisaTipe
     ];
 
     /**
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string}>  $list
      */
-    private function __construct(private readonly array $daftar) {}
+    private function __construct(private readonly array $list) {}
 
-    public static function bawaan(): self
+    public static function default(): self
     {
-        return new self(self::DAFTAR);
+        return new self(self::MODULES);
     }
 
     /**
      * Daftar buatan, hanya untuk test yang membuktikan perilaku daftar ini.
      *
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string}>  $list
      */
-    public static function dariDaftar(array $daftar): self
+    public static function fromList(array $list): self
     {
-        return new self($daftar);
+        return new self($list);
     }
 
-    public function menandai(string $namaFolder): bool
+    public function marks(string $folderName): bool
     {
-        return isset($this->daftar[$namaFolder]);
+        return isset($this->list[$folderName]);
     }
 
     /**
      * @return array<string, array{alasan: string, tenggat: string}>
      */
-    public function semua(): array
+    public function all(): array
     {
-        return $this->daftar;
+        return $this->list;
     }
 
     /**
@@ -78,21 +78,21 @@ final class ModulTanpaAnalisaTipe
      *
      * @return list<string>
      */
-    public function tenggatYangLewat(\DateTimeImmutable $hariIni): array
+    public function overdue(\DateTimeImmutable $today): array
     {
-        $lewat = [];
+        $overdue = [];
 
-        foreach ($this->daftar as $nama => $entri) {
-            $tenggat = \DateTimeImmutable::createFromFormat('!Y-m-d', $entri['tenggat']);
+        foreach ($this->list as $name => $entry) {
+            $deadline = \DateTimeImmutable::createFromFormat('!Y-m-d', $entry['tenggat']);
 
-            if ($tenggat !== false && $tenggat < $hariIni) {
-                $lewat[] = $nama;
+            if ($deadline !== false && $deadline < $today) {
+                $overdue[] = $name;
             }
         }
 
-        sort($lewat);
+        sort($overdue);
 
-        return $lewat;
+        return $overdue;
     }
 
     /**
@@ -100,11 +100,11 @@ final class ModulTanpaAnalisaTipe
      *
      * @return list<string>
      */
-    public function namaFolder(): array
+    public function folderNames(): array
     {
-        $nama = array_keys($this->daftar);
-        sort($nama);
+        $name = array_keys($this->list);
+        sort($name);
 
-        return $nama;
+        return $name;
     }
 }

@@ -112,7 +112,7 @@ class Environment extends Model
     }
 
     /** @return BelongsTo<Environment, $this> */
-    public function sumber(): BelongsTo
+    public function source(): BelongsTo
     {
         return $this->belongsTo(self::class, 'source_environment_id');
     }
@@ -157,16 +157,16 @@ class Environment extends Model
      * konsol, maupun dari log membaca sebab yang sama dengan kata yang sama — dan langsung tahu bahwa
      * yang salah bukan id-nya melainkan tempatnya.
      *
-     * @param  string  $tindakan  kata benda tindakannya, mis. "Penyiapan database"
+     * @param  string  $action  kata benda tindakannya, mis. "Penyiapan database"
      */
-    public function clientServerRefusal(string $tindakan): string
+    public function clientServerRefusal(string $action): string
     {
         return sprintf(
             'Lingkungan "%s" berjalan di server klien, bukan di server ini. %s ditolak: isinya tidak '
             .'ada di sini, dan mengerjakannya dari sini berarti mengerjakan database bersama milik '
             .'tenant lain. Lingkungan ini dikelola dari admin.erp lewat agen di server klien.',
             $this->slug,
-            $tindakan,
+            $action,
         );
     }
 }

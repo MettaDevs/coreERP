@@ -776,7 +776,7 @@ class ReportingTest extends TestCase
      */
     private function reportFromModuleCatalog(): array
     {
-        foreach (app(ModuleReportProviderRegistry::class)->untuk('management-aset')?->catalog() ?? [] as $laporan) {
+        foreach (app(ModuleReportProviderRegistry::class)->providerFor('management-aset')?->catalog() ?? [] as $laporan) {
             if ($laporan['code'] === self::KODE_LAPORAN) {
                 return $laporan;
             }

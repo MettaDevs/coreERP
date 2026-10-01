@@ -67,7 +67,7 @@ class KonteksLaporanPermintaanTest extends TestCase
         //
         // Karena itu yang dicatat adalah **panjangnya sebelum test**, dan yang dibaca hanya
         // bagian yang bertambah sesudahnya.
-        $this->panjangAwal = is_file(BerkasLaporan::jalur()) ? (int) filesize(BerkasLaporan::jalur()) : 0;
+        $this->panjangAwal = is_file(BerkasLaporan::path()) ? (int) filesize(BerkasLaporan::path()) : 0;
     }
 
     public function test_laporan_dari_permintaan_terautentikasi_memuat_tenant_dan_pengguna(): void
@@ -123,7 +123,7 @@ class KonteksLaporanPermintaanTest extends TestCase
     /** Hanya bagian yang ditambahkan test ini, bukan seluruh isi berkas bersama. */
     private function isiLaporan(): string
     {
-        $berkas = BerkasLaporan::jalur();
+        $berkas = BerkasLaporan::path();
 
         $this->assertFileExists($berkas, 'Laporan kesalahan tidak ditulis untuk permintaan yang gagal.');
 

@@ -36,23 +36,23 @@ class PublishWorkflowEvents extends Command
 
     protected $description = 'Kirim keputusan workflow yang belum terkirim ke aplikasi penerima.';
 
-    public function handle(ModuleRegistry $registry, ActiveEnvironment $lingkungan): int
+    public function handle(ModuleRegistry $registry, ActiveEnvironment $environment): int
     {
-        if (! $lingkungan->outboundAllowed()) {
-            return $this->lucuti($lingkungan);
+        if (! $environment->outboundAllowed()) {
+            return $this->disarm($environment);
         }
 
         $key = (string) config('coreerp.app_context_signing_key');
-        $semua = collect(config('coreerp.event_endpoints', []))
+        $all = collect(config('coreerp.event_endpoints', []))
             ->filter(fn (mixed $endpoint): bool => is_array($endpoint) && in_array($endpoint['type'] ?? null, self::TYPES, true) && isset($endpoint['url']))
             ->values();
-        if ($key === '' || $semua->isEmpty()) {
+        if ($key === '' || $all->isEmpty()) {
             return self::SUCCESS;
         }
 
-        $dalamProses = $this->idModulDalamProses($registry);
-        $endpoints = $semua
-            ->reject(fn (array $endpoint): bool => isset($endpoint['module']) && in_array($endpoint['module'], $dalamProses, true))
+        $inProcess = $this->inProcessModuleIds($registry);
+        $endpoints = $all
+            ->reject(fn (array $endpoint): bool => isset($endpoint['module']) && in_array($endpoint['module'], $inProcess, true))
             ->values();
 
         $events = DB::table('outbox_events')->whereIn('type', self::TYPES)->whereNull('published_at')
@@ -76,7 +76,7 @@ class PublishWorkflowEvents extends Command
                 //
                 // Jenis yang tidak punya penerima sama sekali tetap dibiarkan menggantung —
                 // itu konfigurasi yang belum lengkap, bukan event yang sudah sampai.
-                if ($semua->where('type', $event->type)->isNotEmpty()) {
+                if ($all->where('type', $event->type)->isNotEmpty()) {
                     DB::table('outbox_events')->where('id', $event->id)->whereNull('published_at')->update(['published_at' => now(), 'updated_at' => now()]);
                 }
 
@@ -126,7 +126,7 @@ class PublishWorkflowEvents extends Command
      * maupun yang kosong berujung pada hal yang sama — tidak ada yang akan dikirim — jadi
      * membedakan keduanya hanya menyisakan tumpukan baris yang tidak berarti apa-apa.
      */
-    private function lucuti(ActiveEnvironment $lingkungan): int
+    private function disarm(ActiveEnvironment $environment): int
     {
         // Id dipungut lebih dulu lalu diperbarui lewat `whereIn`, bukan `limit()->update()`:
         // PostgreSQL tidak menerima LIMIT pada UPDATE, dan pembatasannya memang harus ikut —
@@ -147,7 +147,7 @@ class PublishWorkflowEvents extends Command
         $this->info(sprintf(
             '%d event ditandai terbit tanpa dikirim. %s',
             count($ids),
-            $lingkungan->refusalReason(),
+            $environment->refusalReason(),
         ));
 
         return self::SUCCESS;
@@ -171,11 +171,11 @@ class PublishWorkflowEvents extends Command
      *
      * @return list<string>
      */
-    private function idModulDalamProses(ModuleRegistry $registry): array
+    private function inProcessModuleIds(ModuleRegistry $registry): array
     {
         return array_map(
             static fn (ModuleManifest $module): string => $module->id,
-            $registry->semuaTermasukYangSedangDipindah(),
+            $registry->allIncludingMoved(),
         );
     }
 }

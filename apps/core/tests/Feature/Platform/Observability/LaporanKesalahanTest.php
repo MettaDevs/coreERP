@@ -37,21 +37,21 @@ class LaporanKesalahanTest extends TestCase
     {
         $permintaan = Request::create('https://erp.test/management-aset/entitas', 'POST');
         $permintaan->attributes->set(ModuleRequestContext::TENANT_ID, 'tenant-01');
-        $permintaan->attributes->set(ResolveModuleContext::MODULE_AKTIF, 'management-aset');
+        $permintaan->attributes->set(ResolveModuleContext::ACTIVE_MODULE, 'management-aset');
         $permintaan->attributes->set(ModuleRequestContext::LEGAL_ENTITY_ID, 'entitas-01');
         $permintaan->attributes->set(ModuleRequestContext::ORG_UNIT_ID, 'unit-01');
         $permintaan->attributes->set(ModuleRequestContext::USER_ID, 'pengguna-01');
 
-        $laporan = LaporanKesalahan::dari(new RuntimeException('gagal menyimpan'), $permintaan);
+        $laporan = LaporanKesalahan::from(new RuntimeException('gagal menyimpan'), $permintaan);
 
-        $teks = $laporan->keTeks();
+        $teks = $laporan->toText();
         $this->assertStringContainsString('POST', $teks);
         $this->assertStringContainsString('/management-aset/entitas', $teks);
         $this->assertStringContainsString('tenant-01', $teks);
         $this->assertStringContainsString('management-aset', $teks);
         $this->assertStringContainsString('gagal menyimpan', $teks);
 
-        $atribut = $laporan->keAtribut();
+        $atribut = $laporan->toAttributes();
         $this->assertSame('tenant-01', $atribut['coreerp.tenant_id']);
         $this->assertSame('management-aset', $atribut['coreerp.module_id']);
         $this->assertSame('entitas-01', $atribut['coreerp.legal_entity_id']);
@@ -67,27 +67,27 @@ class LaporanKesalahanTest extends TestCase
         // middleware module berjalan, jadi tidak satu pun atribut tersedia.
         $permintaan = Request::create('https://erp.test/dashboard', 'GET');
 
-        $laporan = LaporanKesalahan::dari(new RuntimeException('meledak'), $permintaan);
+        $laporan = LaporanKesalahan::from(new RuntimeException('meledak'), $permintaan);
 
-        $teks = $laporan->keTeks();
+        $teks = $laporan->toText();
         $this->assertStringContainsString('meledak', $teks);
         $this->assertStringContainsString('tenant   : -', $teks);
         $this->assertStringContainsString('module   : -', $teks);
 
-        $this->assertArrayNotHasKey('coreerp.tenant_id', array_filter($laporan->keAtribut()));
+        $this->assertArrayNotHasKey('coreerp.tenant_id', array_filter($laporan->toAttributes()));
     }
 
     public function test_kegagalan_kueri_menampilkan_sql_dan_pesan_driver(): void
     {
-        $laporan = LaporanKesalahan::dari($this->kesalahanKueri(), Request::create('https://erp.test/x', 'POST'));
+        $laporan = LaporanKesalahan::from($this->kesalahanKueri(), Request::create('https://erp.test/x', 'POST'));
 
-        $teks = $laporan->keTeks();
+        $teks = $laporan->toText();
         $this->assertStringContainsString('duplicate key value', $teks);
         $this->assertStringContainsString('insert into "aset"', $teks);
         $this->assertStringContainsString("'AST-001'", $teks, 'nilai binding ikut ditulis');
         $this->assertStringContainsString('SQLSTATE 23505', $teks);
 
-        $atribut = $laporan->keAtribut();
+        $atribut = $laporan->toAttributes();
         $this->assertSame('pgsql', $atribut['db.system']);
         $this->assertSame('core_erp', $atribut['db.namespace']);
         $this->assertSame('23505', $atribut['db.response.status_code']);
@@ -118,7 +118,7 @@ class LaporanKesalahanTest extends TestCase
         $permintaan = Request::create('https://erp.test/dashboard', 'GET');
         $permintaan->setLaravelSession($this->app['session']->driver());
 
-        LaporanKesalahan::dari($this->kesalahanKueri(), $permintaan);
+        LaporanKesalahan::from($this->kesalahanKueri(), $permintaan);
 
         $this->assertFalse($disentuh, 'CurrentWorkspace tidak boleh diselesaikan ketika kesalahannya menyangkut database');
     }
@@ -128,29 +128,29 @@ class LaporanKesalahanTest extends TestCase
         // Koneksi ditolak sebelum satu query pun tersusun tidak pernah menjadi
         // `QueryException` — padahal justru itu keadaan ketika database paling tidak boleh
         // disentuh lagi.
-        $this->assertTrue(LaporanKesalahan::kegagalanDatabase(new PDOException('connection refused')));
-        $this->assertTrue(LaporanKesalahan::kegagalanDatabase(new RuntimeException('dibungkus', 0, new PDOException('refused'))));
-        $this->assertFalse(LaporanKesalahan::kegagalanDatabase(new RuntimeException('biasa')));
+        $this->assertTrue(LaporanKesalahan::isDatabaseFailure(new PDOException('connection refused')));
+        $this->assertTrue(LaporanKesalahan::isDatabaseFailure(new RuntimeException('dibungkus', 0, new PDOException('refused'))));
+        $this->assertFalse(LaporanKesalahan::isDatabaseFailure(new RuntimeException('biasa')));
     }
 
     public function test_bentuk_konsol_tanpa_permintaan(): void
     {
-        $laporan = LaporanKesalahan::dari(new RuntimeException('job gagal'), null);
+        $laporan = LaporanKesalahan::from(new RuntimeException('job gagal'), null);
 
-        $teks = $laporan->keTeks();
+        $teks = $laporan->toText();
         $this->assertStringContainsString('konsol', $teks);
         $this->assertStringContainsString('job gagal', $teks);
         $this->assertStringNotContainsString('rute', $teks);
 
-        $atribut = $laporan->keAtribut();
+        $atribut = $laporan->toAttributes();
         $this->assertArrayNotHasKey('url.full', $atribut);
         $this->assertArrayNotHasKey('http.request.method', $atribut);
     }
 
     public function test_kesalahan_4xx_tidak_layak_dilaporkan(): void
     {
-        $this->assertFalse(LaporanKesalahan::layakDilaporkan(new NotFoundHttpException));
-        $this->assertTrue(LaporanKesalahan::layakDilaporkan(new RuntimeException('nyata')));
+        $this->assertFalse(LaporanKesalahan::isReportable(new NotFoundHttpException));
+        $this->assertTrue(LaporanKesalahan::isReportable(new RuntimeException('nyata')));
     }
 
     private function kesalahanKueri(): QueryException

@@ -50,8 +50,8 @@ class OrganizationRequest extends FormRequest
                 'prohibited_if:classification,legal_entity',
                 'nullable',
                 'string',
-                'max:'.OperatingUnit::PANJANG_NOMOR,
-                'regex:'.OperatingUnit::FORMAT_NOMOR,
+                'max:'.OperatingUnit::NUMBER_LENGTH,
+                'regex:'.OperatingUnit::NUMBER_FORMAT,
             ],
         ];
     }

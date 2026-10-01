@@ -124,7 +124,7 @@ class AppServiceProvider extends ServiceProvider
         Passkeys::usePasskeyModel(Passkey::class);
 
         $this->configureDefaults();
-        $this->hentikanPenerusanLogKeOtel();
+        $this->stopForwardingLogsToOtel();
 
         // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia
         // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
@@ -187,7 +187,7 @@ class AppServiceProvider extends ServiceProvider
         // untuk ditolak.
         RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
             (int) config('coreerp.integration_api_rate_limit', 120)
-        )->by(self::kunciKlienIntegrasi($request)));
+        )->by(self::integrationClientKey($request)));
 
         // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
         RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
@@ -195,7 +195,7 @@ class AppServiceProvider extends ServiceProvider
                 $request->header('X-CoreERP-App-Id', 'unknown'),
                 $request->header('X-CoreERP-Tenant-Id', 'unknown'),
             ]))
-            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::kunciKlienIntegrasi($request)));
+            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::integrationClientKey($request)));
     }
 
     /**
@@ -247,7 +247,7 @@ class AppServiceProvider extends ServiceProvider
      *
      * Mengembalikannya cukup dengan menghapus pemanggilan metode ini.
      */
-    private function hentikanPenerusanLogKeOtel(): void
+    private function stopForwardingLogsToOtel(): void
     {
         // Tidak ada pendengar `MessageLogged` lain di basis kode ini — sudah diperiksa — jadi
         // melupakan seluruh pendengarnya setara dengan melepas satu pendengar milik paket itu.
@@ -257,7 +257,7 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
-    private static function kunciKlienIntegrasi(Request $request): string
+    private static function integrationClientKey(Request $request): string
     {
         $token = (string) $request->bearerToken();
         $id = str_contains($token, '.') ? strstr($token, '.', true) : '';

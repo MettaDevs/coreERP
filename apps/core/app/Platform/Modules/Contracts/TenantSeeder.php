@@ -23,6 +23,6 @@ abstract class TenantSeeder extends Seeder
     /** Melempar bila dipanggil di luar pemasangan module, bukan menebak tenant. */
     protected function tenantId(): string
     {
-        return TenantScope::tenantAktif();
+        return TenantScope::activeTenant();
     }
 }

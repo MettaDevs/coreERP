@@ -44,7 +44,7 @@ class FinancePostingEvent extends Model
     }
 
     /** @param  array<string, mixed>  $data */
-    public static function catat(
+    public static function record(
         FinancePosting $posting,
         string $event,
         ?string $fromStatus,
