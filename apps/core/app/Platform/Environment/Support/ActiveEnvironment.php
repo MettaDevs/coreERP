@@ -22,7 +22,7 @@ use Throwable;
  * Dua jalan, berurutan:
  *
  * 1. **Binding eksplisit.** Siapa pun yang tahu persis environment mana yang sedang dikerjakan —
- *    kelak perintah artisan, job antrean, dan scheduler — mengikatnya pada `KUNCI`. Ini jalan yang
+ *    kelak perintah artisan, job antrean, dan scheduler — mengikatnya pada `TenantScope::KEY`. Ini jalan yang
  *    benar, dan ia yang akan menjadi satu-satunya jalan.
  * 2. **Diturunkan dari tenant aktif.** Selama satu tenant baru punya satu environment, tenant yang
  *    terikat sudah cukup untuk menemukannya.

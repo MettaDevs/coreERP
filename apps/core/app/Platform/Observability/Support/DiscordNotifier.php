@@ -14,7 +14,7 @@ use Throwable;
  * **Kenapa webhook, bukan bot.** Yang dibutuhkan di sini hanya satu arah: menaruh pesan di
  * satu channel dan menyebut orang. Bot menambah token yang harus dijaga, undangan per server,
  * dan proses gateway — semuanya demi kemampuan yang tidak dipakai. Pindah ke bot nanti cukup
- * mengganti isi {@see self::kirimKe()}; bentuk pesannya tidak ikut berubah.
+ * mengganti isi {@see self::sendTo()}; bentuk pesannya tidak ikut berubah.
  *
  * **Sebutan harus berada di `content`, tidak boleh di dalam embed.** Discord hanya menerbitkan
  * notifikasi untuk sebutan yang muncul di `content`; yang ditulis di dalam embed tetap tampil

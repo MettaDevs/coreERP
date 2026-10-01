@@ -32,7 +32,7 @@ Berkas tuan rumah itu tinggal di `lib/`, bukan di `pages/`. Pola glob halaman sh
 
 ## Tautan menu adalah aturan tetap, bukan kolom manifest
 
-Tautan entri menu module adalah `/<id module>/<id entri menu>`, disusun `LaunchableAppCatalog::tautanMenu()` dari manifest. Sebuah kolom manifest kedua yang berisi jalur pernah dipertimbangkan dan ditolak: kolom seperti itu akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute module adalah satu-satunya sumber kebenaran, dan `apps/core/tests/Feature/Modules/HalamanModuleShellTest.php` membuktikan setiap tautan menu mendarat pada rute yang terdaftar.
+Tautan entri menu module adalah `/<id module>/<id entri menu>`, disusun `LaunchableAppCatalog::menuLink()` dari manifest. Sebuah kolom manifest kedua yang berisi jalur pernah dipertimbangkan dan ditolak: kolom seperti itu akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute module adalah satu-satunya sumber kebenaran, dan `apps/core/tests/Feature/Modules/HalamanModuleShellTest.php` membuktikan setiap tautan menu mendarat pada rute yang terdaftar.
 
 ## Rute layar dimiliki module, bukan Core
 

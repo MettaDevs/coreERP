@@ -474,7 +474,7 @@ final class ErrorReport
 
     /**
      * Apakah kesalahan ini menyangkut database — dipakai untuk memutuskan boleh-tidaknya
-     * bertanya ke sesi. Lebih longgar dari {@see self::kesalahanKueri()}: `PDOException`
+     * bertanya ke sesi. Lebih longgar dari {@see self::queryException()}: `PDOException`
      * telanjang pun cukup untuk membuat kita tidak menyentuh database lagi.
      */
     private static function involvesDatabase(Throwable $error): bool
@@ -636,7 +636,7 @@ final class ErrorReport
         return true;
     }
 
-    /** Dipakai {@see self::dari()} dan oleh test; dipublikkan supaya perilakunya bisa diuji. */
+    /** Dipakai {@see self::from()} dan oleh test; dipublikkan supaya perilakunya bisa diuji. */
     public static function isDatabaseFailure(Throwable $error): bool
     {
         return self::involvesDatabase($error);

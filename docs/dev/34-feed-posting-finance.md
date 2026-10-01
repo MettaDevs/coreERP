@@ -70,7 +70,7 @@ Tabelnya lahir di `apps/core/database/migrations/2026_09_22_150000_create_financ
 | `finance_postings` | Satu posting: status, `payload`, `input`, `input_hash`, masalah penahanan, hasil ack, dan jejak pull |
 | `finance_posting_lines` | Baris jurnal sebagai kolom, dengan `business_unit_code` dan `department_code` di sampingnya, supaya laporan per unit tidak perlu membongkar JSON (padanan *global dimension* BC, K-07). Dihapus lalu ditulis ulang setiap kali posting dibentuk ulang. |
 | `finance_posting_deliveries` | Jejak kiriman mode push, satu baris per pasangan posting dan klien: jumlah percobaan, jadwal percobaan berikutnya, kode jawaban dan kesalahan terakhir. Mode pull tidak menulis di sini. |
-| `finance_posting_events` | Riwayat untuk layar pantau, beserta pelakunya: pengguna, klien integrasi, atau kosong untuk tindakan sistem. Nama peristiwanya ditentukan pemanggil `FinancePostingEvent::catat()` di `PostingPublisher`, `PostingAcknowledger`, dan `PostingPusher`. |
+| `finance_posting_events` | Riwayat untuk layar pantau, beserta pelakunya: pengguna, klien integrasi, atau kosong untuk tindakan sistem. Nama peristiwanya ditentukan pemanggil `FinancePostingEvent::record()` di `PostingPublisher`, `PostingAcknowledger`, dan `PostingPusher`. |
 
 Kolom yang mudah salah paham:
 
@@ -155,7 +155,7 @@ Pemeriksaannya berlapis, dan urutannya disengaja:
 
 `PostingPublisher::normalize()` memeriksa:
 
-- Field wajib dan panjangnya. `posting_id` hanya huruf, angka, titik, titik dua, garis bawah, dan strip. `posting_type` berbentuk `modul.peristiwa` (`PostingPublisher::POLA_JENIS`).
+- Field wajib dan panjangnya. `posting_id` hanya huruf, angka, titik, titik dua, garis bawah, dan strip. `posting_type` berbentuk `modul.peristiwa` (`PostingPublisher::POSTING_TYPE_PATTERN`).
 - `legal_entity_id` adalah entitas legal milik tenant itu.
 - `currency_code` adalah kode tiga huruf yang presisinya diketahui. Mata uang tanpa setelan dan tanpa bawaan ditolak, bukan ditebak: menebak dua desimal untuk JPY berarti jurnal yang tidak cocok dengan pembacanya.
 - `posting_date` dan `document_date` persis `Y-m-d`; `occurred_at` wajib membawa offset zona waktu (K-21).
@@ -185,7 +185,7 @@ Cutover diperiksa **sebelum** masalah pemetaan. Posting `manual` tidak menyimpan
 
 ### Lapis 3: pemetaan
 
-`PostingPublisher::bentuk()` memeriksa setiap baris dan mengumpulkan semua masalahnya — satu baris boleh punya lebih dari satu. Kode yang dipakai hari ini:
+`PostingPublisher::shape()` memeriksa setiap baris dan mengumpulkan semua masalahnya — satu baris boleh punya lebih dari satu. Kode yang dipakai hari ini:
 
 | Kode | Muncul ketika | Jalan pintas perbaikan (`fix`) |
 | --- | --- | --- |
@@ -347,7 +347,7 @@ Sistem di luar CoreERP masuk lewat klien integrasi, bukan kredensial app. Kreden
 
 **Scope** ada di `IntegrationClient::SCOPES`, sengaja sempit dan per sumber daya. `GET /operating-units` juga dibaca module lewat kredensial app, dari rute dan kontrak yang sama (`AuthenticateInternalCaller`): dua rute untuk data yang sama berarti dua kontrak yang kelak menyimpang.
 
-**Prefix jenis posting** (`posting_type_prefixes`) membatasi jenis yang boleh sampai ke klien (K-23). Tanpa prefix berarti semua jenis, termasuk jenis baru dari modul mana pun. Ejaan `asset.*` disimpan sebagai `asset.`. Prefix dibandingkan sebagai awal teks di SQL oleh `FinancePosting::batasiUntukKlien()`, yang dipakai pull, ack, dan push sekaligus supaya ketiganya tidak pernah berbeda. Karena dibandingkan sebagai teks, prefix tanpa titik seperti `asset` juga cocok dengan `assets.x`; tulis prefix dengan titik.
+**Prefix jenis posting** (`posting_type_prefixes`) membatasi jenis yang boleh sampai ke klien (K-23). Tanpa prefix berarti semua jenis, termasuk jenis baru dari modul mana pun. Ejaan `asset.*` disimpan sebagai `asset.`. Prefix dibandingkan sebagai awal teks di SQL oleh `FinancePosting::restrictToClient()`, yang dipakai pull, ack, dan push sekaligus supaya ketiganya tidak pernah berbeda. Karena dibandingkan sebagai teks, prefix tanpa titik seperti `asset` juga cocok dengan `assets.x`; tulis prefix dengan titik.
 
 **Allowlist IP** (`allowed_ips`) opsional, berisi IP atau CIDR. Kosong berarti semua alamat. Ia lapisan tambahan di atas token untuk pembaca yang alamatnya tetap; feed sendiri tidak bergantung pada letak jaringan pembaca (K-03).
 
@@ -382,7 +382,7 @@ Satu endpoint melayani semua jenis (K-23). Menambah jenis tidak membutuhkan tabe
 
 ### 1. Namai jenisnya
 
-`posting_type` berbentuk `<modul>.<peristiwa>`: huruf kecil, angka, dan garis bawah, setiap ruas diawali huruf, sedikitnya dua ruas (pola `PostingPublisher::POLA_JENIS`), paling panjang 80 karakter. Contohnya `cashier.receipt`. Ruas pertama menjadi prefix yang dipakai admin tenant untuk membatasi klien integrasi, jadi pakai satu ruas pertama untuk seluruh jenis dari module itu.
+`posting_type` berbentuk `<modul>.<peristiwa>`: huruf kecil, angka, dan garis bawah, setiap ruas diawali huruf, sedikitnya dua ruas (pola `PostingPublisher::POSTING_TYPE_PATTERN`), paling panjang 80 karakter. Contohnya `cashier.receipt`. Ruas pertama menjadi prefix yang dipakai admin tenant untuk membatasi klien integrasi, jadi pakai satu ruas pertama untuk seluruh jenis dari module itu.
 
 ### 2. Susun masukan di pembungkus sisi module
 

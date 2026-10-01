@@ -536,7 +536,7 @@ class WorkflowConfigurationTest extends TestCase
      * sebuah larangan pemisahan tugas yang menyala karena satu baris rusak. Tanpa test ini,
      * kalimat "tipenya hidup di registry" cuma komentar.
      *
-     * Barisnya ditulis lewat SQL langsung dengan sengaja: `simpan()` bertipe `bool`, jadi jalur
+     * Barisnya ditulis lewat SQL langsung dengan sengaja: `save()` bertipe `bool`, jadi jalur
      * resmi memang tidak bisa menghasilkan keadaan ini. Yang diuji adalah ketahanan terhadap
      * baris yang datang dari luar aplikasi — pemulihan cadangan, perbaikan manual, atau versi
      * lama.

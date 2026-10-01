@@ -37,7 +37,7 @@ class AppCatalogRequest extends FormRequest
             // Hanya app yang berjalan sebagai container sendiri yang punya database
             // sendiri untuk disebutkan. Module berjalan di dalam runtime Core dan memakai
             // database Core, jadi menuntutnya menyebutkan nama database berarti menuntut
-            // sebuah karangan. Lihat `berjalanSebagaiContainer()` untuk cara membedakannya.
+            // sebuah karangan. Lihat `runsAsContainer()` untuk cara membedakannya.
             'database_name' => [
                 Rule::requiredIf(fn (): bool => $this->runsAsContainer()),
                 'nullable',

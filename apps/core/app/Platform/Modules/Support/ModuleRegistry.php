@@ -78,10 +78,10 @@ final class ModuleRegistry
     /**
      * Semua module termasuk yang sedang dipindah masuk.
      *
-     * Bedanya dengan `semua()` penting dan bukan kenyamanan: **"belum boleh dipasang untuk
+     * Bedanya dengan `all()` penting dan bukan kenyamanan: **"belum boleh dipasang untuk
      * tenant" tidak sama dengan "kodenya tidak boleh dimuat".** Module yang sedang dipindah
      * belum boleh muncul di katalog, belum boleh dipasang, dan belum boleh menerima data
-     * tenant — itu yang dijaga `semua()`. Tetapi kodenya harus tetap bisa dimuat, karena
+     * tenant — itu yang dijaga `all()`. Tetapi kodenya harus tetap bisa dimuat, karena
      * kalau tidak, tidak ada satu pun testnya yang bisa berjalan, dan pemindahannya
      * dikerjakan tanpa jaring pengaman sampai hari terakhir.
      *

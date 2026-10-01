@@ -63,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(DataPolicyAccessResolver::class);
 
         /*
-         * Scoped, dan itu yang membuat `lupakan()` pada kelas itu jarang diperlukan.
+         * Scoped, dan itu yang membuat `forget()` pada kelas itu jarang diperlukan.
          *
          * Jawabannya ditanyakan ulang oleh setiap titik yang menjaga sambungan keluar, dan
          * setiap pertanyaan berarti satu query kalau instansnya baru tiap kali. Scoped juga

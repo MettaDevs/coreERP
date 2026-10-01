@@ -160,8 +160,8 @@ Daftar yang kosong membuat setiap pemeriksaan yang membacanya hijau **tanpa subj
 menguji apa pun. Itu persis keadaan yang berulang kali dilarang berkas-berkas ini sendiri, dan ia jauh
 lebih berbahaya daripada merah, karena ia terlihat seperti keberhasilan.
 
-Karena itu kedua kelas daftar menyediakan pintu untuk daftar buatan (`ModulesBeingMoved::buatan()` dan
-`ModulesWithoutTypeAnalysis::dariDaftar()`), dan testnya membuktikan aturannya pada entri buatan: penghalang
+Karena itu kedua kelas daftar menyediakan pintu untuk daftar buatan (`ModulesBeingMoved::custom()` dan
+`ModulesWithoutTypeAnalysis::fromList()`), dan testnya membuktikan aturannya pada entri buatan: penghalang
 tanpa nomor task ditolak, tenggat berformat salah ditolak, entri yang menyatakan penghalang tidak
 dihitung basi walau modulnya sudah bersih, dan melonggarkan untuk satu modul tidak melonggarkan untuk
 modul lain.
@@ -177,8 +177,8 @@ kenyamanan:
 
 | Pintu | Untuk apa | Modul yang sedang dipindah |
 | --- | --- | --- |
-| `semua()` | Katalog, pemasangan, dan apa pun yang menyentuh data tenant | Tidak ikut |
-| `semuaTermasukYangSedangDipindah()` | Memuat kode, yaitu mendaftarkan penyedia layanan modul | Ikut |
+| `all()` | Katalog, pemasangan, dan apa pun yang menyentuh data tenant | Tidak ikut |
+| `allIncludingMoved()` | Memuat kode, yaitu mendaftarkan penyedia layanan modul | Ikut |
 
 Pintu kedua dipakai **hanya** untuk mendaftarkan penyedia layanan modul. Memakainya untuk katalog,
 pemasangan, atau apa pun yang menyentuh data tenant membatalkan seluruh gunanya.
@@ -242,7 +242,7 @@ Aturan ini masih berlaku: `app-erp-procurement` belum dipindah.
 | --- | --- |
 | `apps/core/app/Platform/Modules/Support/ModulesBeingMoved.php` | Daftar modul yang sedang dipindah, beserta alasan, tenggat, dan penghalangnya |
 | `apps/core/app/Platform/Modules/Support/ModulesWithoutTypeAnalysis.php` | Daftar modul yang belum ikut analisa tipe PHP |
-| `apps/core/app/Platform/Modules/Support/ModuleRegistry.php` | Pembedaan `semua()` dan `semuaTermasukYangSedangDipindah()` |
+| `apps/core/app/Platform/Modules/Support/ModuleRegistry.php` | Pembedaan `all()` dan `allIncludingMoved()` |
 | `apps/core/app/Providers/ModuleServiceProvider.php` | Pendaftaran penyedia layanan modul dan pemuatan migration modul yang sedang dipindah |
 | `apps/core/tests/Feature/Boundary/ModulesBeingMovedTest.php` | Tenggat, pemeriksaan basi, syarat entri, dan kesamaan berkas pengecualian |
 | `apps/core/tests/Feature/Boundary/ModulesWithoutTypeAnalysisTest.php` | Kesamaan daftar dengan `excludePaths` pada `phpstan.neon`, dan tenggatnya |

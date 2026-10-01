@@ -90,7 +90,7 @@ final class ActiveSpan
     }
 
     /**
-     * Id span yang sedang aktif. Aturan kesahihannya sama seperti {@see self::idJejak()}.
+     * Id span yang sedang aktif. Aturan kesahihannya sama seperti {@see self::traceId()}.
      */
     public static function spanId(): ?string
     {

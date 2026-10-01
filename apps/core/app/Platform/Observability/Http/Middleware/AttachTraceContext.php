@@ -39,7 +39,7 @@ final class AttachTraceContext
     /**
      * Nama atribut span untuk id module.
      *
-     * Sengaja tidak memakai `ResolveModuleContext::MODULE_AKTIF` (`module.id`) apa adanya.
+     * Sengaja tidak memakai `ResolveModuleContext::ACTIVE_MODULE` (`module.id`) apa adanya.
      * Nama itu urusan atribut permintaan, dan di sana ia berdiri sendiri; di dalam sebuah
      * span ia berdampingan dengan atribut milik framework, HTTP, dan database, dan
      * `module.id` tanpa awalan akan terbaca sebagai milik salah satu dari mereka.

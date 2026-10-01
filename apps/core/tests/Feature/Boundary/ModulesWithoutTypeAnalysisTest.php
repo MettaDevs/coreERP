@@ -38,7 +38,7 @@ class ModulesWithoutTypeAnalysisTest extends TestCase
     /**
      * Tenggat yang lewat benar-benar membuat alur merah.
      *
-     * Tanpa test ini, `tenggatYangLewat()` bisa saja selalu memulangkan daftar kosong dan
+     * Tanpa test ini, `overdue()` bisa saja selalu memulangkan daftar kosong dan
      * penjaga di atas hijau selamanya tanpa pernah menguji apa pun.
      */
     public function test_tenggat_yang_lewat_terdeteksi(): void

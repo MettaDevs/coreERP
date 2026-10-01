@@ -47,7 +47,7 @@ final class ModuleServiceProvider extends ServiceProvider
         // dimuat": module yang kodenya tidak dimuat tidak punya satu pun test yang bisa
         // berjalan, dan pemindahannya jadi dikerjakan tanpa jaring pengaman sampai hari
         // terakhir. Katalog, pemasangan, dan segala yang menyentuh data tenant tetap memakai
-        // `semua()`, yang melewatkan module yang sedang dipindah.
+        // `all()`, yang melewatkan module yang sedang dipindah.
         foreach ($this->app->make(ModuleRegistry::class)->allIncludingMoved() as $module) {
             $provider = $module->serviceProvider();
 

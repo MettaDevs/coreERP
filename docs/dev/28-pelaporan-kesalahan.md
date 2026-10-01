@@ -144,7 +144,7 @@ pernah sampai.
 
 **`compositeQuery` adalah urusan dalam SigNoz, bukan antarmuka yang dijanjikan.** Diperiksa
 langsung pada v0.141.1 dan bisa berubah pada versi berikutnya. Kalau suatu saat tautannya
-membuka penjelajah tanpa saringan, `DiscordNotifier::tautanSigNoz()` adalah tempat
+membuka penjelajah tanpa saringan, `DiscordNotifier::sigNozLink()` adalah tempat
 memperbaikinya — dan sementara itu tidak ada yang rusak selain kenyamanan.
 
 Penjedanya memakai berkas di `storage/logs/.penjeda-kiriman`, bukan `Cache::`. Penyimpanan

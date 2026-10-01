@@ -28,7 +28,7 @@ use SplFileInfo;
  *
  * ## Kenapa ketiga aturan ini gagal dalam diam kalau tidak dijaga
  *
- * 1. **Manifest sah.** `ModuleRegistry::baca()` mengisi sendiri setiap kunci yang tidak ada:
+ * 1. **Manifest sah.** `ModuleRegistry::read()` mengisi sendiri setiap kunci yang tidak ada:
  *    `name` jatuh ke `id`, `version` ke `0.0.0`, `publisher` ke string kosong, `kind` ke
  *    `business-app`. Tidak ada yang melempar. Dan karena registry mencari module lewat `id`
  *    sementara seluruh pemindaian folder memakai nama folder, `id` yang berbeda dari nama

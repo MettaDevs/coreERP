@@ -165,7 +165,7 @@ class PublishWorkflowEvents extends Command
      * lama memang tidak menyebutnya, dan menganggapnya di dalam proses berarti berhenti
      * mengirim event ke app yang masih hidup sebagai proses tersendiri.
      *
-     * Daftarnya `semuaTermasukYangSedangDipindah()`, bukan `semua()`: yang menentukan di sini
+     * Daftarnya `allIncludingMoved()`, bukan `all()`: yang menentukan di sini
      * adalah apakah **kodenya dimuat** runtime ini, bukan apakah module itu sudah boleh
      * dipasang untuk tenant.
      *

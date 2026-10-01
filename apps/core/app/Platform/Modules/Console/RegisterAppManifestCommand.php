@@ -34,7 +34,7 @@ use Symfony\Component\Yaml\Yaml;
  * didaftarkan ke katalog bisa berbeda dari yang dimuat runtime, dan tidak ada yang akan
  * menyadarinya. Registry yang sama dipakai keduanya.
  *
- * **Kenapa `semua()`, bukan `semuaTermasukYangSedangDipindah()`.** Katalog adalah daftar yang
+ * **Kenapa `all()`, bukan `allIncludingMoved()`.** Katalog adalah daftar yang
  * boleh dipasang untuk tenant. Module yang sedang dipindah masuk belum boleh dipasang —
  * kodenya boleh dimuat supaya testnya berjalan, tetapi datanya belum tentu tersaring
  * `tenant_id`. Mendaftarkannya ke katalog berarti membuka pemasangannya.
