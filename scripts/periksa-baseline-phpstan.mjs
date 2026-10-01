@@ -135,6 +135,67 @@ try {
     );
 }
 
+// Berkas yang dipindah membawa entrinya ke path dan nama kelas baru. Tanpa penerjemahan ini,
+// pemindahan berkas yang isinya tidak berubah terbaca sebagai bungkaman baru di path baru —
+// padahal itu bungkaman lama yang sama. Yang diterjemahkan hanya pasangan yang dikenali git
+// sebagai rename, jadi entri yang benar-benar baru tetap tertangkap.
+function terjemahkanPindahan(entri) {
+    let daftar;
+
+    try {
+        daftar = git('diff', '--name-status', '-M', `${pembanding}...HEAD`, '--', 'apps/core/app');
+    } catch {
+        return entri;
+    }
+
+    const pindahan = [];
+
+    for (const baris of daftar.split('\n')) {
+        const [status, lama, baru] = baris.split('\t');
+
+        if (!status?.startsWith('R') || !lama?.endsWith('.php') || !baru) {
+            continue;
+        }
+
+        const path = (p) => p.replace(/^apps\/core\//, '');
+        const kelas = (p) => 'App\\' + path(p).replace(/^app\//, '').replace(/\.php$/, '').replaceAll('/', '\\');
+
+        pindahan.push({ dari: path(lama), ke: path(baru), kelasDari: kelas(lama), kelasKe: kelas(baru) });
+    }
+
+    if (pindahan.length === 0) {
+        return entri;
+    }
+
+    // Nama kelas terpanjang lebih dulu, supaya `App\X\Y` tidak tertimpa penggantian `App\X`.
+    pindahan.sort((a, b) => b.kelasDari.length - a.kelasDari.length);
+
+    const hasil = new Map();
+
+    for (const [kunci, jumlah] of entri) {
+        let [path, identifier, ...pesan] = kunci.split('|');
+        let teks = pesan.join('|');
+
+        for (const p of pindahan) {
+            if (path === p.dari) {
+                path = p.ke;
+            }
+
+            // Di baseline, backslash nama kelas ditulis ganda karena pesannya pola regex.
+            // Batas kata di belakangnya mencegah `App\Models\Party` ikut mengganti `App\Models\PartyType`.
+            const pola = new RegExp(p.kelasDari.replaceAll('\\', '\\\\').replace(/[\\^$.*+?()[\]{}|]/g, '\\$&') + '(?!\\w)', 'g');
+            teks = teks.replace(pola, () => p.kelasKe.replaceAll('\\', '\\\\'));
+        }
+
+        const baru = `${path}|${identifier}|${teks}`;
+        hasil.set(baru, (hasil.get(baru) ?? 0) + jumlah);
+    }
+
+    return hasil;
+}
+
+sebelum = terjemahkanPindahan(sebelum);
+
 const bungkamanBaru = [];
 
 for (const [kunci, jumlah] of sekarang) {
