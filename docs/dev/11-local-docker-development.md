@@ -306,10 +306,14 @@ Bagian autoload-nya ditulis di dua tempat dan keduanya wajib:
 
 ## `composer update` di repo ini dijalankan dengan `--no-scripts`
 
-`apps/core/composer.json` memasang `post-update-cmd` yang memanggil `install:features` dan
-`vendor:publish --tag=laravel-assets --force`. Keduanya menulis banyak berkas yang tidak ada
-hubungannya dengan pekerjaan yang sedang dikerjakan, dan hasilnya masuk ke dalam diff tanpa ada yang
-memintanya — ini sudah terjadi lebih dari sekali di repo ini.
+`apps/core/composer.json` memasang `post-update-cmd` yang memanggil
+`vendor:publish --tag=laravel-assets --force`. Ia menulis berkas yang tidak ada hubungannya dengan
+pekerjaan yang sedang dikerjakan, dan hasilnya masuk ke dalam diff tanpa ada yang memintanya — ini
+sudah terjadi lebih dari sekali di repo ini.
+
+`install:features` sempat ikut dipanggil di sana dan memangkas berkas fitur auth di setiap
+`composer update`. Sejak 1 Oktober 2026 ia dilepas; ia hanya berjalan sekali saat proyek dibuat
+(`extra.laravel.installer.post-create-project`), sesuai maksud starter kit Laravel asalnya.
 
 ```powershell
 composer update --no-scripts

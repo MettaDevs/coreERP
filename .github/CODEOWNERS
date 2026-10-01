@@ -1,0 +1,27 @@
+# Pemilik peninjauan per lapis (docs/todo/lapis-core).
+#
+# Per 1 Oktober 2026 semua lapis dipegang satu orang. Barisnya tetap dipisah per lapis supaya, begitu
+# tim bertambah, cukup mengganti nama pemilik di baris yang bersangkutan — tidak perlu menyusun ulang
+# berkas ini. Baris yang lebih bawah menang atas baris di atasnya.
+
+*                                   @leaksopan
+
+# Platform: mesin tanpa istilah bisnis (tenant, identitas, akses, lingkungan, runtime module, laporan, integrasi)
+/apps/core/app/Platform/            @leaksopan
+/apps/core/resources/js/pages/platform/ @leaksopan
+/apps/core/tests/Feature/Platform/  @leaksopan
+
+# Foundation: master dan layanan bisnis bersama
+/apps/core/app/Foundation/          @leaksopan
+/apps/core/resources/js/pages/foundation/ @leaksopan
+/apps/core/tests/Feature/Foundation/ @leaksopan
+
+# Kontrak yang dipakai module dan sistem luar; perubahan di sini menyentuh pihak lain
+/apps/core/app/Platform/Modules/Contracts/ @leaksopan
+/apps/core/contracts/               @leaksopan
+
+# Module
+/modules/                           @leaksopan
+
+# Konsol pusat admin.erp
+/apps/control-plane/                @leaksopan

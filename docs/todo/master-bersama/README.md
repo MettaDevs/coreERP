@@ -42,7 +42,7 @@ Selain itu, master tetap milik modulnya.
 | Master | Letak | Keterangan |
 | --- | --- | --- |
 | Vendor, satuan, mata uang, kalender fiskal dan kerja, number sequence, organisasi, buku alamat, wilayah | Foundation / Platform | sudah benar |
-| Worker, Position, Job (`hr_*`) | modul HR | **keputusan terbuka K-W**, lihat di bawah |
+| Worker, Position, Job (`hr_*`) | modul HR | **pindah ke Foundation** (K-W, diputuskan 1 Oktober 2026), lihat di bawah |
 | Jenis, group, kondisi, pabrikan, dan model aset; buku dan profil penyusutan; kelompok harta fiskal; posting group aset; seluruh master pemeliharaan; lokasi aset | modul aset | tetap di modul: khusus aset, juga khusus di Asset management dan Fixed assets D365 |
 
 Master yang **belum ada** dan wajib lahir di Foundation begitu pertama dibutuhkan, bukan di modul yang
@@ -84,7 +84,7 @@ dapat diturunkan ke aset yang dipasang di sana, Site/Warehouse, dan Workers. BC 
   dan tetap dapat diubah;
 - alamat departemen hanya menjadi saran saat membuat lokasi, bukan sumber datanya.
 
-## K-W: Worker — keputusan terbuka
+## K-W: identitas Worker pindah ke Foundation
 
 Hari ini Worker milik modul HR. Core hanya bertanya lewat `LinkedWorkerResolver`, dan modul aset belum
 memakainya — penanggung jawab aset memakai **pengguna** (`penanggung_jawab_user_id`), sehingga staf
@@ -97,7 +97,9 @@ semua itu.
 
 Rekomendasi: **identitas pekerja** (nomor, nama, posisi, atasan, tautan ke pengguna) pindah ke
 Foundation, seperti `Employee` di Base App BC; hal kepegawaian (kontrak, kompensasi, cuti) tetap di
-modul HR. Ini mengubah keputusan gap 3 (#221), jadi belum dikerjakan sampai pemilik memutuskan.
+modul HR. Ini mengubah keputusan gap 3 (#221).
+
+**Diputuskan pemilik pada 1 Oktober 2026: setuju.**
 
 ## Sisa bentuk microservice yang diganti
 
@@ -150,4 +152,5 @@ feed finance.
 - [ ] Duty bawaan modul menyertakan hak master yang ia pakai
 - [ ] Gate CI: suite test tiap modul berjalan dengan hanya modul itu yang terpasang
 - [ ] Lokasi aset: alamat dari buku alamat Core (diwariskan), departemen bawaan per lokasi
-- [ ] K-W: keputusan pemilik soal identitas Worker
+- [ ] K-W: identitas Worker (`hr_workers`, `hr_positions`, `hr_jobs`, penugasan posisi, tautan ke pengguna) pindah ke `Foundation\Worker`; modul HR mempertahankan data kepegawaian
+- [ ] K-2: buku alamat (Party) pindah ke `Platform\AddressBook` — diputuskan pemilik 1 Oktober 2026; menghapus pengecualian `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`
