@@ -21,8 +21,9 @@ use PHPUnit\Framework\TestCase;
  * ditemukan di kode membuat test ini merah, supaya pengecualian yang sudah diperbaiki tidak
  * tertinggal sebagai izin terbuka.
  *
- * Kelas yang belum dipindah dari susunan lama (`App\Models`, `App\Support`, …) belum punya lapis,
- * jadi rujukan ke sana belum diperiksa. Cakupan penjaga ini tumbuh bersama pemindahannya.
+ * Kelas di luar kedua lapis hanya perekat Laravel (`App\Providers`, `App\Http`, `App\Console`;
+ * daftarnya di `docs/onboarding/peta-kode.md`). Ia tidak punya lapis, jadi rujukan ke sana tidak
+ * diperiksa.
  */
 class LayerDirectionBoundaryTest extends TestCase
 {
