@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\Platform\Organization;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\AppServiceCredential;
 use App\Models\ModuleInstallation;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;

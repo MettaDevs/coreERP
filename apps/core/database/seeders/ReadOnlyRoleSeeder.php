@@ -6,7 +6,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
-use App\Models\Tenant;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 

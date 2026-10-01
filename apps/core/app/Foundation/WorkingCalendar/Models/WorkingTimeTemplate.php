@@ -2,8 +2,8 @@
 
 namespace App\Foundation\WorkingCalendar\Models;
 
-use App\Models\Tenant;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\Tenant;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

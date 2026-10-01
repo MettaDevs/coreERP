@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\CoreApp;
-use App\Models\Tenant;
 use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

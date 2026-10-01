@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\Internal;
+namespace App\Platform\Tenant\Http\Requests\Internal;
 
 use App\Platform\Environment\Models\Environment;
 use App\Support\ControlPlane\TemporaryPassword;

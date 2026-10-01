@@ -3,7 +3,7 @@
 namespace App\Support\Reporting;
 
 use App\Jobs\RunReportExport;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Retention\RetentionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;

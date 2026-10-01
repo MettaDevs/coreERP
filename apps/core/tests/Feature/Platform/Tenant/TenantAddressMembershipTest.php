@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\ProviderAccess;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;

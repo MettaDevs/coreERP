@@ -1627,7 +1627,7 @@ paths:
         Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
         `App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly`.
 
-        Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
+        Di belakangnya berjalan `App\Platform\Tenant\Actions\RegisterBusiness` — aksi yang sama
         persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena
         itu bukan hanya baris `tenants`: client, environment produksi, keanggotaan owner,
         role Owner beserta seluruh duty app yang dibeli, entitlement, satuan bawaan, dan

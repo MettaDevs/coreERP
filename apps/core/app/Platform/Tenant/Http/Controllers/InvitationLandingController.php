@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Onboarding;
+namespace App\Platform\Tenant\Http\Controllers;
 
 use App\Actions\Access\CreateInvitation;
 use App\Http\Controllers\Controller;
-use App\Models\InvitationCode;
-use App\Models\Tenant;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 

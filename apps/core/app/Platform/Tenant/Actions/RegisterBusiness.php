@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Onboarding;
+namespace App\Platform\Tenant\Actions;
 
 use App\Actions\Modules\InstallModule;
 use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
@@ -8,12 +8,12 @@ use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
 use App\Models\AppDataPolicy;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\OwnerRoleDuties;
 use App\Support\AppDependencyGraph;
 use App\Support\Modules\Contracts\TenantDisiapkan;

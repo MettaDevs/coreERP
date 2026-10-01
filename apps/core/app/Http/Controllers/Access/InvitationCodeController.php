@@ -6,7 +6,7 @@ use App\Actions\Access\CreateInvitation;
 use App\Actions\Access\UpdateInvitation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\InvitationRequest;
-use App\Models\InvitationCode;
+use App\Platform\Tenant\Models\InvitationCode;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\Sso\SsoInvitationMailer;

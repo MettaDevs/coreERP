@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Platform\Environment;
 
-use App\Models\Tenant;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

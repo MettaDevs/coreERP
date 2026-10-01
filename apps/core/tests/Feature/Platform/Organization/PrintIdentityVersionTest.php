@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Platform\Organization;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;

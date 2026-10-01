@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TenantMembership;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\Request;
 
 abstract class Controller

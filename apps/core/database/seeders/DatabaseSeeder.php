@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Foundation\UnitOfMeasure\Actions\ProvisionDefaultUnitsOfMeasure;
-use App\Models\Tenant;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 

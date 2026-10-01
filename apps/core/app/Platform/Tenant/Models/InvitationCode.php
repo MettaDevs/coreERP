@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Platform\Tenant\Models;
 
+use App\Models\Role;
+use App\Models\User;
 use App\Support\Modules\Contracts\DataClass;
 use App\Support\Modules\Contracts\DataClassification;
 use Illuminate\Contracts\Encryption\DecryptException;

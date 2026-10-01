@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Sso;
 
-use App\Models\InvitationCode;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Tenant\Models\InvitationCode;
 use Illuminate\Support\Facades\Log;
 
 /**

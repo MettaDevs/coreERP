@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\DefinisiParameterWorkflow;
 use App\Support\ParameterWorkflow;
 use App\Support\WorkflowRuntime;

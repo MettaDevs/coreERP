@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

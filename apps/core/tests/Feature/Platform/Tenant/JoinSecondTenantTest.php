@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Workflow;
 
 use App\Http\Controllers\Controller;
-use App\Models\TenantMembership;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DefinisiParameterWorkflow;
 use App\Support\Modules\Contracts\RowVersion;

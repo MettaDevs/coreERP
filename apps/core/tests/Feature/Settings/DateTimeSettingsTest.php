@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Settings;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Foundation\Vendor;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\Vendor\Models\Vendor;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DaftarVendor;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;

@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\FinancePosting;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceReferenceAccount;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\StatusPostingBerubah;
 use App\Support\Modules\Contracts\PenerbitPosting;

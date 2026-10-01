@@ -3,8 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Models\Role;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DataClass;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;

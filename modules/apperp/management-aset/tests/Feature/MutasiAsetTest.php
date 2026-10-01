@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

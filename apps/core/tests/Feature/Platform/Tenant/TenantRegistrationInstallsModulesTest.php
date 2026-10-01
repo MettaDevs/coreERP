@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\ModuleInstallation;
-use App\Models\Tenant;
+use App\Platform\Tenant\Models\Tenant;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

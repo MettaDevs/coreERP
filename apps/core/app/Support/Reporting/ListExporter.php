@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Reporting;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\Contracts\ListExportSource;
 use App\Support\Reporting\Rendering\RenderedFile;

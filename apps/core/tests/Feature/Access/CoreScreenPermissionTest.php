@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Access;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\Role;
 use App\Models\SecurityDuty;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\TenantProducts;

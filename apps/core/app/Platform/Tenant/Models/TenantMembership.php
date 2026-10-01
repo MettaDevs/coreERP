@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Platform\Tenant\Models;
 
+use App\Models\RoleAssignment;
+use App\Models\User;
 use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Support\Access\CorePermissions;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

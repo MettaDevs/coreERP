@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

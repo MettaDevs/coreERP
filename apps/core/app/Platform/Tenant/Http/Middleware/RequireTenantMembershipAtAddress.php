@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Middleware;
+namespace App\Platform\Tenant\Http\Middleware;
 
 use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
 use App\Platform\Environment\Support\CurrentWorkspace;

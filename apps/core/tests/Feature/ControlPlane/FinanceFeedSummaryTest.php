@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\FinancePosting;
 use App\Models\IntegrationClient;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Support\Finance\PostingFeedSummary;
 use App\Support\Finance\PostingPusher;
 use Database\Seeders\AppCatalogSeeder;

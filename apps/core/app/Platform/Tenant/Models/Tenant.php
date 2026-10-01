@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Platform\Tenant\Models;
 
+use App\Models\Role;
+use App\Models\TenantAppEntitlement;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Platform\Organization\Models\Organization;

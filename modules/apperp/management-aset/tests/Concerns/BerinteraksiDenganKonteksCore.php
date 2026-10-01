@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\ModuleManifestFiles;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Carbon;

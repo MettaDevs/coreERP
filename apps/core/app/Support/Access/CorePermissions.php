@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Access;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\LaunchableAppCatalog;
 
 /**

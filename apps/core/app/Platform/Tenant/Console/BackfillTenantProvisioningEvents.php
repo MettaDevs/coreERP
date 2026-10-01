@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Platform\Tenant\Console;
 
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Modules\PengirimEventModul;

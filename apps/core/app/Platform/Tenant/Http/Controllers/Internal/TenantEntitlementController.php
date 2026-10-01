@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Internal;
+namespace App\Platform\Tenant\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Models\Tenant;
 use App\Models\TenantAppEntitlement;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 
 /**

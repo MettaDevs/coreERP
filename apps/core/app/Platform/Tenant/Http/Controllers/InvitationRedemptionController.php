@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\Onboarding;
+namespace App\Platform\Tenant\Http\Controllers;
 
 use App\Actions\Access\CreateInvitation;
-use App\Actions\Onboarding\RedeemInvitation;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Onboarding\JoinInvitationRequest;
-use App\Models\InvitationCode;
-use App\Models\Tenant;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RedeemInvitation;
+use App\Platform\Tenant\Http\Requests\JoinInvitationRequest;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\Tenant;
 use App\Support\Sso\SsoFailure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

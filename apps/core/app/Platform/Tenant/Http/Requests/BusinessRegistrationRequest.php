@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Onboarding;
+namespace App\Platform\Tenant\Http\Requests;
 
 use App\Concerns\PasswordValidationRules;
 use Illuminate\Foundation\Http\FormRequest;

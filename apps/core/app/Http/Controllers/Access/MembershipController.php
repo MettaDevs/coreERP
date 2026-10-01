@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Access;
 use App\Actions\Access\UpdateMembership;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\MembershipRequest;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;

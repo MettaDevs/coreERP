@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Actions\Onboarding;
+namespace App\Platform\Tenant\Actions;
 
 use App\Actions\Access\CreateInvitation;
-use App\Models\InvitationCode;
 use App\Models\RoleAssignment;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

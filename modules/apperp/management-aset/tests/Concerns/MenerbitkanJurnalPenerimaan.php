@@ -4,10 +4,10 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
 use App\Models\FinancePosting;
 use App\Models\FinanceReferenceAccount;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;

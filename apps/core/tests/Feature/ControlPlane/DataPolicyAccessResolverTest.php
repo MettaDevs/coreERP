@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\RoleAssignment;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Support\DataPolicyAccessResolver;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

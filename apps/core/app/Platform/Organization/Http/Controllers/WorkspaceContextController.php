@@ -3,10 +3,10 @@
 namespace App\Platform\Organization\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\TenantMembership;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Organization\Http\Requests\WorkspaceContextRequest;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;

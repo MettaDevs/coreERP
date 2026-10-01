@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Platform\Tenant;
 
 use App\Models\CoreApp;
-use App\Models\Tenant;
 use App\Models\User;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Tenant\Models\Tenant;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

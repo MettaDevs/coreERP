@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Environment;
 
-use App\Models\Tenant;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\OutboundRefused;
+use App\Platform\Tenant\Models\Tenant;
 use App\Support\Modules\TenantScope;
 use App\Support\Observabilitas\LaporanKesalahan;
 use App\Support\Observabilitas\PengirimDiscord;

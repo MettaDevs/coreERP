@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Internal;
+namespace App\Platform\Tenant\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

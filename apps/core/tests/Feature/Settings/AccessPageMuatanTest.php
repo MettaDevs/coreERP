@@ -4,11 +4,11 @@ namespace Tests\Feature\Settings;
 
 use App\Models\CoreApp;
 use App\Models\Role;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

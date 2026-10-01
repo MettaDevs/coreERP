@@ -5,14 +5,14 @@ use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceControl
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Http\Controllers\Internal\FinancePostingFeedController;
-use App\Http\Controllers\Internal\MemberDirectoryController;
-use App\Http\Controllers\Internal\TenantEntitlementController;
-use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Platform\Organization\Http\Controllers\Internal\OrganizationDirectoryController;
+use App\Platform\Tenant\Http\Controllers\Internal\MemberDirectoryController;
+use App\Platform\Tenant\Http\Controllers\Internal\TenantEntitlementController;
+use App\Platform\Tenant\Http\Controllers\Internal\TenantProvisioningController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app'])->group(function (): void {

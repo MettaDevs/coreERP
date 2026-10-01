@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Retention;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\ChangeLog\AlwaysLoggedTables;
 use App\Support\Reporting\ExportQueue;
 use App\Support\Retention\RetentionPolicies;

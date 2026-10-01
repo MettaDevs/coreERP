@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\ControlPlane;
 
 use App\Models\ModuleInstallation;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\InvitationCode;
 use App\Models\Role;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\TenantProducts;

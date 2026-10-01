@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
 use App\Models\IntegrationClient;
-use App\Models\TenantMembership;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\IntegrationClientAccounts;
 use App\Support\Integration\PushDestination;

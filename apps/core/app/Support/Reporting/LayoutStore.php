@@ -2,7 +2,7 @@
 
 namespace App\Support\Reporting;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;

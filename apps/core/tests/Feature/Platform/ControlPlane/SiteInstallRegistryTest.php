@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Models\Tenant;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Tenant\Models\Tenant;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;

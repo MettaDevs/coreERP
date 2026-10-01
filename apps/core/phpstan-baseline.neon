@@ -169,7 +169,7 @@ parameters:
 			path: app/Http/Controllers/Access/SecurityConfigurationController.php
 
 		-
-			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\TenantMembership\|null given\.$#'
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Platform\\Tenant\\Models\\TenantMembership\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/AppLaunchManifestController.php

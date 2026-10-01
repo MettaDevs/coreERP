@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\KonteksPermintaan;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AppCatalogSeeder;

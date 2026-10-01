@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Onboarding;
+namespace App\Platform\Tenant\Http\Controllers;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Onboarding\BusinessRegistrationRequest;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Http\Requests\BusinessRegistrationRequest;
 use Illuminate\Http\JsonResponse;
 
 class BusinessRegistrationController extends Controller
