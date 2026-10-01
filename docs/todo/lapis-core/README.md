@@ -111,10 +111,10 @@ Dengan keputusan di atas ada **23 import** yang melanggar arah. Semuanya jatuh k
 | Pola | Contoh | Perbaikan |
 | --- | --- | --- |
 | ~~`CoreServices` (Platform/Modules) menyambungkan semua facade bisnis~~ | ~~`CoreServices` → `NumberSequenceIssuerCore`, `VendorDirectoryCore`, `WorkflowEngineCore`, `PostingFeedCore`, … (10 import)~~ | Selesai di PR 8b: tiap fitur Foundation mengikat pelaksananya sendiri di `<Fitur>ServiceProvider`, `CoreServices` hanya menyebut antarmukanya |
-| Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation | `InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure` (5 import) | Foundation mendengarkan kejadian tenant/module. Kontrak `TenantProvisioned` sudah ada; kejadian "module terpasang" ditambahkan bila belum ada |
-| Reporting memakai presisi uang dan buku alamat | `ValueFormat`, `ValueFormats` → `MoneyPrecision`; `PrintIdentityStore` → `OrganizationAddressBook` (3 import) | Lewat facade (`CurrencyRounding` sudah ada) atau penyedia yang didaftarkan Foundation |
 | Integration dan onboarding menyentuh milik fitur lain | ~~`AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance)~~; `RegisterBusiness` → `Client` (ControlPlane) (1 import tersisa) | `IntegrationClientAccounts` pindah ke `Platform\Integration\Support` di PR 8b: isinya hanya akun aplikasi klien integrasi (`User` dan `IntegrationClient`, keduanya Platform), tanpa satu pun model posting. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
 | ~~ControlPlane menyebut perintah workflow di docblock (ditemukan saat PR 5)~~ | ~~`ConvertEnvironment`, `CopyEnvironment` → `PublishWorkflowEvents` (Workflow) (2 import)~~ | Selesai di PR 8b: `use` dihapus, docblock menyebut `workflow-events:publish` |
+| ~~Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation~~ | ~~`InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure`, `NumberSequenceReference` (6 import)~~ | **Selesai.** Platform mengirim event internal (`Platform\Tenant\Events\TenantCreated`, `TenantModulesInstalled`, `Platform\Modules\Events\ModuleInstallationRecorded`, `AppNumberSequenceReferencesDeclared`, `AppCatalogRegistered`) sinkron di titik pemanggilan lama, dan Foundation mendengarkannya. `TenantProvisioned` tidak dipakai karena ia dikirim per module sesudah commit. Listener didaftarkan di `NumberSequenceServiceProvider` dan `UnitOfMeasureServiceProvider` |
+| Reporting memakai presisi uang dan buku alamat | ~~`ValueFormat`, `ValueFormats` → `MoneyPrecision`~~; `PrintIdentityStore` → `OrganizationAddressBook` (1 import tersisa) | `ValueFormats` membaca presisi lewat `CurrencyRounding`; `ValueFormat` membawa pembulatan tampilannya sendiri, dijaga sama persis dengan `MoneyPrecision::round` oleh `ValueFormatRoundingTest`. `PrintIdentityStore` menunggu AddressBook pindah ke Platform (K-2) |
 | Model tenant mengenal client milik pusat | `Tenant` → `Client` (ControlPlane) (1 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: isi kelas `Tenant` tidak diubah |
 | Model organisasi menunjuk data Foundation | `LegalEntity` → `FiscalCalendar`; `OrganizationParty` → `Party` (AddressBook) (2 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: PR pemindahan tidak mengubah isi kelas. `OrganizationParty` → `Party` bergantung pada K-2 |
 
@@ -156,7 +156,7 @@ Satu domain per PR. Reporting paling akhir karena sesi analisa gap masih mengerj
 - [x] **PR 2 — Foundation kecil:** Vendor (#231), UnitOfMeasure, Currency, FiscalCalendar,
       WorkingCalendar (#233)
 - [x] **PR 3 — Foundation/NumberSequence** (#233). Pembalikan arah dari `InstallModule`,
-      `RegisterAppCatalog`, dan `RegisterBusiness` belum dikerjakan; barisnya masih di `ALLOWED`
+      `RegisterAppCatalog`, dan `RegisterBusiness` menyusul lewat event sinkron (PR balik arah)
 - [x] **PR 4 — Foundation/Geography dan Foundation/AddressBook** (#232). Pemecahan berkas raksasa
       ditunda; lihat sisa di bawah
 - [x] **PR 5 — Foundation/FinancePosting, Foundation/Workflow,** dan Platform/Integration (#237)

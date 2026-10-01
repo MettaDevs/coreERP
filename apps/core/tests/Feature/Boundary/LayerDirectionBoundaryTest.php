@@ -34,18 +34,9 @@ class LayerDirectionBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED = [
-        // Pemasangan module langsung menyiapkan data Foundation. Perbaikan: Foundation mendengarkan
-        // kejadian "module terpasang".
-        'App\\Platform\\Modules\\Actions\\InstallModule -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
-        'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
-        'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Models\\NumberSequenceReference',
         'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
         'App\\Platform\\Organization\\Models\\OrganizationParty -> App\\Foundation\\AddressBook\\Models\\Party',
         'App\\Platform\\Reporting\\Support\\PrintIdentityStore -> App\\Foundation\\AddressBook\\Support\\OrganizationAddressBook',
-        'App\\Platform\\Reporting\\Support\\ValueFormat -> App\\Foundation\\Currency\\Support\\MoneyPrecision',
-        'App\\Platform\\Reporting\\Support\\ValueFormats -> App\\Foundation\\Currency\\Support\\MoneyPrecision',
-        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
-        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Foundation\\UnitOfMeasure\\Actions\\ProvisionDefaultUnitsOfMeasure',
         'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Platform\\ControlPlane\\Models\\Client',
         'App\\Platform\\Tenant\\Models\\Tenant -> App\\Platform\\ControlPlane\\Models\\Client',
     ];

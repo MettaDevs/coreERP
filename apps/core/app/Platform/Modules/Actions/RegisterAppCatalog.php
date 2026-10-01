@@ -2,13 +2,13 @@
 
 namespace App\Platform\Modules\Actions;
 
-use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
-use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Platform\Access\Models\AppDataPolicy;
 use App\Platform\Access\Models\Permission;
 use App\Platform\Access\Models\SecurityDuty;
 use App\Platform\Access\Models\SecurityPrivilege;
 use App\Platform\Access\Support\OwnerRoleDuties;
+use App\Platform\Modules\Events\AppCatalogRegistered;
+use App\Platform\Modules\Events\AppNumberSequenceReferencesDeclared;
 use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Modules\Support\AppDependencyGraph;
 use Illuminate\Support\Facades\DB;
@@ -96,14 +96,8 @@ class RegisterAppCatalog
             $this->pruneLayer('permissions', $app->id, array_column($security['permissions'], 'code'));
             $this->pruneLayer('app_entry_points', $app->id, array_column($security['entry_points'], 'code'));
 
-            foreach ($numberSequenceReferences as $referenceData) {
-                NumberSequenceReference::query()->updateOrCreate(['code' => $referenceData['code']], [
-                    'app_id' => $app->id,
-                    'name' => $referenceData['name'],
-                    'default_prefix' => $referenceData['default_prefix'] ?? null,
-                    'allowed_scopes' => $referenceData['allowed_scopes'],
-                ]);
-            }
+            // Referensi urutan nomor milik Foundation; listener-nya menyimpan di dalam transaksi ini.
+            event(new AppNumberSequenceReferencesDeclared($app->id, $numberSequenceReferences));
 
             foreach ($workflowTypes as $type) {
                 $existing = DB::table('workflow_types')->where('code', $type['code'])->first(['id']);
@@ -152,7 +146,7 @@ class RegisterAppCatalog
             return $app;
         });
 
-        app(EnsureNumberSequenceDrafts::class)->forReadyApp($app->id);
+        event(new AppCatalogRegistered($app->id));
         // Role Owner setiap tenant memegang semua duty yang sah, termasuk duty yang baru didaftarkan manifest ini.
         app(OwnerRoleDuties::class)->syncAll();
 
