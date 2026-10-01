@@ -33,6 +33,10 @@ class LayerDirectionBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED = [
+        // Hanya rujukan docblock, muncul saat PublishWorkflowEvents pindah ke Foundation/Workflow.
+        // Perbaikan: hapus `use`, sebut nama perintah artisan-nya saja.
+        'App\\Platform\\ControlPlane\\Console\\ConvertEnvironment -> App\\Foundation\\Workflow\\Console\\PublishWorkflowEvents',
+        'App\\Platform\\ControlPlane\\Console\\CopyEnvironment -> App\\Foundation\\Workflow\\Console\\PublishWorkflowEvents',
         'App\\Platform\\Integration\\Http\\Controllers\\IntegrationClientController -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
         'App\\Platform\\Integration\\Http\\Middleware\\AuthenticateIntegrationClient -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
         'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
