@@ -71,7 +71,7 @@ class MaintenanceRequestTest extends TestCase
         $aset = $this->seedAsset($this->jenisAset, 'AST-MON', ['lokasi_aset_id' => $this->location()]);
         $created = $this->create(['aset_id' => $aset])->assertCreated()->assertJsonPath('data.status', 'draft');
         $id = (string) $created->json('data.id');
-        $this->assertStringStartsWith($this->awalanNomor('management-aset.permintaan-pemeliharaan'), (string) $created->json('data.kode'));
+        $this->assertMatchesRegularExpression('/^'.preg_quote($this->awalanNomor('management-aset.permintaan-pemeliharaan'), '/').'/', (string) $created->json('data.kode'));
         // Lokasi yang tidak diisi diambil dari lokasi aset saat ini.
         $this->assertNotNull($created->json('data.lokasi_aset_id'));
 
@@ -92,7 +92,7 @@ class MaintenanceRequestTest extends TestCase
         $done = $this->as(self::PLANNER)->postJson(self::URL.'/'.$id.'/work-order', ['maintenance_job_type_id' => $this->jobType, 'version' => $this->version($id)])
             ->assertOk()->assertJsonPath('data.status', 'work_order_dibuat');
         $workOrder = (string) $done->json('data.pemeliharaan_aset_id');
-        $this->assertStringStartsWith($this->awalanNomor('management-aset.pemeliharaan-aset'), (string) $done->json('data.work_order_kode'));
+        $this->assertMatchesRegularExpression('/^'.preg_quote($this->awalanNomor('management-aset.pemeliharaan-aset'), '/').'/', (string) $done->json('data.work_order_kode'));
         // Tipe work order diwarisi dari jenis permintaan, unit dari pelapor.
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', ['id' => $workOrder, 'tipe_work_order_id' => $this->tipe, 'responsible_org_unit_id' => $this->unitId, 'status' => 'draft']);
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['pemeliharaan_aset_id' => $workOrder, 'aset_id' => $aset, 'maintenance_job_type_id' => $this->jobType]);

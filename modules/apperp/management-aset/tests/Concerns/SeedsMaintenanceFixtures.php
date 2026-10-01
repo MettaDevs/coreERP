@@ -58,7 +58,9 @@ trait SeedsMaintenanceFixtures
     }
 
     /**
-     * Work order yang sudah selesai untuk satu aset dan jenis pekerjaan, sebagai riwayat.
+     * Work order untuk satu aset dan jenis pekerjaan, sebagai riwayat.
+     *
+     * @param  array<string, mixed>  $dates
      */
     private function seedWorkOrder(string $asetId, string $jobTypeId, string $status, array $dates = []): string
     {

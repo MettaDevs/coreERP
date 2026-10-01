@@ -159,7 +159,7 @@ class MaintenanceScheduleTest extends TestCase
         $response = $this->as(self::SCHEDULE)->postJson(self::API.'jadwal-pemeliharaan/work-order', $payload)->assertCreated();
         $this->assertCount(1, $response->json('data.work_orders'));
         $workOrderId = (string) $response->json('data.work_orders.0.id');
-        $this->assertStringStartsWith($this->awalanNomor('management-aset.pemeliharaan-aset'), (string) $response->json('data.work_orders.0.kode'));
+        $this->assertMatchesRegularExpression('/^'.preg_quote($this->awalanNomor('management-aset.pemeliharaan-aset'), '/').'/', (string) $response->json('data.work_orders.0.kode'));
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', [
             'id' => $workOrderId, 'status' => 'draft', 'tipe_work_order_id' => $this->tipe,
             'responsible_org_unit_id' => $this->unitId, 'diharapkan_mulai' => '2026-10-05 00:00:00', 'diharapkan_selesai' => '2026-10-07 23:59:59',
@@ -307,8 +307,8 @@ class MaintenanceScheduleTest extends TestCase
     /** @return list<string> */
     private function dueDates(string $aset): array
     {
-        return DB::table('aset_tr_jadwal_pemeliharaan')->where('aset_id', $aset)->whereNull('deleted_at')
-            ->orderBy('jatuh_tempo')->pluck('jatuh_tempo')->map(static fn ($date): string => substr((string) $date, 0, 10))->all();
+        return array_values(DB::table('aset_tr_jadwal_pemeliharaan')->where('aset_id', $aset)->whereNull('deleted_at')
+            ->orderBy('jatuh_tempo')->pluck('jatuh_tempo')->map(static fn ($date): string => substr((string) $date, 0, 10))->all());
     }
 
     private function reading(string $aset, string $counter, string $at, int $value, int $total): void

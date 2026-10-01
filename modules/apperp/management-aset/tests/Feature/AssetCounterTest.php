@@ -54,7 +54,7 @@ class AssetCounterTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/jenis-counter', ['nama' => 'Jam operasi', 'satuan_id' => $satuan])
             ->assertCreated()
             ->assertJsonPath('data.satuan', 'JAM');
-        $this->assertStringStartsWith($this->awalanNomor('management-aset.jenis-counter'), (string) $created->json('data.kode'));
+        $this->assertMatchesRegularExpression('/^'.preg_quote($this->awalanNomor('management-aset.jenis-counter'), '/').'/', (string) $created->json('data.kode'));
 
         $this->sebagaiPengguna($this->tenantId, $permissions)
             ->withHeader('Idempotency-Key', 'counter-'.Str::ulid())
