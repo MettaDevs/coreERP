@@ -29,6 +29,7 @@ use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
+use Modules\Apperp\ManagementAset\Services\LocationInheritance;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\OpeningBalance;
 use Modules\Apperp\ManagementAset\Services\OpeningBalanceImport;
@@ -788,7 +789,8 @@ class PenerimaanAsetController extends Controller
 
         $data = validator($input ?? $request->all(), [
             'legal_entity_id' => ['required', 'ulid'],
-            'responsible_org_unit_id' => ['required', 'ulid'],
+            // Boleh kosong bila lokasinya punya unit kerja bawaan; lihat di bawah validasi.
+            'responsible_org_unit_id' => ['nullable', 'ulid'],
             'receiving_org_unit_id' => ['nullable', 'ulid'],
             'tanggal' => ['required', 'date_format:Y-m-d'],
             'tanggal_siap_pakai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:tanggal'],
@@ -835,6 +837,16 @@ class PenerimaanAsetController extends Controller
         // validasi.
         $data['details'] = array_values($data['details']);
         $data['cara_perolehan'] ??= AcquisitionMethod::PURCHASE;
+
+        // Unit penanggung jawab yang tidak dikirim diisi unit kerja bawaan lokasi penerimaan, termasuk
+        // warisan lokasi induknya. Layar sudah mengisinya saat lokasi dipilih dan pengguna boleh
+        // menggantinya; yang di sini menjaga klien API yang hanya mengirim lokasi.
+        $data['responsible_org_unit_id'] ??= app(LocationInheritance::class)->defaultDepartment($data['lokasi_aset_id'] ?? null);
+        if ($data['responsible_org_unit_id'] === null) {
+            throw ValidationException::withMessages([
+                'responsible_org_unit_id' => 'Pilih unit penanggung jawab, atau pilih lokasi yang punya unit kerja bawaan.',
+            ]);
+        }
 
         // Harga satuan dan PPN per unit boleh memakai presisi harga satuan mata uangnya (K-20),
         // tidak lebih halus. Keduanya disimpan sebagai teks desimal, bukan float, supaya yang

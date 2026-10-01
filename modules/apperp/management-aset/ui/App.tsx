@@ -84,8 +84,8 @@ const MaintenanceSchedulePage = lazy(
 const CounterReadingPage = lazy(
     () => import('./transactions/counter-readings/CounterReadingPage'),
 );
-const PengaturanAsetTetapPlaceholderPage = lazy(
-    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage'),
+const PengaturanAsetTetapPage = lazy(
+    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPage'),
 );
 const AssetPostingGroupPage = lazy(
     () => import('./asset-posting-group/AssetPostingGroupPage'),
@@ -215,8 +215,11 @@ export default function App({
         permissions.includes('management-aset.fixed-asset-parameters.read')
     ) {
         return (
-            <main>
-                <PengaturanAsetTetapPlaceholderPage kind="parameters" />
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <PengaturanAsetTetapPage permissions={permissions} />
             </main>
         );
     }

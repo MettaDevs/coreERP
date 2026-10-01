@@ -8,7 +8,7 @@ Layar monitoring aset yang dulu dibahas di sini, ringkasan register yang membaca
 
 ## Layar setup yang sengaja kosong
 
-`fixed-asset-parameters` menampilkan `Empty` dengan penjelasan, bukan form: pengaturan pembulatan saat ini disimpan pada Buku penyusutan, dan pengaturan lain menunggu kebutuhannya dipastikan. Komponennya `ui/pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage.tsx`.
+`fixed-asset-parameters` dulu menampilkan `Empty` dengan penjelasan. Sejak 1 Oktober 2026 ia berisi pengaturan sungguhan, dimulai dari buku penyusutan bawaan: lihat [Parameter aset tetap](/apps/management-aset/master/pengaturan/). Pembulatan tetap disimpan pada Buku penyusutan.
 
 Layar kosong kedua yang dulu ada di sini, profil posting aset, sudah berisi sejak 23 September 2026 sebagai [Posting group aset](/apps/management-aset/master/posting-group/). Akunnya ternyata tidak menunggu modul Finance: daftar akun referensi di Core menjadi sumbernya (K-05 feed posting finance).
 

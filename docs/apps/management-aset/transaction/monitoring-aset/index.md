@@ -55,7 +55,7 @@ Koreksi atas monitoring yang sudah selesai adalah monitoring baru. Temuan yang s
 
 Yang perlu dikenali:
 
-- **Nilai dibaca dari buku komersial** — buku aset tanpa master atau yang master bukunya berlapisan `current` — dan bila ada lebih dari satu, yang kodenya paling awal. Aset tanpa buku seperti itu memakai nilai perolehan register, dengan akumulasi dan nilai buku kosong, bukan nol.
+- **Nilai dibaca dari buku penyusutan bawaan** pada [Parameter aset tetap](/apps/management-aset/master/pengaturan/) bila aset itu memilikinya (Default Depr. Book BC). Selain itu dari buku komersial — buku aset tanpa master atau yang master bukunya berlapisan `current` — dan bila ada lebih dari satu, yang kodenya paling awal. Aset tanpa buku seperti itu memakai nilai perolehan register, dengan akumulasi dan nilai buku kosong, bukan nol.
 - **Penanggung jawab dibaca dari penempatan terakhir**, karena aset tidak menyimpannya.
 - **Nama unit dan orang tidak dibekukan.** Idnya yang dibekukan; namanya diterjemahkan saat dibaca, sama seperti mutasi.
 - **Baris yang dikeluarkan diarsipkan**, tidak dihapus, dan nomor barisnya tidak dipakai ulang: foto bukti menempel ke nomor baris.
@@ -127,7 +127,7 @@ Header terdaftar di `AssetAttachments`, jadi foto bukti bisa dilampirkan ke doku
 Pilihan kecil yang diambil saat membangun dan dipertahankan pemilik produk (30 September 2026):
 
 - Isi otomatis memakai lokasi yang persis sama, tidak ikut sub-lokasinya.
-- Nilai baris dibaca dari buku komersial pertama menurut kode; tanpa buku seperti itu, dipakai nilai perolehan register dengan akumulasi dan nilai buku kosong.
+- Nilai baris dibaca dari buku penyusutan bawaan bila aset memilikinya, selain itu dari buku komersial pertama menurut kode; tanpa buku seperti itu, dipakai nilai perolehan register dengan akumulasi dan nilai buku kosong.
 - Laporan menyaring penanggung jawab dan unit pada nilai beku baris, bukan pada header dokumen.
 - Entitas legal dokumen tidak dapat diganti setelah dibuat, karena nomornya terbit untuk entitas legal itu.
 - Baris Tidak sesuai menampilkan kedua tautan tindak lanjut (mutasi dan dekomisioning) bila pengguna berhak membukanya.

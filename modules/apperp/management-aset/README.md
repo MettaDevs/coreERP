@@ -245,6 +245,8 @@ Pohon lokasi sengaja **terpisah** dari struktur organisasi. "Di mana benda ini b
 
 Keduanya dihubungkan lewat satu field opsional, `m_lokasi_aset.org_unit_id`; padanan toggle **Update asset dimension** pada Functional location type di F&O. Saat aset diterima atau dimutasi, `financial_dimension_org_unit_id` pada aset diisi dari unit milik lokasinya. Lokasi yang tidak dipetakan mewarisi unit lokasi induk terdekat yang dipetakan (K-08): satu poli bisa tersebar di beberapa ruang, dan cukup lantainya yang dipetakan. Baru bila tidak ada satu pun lokasi di jalur ke akar yang dipetakan, aset memakai unit penggunanya. Aturannya satu, `Services/LocationDimension`, dipakai penerimaan dan mutasi; pendakiannya dibatasi 32 tingkat dan berhenti pada siklus, yang hanya mungkin bila datanya rusak karena penulisan lokasi menolak siklus, lalu melaporkannya. Nilainya **disalin, bukan dilihat saat dibaca**: mengubah pemetaan lokasi kelak tidak menulis ulang pembebanan aset yang sudah berjalan.
 
+Lokasi juga membawa **alamat** dari buku alamat Core dan **unit kerja bawaan**, keduanya diwarisi lokasi anak yang mengosongkannya. Unit kerja bawaan mengisi unit penanggung jawab saat aset diterima atau dimutasi ke lokasi itu bila dokumennya tidak menyebut unit; pengguna tetap boleh menggantinya. Rinciannya di `docs/apps/management-aset/master/lokasi/`.
+
 Aturan yang berlaku pada master berinduk:
 
 - Anak wajib menyebut induk wajibnya saat dibuat; induk dapat diganti lewat `PATCH`. Master dengan lebih dari satu induk memperlakukan tiap induk secara terpisah — memindahkan satu tidak menggeser yang lain.

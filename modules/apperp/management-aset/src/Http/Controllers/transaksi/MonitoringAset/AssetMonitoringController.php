@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\FixedAssetSetup;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
@@ -496,8 +497,10 @@ class AssetMonitoringController extends Controller
      * Keadaan register untuk sejumlah aset, dibaca sekaligus.
      *
      * Penanggung jawab dibaca dari penempatan terakhir, karena aset tidak menyimpannya. Nilai dibaca
-     * dari buku komersial — buku tanpa master atau buku ber-lapisan `current` — dan bila ada lebih
-     * dari satu, yang kodenya paling awal, supaya satu aset selalu menghasilkan satu angka.
+     * dari buku penyusutan bawaan pada pengaturan aset tetap (Default Depr. Book BC) bila aset itu
+     * memilikinya. Selain itu dari buku komersial — buku tanpa master atau buku ber-lapisan `current` —
+     * dan bila ada lebih dari satu, yang kodenya paling awal, supaya satu aset selalu menghasilkan satu
+     * angka.
      *
      * @param  list<string>  $asetIds
      * @return array<string, array{lifecycle_state: ?string, lokasi_aset_id: ?string, org_unit_id: ?string, custodian_user_id: ?string, nilai_perolehan: ?string, akumulasi_penyusutan: ?string, nilai_buku: ?string}>
@@ -510,6 +513,13 @@ class AssetMonitoringController extends Controller
 
         $custodians = $this->latestCustodians($asetIds);
         $books = [];
+        $defaultBook = FixedAssetSetup::defaultDepreciationBookId();
+        if ($defaultBook !== null) {
+            foreach (BukuAset::query()->whereIn('aset_id', $asetIds)->where('buku_id', $defaultBook)->toBase()
+                ->get(['aset_id', 'acquisition_value', 'accumulated_depreciation', 'net_book_value']) as $book) {
+                $books[(string) $book->aset_id] ??= $book;
+            }
+        }
         $commercial = BukuAset::query()
             ->whereIn('aset_id', $asetIds)
             ->where(fn ($query) => $query->whereNull('buku_id')->orWhereIn('buku_id', BukuPenyusutan::query()->where('posting_layer', 'current')->select('id')))

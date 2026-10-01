@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Platform\Modules\Contracts\AddressDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,6 +55,8 @@ final class ReferenceDataController extends Controller
         'management-aset.aset.read',
         'management-aset.pemeliharaan-aset.read',
         'management-aset.monitoring-aset.read',
+        // Unit kerja bawaan pada lokasi aset.
+        'management-aset.lokasi-aset.read',
     ];
 
     public function operatingUnits(Request $request, AssetOrganizationDirectory $direktori): JsonResponse
@@ -82,6 +85,40 @@ final class ReferenceDataController extends Controller
                 'email' => $anggota['email'],
             ],
             $direktori->members((string) $request->attributes->get('coreerp.tenant_id')),
+        )]);
+    }
+
+    /**
+     * Alamat dari buku alamat Core untuk dipilih pada lokasi aset, dengan nama tempat dan alamatnya.
+     *
+     * Dengan `unit_kerja_id`, yang dipulangkan hanya alamat utama unit kerja itu (nol atau satu baris):
+     * saran alamat saat lokasi diberi unit kerja bawaan. Saran saja — lokasi tetap menyimpan alamatnya
+     * sendiri, dan mengubah alamat unit kerja kemudian tidak menggeser alamat lokasi.
+     */
+    public function addresses(Request $request, AddressDirectory $addresses): JsonResponse
+    {
+        abort_unless(in_array('management-aset.lokasi-aset.read', $request->attributes->get('coreerp.permissions', []), true), 403);
+        $validated = $request->validate(['unit_kerja_id' => ['nullable', 'ulid']]);
+        $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
+
+        if (($validated['unit_kerja_id'] ?? null) === null) {
+            $rows = $addresses->postalAddresses($tenantId);
+        } else {
+            $primary = $addresses->primaryOfOrganization($tenantId, $validated['unit_kerja_id']);
+            $rows = $primary === null ? [] : [$primary];
+        }
+
+        return response()->json(['data' => array_map(
+            // Bentuk pilihan dropdown modul ini: `kode` disamakan dengan nama tempat, dan labelnya
+            // menyebut alamat satu baris supaya dua tempat bernama mirip tetap dapat dibedakan.
+            static fn (array $row): array => [
+                'id' => $row['id'],
+                'kode' => $row['nama'],
+                'nama' => $row['nama'],
+                'alamat' => $row['alamat'],
+                'display_label' => $row['alamat'] === '' ? $row['nama'] : $row['nama'].' — '.str_replace("\n", ', ', $row['alamat']),
+            ],
+            $rows,
         )]);
     }
 

@@ -151,13 +151,39 @@ paths:
         ke database Core; daftar ini dibaca lewat kontrak `OrganizationDirectory` di dalam
         proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
 
-        Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
-        pemeliharaan — sama seperti daftar satuan.
+        Izinnya menumpang izin layar yang memakainya — mutasi, register aset, pemeliharaan,
+        monitoring, atau lokasi aset — sama seperti daftar satuan.
       responses:
         '200':
           description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
         '403':
           description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+  /api/v1/reference-data/alamat:
+    get:
+      tags:
+      - Reference data
+      operationId: listAddresses
+      summary: Alamat dari buku alamat Core, untuk dipilih pada lokasi aset
+      description: |
+        Tempat beralamat pos milik tenant aktif, dibaca lewat kontrak `AddressDirectory`. Modul
+        menyimpan id tempatnya saja; nama dan alamat diterjemahkan saat dibaca. Butuh
+        `management-aset.lokasi-aset.read`.
+
+        Dengan `unit_kerja_id`, yang dipulangkan hanya alamat utama unit kerja itu (nol atau satu
+        baris) — saran alamat saat lokasi diberi unit kerja bawaan.
+      parameters:
+      - name: unit_kerja_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Daftar alamat dengan `id`, `kode` (= nama), `nama`, `alamat`, dan `display_label`
+        '403':
+          description: Pengguna tidak memegang izin lihat lokasi aset
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/v1/reference-data/anggota:
     get:
       tags:
@@ -2455,6 +2481,72 @@ paths:
           $ref: '#/components/responses/StaleVersion'
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/v1/pengaturan-aset-tetap:
+    get:
+      tags:
+      - Master data
+      operationId: getPengaturanAsetTetap
+      summary: Membaca pengaturan aset tetap tenant aktif
+      description: |
+        Padanan halaman Fixed Asset Setup Business Central. Barisnya baru ada setelah disimpan
+        pertama kali; sebelum itu jawaban membawa `version` 0 dan pengaturan kosong.
+      responses:
+        '200':
+          description: Pengaturan aset tetap
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PengaturanAsetTetap'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags:
+      - Master data
+      operationId: updatePengaturanAsetTetap
+      summary: Menyimpan pengaturan aset tetap tenant aktif
+      description: |
+        Butuh `management-aset.fixed-asset-parameters.update`. Penyimpanan pertama membawa
+        `version` 0 dan membuat barisnya; berikutnya membawa versi yang dibuka pengguna.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PengaturanAsetTetapWrite'
+      responses:
+        '200':
+          description: Pengaturan aset tetap disimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PengaturanAsetTetap'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/maintenance-job-types:
     get:
       tags:
@@ -4054,6 +4146,10 @@ paths:
         Akumulasi ditambah residu tidak boleh melebihi nilai per unit, dan periode berjalan tidak
         boleh melebihi masa manfaat buku yang memakainya. Dokumen selain saldo awal tidak boleh
         membawa angka-angka itu.
+
+        `responsible_org_unit_id` boleh kosong bila `lokasi_aset_id` punya unit kerja bawaan
+        (milik sendiri atau warisan lokasi induk terdekat); unit itulah yang dipakai. Bila keduanya
+        kosong, 422 pada `responsible_org_unit_id`. Aturan yang sama berlaku pada `PATCH`.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
       responses:
@@ -7278,7 +7374,6 @@ components:
       - legal_entity_id
       - responsible_org_unit_id
       - tanggal
-      - tujuan_org_unit_id
       - alasan
       - details
       properties:
@@ -7295,7 +7390,13 @@ components:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
         tujuan_org_unit_id:
-          $ref: '#/components/schemas/Ulid'
+          description: |
+            Unit kerja penanggung jawab aset setelah serah terima. Bila kosong, diisi unit kerja
+            bawaan lokasi tujuan (atau lokasi induk terdekat yang mengisinya); bila keduanya kosong,
+            422 pada field ini.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
         diserahkan_oleh_user_id:
           type: string
           maxLength: 64
@@ -9078,6 +9179,43 @@ components:
           oneOf:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
+        alamat_id:
+          description: |
+            Tempat beralamat pos di buku alamat Core (Address pada functional location D365).
+            Kosong berarti mewarisi alamat lokasi induk terdekat yang punya alamat. Id yang tidak
+            ada di buku alamat tenant aktif ditolak 422.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        departemen_bawaan_id:
+          description: |
+            Unit kerja Core yang mengisi unit penanggung jawab aset saat aset diterima atau
+            dimutasi ke lokasi ini, bila dokumennya tidak menyebut unit. Kosong berarti mewarisi
+            lokasi induk terdekat yang mengisinya. Berbeda dari `org_unit_id` (dimensi keuangan).
+            Unit yang tidak ada di tenant aktif ditolak 422.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    LokasiAsetAlamat:
+      type: object
+      required:
+      - id
+      - nama
+      - alamat
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        nama:
+          type: string
+          description: Nama tempat di buku alamat.
+        alamat:
+          type: string
+          description: Alamat tercetak, beberapa baris dipisah baris baru.
+    LokasiAsetWarisanSumber:
+      description: Lokasi pemilik nilai yang diwarisi; `null` bila nilainya milik lokasi ini sendiri.
+      oneOf:
+      - $ref: '#/components/schemas/MasterSummary'
+      - type: 'null'
     LokasiAset:
       description: |
         Pohon lokasi fisik aset; padanan "Functional location" di Dynamics 365 F&O. Ia
@@ -9091,6 +9229,10 @@ components:
         required:
         - parent
         - tipe_lokasi
+        - alamat
+        - alamat_efektif
+        - departemen_bawaan_nama
+        - departemen_bawaan_efektif
         properties:
           parent:
             oneOf:
@@ -9099,6 +9241,43 @@ components:
           tipe_lokasi:
             oneOf:
             - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+          alamat:
+            description: Alamat milik lokasi ini sendiri, diterjemahkan saat dibaca.
+            oneOf:
+            - $ref: '#/components/schemas/LokasiAsetAlamat'
+            - type: 'null'
+          alamat_efektif:
+            description: Alamat yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+            oneOf:
+            - allOf:
+              - $ref: '#/components/schemas/LokasiAsetAlamat'
+              - type: object
+                required:
+                - diwarisi_dari
+                properties:
+                  diwarisi_dari:
+                    $ref: '#/components/schemas/LokasiAsetWarisanSumber'
+            - type: 'null'
+          departemen_bawaan_nama:
+            type: string
+            nullable: true
+          departemen_bawaan_efektif:
+            description: Unit kerja bawaan yang berlaku, milik sendiri atau warisan lokasi induk terdekat.
+            oneOf:
+            - type: object
+              required:
+              - id
+              - nama
+              - diwarisi_dari
+              properties:
+                id:
+                  $ref: '#/components/schemas/Ulid'
+                nama:
+                  type: string
+                  nullable: true
+                diwarisi_dari:
+                  $ref: '#/components/schemas/LokasiAsetWarisanSumber'
             - type: 'null'
     LokasiAsetCreate:
       allOf:
@@ -10722,6 +10901,48 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/MaintenanceRequest'
+    PengaturanAsetTetap:
+      type: object
+      description: |
+        Pengaturan aset tetap satu tenant, padanan Fixed Asset Setup (tabel 5603) Business Central.
+        Selama belum pernah disimpan, `version` bernilai 0 dan setiap pengaturan `null`.
+      required:
+      - version
+      - buku_penyusutan_bawaan_id
+      - buku_penyusutan_bawaan
+      - updated_at
+      properties:
+        version:
+          type: integer
+          minimum: 0
+        buku_penyusutan_bawaan_id:
+          description: Default Depr. Book BC. Nilai buku ini yang dibekukan monitoring aset.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        buku_penyusutan_bawaan:
+          oneOf:
+          - $ref: '#/components/schemas/MasterSummary'
+          - type: 'null'
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    PengaturanAsetTetapWrite:
+      type: object
+      required:
+      - version
+      description: Field yang tidak dikirim tidak diubah.
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          description: Versi yang dibuka pengguna; 0 untuk penyimpanan pertama.
+        buku_penyusutan_bawaan_id:
+          description: Buku penyusutan aktif milik tenant aktif; `null` mengosongkan.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

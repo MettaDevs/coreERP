@@ -8,3 +8,5 @@ Route::get('reference-data/kelompok-harta-fiskal', [ReferenceDataController::cla
 // Unit kerja dan orang milik Core, supaya layar menampilkan nama dan bukan ULID.
 Route::get('reference-data/unit-kerja', [ReferenceDataController::class, 'operatingUnits']);
 Route::get('reference-data/anggota', [ReferenceDataController::class, 'members']);
+// Alamat dari buku alamat Core, dipilih pada lokasi aset.
+Route::get('reference-data/alamat', [ReferenceDataController::class, 'addresses']);
