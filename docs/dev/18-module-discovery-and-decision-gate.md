@@ -4,6 +4,8 @@ Sebelum membuat app, master, transaksi, workflow, atau integrasi, buat proposal 
 
 Proposal menetapkan pemilik data, lifecycle, scope organisasi, keamanan, nomor, workflow/SoD, dan kontrak API/event.
 
+Untuk setiap **master**, proposal menjawab lebih dulu: milik Foundation atau milik module? Master yang dipakai, atau pasti akan dipakai, lebih dari satu module — atau yang padanannya di Business Central/Dynamics 365 hidup di lapis bersama — lahir di Foundation, bukan di module yang pertama memintanya. Pelanggan yang membeli satu module tidak boleh dipaksa membeli module lain demi master itu. Aturannya ada di [standar module](02-module-standard.md#master-bersama-dan-modul-yang-berdiri-sendiri).
+
 Bagian **keamanan** pada proposal berarti rantai lengkapnya, bukan sekadar daftar hak: entry point apa yang dilindungi, permission beserta access level-nya, privilege sebagai satuan tugas, dan duty sebagai bagian proses bisnis — ditambah bentuk security role yang masuk akal disusun tenant dari duty itu. Keempat lapis pertama wajib menjadi empat baris terpisah pada manifest; Core menolak manifest yang meringkasnya. Aturan, diagram, dan checklistnya ada di [Rantai keamanan modul transaksi](19-transaction-security-chain.md), dan harus dilewati **sebelum** modul dibangun, bukan sesudah. Nomor hanya untuk master atau dokumen bisnis yang membutuhkan identitas yang dapat dibaca manusia. App mendeklarasikan reference pada manifest dan admin tenant mengaturnya pada **Atur nomor** Core.
 
 Workflow hanya diperlukan untuk approval, exception, keputusan berisiko/irreversible, atau handoff terkontrol. SoD hanya bila pengaju tidak boleh sekaligus memverifikasi/menyetujui. Event hanya untuk fakta setelah commit yang dikonsumsi lintas app.

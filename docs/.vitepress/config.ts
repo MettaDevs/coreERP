@@ -57,6 +57,7 @@ export default withMermaid({
       'todo/AnalisaGapCoreErpkeBCPhase1/index.md',
     'todo/buku-alamat-global/README.md':
       'todo/buku-alamat-global/index.md',
+    'todo/master-bersama/README.md': 'todo/master-bersama/index.md',
     'todo/lapis-core/README.md': 'todo/lapis-core/index.md',
   },
 
@@ -376,6 +377,16 @@ export default withMermaid({
                 {
                   text: 'Memecah Core per lapis',
                   link: '/todo/lapis-core/',
+                },
+              ],
+            },
+            {
+              text: 'Master bersama',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Master bersama dan modul yang berdiri sendiri',
+                  link: '/todo/master-bersama/',
                 },
               ],
             },

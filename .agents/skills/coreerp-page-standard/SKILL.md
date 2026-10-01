@@ -54,6 +54,13 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 - Keep search first and related filters next. Every control needs a visible label or `aria-label`.
 - Vertical stacking is the mobile fallback, not the desktop default.
 
+## Shared master pages
+
+- A master owned by Foundation (Vendor today; later Customer, Item, Worker) has **one** page. A module never builds its own copy of it, its own vendor dropdown endpoint, or its own vendor setup screen.
+- Fields only one module needs appear as a section of that same page, owned and stored by the module — Business Central's `pageextension` on `Vendor Card`. The section shows only when the module is installed.
+- A module reaches the master page from its own menu, so its users never have to know the Core settings menu.
+- The section slot and module menu entries pointing to Core pages are not built yet; see `docs/todo/master-bersama/README.md`. Until then, link to the Core page instead of rebuilding it.
+
 ## Navigation
 
 - App manifests provide labels and permissions; Shell renders navigation.

@@ -160,6 +160,41 @@ is promoted into the canonical design. The Dynamics references behind this gate
 are the organization, Budget planning security, and XDS documentation linked
 there.
 
+### Shared master and layer decision gate
+
+Core code lives in three layers that mirror Business Central: `App\Platform\<Feature>` (engine with no
+business vocabulary), `App\Foundation\<Feature>` (shared business masters and services), and
+`modules/` (sellable business capabilities). Dependencies point downward only: Platform never uses
+Foundation, and a module reaches Core only through the contract namespace. The layer is a code
+arrangement only — it never appears in a table name, permission code, event name, or URL.
+`LayerDirectionBoundaryTest` guards it; known exceptions live in its `ALLOWED` list and in
+`docs/todo/lapis-core/README.md`, and that list may only shrink.
+
+Before adding any master, decide its owner:
+
+- It belongs in **Foundation** when it is used, or certainly will be used, by two or more modules; or
+  it identifies a party or legal entity; or its Business Central / Dynamics 365 equivalent lives in the
+  shared layer. Otherwise it belongs to its module. Never create a shared master inside the first
+  module that happens to need it.
+- **One master, one page.** A module never builds a competing screen for a Foundation master. Fields
+  only one module needs live in that module's own table keyed by the master id and appear as a section
+  of the same page — the `pageextension` / `tableextension` pattern of Business Central.
+- **Buying one module loses nothing.** A module brings its own menu entry to the master pages it uses,
+  its default duties include the rights to them, and it never depends on another module. Cooperation
+  between two modules is an add-on installed by the second one (extension point or event), so the
+  first stays whole without it.
+- **Keep it simple and keep the BC/F&O equivalent.** Do not invent a shape when Business Central or
+  Dynamics 365 already has one; do not build a mechanism before something real uses it.
+
+Page sections per module and module menu entries that point to Core pages are not built yet; the
+plan, the current inventory, and the open decisions (Worker identity) are in
+`docs/todo/master-bersama/README.md`.
+
+Outbound integration (`internal/v1` feeds, signed push) belongs to `App\Platform\Integration` and is
+for systems outside CoreERP only, never module to module. The finance feed contract v1
+(`integrasi-finance.yaml`) is in use by an external team: its URLs, payload, signature headers, and
+ack rules never change in place.
+
 ### Contract decision gate
 
 A contract is the promise a module makes to code it does not control. It is not

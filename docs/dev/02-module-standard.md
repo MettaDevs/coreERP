@@ -753,6 +753,30 @@ Module baru wajib benar di **dua tempat di luar foldernya sendiri**: baris awala
 `modules/README.md`, dan `require` pada `composer.json` Core. Perintahnya tidak boleh menyunting
 assertion pada test mana pun.
 
+## Master bersama dan modul yang berdiri sendiri
+
+Pelanggan yang membeli satu modul mendapat seluruh kemampuan modul itu, tanpa dipaksa membeli modul
+lain demi sebuah master. Aturan ini berlaku untuk setiap master dan modul baru:
+
+- **Master yang dipakai lebih dari satu modul hidup di Foundation**, bukan di modul yang pertama
+  memintanya. Ukurannya: dipakai, atau pasti akan dipakai, dua modul atau lebih; atau ia identitas
+  pihak atau badan usaha; atau padanannya di Business Central atau Dynamics 365 hidup di lapis bersama.
+  Selain itu, master tetap milik modulnya.
+- **Satu master, satu halaman.** Modul tidak membuat layar tandingan untuk master milik Foundation.
+  Kolom yang hanya dibutuhkan satu modul disimpan di tabel modul itu sendiri dengan `<master>_id`, dan
+  tampil sebagai bagian di halaman master yang sama — padanan `pageextension` dan `tableextension`
+  di Business Central.
+- **Modul membawa pintunya sendiri**: entri menu ke halaman master yang ia pakai, dan duty bawaannya
+  menyertakan hak master itu.
+- **Modul hanya bergantung ke bawah.** Kerja sama dua modul dibangun sebagai tambahan yang dipasang
+  modul kedua — mendaftar ke titik perluasan atau mendengarkan event — sehingga modul pertama tetap
+  utuh tanpanya.
+
+Bagian halaman per modul dan entri menu yang menunjuk halaman Core **belum dibangun**. Rencananya,
+inventaris master hari ini, dan keputusan yang masih terbuka ada di
+[master bersama](../todo/master-bersama/README.md). Sampai mekanismenya ada, master bersama dikelola
+di halaman Core-nya, dan modul memilihnya lewat kontrak di `App\Support\Modules\Contracts`.
+
 ## Contract dan dependency
 
 | Area | Aturan |
@@ -761,7 +785,7 @@ assertion pada test mana pun.
 | Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama. |
 | UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
 | Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `KonteksTenant` dan `KonteksPermintaan`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
-| Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. |
+| Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. Master milik Foundation dibaca lewat kontrak; lihat [master bersama](#master-bersama-dan-modul-yang-berdiri-sendiri). |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
 | Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
 | Compatibility | `dependsOn` dengan versi tepat atau caret divalidasi saat katalog terdaftar; Core menolak cycle dan perubahan versi yang merusak dependent. `requires.core` belum divalidasi oleh Control Plane. |

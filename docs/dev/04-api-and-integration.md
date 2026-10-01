@@ -252,6 +252,21 @@ Module hanya boleh membuka extension point yang eksplisit:
 
 Addon tidak boleh mendapat database credential module lain, meng-import model internal, atau menambahkan route ke service module lain.
 
+### Saluran keluar ke sistem di luar CoreERP
+
+`internal/v1` dan push bertanda tangan adalah jalan sistem di luar CoreERP, **tidak pernah** jalan
+antar-module di satu runtime. Saluran ini milik `App\Platform\Integration`: klien integrasi dengan
+token, scope, dan IP yang diizinkan, signature push, dan aturan URL tujuan. Data yang dikirim milik
+fiturnya masing-masing; feed posting finance milik `App\Foundation\FinancePosting`, dan aplikasi
+finance pelanggan hanyalah satu klien integrasi.
+
+Hari ini mesin pengirimnya baru mengenal satu jenis data, yaitu jurnal posting. Rencana menjadikannya
+umum — padanan Business events di Dynamics 365 F&O dan webhook subscription di Business Central —
+ada di [master bersama](../todo/master-bersama/README.md#saluran-integrasi-ke-sistem-luar). Syarat
+yang mengikat rencana itu sudah berlaku hari ini: kontrak `integrasi-finance.yaml` v1 tidak berubah di
+tempat. URL, payload, header signature, dan aturan ack-nya hanya boleh berubah lewat versi baru yang
+berjalan berdampingan.
+
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — kepemilikan database yang membuat kontrak ini perlu
