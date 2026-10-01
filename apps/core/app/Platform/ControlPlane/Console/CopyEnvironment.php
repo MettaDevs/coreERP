@@ -399,7 +399,7 @@ final class CopyEnvironment extends Command
             return null;
         }
 
-        if (! $source->produksi()) {
+        if (! $source->isProduction()) {
             $this->error(sprintf(
                 'Environment "%s" berjenis %s. Yang disalin menjadi sandbox hanya produksi — '
                 .'menyalin sandbox menghasilkan salinan dari salinan, dan tidak ada seorang pun '
@@ -480,7 +480,7 @@ final class CopyEnvironment extends Command
             return null;
         }
 
-        if ($existing->produksi()) {
+        if ($existing->isProduction()) {
             $this->error(sprintf(
                 'Nama "%s" menunjuk lingkungan PRODUKSI "%s" milik tenant ini. Penyalinan menolak '
                 .'sasaran produksi: seluruh fitur ini ada supaya salinan tidak dapat menyentuh '
@@ -602,9 +602,9 @@ final class CopyEnvironment extends Command
         }
 
         $row = DB::connection($this->maintenanceConnection())
-            ->selectOne('select pg_database_size(?) as ukuran', [$source->database_name]);
+            ->selectOne('select pg_database_size(?) as size', [$source->database_name]);
 
-        $size = is_object($row) && property_exists($row, 'ukuran') ? (int) $row->ukuran : 0;
+        $size = is_object($row) && property_exists($row, 'size') ? (int) $row->size : 0;
         $needed = (int) ceil($size * self::DISK_MARGIN);
 
         DB::purge(self::CONNECTION_MAINTENANCE);
@@ -1158,16 +1158,16 @@ final class CopyEnvironment extends Command
         DB::purge(self::CONNECTION_MAINTENANCE);
 
         try {
-            $koneksi = DB::connection(self::CONNECTION_MAINTENANCE);
+            $connection = DB::connection(self::CONNECTION_MAINTENANCE);
 
-            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
+            if ($connection->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
                 return false;
             }
 
             // `PDO::exec`, bukan `statement()` maupun `unprepared()`. Yang pertama menyiapkan
             // pernyataan lebih dulu, dan protokol extended query PostgreSQL membungkusnya dalam
             // transaksi implisit — persis yang dilarang untuk `CREATE DATABASE`.
-            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
+            $connection->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
 
             return true;
         } catch (PDOException $e) {
@@ -1191,14 +1191,14 @@ final class CopyEnvironment extends Command
      * `CREATE SCHEMA` miliknya sendiri, dan mendirikannya lebih dulu hanya akan membuat
      * `pg_restore` berhenti pada objek yang sudah ada.
      */
-    private function prepareConnection(string $koneksi, string $database): void
+    private function prepareConnection(string $connection, string $database): void
     {
-        $konfigurasi = $this->baseConfig();
-        $konfigurasi['database'] = $database;
-        $konfigurasi['url'] = null;
+        $config = $this->baseConfig();
+        $config['database'] = $database;
+        $config['url'] = null;
 
-        config(['database.connections.'.$koneksi => $konfigurasi]);
-        DB::purge($koneksi);
+        config(['database.connections.'.$connection => $config]);
+        DB::purge($connection);
     }
 
     /**
@@ -1229,14 +1229,14 @@ final class CopyEnvironment extends Command
     private function baseConfig(): array
     {
         $default = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$default);
+        $config = config('database.connections.'.$default);
 
-        if (! is_array($konfigurasi)) {
+        if (! is_array($config)) {
             throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
-        /** @var array<string, mixed> $konfigurasi */
-        return $konfigurasi;
+        /** @var array<string, mixed> $config */
+        return $config;
     }
 
     /**

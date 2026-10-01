@@ -18,7 +18,7 @@ final class ChangeHistoryCore implements ChangeHistory
 {
     public function __construct(
         private readonly ChangeLogValueResolvers $resolvers,
-        private readonly TenantRunner $pelaksana,
+        private readonly TenantRunner $runner,
     ) {}
 
     public function forRecord(string $tenantId, string $table, string $recordId, int $page = 1): array
@@ -96,7 +96,7 @@ final class ChangeHistoryCore implements ChangeHistory
 
         // Model module menyaring lewat tenant aktif; riwayat juga dibaca dari rute admin Core yang tidak
         // melewati middleware konteks module, jadi tenant-nya disebut di sini.
-        return $this->pelaksana->runFor($tenantId, function () use ($resolver, $tenantId, $values): array {
+        return $this->runner->runFor($tenantId, function () use ($resolver, $tenantId, $values): array {
             $display = [];
             foreach ($values as $field => $set) {
                 $display[$field] = $resolver->display($tenantId, $field, array_map('strval', array_keys($set)));

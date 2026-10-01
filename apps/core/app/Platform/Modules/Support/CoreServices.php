@@ -60,7 +60,7 @@ final class CoreServices
      *
      * @var array<class-string, class-string>
      */
-    public const PEMETAAN = [
+    public const BINDINGS = [
         OrganizationDirectory::class => OrganizationDirectoryCore::class,
         TenantContext::class => TenantContextCore::class,
         // Berdiri sendiri di samping TenantContext, tidak digabung ke dalamnya. Tenant
@@ -111,7 +111,7 @@ final class CoreServices
     /**
      * Kontrak yang **module** penuhi untuk Core, bukan sebaliknya.
      *
-     * Dipisahkan dari `PEMETAAN` karena cara mengikatnya berbeda dan bedanya menentukan
+     * Dipisahkan dari `BINDINGS` karena cara mengikatnya berbeda dan bedanya menentukan
      * apakah ia bekerja sama sekali: yang di atas dibuat baru tiap kali dipakai, sedangkan
      * daftar isian harus satu benda untuk seluruh proses. Diikat dengan `bind`, tiap
      * pendaftaran dari penyedia layanan module akan masuk ke salinan yang langsung dibuang,
@@ -122,7 +122,7 @@ final class CoreServices
      *
      * @var array<class-string, class-string>
      */
-    public const PEMETAAN_TUNGGAL = [
+    public const SINGLETON_BINDINGS = [
         ModuleReportProviders::class => ModuleReportProviderRegistry::class,
         // Log perubahan: nilai mentah (ULID, kode status) diterjemahkan pemilik tabelnya menjadi nama.
         ChangeLogValueResolvers::class => ChangeLogValueResolverRegistry::class,
@@ -137,7 +137,7 @@ final class CoreServices
 
     /**
      * Daftar isian milik Foundation. Diikat `singleton` beserta aliasnya oleh penyedia layanan
-     * fitur pemiliknya, dengan alasan yang sama seperti `PEMETAAN_TUNGGAL`.
+     * fitur pemiliknya, dengan alasan yang sama seperti `SINGLETON_BINDINGS`.
      *
      * @var list<class-string>
      */
@@ -155,18 +155,18 @@ final class CoreServices
      */
     public static function contracts(): array
     {
-        return [...array_keys(self::PEMETAAN), ...self::FOUNDATION_CONTRACTS];
+        return [...array_keys(self::BINDINGS), ...self::FOUNDATION_CONTRACTS];
     }
 
-    public static function daftarkan(Application $app): void
+    public static function register(Application $app): void
     {
-        foreach (self::PEMETAAN as $antarmuka => $pelaksana) {
-            $app->bind($antarmuka, $pelaksana);
+        foreach (self::BINDINGS as $contract => $implementation) {
+            $app->bind($contract, $implementation);
         }
 
-        foreach (self::PEMETAAN_TUNGGAL as $antarmuka => $pelaksana) {
-            $app->singleton($pelaksana);
-            $app->alias($pelaksana, $antarmuka);
+        foreach (self::SINGLETON_BINDINGS as $contract => $implementation) {
+            $app->singleton($implementation);
+            $app->alias($implementation, $contract);
         }
     }
 }

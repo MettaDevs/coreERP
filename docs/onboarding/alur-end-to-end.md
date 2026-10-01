@@ -112,13 +112,13 @@ DB::afterCommit(function () use ($appIds, $idEvent, $tenant): void {
     $registry = app(ModuleRegistry::class);
 
     foreach ($appIds as $appId) {
-        if ($registry->cari($appId) === null) {
+        if ($registry->find($appId) === null) {
             continue;
         }
 
         app(InstallModule::class)->handle($appId, $tenant->id);
 
-        app(PengirimEventModul::class)->kirim(
+        app(ModuleEventDispatcher::class)->dispatch(
             new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
             (string) $tenant->id,
         );

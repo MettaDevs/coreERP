@@ -16,11 +16,11 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class AccountDirectoryCore implements AccountDirectory
 {
-    public function search(string $tenantId, ?string $legalEntityId, string $kata = '', int $batas = 20): array
+    public function search(string $tenantId, ?string $legalEntityId, string $keyword = '', int $limit = 20): array
     {
-        $kata = trim($kata);
+        $keyword = trim($keyword);
         // `%` dan `_` di kata pencarian adalah huruf biasa, bukan wildcard.
-        $pola = '%'.addcslashes($kata, '\\%_').'%';
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
 
         return array_values(FinanceReferenceAccount::query()
             ->where('tenant_id', $tenantId)
@@ -28,22 +28,22 @@ final class AccountDirectoryCore implements AccountDirectory
             ->where(fn (Builder $query) => $legalEntityId === null
                 ? $query->whereNull('legal_entity_id')
                 : $query->whereNull('legal_entity_id')->orWhere('legal_entity_id', $legalEntityId))
-            ->when($kata !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('code', 'ilike', $pola)
-                ->orWhere('name', 'ilike', $pola)
-                ->orWhere('external_id', $kata)))
+            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
+                ->where('code', 'ilike', $pattern)
+                ->orWhere('name', 'ilike', $pattern)
+                ->orWhere('external_id', $keyword)))
             ->orderBy('code')
-            ->limit(max(1, min($batas, 100)))
+            ->limit(max(1, min($limit, 100)))
             ->get()
-            ->map(self::baris(...))
+            ->map(self::row(...))
             ->all());
     }
 
     public function find(string $tenantId, string $accountId): ?array
     {
-        $akun = FinanceReferenceAccount::query()->where('tenant_id', $tenantId)->find($accountId);
+        $account = FinanceReferenceAccount::query()->where('tenant_id', $tenantId)->find($accountId);
 
-        return $akun === null ? null : self::baris($akun);
+        return $account === null ? null : self::row($account);
     }
 
     public function findMany(string $tenantId, array $accountIds): array
@@ -56,21 +56,21 @@ final class AccountDirectoryCore implements AccountDirectory
             ->where('tenant_id', $tenantId)
             ->whereIn('id', array_values(array_unique($accountIds)))
             ->get()
-            ->mapWithKeys(fn (FinanceReferenceAccount $akun): array => [$akun->id => self::baris($akun)])
+            ->mapWithKeys(fn (FinanceReferenceAccount $account): array => [$account->id => self::row($account)])
             ->all();
     }
 
     /** @return array{id: string, external_id: string, code: string, name: string, type: string, active: bool, legal_entity_id: ?string} */
-    private static function baris(FinanceReferenceAccount $akun): array
+    private static function row(FinanceReferenceAccount $account): array
     {
         return [
-            'id' => $akun->id,
-            'external_id' => $akun->external_id,
-            'code' => $akun->code,
-            'name' => $akun->name,
-            'type' => $akun->type,
-            'active' => $akun->active,
-            'legal_entity_id' => $akun->legal_entity_id,
+            'id' => $account->id,
+            'external_id' => $account->external_id,
+            'code' => $account->code,
+            'name' => $account->name,
+            'type' => $account->type,
+            'active' => $account->active,
+            'legal_entity_id' => $account->legal_entity_id,
         ];
     }
 }

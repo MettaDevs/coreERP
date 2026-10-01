@@ -35,9 +35,9 @@ class ModuleSeedTest extends TestCase
         $migrator = $this->app->make(ModuleMigrator::class);
 
         foreach (['contoh-a', 'contoh-b'] as $id) {
-            $module = $registry->cari($id);
+            $module = $registry->find($id);
             $this->assertNotNull($module);
-            $migrator->naik($module);
+            $migrator->migrate($module);
         }
     }
 
@@ -121,10 +121,10 @@ class ModuleSeedTest extends TestCase
 
     private function isiDataAwal(string $moduleId): bool
     {
-        $module = $this->app->make(ModuleRegistry::class)->cari($moduleId);
+        $module = $this->app->make(ModuleRegistry::class)->find($moduleId);
         $this->assertNotNull($module);
 
-        return $this->app->make(ModuleSeeder::class)->jalankan($module, $this->tenantId);
+        return $this->app->make(ModuleSeeder::class)->run($module, $this->tenantId);
     }
 
     private function catatPemasangan(string $moduleId): void

@@ -15,11 +15,11 @@ final readonly class ModuleManifest
 {
     public function __construct(
         public string $id,
-        public string $nama,
-        public string $versi,
-        public string $penerbit,
-        public string $jenis,
-        public string $awalanTabel,
+        public string $name,
+        public string $version,
+        public string $publisher,
+        public string $kind,
+        public string $tablePrefix,
         public string $folder,
         /** @var list<string> id module lain yang wajib terpasang lebih dulu */
         public array $dependency = [],
@@ -34,14 +34,14 @@ final readonly class ModuleManifest
      */
     public function internalTestFixtures(): bool
     {
-        return $this->jenis === 'internal-fixture';
+        return $this->kind === 'internal-fixture';
     }
 
     public function serviceProvider(): string
     {
         return sprintf(
             'Modules\\%s\\%s\\ModuleServiceProvider',
-            $this->studly($this->penerbit),
+            $this->studly($this->publisher),
             $this->studly(basename($this->folder)),
         );
     }
@@ -51,8 +51,8 @@ final readonly class ModuleManifest
         return $this->folder.'/database/migrations';
     }
 
-    private function studly(string $nama): string
+    private function studly(string $name): string
     {
-        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $nama)));
+        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $name)));
     }
 }

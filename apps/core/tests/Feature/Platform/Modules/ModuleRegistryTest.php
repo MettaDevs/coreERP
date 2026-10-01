@@ -100,7 +100,7 @@ publisher: apperp
     public function test_module_contoh_ditandai_bahan_uji_internal(): void
     {
         $registry = $this->app->make(ModuleRegistry::class);
-        $contohA = $registry->cari('contoh-a');
+        $contohA = $registry->find('contoh-a');
 
         $this->assertNotNull($contohA);
         $this->assertTrue(

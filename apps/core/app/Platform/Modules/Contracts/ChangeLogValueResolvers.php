@@ -5,7 +5,7 @@ namespace App\Platform\Modules\Contracts;
 /**
  * Daftar penerjemah nilai log perubahan, diisi penyedia layanan tiap module saat boot.
  *
- * Satu benda untuk seluruh proses (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran module dan
+ * Satu benda untuk seluruh proses (`CoreServices::SINGLETON_BINDINGS`), supaya pendaftaran module dan
  * pembacaan riwayat memegang daftar yang sama. Tabel tanpa penerjemah bukan kesalahan: nilainya tampil apa
  * adanya.
  */

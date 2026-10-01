@@ -307,7 +307,7 @@ final class PurgeEnvironment extends Command
         // ada keadaan di rancangan ini yang membuat membuangnya lewat perintah terjadwal menjadi
         // jawaban yang benar. Constraint `environments_produksi_tidak_dibuang` menolaknya sekali
         // lagi di PostgreSQL; yang di sini ada supaya penolakannya berupa kalimat, bukan galat SQL.
-        if ($environment->produksi()) {
+        if ($environment->isProduction()) {
             return 'ia berjenis produksi. Produksi tidak pernah dibuang permanen lewat perintah ini, '
                 .'apa pun statusnya — yang harus diputuskan lebih dulu adalah nasib datanya, dan itu '
                 .'keputusan orang.';

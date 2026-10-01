@@ -30,7 +30,7 @@ final class ModuleServiceProvider extends ServiceProvider
     {
         // Permukaan Core yang boleh dipanggil module. Daftarnya ada di CoreServices, dan
         // menambah barisnya adalah keputusan arsitektur, bukan kenyamanan.
-        CoreServices::daftarkan($this->app);
+        CoreServices::register($this->app);
 
         // Akarnya dibaca dari config, bukan dihitung di sini. Bahan uji penjaga batas hidup di
         // akar kedua yang hanya disebut saat `APP_ENV=testing`, sehingga ia tidak bergantung pada

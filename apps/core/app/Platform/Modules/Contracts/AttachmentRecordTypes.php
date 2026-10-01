@@ -8,7 +8,7 @@ namespace App\Platform\Modules\Contracts;
  * Daftar jenis record yang boleh diberi lampiran dokumen, diisi Core dan penyedia layanan tiap module saat
  * boot (gap 7).
  *
- * Satu benda untuk seluruh proses (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran dan layanan lampiran
+ * Satu benda untuk seluruh proses (`CoreServices::SINGLETON_BINDINGS`), supaya pendaftaran dan layanan lampiran
  * memegang daftar yang sama. Tabel yang tidak terdaftar tidak dapat diberi lampiran.
  */
 interface AttachmentRecordTypes

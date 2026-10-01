@@ -15,20 +15,20 @@ use App\Platform\Modules\Contracts\CurrencyRounding;
  */
 final class CurrencyRoundingCore implements CurrencyRounding
 {
-    public function __construct(private readonly MoneyPrecision $presisi) {}
+    public function __construct(private readonly MoneyPrecision $precision) {}
 
-    public function amountDecimals(string $tenantId, string $kodeMataUang): int
+    public function amountDecimals(string $tenantId, string $currencyCode): int
     {
-        return $this->presisi->amountDecimals($tenantId, $kodeMataUang);
+        return $this->precision->amountDecimals($tenantId, $currencyCode);
     }
 
-    public function unitAmountDecimals(string $tenantId, string $kodeMataUang): int
+    public function unitAmountDecimals(string $tenantId, string $currencyCode): int
     {
-        return $this->presisi->unitAmountDecimals($tenantId, $kodeMataUang);
+        return $this->precision->unitAmountDecimals($tenantId, $currencyCode);
     }
 
-    public function roundAmount(string $tenantId, string|int|float $nilai, string $kodeMataUang): string
+    public function roundAmount(string $tenantId, string|int|float $value, string $currencyCode): string
     {
-        return $this->presisi->roundAmount($tenantId, $nilai, $kodeMataUang);
+        return $this->precision->roundAmount($tenantId, $value, $currencyCode);
     }
 }

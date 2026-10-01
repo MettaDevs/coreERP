@@ -111,7 +111,7 @@ final class ModuleRegistry
         return $this->modulesIncludingMoved = $found;
     }
 
-    public function cari(string $id): ?ModuleManifest
+    public function find(string $id): ?ModuleManifest
     {
         foreach ($this->all() as $module) {
             if ($module->id === $id) {
@@ -244,11 +244,11 @@ final class ModuleRegistry
 
         return new ModuleManifest(
             id: $id,
-            nama: isset($content['name']) && is_string($content['name']) ? $content['name'] : $id,
-            versi: isset($content['version']) && is_string($content['version']) ? $content['version'] : '0.0.0',
-            penerbit: isset($content['publisher']) && is_string($content['publisher']) ? $content['publisher'] : '',
-            jenis: isset($content['kind']) && is_string($content['kind']) ? $content['kind'] : 'business-app',
-            awalanTabel: $this->tablePrefixes($content),
+            name: isset($content['name']) && is_string($content['name']) ? $content['name'] : $id,
+            version: isset($content['version']) && is_string($content['version']) ? $content['version'] : '0.0.0',
+            publisher: isset($content['publisher']) && is_string($content['publisher']) ? $content['publisher'] : '',
+            kind: isset($content['kind']) && is_string($content['kind']) ? $content['kind'] : 'business-app',
+            tablePrefix: $this->tablePrefixes($content),
             folder: dirname($file),
             dependency: $this->dependency($content),
         );
