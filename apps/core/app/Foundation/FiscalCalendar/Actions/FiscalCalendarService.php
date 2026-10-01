@@ -5,7 +5,7 @@ namespace App\Foundation\FiscalCalendar\Actions;
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
 use App\Foundation\FiscalCalendar\Models\FiscalYear;
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;

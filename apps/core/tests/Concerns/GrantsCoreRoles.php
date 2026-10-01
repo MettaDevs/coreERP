@@ -4,7 +4,7 @@ namespace Tests\Concerns;
 
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CorePermissions;
 use App\Support\Access\OwnerRoleDuties;
 use Illuminate\Support\Str;

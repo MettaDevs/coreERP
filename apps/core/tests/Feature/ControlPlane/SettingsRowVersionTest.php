@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\InvitationCode;
-use App\Models\Organization;
-use App\Models\OrganizationHierarchyVersion;
 use App\Models\Role;
 use App\Models\SecurityPrivilege;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\RowVersion;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

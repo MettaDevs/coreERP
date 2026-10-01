@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\License;
 
-use App\Models\Tenant;
+use App\Platform\Tenant\Models\Tenant;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Facades\Log;

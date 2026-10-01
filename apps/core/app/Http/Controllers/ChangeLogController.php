@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\ChangeLog\ChangeLogSetup;
 use App\Support\Modules\Contracts\ChangeHistory;

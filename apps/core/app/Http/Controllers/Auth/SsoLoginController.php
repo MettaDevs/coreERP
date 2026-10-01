@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Actions\Access\CreateInvitation;
-use App\Actions\Onboarding\RedeemInvitation;
 use App\Http\Controllers\Controller;
 use App\Models\ExternalIdentity;
-use App\Models\InvitationCode;
 use App\Models\SsoLoginAttempt;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
+use App\Platform\Tenant\Actions\RedeemInvitation;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Sso\SharedIdentityProvider;
 use App\Support\Sso\SsoFailure;
 use App\Support\Sso\TenantSso;

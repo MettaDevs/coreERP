@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Models\Tenant;
 use App\Platform\ControlPlane\Console\SweepExpiredEnvironments;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Tenant\Models\Tenant;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Console\Scheduling\Schedule;

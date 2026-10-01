@@ -6,7 +6,7 @@ namespace App\Support\Reporting;
 
 use App\Models\ReportLastUsedOption;
 use App\Models\ReportPreset;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use App\Support\UserClock;

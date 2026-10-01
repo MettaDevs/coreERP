@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Database\ChangeLogSwitch;
 use App\Support\Modules\Contracts\AuditColumns;
 use App\Support\Modules\Contracts\ChangeLogDefaults;

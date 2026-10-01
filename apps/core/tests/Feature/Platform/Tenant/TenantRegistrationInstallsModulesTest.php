@@ -1,0 +1,135 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Platform\Tenant;
+
+use App\Models\ModuleInstallation;
+use App\Platform\Tenant\Models\Tenant;
+use Database\Seeders\AppCatalogSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use Tests\TestCase;
+
+/**
+ * Pendaftaran tenant baru memasang module — satu-satunya jalur yang tersisa.
+ *
+ * Sebuah id app yang tidak ada sebagai folder di `modules/` dilewati tanpa suara:
+ * entitlement-nya tercatat, tetapi tidak ada apa pun yang dipasang untuknya dan ia tidak
+ * muncul di peluncur. Test ini juga menjaga jalur container yang sudah dibuang tidak kembali
+ * hidup: ia akan terlihat di sini sebagai baris penempatan yang tidak seharusnya ada.
+ */
+class TenantRegistrationInstallsModulesTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(AppCatalogSeeder::class);
+        Queue::fake();
+    }
+
+    public function test_tenant_baru_langsung_memiliki_module_terpasang_beserta_data_awalnya(): void
+    {
+        $this->daftarkan(['contoh-a']);
+
+        $tenantId = (string) Tenant::query()->value('id');
+
+        $this->assertDatabaseHas('core_module_installations', [
+            'tenant_id' => $tenantId,
+            'module_id' => 'contoh-a',
+            'status' => ModuleInstallation::STATUS_INSTALLED,
+        ]);
+
+        $this->assertSame(
+            2,
+            DB::table('contoh_a_m_barang')->where('tenant_id', $tenantId)->where('bawaan', true)->count(),
+            'Data awal module harus ikut terisi saat tenant mendaftar.'
+        );
+
+        $this->assertNull(
+            DB::table('apps')->where('id', 'contoh-a')->value('database_name'),
+            'Module memakai database Core, jadi katalog tidak boleh menyimpan nama database untuknya.'
+        );
+    }
+
+    public function test_pendaftaran_module_tidak_menjalankan_penempatan_container(): void
+    {
+        $this->daftarkan(['contoh-a']);
+
+        Queue::assertNothingPushed();
+        $this->assertSame(0, DB::table('app_placements')->count());
+    }
+
+    public function test_app_yang_bukan_module_tidak_memasang_apa_pun(): void
+    {
+        $this->daftarkan(['app-uji']);
+
+        Queue::assertNothingPushed();
+        $this->assertSame(
+            0,
+            DB::table('core_module_installations')->count(),
+            'App yang tidak ada sebagai module tidak boleh dicatat sebagai terpasang.'
+        );
+        $this->assertSame(
+            0,
+            DB::table('app_placements')->count(),
+            'Tidak ada lagi penempatan container yang boleh dibuat untuk app mana pun.'
+        );
+    }
+
+    public function test_mendaftar_dengan_module_dan_app_bukan_module_sekaligus(): void
+    {
+        $this->daftarkan(['contoh-a', 'app-uji']);
+
+        $tenantId = (string) Tenant::query()->value('id');
+
+        Queue::assertNothingPushed();
+        $this->assertDatabaseHas('core_module_installations', [
+            'tenant_id' => $tenantId,
+            'module_id' => 'contoh-a',
+        ]);
+        $this->assertDatabaseMissing('core_module_installations', [
+            'tenant_id' => $tenantId,
+            'module_id' => 'app-uji',
+        ]);
+    }
+
+    /** @param  list<string>  $appIds */
+    private function daftarkan(array $appIds): void
+    {
+        // Module contoh belum ada di katalog app, dan pendaftaran menolak id yang tidak
+        // dikenal. Ini urutan yang benar: katalog menyatakan produknya dikenal platform,
+        // pemasangan menyatakan ia ada untuk tenant tertentu.
+        foreach ($appIds as $appId) {
+            DB::table('apps')->updateOrInsert(
+                ['id' => $appId],
+                [
+                    'name' => ucfirst($appId),
+                    'description' => 'Module contoh untuk test pendaftaran.',
+                    'version' => '0.1.0',
+                    'status' => 'available',
+                    // `database_name` sengaja tidak diisi. Module memakai database Core,
+                    // jadi ia tidak punya nama database untuk disebutkan, dan sejak F2-12
+                    // katalog tidak lagi menuntutnya. App container yang sudah ada di
+                    // katalog (mis. app-uji dari AppCatalogSeeder) tidak tersentuh
+                    // di sini, sehingga nama databasenya tetap seperti yang dideklarasikan.
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            );
+        }
+
+        $this->postJson('/api/v1/business-registrations', [
+            'name' => 'Pemilik',
+            'business_name' => 'PT Daftar',
+            'app_ids' => $appIds,
+            'email' => 'daftar@metta.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+    }
+}

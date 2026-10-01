@@ -114,6 +114,13 @@ Dengan keputusan di atas ada **23 import** yang melanggar arah. Semuanya jatuh k
 | Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation | `InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure` (5 import) | Foundation mendengarkan kejadian tenant/module. Kontrak `TenantDisiapkan` sudah ada; kejadian "module terpasang" ditambahkan bila belum ada |
 | Reporting memakai presisi uang dan buku alamat | `ValueFormat`, `ValueFormats` → `MoneyPrecision`; `PrintIdentityStore` → `OrganizationAddressBook` (3 import) | Lewat facade (`PresisiMataUang` sudah ada) atau penyedia yang didaftarkan Foundation |
 | Integration dan onboarding menyentuh milik fitur lain | `AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance); `RegisterBusiness` → `Client` (ControlPlane) (3 import) | Tentukan pemilik saat PR domain itu. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
+| Model tenant mengenal client milik pusat | `Tenant` → `Client` (ControlPlane) (1 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: isi kelas `Tenant` tidak diubah |
+| Model organisasi menunjuk data Foundation | `LegalEntity` → `FiscalCalendar`; `OrganizationParty` → `Party` (AddressBook) (2 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: PR pemindahan tidak mengubah isi kelas. `OrganizationParty` → `Party` bergantung pada K-2 |
+
+**Keputusan terbuka K-2: letak AddressBook.** Organization, Vendor, dan Worker semuanya party.
+Apakah AddressBook (`Party`) seharusnya di Platform, seperti global address book di F&O yang
+menjadi dasar model organisasi? Kalau ya, pengecualian `OrganizationParty` → `Party` dan
+`PrintIdentityStore` → `OrganizationAddressBook` ikut hilang.
 
 Test Boundary lahir dengan **daftar pengecualian** berisi 23 import ini. Setiap PR hanya boleh
 memperpendek daftar itu, tidak boleh memperpanjangnya.

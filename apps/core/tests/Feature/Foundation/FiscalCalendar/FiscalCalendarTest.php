@@ -4,7 +4,7 @@ namespace Tests\Feature\Foundation\FiscalCalendar;
 
 use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

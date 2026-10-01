@@ -3,10 +3,10 @@
 namespace Tests\Feature\Foundation\Geography\AddressSetup;
 
 use App\Foundation\Geography\Models\AddressHierarchy\Province;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\GrantsCoreRoles;

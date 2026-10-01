@@ -8,7 +8,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\OwnerRoleDuties;
 use App\Support\Access\TenantProducts;

@@ -169,7 +169,7 @@ parameters:
 			path: app/Http/Controllers/Access/SecurityConfigurationController.php
 
 		-
-			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\TenantMembership\|null given\.$#'
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Platform\\Tenant\\Models\\TenantMembership\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/AppLaunchManifestController.php
@@ -331,10 +331,10 @@ parameters:
 			path: app/Http/Requests/Access/MembershipRequest.php
 
 		-
-			message: '#^Method App\\Http\\Requests\\Organization\\UpdateOrganizationRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Platform\\Organization\\Http\\Requests\\UpdateOrganizationRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: app/Http/Requests/Organization/UpdateOrganizationRequest.php
+			path: app/Platform/Organization/Http/Requests/UpdateOrganizationRequest.php
 
 		-
 			message: '#^Method App\\Http\\Requests\\ReferenceData\\ConvertUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\Organization;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use App\Support\Modules\Contracts\ReportFormatter;

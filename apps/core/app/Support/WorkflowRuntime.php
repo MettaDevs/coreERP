@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
 use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Collection;

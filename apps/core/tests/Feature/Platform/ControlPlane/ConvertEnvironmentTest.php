@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Models\Tenant;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;

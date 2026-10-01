@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Tenant;
 use App\Models\TenantIdentityProvider;
+use App\Platform\Tenant\Models\Tenant;
 use App\Support\Sso\SharedIdentityProvider;
 use Illuminate\Console\Command;
 

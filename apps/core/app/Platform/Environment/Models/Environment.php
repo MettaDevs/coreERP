@@ -2,8 +2,8 @@
 
 namespace App\Platform\Environment\Models;
 
-use App\Models\Tenant;
 use App\Platform\ControlPlane\OwnedByControlPlane;
+use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;

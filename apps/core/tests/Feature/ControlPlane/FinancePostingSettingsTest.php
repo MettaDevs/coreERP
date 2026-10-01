@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Foundation\Currency\Models\CurrencyPrecision;
 use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Models\FinanceSettlementMode;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use Database\Seeders\AppCatalogSeeder;

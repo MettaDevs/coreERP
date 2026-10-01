@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Finance;
 use App\Http\Controllers\Controller;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceSettlementMode;
-use App\Models\Organization;
+use App\Platform\Organization\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingSettings;

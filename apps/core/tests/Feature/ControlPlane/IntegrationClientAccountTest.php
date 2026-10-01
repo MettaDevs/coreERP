@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\IntegrationClient;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\ProviderAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Attachments;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\DocumentAttachment;
 use App\Models\Role;
-use App\Models\TenantMembership;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Attachments\AttachmentContentMismatch;
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\DataClass;

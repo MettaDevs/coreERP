@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Access;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppDataPolicy;
-use App\Models\InvitationCode;
-use App\Models\Organization;
-use App\Models\OrganizationHierarchy;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\TenantMembership;
+use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Models\OrganizationHierarchy;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Access\TenantProducts;
 use App\Support\Modules\Contracts\LinkedWorkerResolvers;

@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Database\AuditActor;
 use App\Support\Reporting\ExportQueue;
 use App\Support\Reporting\ExportStatus;

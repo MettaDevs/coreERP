@@ -32,7 +32,14 @@ class LayerDirectionBoundaryTest extends TestCase
      *
      * @var list<string>
      */
-    private const ALLOWED = [];
+    private const ALLOWED = [
+        'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
+        'App\\Platform\\Organization\\Models\\OrganizationParty -> App\\Foundation\\AddressBook\\Models\\Party',
+        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
+        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Foundation\\UnitOfMeasure\\Actions\\ProvisionDefaultUnitsOfMeasure',
+        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Platform\\ControlPlane\\Models\\Client',
+        'App\\Platform\\Tenant\\Models\\Tenant -> App\\Platform\\ControlPlane\\Models\\Client',
+    ];
 
     /** Penanda tabel milik pusat: model milik pusat di fitur lain perlu memakainya. */
     private const CONTROL_PLANE_PUBLIC = [

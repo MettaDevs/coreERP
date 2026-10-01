@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\ReadOnlyRoleSeeder;

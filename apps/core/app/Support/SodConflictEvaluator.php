@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 

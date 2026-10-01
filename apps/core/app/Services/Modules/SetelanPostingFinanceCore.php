@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Modules;
 
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use App\Support\Finance\PostingSettings;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use RuntimeException;

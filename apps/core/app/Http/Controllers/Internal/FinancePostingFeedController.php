@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\AuthenticateIntegrationClient;
 use App\Models\FinancePosting;
 use App\Models\IntegrationClient;
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use App\Support\Finance\PostingAcknowledger;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;

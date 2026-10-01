@@ -3,11 +3,11 @@
 namespace Tests\Feature\Foundation\WorkingCalendar;
 
 use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
-use App\Models\Organization;
-use App\Models\Tenant;
-use App\Models\TenantMembership;
 use App\Models\User;
 use App\Platform\ControlPlane\Models\Client;
+use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\GrantsCoreRoles;

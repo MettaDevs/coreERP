@@ -2,9 +2,9 @@
 
 namespace App\Actions\Access;
 
-use App\Models\InvitationCode;
 use App\Models\Role;
-use App\Models\TenantMembership;
+use App\Platform\Tenant\Models\InvitationCode;
+use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\AccessGuards;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\DataPolicyScopeResolver;

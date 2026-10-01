@@ -100,7 +100,7 @@ class CatchTidakMemalsukanHasilTest extends TestCase
         'apps/core/app/Support/Modules/ModuleRegistry.php' => 'Manifest yang tidak terurai membuat modulenya lenyap dari registry, jadi rutenya 404 tanpa ada yang menyebut sebabnya. Melewatinya adalah keputusan yang sudah dipaku ModuleRegistryTest::test_manifest_rusak_dilewati_tanpa_menjatuhkan_runtime; membalikkannya berarti memutuskan apakah satu manifest rusak boleh menahan seluruh runtime menyala.',
         'apps/control-plane/app/Dns/CloudflareSettings.php' => 'Bentuk yang sama dengan InvitationCode di bawah: APP_KEY yang berganti sesudah token disimpan membuat token yang ada berbunyi persis sama dengan token yang memang belum disetel, dan `configured()` menjawab false untuk keduanya. Memisahkannya berarti memutuskan apa yang harus dilihat operator ketika kredensial yang tersimpan tidak lagi dapat dibuka.',
         'apps/control-plane/app/Registry/RegistrySettings.php' => 'Sama, pada kredensial robot registry. Halaman Pengaturan menyebut sebabnya kepada operator, tetapi nilai kembalinya tetap tidak dapat dibedakan pemanggil mana pun.',
-        'apps/core/app/Models/InvitationCode.php' => 'Kode undangan yang gagal didekripsi berbunyi sama dengan undangan yang memang tidak menyimpan kode — dan sama pula dengan "Anda tidak berhak melihatnya", karena pemanggilnya memulangkan null untuk ketiganya. Memisahkannya mengubah bentuk jawaban layar akses.',
+        'apps/core/app/Platform/Tenant/Models/InvitationCode.php' => 'Kode undangan yang gagal didekripsi berbunyi sama dengan undangan yang memang tidak menyimpan kode — dan sama pula dengan "Anda tidak berhak melihatnya", karena pemanggilnya memulangkan null untuk ketiganya. Memisahkannya mengubah bentuk jawaban layar akses.',
     ];
 
     /**

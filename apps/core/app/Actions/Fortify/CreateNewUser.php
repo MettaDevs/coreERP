@@ -2,10 +2,10 @@
 
 namespace App\Actions\Fortify;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\User;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Modules;
 
-use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantAppEntitlement;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Support\AppDependencyGraph;
 use App\Support\Modules\ModuleRegistry;
 use Throwable;

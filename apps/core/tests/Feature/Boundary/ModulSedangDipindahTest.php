@@ -347,7 +347,7 @@ class ModulSedangDipindahTest extends TestCase
             [
                 sprintf('modules/apperp/%s/src/Pelanggar.php menyebut Apperp\\ContohB', $tanpaTanda),
                 sprintf('modules/apperp/%s/src/Pelanggar.php menyebut App\\Http\\Controllers', $tanpaTanda),
-                sprintf('modules/apperp/%s/src/Pelanggar.php menyebut App\\Models\\Tenant', $tanpaTanda),
+                sprintf('modules/apperp/%s/src/Pelanggar.php menyebut App\\Platform\\Tenant\\Models\\Tenant', $tanpaTanda),
                 sprintf('modules/apperp/%s/src/Pelanggar.php memakai DB::table(', $tanpaTanda),
             ],
             $pelanggaranTanpaTanda,
@@ -554,7 +554,7 @@ class ModulSedangDipindahTest extends TestCase
 
         namespace App\Http\Controllers;
 
-        use App\Models\Tenant;
+        use App\Platform\Tenant\Models\Tenant;
         use Illuminate\Support\Facades\DB;
         use Modules\Apperp\ContohB\Models\Rak;
 
