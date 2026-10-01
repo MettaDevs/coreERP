@@ -59,6 +59,12 @@ tags:
   description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
 - name: Permintaan pemeliharaan
   description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
+- name: Asuransi aset
+  description: Jenis asuransi, polis, dan pertanggungan aset per periode; ringkasan aset yang belum atau kurang diasuransikan.
+- name: Garansi dan kontrak servis
+  description: Garansi per aset dan kontrak servis vendor; daftar yang akan berakhir dan pemberitahuan untuk work order.
+- name: Downtime dan KPI
+  description: Pencatatan downtime aset dan KPI pemeliharaan yang dihitung saat dibaca.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke
     aplikasi finance.
@@ -6346,6 +6352,1230 @@ paths:
           $ref: '#/components/responses/VersionRequired'
         '503':
           $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/alasan-downtime:
+    get:
+      tags:
+      - Downtime dan KPI
+      operationId: listDowntimeReasons
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar alasan downtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowntimeReasonList'
+    post:
+      tags:
+      - Downtime dan KPI
+      operationId: createDowntimeReason
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/MasterCreate'
+              - type: object
+                properties:
+                  masuk_kpi:
+                    type: boolean
+                    default: true
+      responses:
+        '201':
+          description: Alasan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowntimeReasonResponse'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/alasan-downtime/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Downtime dan KPI
+      operationId: getDowntimeReason
+      responses:
+        '200':
+          description: Alasan downtime
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowntimeReasonResponse'
+    patch:
+      tags:
+      - Downtime dan KPI
+      operationId: updateDowntimeReason
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/MasterPatch'
+              - type: object
+                properties:
+                  masuk_kpi:
+                    type: boolean
+      responses:
+        '200':
+          description: Alasan diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowntimeReasonResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Downtime dan KPI
+      operationId: archiveDowntimeReason
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Alasan diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/downtime-aset:
+    get:
+      tags:
+      - Downtime dan KPI
+      operationId: listAssetDowntime
+      description: Paling banyak 500 catatan atas aset dalam jangkauan pengguna. `dari` dan `sampai` adalah tanggal menurut
+        zona pengguna; catatan yang sebagian berada di dalamnya ikut.
+      parameters:
+      - name: aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: pemeliharaan_aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: dari
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: terbuka
+        in: query
+        required: false
+        description: Hanya catatan yang belum selesai.
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Daftar downtime
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetDowntime'
+    post:
+      tags:
+      - Downtime dan KPI
+      operationId: recordAssetDowntime
+      description: |
+        Mencatat periode aset tidak dapat dipakai. Waktu tanpa offset dibaca menurut zona pengguna dan disimpan
+        dalam UTC; mulai dan selesai tidak boleh di masa depan. `selesai` kosong berarti aset masih berhenti, dan
+        satu aset paling banyak satu catatan terbuka. Catatan satu aset tidak boleh tumpang tindih. Permintaan
+        yang melahirkan work order ikut tercatat bila tidak dikirim.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDowntimeWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Downtime dicatat
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetDowntime'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/downtime-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    patch:
+      tags:
+      - Downtime dan KPI
+      operationId: correctAssetDowntime
+      description: Mengoreksi waktu
+      alasan: null
+      dan keterangan. Aset: null
+      work order: null
+      dan permintaan tidak dapat diganti.: null
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - mulai
+              properties:
+                mulai:
+                  type: string
+                selesai:
+                  type:
+                  - string
+                  - 'null'
+                alasan_downtime_id:
+                  oneOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  - type: 'null'
+                keterangan:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 2000
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Downtime dikoreksi
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetDowntime'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Downtime dan KPI
+      operationId: archiveAssetDowntime
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Downtime diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/kpi-pemeliharaan:
+    get:
+      tags:
+      - Downtime dan KPI
+      operationId: getMaintenanceKpis
+      description: |
+        KPI pemeliharaan per aset, jenis aset, atau lokasi untuk satu periode (tanggal zona pengguna, inklusif,
+        paling panjang 400 hari; bawaan awal bulan ini sampai hari ini). Dihitung saat dibaca. Rumusnya di
+        halaman fitur Downtime dan KPI pemeliharaan; ringkasnya: availability = (total − downtime) ÷ total × 100,
+        MTBF = total ÷ kerusakan (tanpa kerusakan = total), MTTR = jam perbaikan ÷ kerusakan (tanpa kerusakan =
+        jam perbaikan). Kalender 24 jam; periode yang melewati saat ini dihitung sampai saat ini.
+      parameters:
+      - name: dari
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: kelompok
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - aset
+          - jenis
+          - lokasi
+          default: aset
+      - name: legal_entity_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - $ref: '#/components/parameters/JenisAsetFilter'
+      - name: lokasi_aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: KPI per kelompok dan totalnya
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MaintenanceKpiRow'
+                  meta:
+                    type: object
+                    properties:
+                      dari:
+                        type: string
+                        format: date
+                      sampai:
+                        type: string
+                        format: date
+                      zona_waktu:
+                        type: string
+                      kelompok:
+                        type: string
+                      total:
+                        $ref: '#/components/schemas/MaintenanceKpiFigures'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/garansi-aset:
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: listAssetWarranties
+      description: Paling banyak 500 garansi atas aset dalam jangkauan pengguna, yang berakhir paling akhir lebih dulu.
+      parameters:
+      - name: aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - berlaku
+          - berakhir
+      responses:
+        '200':
+          description: Daftar garansi
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetWarranty'
+    post:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: createAssetWarranty
+      description: Penjamin, bila diisi, wajib vendor entitas legal aset. Garansi tambahan dicatat sebagai baris baru.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - type: object
+                required:
+                - aset_id
+                properties:
+                  aset_id:
+                    $ref: '#/components/schemas/Ulid'
+              - $ref: '#/components/schemas/AssetWarrantyWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Garansi dicatat
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetWarranty'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/garansi-aset/vendor:
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: listWarrantyVendors
+      description: Vendor aktif satu entitas legal untuk pemilih penjamin garansi dan vendor kontrak servis. Menuntut hak
+        baca garansi atau kontrak servis.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        '200':
+          description: Vendor aktif
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VendorOption'
+  /api/v1/garansi-aset/akan-berakhir:
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: listExpiringWarrantiesAndContracts
+      description: |
+        Garansi dan kontrak servis yang berakhir antara hari ini dan `hari` hari ke depan (zona pengguna), diurutkan
+        menurut tanggal akhir. Garansi tampil bila pengguna memegang `garansi-aset.read`, kontrak bila memegang
+        `kontrak-servis.read`.
+      parameters:
+      - name: hari
+        in: query
+        required: false
+        schema:
+          type: integer
+          enum:
+          - 30
+          - 60
+          - 90
+          default: 30
+      responses:
+        '200':
+          description: Yang akan berakhir
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpiringCoverage'
+                  meta:
+                    type: object
+                    properties:
+                      hari:
+                        type: integer
+                      sampai:
+                        type: string
+                        format: date
+  /api/v1/garansi-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    patch:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: updateAssetWarranty
+      description: Aset tidak dapat diganti.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetWarrantyWrite'
+              - type: object
+                properties:
+                  version:
+                    $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Garansi diubah
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetWarranty'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: archiveAssetWarranty
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Garansi diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/pemeliharaan-aset/referensi/garansi:
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: listActiveWarrantiesForWorkOrder
+      description: |
+        Garansi dan kontrak servis yang berlaku pada `tanggal` (bawaan hari ini) untuk aset-aset sebuah work order,
+        padanan pemberitahuan warranty agreement F&O. Hanya informasi. Dijaga `pemeliharaan-aset.read`.
+      parameters:
+      - name: aset_id[]
+        in: query
+        required: true
+        style: form
+        explode: true
+        schema:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Ulid'
+      - name: tanggal
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Garansi dan kontrak aktif
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActiveWarranty'
+  /api/v1/kontrak-servis:
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: listServiceContracts
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Daftar kontrak dalam jangkauan entitas legal pengguna
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceContract'
+    post:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: createServiceContract
+      description: Nomor diterbitkan Number Sequence Core per entitas legal. Aset wajib dalam jangkauan pengguna dan milik
+        entitas legal kontrak.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceContractWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Kontrak dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceContractResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/kontrak-servis/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: getServiceContract
+      description: '`aset` hanya memuat aset dalam jangkauan pengguna; `lines_count` menghitung seluruhnya.'
+      responses:
+        '200':
+          description: Kontrak
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceContractResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: updateServiceContract
+      description: '`aset_ids` wajib dikirim; aset dalam jangkauan pengguna yang tidak dikirim dikeluarkan dari kontrak. Aset
+        di luar jangkauannya tidak tersentuh.'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/ServiceContractWrite'
+              - type: object
+                properties:
+                  version:
+                    $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Kontrak diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceContractResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: archiveServiceContract
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Kontrak diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/jenis-asuransi:
+    get:
+      tags:
+      - Asuransi aset
+      operationId: listInsuranceTypes
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar jenis asuransi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsuranceTypeList'
+    post:
+      tags:
+      - Asuransi aset
+      operationId: createInsuranceType
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MasterCreate'
+      responses:
+        '201':
+          description: Jenis asuransi dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsuranceTypeResponse'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/jenis-asuransi/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Asuransi aset
+      operationId: getInsuranceType
+      responses:
+        '200':
+          description: Jenis asuransi
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsuranceTypeResponse'
+    patch:
+      tags:
+      - Asuransi aset
+      operationId: updateInsuranceType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MasterPatch'
+      responses:
+        '200':
+          description: Jenis asuransi diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsuranceTypeResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Asuransi aset
+      operationId: archiveInsuranceType
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Jenis asuransi diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/polis-asuransi:
+    get:
+      tags:
+      - Asuransi aset
+      operationId: listInsurancePolicies
+      description: Paling banyak 500 polis dalam jangkauan entitas legal pengguna, beserta total yang ditanggung hari ini
+        (zona pengguna).
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Daftar polis
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InsurancePolicy'
+    post:
+      tags:
+      - Asuransi aset
+      operationId: createInsurancePolicy
+      description: Nomor polis sistem diterbitkan Number Sequence Core per entitas legal. Penanggung wajib vendor entitas
+        legal itu.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsurancePolicyWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang; header `Idempotent-Replayed: true`'
+        '201':
+          description: Polis dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/polis-asuransi/vendor:
+    get:
+      tags:
+      - Asuransi aset
+      operationId: listInsuranceVendors
+      description: Vendor aktif satu entitas legal untuk pemilih penanggung.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        '200':
+          description: Vendor aktif
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VendorOption'
+  /api/v1/polis-asuransi/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Asuransi aset
+      operationId: getInsurancePolicy
+      description: Polis beserta seluruh pertanggungan (termasuk yang sudah berakhir) atas aset dalam jangkauan pengguna.
+      responses:
+        '200':
+          description: Polis
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Asuransi aset
+      operationId: updateInsurancePolicy
+      description: Entitas legal tidak dapat diganti; masa berlaku wajib tetap mencakup seluruh pertanggungan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/InsurancePolicyWrite'
+              - type: object
+                properties:
+                  version:
+                    $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Polis diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Asuransi aset
+      operationId: archiveInsurancePolicy
+      description: Ditolak 422 selama polis masih menanggung aset hari ini atau sesudahnya.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Polis diarsipkan
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Polis masih menanggung aset
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/polis-asuransi/{id}/pertanggungan:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    post:
+      tags:
+      - Asuransi aset
+      operationId: addInsuranceCoverage
+      description: |
+        Menambah pertanggungan satu aset (padanan satu baris *Insurance Journal* BC). Memakai versi polis. Aset wajib
+        dalam jangkauan pengguna, milik entitas legal polis, dan masih beredar; periode wajib di dalam masa berlaku
+        polis; satu aset tidak boleh ditanggung dua kali oleh polis yang sama pada tanggal yang sama. Polis yang
+        diblokir menolak pertanggungan baru.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsuranceCoverageWrite'
+      responses:
+        '201':
+          description: Polis beserta pertanggungannya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/polis-asuransi/{id}/pertanggungan/{coverageId}/akhiri:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: coverageId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    post:
+      tags:
+      - Asuransi aset
+      operationId: endInsuranceCoverage
+      description: Mengisi tanggal akhir; tidak boleh sebelum mulai atau sesudah tanggal akhir yang sudah ada.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - berlaku_sampai
+              properties:
+                berlaku_sampai:
+                  type: string
+                  format: date
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Polis beserta pertanggungannya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/polis-asuransi/{id}/pertanggungan/{coverageId}/ganti-nilai:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: coverageId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    post:
+      tags:
+      - Asuransi aset
+      operationId: replaceInsuranceCoverageValue
+      description: Baris lama berakhir sehari sebelum `berlaku_mulai`; baris baru membawa nilai baru dan sisa periodenya.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - nilai_pertanggungan
+              - berlaku_mulai
+              properties:
+                nilai_pertanggungan:
+                  type: number
+                  exclusiveMinimum: 0
+                berlaku_mulai:
+                  type: string
+                  format: date
+                keterangan:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 2000
+                version:
+                  $ref: '#/components/schemas/VersionField'
+      responses:
+        '200':
+          description: Polis beserta pertanggungannya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/polis-asuransi/{id}/pertanggungan/{coverageId}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: coverageId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    delete:
+      tags:
+      - Asuransi aset
+      operationId: archiveInsuranceCoverage
+      description: Mengarsipkan pertanggungan yang salah dicatat. Memakai versi polis.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Polis beserta pertanggungannya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePolicyResponse'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/asuransi-aset:
+    get:
+      tags:
+      - Asuransi aset
+      operationId: getAssetInsurance
+      description: Riwayat pertanggungan satu aset dari seluruh polis, total yang ditanggung hari ini, nilai perolehan buku
+        komersial, dan statusnya.
+      parameters:
+      - name: aset_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Asuransi aset
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetInsurance'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/asuransi-aset/ringkasan:
+    get:
+      tags:
+      - Asuransi aset
+      operationId: summarizeAssetInsurance
+      description: |
+        Aset beredar beserta total pertanggungannya pada satu tanggal (padanan laporan *Insurance - Uninsured FAs*
+        BC). Bawaan `status=bermasalah`: tidak diasuransikan dan kurang diasuransikan (total < nilai perolehan).
+        Paling banyak 2000 baris; `meta.terpotong` menyatakan sisanya.
+      parameters:
+      - name: tanggal
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: legal_entity_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - $ref: '#/components/parameters/JenisAsetFilter'
+      - name: lokasi_aset_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - bermasalah
+          - tidak_diasuransikan
+          - kurang_diasuransikan
+          - cukup
+          - semua
+      responses:
+        '200':
+          description: Ringkasan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetInsuranceSummaryRow'
+                  meta:
+                    type: object
+                    properties:
+                      tanggal:
+                        type: string
+                        format: date
+                      terpotong:
+                        type: boolean
   /api/v1/penyusutan/proposal:
     post:
       tags:
@@ -10048,6 +11278,846 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/MaintenanceRequest'
+    VendorOption:
+      description: Vendor milik Core (K-06), dibaca lewat kontrak `VendorDirectory`.
+      type: object
+      required:
+      - id
+      - number
+      - name
+      - status
+      - legal_entity_id
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        tax_number:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+        legal_entity_id:
+          type: string
+    VendorSummary:
+      type: object
+      required:
+      - id
+      - number
+      - name
+      - status
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+    InsuranceTypeResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/MasterRecord'
+    InsuranceTypeList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MasterRecord'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    InsurancePolicyWrite:
+      type: object
+      required:
+      - legal_entity_id
+      - nama
+      - nomor_polis
+      - berlaku_mulai
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        nama:
+          type: string
+          maxLength: 150
+        nomor_polis:
+          type: string
+          maxLength: 60
+          description: Nomor polis dari penanggung (*Policy No.* BC).
+        jenis_asuransi_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        vendor_id:
+          type:
+          - string
+          - 'null'
+          description: Penanggung; vendor entitas legal polis.
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type:
+          - string
+          - 'null'
+          format: date
+        premi_tahunan:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+        nilai_pertanggungan:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          description: Plafon polis (*Policy Coverage* BC).
+        diblokir:
+          type: boolean
+          description: Polis diblokir menolak pertanggungan baru; yang sudah ada tetap menanggung.
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+    InsuranceCoverage:
+      type: object
+      required:
+      - id
+      - polis_asuransi_id
+      - aset_id
+      - nilai_pertanggungan
+      - berlaku_mulai
+      - berlaku_sampai
+      - berjalan
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        polis_asuransi_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_kode:
+          type: string
+        aset_nama:
+          type: string
+        nilai_pertanggungan:
+          type: string
+          description: Desimal dua angka sebagai teks.
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Kosong berarti mengikuti masa berlaku polis.
+        keterangan:
+          type:
+          - string
+          - 'null'
+        berjalan:
+          type: boolean
+          description: Berlaku hari ini (zona pengguna).
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    InsuranceCoverageWrite:
+      type: object
+      required:
+      - aset_id
+      - nilai_pertanggungan
+      - berlaku_mulai
+      properties:
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        nilai_pertanggungan:
+          type: number
+          exclusiveMinimum: 0
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type:
+          - string
+          - 'null'
+          format: date
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        version:
+          $ref: '#/components/schemas/VersionField'
+    InsurancePolicy:
+      type: object
+      required:
+      - id
+      - kode
+      - legal_entity_id
+      - nama
+      - nomor_polis
+      - berlaku_mulai
+      - berlaku_sampai
+      - premi_tahunan
+      - nilai_pertanggungan
+      - diblokir
+      - total_nilai_tertanggung
+      - selisih_plafon
+      - berlaku
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        nama:
+          type: string
+        nomor_polis:
+          type: string
+        jenis_asuransi_id:
+          type:
+          - string
+          - 'null'
+        jenis_asuransi_kode:
+          type:
+          - string
+          - 'null'
+        jenis_asuransi_nama:
+          type:
+          - string
+          - 'null'
+        vendor_id:
+          type:
+          - string
+          - 'null'
+        vendor:
+          oneOf:
+          - $ref: '#/components/schemas/VendorSummary'
+          - type: 'null'
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type:
+          - string
+          - 'null'
+          format: date
+        premi_tahunan:
+          type: string
+        nilai_pertanggungan:
+          type: string
+        diblokir:
+          type: boolean
+        keterangan:
+          type:
+          - string
+          - 'null'
+        total_nilai_tertanggung:
+          type: string
+          description: Jumlah pertanggungan yang berlaku hari ini (*Total Value Insured* BC).
+        selisih_plafon:
+          type: string
+          description: Plafon polis dikurangi total yang ditanggung (*Over/Under Insured* BC); negatif berarti melebihi plafon.
+        berlaku:
+          type: boolean
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+        pertanggungan:
+          type: array
+          description: Hanya pada GET satu polis dan jawaban tindakannya.
+          items:
+            $ref: '#/components/schemas/InsuranceCoverage'
+    InsurancePolicyResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/InsurancePolicy'
+    AssetInsurance:
+      type: object
+      required:
+      - tanggal
+      - total_nilai_tertanggung
+      - nilai_perolehan
+      - status
+      - pertanggungan
+      properties:
+        tanggal:
+          type: string
+          format: date
+        total_nilai_tertanggung:
+          type: string
+        nilai_perolehan:
+          type: string
+          description: Nilai perolehan buku komersial; nilai perolehan aset bila belum punya buku.
+        nilai_buku:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          enum:
+          - tidak_diasuransikan
+          - kurang_diasuransikan
+          - cukup
+        pertanggungan:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/InsuranceCoverage'
+            - type: object
+              properties:
+                polis_kode:
+                  type: string
+                polis_nama:
+                  type: string
+                nomor_polis:
+                  type: string
+    AssetInsuranceSummaryRow:
+      type: object
+      required:
+      - id
+      - kode
+      - nama
+      - nilai_perolehan
+      - total_nilai_tertanggung
+      - kekurangan
+      - status
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        nama:
+          type: string
+        legal_entity_id:
+          type: string
+        jenis_aset_id:
+          type: string
+        jenis_aset_nama:
+          type:
+          - string
+          - 'null'
+        lokasi_aset_id:
+          type:
+          - string
+          - 'null'
+        lokasi_aset_nama:
+          type:
+          - string
+          - 'null'
+        nilai_perolehan:
+          type: string
+        akumulasi_penyusutan:
+          type:
+          - string
+          - 'null'
+        nilai_buku:
+          type:
+          - string
+          - 'null'
+        total_nilai_tertanggung:
+          type: string
+        kekurangan:
+          type: string
+          description: Nilai perolehan dikurangi total yang ditanggung
+          paling kecil nol.: null
+        status:
+          type: string
+          enum:
+          - tidak_diasuransikan
+          - kurang_diasuransikan
+          - cukup
+    AssetWarrantyWrite:
+      type: object
+      required:
+      - jenis_garansi
+      - berlaku_mulai
+      - berlaku_sampai
+      properties:
+        vendor_id:
+          type:
+          - string
+          - 'null'
+          description: Penjamin; vendor entitas legal aset.
+        jenis_garansi:
+          type: string
+          enum:
+          - penuh
+          - sebagian
+          description: Padanan *full* dan *partial coverage* warranty agreement F&O.
+        nomor_referensi:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type: string
+          format: date
+        catatan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+    AssetWarranty:
+      type: object
+      required:
+      - id
+      - aset_id
+      - jenis_garansi
+      - berlaku_mulai
+      - berlaku_sampai
+      - berlaku
+      - sisa_hari
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_kode:
+          type: string
+        aset_nama:
+          type: string
+        vendor_id:
+          type:
+          - string
+          - 'null'
+        vendor:
+          oneOf:
+          - $ref: '#/components/schemas/VendorSummary'
+          - type: 'null'
+        jenis_garansi:
+          type: string
+          enum:
+          - penuh
+          - sebagian
+        jenis_garansi_label:
+          type: string
+        nomor_referensi:
+          type:
+          - string
+          - 'null'
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type: string
+          format: date
+        catatan:
+          type:
+          - string
+          - 'null'
+        berlaku:
+          type: boolean
+        sisa_hari:
+          type: integer
+          minimum: 0
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    ExpiringCoverage:
+      type: object
+      required:
+      - jenis
+      - id
+      - berlaku_sampai
+      - sisa_hari
+      - jumlah_aset
+      properties:
+        jenis:
+          type: string
+          enum:
+          - garansi
+          - kontrak_servis
+        id:
+          $ref: '#/components/schemas/Ulid'
+        referensi:
+          type:
+          - string
+          - 'null'
+        aset_id:
+          type:
+          - string
+          - 'null'
+        aset_kode:
+          type:
+          - string
+          - 'null'
+        aset_nama:
+          type:
+          - string
+          - 'null'
+        jumlah_aset:
+          type: integer
+        vendor_nama:
+          type:
+          - string
+          - 'null'
+        berlaku_sampai:
+          type: string
+          format: date
+        sisa_hari:
+          type: integer
+    ActiveWarranty:
+      type: object
+      required:
+      - aset_id
+      - jenis
+      - berlaku_sampai
+      properties:
+        aset_id:
+          type: string
+        jenis:
+          type: string
+          enum:
+          - garansi
+          - kontrak_servis
+        referensi:
+          type:
+          - string
+          - 'null'
+        vendor_nama:
+          type:
+          - string
+          - 'null'
+        jenis_garansi:
+          type:
+          - string
+          - 'null'
+          enum:
+          - penuh
+          - sebagian
+          - null
+        cakupan:
+          type:
+          - string
+          - 'null'
+        berlaku_sampai:
+          type: string
+          format: date
+    ServiceContractWrite:
+      type: object
+      required:
+      - legal_entity_id
+      - nomor_kontrak
+      - vendor_id
+      - berlaku_mulai
+      - berlaku_sampai
+      - aset_ids
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        nomor_kontrak:
+          type: string
+          maxLength: 80
+        vendor_id:
+          type: string
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type: string
+          format: date
+        cakupan:
+          type:
+          - string
+          - 'null'
+          maxLength: 4000
+        nilai_kontrak:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        aset_ids:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Ulid'
+    ServiceContract:
+      type: object
+      required:
+      - id
+      - kode
+      - legal_entity_id
+      - nomor_kontrak
+      - vendor_id
+      - berlaku_mulai
+      - berlaku_sampai
+      - berlaku
+      - sisa_hari
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        nomor_kontrak:
+          type: string
+        vendor_id:
+          type: string
+        vendor:
+          oneOf:
+          - $ref: '#/components/schemas/VendorSummary'
+          - type: 'null'
+        berlaku_mulai:
+          type: string
+          format: date
+        berlaku_sampai:
+          type: string
+          format: date
+        cakupan:
+          type:
+          - string
+          - 'null'
+        nilai_kontrak:
+          type:
+          - string
+          - 'null'
+        keterangan:
+          type:
+          - string
+          - 'null'
+        lines_count:
+          type:
+          - integer
+          - 'null'
+        berlaku:
+          type: boolean
+        sisa_hari:
+          type: integer
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+        aset:
+          type: array
+          description: Hanya pada GET satu kontrak dan jawaban simpannya.
+          items:
+            type: object
+            properties:
+              line_number:
+                type: integer
+              aset_id:
+                type: string
+              aset_kode:
+                type: string
+              aset_nama:
+                type: string
+    ServiceContractResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/ServiceContract'
+    DowntimeReason:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - type: object
+        properties:
+          masuk_kpi:
+            type: boolean
+            description: Padanan *KPI include* F&O. Downtime beralasan ini dihitung pada availability dan jumlah henti.
+    DowntimeReasonResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/DowntimeReason'
+    DowntimeReasonList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DowntimeReason'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    AssetDowntimeWrite:
+      type: object
+      required:
+      - aset_id
+      - mulai
+      properties:
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        mulai:
+          type: string
+          description: Waktu; tanpa offset dibaca menurut zona pengguna.
+        selesai:
+          type:
+          - string
+          - 'null'
+        alasan_downtime_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        pemeliharaan_aset_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+          description: Work order yang memuat aset ini.
+        permintaan_pemeliharaan_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+          description: Permintaan pemeliharaan atas aset ini.
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+    AssetDowntime:
+      type: object
+      required:
+      - id
+      - aset_id
+      - mulai
+      - selesai
+      - sumber
+      - durasi_jam
+      - terbuka
+      - masuk_kpi
+      - version
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_kode:
+          type: string
+        aset_nama:
+          type: string
+        mulai:
+          type: string
+          description: Waktu UTC.
+        selesai:
+          type:
+          - string
+          - 'null'
+          description: Waktu UTC; kosong selama aset masih berhenti.
+        alasan_downtime_id:
+          type:
+          - string
+          - 'null'
+        alasan_downtime_kode:
+          type:
+          - string
+          - 'null'
+        alasan_downtime_nama:
+          type:
+          - string
+          - 'null'
+        masuk_kpi:
+          type: boolean
+        pemeliharaan_aset_id:
+          type:
+          - string
+          - 'null'
+        pemeliharaan_aset_kode:
+          type:
+          - string
+          - 'null'
+        permintaan_pemeliharaan_id:
+          type:
+          - string
+          - 'null'
+        permintaan_pemeliharaan_kode:
+          type:
+          - string
+          - 'null'
+        sumber:
+          type: string
+          enum:
+          - manual
+          - work_order
+          description: '`work_order` dibuka dan ditutup perpindahan status work order.'
+        keterangan:
+          type:
+          - string
+          - 'null'
+        durasi_jam:
+          type: number
+          description: Catatan terbuka dihitung sampai saat ini.
+        terbuka:
+          type: boolean
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+    MaintenanceKpiFigures:
+      type: object
+      properties:
+        jumlah_aset:
+          type: integer
+        total_jam:
+          type: number
+        downtime_jam:
+          type: number
+        uptime_jam:
+          type: number
+        availability_persen:
+          type:
+          - number
+          - 'null'
+          description: Uptime dibagi total waktu kali 100; kosong bila total waktu nol.
+        jumlah_henti:
+          type: integer
+        jumlah_kerusakan:
+          type: integer
+        mtbf_jam:
+          type: number
+        jam_perbaikan:
+          type: number
+        mttr_jam:
+          type: number
+        wo_selesai:
+          type: integer
+    MaintenanceKpiRow:
+      allOf:
+      - type: object
+        properties:
+          kunci:
+            type:
+            - string
+            - 'null'
+            description: Id aset
+            jenis aset: null
+            atau lokasi; kosong untuk aset tanpa lokasi.: null
+          kode:
+            type:
+            - string
+            - 'null'
+          nama:
+            type:
+            - string
+            - 'null'
+      - $ref: '#/components/schemas/MaintenanceKpiFigures'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

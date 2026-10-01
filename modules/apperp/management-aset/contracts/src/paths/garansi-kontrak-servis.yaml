@@ -1,0 +1,64 @@
+# Garansi aset dan kontrak servis vendor: padanan *Vendor warranty* pada aset Dynamics 365 F&O Asset Management.
+# Hanya informasi; tidak memblokir work order dan tidak diposting.
+/api/v1/garansi-aset:
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: listAssetWarranties
+    description: Paling banyak 500 garansi atas aset dalam jangkauan pengguna, yang berakhir paling akhir lebih dulu.
+    parameters: [{name: aset_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}, {name: status, in: query, required: false, schema: {type: string, enum: [berlaku, berakhir]}}]
+    responses: {'200': {description: Daftar garansi, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/AssetWarranty'}}}}}}}}
+  post:
+    tags: [Garansi dan kontrak servis]
+    operationId: createAssetWarranty
+    description: Penjamin, bila diisi, wajib vendor entitas legal aset. Garansi tambahan dicatat sebagai baris baru.
+    parameters: [$ref: '#/components/parameters/IdempotencyKeyTransaksi']
+    requestBody: {required: true, content: {application/json: {schema: {allOf: [{type: object, required: [aset_id], properties: {aset_id: {$ref: '#/components/schemas/Ulid'}}}, {$ref: '#/components/schemas/AssetWarrantyWrite'}]}}}}
+    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Garansi dicatat, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetWarranty'}}}}}}, '422': {$ref: '#/components/responses/ValidationError'}}
+/api/v1/garansi-aset/vendor:
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: listWarrantyVendors
+    description: Vendor aktif satu entitas legal untuk pemilih penjamin garansi dan vendor kontrak servis. Menuntut hak baca garansi atau kontrak servis.
+    parameters: [{name: legal_entity_id, in: query, required: true, schema: {$ref: '#/components/schemas/Ulid'}}, {name: q, in: query, required: false, schema: {type: string, maxLength: 100}}]
+    responses: {'200': {description: Vendor aktif, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/VendorOption'}}}}}}}}
+/api/v1/garansi-aset/akan-berakhir:
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: listExpiringWarrantiesAndContracts
+    description: |
+      Garansi dan kontrak servis yang berakhir antara hari ini dan `hari` hari ke depan (zona pengguna), diurutkan
+      menurut tanggal akhir. Garansi tampil bila pengguna memegang `garansi-aset.read`, kontrak bila memegang
+      `kontrak-servis.read`.
+    parameters: [{name: hari, in: query, required: false, schema: {type: integer, enum: [30, 60, 90], default: 30}}]
+    responses: {'200': {description: Yang akan berakhir, content: {application/json: {schema: {type: object, required: [data, meta], properties: {data: {type: array, items: {$ref: '#/components/schemas/ExpiringCoverage'}}, meta: {type: object, properties: {hari: {type: integer}, sampai: {type: string, format: date}}}}}}}}}
+/api/v1/garansi-aset/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  patch: {tags: [Garansi dan kontrak servis], operationId: updateAssetWarranty, description: Aset tidak dapat diganti., parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/AssetWarrantyWrite'}, {type: object, properties: {version: {$ref: '#/components/schemas/VersionField'}}}]}}}}, responses: {'200': {description: Garansi diubah, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetWarranty'}}}}}}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+  delete: {tags: [Garansi dan kontrak servis], operationId: archiveAssetWarranty, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/VersionInput'}}}}, responses: {'204': {description: Garansi diarsipkan}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+/api/v1/pemeliharaan-aset/referensi/garansi:
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: listActiveWarrantiesForWorkOrder
+    description: |
+      Garansi dan kontrak servis yang berlaku pada `tanggal` (bawaan hari ini) untuk aset-aset sebuah work order,
+      padanan pemberitahuan warranty agreement F&O. Hanya informasi. Dijaga `pemeliharaan-aset.read`.
+    parameters: [{name: 'aset_id[]', in: query, required: true, style: form, explode: true, schema: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/Ulid'}}}, {name: tanggal, in: query, required: false, schema: {type: string, format: date}}]
+    responses: {'200': {description: Garansi dan kontrak aktif, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/ActiveWarranty'}}}}}}}}
+/api/v1/kontrak-servis:
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: listServiceContracts
+    parameters: [{name: legal_entity_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}]
+    responses: {'200': {description: Daftar kontrak dalam jangkauan entitas legal pengguna, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/ServiceContract'}}}}}}}}
+  post:
+    tags: [Garansi dan kontrak servis]
+    operationId: createServiceContract
+    description: Nomor diterbitkan Number Sequence Core per entitas legal. Aset wajib dalam jangkauan pengguna dan milik entitas legal kontrak.
+    parameters: [$ref: '#/components/parameters/IdempotencyKeyTransaksi']
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractWrite'}}}}
+    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Kontrak dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '422': {$ref: '#/components/responses/ValidationError'}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+/api/v1/kontrak-servis/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Garansi dan kontrak servis], operationId: getServiceContract, description: '`aset` hanya memuat aset dalam jangkauan pengguna; `lines_count` menghitung seluruhnya.', responses: {'200': {description: Kontrak, headers: {ETag: {$ref: '#/components/headers/ETag'}}, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '404': {$ref: '#/components/responses/NotFound'}}}
+  patch: {tags: [Garansi dan kontrak servis], operationId: updateServiceContract, description: '`aset_ids` wajib dikirim; aset dalam jangkauan pengguna yang tidak dikirim dikeluarkan dari kontrak. Aset di luar jangkauannya tidak tersentuh.', parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/ServiceContractWrite'}, {type: object, properties: {version: {$ref: '#/components/schemas/VersionField'}}}]}}}}, responses: {'200': {description: Kontrak diubah, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+  delete: {tags: [Garansi dan kontrak servis], operationId: archiveServiceContract, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/VersionInput'}}}}, responses: {'204': {description: Kontrak diarsipkan}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}

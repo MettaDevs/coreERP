@@ -23,6 +23,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\Pemeliharaan
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetStatusLog;
 use Modules\Apperp\ManagementAset\Services\MaintenanceChecklistSnapshot;
+use Modules\Apperp\ManagementAset\Services\WorkOrderDowntime;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
 use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
@@ -143,6 +144,9 @@ class PelaksanaanController extends Controller
             if ($target === WorkOrderStatus::SELESAI) {
                 $this->simpulkanHasil($id);
             }
+            // Downtime aset untuk pekerjaan yang menuntut aset berhenti; lihat WorkOrderDowntime.
+            $waktu = PemeliharaanAset::query()->whereKey($id)->first(['aktual_mulai', 'aktual_selesai']);
+            app(WorkOrderDowntime::class)->onStatusChanged($id, $target, $waktu?->aktual_mulai, $waktu?->aktual_selesai);
             PemeliharaanAsetStatusLog::create([
                 'pemeliharaan_aset_id' => $id,
                 'dari_status' => $locked->status, 'ke_status' => $target,

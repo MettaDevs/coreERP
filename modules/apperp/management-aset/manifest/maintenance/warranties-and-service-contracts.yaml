@@ -1,0 +1,87 @@
+# Garansi aset dan kontrak servis vendor; padanan *Vendor warranty* pada aset Dynamics 365 F&O Asset
+# Management dan *Warranty Date* / *Maintenance Vendor No.* pada kartu aset Business Central. Satu layar,
+# dua resource: garansi menempel pada satu aset, kontrak servis menanggung banyak aset.
+security:
+  entry_points:
+    - code: management-aset.garansi-aset.form
+      name: Layar garansi dan kontrak servis
+      type: form
+    - code: management-aset.garansi-aset.api
+      name: API garansi aset
+      type: api
+    - code: management-aset.kontrak-servis.api
+      name: API kontrak servis
+      type: api
+  permissions:
+    - code: management-aset.garansi-aset.read
+      name: Lihat garansi aset
+      entry_point: management-aset.garansi-aset.form
+      access: read
+    - code: management-aset.garansi-aset.create
+      name: Catat garansi aset
+      entry_point: management-aset.garansi-aset.api
+      access: create
+    - code: management-aset.garansi-aset.update
+      name: Ubah garansi aset
+      entry_point: management-aset.garansi-aset.api
+      access: update
+    - code: management-aset.garansi-aset.archive
+      name: Arsipkan garansi aset
+      entry_point: management-aset.garansi-aset.api
+      access: delete
+    - code: management-aset.kontrak-servis.read
+      name: Lihat kontrak servis
+      entry_point: management-aset.garansi-aset.form
+      access: read
+    - code: management-aset.kontrak-servis.create
+      name: Buat kontrak servis
+      entry_point: management-aset.kontrak-servis.api
+      access: create
+    - code: management-aset.kontrak-servis.update
+      name: Ubah kontrak servis dan asetnya
+      entry_point: management-aset.kontrak-servis.api
+      access: update
+    - code: management-aset.kontrak-servis.archive
+      name: Arsipkan kontrak servis
+      entry_point: management-aset.kontrak-servis.api
+      access: delete
+  privileges:
+    # Pemilih aset membaca register aset; tanpa hak tulis atasnya.
+    - code: management-aset.garansi-aset.view
+      name: Lihat garansi dan kontrak servis
+      permissions:
+        - management-aset.garansi-aset.read
+        - management-aset.kontrak-servis.read
+        - management-aset.aset.read
+    - code: management-aset.garansi-aset.maintain
+      name: Catat garansi aset
+      permissions:
+        - management-aset.garansi-aset.read
+        - management-aset.garansi-aset.create
+        - management-aset.garansi-aset.update
+        - management-aset.garansi-aset.archive
+    - code: management-aset.kontrak-servis.maintain
+      name: Susun kontrak servis
+      permissions:
+        - management-aset.kontrak-servis.read
+        - management-aset.kontrak-servis.create
+        - management-aset.kontrak-servis.update
+    - code: management-aset.kontrak-servis.retire
+      name: Arsipkan kontrak servis
+      permissions:
+        - management-aset.kontrak-servis.archive
+  duties:
+    - code: management-aset.garansi-aset.manage
+      name: Kelola garansi dan kontrak servis
+      privileges:
+        - management-aset.garansi-aset.view
+        - management-aset.garansi-aset.maintain
+        - management-aset.kontrak-servis.maintain
+        - management-aset.kontrak-servis.retire
+number_sequences:
+  references:
+    - code: management-aset.kontrak-servis
+      name: Nomor kontrak servis
+      default_prefix: KSVA
+      allowed_scopes:
+        - legal_entity

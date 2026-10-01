@@ -1,0 +1,68 @@
+# Downtime aset dan KPI pemeliharaan; padanan *Maintenance downtime* dan *Asset KPIs* Dynamics 365 F&O
+# Asset Management serta *Maintenance Analysis* Business Central. Downtime dari work order dibuka dan
+# ditutup oleh perpindahan status work order dengan hak work order itu sendiri; permission di sini
+# untuk pencatatan dan koreksi oleh pengguna.
+security:
+  entry_points:
+    - code: management-aset.downtime-aset.form
+      name: Layar downtime aset
+      type: form
+    - code: management-aset.downtime-aset.api
+      name: API downtime aset
+      type: api
+    - code: management-aset.kpi-pemeliharaan.form
+      name: Layar KPI pemeliharaan
+      type: form
+  permissions:
+    - code: management-aset.downtime-aset.read
+      name: Lihat downtime aset
+      entry_point: management-aset.downtime-aset.form
+      access: read
+    - code: management-aset.downtime-aset.create
+      name: Catat downtime aset
+      entry_point: management-aset.downtime-aset.api
+      access: create
+    - code: management-aset.downtime-aset.update
+      name: Koreksi downtime aset
+      entry_point: management-aset.downtime-aset.api
+      access: update
+    - code: management-aset.downtime-aset.archive
+      name: Arsipkan downtime aset
+      entry_point: management-aset.downtime-aset.api
+      access: delete
+    - code: management-aset.kpi-pemeliharaan.read
+      name: Lihat KPI pemeliharaan
+      entry_point: management-aset.kpi-pemeliharaan.form
+      access: read
+  privileges:
+    - code: management-aset.downtime-aset.view
+      name: Lihat downtime aset
+      permissions:
+        - management-aset.downtime-aset.read
+        - management-aset.alasan-downtime.read
+        - management-aset.aset.read
+    - code: management-aset.downtime-aset.record
+      name: Catat dan koreksi downtime aset
+      permissions:
+        - management-aset.downtime-aset.read
+        - management-aset.downtime-aset.create
+        - management-aset.downtime-aset.update
+        - management-aset.downtime-aset.archive
+    # Angka KPI membaca register aset, jenis, dan lokasi untuk penyaringnya; tanpa hak tulis.
+    - code: management-aset.kpi-pemeliharaan.view
+      name: Lihat KPI pemeliharaan
+      permissions:
+        - management-aset.kpi-pemeliharaan.read
+        - management-aset.aset.read
+        - management-aset.jenis-aset.read
+        - management-aset.lokasi-aset.read
+  duties:
+    - code: management-aset.downtime-aset.manage
+      name: Catat downtime aset
+      privileges:
+        - management-aset.downtime-aset.view
+        - management-aset.downtime-aset.record
+    - code: management-aset.kpi-pemeliharaan.analyze
+      name: Analisis kinerja pemeliharaan
+      privileges:
+        - management-aset.kpi-pemeliharaan.view

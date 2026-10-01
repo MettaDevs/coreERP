@@ -10,6 +10,7 @@ use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\Insurance\InsurancePolicy;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MaintenanceRequest\MaintenanceRequest;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
@@ -24,6 +25,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAs
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
+use Modules\Apperp\ManagementAset\Models\transaksi\ServiceContract\ServiceContract;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
 /**
@@ -45,6 +47,7 @@ final class AssetAttachments implements AttachmentRecordType
      * @param  class-string<Model>  $model
      * @param  string|null  $resource  resource permission; null berarti dibaca dari `jenis_dokumen` barisnya
      * @param  string  $updatePermission  aksi permission yang berarti boleh mengubah record, termasuk melampirinya
+     * @param  string|null  $organizationUnitColumn  kolom unit pemilik; null untuk record milik entitas legal saja
      * @param  class-string<Model>|null  $lineModel
      */
     private function __construct(
@@ -52,7 +55,7 @@ final class AssetAttachments implements AttachmentRecordType
         private readonly string $model,
         private readonly ?string $resource,
         private readonly string $updatePermission,
-        private readonly string $organizationUnitColumn,
+        private readonly ?string $organizationUnitColumn,
         private readonly ?string $lineModel = null,
         private readonly ?string $lineForeignKey = null,
     ) {}
@@ -74,6 +77,9 @@ final class AssetAttachments implements AttachmentRecordType
             // Dekomisioning, penjualan, dan pemusnahan tidak punya permission ubah; yang boleh membuat dokumennya
             // yang boleh melampirinya (K-20).
             new self('aset_tr_dokumen_siklus_aset', DokumenSiklusAset::class, null, 'create', 'responsible_org_unit_id'),
+            // Berkas polis dan berkas kontrak servis. Keduanya milik entitas legal tanpa unit kerja.
+            new self('aset_m_polis_asuransi', InsurancePolicy::class, 'polis-asuransi', 'update', null),
+            new self('aset_tr_kontrak_servis', ServiceContract::class, 'kontrak-servis', 'update', null),
         ];
     }
 
@@ -125,7 +131,9 @@ final class AssetAttachments implements AttachmentRecordType
     private function resourceOf(string $recordId): ?string
     {
         $query = $this->model::query()->where($this->table.'.id', $recordId);
-        app(OrganizationScope::class)->query($query, request(), $this->table.'.legal_entity_id', $this->table.'.'.$this->organizationUnitColumn);
+        $this->organizationUnitColumn === null
+            ? app(OrganizationScope::class)->legalEntityQuery($query, request(), $this->table.'.legal_entity_id')
+            : app(OrganizationScope::class)->query($query, request(), $this->table.'.legal_entity_id', $this->table.'.'.$this->organizationUnitColumn);
 
         if ($this->resource !== null) {
             return $query->exists() ? $this->resource : null;
