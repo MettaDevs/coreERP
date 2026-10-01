@@ -1,6 +1,6 @@
 ---
 name: coreerp-konsol
-description: Work safely on admin.erp — the operator console in `apps/control-plane` — and on SSO in both applications. Use when touching anything under `apps/control-plane/`, the agent API or `contracts/openapi-agent.yaml`, central-side tables (`sites`, `site_*`, `environments`, `console_settings`, `operator_audit_events`, `external_identities`), site licensing or DNS, operator authentication, or `app/Sso/` and `apps/core/app/Support/Sso/`. Also use when adding a console screen, route, audited action, console setting, or a field to the agent report.
+description: Work safely on admin.erp — the operator console in `apps/control-plane` — and on SSO in both applications. Use when touching anything under `apps/control-plane/`, the agent API or `contracts/openapi-agent.yaml`, central-side tables (`sites`, `site_*`, `environments`, `console_settings`, `operator_audit_events`, `external_identities`), site licensing or DNS, operator authentication, or `app/Sso/` and `apps/core/app/Platform/Identity/Support/Sso/`. Also use when adding a console screen, route, audited action, console setting, or a field to the agent report.
 ---
 
 # CoreERP operator console and SSO

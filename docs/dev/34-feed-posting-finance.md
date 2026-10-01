@@ -526,28 +526,28 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | `apps/core/app/Platform/Modules/Contracts/PostingFeed.php` | Kontrak module: bentuk masukan dan hasil |
 | `apps/core/app/Platform/Modules/Contracts/InvalidPosting.php` | Exception untuk bug penerbit |
 | `apps/core/app/Platform/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
-| `apps/core/app/Support/Finance/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
-| `apps/core/app/Services/Modules/PostingFeedCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Support/Modules/CoreServices.php` |
-| `apps/core/app/Support/Finance/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |
-| `apps/core/app/Support/Finance/PostingInput.php` | Masukan yang sudah dinormalkan, beserta hash-nya |
-| `apps/core/app/Support/BusinessUnitResolver.php` | Business unit induk lewat hierarki manajemen pada tanggal posting |
-| `apps/core/app/Support/Finance/MoneyPrecision.php` | Presisi per mata uang dan satu-satunya cara membulatkan |
-| `apps/core/app/Support/Finance/PostingSettings.php` | Feed aktif, cutover, dan mode per tanggal |
-| `apps/core/app/Support/Finance/PostingAcknowledger.php` | Aturan ack untuk pull dan push |
-| `apps/core/app/Support/Finance/PostingPusher.php` | Kiriman push: urutan, jeda, dan kegagalan |
-| `apps/core/app/Support/Finance/StatusPostingBerubah.php` | Status berubah di antara layar dibuka dan tombol ditekan |
-| `apps/core/app/Support/Integration/SignedPush.php` | Signature dan kiriman HTTP |
-| `apps/core/app/Support/Integration/PushDestination.php` | Aturan URL tujuan push |
-| `apps/core/app/Console/Commands/PushFinancePostings.php` | Perintah `finance-postings:push` |
-| `apps/core/app/Http/Controllers/Internal/FinancePostingFeedController.php` | Pull dan ack |
-| `apps/core/app/Http/Middleware/AuthenticateIntegrationClient.php` | Token, IP, scope, salinan sandbox, dan pelaku permintaan |
-| `apps/core/app/Support/Finance/IntegrationClientAccounts.php` | Akun aplikasi klien integrasi |
-| `apps/core/app/Http/Middleware/AuthenticateInternalCaller.php` | Rute yang dibaca module dan klien integrasi sekaligus |
-| `apps/core/app/Http/Controllers/Finance/FinancePostingMonitorController.php` | Layar pantau dan aksinya |
-| `apps/core/app/Http/Controllers/Finance/FinancePostingSettingController.php` | Setelan feed per entitas legal |
-| `apps/core/app/Http/Controllers/Finance/IntegrationClientController.php` | Klien integrasi |
-| `apps/core/app/Models/FinancePosting.php` | Status, alasan manual, kode penolakan, dan penyempitan per klien |
-| `apps/core/app/Models/IntegrationClient.php` | Scope, allowlist IP, dan mode pengiriman |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
+| `apps/core/app/Foundation/FinancePosting/ModuleServices/PostingFeedCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Platform/Modules/Support/CoreServices.php` |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingInput.php` | Masukan yang sudah dinormalkan, beserta hash-nya |
+| `apps/core/app/Platform/Organization/Support/BusinessUnitResolver.php` | Business unit induk lewat hierarki manajemen pada tanggal posting |
+| `apps/core/app/Foundation/Currency/Support/MoneyPrecision.php` | Presisi per mata uang dan satu-satunya cara membulatkan |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingSettings.php` | Feed aktif, cutover, dan mode per tanggal |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingAcknowledger.php` | Aturan ack untuk pull dan push |
+| `apps/core/app/Foundation/FinancePosting/Support/PostingPusher.php` | Kiriman push: urutan, jeda, dan kegagalan |
+| `apps/core/app/Foundation/FinancePosting/Support/StatusPostingBerubah.php` | Status berubah di antara layar dibuka dan tombol ditekan |
+| `apps/core/app/Platform/Integration/Support/SignedPush.php` | Signature dan kiriman HTTP |
+| `apps/core/app/Platform/Integration/Support/PushDestination.php` | Aturan URL tujuan push |
+| `apps/core/app/Foundation/FinancePosting/Console/PushFinancePostings.php` | Perintah `finance-postings:push` |
+| `apps/core/app/Foundation/FinancePosting/Http/Controllers/Internal/FinancePostingFeedController.php` | Pull dan ack |
+| `apps/core/app/Platform/Integration/Http/Middleware/AuthenticateIntegrationClient.php` | Token, IP, scope, salinan sandbox, dan pelaku permintaan |
+| `apps/core/app/Foundation/FinancePosting/Support/IntegrationClientAccounts.php` | Akun aplikasi klien integrasi |
+| `apps/core/app/Platform/Integration/Http/Middleware/AuthenticateInternalCaller.php` | Rute yang dibaca module dan klien integrasi sekaligus |
+| `apps/core/app/Foundation/FinancePosting/Http/Controllers/FinancePostingMonitorController.php` | Layar pantau dan aksinya |
+| `apps/core/app/Foundation/FinancePosting/Http/Controllers/FinancePostingSettingController.php` | Setelan feed per entitas legal |
+| `apps/core/app/Platform/Integration/Http/Controllers/IntegrationClientController.php` | Klien integrasi |
+| `apps/core/app/Foundation/FinancePosting/Models/FinancePosting.php` | Status, alasan manual, kode penolakan, dan penyempitan per klien |
+| `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | Scope, allowlist IP, dan mode pengiriman |
 | `apps/core/database/migrations/2026_09_22_150000_create_finance_postings_tables.php` | Tabel feed dan pemeriksaan database-nya |
 | `apps/core/routes/api.php` | Rute `internal/v1` dan penjaganya |
 | `apps/core/resources/js/pages/settings/finance-postings.tsx` | Halaman layar pantau |

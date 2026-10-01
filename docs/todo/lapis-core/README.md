@@ -148,27 +148,65 @@ menyebut satu namespace" tetap berlaku; hanya namespacenya yang berganti, dan
 Satu domain per PR. Reporting paling akhir karena sesi analisa gap masih mengerjakan K-30
 ("+ Tambah filter").
 
-- [ ] **PR 0 — pagar dulu, tanpa memindah berkas.** Test Boundary untuk arah lapis beserta daftar
-      pengecualiannya (dicocokkan lewat pola folder lama *dan* baru, supaya tetap berlaku selama
-      pemindahan), ESLint `no-restricted-imports` untuk `resources/js`, dan CODEOWNERS per lapis
-- [ ] **PR 1 — Platform/Environment dan Platform/ControlPlane.** Tutup ControlPlane
-- [ ] **PR 2 — Foundation kecil:** Vendor, UnitOfMeasure, Currency, FiscalCalendar, WorkingCalendar
-- [ ] **PR 3 — Foundation/NumberSequence,** termasuk membalik arah dari `InstallModule`,
-      `RegisterAppCatalog`, dan `RegisterBusiness`
-- [ ] **PR 4 — Foundation/Geography dan Foundation/AddressBook,** sekaligus memecah
-      `address-setup.tsx` (4.429 baris) dan `AddressSetupController.php` (1.554 baris)
-- [ ] **PR 5 — Foundation/Finance dan Foundation/Workflow**
-- [ ] **PR 6 — Platform/Organization dan Platform/Tenant,** sekaligus memecah `organization.tsx`
-- [ ] **PR 7 — Platform/Identity, Platform/Access,** dan fitur Platform kecil (ChangeLog,
-      Observability, Integration, License, Docs, Attachments, Retention). Pecah `access.tsx` dan
-      `security-configuration.tsx`
-- [x] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/`
-- [ ] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur (sengaja dipisah dari PR 8;
-      sampai saat itu sepuluh baris `CoreServices -> …Core` tetap di `ALLOWED`)
-- [ ] **PR 9 — Platform/Reporting,** setelah K-30 masuk main. **Kabari sesi analisa gap sebelum
-      mulai**
-- [ ] **Penutup:** daftar pengecualian Boundary kosong. Perbarui `docs/dev` (peta kode, grand
-      design, standar module), skill yang menyebut path lama, dan `docs/onboarding/peta-kode`
+- [x] **PR 0 — pagar dulu, tanpa memindah berkas** (#230). Test Boundary untuk arah lapis beserta
+      daftar pengecualiannya. ESLint `no-restricted-imports` dan CODEOWNERS belum ikut; lihat sisa di
+      bawah
+- [x] **Pilot — Foundation/Vendor** (#231)
+- [x] **PR 1 — Platform/Environment dan Platform/ControlPlane** (#234)
+- [x] **PR 2 — Foundation kecil:** Vendor (#231), UnitOfMeasure, Currency, FiscalCalendar,
+      WorkingCalendar (#233)
+- [x] **PR 3 — Foundation/NumberSequence** (#233). Pembalikan arah dari `InstallModule`,
+      `RegisterAppCatalog`, dan `RegisterBusiness` belum dikerjakan; barisnya masih di `ALLOWED`
+- [x] **PR 4 — Foundation/Geography dan Foundation/AddressBook** (#232). Pemecahan berkas raksasa
+      ditunda; lihat sisa di bawah
+- [x] **PR 5 — Foundation/FinancePosting, Foundation/Workflow,** dan Platform/Integration (#237)
+- [x] **PR 6 — Platform/Organization dan Platform/Tenant** (#236)
+- [x] **PR 7 — Platform/Identity, Platform/Access,** dan fitur Platform kecil (ChangeLog,
+      Observability, Integration, License, Docs, Attachments, Retention) (#238)
+- [x] **PR 9 — Platform/Reporting** (#240)
+- [x] **Platform/Modules** (#241)
+- [x] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/` (#242)
+- [x] **Penutup:** sisa kelas di folder lama dipindah, path lama di `docs/`, skill, dan kontrak
+      diperbarui, peta kode di [Peta kode ke dokumen](/onboarding/peta-kode#susunan-kode-core)
+
+Folder lama di `apps/core/app` sekarang hanya berisi perekat Laravel: `Providers/`,
+`Http/Controllers/Controller.php`, `Http/Middleware/{HandleInertiaRequests,HandleAppearance,ThrottleRequestsPerRoute}`,
+dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta kode.
+
+### Yang tersisa
+
+- [ ] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur. Sampai saat itu baris
+      `CoreServices -> …Core` tetap di `ALLOWED`
+- [ ] **Pembalikan arah pemasangan dan onboarding:** `InstallModule`, `RegisterAppCatalog`, dan
+      `RegisterBusiness` berhenti menyiapkan data Foundation secara langsung (pola kedua pada tabel
+      pelanggaran)
+- [ ] **K-2:** putuskan letak AddressBook. Jawabannya menentukan nasib pengecualian
+      `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`
+- [ ] **Daftar `ALLOWED` kosong.** Selama pekerjaan di atas belum selesai, daftar itu belum bisa
+      kosong; ia hanya boleh memendek
+- [ ] **CODEOWNERS per lapis** dan **ESLint `no-restricted-imports`** untuk `resources/js`, bagian
+      PR 0 yang belum dikerjakan
+- [ ] **Pecah berkas raksasa:** `pages/foundation/geography/address-setup.tsx`,
+      `Foundation/Geography/Http/Controllers/AddressSetupController.php`,
+      `pages/platform/organization/organization.tsx`, `pages/platform/access/access.tsx`, dan
+      `pages/platform/access/security-configuration.tsx`. Ini perubahan isi, jadi PR-nya terpisah
+      dari pemindahan
+- [ ] **Test yang masih di folder lama:** `tests/Feature/Auth`, `tests/Feature/ControlPlane`,
+      `tests/Feature/Database`, dan `tests/Feature/Modules` belum mengikuti
+      `tests/Feature/<Lapis>/<Fitur>`. `tests/Feature/Http` menguji perekat
+      `ThrottleRequestsPerRoute`, jadi tetap di sana
+- [ ] **Sisa nama Indonesia di kode.** Pemindahan sengaja tidak mengganti nama kelas selain facade.
+      Yang tersisa, sebagai pekerjaan lanjutan:
+      - nama parameter method facade di `App\Platform\Modules\Contracts`, yang ikut terlihat oleh
+        module lewat argumen bernama;
+      - pembungkus facade di module, misalnya `PenerbitNomorAset`, `DaftarSatuanAset`, dan
+        `PenerbitNomorHr`;
+      - kelas Platform dan Foundation, misalnya `PelaporKesalahan`, `JejakAktif`,
+        `LampirkanKonteksJejak`, `WajibGantiSandi`, `StatusPostingBerubah`, `ModulSedangDipindah`, dan
+        `ModulTanpaAnalisaTipe`.
+
+      Mengganti nama kelas yang disebut di docs, `phpstan-baseline.neon`, atau test mengikuti aturan
+      yang sama dengan pemindahan: satu PR per kelompok, isi kelas tidak berubah
 
 ## Yang wajib diperiksa di setiap PR pemindahan
 

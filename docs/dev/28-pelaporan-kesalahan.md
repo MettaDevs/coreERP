@@ -342,13 +342,13 @@ Konsekuensinya disadari: image yang diverifikasi saat PR bukan image yang dikiri
 
 | Berkas | Isi |
 |---|---|
-| `app/Support/Observabilitas/PelaporKesalahan.php` | Pintu masuk, penjaga, tiga tujuan |
-| `app/Support/Observabilitas/PengirimDiscord.php` | Muatan webhook, sebutan, dan izinnya |
-| `app/Support/Observabilitas/PenjedaKiriman.php` | Penjeda per kesalahan, berbasis berkas |
-| `app/Support/Observabilitas/LaporanKesalahan.php` | Pengumpul konteks dan perender |
-| `app/Support/Observabilitas/BerkasLaporan.php` | Penulisan berkas, rotasi per hari dan peran |
-| `app/Support/Observabilitas/SqlTerbaca.php` | Penyisipan binding tanpa I/O |
-| `app/Support/Observabilitas/TersangkaPemotongan.php` | Penunjuk nilai yang tidak muat |
-| `app/Support/Observabilitas/JejakAktif.php` | Satu-satunya penyentuh span aktif |
+| `app/Platform/Observability/Support/PelaporKesalahan.php` | Pintu masuk, penjaga, tiga tujuan |
+| `app/Platform/Observability/Support/PengirimDiscord.php` | Muatan webhook, sebutan, dan izinnya |
+| `app/Platform/Observability/Support/PenjedaKiriman.php` | Penjeda per kesalahan, berbasis berkas |
+| `app/Platform/Observability/Support/LaporanKesalahan.php` | Pengumpul konteks dan perender |
+| `app/Platform/Observability/Support/BerkasLaporan.php` | Penulisan berkas, rotasi per hari dan peran |
+| `app/Platform/Observability/Support/SqlTerbaca.php` | Penyisipan binding tanpa I/O |
+| `app/Platform/Observability/Support/TersangkaPemotongan.php` | Penunjuk nilai yang tidak muat |
+| `app/Platform/Observability/Support/JejakAktif.php` | Satu-satunya penyentuh span aktif |
 | `resources/js/lib/pelaporan-kesalahan.ts` | Padanannya di peramban |
 | `tests/Feature/Observabilitas/` | Penjaga untuk semua sifat di atas |

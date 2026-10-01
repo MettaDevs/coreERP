@@ -11,6 +11,10 @@ namespace Tests\Feature\Boundary;
  * `app/Models`: tiap fitur punya `app/<Lapis>/<Fitur>/Models`. Penjaga yang hanya membaca
  * `app/Models` akan diam-diam kehilangan model yang sudah pindah, dan tabelnya lolos tanpa
  * diperiksa. Daftar foldernya karena itu dibangun di satu tempat ini.
+ *
+ * `app/Models` sudah kosong dan dihapus, tetapi tetap dibaca bila muncul lagi: `php artisan
+ * make:model` tanpa namespace lengkap membuat berkas di sana, dan model itu tidak boleh lolos dari
+ * penjaga hanya karena salah tempat.
  */
 final class CoreModelFolders
 {
@@ -19,7 +23,7 @@ final class CoreModelFolders
      */
     public static function all(): array
     {
-        $folders = [[app_path('Models'), 'App\\Models\\']];
+        $folders = is_dir(app_path('Models')) ? [[app_path('Models'), 'App\\Models\\']] : [];
 
         foreach (['Platform', 'Foundation'] as $layer) {
             foreach (glob(app_path($layer.'/*/Models'), GLOB_ONLYDIR) ?: [] as $folder) {

@@ -168,4 +168,4 @@ membuka alamat tenant lain, dan halaman masuk yang tidak pernah mencetak teks da
 
 - [Identity dan access](09-identity-and-access.md) — kapan tenant memakai SSO, dan dua jenis undangan.
 - [admin.erp: konsol operator](31-admin-erp-control-plane.md) — siapa yang dianggap operator.
-- `apps/core/app/Support/Sso/` dan `apps/control-plane/app/Sso/` — kodenya.
+- `apps/core/app/Platform/Identity/Support/Sso/` dan `apps/control-plane/app/Sso/` — kodenya.

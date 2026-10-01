@@ -4,6 +4,100 @@ Ketemu berkas tapi tidak tahu aturannya, atau baca dokumen tapi tidak tahu koden
 
 Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 
+## Susunan kode Core
+
+Kode Core tidak dikelompokkan per jenis teknis (`Models/`, `Support/`, `Http/Controllers/`), tetapi per
+**lapis**, lalu per **fitur** di dalam lapis itu. Polanya meniru Business Central: System Application,
+lalu Business Foundation, lalu Base App. Rencana dan alasannya ada di
+[Memecah Core menjadi lapis Platform dan Foundation](/todo/lapis-core/).
+
+| Lapis | Namespace | Isinya |
+| --- | --- | --- |
+| Platform | `App\Platform\<Fitur>` | Yang dibutuhkan setiap aplikasi bisnis sebelum ada satu pun transaksi: tenant, lingkungan, identitas, akses, organisasi, runtime module, laporan, log perubahan, lampiran, retensi, observability, integrasi, lisensi |
+| Foundation | `App\Foundation\<Fitur>` | Data acuan bisnis yang dipakai lintas module: buku alamat, wilayah, satuan ukur, mata uang, nomor urut, kalender fiskal dan kerja, vendor, workflow, posting finance |
+| Module | `modules/<vendor>/<module>` (root repo) | Aplikasi bisnis. Hanya boleh menyebut facade `App\Platform\Modules\Contracts` |
+
+Daftar fitur yang berlaku adalah isi folder `app/Platform/` dan `app/Foundation/` itu sendiri.
+
+### Isi satu fitur
+
+```
+app/<Lapis>/<Fitur>/
+  Models/                       model Eloquent
+  Actions/                      satu tindakan bisnis per kelas
+  Http/Controllers/             controller layar dan API
+  Http/Controllers/Internal/    controller rute internal/v1
+  Http/Requests/                form request
+  Http/Middleware/              middleware milik fitur
+  Console/                      perintah artisan
+  Jobs/                         job antrean
+  Support/                      semua kelas lain
+  ModuleServices/               pelaksana facade module (`…Core`)
+```
+
+Folder yang tidak dibutuhkan sebuah fitur memang tidak ada. Sub-folder yang bermakna dipertahankan,
+misalnya `Foundation/Geography/Models/AddressHierarchy/`.
+
+Facade module tidak ikut pola per fitur: semuanya tinggal di satu namespace,
+`App\Platform\Modules\Contracts`, sedangkan pelaksananya di `ModuleServices` fitur pemiliknya.
+
+Halaman Inertia dan test mengikuti susunan yang sama:
+
+| Jenis | Letak | Contoh |
+| --- | --- | --- |
+| Halaman Inertia | `resources/js/pages/<lapis>/<fitur>/` dengan huruf kecil dan tanda hubung | `pages/foundation/unit-of-measure/units-of-measure.tsx`, dirender `Inertia::render('foundation/unit-of-measure/units-of-measure')` |
+| Test feature | `tests/Feature/<Lapis>/<Fitur>/` | `tests/Feature/Foundation/Vendor/` |
+| Test unit | `tests/Unit/<Lapis>/<Fitur>/` | `tests/Unit/Platform/Reporting/` |
+
+### Yang tetap di folder bawaan Laravel
+
+Beberapa kelas adalah perekat framework, bukan milik fitur mana pun, sehingga tetap di tempat
+bawaannya:
+
+| Berkas | Alasan |
+| --- | --- |
+| `app/Providers/*` | Service provider yang didaftarkan `bootstrap/providers.php` |
+| `app/Http/Controllers/Controller.php` | Controller dasar yang diturunkan semua controller |
+| `app/Http/Middleware/HandleInertiaRequests.php`, `HandleAppearance.php`, `ThrottleRequestsPerRoute.php` | Middleware global dan alias `throttle` yang dipasang `bootstrap/app.php` untuk semua rute |
+| `app/Console/Commands/ConfigureLocalCoreCommand.php` | `core:configure-local` hanya menulis `.env` mesin pengembang (kunci aplikasi, sandi database lokal, akun provider); tidak ada fitur yang memilikinya |
+
+Kelas baru tidak masuk ke folder ini. Kalau ragu fitur mana pemiliknya, tanyakan dulu.
+
+### Jebakan `php artisan make:*`
+
+Perintah `make:model`, `make:controller`, `make:request`, `make:command`, dan sejenisnya membuat berkas
+di folder bawaan Laravel (`app/Models`, `app/Http/Controllers`, `app/Console/Commands`, …). Folder itu
+bukan tempatnya lagi. Sebut namespace lengkap:
+
+```bash
+php artisan make:model "App\Foundation\Vendor\Models\Vendor"
+php artisan make:controller "App\Foundation\Vendor\Http\Controllers\VendorController"
+```
+
+atau pindahkan berkasnya ke fitur pemiliknya sesudah dibuat. Penjaga batas tetap membaca `app/Models`
+bila folder itu muncul lagi, jadi model yang salah tempat tidak lolos diam-diam, tetapi ia tetap salah
+tempat.
+
+Perintah artisan baru ditemukan otomatis dari `app/<Lapis>/<Fitur>/Console/`: `bootstrap/app.php`
+mendaftarkan folder itu lewat `withCommands`. Tidak perlu mendaftarkannya di tempat lain.
+
+### Penjaga arah lapis
+
+Arah ketergantungannya satu: module ke Foundation lewat facade, Foundation ke Platform. Platform tidak
+boleh memakai Foundation, dan `Platform\ControlPlane` hanya boleh dipakai dari `Platform\ControlPlane`
+(kecuali penanda `OwnedByControlPlane`).
+
+Yang menjaganya `tests/Feature/Boundary/LayerDirectionBoundaryTest.php`. Ia membaca teks berkas, jadi
+`use`, pemanggilan statis, dan nama kelas di dalam string sama-sama tertangkap. Pelanggaran yang sudah
+ada sebelum pemindahan dicatat di konstanta `ALLOWED`, dan **daftar itu hanya boleh memendek**:
+
+- Pelanggaran baru di luar `ALLOWED` membuat test merah. Perbaiki arahnya, jangan menambah entri.
+- Entri `ALLOWED` yang tidak lagi ditemukan di kode juga membuat test merah, supaya pengecualian yang
+  sudah diperbaiki ikut dihapus dari daftar.
+- Setiap entri harus tercatat di tabel pelanggaran pada [rencana lapis Core](/todo/lapis-core/#pelanggaran-arah-yang-sudah-ada).
+
+Batas module ke Core dijaga terpisah oleh `ModuleNamespaceBoundaryTest`.
+
 ## Berdasarkan area
 
 ### Module: runtime, kontrak, dan penjaga batas
@@ -12,69 +106,70 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | --- | --- |
 | `modules/` (root repo) — satu folder per module | [Standar module](/dev/02-module-standard), dan `modules/README.md` untuk bentuk foldernya |
 | `app/Platform/Modules/Contracts/` | [API dan integrasi](/dev/04-api-and-integration) — satu-satunya namespace Core yang boleh disebut module |
-| `app/Support/Modules/ModuleRegistry.php`, `ModuleManifest.php`, `ModuleManifestFiles.php` | [Standar module](/dev/02-module-standard) — pembacaan `app.yaml` dan penggabungannya dengan folder `manifest/` |
-| `app/Support/Modules/ModuleMigrator.php`, `ModuleMigrationRepository.php` | [Development stack lokal](/dev/11-local-docker-development) |
-| `app/Support/Modules/TenantScope.php` dan trait `BelongsToTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
-| `app/Support/Modules/EditionModules.php`, `config/modules.php` | [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis) |
-| `tests/Feature/Boundary/` | [Definition of done](/onboarding/definition-of-done) — penjaga batas yang memindai `modules/` |
-| `app/Console/Commands/Module*.php`, `RegisterAppManifestCommand.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
+| `app/Platform/Modules/Support/ModuleRegistry.php`, `ModuleManifest.php`, `ModuleManifestFiles.php` | [Standar module](/dev/02-module-standard) — pembacaan `app.yaml` dan penggabungannya dengan folder `manifest/` |
+| `app/Platform/Modules/Support/ModuleMigrator.php`, `ModuleMigrationRepository.php` | [Development stack lokal](/dev/11-local-docker-development) |
+| `app/Platform/Modules/Support/TenantScope.php` dan trait `BelongsToTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
+| `app/Platform/Modules/Support/EditionModules.php`, `config/modules.php` | [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis) |
+| `tests/Feature/Boundary/` | [Definition of done](/onboarding/definition-of-done) — penjaga batas yang memindai `modules/` dan arah lapis Core |
+| `app/Platform/Modules/Console/Module*.php`, `RegisterAppManifestCommand.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
 | `resources/js/lib/halaman-module.tsx` | Tuan rumah halaman module di dalam shell |
 
 ### Tenant, organisasi, hierarki
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Models/Organization.php`, `OrganizationHierarchy.php`, `OrganizationHierarchyNode.php`, `OrganizationHierarchyVersion.php` | [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy) |
-| `app/Models/LegalEntity.php`, `OperatingUnit.php`, `HierarchyPurpose.php` | [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy) |
-| `app/Actions/Organization/` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
-| `app/Http/Controllers/Organization/` | idem |
-| `app/Support/CurrentWorkspace.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
+| `app/Platform/Organization/Models/Organization.php`, `OrganizationHierarchy.php`, `OrganizationHierarchyNode.php`, `OrganizationHierarchyVersion.php` | [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy) |
+| `app/Platform/Organization/Models/LegalEntity.php`, `OperatingUnit.php`, `HierarchyPurpose.php` | [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy) |
+| `app/Platform/Organization/Actions/` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
+| `app/Platform/Organization/Http/Controllers/` | idem |
+| `app/Platform/Environment/Support/CurrentWorkspace.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
 
 ### Identity, akses, security
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Models/Role.php`, `RoleAssignment.php`, `Permission.php` | [Identity dan access](/dev/09-identity-and-access) |
-| `app/Actions/Access/` — `CreateInvitation`, `UpdateMembership`, `UpsertRole` | idem |
-| `app/Http/Controllers/Access/` | idem |
-| `app/Support/RoleHierarchy.php` | [Identity dan access](/dev/09-identity-and-access) |
-| `app/Support/SodConflictEvaluator.php` | [Identity dan access](/dev/09-identity-and-access) — bagian SoD |
-| `app/Support/DataPolicyAccessResolver.php`, `DataPolicyScopeResolver.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
-| `app/Models/AppDataPolicy.php` | [Standar module](/dev/02-module-standard) — deklarasi manifest |
+| `app/Platform/Access/Models/Role.php`, `RoleAssignment.php`, `Permission.php` | [Identity dan access](/dev/09-identity-and-access) |
+| `app/Platform/Access/Actions/` — `CreateInvitation`, `UpdateMembership`, `UpsertRole` | idem |
+| `app/Platform/Access/Http/Controllers/` | idem |
+| `app/Platform/Access/Support/RoleHierarchy.php` | [Identity dan access](/dev/09-identity-and-access) |
+| `app/Platform/Access/Support/SodConflictEvaluator.php` | [Identity dan access](/dev/09-identity-and-access) — bagian SoD |
+| `app/Platform/Access/Support/DataPolicyAccessResolver.php`, `DataPolicyScopeResolver.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
+| `app/Platform/Access/Models/AppDataPolicy.php` | [Standar module](/dev/02-module-standard) — deklarasi manifest |
+| `app/Platform/Identity/` | Login, SSO, passkey, profil. SSO dijelaskan di [SSO](/dev/32-sso) |
 
 ### Onboarding dan tenant baru
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Actions/Onboarding/RegisterBusiness.php` | [Alur end-to-end](/onboarding/alur-end-to-end) |
-| `app/Actions/Onboarding/RedeemInvitation.php` | [Identity dan access](/dev/09-identity-and-access) |
-| `app/Http/Controllers/Onboarding/` | idem |
+| `app/Platform/Tenant/Actions/RegisterBusiness.php` | [Alur end-to-end](/onboarding/alur-end-to-end) |
+| `app/Platform/Tenant/Actions/RedeemInvitation.php` | [Identity dan access](/dev/09-identity-and-access) |
+| `app/Platform/Tenant/Http/Controllers/` | idem |
 
 ### Katalog app, pemasangan module, deployment
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Models/CoreApp.php`, `ModuleInstallation.php` | [Standar module](/dev/02-module-standard) |
-| `app/Actions/Modules/InstallModule.php` | [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran), [Release dan on-prem](/dev/03-release-and-on-prem) |
-| `app/Http/Controllers/Provider/AppCatalogController.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
-| `app/Support/LaunchableAppCatalog.php` | [Standar module](/dev/02-module-standard) |
-| `app/Http/Controllers/AppLaunchManifestController.php` | idem |
+| `app/Platform/Modules/Models/CoreApp.php`, `ModuleInstallation.php` | [Standar module](/dev/02-module-standard) |
+| `app/Platform/Modules/Actions/InstallModule.php` | [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran), [Release dan on-prem](/dev/03-release-and-on-prem) |
+| `app/Platform/Modules/Http/Controllers/AppCatalogController.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
+| `app/Platform/Modules/Support/LaunchableAppCatalog.php` | [Standar module](/dev/02-module-standard) |
+| `app/Platform/Modules/Http/Controllers/AppLaunchManifestController.php` | idem |
 | tabel `core_module_installations`, `tenant_deployments` | [Gate fondasi Core](/dev/10-core-foundation-gates) |
 
 ### Reference data platform
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Models/NumberSequence*.php`, `app/Actions/NumberSequence/`, `app/Support/NumberSequenceMatrix.php` | [Number sequence](/dev/14-number-sequences) |
-| `app/Models/FiscalCalendar.php`, `FiscalYear.php`, `FiscalPeriod.php`, `app/Actions/FiscalCalendar/` | [Kalender fiskal](/dev/15-fiscal-calendars) |
-| `app/Services/UnitOfMeasureService.php`, `app/Actions/ReferenceData/` | [Satuan ukur](/dev/16-units-of-measure) |
-| `app/Models/CountryRegion.php`, `Party.php`, `PartyLocation.php`, `ElectronicAddress.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema) |
+| `app/Foundation/NumberSequence/` | [Number sequence](/dev/14-number-sequences) |
+| `app/Foundation/FiscalCalendar/` | [Kalender fiskal](/dev/15-fiscal-calendars) |
+| `app/Foundation/UnitOfMeasure/` | [Satuan ukur](/dev/16-units-of-measure) |
+| `app/Foundation/Geography/Models/CountryRegion.php`, `app/Foundation/AddressBook/Models/Party.php`, `PartyLocation.php`, `ElectronicAddress.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema), [Buku alamat](/dev/24-global-address-book) |
 
 ### Workflow
 
 | Kode | Dokumen |
 | --- | --- |
-| `app/Support/WorkflowRuntime.php`, `app/Http/Controllers/Workflow/` | [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) |
+| `app/Foundation/Workflow/Support/WorkflowRuntime.php`, `app/Foundation/Workflow/Http/Controllers/` | [Visual workflow engine](/dev/21-visual-workflow-engine), [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) |
 
 ### Frontend
 
@@ -100,6 +195,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | "Saya ditugaskan ke app X, mulai dari mana?" | [Katalog app](/apps/) lalu hub app-nya |
 | "Langkah membangun modul dari nol apa saja?" | [Membangun modul baru](/apps/membangun-app-baru) |
 | "Kenapa module saya tidak boleh menyebut kelas Core ini?" | [Standar module](/dev/02-module-standard) — hanya `App\Platform\Modules\Contracts` yang boleh disebut |
+| "Kelas baru Core ini saya taruh di mana?" | [Susunan kode Core](#susunan-kode-core) di halaman ini |
 | "Hak akses apa saja yang harus saya rancang untuk satu transaksi?" | [Rantai keamanan modul transaksi](/dev/19-transaction-security-chain) |
 | "Fondasi ini belum ada, boleh saya bikin?" | [Gate fondasi Core](/dev/10-core-foundation-gates) |
 | "Kapan module saya boleh disebut selesai?" | [Definition of done](/onboarding/definition-of-done) |

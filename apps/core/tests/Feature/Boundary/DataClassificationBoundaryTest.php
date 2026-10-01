@@ -60,7 +60,7 @@ final class DataClassificationBoundaryTest extends TestCase
                 $problems,
             ))
             ."\n\nModel: pasang #[DataClassification(DataClass::...)] dan timpa kolom di COLUMN_CLASSIFICATION."
-            ."\nTabel tanpa model: tambahkan ke registry pemiliknya (App\\Models\\UnmodeledTables atau registry module).");
+            ."\nTabel tanpa model: tambahkan ke registry pemiliknya (App\\Platform\\Modules\\Models\\UnmodeledTables atau registry module).");
 
         // Contoh yang dijaga eksplisit: nama dan email pekerja adalah data pribadi, dan kolom jejak
         // mendapat klasifikasinya dari platform.

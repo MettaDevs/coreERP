@@ -46,12 +46,12 @@ Layarnya Inertia + React di `resources/js/pages/`.
 ## Batas data: apa milik sisi pusat
 
 Tabel yang hanya dibaca-tulis konsol ditandai di sisi Core dengan trait
-`App\Support\ControlPlane\OwnedByControlPlane`. Hari ini trait itu tidak melakukan apa pun — koneksi terpisah
+`App\Platform\ControlPlane\OwnedByControlPlane`. Hari ini trait itu tidak melakukan apa pun — koneksi terpisah
 belum ada — dan itu memang disengaja: **batas yang mahal adalah batasnya, bukan koneksinya.** Ketika database
 konsol kelak dipisah, yang berubah hanya setelan koneksi, bukan kode yang memakai tabelnya.
 
 Aturannya satu kalimat: **setiap tabel baru yang hanya dipakai konsol wajib punya model penanda di Core.**
-Daftar model penandanya ada di `apps/core/app/Models/` — cari `use OwnedByControlPlane`, dan penjaganya
+Model penandanya tersebar di folder `Models` tiap fitur `apps/core/app/Platform/` — cari `use OwnedByControlPlane`, dan penjaganya
 `apps/core/tests/Feature/Boundary/BatasPusatTest.php`. Tabel yang lupa ditandai tidak membuat satu pun test
 merah sampai seseorang memisahkan databasenya, dan pada saat itu sebabnya sudah lama terlupakan.
 

@@ -129,7 +129,7 @@ Sebagian kecil identitas dimiliki Core, bukan module. Saat ini hanya satu: nomor
 
 - Ia milik baris app `core` berstatus `internal` di tabel `apps`. Status itu bukan `available`, jadi baris ini tidak pernah tampil di peluncur, pendaftaran, atau katalog produk, dan tidak butuh entitlement.
 - Reference dan baris `apps`-nya ditulis migration, bukan registrasi katalog, jadi aturan manifest di atas tidak diperiksa untuknya. Kodenya tetap diawali ID pemiliknya (`core.`).
-- Setelan awal per reference (profile, scope, segment) ditulis di `App\Support\Finance\CoreNumberSequences`, bukan diturunkan dari `default_prefix` seperti reference module.
+- Setelan awal per reference (profile, scope, segment) ditulis di `App\Foundation\NumberSequence\Support\CoreNumberSequences`, bukan diturunkan dari `default_prefix` seperti reference module.
 - Urutan tenant lahir saat pertama kali dipakai atau saat layar Nomor dokumen dibuka, mana yang lebih dulu. Yang kedua penting: format terkunci begitu nomor pertama terbit, jadi admin harus bisa menyesuaikannya lebih dulu, misalnya dengan nomor pemasok lama yang akan diketik manual.
 
 Menambah reference Core berarti menambah baris di migration dan di `CoreNumberSequences`. Keputusannya tetap melewati gate yang sama dengan reference module: pemilik, scope, mode, periode reset, dan format.
@@ -301,7 +301,7 @@ Angka absolut akan berbeda per mesin; yang penting adalah bentuk kurvanya. Sebel
 
 ### Simulasi matriks konfigurasi
 
-Estate yang seragam hanya membuktikan satu konfigurasi. `number-sequences:matrix-seed` menyiapkan 100 tenant, masing-masing dengan satu entitas legal, kalender fiskal yang bulan awalnya berbeda-beda, dan tiga cabang; lalu mengaktifkan **seluruh 14 konfigurasi yang sah** (lihat `App\Support\NumberSequenceMatrix`) pada setiap tenant.
+Estate yang seragam hanya membuktikan satu konfigurasi. `number-sequences:matrix-seed` menyiapkan 100 tenant, masing-masing dengan satu entitas legal, kalender fiskal yang bulan awalnya berbeda-beda, dan tiga cabang; lalu mengaktifkan **seluruh 14 konfigurasi yang sah** (lihat `App\Foundation\NumberSequence\Support\NumberSequenceMatrix`) pada setiap tenant.
 
 ```bash
 DB_TEST_SCHEMA=coreerp_load APP_ENV=testing php artisan number-sequences:matrix-seed --database=pgsql_test --tenants=100 --branches=3

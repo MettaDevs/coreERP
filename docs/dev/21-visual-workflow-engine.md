@@ -201,9 +201,9 @@ sakelar.
 
 | Berkas | Isinya |
 | --- | --- |
-| `apps/core/app/Http/Controllers/Workflow/WorkflowConfigurationController.php` | Manajemen konfigurasi dan editor graf workflow |
-| `apps/core/app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances` |
-| `apps/core/app/Http/Controllers/Workflow/WorkflowInboxController.php` | Pengelolaan work items dan inbox persetujuan |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowConfigurationController.php` | Manajemen konfigurasi dan editor graf workflow |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/Internal/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances` |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowInboxController.php` | Pengelolaan work items dan inbox persetujuan |
 | `apps/core/resources/js/pages/settings/workflows.tsx` | Layar daftar konfigurasi workflow per tipe |
 | `apps/core/resources/js/pages/settings/workflow-editor.tsx` | Editor kanvas visual untuk menyusun step dan rule kondisi |
 | `apps/core/resources/js/pages/workflow-inbox.tsx` | Layar antrian inbox persetujuan terpusat |

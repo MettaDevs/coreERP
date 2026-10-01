@@ -115,7 +115,7 @@ siapa yang menegakkannya: dulu database terpisah, sekarang penjaga batas di
 | --- | --- |
 | `modules/apperp/management-aset/src/Support/OrganizationScope.php` | Penyaringan dan pemeriksaan hak |
 | `apps/core/app/Platform/Modules/Contracts/TenantContext.php`, `RequestContext.php` | Pintu tempat modul membaca konteksnya |
-| `apps/core/app/Support/Modules/TenantScope.php` | Penegakan `BelongsToTenant` pada sisi baca dan sisi tulis |
+| `apps/core/app/Platform/Modules/Support/TenantScope.php` | Penegakan `BelongsToTenant` pada sisi baca dan sisi tulis |
 | [Rancangan scope data aset](/apps/management-aset/arsitektur/rancangan-scope-data-aset) | Rancangan pemisahan data per organisasi |
 
 ## Halaman terkait
