@@ -51,6 +51,15 @@ Work order menambah master `m_tipe_work_order`, `m_tingkat_layanan`, `m_trade`,
 `tr_pemeliharaan_aset_details`, `tr_pemeliharaan_aset_checklist`, dan
 `tr_pemeliharaan_aset_status_log`.
 
+Pemeliharaan preventif menambah master `aset_m_jenis_counter`, `aset_m_jenis_aset_counter`,
+`aset_m_rencana_pemeliharaan`, `aset_m_rencana_pemeliharaan_baris`, dan
+`aset_m_rencana_pemeliharaan_objek`, serta transaksi `aset_tr_pembacaan_counter` dan
+`aset_tr_jadwal_pemeliharaan`. Keunikan usulan jadwal dijaga dua indeks unik parsial — per
+tanggal jatuh tempo untuk baris waktu, per batas total counter untuk baris counter — supaya
+perhitungan ulang idempoten. Permintaan pemeliharaan menambah `aset_m_jenis_permintaan_pemeliharaan`
+dan `aset_tr_permintaan_pemeliharaan`. Rinciannya di docs **Pemeliharaan preventif** dan
+**Permintaan pemeliharaan**.
+
 Master sebab dan tindakan memiliki `minta_keterangan`. Jika aktif, baris pekerjaan wajib
 menyimpan teks bebas pada `sebab_kerusakan_keterangan` atau
 `tindakan_perbaikan_keterangan`; teks tersebut dikosongkan bila pilihan tidak memintanya.

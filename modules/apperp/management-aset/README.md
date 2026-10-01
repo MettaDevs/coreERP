@@ -39,9 +39,10 @@ Baris template dapat berupa header, teks, pengukuran, variabel, atau template la
 pengukuran, satuan dipilih dari CoreERP; batas minimum dan maksimum opsional ikut disalin ke
 work order dan menghasilkan gagal bila angka yang diisi berada di luar rentang.
 
-Transaksi maintenance seperti maintenance request, work order, maintenance plan,
-scheduling, dan fault belum termasuk dalam versi ini. Tombol Forecast, Tools, dan Work
-description juga belum ditampilkan karena model bisnisnya belum tersedia.
+Transaksi maintenance di atas setup ini: work order, permintaan pemeliharaan, counter aset,
+rencana pemeliharaan, dan jadwal yang dihitung darinya. Rinciannya ada di halaman docs
+**Pemeliharaan aset**, **Permintaan pemeliharaan**, dan **Pemeliharaan preventif**. Maintenance
+round, Forecast, Tools, dan Work description belum ada karena model bisnisnya belum tersedia.
 
 Tenant baru menerima seed starter Indonesia secara otomatis. Untuk tenant yang sudah ada,
 jalankan perintah berikut dari container API tanpa mengganti data custom yang sudah dibuat:
