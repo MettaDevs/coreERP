@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
+use Modules\Apperp\ManagementAset\Models\transaksi\Reclassification\AssetReclassificationBook;
 use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
@@ -32,6 +33,7 @@ use stdClass;
  *
  * - akumulasi = akumulasi saldo awal aset lama + periode penyusutan **final** sampai akhir
  *   bulan laporan. Baris pembalik sudah tersimpan negatif, jadi ikut dijumlah apa adanya.
+ *   Akumulasi yang berpindah lewat pecah aset sampai tanggal itu ikut ditambah atau dikurangi.
  *   Ini persamaan yang sama dengan `accumulated_depreciation` pada buku asetnya.
  * - penyusutan bulan ini dan tahun berjalan = periode final dalam rentang itu. Tahun
  *   berjalan mengikuti kalender fiskal entitas legal asetnya; tanpa kalender, tahun kalender.
@@ -157,6 +159,7 @@ final class AssetDepreciationReport implements ReportDefinition
             ->selectSub($this->finalAmount($monthEnd)->where('aset_tr_penyusutan_aset.period_ends_on', '>=', $monthStart), 'penyusutan_bulan_ini')
             ->selectSub($this->yearToDate($monthEnd, $yearStarts), 'penyusutan_tahun_berjalan')
             ->selectSub($this->netFinalPeriods($monthEnd), 'periode_final')
+            ->selectSub($this->reclassifiedAccumulated($monthEnd), 'akumulasi_reklasifikasi')
             ->orderBy('aset_tr_aset.kode')
             ->orderBy('buku.book_code')
             ->toBase()
@@ -171,7 +174,7 @@ final class AssetDepreciationReport implements ReportDefinition
             $monthsPerPeriod = intdiv(12, $calculator->periodsPerYear($row->frequency));
             $usefulLife = $row->useful_life_periods === null ? null : (int) $row->useful_life_periods * $monthsPerPeriod;
             $elapsed = ((int) $row->elapsed_periods_offset + (int) $row->periode_final) * $monthsPerPeriod;
-            $accumulated = BigDecimal::of((string) $row->opening_accumulated_depreciation)->plus((string) $row->penyusutan_tercatat);
+            $accumulated = BigDecimal::of((string) $row->opening_accumulated_depreciation)->plus((string) $row->penyusutan_tercatat)->plus((string) $row->akumulasi_reklasifikasi);
             $amounts = [
                 'nilai_perolehan' => BigDecimal::of((string) $row->acquisition_value),
                 'penyusutan_bulan_ini' => BigDecimal::of((string) $row->penyusutan_bulan_ini),
@@ -263,6 +266,22 @@ final class AssetDepreciationReport implements ReportDefinition
             ->whereColumn('aset_tr_penyusutan_aset.buku_aset_id', 'buku.id')
             ->where('aset_tr_penyusutan_aset.status', 'final')
             ->where('aset_tr_penyusutan_aset.period_ends_on', '<=', $until);
+    }
+
+    /**
+     * Akumulasi yang masuk dikurangi yang keluar lewat pecah aset sampai `$until`: buku aset pecahan membawa
+     * akumulasinya dari reklasifikasi, bukan dari periodenya sendiri, dan buku asalnya kehilangan bagian itu.
+     * Pindah group — buku asal dan tujuannya sama — tidak mengubah akumulasi.
+     *
+     * @return Builder<AssetReclassificationBook>
+     */
+    private function reclassifiedAccumulated(string $until): Builder
+    {
+        return AssetReclassificationBook::query()
+            ->selectRaw('coalesce(sum(case when aset_tr_reklasifikasi_aset_buku.buku_aset_tujuan_id = buku.id then akumulasi_penyusutan else -akumulasi_penyusutan end), 0)')
+            ->where(fn ($query) => $query->whereColumn('aset_tr_reklasifikasi_aset_buku.buku_aset_tujuan_id', 'buku.id')->orWhereColumn('aset_tr_reklasifikasi_aset_buku.buku_aset_asal_id', 'buku.id'))
+            ->whereColumn('aset_tr_reklasifikasi_aset_buku.buku_aset_asal_id', '!=', 'aset_tr_reklasifikasi_aset_buku.buku_aset_tujuan_id')
+            ->where('aset_tr_reklasifikasi_aset_buku.tanggal', '<=', $until);
     }
 
     /**
