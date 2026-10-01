@@ -58,6 +58,8 @@ tags:
 - name: Penyesuaian nilai aset
   description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya
     ke aplikasi finance.
+- name: Reklasifikasi aset
+  description: Pindah group aset dan pecah aset, beserta jurnal pemindahan saldonya antar group ke aplikasi finance.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke
     aplikasi finance.
@@ -5274,6 +5276,238 @@ paths:
         '500':
           description: Jurnal gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); nilai buku tidak
             berubah
+  /api/v1/reklasifikasi-aset:
+    get:
+      tags:
+      - Reklasifikasi aset
+      operationId: listAssetReclassifications
+      summary: Menampilkan reklasifikasi aset dalam jangkauan organisasi pengguna
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - posted
+      - name: jenis
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pindah_group
+          - pecah
+      - name: dari
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Daftar reklasifikasi beserta jumlah barisnya
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetReclassification'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Reklasifikasi aset
+      operationId: createAssetReclassification
+      summary: Membuat draf reklasifikasi; nomor diterbitkan Number Sequence Core per entitas legal
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyReklasifikasi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetReclassificationWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+        '201':
+          description: Draf dibuat beserta barisnya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetReclassificationResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Isian baris tidak sesuai jenisnya, aset di luar jangkauan, milik entitas legal lain, sudah dilepas,
+            atau muncul dua kali pada pindah group
+  /api/v1/reklasifikasi-aset/{id}:
+    get:
+      tags:
+      - Reklasifikasi aset
+      operationId: showAssetReclassification
+      summary: Membaca satu reklasifikasi beserta barisnya
+      description: |
+        Sesudah diposting, setiap baris membawa group asal yang dibekukan, aset baru pecahan
+        (`aset_baru_id`, `aset_baru_kode`), nilai perolehan register yang dipindah, dan `books`: yang
+        dipindah per buku penyusutan beserta tanda apakah buku itu dibawa jurnal.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Reklasifikasi beserta barisnya
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetReclassificationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Reklasifikasi aset
+      operationId: updateAssetReclassification
+      summary: Mengubah draf dan menyamakan barisnya dengan daftar yang dikirim
+      description: |
+        `details` wajib dikirim, walau kosong. Baris dicocokkan menurut `id`: baris yang dikirim dengan
+        `id`-nya dipertahankan beserta nomornya, yang tidak dikirim diarsipkan, dan baris tanpa `id` mendapat
+        nomor baru. `legal_entity_id` dan `jenis` wajib sama dengan milik dokumen.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetReclassificationWrite'
+              - $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Reklasifikasi setelah diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetReclassificationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Reklasifikasi sudah diposting, jenis atau entitas legal diganti, atau isian tidak sah
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Reklasifikasi aset
+      operationId: archiveAssetReclassification
+      summary: Mengarsipkan draf reklasifikasi
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Draf diarsipkan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Reklasifikasi yang sudah diposting tidak dapat diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/reklasifikasi-aset/{id}/pratinjau-posting:
+    get:
+      tags:
+      - Reklasifikasi aset
+      operationId: previewAssetReclassificationPosting
+      summary: Pratinjau pemindahan dan jurnal reklasifikasi draf, tanpa menyimpan apa pun
+      description: |
+        Butuh izin `management-aset.reklasifikasi-aset.post` atau `.update`. `data` berisi `blockers` (daftar
+        `{field, message}`: dokumen tanpa baris, aset dilepas atau dihentikan, aset tanpa buku, usulan
+        penyusutan yang belum difinalkan, penyusutan final sesudah tanggal reklasifikasi, group tujuan sama
+        dengan group sekarang, group tujuan dengan buku yang di-post ke finance berbeda, bagian pecah 100% atau
+        lebih, atau masalah mata uang berkunci `currency_code`), `note` (kenapa tidak ada jurnal), `moves`
+        (pemindahan per baris yang tidak tertahan: `line_number`, `aset_kode`, `from_group_id`, `to_group_id`,
+        `journal`, `nilai_perolehan_aset`, dan `books` berisi `book_code`, `nilai_perolehan`,
+        `akumulasi_penyusutan`, `penurunan_nilai`, `kenaikan_nilai`, `nilai_buku`), dan `posting`
+        `{posting_id, status, posting_date, currency, total, lines, problems}` atau `null`.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Pratinjau pemindahan dan jurnal reklasifikasi
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Reklasifikasi sudah diposting
+        '500':
+          description: Jurnal tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
+  /api/v1/reklasifikasi-aset/{id}/posting:
+    post:
+      tags:
+      - Reklasifikasi aset
+      operationId: postAssetReclassification
+      summary: Memposting draf — saldo berpindah, aset baru lahir atau group berganti, jurnal terbit, dokumen terkunci
+      description: |
+        Butuh izin `management-aset.reklasifikasi-aset.post`. Penghalangnya sama dengan pratinjau dan dijawab 422
+        berkunci field-nya. Untuk pecah, nomor aset baru diterbitkan Number Sequence Core (`management-aset.aset`)
+        sebelum transaksi dengan kunci per baris, sehingga percobaan ulang memakai nomor yang sama. Posting yang
+        pemetaan akunnya belum lengkap tetap terbit sebagai `held` dan nilainya tetap berpindah.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Reklasifikasi berstatus `posted`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetReclassificationResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Penghalang posting berkunci field-nya (bentuk `ValidationError`), atau nomor aset baru tidak dapat
+            diterbitkan Core (`error.code` dari Number Sequence)
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+        '500':
+          description: Jurnal gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); tidak ada nilai
+            yang berpindah
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -6008,6 +6242,17 @@ components:
         type: string
         maxLength: 143
         pattern: ^[A-Za-z0-9._:-]+$
+    IdempotencyKeyReklasifikasi:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Sama seperti `IdempotencyKey`, untuk reklasifikasi aset: kunci diteruskan ke Core diawali
+        `reklasifikasi-aset:`, sehingga batasnya 140 karakter.
+      schema:
+        type: string
+        maxLength: 140
+        pattern: ^[A-Za-z0-9._:-]+$
     IdempotencyKeyPenyesuaianNilai:
       name: Idempotency-Key
       in: header
@@ -6481,6 +6726,206 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/AssetValueAdjustment'
+    AssetReclassificationWrite:
+      type: object
+      required:
+      - legal_entity_id
+      - responsible_org_unit_id
+      - jenis
+      - tanggal
+      - keterangan
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis:
+          description: '`pindah_group` memindah seluruh aset ke group lain; `pecah` memindah sebagian nilainya ke aset baru.
+            Tidak dapat diganti sesudah draf disimpan.'
+          type: string
+          enum:
+          - pindah_group
+          - pecah
+        tanggal:
+          description: Tanggal nilai berpindah dan tanggal jurnal.
+          type: string
+          format: date
+        keterangan:
+          description: Alasan reklasifikasi; ikut ke keterangan jurnal di aplikasi finance.
+          type: string
+          maxLength: 250
+        details:
+          description: Wajib dikirim pada PATCH, walau kosong. Pada pindah group satu aset paling banyak sekali; pecah boleh
+            memecah satu aset ke beberapa baris.
+          type: array
+          items:
+            type: object
+            required:
+            - aset_id
+            properties:
+              id:
+                description: Id baris yang sudah ada, untuk mempertahankan nomornya pada PATCH.
+                type: string
+                nullable: true
+              aset_id:
+                $ref: '#/components/schemas/Ulid'
+              group_aset_tujuan_id:
+                description: Wajib untuk pindah group. Untuk pecah, kosong berarti aset baru tetap di group aset asal.
+                type: string
+                nullable: true
+              persen:
+                description: Pecah saja, salah satu dengan `nilai_perolehan`. Bagian setiap saldo setiap buku yang dipindah,
+                  di atas 0 dan di bawah 100, paling banyak enam desimal.
+                type: number
+                nullable: true
+              nilai_perolehan:
+                description: Pecah saja, salah satu dengan `persen`. Harga perolehan yang dipindah; saldo lain dipindah dengan
+                  perbandingan yang sama terhadap harga perolehan register aset.
+                type: number
+                nullable: true
+              nama_aset_baru:
+                description: Pecah saja. Kosong berarti nama aset asal.
+                type: string
+                maxLength: 255
+                nullable: true
+              keterangan:
+                type: string
+                maxLength: 500
+                nullable: true
+    AssetReclassification:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        jenis:
+          type: string
+          enum:
+          - pindah_group
+          - pecah
+        status:
+          type: string
+          enum:
+          - draft
+          - posted
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_nama:
+          type: string
+          nullable: true
+        tanggal:
+          type: string
+          format: date
+        keterangan:
+          type: string
+        diposting_pada:
+          type: string
+          format: date-time
+          nullable: true
+        posting_id:
+          description: Posting finance yang terbit saat diposting; kosong bila tidak ada baris yang berpindah group pada buku
+            yang di-post ke finance.
+          type: string
+          nullable: true
+        posting:
+          description: Hanya pada jawaban satu dokumen. Keadaan jurnalnya sekarang.
+          type: object
+          nullable: true
+          properties:
+            posting_id:
+              type: string
+            status:
+              type: string
+        jumlah_baris:
+          description: Hanya pada daftar.
+          type: integer
+        details:
+          description: Hanya pada jawaban satu dokumen.
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              line_number:
+                type: integer
+              aset_id:
+                $ref: '#/components/schemas/Ulid'
+              aset_kode:
+                type: string
+                nullable: true
+              aset_nama:
+                type: string
+                nullable: true
+              nilai_perolehan_aset:
+                description: Harga perolehan register aset asal sekarang.
+                type: string
+                nullable: true
+              group_aset_asal_id:
+                description: Group aset sekarang selama draf; dibekukan saat diposting.
+                type: string
+                nullable: true
+              group_aset_asal_nama:
+                type: string
+                nullable: true
+              group_aset_tujuan_id:
+                type: string
+                nullable: true
+              group_aset_tujuan_nama:
+                type: string
+                nullable: true
+              persen:
+                type: string
+                nullable: true
+              nilai_perolehan:
+                type: string
+                nullable: true
+              nama_aset_baru:
+                type: string
+                nullable: true
+              keterangan:
+                type: string
+                nullable: true
+              aset_baru_id:
+                type: string
+                nullable: true
+              aset_baru_kode:
+                type: string
+                nullable: true
+              nilai_perolehan_dipindah:
+                type: string
+                nullable: true
+              books:
+                description: Kosong selama draf. Yang dipindah per buku penyusutan saat diposting.
+                type: array
+                items:
+                  type: object
+                  properties:
+                    buku_id:
+                      $ref: '#/components/schemas/Ulid'
+                    nilai_perolehan:
+                      type: string
+                    akumulasi_penyusutan:
+                      type: string
+                    penurunan_nilai:
+                      type: string
+                    kenaikan_nilai:
+                      type: string
+                    dijurnal:
+                      description: Buku ini dibawa jurnal `asset.reclassification`.
+                      type: boolean
+    AssetReclassificationResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/AssetReclassification'
     AssetMonitoringWrite:
       type: object
       description: |

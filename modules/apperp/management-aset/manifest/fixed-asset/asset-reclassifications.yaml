@@ -1,0 +1,69 @@
+# Reklasifikasi aset: pindah group aset dan pecah aset, padanan FA Reclass. Journal di Business Central.
+# Memposting memindah nilai buku, melahirkan aset baru atau mengganti group, dan mengirim jurnalnya ke
+# aplikasi finance bila group berubah, jadi duty-nya terpisah dari menyusun draf, seperti penyesuaian
+# nilai aset.
+security:
+  entry_points:
+    - code: management-aset.reklasifikasi-aset.form
+      name: Layar reklasifikasi aset
+      type: form
+    - code: management-aset.reklasifikasi-aset.api
+      name: API reklasifikasi aset
+      type: api
+  permissions:
+    - code: management-aset.reklasifikasi-aset.read
+      name: Lihat reklasifikasi aset
+      entry_point: management-aset.reklasifikasi-aset.form
+      access: read
+    - code: management-aset.reklasifikasi-aset.create
+      name: Buat reklasifikasi aset
+      entry_point: management-aset.reklasifikasi-aset.api
+      access: create
+    - code: management-aset.reklasifikasi-aset.update
+      name: Ubah reklasifikasi aset
+      entry_point: management-aset.reklasifikasi-aset.api
+      access: update
+    - code: management-aset.reklasifikasi-aset.archive
+      name: Arsipkan reklasifikasi aset
+      entry_point: management-aset.reklasifikasi-aset.api
+      access: delete
+    - code: management-aset.reklasifikasi-aset.post
+      name: Posting reklasifikasi aset
+      entry_point: management-aset.reklasifikasi-aset.api
+      access: invoke
+  privileges:
+    # Penyusun perlu memilih aset dan group tujuannya; hanya permission baca yang dipasang.
+    - code: management-aset.reklasifikasi-aset.maintain
+      name: Susun reklasifikasi aset
+      permissions:
+        - management-aset.reklasifikasi-aset.read
+        - management-aset.reklasifikasi-aset.create
+        - management-aset.reklasifikasi-aset.update
+        - management-aset.aset.read
+        - management-aset.group-aset.read
+    - code: management-aset.reklasifikasi-aset.retire
+      name: Arsipkan draf reklasifikasi aset
+      permissions:
+        - management-aset.reklasifikasi-aset.archive
+    - code: management-aset.reklasifikasi-aset.post-to-finance
+      name: Posting reklasifikasi aset
+      permissions:
+        - management-aset.reklasifikasi-aset.read
+        - management-aset.reklasifikasi-aset.post
+  duties:
+    - code: management-aset.reklasifikasi-aset.manage
+      name: Kelola reklasifikasi aset
+      privileges:
+        - management-aset.reklasifikasi-aset.maintain
+        - management-aset.reklasifikasi-aset.retire
+    - code: management-aset.reklasifikasi-aset.posting
+      name: Posting reklasifikasi aset
+      privileges:
+        - management-aset.reklasifikasi-aset.post-to-finance
+number_sequences:
+  references:
+    - code: management-aset.reklasifikasi-aset
+      name: Nomor reklasifikasi aset
+      default_prefix: RKLA
+      allowed_scopes:
+        - legal_entity

@@ -54,6 +54,11 @@ security:
         - management-aset.penyesuaian-nilai-aset.update
         - management-aset.penyesuaian-nilai-aset.archive
         - management-aset.penyesuaian-nilai-aset.post
+        - management-aset.reklasifikasi-aset.read
+        - management-aset.reklasifikasi-aset.create
+        - management-aset.reklasifikasi-aset.update
+        - management-aset.reklasifikasi-aset.archive
+        - management-aset.reklasifikasi-aset.post
         - management-aset.penyusutan.read
         - management-aset.penyusutan.create
         - management-aset.penyusutan.finalize

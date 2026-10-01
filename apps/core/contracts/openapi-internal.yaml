@@ -151,6 +151,7 @@ paths:
           - `asset.disposal_scrap` — pemusnahan aset diposting
           - `asset.write_down` — penurunan nilai aset diposting
           - `asset.appreciation` — kenaikan nilai aset diposting
+          - `asset.reclassification` — reklasifikasi aset antar group aset diposting
 
           Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
       - name: legal_entity
@@ -962,6 +963,108 @@ paths:
                           net_book_value_before: '34000000.00'
                           net_book_value_after: '36000000.00'
                         reason: Revaluasi akhir tahun oleh penilai
+                    meta:
+                      count: 1
+                      has_more: false
+                reklasifikasi_aset:
+                  summary: Ventilator dipindah dari group Kendaraan ke Alat kesehatan dengan saldonya
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-RCL-01J9Z9C3D4E5F6G7H8J9K0M1N2
+                      posting_type: asset.reclassification
+                      settlement_mode: null
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-31'
+                      document_date: '2026-10-31'
+                      occurred_at: '2026-11-02T10:00:00+07:00'
+                      published_at: '2026-11-02T03:00:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: reklasifikasi-aset
+                        number: RKLA-2026-10-0001
+                        description: 'Pindah group aset RKLA-2026-10-0001: Salah klasifikasi saat penerimaan'
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1460'
+                          code: 1-2400
+                          name: Aset Tetap - Alat Kesehatan
+                        debit: '48000000.00'
+                        credit: '0.00'
+                        description: Reklasifikasi aset 31/10/2026 · RKLA-2026-10-0001 · Alat kesehatan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1459'
+                          code: 1-2390
+                          name: Akumulasi Penyusutan - Kendaraan
+                        debit: '1000000.00'
+                        credit: '0.00'
+                        description: Reklasifikasi aset 31/10/2026 · RKLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '1469'
+                          code: 1-2490
+                          name: Akumulasi Penyusutan - Alat Kesehatan
+                        debit: '0.00'
+                        credit: '1000000.00'
+                        description: Reklasifikasi aset 31/10/2026 · RKLA-2026-10-0001 · Alat kesehatan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 4
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '0.00'
+                        credit: '48000000.00'
+                        description: Reklasifikasi aset 31/10/2026 · RKLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '49000000.00'
+                        credit: '49000000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0031
+                          new_asset_code: null
+                          from_group: KENDARAAN
+                          to_group: ALKES
+                          book: KOMERSIAL
+                          acquisition_value: '48000000.00'
+                          accumulated_depreciation: '1000000.00'
+                          write_down_amount: '0.00'
+                          appreciation_amount: '0.00'
+                        reason: Salah klasifikasi saat penerimaan
                     meta:
                       count: 1
                       has_more: false
@@ -3319,6 +3422,7 @@ components:
         | `asset.disposal_scrap` | Pemusnahan aset diposting | Sudah |
         | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
         | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
+        | `asset.reclassification` | Reklasifikasi aset antar group aset diposting | Sudah |
 
         **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
         *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.
@@ -3336,6 +3440,7 @@ components:
       - asset.disposal_scrap
       - asset.write_down
       - asset.appreciation
+      - asset.reclassification
     Reservation:
       type: object
       required:

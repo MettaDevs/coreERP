@@ -29,6 +29,17 @@ IdempotencyKeyMonitoring:
     type: string
     maxLength: 143
     pattern: ^[A-Za-z0-9._:-]+$
+IdempotencyKeyReklasifikasi:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: |
+    Sama seperti `IdempotencyKey`, untuk reklasifikasi aset: kunci diteruskan ke Core diawali
+    `reklasifikasi-aset:`, sehingga batasnya 140 karakter.
+  schema:
+    type: string
+    maxLength: 140
+    pattern: ^[A-Za-z0-9._:-]+$
 IdempotencyKeyPenyesuaianNilai:
   name: Idempotency-Key
   in: header

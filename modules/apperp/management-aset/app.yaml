@@ -144,6 +144,9 @@ ui:
         - id: penyesuaian-nilai-aset
           label: Penyesuaian nilai aset
           permission: management-aset.penyesuaian-nilai-aset.read
+        - id: reklasifikasi-aset
+          label: Reklasifikasi aset
+          permission: management-aset.reklasifikasi-aset.read
       laporan:
         - id: laporan-penyusutan-aset
           label: Laporan penyusutan aset
@@ -163,6 +166,20 @@ ui:
         - id: laporan-pemusnahan-aset
           label: Laporan pemusnahan aset
           permission: management-aset.pemusnahan-aset.read
+        # Laporan keuangan aset, padanan Fixed Asset - Book Value, Projected Value, Acquisition List, dan
+        # G/L Analysis di Business Central.
+        - id: laporan-nilai-buku-aset
+          label: Laporan mutasi nilai buku aset
+          permission: management-aset.penyusutan.read
+        - id: laporan-proyeksi-penyusutan-aset
+          label: Proyeksi penyusutan aset
+          permission: management-aset.penyusutan.read
+        - id: laporan-perolehan-aset
+          label: Daftar perolehan aset
+          permission: management-aset.aset.read
+        - id: laporan-rekonsiliasi-aset-buku-besar
+          label: Rekonsiliasi aset ke buku besar
+          permission: management-aset.penyusutan.read
 database:
   logical_name: app_erp_management_aset
   migrations: database/migrations

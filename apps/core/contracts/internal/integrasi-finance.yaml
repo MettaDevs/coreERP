@@ -29,8 +29,8 @@ info:
     Modul aset CoreERP            CoreERP                         Aplikasi finance Anda
     ──────────────────            ─────────────────────           ─────────────────────
     penerimaan, penyusutan, ──▶   posting berstatus pending  ──▶  pull atau push
-    pelepasan, nilai aset         status akhir: posted /     ◀──  ack: posted atau
-                                  rejected                        rejected
+    pelepasan, nilai aset,        status akhir: posted /     ◀──  ack: posted atau
+    reklasifikasi                 rejected                        rejected
     ```
 
     - **Posting** adalah satu dokumen sumber, misalnya satu penerimaan aset, dengan jurnal yang
@@ -210,6 +210,7 @@ info:
     | `asset.disposal_scrap` | Pemusnahan aset diposting | Sudah |
     | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
     | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
+    | `asset.reclassification` | Reklasifikasi aset antar group aset diposting | Sudah |
 
     **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
     *Belum* tidak pernah muncul di `GET /finance-postings` sampai modulnya menerbitkannya.
@@ -278,6 +279,18 @@ info:
     `adjustment_amount`, `net_book_value_before`, dan `net_book_value_after`; alasannya di
     `details.reason` dan `source_document.description`. Saat aset itu kelak dilepas, kedua saldo ini
     ikut dibalik oleh `asset.disposal_sale` atau `asset.disposal_scrap`.
+
+    `asset.reclassification` memindah saldo aset dari akun group aset lama ke akun group aset baru:
+    saat aset pindah group, atau saat sebagian nilainya dipecah ke aset baru di group lain. Satu posting
+    per dokumen reklasifikasi, dengan `posting_id` `AST-RCL-<id dokumen>`, bertanggal dokumen itu.
+    Barisnya berpasangan per akun: debit harga perolehan group baru dan kredit harga perolehan group lama;
+    debit akumulasi penyusutan group lama dan kredit akumulasi penyusutan group baru; begitu pula
+    akumulasi penurunan nilai (seperti akumulasi penyusutan) dan kenaikan nilai (seperti harga
+    perolehan) bila ada. Tidak ada akun laba rugi, dan nilai buku asetnya tidak berubah. Pemecahan aset
+    di dalam satu group tidak menerbitkan posting, karena akunnya sama. Rincian per aset di
+    `details.assets` membawa `asset_code`, `new_asset_code` (aset baru pecahan, `null` untuk pindah
+    group), `from_group`, `to_group`, `book`, dan nilai yang dipindah: `acquisition_value`,
+    `accumulated_depreciation`, `write_down_amount`, `appreciation_amount`.
 
     Menyaring di `GET /finance-postings`:
 
