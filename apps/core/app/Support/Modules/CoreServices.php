@@ -19,8 +19,10 @@ use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
 use App\Platform\ChangeLog\Support\ChangeLogValueResolverRegistry;
 use App\Platform\Organization\ModuleServices\DirektoriOrganisasiCore;
+use App\Platform\Reporting\ModuleServices\ReportFormatterCore;
+use App\Platform\Reporting\Support\DaftarLaporanModul;
+use App\Platform\Reporting\Support\ListExportRegistry;
 use App\Services\Modules\KonteksTenantPermintaan;
-use App\Services\Modules\ReportFormatterCore;
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Modules\Contracts\ChangeHistory;
 use App\Support\Modules\Contracts\ChangeLogValueResolvers;
@@ -42,8 +44,6 @@ use App\Support\Modules\Contracts\PostingAccountResolvers;
 use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\ReportFormatter;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
-use App\Support\Reporting\DaftarLaporanModul;
-use App\Support\Reporting\ListExportRegistry;
 use Illuminate\Contracts\Foundation\Application;
 
 /**

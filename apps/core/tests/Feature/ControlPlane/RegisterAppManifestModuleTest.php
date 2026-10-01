@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
+use App\Platform\Reporting\Support\DaftarLaporanModul;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModulSedangDipindah;
-use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RecursiveDirectoryIterator;

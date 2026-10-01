@@ -178,25 +178,25 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$file_mime\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Reporting/ReportExportController.php
+			path: app/Platform/Reporting/Http/Controllers/ReportExportController.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$file_name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Reporting/ReportExportController.php
+			path: app/Platform/Reporting/Http/Controllers/ReportExportController.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$file_path\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Reporting/ReportExportController.php
+			path: app/Platform/Reporting/Http/Controllers/ReportExportController.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$status\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Http/Controllers/Reporting/ReportExportController.php
+			path: app/Platform/Reporting/Http/Controllers/ReportExportController.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$id\.$#'
@@ -430,229 +430,229 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$created_at\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$file_path\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$format\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$layout_name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$layout_ref\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$parameters\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$progress\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$report_code\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$report_name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$status\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$tenant_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
-			message: '#^Method App\\Support\\Reporting\\ExportQueue\:\:mine\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\<string, mixed\>\>\.$#'
+			message: '#^Method App\\Platform\\Reporting\\Support\\ExportQueue\:\:mine\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\<string, mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/Reporting/ExportQueue.php
+			path: app/Platform/Reporting/Support/ExportQueue.php
 
 		-
-			message: '#^Method App\\Support\\Reporting\\LayoutInspector\:\:docxPlaceholders\(\) should return list\<string\> but returns array\<string\>\.$#'
+			message: '#^Method App\\Platform\\Reporting\\Support\\LayoutInspector\:\:docxPlaceholders\(\) should return list\<string\> but returns array\<string\>\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/Reporting/LayoutInspector.php
+			path: app/Platform/Reporting/Support/LayoutInspector.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$created_at\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$description\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$file_size\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$format\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$legal_entity_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
-			message: '#^Method App\\Support\\Reporting\\LayoutStore\:\:list\(\) should return list\<array\<string, mixed\>\> but returns array\.$#'
+			message: '#^Method App\\Platform\\Reporting\\Support\\LayoutStore\:\:list\(\) should return list\<array\<string, mixed\>\> but returns array\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Parameter \#2 \$contents of method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:put\(\) expects Illuminate\\Http\\File\|Illuminate\\Http\\UploadedFile\|Psr\\Http\\Message\\StreamInterface\|resource\|string, string\|false given\.$#'
 			identifier: argument.type
 			count: 2
-			path: app/Support/Reporting/LayoutStore.php
+			path: app/Platform/Reporting/Support/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$display_name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$footer_text\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$logos\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$organization_id\.$#'
 			identifier: property.notFound
 			count: 3
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$parent_lines\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$registration_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$tax_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$updated_at\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Parameter \#2 \$contents of method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:put\(\) expects Illuminate\\Http\\File\|Illuminate\\Http\\UploadedFile\|Psr\\Http\\Message\\StreamInterface\|resource\|string, string\|false given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Support/Reporting/PrintIdentityStore.php
+			path: app/Platform/Reporting/Support/PrintIdentityStore.php
 
 		-
 			message: '#^Parameter \#1 \$array \(non\-empty\-list\<array\<string, float\|int\|string\|null\>\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
-			path: app/Support/Reporting/Rendering/DocxTemplateRenderer.php
+			path: app/Platform/Reporting/Support/Rendering/DocxTemplateRenderer.php
 
 		-
 			message: '#^Parameter \#2 \$contents of method Illuminate\\Http\\Client\\PendingRequest\<false\>\:\:attach\(\) expects resource\|string, string\|false given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Support/Reporting/Rendering/PdfConverter.php
+			path: app/Platform/Reporting/Support/Rendering/PdfConverter.php
 
 		-
 			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
 			identifier: return.unusedType
 			count: 1
-			path: app/Support/Reporting/Rendering/XlsxTemplateRenderer.php
+			path: app/Platform/Reporting/Support/Rendering/XlsxTemplateRenderer.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<array\<string, float\|int\|string\|null\>\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
-			path: app/Support/Reporting/Rendering/XlsxTemplateRenderer.php
+			path: app/Platform/Reporting/Support/Rendering/XlsxTemplateRenderer.php
 
 		-
-			message: '#^Method App\\Support\\Reporting\\ReportCatalog\:\:forMembership\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{code\: mixed, app_id\: mixed, app_name\: string, name\: mixed, description\: mixed, permission\: mixed, parameters\: mixed, can_run\: bool, \.\.\.\}\>\.$#'
+			message: '#^Method App\\Platform\\Reporting\\Support\\ReportCatalog\:\:forMembership\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{code\: mixed, app_id\: mixed, app_name\: string, name\: mixed, description\: mixed, permission\: mixed, parameters\: mixed, can_run\: bool, \.\.\.\}\>\.$#'
 			identifier: return.type
 			count: 1
-			path: app/Support/Reporting/ReportCatalog.php
+			path: app/Platform/Reporting/Support/ReportCatalog.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$role_id\.$#'

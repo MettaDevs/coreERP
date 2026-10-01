@@ -4,10 +4,10 @@ namespace App\Console\Commands;
 
 use App\Actions\Provider\RegisterAppCatalog;
 use App\Http\Requests\Provider\AppCatalogRequest;
+use App\Platform\Reporting\Support\DaftarLaporanModul;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleManifestFiles;
 use App\Support\Modules\ModuleRegistry;
-use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
