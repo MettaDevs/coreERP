@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\HumanResources\Models;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,8 +35,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class WorkerPositionAssignment extends Model
 {
+    use BelongsToTenant;
     use HasUlids, SoftDeletes;
-    use MilikTenant;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

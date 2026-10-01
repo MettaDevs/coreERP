@@ -142,7 +142,7 @@ tiruan.
 | Tabel negara | **Satu**: `country_regions` menang sebagai identitas negara; kolom tambahan `ref_countries` dipindahkan ke sana | Alamat pos dan master wilayah akhirnya menunjuk negara yang sama | Master wilayah, importer, dan halaman Address setup ikut berubah — kode yang ditulis orang lain |
 | Siapa boleh mengubah negara | **Bukan tenant.** Daftar negara adalah data bersama: isinya dari migrasi dan seeder, perubahannya lewat admin | Satu tenant tidak dapat mengubah pilihan alamat milik tenant lain | Menambah negara menuntut rilis atau tindakan admin, bukan swalayan di layar tenant |
 | Alamat terstruktur | Alamat Indonesia **menunjuk baris wilayah** (`ref_provinces` … `ref_villages`) dan tetap menyimpan namanya untuk dicetak | Kode pos dan ejaan berhenti jadi tebakan pengetik | Alamat luar negeri tetap teks bebas, jadi kode menangani dua bentuk |
-| Cara modul memakainya | **Kontrak PHP dalam satu proses**, didaftarkan di `CoreServices::PEMETAAN`, seperti `PenerbitNomor` dan `DirektoriOrganisasi` | Pola yang sudah dipakai HR dan Management Aset; tanpa token, tanpa HTTP, ikut transaksi pemanggilnya | Modul di luar runtime tidak terlayani sampai ada yang memintanya |
+| Cara modul memakainya | **Kontrak PHP dalam satu proses**, didaftarkan di `CoreServices::PEMETAAN`, seperti `NumberSequenceIssuer` dan `OrganizationDirectory` | Pola yang sudah dipakai HR dan Management Aset; tanpa token, tanpa HTTP, ikut transaksi pemanggilnya | Modul di luar runtime tidak terlayani sampai ada yang memintanya |
 | `internal/v1` untuk party | **Belum**, sampai ada pemanggil di luar runtime | Kontrak tidak ditulis untuk pemanggil yang belum ada | Integrator luar menunggu; dicatat di [API untuk sistem pelanggan](../api-untuk-integrator/) |
 | Address book (grup) | **Tahap terakhir, boleh tidak pernah dikerjakan** | — | Tanpa ini, seluruh party terlihat oleh siapa pun yang boleh membuka buku alamat |
 | Nomor party | Lewat **Number Sequence** Core: referensi `core.party`, awalan `PIHK`, non-continuous, lingkup tenant, tanpa reset | Nomor yang dapat diucapkan dan dicari, seperti `PartyNumber` di D365 | Referensi number sequence menuntut baris `apps` untuk Core — dikerjakan bersama izin di bawah |
@@ -338,8 +338,8 @@ dengan uji pulih.
 ## Bagaimana modul memakainya
 
 Sejak pemindahan ke satu runtime, modul memanggil Core lewat **kontrak PHP yang di-resolve dari
-container**, bukan HTTP. Polanya sudah dipakai di dua tempat: `PenerbitNomor` untuk nomor dokumen dan
-`DirektoriOrganisasi` untuk anggota serta unit operasi. Daftar resminya di
+container**, bukan HTTP. Polanya sudah dipakai di dua tempat: `NumberSequenceIssuer` untuk nomor dokumen dan
+`OrganizationDirectory` untuk anggota serta unit operasi. Daftar resminya di
 `apps/core/app/Support/Modules/CoreServices.php:39-57`, implementasinya di
 `apps/core/app/Services/Modules/`, dan contoh pemakaiannya di
 `modules/apperp/human-resources/src/Services/DirektoriHr.php:33`.

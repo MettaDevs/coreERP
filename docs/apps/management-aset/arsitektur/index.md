@@ -78,7 +78,7 @@ src/
 klien HTTP; yang tersisa dari perannya sekarang hanya menerjemahkan kegagalan Core menjadi kegagalan
 yang berarti bagi pemanggil modul. `Support/` berisi aturan murni: `OrganizationScope`,
 `WorkOrderStatus`, `AssetAttributeValidator`. `Reporting/` berisi definisi dan dataset laporan yang
-dibaca Core lewat kontrak `PenyediaLaporanModul`; layout, render, dan antrean ekspornya milik Core.
+dibaca Core lewat kontrak `ModuleReportProvider`; layout, render, dan antrean ekspornya milik Core.
 Lihat [Laporan dan ekspor](/apps/management-aset/transaction/laporan/).
 
 Kalau Anda menaruh aturan bisnis di controller padahal ia dipakai lebih dari satu tempat, ia akan menyimpang. Contoh yang sudah benar: status work order dikumpulkan di `WorkOrderStatus`, bukan disebar sebagai pemeriksaan di tiap endpoint.
@@ -129,8 +129,8 @@ Kalau layanan satuan Core belum bisa dijawab, endpoint satuan menjawab galat, bu
 
 ## Yang wajib ada di setiap endpoint baru
 
-1. **Permission sendiri**, bukan menumpang yang sudah ada. Diperiksa lewat kontrak `KonteksPermintaan`.
-2. **Batas tenant.** Modelnya memakai trait `MilikTenant`, dan penyaringan tenant **tidak** ditulis ulang dengan tangan pada model yang sudah memakainya — query yang menyaring sendiri tetap benar walau traitnya dicabut, sehingga penjaganya berhenti terukur.
+1. **Permission sendiri**, bukan menumpang yang sudah ada. Diperiksa lewat kontrak `RequestContext`.
+2. **Batas tenant.** Modelnya memakai trait `BelongsToTenant`, dan penyaringan tenant **tidak** ditulis ulang dengan tangan pada model yang sudah memakainya — query yang menyaring sendiri tetap benar walau traitnya dicabut, sehingga penjaganya berhenti terukur.
 3. **Batas organisasi** untuk data aset — lewat `OrganizationScope`, bukan hanya `tenant_id`.
 4. **Rute di dalam grup ber-`konteks-module`.** Ada penjaga batas yang menolak rute modul tanpa middleware itu.
 5. **`Idempotency-Key`** kalau endpoint itu membuat sesuatu.

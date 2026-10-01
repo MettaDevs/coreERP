@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
 use App\Platform\Modules\Contracts\ReportFormatter;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -48,7 +48,7 @@ class PenyediaLaporanTest extends TestCase
 
     public function test_definisi_menyebut_placeholder_dan_layout_bawaan(): void
     {
-        $definisi = $this->penyedia()->definisi('work-order', $this->konteks(['management-aset.pemeliharaan-aset.read']));
+        $definisi = $this->penyedia()->definition('work-order', $this->konteks(['management-aset.pemeliharaan-aset.read']));
 
         $this->assertSame(['id'], $definisi['parameters']);
         $this->assertContains(
@@ -56,10 +56,10 @@ class PenyediaLaporanTest extends TestCase
             $definisi['fields'],
         );
 
-        $isi = $this->penyedia()->layoutBawaan('work-order', 'standar', $this->konteks(['management-aset.pemeliharaan-aset.read']));
+        $isi = $this->penyedia()->defaultLayout('work-order', 'standar', $this->konteks(['management-aset.pemeliharaan-aset.read']));
         $this->assertNotSame('', $isi, 'Berkas layout bawaan terbaca kosong dari folder module.');
 
-        $this->assertFalse($this->penyedia()->punya('tidak-ada'));
+        $this->assertFalse($this->penyedia()->has('tidak-ada'));
     }
 
     public function test_dataset_menuntut_izin_data_dan_menghormati_scope_organisasi(): void
@@ -135,7 +135,7 @@ class PenyediaLaporanTest extends TestCase
             ->json('data');
         $cetak = app(ReportFormatter::class)->display(
             $this->tenantId,
-            $this->penyedia()->definisi('daftar-work-order', $this->konteks($izin))['fields'],
+            $this->penyedia()->definition('daftar-work-order', $this->konteks($izin))['fields'],
             $this->penyedia()->dataset('daftar-work-order', $this->konteks($izin), []),
             'UTC',
         );
@@ -263,7 +263,7 @@ class PenyediaLaporanTest extends TestCase
 
         $cetak = app(ReportFormatter::class)->display(
             $this->tenantId,
-            $this->penyedia()->definisi('daftar-work-order', $wib)['fields'],
+            $this->penyedia()->definition('daftar-work-order', $wib)['fields'],
             $data,
             'Asia/Jakarta',
         );
@@ -499,7 +499,7 @@ class PenyediaLaporanTest extends TestCase
         $run = fn (array $filters): array => $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08', 'filters' => ['aset' => $filters]]);
 
         // Definisi menawarkan data item Aset dengan kolom bawaan dan kolom tabel lainnya, beserta tipenya.
-        $definisi = $this->penyedia()->definisi('laporan-penyusutan-aset', $konteks);
+        $definisi = $this->penyedia()->definition('laporan-penyusutan-aset', $konteks);
         $this->assertSame(['aset', 'buku'], array_column($definisi['data_items'], 'key'));
         $this->assertSame(['kode'], $definisi['data_items'][0]['default_fields']);
         $fields = array_column($definisi['data_items'][0]['fields'], null, 'key');
@@ -567,7 +567,7 @@ class PenyediaLaporanTest extends TestCase
         $aset = fn (array $laporan): array => array_column($laporan['tables']['baris'], 'aset_kode');
 
         // Definisi menawarkan dokumen lalu barisnya, masing-masing dengan kolom bawaannya.
-        $definisi = $this->penyedia()->definisi('daftar-mutasi-aset', $konteks);
+        $definisi = $this->penyedia()->definition('daftar-mutasi-aset', $konteks);
         $this->assertSame(['mutasi', 'baris'], array_column($definisi['data_items'], 'key'));
         $this->assertSame([['kode'], []], array_column($definisi['data_items'], 'default_fields'));
 
@@ -935,7 +935,7 @@ class PenyediaLaporanTest extends TestCase
     {
         $declared = array_values(array_filter(array_map(
             static fn (array $field): ?string => $field['table'] === 'baris' ? substr($field['key'], strlen('baris.')) : null,
-            $this->penyedia()->definisi($kode, $this->konteks([app(ReportRegistry::class)->get($kode)->permission()]))['fields'],
+            $this->penyedia()->definition($kode, $this->konteks([app(ReportRegistry::class)->get($kode)->permission()]))['fields'],
         )));
         $this->assertEqualsCanonicalizing($declared, array_keys($row), "Kolom baris {$kode} tidak sama dengan fields().");
     }
@@ -1082,7 +1082,7 @@ class PenyediaLaporanTest extends TestCase
     {
         return new PenyediaLaporanTerikat(
             $this->app->make(PenyediaLaporan::class),
-            $this->app->make(PelaksanaUntukTenant::class),
+            $this->app->make(TenantRunner::class),
             $this->tenantId,
         );
     }
@@ -1201,28 +1201,28 @@ final class PenyediaLaporanTerikat
 {
     public function __construct(
         private readonly PenyediaLaporan $penyedia,
-        private readonly PelaksanaUntukTenant $pelaksana,
+        private readonly TenantRunner $pelaksana,
         private readonly string $tenantId,
     ) {}
 
-    public function punya(string $kode): bool
+    public function has(string $kode): bool
     {
-        return $this->penyedia->punya($kode);
+        return $this->penyedia->has($kode);
     }
 
     /**
      * @param  array<string, mixed>  $konteks
      * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
-    public function definisi(string $kode, array $konteks): array
+    public function definition(string $kode, array $konteks): array
     {
-        return $this->pelaksana->jalankanUntuk($this->tenantId, fn (): array => $this->penyedia->definisi($kode, $konteks));
+        return $this->pelaksana->runFor($this->tenantId, fn (): array => $this->penyedia->definition($kode, $konteks));
     }
 
     /** @param array<string, mixed> $konteks */
-    public function layoutBawaan(string $kode, string $kunci, array $konteks): string
+    public function defaultLayout(string $kode, string $kunci, array $konteks): string
     {
-        return $this->pelaksana->jalankanUntuk($this->tenantId, fn (): string => $this->penyedia->layoutBawaan($kode, $kunci, $konteks));
+        return $this->pelaksana->runFor($this->tenantId, fn (): string => $this->penyedia->defaultLayout($kode, $kunci, $konteks));
     }
 
     /**
@@ -1232,6 +1232,6 @@ final class PenyediaLaporanTerikat
      */
     public function dataset(string $kode, array $konteks, array $parameter): array
     {
-        return $this->pelaksana->jalankanUntuk($this->tenantId, fn (): array => $this->penyedia->dataset($kode, $konteks, $parameter));
+        return $this->pelaksana->runFor($this->tenantId, fn (): array => $this->penyedia->dataset($kode, $konteks, $parameter));
     }
 }

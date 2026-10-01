@@ -57,7 +57,7 @@ tanpa membuktikan apa pun.
 
 - Induk lintas tenant tertolak.
 - Daftar tidak pernah memuat baris tenant lain.
-- Menyimpan atas nama tenant lain dibatalkan sisi tulis `MilikTenant`.
+- Menyimpan atas nama tenant lain dibatalkan sisi tulis `BelongsToTenant`.
 - Hak satu master tidak merembet ke master lain.
 - Induk yang masih beranak tidak bisa diarsipkan.
 - `kode` selalu berasal dari Core.
@@ -67,7 +67,7 @@ tanpa membuktikan apa pun.
 ### Penjaga batas berjalan di perintah yang sama
 
 `apps/core/tests/Feature/Boundary/` memindai seluruh isi `modules/` dan menolak: tabel
-tanpa awalan modul, tabel milik modul lain yang disentuh, model tenant tanpa `MilikTenant`,
+tanpa awalan modul, tabel milik modul lain yang disentuh, model tenant tanpa `BelongsToTenant`,
 namespace yang menyeberang, kerangka aplikasi Laravel di dalam folder modul, rute modul tanpa
 middleware konteks, dan manifest yang susunannya tidak sah.
 
@@ -105,7 +105,7 @@ folder itu.
 | `depreciation.js` | Proposal dan finalisasi penyusutan beserta pengulangannya | **belum dipindah**; berhenti dengan galat bila dijalankan |
 | `work-order.js` | Dokumen work order di bawah beban | **belum dipindah**; berhenti dengan galat bila dijalankan |
 
-Tidak ada lagi tiruan Core. Nomor diterbitkan proses yang sama lewat `PenerbitNomor`, jadi oracle
+Tidak ada lagi tiruan Core. Nomor diterbitkan proses yang sama lewat `NumberSequenceIssuer`, jadi oracle
 nomor dibaca dari tabel terbitan Core: tiap `kode` yang tersimpan modul harus punya satu baris di
 `number_sequence_issues` pada tenant dan reference yang benar.
 

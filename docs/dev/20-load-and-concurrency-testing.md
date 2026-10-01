@@ -151,7 +151,7 @@ Beberapa aturan yang mengikuti dari pengalaman menjalankannya:
 
 Skenario dan oracle milik module tinggal di folder module — `modules/apperp/management-aset/loadtest/` — karena permukaan yang diuji memang miliknya, dan keduanya berjalan di atas stack di atas lewat `k6/lib.js` yang sama.
 
-Tiruan Core sudah tidak ada. Nomor diterbitkan proses yang sama lewat kontrak `PenerbitNomor`, jadi oracle nomor dibaca dari tabel `number_sequence_issues` — buku terbitan Core yang sungguhan, yang mengikat tiap kode tersimpan ke satu baris terbitan milik tenant dan reference yang benar.
+Tiruan Core sudah tidak ada. Nomor diterbitkan proses yang sama lewat kontrak `NumberSequenceIssuer`, jadi oracle nomor dibaca dari tabel `number_sequence_issues` — buku terbitan Core yang sungguhan, yang mengikat tiap kode tersimpan ke satu baris terbitan milik tenant dan reference yang benar.
 
 ## Lihat juga
 

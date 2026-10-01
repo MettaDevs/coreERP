@@ -58,7 +58,7 @@ module dilewati, dan ia **tidak** muncul di peluncur — karena peluncur membaca
 1. memvalidasi module ada di registry runtime dan tenant-nya berhak;
 2. menjalankan migration module secara idempotent;
 3. membuat urutan nomor module untuk tenant itu sebelum data awal disemai;
-4. menyemai data awal lewat event `TenantDisiapkan` per module yang benar-benar terpasang;
+4. menyemai data awal lewat event `TenantProvisioned` per module yang benar-benar terpasang;
 5. menyimpan kegagalan **tanpa** mengubah entitlement atau memberikan role.
 
 Poin terakhir penting: pemasangan gagal tidak boleh mencabut hak tenant, dan tidak boleh diam-diam memberi akses.

@@ -9,7 +9,7 @@ use stdClass;
 
 /**
  * Laporan yang dikenal Core, didaftarkan `app:register-manifest` dari definisi laporan module
- * (`PenyediaLaporanModul::catalog()`) ke tabel `app_reports`. Satu laporan dapat
+ * (`ModuleReportProvider::catalog()`) ke tabel `app_reports`. Satu laporan dapat
  * dijalankan seorang pengguna bila app-nya siap dibuka olehnya dan ia memegang
  * permission bisnis yang disebut laporan itu; hak yang sama ditegakkan lagi oleh app
  * saat dataset diminta.

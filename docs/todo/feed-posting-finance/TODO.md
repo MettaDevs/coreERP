@@ -91,7 +91,7 @@ dari sebuah department bisa ditemukan (K-07).
   - [x] 1.3.4 Verifikasi di browser: buat unit bernomor, ubah nomor, dan lihat tanda di daftar dan pohon hierarki.
     Diverifikasi 23 September 2026: nomor berspasi ditolak, nomor bisa diubah, dan tanda "Belum bernomor" tampil di
     daftar dan pohon. Satu cacat diperbaiki: pohon hierarki menampilkan kode tipe (`business_unit`), bukan labelnya.
-- [x] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Platform/Modules/Contracts/`).
+- [x] 1.4 Kontrak module `OrganizationDirectory` (`apps/core/app/Platform/Modules/Contracts/`).
   - [x] 1.4.1 `unitOperasi()` mengembalikan `tipe` dan `nomor` selain `id` dan `nama`.
   - [x] 1.4.2 Metode baru `unitBisnisInduk(tenant, orgUnitIds, tanggal)`: BU induk dari org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
   - [x] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`. Dua hierarki manajemen yang tidak sepakat juga `null`.
@@ -128,7 +128,7 @@ sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan dibaca pem
   - [x] 2.4.4 Verifikasi di browser: buat vendor baru, pilih party yang sudah ada, nomor manual, ubah nama, nonaktifkan.
     Diverifikasi 23 September 2026. Mengganti nama mengganti nama party, jadi vendor lain yang memakai party yang sama
     ikut berganti nama. Itu memang bentuk buku alamat, bukan cacat.
-- [x] 2.5 Kontrak module `DaftarVendor`.
+- [x] 2.5 Kontrak module `VendorDirectory`.
   - [x] 2.5.1 `aktif(tenantId, legalEntityId, cari)` dan `satu(tenantId, vendorId)` mengembalikan `{id, number, name, tax_number, status, legal_entity_id}`.
   - [x] 2.5.2 Bind di `apps/core/app/Support/Modules/CoreServices.php`.
 - [x] 2.6 Internal API `GET /internal/v1/vendors?updated_since=…` untuk klien integrasi (scope `vendors.read`) + OpenAPI. Dibaca per halaman lewat kursor, bukan nomor halaman: vendor yang berubah di tengah sinkron tidak menggeser vendor lain keluar dari halaman yang belum dibaca.
@@ -155,7 +155,7 @@ di sisi finance berperilaku seperti di PRD (K-05).
   - [x] 3.2.4 Validasi: `type` wajib salah satu dari dua nilai, dan `external_id` tidak boleh ganda dalam satu berkas.
   - [x] 3.2.5 Laporan hasil: baru, berubah, tidak ada di berkas, ditolak (beserta baris dan alasannya).
 - [x] 3.3 Layar Core: daftar akun, pencarian, impor, dan riwayat impor (Data referensi › Daftar akun).
-- [x] 3.4 Kontrak module `DaftarAkun`.
+- [x] 3.4 Kontrak module `AccountDirectory`.
   - [x] 3.4.1 `cari(tenant, legalEntityId, kata)` untuk dropdown, hanya akun aktif.
   - [x] 3.4.2 `satu(tenant, accountId)` mengembalikan `{id, external_id, code, name, type, active, legal_entity_id}`, termasuk akun nonaktif. Ditambah `banyak(tenant, ids)` untuk layar matriks.
   - [x] 3.4.3 Bind di `CoreServices.php`.
@@ -220,7 +220,7 @@ terbaca per mata uang (K-10, K-16, K-20).
   - [x] 5.1.1 `finance_posting_settings`: `legal_entity_id` (unik), `tenant_id`, `enabled`, `cutover_date`. Database menolak feed aktif tanpa cutover.
   - [x] 5.1.2 `finance_settlement_modes`: `legal_entity_id`, `mode` (`direct_payable` / `clearing`), `effective_from`. Unik (`legal_entity_id`, `effective_from`).
 - [x] 5.2 Layar Core di halaman entitas legal: aktif/tidak, tanggal cutover, dan riwayat mode beserta tanggal berlakunya.
-- [x] 5.3 Kontrak module `SetelanPostingFinance`: `modePenyelesaian(legalEntityId, tanggal)` dan `cutover(legalEntityId)`. Id entitas yang tidak ada dilempar sebagai `RuntimeException`.
+- [x] 5.3 Kontrak module `FinancePostingSettings`: `modePenyelesaian(legalEntityId, tanggal)` dan `cutover(legalEntityId)`. Id entitas yang tidak ada dilempar sebagai `RuntimeException`.
 - [x] 5.4 Test (`FinancePostingSettingsTest`).
   - [x] 5.4.1 Mode terbaca sesuai tanggal berlaku.
   - [x] 5.4.2 Entitas tanpa baris mode menghasilkan default `direct_payable`.
@@ -235,7 +235,7 @@ terbaca per mata uang (K-10, K-16, K-20).
     setelannya tersimpan. Diperbaiki di hari yang sama. Posting yang sudah terbit dibentuk ulang dan diterbitkan ulang
     dengan presisi saat ia terbit (`currency_decimals`). Penilaian ulang cutover melaporkan posting yang gagal dibentuk
     ulang lalu lanjut ke posting berikutnya, tidak berhenti dengan 500.
-  - [x] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(tenant, currencyCode)`, `hargaSatuan(tenant, currencyCode)`, dan `bulatkan(tenant, nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
+  - [x] 5.5.4 Kontrak module `CurrencyRounding`: `nilai(tenant, currencyCode)`, `hargaSatuan(tenant, currencyCode)`, dan `bulatkan(tenant, nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
   - [x] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
 - [x] 5.6 Verifikasi di browser: setelan posting di halaman entitas legal dan halaman Mata uang.
   Diverifikasi 23 September 2026: mengaktifkan tanpa cutover ditolak, tanggal mode ganda ditolak, dan presisi IDR
@@ -253,10 +253,10 @@ tidak ada posting yang hilang atau dobel.
 - [x] 6.1 Migration `finance_postings`.
   - [x] 6.1.1 Kolom: `id`, `tenant_id`, `legal_entity_id`, `posting_id` (unik per tenant), `posting_type`, `source_module`, `source_type`, `source_number`, `posting_date`, `settlement_mode` (nullable), `status`, `held_reason`, `payload` (json, bentuk kontrak lengkap), `total_debit`, `total_credit`, `reverses_posting_id`, `adjusts_posting_id`, `external_reference`, `reason_code`, `reason`, `acknowledged_at`, `served_count`, `last_served_at`, timestamps. `held_reason` menjadi `hold_reasons` (daftar masalah per baris), ditambah `manual_reason`, `input` (permintaan asli module, untuk membentuk ulang posting yang tertahan), dan `input_hash`. Tiga tabel pendamping: `finance_posting_lines`, `finance_posting_deliveries` (mode push), `finance_posting_events` (riwayat).
   - [x] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk pull, ditambah `published_at` sesuai urutan pull.
-- [x] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Platform/Modules/Contracts/`.
+- [x] 6.2 Kontrak `PostingFeed` di `apps/core/app/Platform/Modules/Contracts/`.
   - [x] 6.2.1 `terbitkan(array $posting)` menerima jenis, entitas legal, tanggal, dokumen sumber, vendor, dan baris jurnal dengan `account_id` referensi + `org_unit_id` sumber dimensi. Ditambah `pratinjau()` (pemeriksaan sama tanpa menyimpan, untuk K-22) dan `status()`.
   - [x] 6.2.2 Dipanggil **di dalam** transaksi pemanggil. Tidak membuka transaksi sendiri; dipanggil di luar transaksi dilempar sebagai `LogicException`.
-  - [x] 6.2.3 Idempoten: `posting_id` yang sama mengembalikan posting yang sudah ada. `posting_id` sama dengan isi jurnal berbeda dilempar sebagai `PostingTidakSah`.
+  - [x] 6.2.3 Idempoten: `posting_id` yang sama mengembalikan posting yang sudah ada. `posting_id` sama dengan isi jurnal berbeda dilempar sebagai `InvalidPosting`.
   - [x] 6.2.4 Bind di `CoreServices.php`. Pembungkus sisi module dibuat bersama pemanggil pertamanya (9.7), supaya bentuknya mengikuti kebutuhan penerimaan aset.
 - [x] 6.3 Validasi dan pembentukan payload (`App\Support\Finance\PostingPublisher`).
   - [x] 6.3.1 Seimbang, dan setiap baris hanya debit atau hanya kredit.
@@ -264,7 +264,7 @@ tidak ada posting yang hilang atau dobel.
   - [x] 6.3.3 Dimensi: akun neraca → `BUSINESS_UNIT`, akun laba rugi → `BUSINESS_UNIT` + `DEPARTMENT`, dari org unit lewat area 1.4. Bentuk per dimensi `{code, display_name, value_code, value_display_name, value_id}`, disejajarkan dengan `dimensionSetLines` BC. Snapshot nomor dan nama saat terbit.
   - [x] 6.3.4 Vendor wajib untuk `direct_payable` + pembelian (module mengirim `requires_vendor`). Vendor kosong atau milik entitas lain dilempar sebagai bug penerbit, bukan ditahan.
   - [x] 6.3.5 Tanggal sebelum cutover → `manual`. Entitas legal dengan feed tidak aktif → `manual`. Mengubah setelan feed menilai ulang posting yang belum pernah sampai ke pembaca.
-  - [x] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan terstruktur `{line_no, code, message, object, fix}`, supaya bisa ditampilkan per baris (7.6). Gagal di 6.3.1 → `PostingTidakSah`, yang membatalkan dokumen dan sampai ke SigNoz lewat pelapor kesalahan biasa.
+  - [x] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan terstruktur `{line_no, code, message, object, fix}`, supaya bisa ditampilkan per baris (7.6). Gagal di 6.3.1 → `InvalidPosting`, yang membatalkan dokumen dan sampai ke SigNoz lewat pelapor kesalahan biasa.
   - [x] 6.3.7 Nilai uang disimpan dan dikirim sebagai string desimal dengan jumlah desimal persis presisi mata uang (5.5). Tolak nilai yang skalanya lebih halus. Header membawa `currency: {code, decimals}`.
   - [x] 6.3.8 Empat waktu (K-21): `posting_date` dan `document_date` dari pemanggil (tanggal saja); `occurred_at` dari pemanggil (jam + offset); `published_at` diisi Core saat terbit.
   - [x] 6.3.9 Kolom dimensi global di tabel baris (`business_unit_code`, `department_code`) untuk laporan cepat, di samping payload JSON.
@@ -314,7 +314,7 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
 
 - [x] 7.1 Daftar posting: filter status, jenis, entitas legal, dan rentang tanggal. Kolom umur `pending`.
 - [x] 7.2 Detail: dokumen sumber (tautan ke modul), baris jurnal beserta dimensi, alasan tahan/tolak, dan riwayat pull/ack.
-  - Tautan dokumen dari `source_document.url` opsional yang dikirim module lewat `PenerbitPosting`, karena hanya module yang tahu alamat layarnya. Hanya jalur relatif yang diterima, dan nilainya tidak ikut payload pembaca. Module belum mengirimnya; itu bagian 9.7 dan 11.2.
+  - Tautan dokumen dari `source_document.url` opsional yang dikirim module lewat `PostingFeed`, karena hanya module yang tahu alamat layarnya. Hanya jalur relatif yang diterima, dan nilainya tidak ikut payload pembaca. Module belum mengirimnya; itu bagian 9.7 dan 11.2.
   - Riwayat pull hanya jumlah penyajian dan waktu terakhirnya: klien mana yang melakukan pull tidak pernah disimpan per posting (6.4).
 - [x] 7.3 Aksi.
   - [x] 7.3.1 "Validasi ulang" untuk `held`.
@@ -336,7 +336,7 @@ Layar di `/settings/finance-postings` (menu Posting finance › Pantau posting),
   - [x] 7.6.2 Tabel baris jurnal: akun, debit, kredit, dimensi, dan saldo berjalan di bawahnya.
   - [x] 7.6.3 Masalah per baris dari alasan terstruktur 6.3.6: objek yang bermasalah, pesannya, dan tombol jalan pintas ke layar perbaikannya.
   - [x] 7.6.4 Tombol "Validasi ulang" setelah perbaikan.
-  - [ ] 7.6.5 Endpoint pratinjau di Core: bentuk posting dari data yang belum disimpan, dengan validasi yang sama dengan 6.3, tanpa menulis apa pun. Logikanya sudah ada sebagai `PenerbitPosting::pratinjau()` (6.2). Dalam satu runtime, layar module memanggilnya lewat controller module-nya sendiri, jadi endpoint HTTP di Core mungkin tidak diperlukan; diputuskan bersama 9.3.
+  - [ ] 7.6.5 Endpoint pratinjau di Core: bentuk posting dari data yang belum disimpan, dengan validasi yang sama dengan 6.3, tanpa menulis apa pun. Logikanya sudah ada sebagai `PostingFeed::preview()` (6.2). Dalam satu runtime, layar module memanggilnya lewat controller module-nya sendiri, jadi endpoint HTTP di Core mungkin tidak diperlukan; diputuskan bersama 9.3.
 
 ---
 
@@ -352,7 +352,7 @@ dan dimensi lokasi mewarisi dari induk.
   - [x] 8.1.1 Tabel `aset_m_posting_group`: `group_aset_id`, `effective_from`, dan tujuh kolom akun (ID daftar akun referensi): harga perolehan, akumulasi, beban penyusutan, lawan hutang, perantara, PPN Masukan, penyeimbang saldo awal.
   - [x] 8.1.2 Unik (`tenant_id`, `group_aset_id`, `effective_from`), parsial `WHERE deleted_at IS NULL` supaya tanggal
     yang barisnya diarsipkan boleh dipakai lagi.
-  - [x] 8.1.3 Controller + rute, dengan akun dipilih lewat kontrak `DaftarAkun`. Simpan adalah `PUT` ke alamat pasangan
+  - [x] 8.1.3 Controller + rute, dengan akun dipilih lewat kontrak `AccountDirectory`. Simpan adalah `PUT` ke alamat pasangan
     group dan tanggal (tanpa kunci idempotensi); hanya akun aktif yang berlaku untuk semua entitas legal.
   - [x] 8.1.4 UI tabel matriks gaya FA Posting Groups BC: baris group, kolom akun, dan riwayat tanggal berlaku.
   - [x] 8.1.5 Tanda merah di setiap sel akun wajib yang masih kosong, seperti *General Posting Setup* BC, plus ringkasan jumlah group yang belum lengkap di atas matriks.
@@ -418,7 +418,7 @@ dan PPN, untuk kedua mode.
   - [x] 9.2.3 Group tanpa buku yang di-post ke finance menolak penyelesaian, mengikuti D365 (K-26). Diperiksa
     sebelum nomor aset terbit, dan tampil lebih dulu di pratinjau.
 - [x] 9.3 UI `ui/transactions/inventarisasi-aset/PenerimaanDetailPage.tsx`.
-  - [x] 9.3.1 Pilih vendor (dari `DaftarVendor`), cara perolehan, referensi faktur, dan PPN per baris.
+  - [x] 9.3.1 Pilih vendor (dari `VendorDirectory`), cara perolehan, referensi faktur, dan PPN per baris.
   - [x] 9.3.2 Pratinjau posting sebelum tombol "Selesaikan", memakai komponen 7.6: baris jurnal yang akan terbit, dimensinya, dan masalahnya (misalnya group belum dipetakan) beserta jalan pintas perbaikannya.
     Endpointnya di module, `GET /penerimaan-aset/{id}/pratinjau-posting`, sekaligus menutup 7.6.5. Dialog
     konfirmasi menyebut penghalangnya dan menonaktifkan tombolnya selama ada.
@@ -432,7 +432,7 @@ dan PPN, untuk kedua mode.
   - [x] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
   - [x] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
     Jurnalnya sekali per aset lewat satu buku yang di-post, bukan sekali per buku (K-26).
-- [x] 9.7 Pembungkus `PenerbitPosting` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `PostingTidakSah` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
+- [x] 9.7 Pembungkus `PostingFeed` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `InvalidPosting` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
 - [x] 9.5 Test (`AcquisitionPostingTest`).
   - [x] 9.5.1 Mode `direct_payable`: jurnal seperti di PRD, seimbang, dengan vendor.
   - [x] 9.5.2 Mode `clearing`: kredit ke perantara, vendor boleh kosong.
@@ -554,7 +554,7 @@ alasan wajib).
   `applyValueChange` dan sesudah baris asetnya dikunci. `AST-ADJ-<id aset>-<nomor urut koreksi>`, merujuk
   `AST-ACQ-…` atau `AST-OPB-…`; satu aset per posting, dengan dimensi aset itu saat dikoreksi.
 - [x] 12.2 Mode diambil dari posting asal, bukan dari setelan hari ini.
-  `PenerbitPosting::status()` kini ikut mengembalikan `settlement_mode` yang tercatat saat terbit.
+  `PostingFeed::status()` kini ikut mengembalikan `settlement_mode` yang tercatat saat terbit.
 - [x] 12.3 Selisih negatif menghasilkan jurnal arah sebaliknya.
 - [x] 12.4 Test (`AcquisitionAdjustmentTest`).
   - [x] 12.4.1 500 → 510 menghasilkan Dr aset 10 / Cr hutang 10.

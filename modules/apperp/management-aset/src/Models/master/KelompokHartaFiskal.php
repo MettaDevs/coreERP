@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -39,8 +39,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class KelompokHartaFiskal extends Model
 {
+    use BelongsToTenant;
     use HasUlids, SoftDeletes;
-    use MilikTenant;
 
     protected $table = 'aset_m_kelompok_harta_fiskal';
 

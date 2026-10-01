@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting;
 
-use App\Platform\Modules\Contracts\PenyediaLaporanModul;
+use App\Platform\Modules\Contracts\ModuleReportProvider;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use RuntimeException;
@@ -26,16 +26,16 @@ use RuntimeException;
  * menyebut kelas Core di luar kontrak, jadi ia tidak bisa melempar kegagalan laporan milik
  * Core; penerjemahannya dikerjakan `SumberLaporan` di sisi pemanggil.
  */
-final class PenyediaLaporan implements PenyediaLaporanModul
+final class PenyediaLaporan implements ModuleReportProvider
 {
     public function __construct(private readonly ReportRegistry $registry) {}
 
-    public function idModule(): string
+    public function moduleId(): string
     {
         return 'management-aset';
     }
 
-    public function punya(string $kodeLaporan): bool
+    public function has(string $kodeLaporan): bool
     {
         return $this->registry->has($kodeLaporan);
     }
@@ -43,11 +43,11 @@ final class PenyediaLaporan implements PenyediaLaporanModul
     public function catalog(): array
     {
         return array_map(fn (ReportDefinition $definition): array => [
-            'code' => $this->idModule().'.'.$definition->code(),
+            'code' => $this->moduleId().'.'.$definition->code(),
             'name' => $definition->name(),
             'description' => $definition->description(),
             'permission' => $definition->permission(),
-            // Sama dengan yang dipulangkan `definisi()`: nama parameter adalah kunci aturannya.
+            // Sama dengan yang dipulangkan `definition()`: nama parameter adalah kunci aturannya.
             'parameters' => $this->parameterNames($definition),
             'builtin_layouts' => array_map(static fn (BuiltinLayout $layout): array => [
                 'key' => $layout->key,
@@ -62,7 +62,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
      * @param  array<string, mixed>  $konteks
      * @return array{fields: list<array{key: string, label: string, table: ?string, type?: string}>, parameters: list<string>, data_items: list<array{key: string, caption: string, default_fields: list<string>, fields: list<array{key: string, caption: string, type: string, options?: list<array{value: string, label: string}>, lookup?: string}>}>}
      */
-    public function definisi(string $kodeLaporan, array $konteks): array
+    public function definition(string $kodeLaporan, array $konteks): array
     {
         $definition = $this->terizinkan($kodeLaporan, $konteks);
 
@@ -79,7 +79,7 @@ final class PenyediaLaporan implements PenyediaLaporanModul
     }
 
     /** @param array<string, mixed> $konteks */
-    public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string
+    public function defaultLayout(string $kodeLaporan, string $kunci, array $konteks): string
     {
         $definition = $this->terizinkan($kodeLaporan, $konteks);
 

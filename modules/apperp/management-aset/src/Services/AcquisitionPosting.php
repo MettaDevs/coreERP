@@ -2,11 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Platform\Modules\Contracts\DaftarVendor;
-use App\Platform\Modules\Contracts\PenerbitPosting;
-use App\Platform\Modules\Contracts\PostingTidakSah;
-use App\Platform\Modules\Contracts\PresisiMataUang;
-use App\Platform\Modules\Contracts\SetelanPostingFinance;
+use App\Platform\Modules\Contracts\CurrencyRounding;
+use App\Platform\Modules\Contracts\FinancePostingSettings;
+use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\PostingFeed;
+use App\Platform\Modules\Contracts\VendorDirectory;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Carbon;
@@ -76,10 +76,10 @@ final class AcquisitionPosting
     private array $bukuDiPostId = [];
 
     public function __construct(
-        private readonly PenerbitPosting $publisher,
-        private readonly PresisiMataUang $precision,
-        private readonly SetelanPostingFinance $settings,
-        private readonly DaftarVendor $vendors,
+        private readonly PostingFeed $publisher,
+        private readonly CurrencyRounding $precision,
+        private readonly FinancePostingSettings $settings,
+        private readonly VendorDirectory $vendors,
         private readonly AssetPostingAccounts $accounts,
         private readonly PembuatAset $assets,
     ) {}
@@ -100,9 +100,9 @@ final class AcquisitionPosting
     public function lineAmounts(string $tenantId, string $currency, stdClass $line): array
     {
         $jumlah = (int) $line->jumlah;
-        $desimal = $this->precision->nilai($tenantId, $currency);
-        $nilai = $this->precision->bulatkan($tenantId, (string) BigDecimal::of((string) $line->nilai_per_unit)->multipliedBy($jumlah), $currency);
-        $pajak = $this->precision->bulatkan($tenantId, (string) BigDecimal::of((string) ($line->ppn_per_unit ?? '0'))->multipliedBy($jumlah), $currency);
+        $desimal = $this->precision->amountDecimals($tenantId, $currency);
+        $nilai = $this->precision->roundAmount($tenantId, (string) BigDecimal::of((string) $line->nilai_per_unit)->multipliedBy($jumlah), $currency);
+        $pajak = $this->precision->roundAmount($tenantId, (string) BigDecimal::of((string) ($line->ppn_per_unit ?? '0'))->multipliedBy($jumlah), $currency);
         $buku = $this->bukuDiPostId((string) $line->group_aset_id);
         $akumulasi = $buku === null ? '0.00' : OpeningBalance::pick(OpeningBalance::fromLine($line), $buku)['accumulated'];
 
@@ -132,7 +132,7 @@ final class AcquisitionPosting
         $masalah = [];
         $mataUang = (string) $receipt->currency_code;
         try {
-            $desimal = $this->precision->nilai((string) $receipt->tenant_id, $mataUang);
+            $desimal = $this->precision->amountDecimals((string) $receipt->tenant_id, $mataUang);
             if ($desimal > self::REGISTER_DECIMALS) {
                 $masalah['currency_code'] = sprintf(
                     'Presisi nilai %s (%d desimal) lebih halus dari yang dapat dicatat register aset (%d desimal). Ubah presisinya di Data referensi › Mata uang.',
@@ -192,7 +192,7 @@ final class AcquisitionPosting
     }
 
     /**
-     * Masukan `PenerbitPosting` untuk penerimaan ini, atau `null` bila tidak ada nilai yang dijurnal:
+     * Masukan `PostingFeed` untuk penerimaan ini, atau `null` bila tidak ada nilai yang dijurnal:
      * seluruh barisnya bernilai nol, dan penerbit posting menolak baris tanpa debit maupun kredit.
      *
      * `$assets` hanya ada saat penerimaan benar-benar diselesaikan. Pratinjau belum punya kode aset,
@@ -215,7 +215,7 @@ final class AcquisitionPosting
         if ($tanggal === null) {
             return null;
         }
-        $mode = $this->settings->modePenyelesaian((string) $receipt->legal_entity_id, $tanggal);
+        $mode = $this->settings->settlementMode((string) $receipt->legal_entity_id, $tanggal);
         $grup = $this->groups($lines);
 
         // Nilai per pasangan group dan unit dimensi, dalam urutan kemunculan barisnya.
@@ -233,7 +233,7 @@ final class AcquisitionPosting
 
         $kolomDebit = $this->accounts->acquisitionColumn($cara);
         $kolomKredit = $this->accounts->offsetColumn($cara, $mode);
-        $vendor = $saldoAwal || ($receipt->vendor_id ?? null) === null ? null : $this->vendors->satu($tenant, (string) $receipt->vendor_id);
+        $vendor = $saldoAwal || ($receipt->vendor_id ?? null) === null ? null : $this->vendors->find($tenant, (string) $receipt->vendor_id);
         $pemetaan = [];
         $kode = (string) $receipt->kode;
 
@@ -327,7 +327,7 @@ final class AcquisitionPosting
         }
         $input = $this->input($receipt, $lines);
         // Vendor yang wajib tetapi kosong sudah disebut sebagai penghalang di atas. Diteruskan ke
-        // penerbit, syarat itu menjadi `PostingTidakSah` — bug penerbit — dan pratinjau berhenti
+        // penerbit, syarat itu menjadi `InvalidPosting` — bug penerbit — dan pratinjau berhenti
         // tepat pada dokumen yang paling butuh melihat jurnalnya.
         if ($input !== null && isset($blockers['vendor_id'])) {
             $input['requires_vendor'] = false;
@@ -335,7 +335,7 @@ final class AcquisitionPosting
 
         return [
             'blockers' => $blockers,
-            'posting' => $input === null ? null : $this->atauGagal(fn (): array => $this->publisher->pratinjau($input)),
+            'posting' => $input === null ? null : $this->atauGagal(fn (): array => $this->publisher->preview($input)),
         ];
     }
 
@@ -353,7 +353,7 @@ final class AcquisitionPosting
     {
         $input = $this->input($receipt, $lines, $assets);
 
-        return $input === null ? null : $this->atauGagal(fn (): array => $this->publisher->terbitkan($input));
+        return $input === null ? null : $this->atauGagal(fn (): array => $this->publisher->publish($input));
     }
 
     /** Cutover entitas legal penerimaan (`Y-m-d`), atau `null` bila belum disetel. */
@@ -363,7 +363,7 @@ final class AcquisitionPosting
     }
 
     /**
-     * `PostingTidakSah` adalah bug penerbit, bukan keadaan yang diserahkan ke pengguna (K-22). Ia
+     * `InvalidPosting` adalah bug penerbit, bukan keadaan yang diserahkan ke pengguna (K-22). Ia
      * tetap dilaporkan ke pemantauan kesalahan, lalu diterjemahkan menjadi kegagalan dokumen yang
      * dapat dibaca orang; pemanggilnya membatalkan transaksi dokumen.
      *
@@ -376,7 +376,7 @@ final class AcquisitionPosting
     {
         try {
             return $aksi();
-        } catch (PostingTidakSah $kegagalan) {
+        } catch (InvalidPosting $kegagalan) {
             report($kegagalan);
 
             throw new AcquisitionPostingFailed($kegagalan);
@@ -458,7 +458,7 @@ final class AcquisitionPosting
 
     private function mode(stdClass $receipt): string
     {
-        return $this->settings->modePenyelesaian((string) $receipt->legal_entity_id, self::tanggal($receipt->tanggal));
+        return $this->settings->settlementMode((string) $receipt->legal_entity_id, self::tanggal($receipt->tanggal));
     }
 
     /**

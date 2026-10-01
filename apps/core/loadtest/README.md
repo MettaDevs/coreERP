@@ -4,7 +4,7 @@ Satu stack untuk seluruh runtime. Sampai F7-03 ada dua: yang ini untuk Core, dan
 dalam folder module Management Aset dengan image, database, dan **tiruan Core** sendiri. Bentuk
 itu benar ketika module masih app berkontainer yang memanggil Core lewat HTTP. Ia tidak benar
 lagi — dan yang paling penting, tiruannya sudah tidak mewakili apa pun: nomor sekarang
-diterbitkan proses yang sama lewat kontrak `PenerbitNomor`.
+diterbitkan proses yang sama lewat kontrak `NumberSequenceIssuer`.
 
 ```text
 k6 ──► nginx (least_conn) ──► api1..api4  (image erp-core-app:local, Core + seluruh module)

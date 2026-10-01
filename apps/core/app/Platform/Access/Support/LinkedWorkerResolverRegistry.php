@@ -6,7 +6,7 @@ namespace App\Platform\Access\Support;
 
 use App\Platform\Modules\Contracts\LinkedWorkerResolver;
 use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use App\Platform\Modules\Models\ModuleInstallation;
 
 /**
@@ -22,7 +22,7 @@ final class LinkedWorkerResolverRegistry implements LinkedWorkerResolvers
     /** @var array<string, LinkedWorkerResolver> */
     private array $resolvers = [];
 
-    public function __construct(private readonly PelaksanaUntukTenant $runner) {}
+    public function __construct(private readonly TenantRunner $runner) {}
 
     public function register(LinkedWorkerResolver $resolver): void
     {
@@ -43,7 +43,7 @@ final class LinkedWorkerResolverRegistry implements LinkedWorkerResolvers
         $workers = [];
         foreach ($this->installedResolvers($tenantId) as $resolver) {
             // Module yang terdaftar lebih dulu menang bila dua module menautkan keanggotaan yang sama.
-            $workers += $this->runner->jalankanUntuk($tenantId, fn (): array => $resolver->forMemberships($tenantId, $membershipIds));
+            $workers += $this->runner->runFor($tenantId, fn (): array => $resolver->forMemberships($tenantId, $membershipIds));
         }
 
         return $workers;

@@ -52,7 +52,7 @@ channels:
       Keputusan workflow dekomisioning aset yang diputuskan Core.
 
       Sejak F3-09 module ini menerimanya **di dalam proses**, sebagai event Laravel
-      `KeputusanWorkflowDiambil` yang didengarkan `TerapkanKeputusanDekomisioning`.
+      `WorkflowDecisionTaken` yang didengarkan `TerapkanKeputusanDekomisioning`.
       Tidak ada lagi permintaan HTTP, tidak ada tanda tangan HMAC, dan tidak ada
       endpoint penerima.
 

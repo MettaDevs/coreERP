@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
-use App\Platform\Modules\Contracts\DaftarLaporan;
-use App\Platform\Modules\Contracts\PenyediaLaporanModul;
+use App\Platform\Modules\Contracts\ModuleReportProvider;
+use App\Platform\Modules\Contracts\ModuleReportProviders;
 use App\Platform\Modules\Contracts\ReportFormatter;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Reporting\Support\Rendering\DocxTemplateRenderer;
@@ -101,17 +101,17 @@ class ReportValueFormatsTest extends TestCase
 
     public function test_report_source_reads_types_from_the_report_definition(): void
     {
-        app(DaftarLaporan::class)->daftarkan(new class(self::FIELDS) implements PenyediaLaporanModul
+        app(ModuleReportProviders::class)->register(new class(self::FIELDS) implements ModuleReportProvider
         {
             /** @param list<array{key: string, label: string, table: ?string, type?: string}> $fields */
             public function __construct(private readonly array $fields) {}
 
-            public function idModule(): string
+            public function moduleId(): string
             {
                 return 'modul-uji-format';
             }
 
-            public function punya(string $kodeLaporan): bool
+            public function has(string $kodeLaporan): bool
             {
                 return $kodeLaporan === 'rekap';
             }
@@ -121,12 +121,12 @@ class ReportValueFormatsTest extends TestCase
                 return [];
             }
 
-            public function definisi(string $kodeLaporan, array $konteks): array
+            public function definition(string $kodeLaporan, array $konteks): array
             {
                 return ['fields' => $this->fields, 'parameters' => [], 'data_items' => []];
             }
 
-            public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string
+            public function defaultLayout(string $kodeLaporan, string $kunci, array $konteks): string
             {
                 return '';
             }
@@ -284,17 +284,17 @@ class ReportValueFormatsTest extends TestCase
     private function registerTimeReport(): \ArrayObject
     {
         $zones = new \ArrayObject;
-        app(DaftarLaporan::class)->daftarkan(new class($zones) implements PenyediaLaporanModul
+        app(ModuleReportProviders::class)->register(new class($zones) implements ModuleReportProvider
         {
             /** @param \ArrayObject<int, string> $zones */
             public function __construct(private readonly \ArrayObject $zones) {}
 
-            public function idModule(): string
+            public function moduleId(): string
             {
                 return 'modul-uji-waktu';
             }
 
-            public function punya(string $kodeLaporan): bool
+            public function has(string $kodeLaporan): bool
             {
                 return $kodeLaporan === 'cetak';
             }
@@ -304,7 +304,7 @@ class ReportValueFormatsTest extends TestCase
                 return [];
             }
 
-            public function definisi(string $kodeLaporan, array $konteks): array
+            public function definition(string $kodeLaporan, array $konteks): array
             {
                 $this->zones[] = (string) $konteks['timezone'];
 
@@ -315,7 +315,7 @@ class ReportValueFormatsTest extends TestCase
                 ], 'parameters' => [], 'data_items' => []];
             }
 
-            public function layoutBawaan(string $kodeLaporan, string $kunci, array $konteks): string
+            public function defaultLayout(string $kodeLaporan, string $kunci, array $konteks): string
             {
                 return '';
             }

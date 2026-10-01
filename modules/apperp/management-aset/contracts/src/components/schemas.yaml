@@ -1651,7 +1651,7 @@ GroupBukuPenyusutanList:
 PostingGroupAsetAccounts:
   type: object
   description: |
-    Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
+    Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`AccountDirectory`),
     bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
 
     Pada permintaan PUT body juga membawa `version` (atau kirim header `If-Match`): versi baris yang

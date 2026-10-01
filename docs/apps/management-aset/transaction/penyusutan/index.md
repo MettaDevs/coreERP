@@ -72,7 +72,7 @@ Tahun buku diambil dari fiscal calendar Core lewat `FiscalCalendarClient`. App t
 
 Ini penting: kalender fiskal milik **badan hukum**, bukan unit operasi. Itu sebabnya permintaan nomor dan hitungan periode selalu membawa `legal_entity_id`.
 
-Business unit baris akumulasi dibaca lewat kontrak `DirektoriOrganisasi` — resolver yang sama dengan yang dipakai penerbit posting Core — pada tanggal akhir periode, dan jurnalnya terbit lewat `PenerbitPosting`.
+Business unit baris akumulasi dibaca lewat kontrak `OrganizationDirectory` — resolver yang sama dengan yang dipakai penerbit posting Core — pada tanggal akhir periode, dan jurnalnya terbit lewat `PostingFeed`.
 
 ## Di mana kodenya
 

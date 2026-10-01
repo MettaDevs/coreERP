@@ -100,7 +100,7 @@ Untuk pengembangan lokal, skrip orkestrasi menjalankannya otomatis untuk tiap mo
 2. Ada `tenant_id`, dan diindeks.
 3. Ada `unique(['tenant_id', 'id'])`.
 4. Semua foreign key menunjuk pasangan `(tenant_id, id)`.
-5. Modelnya memakai trait `MilikTenant`, dan tidak menyaring `tenant_id` lagi dengan tangan.
+5. Modelnya memakai trait `BelongsToTenant`, dan tidak menyaring `tenant_id` lagi dengan tangan.
 6. Kalau ia master: ada `kode`, `creation_key`, `aktif`, `softDeletes()`, dan dua kunci unik di atas.
 7. Kalau ia punya baris anak: aturan penghapusannya dipilih sadar, bukan default.
 

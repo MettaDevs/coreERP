@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Platform\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 
 /**
  * Anggota dan unit kerja tenant lewat kontrak Core, bukan lewat HTTP.
@@ -29,7 +29,7 @@ final class DirektoriHr
      */
     private const BATAS_HASIL = 20;
 
-    public function __construct(private readonly DirektoriOrganisasi $direktori) {}
+    public function __construct(private readonly OrganizationDirectory $direktori) {}
 
     /**
      * Anggota tenant yang cocok dengan kata pencarian.
@@ -46,7 +46,7 @@ final class DirektoriHr
         $cari = mb_strtolower(trim($query));
         $hasil = [];
 
-        foreach ($this->direktori->anggota($tenantId) as $anggota) {
+        foreach ($this->direktori->members($tenantId) as $anggota) {
             if ($cari !== ''
                 && ! str_contains(mb_strtolower($anggota['nama']), $cari)
                 && ! str_contains(mb_strtolower($anggota['email']), $cari)) {
@@ -72,7 +72,7 @@ final class DirektoriHr
     {
         $hasil = [];
 
-        foreach ($this->direktori->unitOperasi($tenantId) as $unit) {
+        foreach ($this->direktori->operatingUnits($tenantId) as $unit) {
             $hasil[] = ['id' => $unit['id'], 'name' => $unit['nama']];
         }
 
@@ -94,7 +94,7 @@ final class DirektoriHr
         }
 
         $hasil = [];
-        foreach ($this->direktori->anggota($tenantId) as $anggota) {
+        foreach ($this->direktori->members($tenantId) as $anggota) {
             if (mb_strtolower(trim($anggota['email'])) === $dicari) {
                 $hasil[] = $this->bentukAnggota($anggota);
             }
@@ -118,7 +118,7 @@ final class DirektoriHr
 
         $dicari = array_flip($membershipIds);
         $hasil = [];
-        foreach ($this->direktori->anggota($tenantId) as $anggota) {
+        foreach ($this->direktori->members($tenantId) as $anggota) {
             if (isset($dicari[$anggota['id']])) {
                 $hasil[$anggota['id']] = $this->bentukAnggota($anggota);
             }
@@ -136,7 +136,7 @@ final class DirektoriHr
      */
     public function member(string $tenantId, string $membershipId): ?array
     {
-        $anggota = $this->direktori->anggotaSatu($tenantId, $membershipId);
+        $anggota = $this->direktori->member($tenantId, $membershipId);
 
         return $anggota === null ? null : $this->bentukAnggota($anggota);
     }

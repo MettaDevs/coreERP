@@ -16,14 +16,14 @@ konteks modul, **tidak pernah** dari isi permintaan.
 
 ### Trait yang menyaring, bukan penyaringan yang ditulis ulang
 
-Model modul memakai trait `MilikTenant` dan **tidak menulis penyaringan tenant sendiri**:
+Model modul memakai trait `BelongsToTenant` dan **tidak menulis penyaringan tenant sendiri**:
 
 ```php
-use App\Platform\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
 
 final class Asset extends Model
 {
-    use MilikTenant;
+    use BelongsToTenant;
 }
 ```
 
@@ -49,8 +49,8 @@ dua kontrak Core:
 
 | Kontrak | Menjawab |
 | --- | --- |
-| `KonteksTenant` | Tenant, badan hukum, dan unit kerja yang sedang dipilih — **tempat** query boleh membaca |
-| `KonteksPermintaan` | Id pengguna, permission efektif, dan lingkup kebijakan data — **apa** yang boleh dilakukan di tempat itu |
+| `TenantContext` | Tenant, badan hukum, dan unit kerja yang sedang dipilih — **tempat** query boleh membaca |
+| `RequestContext` | Id pengguna, permission efektif, dan lingkup kebijakan data — **apa** yang boleh dilakukan di tempat itu |
 
 Dua pertanyaan berbeda, dua pintu berbeda, dan tidak ada satu pun jawaban yang punya dua sumber.
 Keduanya gagal menutup: tanpa konteks, jawabannya `false` atau sebuah lemparan, tidak pernah sebuah
@@ -80,7 +80,7 @@ Punya permission belum berarti boleh melihat semua aset. Penyaringan keduanya le
 Cara kerjanya:
 
 1. Core menentukan badan hukum dan unit kerja mana yang boleh diakses pengguna, berdasarkan penugasan role dan hierarki organisasi.
-2. Daftar itu tersedia lewat `KonteksPermintaan::kebijakanData()`, sebagai data biasa — modul tidak pernah menerima objek Core.
+2. Daftar itu tersedia lewat `RequestContext::dataPolicies()`, sebagai data biasa — modul tidak pernah menerima objek Core.
 3. Modul menyaring kueri berdasarkan `legal_entity_id` dan `responsible_org_unit_id` pada aset.
 
 Jadi dua orang dengan permission yang sama persis tetap bisa melihat daftar aset yang berbeda.
@@ -114,8 +114,8 @@ siapa yang menegakkannya: dulu database terpisah, sekarang penjaga batas di
 | Berkas | Isinya |
 | --- | --- |
 | `modules/apperp/management-aset/src/Support/OrganizationScope.php` | Penyaringan dan pemeriksaan hak |
-| `apps/core/app/Platform/Modules/Contracts/KonteksTenant.php`, `KonteksPermintaan.php` | Pintu tempat modul membaca konteksnya |
-| `apps/core/app/Support/Modules/TenantScope.php` | Penegakan `MilikTenant` pada sisi baca dan sisi tulis |
+| `apps/core/app/Platform/Modules/Contracts/TenantContext.php`, `RequestContext.php` | Pintu tempat modul membaca konteksnya |
+| `apps/core/app/Support/Modules/TenantScope.php` | Penegakan `BelongsToTenant` pada sisi baca dan sisi tulis |
 | [Rancangan scope data aset](/apps/management-aset/arsitektur/rancangan-scope-data-aset) | Rancangan pemisahan data per organisasi |
 
 ## Halaman terkait

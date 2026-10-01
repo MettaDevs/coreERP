@@ -81,7 +81,7 @@ Akibatnya pada tenant yang sudah ada sebelum rilis ini: role Owner menyimpan sal
 
 ## Yang datang dari Core
 
-- Daftar akun lewat kontrak `DaftarAkun`: `cari()` untuk pemilih akun, `banyak()` untuk menerjemahkan id menjadi nomor dan nama.
+- Daftar akun lewat kontrak `AccountDirectory`: `search()` untuk pemilih akun, `findMany()` untuk menerjemahkan id menjadi nomor dan nama.
 - Penahanan posting yang akunnya kosong atau nonaktif, beserta layar pantaunya.
 
 ## Di mana kodenya

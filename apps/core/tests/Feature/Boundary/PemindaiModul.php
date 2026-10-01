@@ -219,7 +219,7 @@ final class PemindaiModul
      * **Test juga tidak, dan alasannya berbeda dari migration.** Test menyemai baris untuk
      * tenant yang ditentukannya sendiri — termasuk tenant kedua, yang justru dipakai untuk
      * membuktikan data tenant pertama tidak bocor. Menyimpan baris itu lewat model dibatalkan
-     * `MilikTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
+     * `BelongsToTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
      * Menuntut test memakai model berarti membuat test isolasi tenant mustahil ditulis, yaitu
      * membuang penjagaan yang paling penting demi menegakkan aturannya.
      *
@@ -346,8 +346,8 @@ final class PemindaiModul
      * kalimat aturannya. Sebelumnya seluruh `App\\Support\\Modules` diizinkan supaya model
      * module bisa menyebut `TenantScope` — dan itu berarti kelas apa pun yang kelak ditaruh
      * di folder itu ikut boleh disentuh module, tanpa ada yang menahan dan tanpa ada yang
-     * memutuskan. Sekarang model memakai trait `MilikTenant` dan seeder mewarisi
-     * `SeederModule`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
+     * memutuskan. Sekarang model memakai trait `BelongsToTenant` dan seeder mewarisi
+     * `TenantSeeder`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
      *
      * @return list<string>
      */

@@ -2,10 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Platform\Modules\Contracts\DaftarVendor;
-use App\Platform\Modules\Contracts\PenerbitPosting;
-use App\Platform\Modules\Contracts\PostingTidakSah;
-use App\Platform\Modules\Contracts\PresisiMataUang;
+use App\Platform\Modules\Contracts\CurrencyRounding;
+use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\PostingFeed;
+use App\Platform\Modules\Contracts\VendorDirectory;
 use Brick\Math\BigDecimal;
 use InvalidArgumentException;
 use Modules\Apperp\ManagementAset\Models\master\AssetPostingGroup;
@@ -55,9 +55,9 @@ final class AcquisitionAdjustment
     private const ASAL_MANUAL = 'Jurnal perolehan aset ini dicatat manual di aplikasi finance, jadi koreksinya juga dicatat manual di sana. Nilai di register aset tetap berubah.';
 
     public function __construct(
-        private readonly PenerbitPosting $publisher,
-        private readonly PresisiMataUang $precision,
-        private readonly DaftarVendor $vendors,
+        private readonly PostingFeed $publisher,
+        private readonly CurrencyRounding $precision,
+        private readonly VendorDirectory $vendors,
         private readonly AssetPostingAccounts $accounts,
         private readonly PembuatAset $assets,
     ) {}
@@ -79,7 +79,7 @@ final class AcquisitionAdjustment
     {
         $mataUang = (string) $aset->currency_code;
         try {
-            $desimal = $this->precision->nilai((string) $aset->tenant_id, $mataUang);
+            $desimal = $this->precision->amountDecimals((string) $aset->tenant_id, $mataUang);
         } catch (RuntimeException $kegagalan) {
             return ['acquisition_value' => $kegagalan->getMessage()];
         }
@@ -111,7 +111,7 @@ final class AcquisitionAdjustment
         return [
             'difference' => $susunan['difference'],
             'note' => $susunan['note'],
-            'posting' => $susunan['input'] === null ? null : $this->atauGagal(fn (): array => $this->publisher->pratinjau($susunan['input'])),
+            'posting' => $susunan['input'] === null ? null : $this->atauGagal(fn (): array => $this->publisher->preview($susunan['input'])),
         ];
     }
 
@@ -130,12 +130,12 @@ final class AcquisitionAdjustment
 
         return [
             'note' => $susunan['note'],
-            'posting' => $susunan['input'] === null ? null : $this->atauGagal(fn (): array => $this->publisher->terbitkan($susunan['input'])),
+            'posting' => $susunan['input'] === null ? null : $this->atauGagal(fn (): array => $this->publisher->publish($susunan['input'])),
         ];
     }
 
     /**
-     * Masukan `PenerbitPosting` untuk satu koreksi, atau catatan kenapa tidak ada jurnal.
+     * Masukan `PostingFeed` untuk satu koreksi, atau catatan kenapa tidak ada jurnal.
      *
      * @return array{difference: string, note: ?string, input: array<string, mixed>|null}
      *
@@ -181,7 +181,7 @@ final class AcquisitionAdjustment
         $nilai = (string) $selisih->abs()->toScale($desimal);
         $naik = $selisih->isPositive();
         $pembelian = $cara === AcquisitionMethod::PURCHASE;
-        $vendor = $pembelian && $penerimaan->vendor_id !== null ? $this->vendors->satu($tenant, (string) $penerimaan->vendor_id) : null;
+        $vendor = $pembelian && $penerimaan->vendor_id !== null ? $this->vendors->find($tenant, (string) $penerimaan->vendor_id) : null;
         $kode = (string) $aset->kode;
         $namaGroup = (string) ($grup->nama ?? $groupId);
         $pemetaan = $this->accounts->effective($groupId, $tanggal);
@@ -243,7 +243,7 @@ final class AcquisitionAdjustment
      */
     private function desimal(string $tenant, string $mataUang): int
     {
-        $desimal = $this->precision->nilai($tenant, $mataUang);
+        $desimal = $this->precision->amountDecimals($tenant, $mataUang);
         if ($desimal < 0) {
             throw new InvalidArgumentException('Jumlah desimal tidak boleh negatif.');
         }
@@ -299,7 +299,7 @@ final class AcquisitionAdjustment
     {
         try {
             return $aksi();
-        } catch (PostingTidakSah $kegagalan) {
+        } catch (InvalidPosting $kegagalan) {
             throw $this->gagal($kegagalan);
         }
     }

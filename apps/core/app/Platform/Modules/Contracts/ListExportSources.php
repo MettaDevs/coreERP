@@ -10,7 +10,7 @@ namespace App\Platform\Modules\Contracts;
  *
  *     $this->app->make(ListExportSources::class)->register($this->app->make(AssetRegisterList::class));
  *
- * Arahnya sama dengan {@see DaftarLaporan}: module yang melayani Core.
+ * Arahnya sama dengan {@see ModuleReportProviders}: module yang melayani Core.
  */
 interface ListExportSources
 {

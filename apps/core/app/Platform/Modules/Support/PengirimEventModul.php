@@ -30,12 +30,12 @@ final class PengirimEventModul
 {
     public function __construct(
         private readonly Dispatcher $events,
-        private readonly PelaksanaTenant $pelaksana,
+        private readonly TenantRunnerCore $pelaksana,
     ) {}
 
     public function kirim(object $event, string $tenantId): void
     {
-        $this->pelaksana->jalankanUntuk($tenantId, function () use ($event): void {
+        $this->pelaksana->runFor($tenantId, function () use ($event): void {
             $this->events->dispatch($event);
         });
     }

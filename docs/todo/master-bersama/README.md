@@ -110,7 +110,7 @@ sebagian hanya beban:
 | Kontrak menerima id dan memulangkan baris biasa, bukan model | **tetap** |
 | Hanya pemilik yang menulis | **tetap** |
 | Foreign key dari tabel modul ke tabel Core | **sudah diizinkan** ([standar module](../../dev/02-module-standard.md#ownership-dan-data)); ke modul lain tetap dilarang |
-| Membaca satu per satu (`DaftarVendor::satu()` per baris daftar) | **berubah**: kontrak master bersama menyediakan pembacaan banyak id sekaligus |
+| Membaca satu per satu (`VendorDirectory::find()` per baris daftar) | **berubah**: kontrak master bersama menyediakan pembacaan banyak id sekaligus |
 | Dropdown vendor lewat endpoint perantara milik modul | **berubah**: Foundation menyediakan komponen pemilih beserta endpoint-nya |
 | `internal/v1` | hanya untuk sistem di luar CoreERP, tidak pernah antar-modul |
 

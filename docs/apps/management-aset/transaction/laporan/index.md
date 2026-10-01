@@ -9,7 +9,7 @@ Laporan adalah dokumen yang dibuat dari data app: work order yang dibawa teknisi
 **Laporan bukan layout.** Laporan adalah dataset yang ditulis developer: kolom apa yang tersedia, dari tabel mana, dengan hak apa. Layout adalah berkas Word atau Excel yang menentukan tampilannya, dikelola admin tenant di Core. Kalau customer minta bentuk cetakan berbeda, jawabannya layout baru di halaman Layout laporan Core, bukan kode baru; kode baru hanya dibutuhkan bila ada kolom yang belum ada di dataset.
 
 **Laporan dibaca Core, bukan diminta browser.** Mesin laporan Core memanggil modul ini **di dalam
-proses yang sama**, lewat kontrak `PenyediaLaporanModul`. Tidak ada endpoint HTTP, tidak ada token,
+proses yang sama**, lewat kontrak `ModuleReportProvider`. Tidak ada endpoint HTTP, tidak ada token,
 dan tidak ada alamat yang harus benar sebelum sebuah laporan bisa dicetak.
 
 **Konteks dibawa sebagai argumen, bukan dibaca dari permintaan.** Ekspor berjalan di worker antrean,
@@ -31,14 +31,14 @@ Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `da
 
 ## Yang diminta Core
 
-`PenyediaLaporan` mendaftarkan diri ke `DaftarLaporan` sekali saat boot penyedia layanan modul.
+`PenyediaLaporan` mendaftarkan diri ke `ModuleReportProviders` sekali saat boot penyedia layanan modul.
 Tanpa pendaftaran itu Core tidak tahu modul punya laporan, dan ia jatuh ke jalur HTTP lama — alamat
 yang sudah tidak ada.
 
 | Yang diminta | Guna |
 | --- | --- |
-| `definisi()` | Placeholder (`fields`), nama parameter, dan layout bawaan |
-| `layout()` | Berkas layout bawaan dari `resources/laporan/<kode>/<key>.<format>` |
+| `definition()` | Placeholder (`fields`), nama parameter, dan layout bawaan |
+| `defaultLayout()` | Berkas layout bawaan dari `resources/laporan/<kode>/<key>.<format>` |
 | `dataset()` | Dataset: `fields` sekali tampil, `tables` diulang per baris, `file_name` |
 
 Tiga rute `internal/v1/laporan` yang dulu melayani ketiganya dihapus bersama controllernya.
@@ -93,7 +93,7 @@ Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`
 
 | Berkas | Isi |
 | --- | --- |
-| `src/Reporting/PenyediaLaporan.php` | Pintu yang dipanggil Core; mengimplementasikan `PenyediaLaporanModul` |
+| `src/Reporting/PenyediaLaporan.php` | Pintu yang dipanggil Core; mengimplementasikan `ModuleReportProvider` |
 | `src/Reporting/ReportRegistry.php` | Daftar laporan modul ini |
 | `src/Reporting/ReportDefinition.php` | Kontrak satu laporan: kode, permission, layout bawaan, parameter, placeholder, dataset |
 | `src/Reporting/ReportContext.php` | Konteks yang diserahkan Core, dan penyusun scope untuk `OrganizationScope` |

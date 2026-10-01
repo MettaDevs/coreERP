@@ -7,7 +7,7 @@ use Throwable;
 
 /**
  * Posting perolehan tidak dapat diterbitkan karena kesalahan sistem, bukan karena isian pengguna
- * (TODO 9.7). Penyebabnya — `PostingTidakSah` dari Core — sudah dilaporkan ke pemantauan kesalahan;
+ * (TODO 9.7). Penyebabnya — `InvalidPosting` dari Core — sudah dilaporkan ke pemantauan kesalahan;
  * pesan ini yang sampai ke layar, dan transaksi penyelesaian penerimaan dibatalkan karenanya.
  */
 final class AcquisitionPostingFailed extends RuntimeException

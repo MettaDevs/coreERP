@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Listeners;
 
-use App\Platform\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Models\support\ProcessedCoreEvent;
@@ -36,7 +36,7 @@ class TerapkanKeputusanDekomisioning
 {
     private const TIPE = 'management-aset.dekomisioning-aset-verification';
 
-    public function handle(KeputusanWorkflowDiambil $event): void
+    public function handle(WorkflowDecisionTaken $event): void
     {
         $data = $event->data;
 
@@ -51,7 +51,7 @@ class TerapkanKeputusanDekomisioning
 
         if (! in_array($keputusan, ['approved', 'rejected'], true) || ! is_string($instanceId) || ! is_string($documentId) || ! is_string($asetId)) {
             Log::warning('Keputusan workflow dekomisioning datang tanpa data yang lengkap.', [
-                'event_id' => $event->idEvent,
+                'event_id' => $event->eventId,
                 'tenant_id' => $event->tenantId,
             ]);
 
@@ -84,7 +84,7 @@ class TerapkanKeputusanDekomisioning
 
         if ($dokumen === null || ! $instanceCocok || $dokumen->aset_id !== $asetId) {
             Log::warning('Keputusan workflow dekomisioning tidak cocok dengan dokumen mana pun.', [
-                'event_id' => $event->idEvent,
+                'event_id' => $event->eventId,
                 'tenant_id' => $event->tenantId,
                 'workflow_instance_id' => $instanceId,
                 'source_document_id' => $documentId,
@@ -101,7 +101,7 @@ class TerapkanKeputusanDekomisioning
         $sudahPernah = ProcessedCoreEvent::query()->insertOrIgnore([
             'id' => (string) Str::ulid(),
             'tenant_id' => $event->tenantId,
-            'event_id' => $event->idEvent,
+            'event_id' => $event->eventId,
             'processed_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),

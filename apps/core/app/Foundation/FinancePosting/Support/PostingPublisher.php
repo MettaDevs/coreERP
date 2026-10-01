@@ -11,9 +11,9 @@ use App\Foundation\FinancePosting\Models\FinancePostingLine;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Foundation\FinancePosting\Models\FinanceSettlementMode;
 use App\Foundation\Vendor\Models\Vendor;
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\InvalidPosting;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
-use App\Platform\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\TenantRunner;
 use App\Platform\Organization\Models\LegalEntity;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Support\BusinessUnitResolver;
@@ -33,7 +33,7 @@ use Throwable;
  * Urutan pemeriksaannya disengaja:
  *
  * 1. **Bentuk** — seimbang, satu sisi per baris, presisi, tanggal, vendor, posting asal. Gagal di
- *    sini adalah bug penerbit: dilempar sebagai `PostingTidakSah` dan membatalkan dokumennya (K-22).
+ *    sini adalah bug penerbit: dilempar sebagai `InvalidPosting` dan membatalkan dokumennya (K-22).
  * 2. **Cutover** — entitas legal yang feed-nya tidak aktif, atau tanggal sebelum cutover, menjadi
  *    `manual` dan tidak pernah disajikan (K-16).
  * 3. **Pemetaan** — akun ada dan aktif, dimensi dapat dibentuk dari unit organisasi. Gagal di sini
@@ -64,7 +64,7 @@ final class PostingPublisher
         private readonly PostingSettings $setelan,
         private readonly BusinessUnitResolver $businessUnits,
         private readonly PostingAccountResolvers $pemetaAkun,
-        private readonly PelaksanaUntukTenant $pelaksana,
+        private readonly TenantRunner $pelaksana,
     ) {}
 
     /**
@@ -74,7 +74,7 @@ final class PostingPublisher
     public function publish(array $input): array
     {
         if (DB::transactionLevel() === 0) {
-            throw new LogicException('PenerbitPosting::terbitkan harus dipanggil di dalam transaksi dokumen sumbernya.');
+            throw new LogicException('PostingFeed::publish harus dipanggil di dalam transaksi dokumen sumbernya.');
         }
 
         $ada = $this->existing($input);
@@ -227,7 +227,7 @@ final class PostingPublisher
                         $sebelum = $posting->status;
                         try {
                             $berubah += $this->terapkanUlang($posting, 'cutover_reevaluated', $userId)->status !== $sebelum ? 1 : 0;
-                        } catch (PostingTidakSah $kegagalan) {
+                        } catch (InvalidPosting $kegagalan) {
                             // Setelan entitasnya sudah tersimpan. Posting yang tidak dapat dibentuk
                             // ulang, misalnya karena vendornya sudah diarsipkan, tetap di statusnya
                             // dan tampil di layar pantau; posting lain tetap dinilai ulang.
@@ -252,11 +252,11 @@ final class PostingPublisher
         $tenant = $this->wajib($input, 'tenant_id', 26);
         $postingId = $this->wajib($input, 'posting_id', 120);
         if (preg_match(self::POLA_POSTING_ID, $postingId) !== 1) {
-            throw new PostingTidakSah('posting_id hanya boleh huruf, angka, titik, titik dua, garis bawah, dan strip.');
+            throw new InvalidPosting('posting_id hanya boleh huruf, angka, titik, titik dua, garis bawah, dan strip.');
         }
         $jenis = $this->wajib($input, 'posting_type', 80);
         if (preg_match(self::POLA_JENIS, $jenis) !== 1) {
-            throw new PostingTidakSah(sprintf('posting_type "%s" harus berbentuk modul.jenis, misalnya asset.acquisition.', $jenis));
+            throw new InvalidPosting(sprintf('posting_type "%s" harus berbentuk modul.jenis, misalnya asset.acquisition.', $jenis));
         }
 
         $legalEntityId = $this->wajib($input, 'legal_entity_id', 26);
@@ -265,31 +265,31 @@ final class PostingPublisher
             ->where('classification', 'legal_entity')
             ->find($legalEntityId);
         if ($entitas === null) {
-            throw new PostingTidakSah('legal_entity_id bukan entitas legal milik tenant ini.');
+            throw new InvalidPosting('legal_entity_id bukan entitas legal milik tenant ini.');
         }
         $kodeEntitas = LegalEntity::query()->where('organization_id', $entitas->id)->value('company_code');
 
         $mataUang = strtoupper($this->wajib($input, 'currency_code', 3));
         if (preg_match('/^[A-Z]{3}$/', $mataUang) !== 1) {
-            throw new PostingTidakSah('currency_code harus kode ISO 4217 tiga huruf.');
+            throw new InvalidPosting('currency_code harus kode ISO 4217 tiga huruf.');
         }
         try {
             $desimal = $amountDecimals ?? $this->presisi->amountDecimals($tenant, $mataUang);
         } catch (RuntimeException $kegagalan) {
-            throw new PostingTidakSah($kegagalan->getMessage(), 0, $kegagalan);
+            throw new InvalidPosting($kegagalan->getMessage(), 0, $kegagalan);
         }
 
         $tanggalPosting = $this->tanggal($input, 'posting_date');
         $tanggalDokumen = $this->tanggal($input, 'document_date');
         $terjadi = $this->wajib($input, 'occurred_at', 40);
         if (preg_match(self::POLA_WAKTU, $terjadi) !== 1) {
-            throw new PostingTidakSah('occurred_at harus waktu ISO 8601 lengkap dengan offset zona waktu, misalnya 2026-09-28T23:50:00+07:00.');
+            throw new InvalidPosting('occurred_at harus waktu ISO 8601 lengkap dengan offset zona waktu, misalnya 2026-09-28T23:50:00+07:00.');
         }
         $terjadi = Carbon::parse($terjadi)->toIso8601String();
 
         $sumber = $input['source_document'] ?? null;
         if (! is_array($sumber)) {
-            throw new PostingTidakSah('source_document wajib diisi.');
+            throw new InvalidPosting('source_document wajib diisi.');
         }
         $dokumen = [
             'module' => $this->wajib($sumber, 'module', 80, 'source_document.module'),
@@ -303,24 +303,24 @@ final class PostingPublisher
         $membalik = $this->teks($input, 'reverses_posting_id', 120, false);
         $mengoreksi = $this->teks($input, 'adjusts_posting_id', 120, false);
         if ($membalik !== null && $mengoreksi !== null) {
-            throw new PostingTidakSah('Satu posting hanya boleh membalik atau mengoreksi satu posting lain, tidak keduanya.');
+            throw new InvalidPosting('Satu posting hanya boleh membalik atau mengoreksi satu posting lain, tidak keduanya.');
         }
         $mode = $this->teks($input, 'settlement_mode', 20, false);
         if ($mode !== null && ! in_array($mode, FinanceSettlementMode::MODES, true)) {
-            throw new PostingTidakSah(sprintf('settlement_mode "%s" tidak dikenal.', $mode));
+            throw new InvalidPosting(sprintf('settlement_mode "%s" tidak dikenal.', $mode));
         }
         $asal = $membalik ?? $mengoreksi;
         if ($asal !== null) {
             $induk = $this->cari($tenant, $asal);
             if ($induk === null || $induk->legal_entity_id !== $entitas->id) {
-                throw new PostingTidakSah(sprintf('Posting asal %s tidak ditemukan di entitas legal ini.', $asal));
+                throw new InvalidPosting(sprintf('Posting asal %s tidak ditemukan di entitas legal ini.', $asal));
             }
             // K-10: koreksi selalu mewarisi mode posting aslinya, walaupun setelan entitas sudah
             // berganti, supaya koreksi masuk ke akun yang sama dengan jurnal aslinya.
             if ($mode === null) {
                 $mode = $induk->settlement_mode;
             } elseif ($induk->settlement_mode !== null && $induk->settlement_mode !== $mode) {
-                throw new PostingTidakSah(sprintf('Koreksi atas %s harus memakai mode %s, sama dengan posting aslinya.', $asal, $induk->settlement_mode));
+                throw new InvalidPosting(sprintf('Koreksi atas %s harus memakai mode %s, sama dengan posting aslinya.', $asal, $induk->settlement_mode));
             }
         }
 
@@ -329,18 +329,18 @@ final class PostingPublisher
         if ($vendorId !== null) {
             $baris = Vendor::query()->with('party:id,name')->where('tenant_id', $tenant)->find($vendorId);
             if ($baris === null || $baris->legal_entity_id !== $entitas->id) {
-                throw new PostingTidakSah('vendor_id bukan vendor entitas legal ini.');
+                throw new InvalidPosting('vendor_id bukan vendor entitas legal ini.');
             }
             $vendor = ['id' => $baris->id, 'number' => $baris->number, 'name' => (string) $baris->party->name];
         } elseif (($input['requires_vendor'] ?? false) === true) {
-            throw new PostingTidakSah('Posting ini wajib membawa vendor: perolehan lewat pembelian dengan mode direct_payable.');
+            throw new InvalidPosting('Posting ini wajib membawa vendor: perolehan lewat pembelian dengan mode direct_payable.');
         }
 
         [$baris, $total] = $this->barisJurnal($input['lines'] ?? null, $desimal);
 
         $rincian = $input['details'] ?? [];
         if (! is_array($rincian) || ($rincian !== [] && array_is_list($rincian))) {
-            throw new PostingTidakSah('details harus objek (array berkunci), bukan daftar.');
+            throw new InvalidPosting('details harus objek (array berkunci), bukan daftar.');
         }
         /** @var array<string, mixed> $rincian */
         $hash = hash('sha256', (string) json_encode([
@@ -630,7 +630,7 @@ final class PostingPublisher
                 continue;
             }
             try {
-                $input['lines'][$indeks]['account_id'] = $this->pelaksana->jalankanUntuk(
+                $input['lines'][$indeks]['account_id'] = $this->pelaksana->runFor(
                     $posting->tenant_id,
                     fn (): ?string => $pemeta->account($posting->tenant_id, $kunci, $tanggal),
                 );
@@ -677,10 +677,10 @@ final class PostingPublisher
     private function barisJurnal(mixed $lines, int $desimal): array
     {
         if (! is_array($lines) || ! array_is_list($lines) || count($lines) < 2) {
-            throw new PostingTidakSah('lines wajib berisi sedikitnya dua baris jurnal.');
+            throw new InvalidPosting('lines wajib berisi sedikitnya dua baris jurnal.');
         }
         if (count($lines) > self::MAX_LINES) {
-            throw new PostingTidakSah(sprintf('Satu posting paling banyak %d baris jurnal. Ringkas per akun dan dimensi.', self::MAX_LINES));
+            throw new InvalidPosting(sprintf('Satu posting paling banyak %d baris jurnal. Ringkas per akun dan dimensi.', self::MAX_LINES));
         }
 
         $debit = BigDecimal::zero();
@@ -689,12 +689,12 @@ final class PostingPublisher
         foreach ($lines as $indeks => $line) {
             $no = $indeks + 1;
             if (! is_array($line)) {
-                throw new PostingTidakSah(sprintf('Baris %d bukan objek.', $no));
+                throw new InvalidPosting(sprintf('Baris %d bukan objek.', $no));
             }
             $d = $this->uang($line['debit'] ?? '0', $desimal, sprintf('Baris %d debit', $no));
             $k = $this->uang($line['credit'] ?? '0', $desimal, sprintf('Baris %d kredit', $no));
             if (BigDecimal::of($d)->isZero() === BigDecimal::of($k)->isZero()) {
-                throw new PostingTidakSah(sprintf('Baris %d harus berisi debit atau kredit, tepat salah satu.', $no));
+                throw new InvalidPosting(sprintf('Baris %d harus berisi debit atau kredit, tepat salah satu.', $no));
             }
             $debit = $debit->plus($d);
             $kredit = $kredit->plus($k);
@@ -720,7 +720,7 @@ final class PostingPublisher
         }
 
         if (! $debit->isEqualTo($kredit)) {
-            throw new PostingTidakSah(sprintf('Jurnal tidak seimbang: debit %s, kredit %s.', $debit, $kredit));
+            throw new InvalidPosting(sprintf('Jurnal tidak seimbang: debit %s, kredit %s.', $debit, $kredit));
         }
 
         return [$hasil, MoneyPrecision::round((string) $debit, $desimal)];
@@ -732,16 +732,16 @@ final class PostingPublisher
             $nilai = (string) $nilai;
         }
         if (! is_string($nilai) || preg_match('/^\d+(\.\d+)?$/', trim($nilai)) !== 1) {
-            throw new PostingTidakSah($medan.' harus string desimal tanpa tanda dan tanpa pemisah ribuan, misalnya "1500000.00".');
+            throw new InvalidPosting($medan.' harus string desimal tanpa tanda dan tanpa pemisah ribuan, misalnya "1500000.00".');
         }
 
         try {
             $skala = MoneyPrecision::scale($nilai);
         } catch (MathException $kegagalan) {
-            throw new PostingTidakSah($medan.' bukan angka desimal.', 0, $kegagalan);
+            throw new InvalidPosting($medan.' bukan angka desimal.', 0, $kegagalan);
         }
         if ($skala > $desimal) {
-            throw new PostingTidakSah(sprintf('%s memakai %d desimal, lebih halus dari presisi mata uang (%d). Bulatkan di sumber lewat PresisiMataUang.', $medan, $skala, $desimal));
+            throw new InvalidPosting(sprintf('%s memakai %d desimal, lebih halus dari presisi mata uang (%d). Bulatkan di sumber lewat CurrencyRounding.', $medan, $skala, $desimal));
         }
 
         return MoneyPrecision::round($nilai, $desimal);
@@ -754,17 +754,17 @@ final class PostingPublisher
         $nama ??= $kunci;
         if ($nilai === null || (is_string($nilai) && trim($nilai) === '')) {
             if ($wajib) {
-                throw new PostingTidakSah($nama.' wajib diisi.');
+                throw new InvalidPosting($nama.' wajib diisi.');
             }
 
             return null;
         }
         if (! is_string($nilai)) {
-            throw new PostingTidakSah($nama.' harus teks.');
+            throw new InvalidPosting($nama.' harus teks.');
         }
         $nilai = trim($nilai);
         if (mb_strlen($nilai) > $maks) {
-            throw new PostingTidakSah(sprintf('%s paling panjang %d karakter.', $nama, $maks));
+            throw new InvalidPosting(sprintf('%s paling panjang %d karakter.', $nama, $maks));
         }
 
         return $nilai;
@@ -786,7 +786,7 @@ final class PostingPublisher
             $tanggal = null;
         }
         if ($tanggal === null || $tanggal->format('Y-m-d') !== $nilai) {
-            throw new PostingTidakSah($kunci.' harus tanggal Y-m-d, misalnya 2026-09-28.');
+            throw new InvalidPosting($kunci.' harus tanggal Y-m-d, misalnya 2026-09-28.');
         }
 
         return $nilai;
@@ -841,7 +841,7 @@ final class PostingPublisher
     private function hasilYangAda(FinancePosting $posting, PostingInput $masukan): array
     {
         if (! hash_equals($posting->input_hash, $masukan->hash)) {
-            throw new PostingTidakSah(sprintf(
+            throw new InvalidPosting(sprintf(
                 'Posting %s sudah terbit dengan isi jurnal berbeda. Dokumen yang sudah terbit dikoreksi lewat posting koreksi, bukan diterbitkan ulang.',
                 $masukan->postingId,
             ));
@@ -904,7 +904,7 @@ final class PostingPublisher
     {
         $url = $this->teks($sumber, 'url', 255, false, 'source_document.url');
         if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
-            throw new PostingTidakSah('source_document.url harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /management-aset/inventarisasi-aset/penerimaan/01J….');
+            throw new InvalidPosting('source_document.url harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /management-aset/inventarisasi-aset/penerimaan/01J….');
         }
 
         return $url;
@@ -917,7 +917,7 @@ final class PostingPublisher
     private function pathInsideApp(?string $url, string $field): ?string
     {
         if ($url !== null && preg_match('#^/(?!/)[^\s\\\\]*$#', $url) !== 1) {
-            throw new PostingTidakSah($field.' harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /m/management-aset/posting-groups/KENDARAAN.');
+            throw new InvalidPosting($field.' harus jalur di dalam aplikasi yang diawali satu garis miring, misalnya /m/management-aset/posting-groups/KENDARAAN.');
         }
 
         return $url;

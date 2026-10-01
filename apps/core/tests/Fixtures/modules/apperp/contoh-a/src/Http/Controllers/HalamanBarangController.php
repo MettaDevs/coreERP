@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Http\Controllers;
 
-use App\Platform\Modules\Contracts\KonteksPermintaan;
-use App\Platform\Modules\Contracts\KonteksTenant;
+use App\Platform\Modules\Contracts\RequestContext;
+use App\Platform\Modules\Contracts\TenantContext;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Apperp\ContohA\Models\Barang;
@@ -29,9 +29,9 @@ use Modules\Apperp\ContohA\Models\Barang;
  */
 final class HalamanBarangController
 {
-    public function __invoke(KonteksTenant $konteks, KonteksPermintaan $akses): Response
+    public function __invoke(TenantContext $konteks, RequestContext $akses): Response
     {
-        abort_unless($akses->punyaIzin('contoh-a.barang.read'), 403);
+        abort_unless($akses->hasPermission('contoh-a.barang.read'), 403);
 
         return Inertia::render('contoh-a::Daftar', [
             'barang' => Barang::query()

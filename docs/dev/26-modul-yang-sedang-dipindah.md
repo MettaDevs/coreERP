@@ -7,7 +7,7 @@ tempat".
 
 Akibatnya bisa ditebak: begitu foldernya mendarat, penjaga batas Core merah sekaligus. Kodenya masih
 ber-namespace `App\`, masih memanggil `DB::table(`, manifestnya belum menyatakan awalan tabel, dan
-modelnya belum memakai `MilikTenant`. Penjaganya benar; yang belum lengkap adalah rencananya.
+modelnya belum memakai `BelongsToTenant`. Penjaganya benar; yang belum lengkap adalah rencananya.
 
 Halaman ini menjelaskan cara Core menampung keadaan setengah jalan itu tanpa membuka lubang permanen —
 aturannya, dan kenapa aturannya begitu.
@@ -208,7 +208,7 @@ berbahaya bukan berkas kerangkanya melainkan migrationnya: tabrakannya pasti, da
 pemasangan modul di tenant sungguhan — bukan saat ada yang sedang memperhatikan. Susunan folder yang
 berlaku ada di [standar app dan addon app](02-module-standard.md).
 
-**`MilikTenant` pada tiap kelas yang `extends Model`.** Penyaringan tenant bukan hal yang boleh menunggu:
+**`BelongsToTenant` pada tiap kelas yang `extends Model`.** Penyaringan tenant bukan hal yang boleh menunggu:
 modul yang sudah dipasang di tenant sungguhan sambil menunggu dibereskan adalah modul yang sudah
 membocorkan data. Penjaganya membaca berkas, bukan mengandalkan pewarisan model dasar — model dasar hanya
 menjaga yang mewarisinya, dan pada satu modul ada tiga model yang tidak mewarisi model dasarnya, termasuk
@@ -251,8 +251,8 @@ Aturan ini masih berlaku: `app-erp-procurement` belum dipindah.
 
 ## Lihat juga
 
-- [Standar app dan addon app](02-module-standard.md) — susunan folder modul, nama tabel, dan `MilikTenant`
-- [Schema dan query scope](08-query-scopes-and-schema.md) — penyaringan tenant yang dijaga `MilikTenant`
+- [Standar app dan addon app](02-module-standard.md) — susunan folder modul, nama tabel, dan `BelongsToTenant`
+- [Schema dan query scope](08-query-scopes-and-schema.md) — penyaringan tenant yang dijaga `BelongsToTenant`
 - [Grand design](01-grand-design.md) — dua bentuk yang hidup berdampingan, modul di dalam runtime Core dan app yang belum dipindah
 - [Kondisi repository sekarang dan target pemisahan app](06-worktree-target.md) — arah pemindahan repo modul
 - [CI/CD](22-ci-cd.md) — alur yang menjalankan pemeriksaan gaya, tipe, dan analisa statis di atas

@@ -62,7 +62,7 @@ Kata **demo** tidak muncul satu kali pun di seluruh `docs/`. Halaman ini yang pe
 | Pendaftaran usaha lengkap dengan pemasangan module | Ada | `App\Actions\Onboarding\RegisterBusiness` |
 | Pemasangan, penonaktifan, dan pencabutan module per tenant | Ada | `module:install`, `module:disable`, `module:uninstall` |
 | Registry module dari berkas, tanpa daftar yang ditulis tangan | Ada | `App\Support\Modules\ModuleRegistry` |
-| Scope tenant yang gagal tertutup pada baca **dan** tulis | Ada | `TenantScope`, `MilikTenant` |
+| Scope tenant yang gagal tertutup pada baca **dan** tulis | Ada | `TenantScope`, `BelongsToTenant` |
 | Konteks aktif per permintaan, dimemoisasi | Ada | `CurrentWorkspace`, `ResolveModuleContext` |
 | Menghitung modul yang ikut ke dalam image | Ada | `php artisan edition:modules` |
 | Membuktikan modul yang tidak dibeli tidak ada di image | Ada, dijaga CI | `scripts/verify-edition.sh` |

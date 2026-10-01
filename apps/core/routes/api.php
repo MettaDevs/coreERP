@@ -42,7 +42,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-
 });
 
 /*
- * Hanya untuk sistem di luar CoreERP. Module di runtime ini membaca vendor lewat kontrak DaftarVendor,
+ * Hanya untuk sistem di luar CoreERP. Module di runtime ini membaca vendor lewat kontrak VendorDirectory,
  * bukan lewat HTTP, jadi rute ini tidak menerima kredensial app.
  */
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:vendors.read'])->group(function (): void {

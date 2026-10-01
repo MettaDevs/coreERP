@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class MaintenanceJobTypeJenisAset extends Model
 {
-    use MilikTenant;
+    use BelongsToTenant;
 
     protected $table = 'aset_m_maintenance_job_type_jenis_aset';
 

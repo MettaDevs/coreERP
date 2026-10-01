@@ -6,9 +6,9 @@ namespace Tests\Feature\Platform\Modules;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
-use App\Platform\Modules\Contracts\DirektoriOrganisasi;
-use App\Platform\Modules\Contracts\KalenderFiskal;
-use App\Platform\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\FiscalCalendarDirectory;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Support\CoreServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -38,8 +38,8 @@ class CoreServicesForModulesTest extends TestCase
     {
         [$konteks] = $this->sequenceContoh();
 
-        $hasil = $this->app->make(PenerbitNomor::class)
-            ->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $hasil = $this->app->make(NumberSequenceIssuer::class)
+            ->issue($konteks, 'sample-app.document', (string) Str::ulid());
 
         $this->assertSame('issued', $hasil['status']);
         $this->assertSame('000001', $hasil['number']);
@@ -49,10 +49,10 @@ class CoreServicesForModulesTest extends TestCase
     {
         [$konteks] = $this->sequenceContoh();
         $kunci = (string) Str::ulid();
-        $penerbit = $this->app->make(PenerbitNomor::class);
+        $penerbit = $this->app->make(NumberSequenceIssuer::class);
 
-        $pertama = $penerbit->terbitkan($konteks, 'sample-app.document', $kunci);
-        $kedua = $penerbit->terbitkan($konteks, 'sample-app.document', $kunci);
+        $pertama = $penerbit->issue($konteks, 'sample-app.document', $kunci);
+        $kedua = $penerbit->issue($konteks, 'sample-app.document', $kunci);
 
         $this->assertSame($pertama['number'], $kedua['number']);
     }
@@ -63,8 +63,8 @@ class CoreServicesForModulesTest extends TestCase
         // berurutan memang menolaknya, dan penolakan itu perilaku Core, bukan cacat kontrak.
         [$konteks] = $this->sequenceContoh(berurutan: true);
 
-        $hasil = $this->app->make(PenerbitNomor::class)
-            ->cadangkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $hasil = $this->app->make(NumberSequenceIssuer::class)
+            ->reserve($konteks, 'sample-app.document', (string) Str::ulid());
 
         $this->assertArrayHasKey('number', $hasil);
     }
@@ -74,14 +74,14 @@ class CoreServicesForModulesTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('tidak ditemukan');
 
-        $this->app->make(KalenderFiskal::class)->periode((string) Str::ulid(), '2026-09-08');
+        $this->app->make(FiscalCalendarDirectory::class)->period((string) Str::ulid(), '2026-09-08');
     }
 
     public function test_direktori_organisasi_mengembalikan_baris_biasa_bukan_model_core(): void
     {
         [$konteks] = $this->sequenceContoh();
 
-        $unit = $this->app->make(DirektoriOrganisasi::class)->unitOperasi($konteks['tenant_id']);
+        $unit = $this->app->make(OrganizationDirectory::class)->operatingUnits($konteks['tenant_id']);
 
         $this->assertSame([], $unit);
 
@@ -95,7 +95,7 @@ class CoreServicesForModulesTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $unit = $this->app->make(DirektoriOrganisasi::class)->unitOperasi($konteks['tenant_id']);
+        $unit = $this->app->make(OrganizationDirectory::class)->operatingUnits($konteks['tenant_id']);
 
         $this->assertCount(1, $unit);
         $this->assertSame(['id', 'nama', 'klasifikasi', 'tipe', 'nomor'], array_keys($unit[0]));

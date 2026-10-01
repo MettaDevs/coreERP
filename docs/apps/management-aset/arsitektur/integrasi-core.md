@@ -21,7 +21,7 @@ dalam proses yang sama. Alasannya ada di [grand design](/dev/01-grand-design).
 ### Nomor dokumen
 
 Setiap `kode` — master maupun transaksi — diterbitkan Number Sequence Core lewat kontrak
-`PenerbitNomor`, dibungkus `PenerbitNomorAset` yang menerjemahkan kegagalan Core menjadi kegagalan
+`NumberSequenceIssuer`, dibungkus `PenerbitNomorAset` yang menerjemahkan kegagalan Core menjadi kegagalan
 yang berarti bagi pemanggil modul.
 
 Yang perlu dipahami:
@@ -36,19 +36,19 @@ Yang perlu dipahami:
 
 ### Tahun buku
 
-`KalenderFiskalAset` menanyakan periode fiskal ke Core lewat kontrak `KalenderFiskal`. Modul tidak
+`KalenderFiskalAset` menanyakan periode fiskal ke Core lewat kontrak `FiscalCalendarDirectory`. Modul tidak
 menyimpan kalender fiskalnya sendiri, karena kalender itu milik badan hukum dan dipakai bersama
 modul lain.
 
 ### Satuan
 
-`DaftarSatuanAset` mengambil daftar satuan lewat kontrak `DaftarSatuan`, untuk dipakai rencana
+`DaftarSatuanAset` mengambil daftar satuan lewat kontrak `UnitOfMeasureDirectory`, untuk dipakai rencana
 pengadaan. Kalau daftar satuan belum bisa diambil, endpointnya menjawab galat, bukan daftar kosong —
 daftar kosong akan terbaca sebagai "tidak ada satuan", padahal yang terjadi adalah "belum tahu".
 
 ### Persetujuan
 
-Dokumen dekomisioning diajukan ke workflow Core lewat kontrak `MesinWorkflow`. Modul tidak tahu
+Dokumen dekomisioning diajukan ke workflow Core lewat kontrak `WorkflowEngine`. Modul tidak tahu
 siapa approver-nya dan tidak boleh tahu — itu dikonfigurasi admin tenant di Core.
 
 Pengajuan berjalan **di dalam transaksi yang menyimpan dokumennya**. Kalau alur persetujuan belum
@@ -57,7 +57,7 @@ disiapkan untuk entitas legal tersebut, dokumennya tidak jadi dibuat dan nomorny
 ### Konteks permintaan
 
 Tenant, badan hukum, unit kerja, id pengguna, permission efektif, dan lingkup kebijakan data dibaca
-dari kontrak `KonteksTenant` dan `KonteksPermintaan`, yang diisi middleware `konteks-module`.
+dari kontrak `TenantContext` dan `RequestContext`, yang diisi middleware `konteks-module`.
 Pembagiannya bukan selera: tenant dan batas organisasi adalah **tempat** sebuah query boleh membaca,
 sedang izin dan kebijakan data adalah **apa** yang boleh dilakukan pengguna di tempat itu.
 
@@ -71,8 +71,8 @@ permintaan HTTP bertanda tangan. Modul mendengarkannya dengan listener biasa.
 
 | Event | Listener | Akibatnya |
 | --- | --- | --- |
-| `TenantDisiapkan` | `SiapkanDataAwalTenant` | Master dasar Indonesia diisi |
-| `KeputusanWorkflowDiambil` | `TerapkanKeputusanDekomisioning` | Dokumen dan aset berpindah status |
+| `TenantProvisioned` | `SiapkanDataAwalTenant` | Master dasar Indonesia diisi |
+| `WorkflowDecisionTaken` | `TerapkanKeputusanDekomisioning` | Dokumen dan aset berpindah status |
 
 Tanda tangan HMAC, batas selisih waktu, dan `COREERP_APP_CONTEXT_SIGNING_KEY` tidak ada lagi pada
 jalur ini. Ketiganya melindungi permintaan yang menyeberangi jaringan; permintaan itu sudah tidak
@@ -134,7 +134,7 @@ itu dicatat, bukan saat event dikirim.
 
 ## Penyiapan tenant baru
 
-Saat `TenantDisiapkan` diterima:
+Saat `TenantProvisioned` diterima:
 
 1. Listener memeriksa `data.app_ids` memuat id modul ini. Kalau tidak, ia berhenti tanpa kesalahan.
 2. `ProvisionIndonesiaStarterData` mengisi master dasar: kelompok harta fiskal PMK 72/2023, profil penyusutan, buku, tipe lokasi, kondisi, setup maintenance.

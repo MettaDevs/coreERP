@@ -119,7 +119,7 @@ DB::afterCommit(function () use ($appIds, $idEvent, $tenant): void {
         app(InstallModule::class)->handle($appId, $tenant->id);
 
         app(PengirimEventModul::class)->kirim(
-            new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
+            new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
             (string) $tenant->id,
         );
     }
@@ -134,7 +134,7 @@ Tiga hal yang layak diperhatikan:
 
 **Registry runtime yang ditanya, bukan entitlement.** Id yang tidak ada sebagai folder di `modules/` dilewati tanpa suara: entitlement-nya tercatat, tetapi tidak ada yang bisa dipasang untuknya, dan ia tidak muncul di peluncur.
 
-**Event `TenantDisiapkan` dipancarkan per module yang benar-benar terpasang**, bukan sekali dengan seluruh daftar app. Sekali dengan seluruh daftar akan membuat listener module yang tidak terpasang ikut menjawab dan menyemai data ke tabel yang migration-nya belum pernah dijalankan untuk tenant itu.
+**Event `TenantProvisioned` dipancarkan per module yang benar-benar terpasang**, bukan sekali dengan seluruh daftar app. Sekali dengan seluruh daftar akan membuat listener module yang tidak terpasang ikut menjawab dan menyemai data ke tabel yang migration-nya belum pernah dijalankan untuk tenant itu.
 
 Sampai 10 September 2026 di sini ada langkah kesepuluh: sebuah job `DeployAppPlacement` yang menarik
 image app, menjalankan migration di container lain, dan menaikkan `runtime_status` menjadi `ready`.

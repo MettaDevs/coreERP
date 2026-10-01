@@ -13,7 +13,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\Pemeliharaan
  * Menyalin prosedur pemeriksaan menjadi snapshot milik satu baris pekerjaan.
  *
  * Tenant tidak lagi diminta sebagai argumen: setiap model di sini tersaring tenant aktif
- * lewat `MilikTenant`, dan tenant yang dikirim terpisah dari konteks permintaan justru
+ * lewat `BelongsToTenant`, dan tenant yang dikirim terpisah dari konteks permintaan justru
  * membuka celah menyalin prosedur milik tenant lain.
  */
 final class MaintenanceChecklistSnapshot

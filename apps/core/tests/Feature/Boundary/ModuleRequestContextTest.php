@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use App\Platform\Identity\Models\User;
-use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
@@ -188,10 +188,10 @@ class ModuleRequestContextTest extends TestCase
     public function test_konteks_menjawab_izin_yang_dipegang_dan_menolak_yang_tidak(): void
     {
         Route::middleware(['web', 'auth', 'konteks-module:contoh-a'])
-            ->get('/uji/izin', fn (KonteksPermintaan $akses): JsonResponse => new JsonResponse([
-                'dipegang' => $akses->punyaIzin('contoh-a.barang.read'),
-                'tidak_dipegang' => $akses->punyaIzin('contoh-a.barang.hapus'),
-                'pengguna' => $akses->penggunaId(),
+            ->get('/uji/izin', fn (RequestContext $akses): JsonResponse => new JsonResponse([
+                'dipegang' => $akses->hasPermission('contoh-a.barang.read'),
+                'tidak_dipegang' => $akses->hasPermission('contoh-a.barang.hapus'),
+                'pengguna' => $akses->userId(),
             ]));
 
         $respons = $this->actingAs($this->pemilik)->getJson('/uji/izin')->assertOk();
@@ -210,7 +210,7 @@ class ModuleRequestContextTest extends TestCase
         $this->travelTo($utc);
         $this->pemilik->forceFill(['timezone' => 'Asia/Jakarta'])->save();
         Route::middleware(['web', 'auth', 'konteks-module:contoh-a'])
-            ->get('/uji/zona', fn (KonteksPermintaan $akses): JsonResponse => new JsonResponse([
+            ->get('/uji/zona', fn (RequestContext $akses): JsonResponse => new JsonResponse([
                 'zona' => $akses->timezone(),
                 'hari_ini' => CarbonImmutable::now($akses->timezone())->toDateString(),
             ]));
@@ -231,19 +231,19 @@ class ModuleRequestContextTest extends TestCase
         // menjawab "tidak punya izin", bukan "punya semua izin" — dan pembacaan id pengguna
         // harus melempar, bukan mengembalikan string kosong yang lalu masuk ke jejak audit.
         Route::middleware(['web', 'auth'])
-            ->get('/uji/tanpa-konteks', function (KonteksPermintaan $akses): JsonResponse {
+            ->get('/uji/tanpa-konteks', function (RequestContext $akses): JsonResponse {
                 $melempar = false;
 
                 try {
-                    $akses->penggunaId();
+                    $akses->userId();
                 } catch (RuntimeException) {
                     $melempar = true;
                 }
 
                 return new JsonResponse([
-                    'punya_izin' => $akses->punyaIzin('contoh-a.barang.read'),
-                    'izin' => $akses->izin(),
-                    'kebijakan' => $akses->kebijakanData(),
+                    'punya_izin' => $akses->hasPermission('contoh-a.barang.read'),
+                    'izin' => $akses->permissions(),
+                    'kebijakan' => $akses->dataPolicies(),
                     'pengguna_melempar' => $melempar,
                 ]);
             });

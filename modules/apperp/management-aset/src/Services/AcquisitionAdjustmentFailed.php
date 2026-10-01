@@ -7,7 +7,7 @@ use Throwable;
 
 /**
  * Jurnal koreksi nilai perolehan tidak dapat diterbitkan karena kesalahan sistem, bukan karena isian
- * pengguna (TODO 12). Penyebabnya — `PostingTidakSah` dari Core — sudah dilaporkan ke pemantauan
+ * pengguna (TODO 12). Penyebabnya — `InvalidPosting` dari Core — sudah dilaporkan ke pemantauan
  * kesalahan; pesan ini yang sampai ke layar, dan transaksinya dibatalkan: nilai aset tidak berubah.
  */
 final class AcquisitionAdjustmentFailed extends RuntimeException

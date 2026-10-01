@@ -3,7 +3,7 @@
 namespace Tests\Feature\Platform\Organization;
 
 use App\Platform\Identity\Models\User;
-use App\Platform\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Models\AppServiceCredential;
 use App\Platform\Modules\Models\ModuleInstallation;
 use App\Platform\Organization\Models\Organization;
@@ -171,7 +171,7 @@ class OperatingUnitNumberTest extends TestCase
             [$klinik, $le], [$layanan, $klinik], [$poli, $layanan],
         ], '2026-01-01');
 
-        $hasil = $this->direktori()->unitBisnisInduk($le->tenant_id, [$poli->id, $klinik->id], '2026-09-30');
+        $hasil = $this->direktori()->parentBusinessUnits($le->tenant_id, [$poli->id, $klinik->id], '2026-09-30');
 
         $this->assertSame(['id' => $klinik->id, 'nama' => 'Klinik A', 'nomor' => 'KLN-A'], $hasil[$poli->id]);
         // Business unit menurunkan dirinya sendiri.
@@ -185,7 +185,7 @@ class OperatingUnitNumberTest extends TestCase
         $lepas = $this->operatingUnit('Poli Lepas', 'department', 'POLI-LEPAS');
         $this->hierarkiTerbit('Struktur manajemen', ['management'], $le, [[$poli, $le]], '2026-01-01');
 
-        $hasil = $this->direktori()->unitBisnisInduk($le->tenant_id, [$poli->id, $lepas->id], '2026-09-30');
+        $hasil = $this->direktori()->parentBusinessUnits($le->tenant_id, [$poli->id, $lepas->id], '2026-09-30');
 
         $this->assertSame([$poli->id => null, $lepas->id => null], $hasil);
     }
@@ -198,7 +198,7 @@ class OperatingUnitNumberTest extends TestCase
         $this->hierarkiTerbit('Struktur pengadaan', ['procurement'], $le, [[$klinik, $le], [$poli, $klinik]], '2026-01-01');
         $this->hierarki('Draft manajemen', ['management'], $le, [[$klinik, $le], [$poli, $klinik]], '2026-01-01');
 
-        $hasil = $this->direktori()->unitBisnisInduk($le->tenant_id, [$poli->id], '2026-09-30');
+        $hasil = $this->direktori()->parentBusinessUnits($le->tenant_id, [$poli->id], '2026-09-30');
 
         $this->assertNull($hasil[$poli->id]);
     }
@@ -212,7 +212,7 @@ class OperatingUnitNumberTest extends TestCase
         $this->hierarkiTerbit('Manajemen satu', ['management'], $le, [[$klinikA, $le], [$poli, $klinikA]], '2026-01-01');
         $this->hierarkiTerbit('Manajemen dua', ['management'], $le, [[$klinikB, $le], [$poli, $klinikB]], '2026-01-01');
 
-        $this->assertNull($this->direktori()->unitBisnisInduk($le->tenant_id, [$poli->id], '2026-09-30')[$poli->id]);
+        $this->assertNull($this->direktori()->parentBusinessUnits($le->tenant_id, [$poli->id], '2026-09-30')[$poli->id]);
     }
 
     public function test_business_unit_mengikuti_versi_hierarki_yang_berlaku_pada_tanggal_posting(): void
@@ -240,8 +240,8 @@ class OperatingUnitNumberTest extends TestCase
         $this->post("/settings/organization/hierarchy-versions/{$versiDua->id}/publish", ['version' => $versiDua->hierarchy()->value('version')])->assertSessionHasNoErrors();
 
         $direktori = $this->direktori();
-        $this->assertSame('KLN-A', $direktori->unitBisnisInduk($le->tenant_id, [$poli->id], '2026-09-30')[$poli->id]['nomor'] ?? null);
-        $this->assertSame('KLN-B', $direktori->unitBisnisInduk($le->tenant_id, [$poli->id], '2026-10-01')[$poli->id]['nomor'] ?? null);
+        $this->assertSame('KLN-A', $direktori->parentBusinessUnits($le->tenant_id, [$poli->id], '2026-09-30')[$poli->id]['nomor'] ?? null);
+        $this->assertSame('KLN-B', $direktori->parentBusinessUnits($le->tenant_id, [$poli->id], '2026-10-01')[$poli->id]['nomor'] ?? null);
     }
 
     public function test_business_unit_induk_tidak_menyeberang_tenant(): void
@@ -252,7 +252,7 @@ class OperatingUnitNumberTest extends TestCase
         $this->hierarkiTerbit('Struktur manajemen', ['management'], $le, [[$klinik, $le], [$poli, $klinik]], '2026-01-01');
         $tenantLain = TenantMembership::query()->where('user_id', $this->pemilikBaru('lain@metta.test', 'PT Lain')->id)->value('tenant_id');
 
-        $this->assertNull($this->direktori()->unitBisnisInduk((string) $tenantLain, [$poli->id], '2026-09-30')[$poli->id]);
+        $this->assertNull($this->direktori()->parentBusinessUnits((string) $tenantLain, [$poli->id], '2026-09-30')[$poli->id]);
     }
 
     public function test_unit_operasi_memulangkan_tipe_dan_nomor(): void
@@ -260,7 +260,7 @@ class OperatingUnitNumberTest extends TestCase
         $klinik = $this->operatingUnit('Klinik A', 'business_unit', 'KLN-A');
         $this->operatingUnit('Poli Umum', 'department', null);
 
-        $unit = $this->direktori()->unitOperasi($klinik->tenant_id);
+        $unit = $this->direktori()->operatingUnits($klinik->tenant_id);
 
         $this->assertSame([
             ['id' => $klinik->id, 'nama' => 'Klinik A', 'klasifikasi' => 'operating_unit', 'tipe' => 'business_unit', 'nomor' => 'KLN-A'],
@@ -319,9 +319,9 @@ class OperatingUnitNumberTest extends TestCase
         $this->internal($klinik->tenant_id)->assertOk()->assertJsonCount(1, 'data');
     }
 
-    private function direktori(): DirektoriOrganisasi
+    private function direktori(): OrganizationDirectory
     {
-        return $this->app->make(DirektoriOrganisasi::class);
+        return $this->app->make(OrganizationDirectory::class);
     }
 
     private function pemilikBaru(string $email, string $bisnis): User

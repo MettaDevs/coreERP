@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\PenerbitContoh\ChangeMe\Tests\Feature;
 
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +33,7 @@ use Tests\TestCase;
  *    pekerjaan latar yang lupa menyetel konteks.
  *
  * Baris pembanding disisipkan lewat query builder, bukan lewat model, dan itu disengaja:
- * `MilikTenant` membatalkan penyimpanan baris milik tenant selain tenant aktif — persis yang
+ * `BelongsToTenant` membatalkan penyimpanan baris milik tenant selain tenant aktif — persis yang
  * dibuktikan butir 2. Menuntut penyemaian memakai model berarti membuat test kebocoran antar
  * tenant mustahil ditulis.
  */
@@ -96,7 +96,7 @@ class PenyaringanTenantTest extends TestCase
      * Menjalankan sepotong pekerjaan dengan tenant tertentu sebagai tenant aktif.
      *
      * Di permintaan HTTP tenant diikat middleware `konteks-module`. Test memanggil model
-     * secara langsung, jadi tenantnya harus disebut — dan `PelaksanaUntukTenant` satu-satunya
+     * secara langsung, jadi tenantnya harus disebut — dan `TenantRunner` satu-satunya
      * cara module boleh menyebutnya.
      *
      * @template T
@@ -106,7 +106,7 @@ class PenyaringanTenantTest extends TestCase
      */
     private function untukTenant(string $tenantId, callable $aksi): mixed
     {
-        return $this->app->make(PelaksanaUntukTenant::class)->jalankanUntuk($tenantId, $aksi);
+        return $this->app->make(TenantRunner::class)->runFor($tenantId, $aksi);
     }
 
     /**

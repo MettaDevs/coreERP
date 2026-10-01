@@ -401,7 +401,7 @@ Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
   lain ditulis selisihnya dari UTC pada saat itu, misalnya "UTC+09:00", karena singkatan seperti IST atau
   CST dipakai lebih dari satu zona. Tanggal tanpa jam (`date`) tidak digeser.
 - **Zona di konteks module.** Konteks laporan membawa `timezone`, dihitung dari pengguna dan entitas legal
-  catatan ekspor (worker tidak punya sesi); `KonteksPermintaan::timezone()` menjawab hal yang sama di rute
+  catatan ekspor (worker tidak punya sesi); `RequestContext::timezone()` menjawab hal yang sama di rute
   module. Laporan aset memakainya untuk periode bawaan, nama berkas, dan batas hari filter tanggal, dan
   mengirim waktu cetak, waktu dibuat, serta waktu mulai dan selesai aktual work order sebagai `datetime`.
 

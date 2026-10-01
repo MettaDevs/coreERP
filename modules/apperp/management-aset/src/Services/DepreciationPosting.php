@@ -2,10 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Platform\Modules\Contracts\DirektoriOrganisasi;
-use App\Platform\Modules\Contracts\PenerbitPosting;
-use App\Platform\Modules\Contracts\PostingTidakSah;
-use App\Platform\Modules\Contracts\PresisiMataUang;
+use App\Platform\Modules\Contracts\CurrencyRounding;
+use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
+use App\Platform\Modules\Contracts\PostingFeed;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Http\Request;
@@ -79,11 +79,11 @@ final class DepreciationPosting
     private array $postingGroups = [];
 
     public function __construct(
-        private readonly PenerbitPosting $publisher,
-        private readonly PresisiMataUang $precision,
+        private readonly PostingFeed $publisher,
+        private readonly CurrencyRounding $precision,
         private readonly AssetPostingAccounts $accounts,
         private readonly PembuatAset $assets,
-        private readonly DirektoriOrganisasi $organizations,
+        private readonly OrganizationDirectory $organizations,
     ) {}
 
     /** `posting_id` satu proses post: entitas legal, buku, tanggal akhir periode, dan nomor urut prosesnya. */
@@ -114,7 +114,7 @@ final class DepreciationPosting
         $posting = null;
         if ($blockers === [] && $run['included'] !== []) {
             $input = $this->input($tenant, $legalEntityId, $book, $periodEndsOn, $this->nextSequence($legalEntityId, (string) $book->id, $periodEndsOn), $run['included']);
-            $posting = $this->orFail(fn (): array => $this->publisher->pratinjau($input));
+            $posting = $this->orFail(fn (): array => $this->publisher->preview($input));
         }
 
         return $this->result($legalEntityId, $book, $periodEndsOn, $run, $blockers, $posting);
@@ -151,7 +151,7 @@ final class DepreciationPosting
             }
 
             $input = $this->input($tenant, $legalEntityId, $book, $periodEndsOn, $this->nextSequence($legalEntityId, (string) $book->id, $periodEndsOn), $run['included']);
-            $posting = $this->orFail(fn (): array => $this->publisher->terbitkan($input));
+            $posting = $this->orFail(fn (): array => $this->publisher->publish($input));
             foreach (array_chunk(array_column($run['included'], 'id'), self::CHUNK) as $ids) {
                 DepreciationPeriod::query()->whereIn('id', $ids)->update(['posted_posting_id' => $posting['posting_id'], 'updated_at' => now()]);
             }
@@ -198,7 +198,7 @@ final class DepreciationPosting
         $unit = (string) $original->usage_org_unit_id;
         $grup = $this->groups([$group]);
         $namaGroup = $grup[$group]->nama ?? $group;
-        $bu = $this->organizations->unitBisnisInduk($tenantId, [$unit], $tanggal)[$unit]['id'] ?? $unit;
+        $bu = $this->organizations->parentBusinessUnits($tenantId, [$unit], $tanggal)[$unit]['id'] ?? $unit;
         $label = Carbon::parse($tanggal)->format('d/m/Y');
 
         $input = [
@@ -233,7 +233,7 @@ final class DepreciationPosting
             ]]],
         ];
 
-        return $this->orFail(fn (): array => $this->publisher->terbitkan($input));
+        return $this->orFail(fn (): array => $this->publisher->publish($input));
     }
 
     /**
@@ -359,7 +359,7 @@ final class DepreciationPosting
         }
 
         try {
-            $desimal = $this->precision->nilai($tenantId, $mataUang[0]);
+            $desimal = $this->precision->amountDecimals($tenantId, $mataUang[0]);
         } catch (RuntimeException $kegagalan) {
             return ['legal_entity_id' => $kegagalan->getMessage()];
         }
@@ -381,7 +381,7 @@ final class DepreciationPosting
     }
 
     /**
-     * Masukan `PenerbitPosting` satu proses post.
+     * Masukan `PostingFeed` satu proses post.
      *
      * @param  list<stdClass>  $rows
      * @return array<string, mixed>
@@ -392,7 +392,7 @@ final class DepreciationPosting
         $desimal = $this->decimals($tenantId, $mataUang);
         $grup = $this->groups(array_map(static fn (stdClass $row): string => (string) $row->group_aset_id, $rows));
         $unit = array_values(array_unique(array_map(static fn (stdClass $row): string => (string) $row->usage_org_unit_id, $rows)));
-        $bisnis = $this->organizations->unitBisnisInduk($tenantId, $unit, $periodEndsOn);
+        $bisnis = $this->organizations->parentBusinessUnits($tenantId, $unit, $periodEndsOn);
 
         $beban = [];
         $akumulasi = [];
@@ -558,7 +558,7 @@ final class DepreciationPosting
     private function decimals(string $tenantId, string $currency): int
     {
         try {
-            $desimal = $this->precision->nilai($tenantId, $currency);
+            $desimal = $this->precision->amountDecimals($tenantId, $currency);
         } catch (RuntimeException $kegagalan) {
             throw ValidationException::withMessages(['legal_entity_id' => $kegagalan->getMessage()]);
         }
@@ -600,7 +600,7 @@ final class DepreciationPosting
     }
 
     /**
-     * `PostingTidakSah` adalah bug penerbit, bukan keadaan yang diserahkan ke pengguna (K-22). Ia tetap
+     * `InvalidPosting` adalah bug penerbit, bukan keadaan yang diserahkan ke pengguna (K-22). Ia tetap
      * dilaporkan ke pemantauan kesalahan, lalu diterjemahkan menjadi kegagalan yang dapat dibaca orang;
      * pemanggilnya membatalkan transaksinya.
      *
@@ -611,7 +611,7 @@ final class DepreciationPosting
     {
         try {
             return $aksi();
-        } catch (PostingTidakSah $kegagalan) {
+        } catch (InvalidPosting $kegagalan) {
             report($kegagalan);
 
             throw new DepreciationPostingFailed($kegagalan);

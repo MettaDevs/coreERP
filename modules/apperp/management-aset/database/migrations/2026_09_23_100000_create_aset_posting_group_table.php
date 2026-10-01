@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Schema;
  * baris dengan `effective_from` terbesar yang tidak melewati tanggal postingnya.
  *
  * **Kenapa akun tanpa foreign key.** Id akun adalah id daftar akun referensi milik Core
- * (`DaftarAkun`, K-05). Module tidak menyentuh tabel Core; keberadaan dan status akun diperiksa
+ * (`AccountDirectory`, K-05). Module tidak menyentuh tabel Core; keberadaan dan status akun diperiksa
  * lewat kontrak saat disimpan, dan diperiksa lagi oleh penerbit posting saat jurnal terbit.
  *
  * Setiap kolom akun boleh kosong. Akun yang belum dipetakan tidak menghalangi apa pun di modul

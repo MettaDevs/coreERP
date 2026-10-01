@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Platform\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use RuntimeException;
 use Throwable;
 
@@ -21,7 +21,7 @@ use Throwable;
  */
 final class PenerbitNomorHr
 {
-    public function __construct(private readonly PenerbitNomor $penerbit) {}
+    public function __construct(private readonly NumberSequenceIssuer $penerbit) {}
 
     /**
      * Menerbitkan satu nomor untuk referensi milik module ini.
@@ -32,7 +32,7 @@ final class PenerbitNomorHr
     public function issue(string $reference, string $tenantId, string $key): string
     {
         try {
-            $hasil = $this->penerbit->terbitkan(
+            $hasil = $this->penerbit->issue(
                 ['tenant_id' => $tenantId, 'app_id' => 'human-resources'],
                 $reference,
                 $key,

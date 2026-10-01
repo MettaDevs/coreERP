@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
-use App\Platform\Modules\Contracts\KonteksPermintaan;
 use App\Platform\Modules\Contracts\ReportFormatter;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Reporting\PenyediaLaporan;
@@ -27,14 +27,14 @@ use RuntimeException;
  */
 final class ReportPreviewController extends Controller
 {
-    public function show(Request $request, string $code, PenyediaLaporan $reports, ReportFormatter $formatter, KonteksPermintaan $akses): JsonResponse
+    public function show(Request $request, string $code, PenyediaLaporan $reports, ReportFormatter $formatter, RequestContext $akses): JsonResponse
     {
-        abort_unless($reports->punya($code), 404, 'Laporan ini belum tersedia.');
+        abort_unless($reports->has($code), 404, 'Laporan ini belum tersedia.');
         $context = ReportContext::fromRequest($request, $akses->timezone());
 
         try {
             $data = $reports->dataset($code, $context->toArray(), $request->query());
-            $data = $formatter->display($context->tenantId, $reports->definisi($code, $context->toArray())['fields'], $data, $context->timezone);
+            $data = $formatter->display($context->tenantId, $reports->definition($code, $context->toArray())['fields'], $data, $context->timezone);
         } catch (ReportAccessDeniedException $exception) {
             abort(403, $exception->getMessage());
         } catch (RuntimeException $exception) {

@@ -4,7 +4,7 @@ namespace Tests\Feature\Foundation\FinancePosting;
 
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Platform\Identity\Models\User;
-use App\Platform\Modules\Contracts\DaftarAkun;
+use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
@@ -76,7 +76,7 @@ class ReferenceAccountTest extends TestCase
         $jawaban->assertJsonPath('data.updated.0.changes.code.to', '1-2305');
         $jawaban->assertJsonPath('data.unchanged_count', 2);
         // Baris yang sama, bukan baris baru: pemetaan yang menunjuk id ini tetap utuh.
-        $akun = $this->app->make(DaftarAkun::class)->satu($this->membership->tenant_id, (string) $id);
+        $akun = $this->app->make(AccountDirectory::class)->find($this->membership->tenant_id, (string) $id);
         $this->assertSame(['1-2305', 'Kendaraan Operasional'], [$akun['code'] ?? null, $akun['name'] ?? null]);
         $this->assertDatabaseCount('finance_reference_accounts', 3);
     }
@@ -99,11 +99,11 @@ class ReferenceAccountTest extends TestCase
             ->patchJson("/api/v1/finance-reference-accounts/{$lama}", ['active' => false, 'version' => FinanceReferenceAccount::query()->findOrFail($lama)->version])
             ->assertOk()->assertJsonPath('data.active', false);
 
-        $daftar = $this->app->make(DaftarAkun::class);
+        $daftar = $this->app->make(AccountDirectory::class);
         $tenant = $this->membership->tenant_id;
-        $this->assertNotContains('1452', array_column($daftar->cari($tenant, null), 'external_id'), 'Akun nonaktif tidak muncul di dropdown.');
-        $this->assertFalse($daftar->satu($tenant, $lama)['active'] ?? true, 'Pemetaan lama tetap bisa menampilkan akun nonaktif.');
-        $this->assertArrayHasKey($lama, $daftar->banyak($tenant, [$lama]));
+        $this->assertNotContains('1452', array_column($daftar->search($tenant, null), 'external_id'), 'Akun nonaktif tidak muncul di dropdown.');
+        $this->assertFalse($daftar->find($tenant, $lama)['active'] ?? true, 'Pemetaan lama tetap bisa menampilkan akun nonaktif.');
+        $this->assertArrayHasKey($lama, $daftar->findMany($tenant, [$lama]));
     }
 
     public function test_satu_baris_salah_menolak_seluruh_berkas_dengan_nomor_barisnya(): void
@@ -160,12 +160,12 @@ class ReferenceAccountTest extends TestCase
         $this->impor("external_id,code,name,type,active\n1501,1-1500,PPN Masukan,balance_sheet,true\n")
             ->assertOk()->assertJsonPath('data.status', 'rejected');
 
-        $daftar = $this->app->make(DaftarAkun::class);
+        $daftar = $this->app->make(AccountDirectory::class);
         $tenant = $this->membership->tenant_id;
-        $this->assertEqualsCanonicalizing(['1452', '1453', '1501', '6510'], array_column($daftar->cari($tenant, $le), 'external_id'));
-        $this->assertEqualsCanonicalizing(['1452', '1453', '6510'], array_column($daftar->cari($tenant, null), 'external_id'));
-        $this->assertSame(['6510'], array_column($daftar->cari($tenant, null, 'beban'), 'external_id'));
-        $this->assertSame([], $daftar->cari($tenant, null, '%'), 'Persen di kata pencarian adalah huruf biasa.');
+        $this->assertEqualsCanonicalizing(['1452', '1453', '1501', '6510'], array_column($daftar->search($tenant, $le), 'external_id'));
+        $this->assertEqualsCanonicalizing(['1452', '1453', '6510'], array_column($daftar->search($tenant, null), 'external_id'));
+        $this->assertSame(['6510'], array_column($daftar->search($tenant, null, 'beban'), 'external_id'));
+        $this->assertSame([], $daftar->search($tenant, null, '%'), 'Persen di kata pencarian adalah huruf biasa.');
     }
 
     public function test_entitas_milik_tenant_lain_tidak_dapat_menjadi_cakupan(): void
@@ -187,11 +187,11 @@ class ReferenceAccountTest extends TestCase
         ])->assertOk();
         $akunLain = (string) FinanceReferenceAccount::query()->where('external_id', '9999')->value('id');
 
-        $daftar = $this->app->make(DaftarAkun::class);
+        $daftar = $this->app->make(AccountDirectory::class);
         $tenant = $this->membership->tenant_id;
-        $this->assertNull($daftar->satu($tenant, $akunLain));
-        $this->assertSame([], $daftar->banyak($tenant, [$akunLain]));
-        $this->assertNotContains('9999', array_column($daftar->cari($tenant, null, '', 100), 'external_id'));
+        $this->assertNull($daftar->find($tenant, $akunLain));
+        $this->assertSame([], $daftar->findMany($tenant, [$akunLain]));
+        $this->assertNotContains('9999', array_column($daftar->search($tenant, null, '', 100), 'external_id'));
 
         $this->actingAs($this->owner)
             ->patchJson("/api/v1/finance-reference-accounts/{$akunLain}", ['active' => false])

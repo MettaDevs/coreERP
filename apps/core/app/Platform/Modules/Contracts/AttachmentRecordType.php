@@ -15,7 +15,7 @@ namespace App\Platform\Modules\Contracts;
  *
  * Module mendaftarkannya ke {@see AttachmentRecordTypes} dari penyedia layanannya. Sebelum bertanya, Core
  * memasang konteks module yang disebut {@see self::moduleId()} pada permintaan itu, sama seperti rute module
- * sendiri, sehingga `KonteksPermintaan`, kebijakan data, dan penyaringan tenant model module berlaku.
+ * sendiri, sehingga `RequestContext`, kebijakan data, dan penyaringan tenant model module berlaku.
  */
 interface AttachmentRecordType
 {

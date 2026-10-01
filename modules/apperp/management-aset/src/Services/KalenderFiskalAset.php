@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Platform\Modules\Contracts\KalenderFiskal;
+use App\Platform\Modules\Contracts\FiscalCalendarDirectory;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,7 +25,7 @@ use Illuminate\Validation\ValidationException;
  */
 class KalenderFiskalAset
 {
-    public function __construct(private readonly KalenderFiskal $kalender) {}
+    public function __construct(private readonly FiscalCalendarDirectory $kalender) {}
 
     /**
      * `null` bila entitas legal belum punya kalender atau tanggalnya belum tercakup.
@@ -42,7 +42,7 @@ class KalenderFiskalAset
     public function resolve(string $tenantId, string $legalEntityId, string $date): ?array
     {
         try {
-            return $this->kalender->periode($legalEntityId, $date);
+            return $this->kalender->period($legalEntityId, $date);
         } catch (ValidationException) {
             return null;
         }

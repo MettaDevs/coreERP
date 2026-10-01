@@ -13,7 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
-use App\Platform\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\InvalidPosting;
 use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -182,7 +182,7 @@ final class FinancePostingMonitorController extends Controller
 
         try {
             $hasil = $penerbit->revalidate($posting, (int) $request->user()?->getAuthIdentifier());
-        } catch (PostingTidakSah $kesalahan) {
+        } catch (InvalidPosting $kesalahan) {
             // Masukan yang dulu sah kini ditolak — misalnya vendornya berpindah entitas legal. Itu
             // bukan kesalahan pengguna di layar ini, jadi dilaporkan ke pemantauan kesalahan juga.
             report($kesalahan);

@@ -40,7 +40,7 @@ berbeda pada `FIXTURE` yang sama berbagi tenant.
 
 **Tidak ada lagi tiruan Core.** `stub-core/` dulu berdiri di tempat Control Plane untuk
 menerbitkan nomor lewat HTTP, dan sekaligus menjadi oracle nomor lewat `/__stats`. Di dalam satu
-runtime, nomor diterbitkan proses yang sama lewat kontrak `PenerbitNomor`; tidak ada yang tersisa
+runtime, nomor diterbitkan proses yang sama lewat kontrak `NumberSequenceIssuer`; tidak ada yang tersisa
 untuk ditiru. Oracle-nya pindah ke `verify.sql`, dan pindah ke atas: tiap `kode` yang tersimpan
 modul harus punya satu baris di `number_sequence_issues` pada tenant **dan** reference yang benar.
 Yang dulu dibuktikan dengan menghitung ("4.342 terbit, 4.342 unik") sekarang dibuktikan dengan

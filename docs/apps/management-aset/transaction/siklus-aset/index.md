@@ -26,9 +26,9 @@ Jadi tidak ada jalan menjual aset yang persetujuan penghentiannya belum keluar.
 
 ## Persetujuan datang dari Core, bukan dari sini
 
-Dokumen dekomisioning tidak menyetujui dirinya sendiri. Saat dibuat, app mengajukannya ke workflow milik Core lewat kontrak `MesinWorkflow`, lalu menunggu.
+Dokumen dekomisioning tidak menyetujui dirinya sendiri. Saat dibuat, app mengajukannya ke workflow milik Core lewat kontrak `WorkflowEngine`, lalu menunggu.
 
-Core menjalankan alur persetujuan yang dikonfigurasi admin tenant — siapa approver-nya, berapa tahap, dan sebagainya — lalu memancarkan keputusannya sebagai event `KeputusanWorkflowDiambil`. Amplop `core.workflow.decision.v2` tetap ditulis ke outbox untuk penerima yang berada di luar proses.
+Core menjalankan alur persetujuan yang dikonfigurasi admin tenant — siapa approver-nya, berapa tahap, dan sebagainya — lalu memancarkan keputusannya sebagai event `WorkflowDecisionTaken`. Amplop `core.workflow.decision.v2` tetap ditulis ke outbox untuk penerima yang berada di luar proses.
 
 Yang perlu dipahami saat menulis kode di sini:
 

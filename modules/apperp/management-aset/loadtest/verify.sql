@@ -13,7 +13,7 @@
 --
 -- 2. **Oracle nomor pindah ke `number_sequence_issues`.** Dulu jumlah nomor terbit dibaca dari
 --    `/__stats` milik tiruan Core. Tiruan itu tidak ada lagi; nomor diterbitkan proses yang
---    sama lewat `PenerbitNomor`, dan tiap penerbitan meninggalkan baris di buku terbitan Core.
+--    sama lewat `NumberSequenceIssuer`, dan tiap penerbitan meninggalkan baris di buku terbitan Core.
 --    Itu oracle yang lebih kuat daripada yang digantikannya: ia tidak hanya menghitung, ia
 --    juga mengikat tiap kode yang tersimpan module ke satu baris terbitan milik tenant dan
 --    reference yang benar. Kode yang tidak punya pasangan di sana berarti nomor yang lahir di
@@ -473,7 +473,7 @@ posting_group_group_lintas_tenant as (
 ),
 posting_group_akun_asing as (
     -- Satu-satunya yang ditahan kode: kolom akun menyimpan id daftar akun milik Core TANPA kunci
-    -- asing, dan hanya pemeriksaan `DaftarAkun` di controller yang menolak akun tenant lain atau
+    -- asing, dan hanya pemeriksaan `AccountDirectory` di controller yang menolak akun tenant lain atau
     -- akun yang tidak ada.
     select count(*) as n
     from aset_m_posting_group p

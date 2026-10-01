@@ -13,10 +13,10 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
-use App\Platform\Modules\Contracts\PenerbitPosting;
+use App\Platform\Modules\Contracts\InvalidPosting;
 use App\Platform\Modules\Contracts\PostingAccountResolver;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
-use App\Platform\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;
@@ -140,7 +140,7 @@ class FinancePostingFeedTest extends TestCase
     {
         try {
             DB::transaction(function (): void {
-                app(PenerbitPosting::class)->terbitkan($this->perolehan());
+                app(PostingFeed::class)->publish($this->perolehan());
                 throw new RuntimeException('Dokumen sumber gagal disimpan.');
             });
         } catch (RuntimeException) {
@@ -159,7 +159,7 @@ class FinancePostingFeedTest extends TestCase
         $this->assertSame($pertama['payload']['published_at'], $kedua['payload']['published_at']);
         $this->assertSame(1, FinancePosting::query()->count());
 
-        $this->expectException(PostingTidakSah::class);
+        $this->expectException(InvalidPosting::class);
         $this->terbitkan($this->perolehan(['nilai' => '400000000.00']));
     }
 
@@ -175,7 +175,7 @@ class FinancePostingFeedTest extends TestCase
             try {
                 $this->terbitkan($masukan);
                 $this->fail('Posting yang tidak mungkin benar harus dilempar.');
-            } catch (PostingTidakSah) {
+            } catch (InvalidPosting) {
             }
         }
 
@@ -191,7 +191,7 @@ class FinancePostingFeedTest extends TestCase
             try {
                 $this->terbitkan($masukan);
                 $this->fail(sprintf('Nilai %s harus ditolak.', var_export($nilai, true)));
-            } catch (PostingTidakSah) {
+            } catch (InvalidPosting) {
             }
         }
 
@@ -406,7 +406,7 @@ class FinancePostingFeedTest extends TestCase
             try {
                 $this->terbitkan($masukan);
                 $this->fail(sprintf('fix_url %s harus ditolak.', $url));
-            } catch (PostingTidakSah $kegagalan) {
+            } catch (InvalidPosting $kegagalan) {
                 $this->assertStringContainsString('Baris 2 mapping.fix_url', $kegagalan->getMessage());
             }
         }
@@ -607,7 +607,7 @@ class FinancePostingFeedTest extends TestCase
             try {
                 $this->terbitkan($masukan);
                 $this->fail('Koreksi yang tidak mewarisi posting asalnya harus ditolak.');
-            } catch (PostingTidakSah) {
+            } catch (InvalidPosting) {
             }
         }
     }
@@ -625,7 +625,7 @@ class FinancePostingFeedTest extends TestCase
             try {
                 $this->terbitkan($masukan);
                 $this->fail('Vendor yang salah harus ditolak.');
-            } catch (PostingTidakSah) {
+            } catch (InvalidPosting) {
             }
         }
         $this->assertSame(0, FinancePosting::query()->count());
@@ -635,13 +635,13 @@ class FinancePostingFeedTest extends TestCase
     {
         FinanceReferenceAccount::query()->whereKey($this->akun['aset'])->update(['active' => false]);
 
-        $hasil = app(PenerbitPosting::class)->pratinjau($this->perolehan());
+        $hasil = app(PostingFeed::class)->preview($this->perolehan());
 
         $this->assertSame('held', $hasil['status']);
         $this->assertSame('ACCOUNT_INACTIVE', $hasil['problems'][0]['code']);
         $this->assertFalse($hasil['created']);
         $this->assertSame(0, FinancePosting::query()->count());
-        $this->assertNull(app(PenerbitPosting::class)->status($this->membership->tenant_id, 'AST-ACQ-0001'));
+        $this->assertNull(app(PostingFeed::class)->status($this->membership->tenant_id, 'AST-ACQ-0001'));
     }
 
     public function test_push_bertanda_tangan_dan_ack_di_jawaban_menutup_posting(): void
@@ -812,7 +812,7 @@ class FinancePostingFeedTest extends TestCase
      */
     private function terbitkan(array $masukan): array
     {
-        return DB::transaction(fn (): array => app(PenerbitPosting::class)->terbitkan($masukan));
+        return DB::transaction(fn (): array => app(PostingFeed::class)->publish($masukan));
     }
 
     /**

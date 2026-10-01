@@ -89,8 +89,8 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_pemeriksa_kelas_core_membedakan_kontrak_dari_kelas_biasa(): void
     {
         $contoh = implode("\n", [
-            'use App\\Platform\\Modules\\Contracts\\PenerbitNomor;',
-            'use App\\Platform\\Modules\\Contracts\\MilikTenant;',
+            'use App\\Platform\\Modules\\Contracts\\NumberSequenceIssuer;',
+            'use App\\Platform\\Modules\\Contracts\\BelongsToTenant;',
             'use App\\Platform\\Tenant\\Models\\Tenant;',
             'use App\\Platform\\Environment\\Support\\CurrentWorkspace;',
         ]);

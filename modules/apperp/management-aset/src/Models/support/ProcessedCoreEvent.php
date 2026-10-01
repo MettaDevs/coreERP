@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Models\support;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
  * Event Core yang sudah pernah diproses module ini.
  *
  * Bukan data bisnis: satu baris di sini hanya berarti "id event ini sudah pernah sampai".
- * Ia tetap membawa `tenant_id` dan tetap memakai `MilikTenant`, karena keunikannya
+ * Ia tetap membawa `tenant_id` dan tetap memakai `BelongsToTenant`, karena keunikannya
  * `(tenant_id, event_id)` — dua tenant boleh punya event dengan id yang sama tanpa saling
  * menutup.
  *
@@ -26,7 +26,7 @@ use Illuminate\Support\Carbon;
  * pengiriman ulang yang sah akan menjatuhkan keputusan yang sah.
  *
  * Konsekuensinya `tenant_id` ditulis eksplisit pada penyisipan itu: `insertOrIgnore` tidak
- * membuat instance, sehingga pengisian otomatis oleh `MilikTenant` tidak berjalan. Yang
+ * membuat instance, sehingga pengisian otomatis oleh `BelongsToTenant` tidak berjalan. Yang
  * dijaga trait ini di sini adalah pembacaannya.
  *
  * @property string $id
@@ -39,8 +39,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::SystemMetadata)]
 final class ProcessedCoreEvent extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     protected $table = 'aset_processed_core_events';
 

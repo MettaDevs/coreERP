@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Database\Seeders;
 
-use App\Platform\Modules\Contracts\SeederModule;
+use App\Platform\Modules\Contracts\TenantSeeder;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohA\Models\Barang;
 
@@ -17,7 +17,7 @@ use Modules\Apperp\ContohA\Models\Barang;
  *
  * Setiap baris ditandai `bawaan`, supaya bisa dibedakan dari baris yang diketik pengguna.
  */
-final class BarangBawaanSeeder extends SeederModule
+final class BarangBawaanSeeder extends TenantSeeder
 {
     public function run(): void
     {

@@ -14,7 +14,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | `app/Platform/Modules/Contracts/` | [API dan integrasi](/dev/04-api-and-integration) — satu-satunya namespace Core yang boleh disebut module |
 | `app/Support/Modules/ModuleRegistry.php`, `ModuleManifest.php`, `ModuleManifestFiles.php` | [Standar module](/dev/02-module-standard) — pembacaan `app.yaml` dan penggabungannya dengan folder `manifest/` |
 | `app/Support/Modules/ModuleMigrator.php`, `ModuleMigrationRepository.php` | [Development stack lokal](/dev/11-local-docker-development) |
-| `app/Support/Modules/TenantScope.php` dan trait `MilikTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
+| `app/Support/Modules/TenantScope.php` dan trait `BelongsToTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
 | `app/Support/Modules/EditionModules.php`, `config/modules.php` | [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis) |
 | `tests/Feature/Boundary/` | [Definition of done](/onboarding/definition-of-done) — penjaga batas yang memindai `modules/` |
 | `app/Console/Commands/Module*.php`, `RegisterAppManifestCommand.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |

@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -242,14 +242,14 @@ class MaintenanceSetupTest extends TestCase
     /**
      * Menyemai setup maintenance seperti perintah artisan menyemainya.
      *
-     * Lewat `PelaksanaUntukTenant`, bukan panggilan langsung, karena test ini tidak selalu
+     * Lewat `TenantRunner`, bukan panggilan langsung, karena test ini tidak selalu
      * didahului permintaan HTTP — dan hanya permintaan HTTP yang menetapkan tenant aktif.
      * Memanggilnya langsung membuat test lulus atau gagal tergantung apakah kebetulan ada
      * permintaan sebelumnya di metode yang sama, yang bukan perbedaan yang ingin diuji.
      */
     private function semaiMaintenance(): void
     {
-        $this->app->make(PelaksanaUntukTenant::class)->jalankanUntuk(
+        $this->app->make(TenantRunner::class)->runFor(
             $this->tenantId,
             fn (): array => $this->app->make(ProvisionIndonesiaStarterData::class)
                 ->maintenanceForTenant($this->tenantId),

@@ -1,6 +1,6 @@
 <?php
 
-use App\Platform\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Support\Facades\Artisan;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 
@@ -10,7 +10,7 @@ use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
  * menutup: tanpa `jalankanUntuk`, pembacaan pertama melempar "Query module dijalankan tanpa
  * tenant aktif" dan seluruh perintah berhenti sebelum menyemai apa pun.
  */
-Artisan::command('management-aset:seed-maintenance {tenant? : ULID tenant tujuan} {--tenant= : ULID tenant tujuan (alternatif)} {--template-key=id:maintenance:starter:v1 : Versi template seed}', function (ProvisionIndonesiaStarterData $provisioner, PelaksanaUntukTenant $pelaksana): void {
+Artisan::command('management-aset:seed-maintenance {tenant? : ULID tenant tujuan} {--tenant= : ULID tenant tujuan (alternatif)} {--template-key=id:maintenance:starter:v1 : Versi template seed}', function (ProvisionIndonesiaStarterData $provisioner, TenantRunner $pelaksana): void {
     // `option()` dan `argument()` menjanjikan array|bool|float|int|string|null karena harus
     // melayani setiap bentuk definisi perintah. Ketiga nilai di bawah dideklarasikan sebagai
     // nilai tunggal, jadi bentuk lain tidak pernah muncul dan diperlakukan sebagai tidak diisi.
@@ -24,7 +24,7 @@ Artisan::command('management-aset:seed-maintenance {tenant? : ULID tenant tujuan
     }
     $opsiTemplate = $this->option('template-key');
     $templateKey = is_string($opsiTemplate) ? $opsiTemplate : '';
-    $result = $pelaksana->jalankanUntuk(
+    $result = $pelaksana->runFor(
         $tenantId,
         static fn (): array => $provisioner->maintenanceForTenant($tenantId, $templateKey),
     );

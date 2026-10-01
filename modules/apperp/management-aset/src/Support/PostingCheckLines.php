@@ -10,7 +10,7 @@ namespace Modules\Apperp\ManagementAset\Support;
 final class PostingCheckLines
 {
     /**
-     * @param  array<string, mixed>|null  $payload  Payload kontrak hasil `PenerbitPosting`.
+     * @param  array<string, mixed>|null  $payload  Payload kontrak hasil `PostingFeed`.
      * @return list<array{line_no: int, account_code: ?string, account_name: ?string, description: ?string, debit: string, credit: string, dimensions: list<array{code: string, display_name: ?string, value_code: ?string, value_display_name: ?string}>}>
      */
     public static function from(?array $payload): array

@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use App\Platform\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -51,8 +51,8 @@ use Modules\Apperp\ManagementAset\Support\StatusAset;
 #[DataClassification(DataClass::CustomerContent)]
 class Aset extends Model
 {
+    use BelongsToTenant;
     use HasUlids, SoftDeletes;
-    use MilikTenant;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

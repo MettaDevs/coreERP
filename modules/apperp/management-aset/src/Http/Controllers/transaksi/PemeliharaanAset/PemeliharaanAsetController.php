@@ -41,7 +41,7 @@ use stdClass;
  * pelaksanaan, supaya penyuntingan dokumen dan pengerjaan lapangan tidak berbagi jalur.
  *
  * Penyaringan tenant tidak lagi ditulis di sini: model module membawanya sendiri lewat
- * `MilikTenant`. Yang tersisa hanyalah tabel yang di-`join`, karena tabel yang di-join
+ * `BelongsToTenant`. Yang tersisa hanyalah tabel yang di-`join`, karena tabel yang di-join
  * tidak ikut tersaring scope dan harus membawa `tenant_id`-nya sendiri.
  */
 class PemeliharaanAsetController extends Controller

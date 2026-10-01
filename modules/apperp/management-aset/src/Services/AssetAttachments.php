@@ -6,7 +6,7 @@ namespace Modules\Apperp\ManagementAset\Services;
 
 use App\Platform\Modules\Contracts\AttachmentRecordType;
 use App\Platform\Modules\Contracts\DataClass;
-use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
@@ -31,7 +31,7 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * Haknya sama dengan membuka dan mengubah record itu di layar aset: permission resource-nya, lalu kebijakan
  * `management-aset.asset-responsibility` atas entitas legal dan unit kerja pemilik record, lewat
  * {@see OrganizationScope} yang juga dipakai controller-nya. Penyaringan tenant dilakukan model
- * (`MilikTenant`), jadi `tenantId` dari Core tidak ditulis ulang di query.
+ * (`BelongsToTenant`), jadi `tenantId` dari Core tidak ditulis ulang di query.
  *
  * Status dokumen tidak ikut menentukan: lampiran boleh ditambah pada dokumen yang sudah selesai, seperti
  * lampiran pada dokumen terposting di BC.
@@ -135,6 +135,6 @@ final class AssetAttachments implements AttachmentRecordType
 
     private function allows(string $resource, string $action): bool
     {
-        return app(KonteksPermintaan::class)->punyaIzin(self::MODULE.'.'.$resource.'.'.$action);
+        return app(RequestContext::class)->hasPermission(self::MODULE.'.'.$resource.'.'.$action);
     }
 }

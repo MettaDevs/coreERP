@@ -125,7 +125,7 @@ Jawaban API memulangkan id **dan** namanya berpasangan — `tujuan_org_unit_nama
 `asal_custodian_nama` pada baris — dan form memakai dropdown berisi nama, bukan kotak ketik.
 Daftarnya dibaca lewat `GET /api/v1/reference-data/unit-kerja` dan
 `GET /api/v1/reference-data/anggota`, yang keduanya berdiri di atas kontrak Core
-`DirektoriOrganisasi`; modul tidak pernah menyentuh database Core.
+`OrganizationDirectory`; modul tidak pernah menyentuh database Core.
 
 Nama diterjemahkan **saat dibaca**, bukan dibekukan sebagai snapshot. Nama orang dan nama
 unit berubah karena sebab yang tidak ada hubungannya dengan aset — pernikahan, reorganisasi,

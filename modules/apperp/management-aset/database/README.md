@@ -89,14 +89,14 @@ tanggal yang barisnya diarsipkan boleh dipakai lagi. Delapan kolom akunnya (`acq
 `clearing_account_id`, `input_vat_account_id`, `opening_balance_offset_account_id`,
 `grant_offset_account_id`) menyimpan id
 `finance_reference_accounts` milik Core tanpa foreign key; keberadaan dan statusnya diperiksa lewat
-kontrak `DaftarAkun`.
+kontrak `AccountDirectory`.
 
 `m_buku_penyusutan.export_to_backoffice` sudah dibuang (TODO 8.4.3): saklarnya dilebur ke
 `posting_layer` (K-15) di rilis 0.9.0, dan kolomnya dibiarkan satu rilis supaya 0.8.0 tetap berjalan di
 atas skema 0.9.0 (aturan N-1). API tetap menolak field itu dengan 422.
 
 `tr_penerimaan_aset.vendor_id` menunjuk vendor milik Core (K-06), juga tanpa foreign key; keberadaan
-dan entitas legalnya diperiksa lewat kontrak `DaftarVendor`. `cara_perolehan` bernilai `pembelian`,
+dan entitas legalnya diperiksa lewat kontrak `VendorDirectory`. `cara_perolehan` bernilai `pembelian`,
 `hibah`, atau `saldo_awal`. `tr_penerimaan_aset_details.nilai_per_unit` dan
 `ppn_per_unit` berpresisi `decimal(24,6)` supaya harga satuan dapat memakai presisi harga satuan mata
 uangnya (K-20); nilai aset di register tetap `decimal(18,2)`, hasil pembagian nilai baris yang sudah

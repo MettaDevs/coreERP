@@ -14,7 +14,7 @@ namespace App\Platform\Modules\Contracts;
  * menegakkan permission baca dan kebijakan data organisasi, **persis seperti daftar di layarnya**: ekspor
  * tidak boleh memuat baris yang tidak dapat dilihat pengguna itu di layar.
  *
- * `$context` berbentuk sama dengan konteks laporan ({@see PenyediaLaporanModul}): `tenant_id`,
+ * `$context` berbentuk sama dengan konteks laporan ({@see ModuleReportProvider}): `tenant_id`,
  * `legal_entity_id`, `org_unit_id`, `user_id`, `permissions`, `data_policies`, dan `timezone`. Ia dibawa
  * sebagai argumen karena ekspor berjalan di worker tanpa permintaan HTTP.
  *

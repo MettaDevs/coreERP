@@ -147,9 +147,9 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Tidak ditulis di manifest module | Laporan module masuk katalog Core dari kelas datasetnya lewat `PenyediaLaporanModul::catalog()` saat registrasi; manifest module yang masih memuat blok ini ditolak. Admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Lihat [dokumen cetak](23-document-rendering.md) |
+| `reports` | Tidak ditulis di manifest module | Laporan module masuk katalog Core dari kelas datasetnya lewat `ModuleReportProvider::catalog()` saat registrasi; manifest module yang masih memuat blok ini ditolak. Admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Lihat [dokumen cetak](23-document-rendering.md) |
 
-Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
+Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `NumberSequenceIssuer` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
 ### Daftar berkode dipecah ke folder `manifest/`
 
@@ -308,14 +308,14 @@ Di dalam kumpulan tabel miliknya sendiri, sebuah app boleh memakai transaksi, fo
 
 ### Penyaringan tenant
 
-Model module memakai trait `MilikTenant` dan tidak menulis penyaringan tenant sendiri:
+Model module memakai trait `BelongsToTenant` dan tidak menulis penyaringan tenant sendiri:
 
 ```php
-use App\Platform\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
 
 final class Barang extends Model
 {
-    use MilikTenant;
+    use BelongsToTenant;
 }
 ```
 
@@ -505,7 +505,7 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
 | `hasLine($tenantId, $recordId, $lineNumber)` | Dokumen itu punya baris bernomor ini (`line_number` di tabel `_details`). Tabel tanpa baris menjawab `false`. |
 
 - **Hak mengikuti record induk.** Lampiran tidak punya permission sendiri. Jawaban module dibaca lewat
-  `KonteksPermintaan` dan model module yang memakai `MilikTenant`, jadi `tenantId` tidak perlu ditulis
+  `RequestContext` dan model module yang memakai `BelongsToTenant`, jadi `tenantId` tidak perlu ditulis
   ulang di query. Core tidak pernah membaca tabel module.
 - **Baris dokumen menempel ke dokumennya.** Lampiran pada baris dokumen didaftarkan pada tabel header
   dengan nomor baris, seperti `Line No.` di BC; tabel `_details` tidak didaftarkan sendiri.
@@ -712,9 +712,9 @@ ingin memperbaiki data bawaan tidak punya cara membedakan mana yang boleh disent
 
 ### Aturan model
 
-Model module memakai `HasULids`, `SoftDeletes`, dan `MilikTenant` sejak migration pertama, dan tidak
+Model module memakai `HasULids`, `SoftDeletes`, dan `BelongsToTenant` sejak migration pertama, dan tidak
 memakai `DB::table()` sama sekali. Setiap kelas module yang `extends Model` **wajib** memakai
-`MilikTenant`; penjaganya memeriksa itu untuk semua module, termasuk yang sedang dipindah.
+`BelongsToTenant`; penjaganya memeriksa itu untuk semua module, termasuk yang sedang dipindah.
 Akibatnya module **tidak menulis `tenant_id` sama sekali** — trait itu yang mengisinya, dan trait itu
 juga yang membatalkan penyimpanan ke tenant lain.
 
@@ -784,7 +784,7 @@ di halaman Core-nya, dan modul memilihnya lewat kontrak di `App\Platform\Modules
 | API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI bila permukaannya dipanggil dari luar runtime. Rute module yang hanya dipanggil halamannya sendiri dijaga test module, bukan kontrak terbit. |
 | Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama. |
 | UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
-| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `KonteksTenant` dan `KonteksPermintaan`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
+| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `TenantContext` dan `RequestContext`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
 | Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. Master milik Foundation dibaca lewat kontrak; lihat [master bersama](#master-bersama-dan-modul-yang-berdiri-sendiri). |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
 | Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
@@ -817,7 +817,7 @@ Waktu dari server (misalnya kapan record dibuat) ditampilkan lewat `useDateTimeF
 `toLocaleString()` atau `Intl.DateTimeFormat` tanpa `timeZone`: keduanya memakai zona perangkat. Tanggal
 tanpa jam tidak lewat pemformat ini, karena tanggal tidak punya zona.
 
-Di server, module membaca zona yang sama lewat `KonteksPermintaan::timezone()` untuk "hari ini" dan batas
+Di server, module membaca zona yang sama lewat `RequestContext::timezone()` untuk "hari ini" dan batas
 hari menurut pengguna, bukan `now()` atau `today()` yang berjalan dalam UTC. Laporan membacanya dari konteks
 laporan (`timezone`), dan waktu di dataset dikirim dalam UTC bertipe `datetime`; lihat
 [perenderan dokumen](23-document-rendering.md#cara-layout-membaca-dataset).

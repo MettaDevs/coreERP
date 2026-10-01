@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
-use App\Platform\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Reporting\Models\ReportPreset;
 use App\Platform\Reporting\Support\LayoutRef;
 use App\Platform\Reporting\Support\RelativeDates;
@@ -46,7 +46,7 @@ class ReportOptionsTest extends TestCase
         Storage::fake('reporting-test');
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
-        Event::fake([TenantDisiapkan::class]);
+        Event::fake([TenantProvisioned::class]);
 
         $this->owner = $this->business('owner@opsi.test', 'Tenant opsi');
         $this->membership = $this->owner->activeMembership();

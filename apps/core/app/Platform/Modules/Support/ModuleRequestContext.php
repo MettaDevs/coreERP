@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\Identity\Support\UserClock;
-use App\Platform\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Http\Request;
 use RuntimeException;
 
@@ -27,7 +27,7 @@ use RuntimeException;
  * module lupa dipasangi middleware-nya — dan pada keadaan itu jawaban yang benar adalah
  * "tidak punya izin", bukan "punya semua izin".
  */
-final class ModuleRequestContext implements KonteksPermintaan
+final class ModuleRequestContext implements RequestContext
 {
     public const TENANT_ID = 'coreerp.tenant_id';
 
@@ -46,7 +46,7 @@ final class ModuleRequestContext implements KonteksPermintaan
         private readonly UserClock $clock,
     ) {}
 
-    public function penggunaId(): string
+    public function userId(): string
     {
         $nilai = $this->permintaan->attributes->get(self::USER_ID);
 
@@ -60,7 +60,7 @@ final class ModuleRequestContext implements KonteksPermintaan
     }
 
     /** @return list<string> */
-    public function izin(): array
+    public function permissions(): array
     {
         $nilai = $this->permintaan->attributes->get(self::PERMISSIONS, []);
 
@@ -79,13 +79,13 @@ final class ModuleRequestContext implements KonteksPermintaan
         return $kode;
     }
 
-    public function punyaIzin(string $kode): bool
+    public function hasPermission(string $kode): bool
     {
-        return in_array($kode, $this->izin(), true);
+        return in_array($kode, $this->permissions(), true);
     }
 
     /** @return array<string, mixed> */
-    public function kebijakanData(): array
+    public function dataPolicies(): array
     {
         $nilai = $this->permintaan->attributes->get(self::DATA_POLICIES, []);
 

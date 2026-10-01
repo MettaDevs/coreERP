@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use App\Platform\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -35,8 +35,8 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 #[DataClassification(DataClass::CustomerContent)]
 class MutasiAsetDetail extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

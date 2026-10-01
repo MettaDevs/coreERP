@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
-use App\Platform\Modules\Contracts\MilikTenant;
 use App\Platform\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -43,8 +43,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class BukuAset extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     /**
      * Nama kolom untuk filter tambahan laporan (K-30), padanan Caption field tabel di BC; tipe kolom dibaca
