@@ -2,9 +2,9 @@
 
 namespace App\Platform\Environment\Support;
 
-use App\Models\Organization;
 use App\Models\TenantMembership;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Organization\Models\Organization;
 use App\Support\DataPolicyAccessResolver;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;

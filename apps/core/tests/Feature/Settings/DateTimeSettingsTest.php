@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Settings;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\Organization;
 use App\Models\RoleAssignment;
 use App\Models\User;
+use App\Platform\Organization\Models\Organization;
 use Carbon\CarbonImmutable;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -5,7 +5,7 @@ namespace App\Foundation\FiscalCalendar\Http\Controllers\Internal;
 use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
 use App\Foundation\FiscalCalendar\Models\FiscalPeriod;
 use App\Http\Controllers\Controller;
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;

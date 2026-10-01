@@ -5,7 +5,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 use App\Foundation\Currency\Models\CurrencyPrecision;
 use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Models\FinancePosting;
-use App\Models\OrganizationHierarchyVersion;
+use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

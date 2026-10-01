@@ -2,9 +2,9 @@
 
 namespace App\Support;
 
-use App\Models\LegalEntity;
 use App\Models\User;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Organization\Models\LegalEntity;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DateTimeZone;

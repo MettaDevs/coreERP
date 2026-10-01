@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Models\AppDataPolicy;
-use App\Models\Organization;
-use App\Models\OrganizationHierarchy;
 use App\Models\Role;
+use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Models\OrganizationHierarchy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 

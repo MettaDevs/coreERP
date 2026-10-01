@@ -5,7 +5,7 @@ namespace App\Foundation\AddressBook\Http\Controllers;
 use App\Foundation\AddressBook\Models\ElectronicAddress;
 use App\Foundation\AddressBook\Support\OrganizationAddressBook;
 use App\Http\Controllers\Controller;
-use App\Models\Organization;
+use App\Platform\Organization\Models\Organization;
 use App\Support\Access\CoreSecurityCatalog;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;

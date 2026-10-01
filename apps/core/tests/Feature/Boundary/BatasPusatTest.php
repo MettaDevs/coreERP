@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Models\Organization;
 use App\Models\ProviderAccess;
 use App\Models\Tenant;
 use App\Models\TenantIdentityProvider;
@@ -21,6 +20,7 @@ use App\Platform\ControlPlane\Models\SiteReport;
 use App\Platform\ControlPlane\OwnedByControlPlane;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Organization\Models\Organization;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;

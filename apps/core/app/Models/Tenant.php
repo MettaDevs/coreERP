@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\ControlPlane\OwnedByControlPlane;
+use App\Platform\Organization\Models\Organization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

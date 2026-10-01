@@ -4,7 +4,7 @@ namespace App\Foundation\Vendor\Http\Controllers\Internal;
 
 use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
-use App\Models\LegalEntity;
+use App\Platform\Organization\Models\LegalEntity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
