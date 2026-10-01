@@ -1,0 +1,49 @@
+security:
+  entry_points:
+    - code: management-aset.jenis-permintaan-pemeliharaan.form
+      name: Layar jenis permintaan pemeliharaan
+      type: form
+    - code: management-aset.jenis-permintaan-pemeliharaan.api
+      name: API jenis permintaan pemeliharaan
+      type: api
+  permissions:
+    - code: management-aset.jenis-permintaan-pemeliharaan.read
+      name: Lihat jenis permintaan pemeliharaan
+      entry_point: management-aset.jenis-permintaan-pemeliharaan.form
+      access: read
+    - code: management-aset.jenis-permintaan-pemeliharaan.create
+      name: Tambah jenis permintaan pemeliharaan
+      entry_point: management-aset.jenis-permintaan-pemeliharaan.api
+      access: create
+    - code: management-aset.jenis-permintaan-pemeliharaan.update
+      name: Ubah jenis permintaan pemeliharaan
+      entry_point: management-aset.jenis-permintaan-pemeliharaan.api
+      access: update
+    - code: management-aset.jenis-permintaan-pemeliharaan.archive
+      name: Arsipkan jenis permintaan pemeliharaan
+      entry_point: management-aset.jenis-permintaan-pemeliharaan.api
+      access: delete
+  privileges:
+    - code: management-aset.jenis-permintaan-pemeliharaan.maintain
+      name: Pelihara jenis permintaan pemeliharaan
+      permissions:
+        - management-aset.jenis-permintaan-pemeliharaan.read
+        - management-aset.jenis-permintaan-pemeliharaan.create
+        - management-aset.jenis-permintaan-pemeliharaan.update
+    - code: management-aset.jenis-permintaan-pemeliharaan.retire
+      name: Arsipkan jenis permintaan pemeliharaan
+      permissions:
+        - management-aset.jenis-permintaan-pemeliharaan.archive
+  duties:
+    - code: management-aset.jenis-permintaan-pemeliharaan.manage
+      name: Kelola jenis permintaan pemeliharaan
+      privileges:
+        - management-aset.jenis-permintaan-pemeliharaan.maintain
+        - management-aset.jenis-permintaan-pemeliharaan.retire
+number_sequences:
+  references:
+    - code: management-aset.jenis-permintaan-pemeliharaan
+      name: Kode jenis permintaan pemeliharaan
+      default_prefix: JPPM
+      allowed_scopes:
+        - tenant

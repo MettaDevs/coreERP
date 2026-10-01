@@ -40,6 +40,18 @@ security:
         - management-aset.pemeliharaan-aset.schedule
         - management-aset.pemeliharaan-aset.execute
         - management-aset.pemeliharaan-aset.close
+        - management-aset.pembacaan-counter.read
+        - management-aset.pembacaan-counter.create
+        - management-aset.pembacaan-counter.archive
+        - management-aset.jadwal-pemeliharaan.read
+        - management-aset.jadwal-pemeliharaan.run
+        - management-aset.jadwal-pemeliharaan.discard
+        - management-aset.permintaan-pemeliharaan.read
+        - management-aset.permintaan-pemeliharaan.create
+        - management-aset.permintaan-pemeliharaan.update
+        - management-aset.permintaan-pemeliharaan.archive
+        - management-aset.permintaan-pemeliharaan.submit
+        - management-aset.permintaan-pemeliharaan.review
         - management-aset.dekomisioning-aset.read
         - management-aset.dekomisioning-aset.create
         - management-aset.dekomisioning-aset.verify

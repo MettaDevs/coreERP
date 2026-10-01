@@ -93,6 +93,15 @@ ui:
         - id: tingkat-layanan
           label: Tingkat layanan
           permission: management-aset.tingkat-layanan.read
+        - id: jenis-permintaan-pemeliharaan
+          label: Jenis permintaan pemeliharaan
+          permission: management-aset.jenis-permintaan-pemeliharaan.read
+        - id: jenis-counter
+          label: Jenis counter
+          permission: management-aset.jenis-counter.read
+        - id: rencana-pemeliharaan
+          label: Rencana pemeliharaan
+          permission: management-aset.rencana-pemeliharaan.read
         - id: sebab-kerusakan
           label: Sebab kerusakan
           permission: management-aset.sebab-kerusakan.read
@@ -123,9 +132,18 @@ ui:
         - id: mutasi-aset
           label: Mutasi aset
           permission: management-aset.mutasi-aset.read
+        - id: permintaan-pemeliharaan
+          label: Permintaan pemeliharaan
+          permission: management-aset.permintaan-pemeliharaan.read
+        - id: jadwal-pemeliharaan
+          label: Jadwal pemeliharaan
+          permission: management-aset.jadwal-pemeliharaan.read
         - id: pemeliharaan-aset
           label: Pemeliharaan aset
           permission: management-aset.pemeliharaan-aset.read
+        - id: pembacaan-counter
+          label: Pembacaan counter
+          permission: management-aset.pembacaan-counter.read
         - id: dekomisioning-aset
           label: Dekomisioning aset
           permission: management-aset.dekomisioning-aset.read

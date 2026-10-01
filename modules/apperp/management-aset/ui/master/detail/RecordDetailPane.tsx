@@ -21,12 +21,15 @@ import {
     permission,
 } from '../masters';
 import JenisAsetCounters from './JenisAsetCounters';
+import JenisAsetCounterTypes from './JenisAsetCounterTypes';
 import type { JenisAsetDetail } from './jenisAsetDetail';
 import JenisAsetMaintenanceJobTypes from './JenisAsetMaintenanceJobTypes';
 import JenisAsetModels from './JenisAsetModels';
 import MaintenanceChecklistTemplateLines from './MaintenanceChecklistTemplateLines';
 import MaintenanceChecklistVariableValues from './MaintenanceChecklistVariableValues';
 import MaintenanceJobTypeDetails from './MaintenanceJobTypeDetails';
+import MaintenancePlanLines from './MaintenancePlanLines';
+import MaintenancePlanTargets from './MaintenancePlanTargets';
 import PabrikanAsetCounters from './PabrikanAsetCounters';
 import type { PabrikanAsetDetail } from './pabrikanAsetDetail';
 import PabrikanModels from './PabrikanModels';
@@ -496,6 +499,55 @@ export default function RecordDetailPane({
             ) : (
                 <p className="text-muted-foreground text-sm">
                     Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.
+                </p>
+            );
+        }
+
+        if (section.assetTypeCounters) {
+            return record ? (
+                <JenisAsetCounterTypes
+                    key={record.id}
+                    jenisAsetId={record.id}
+                    canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
+                />
+            ) : (
+                <p className="text-muted-foreground text-sm">
+                    Counter dapat dikaitkan setelah jenis aset disimpan.
+                </p>
+            );
+        }
+
+        if (section.maintenancePlanLines) {
+            return record ? (
+                <MaintenancePlanLines
+                    key={record.id}
+                    planId={record.id}
+                    canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
+                />
+            ) : (
+                <p className="text-muted-foreground text-sm">
+                    Baris rencana dapat diatur setelah rencana disimpan.
+                </p>
+            );
+        }
+
+        if (section.maintenancePlanTargets) {
+            return record ? (
+                <MaintenancePlanTargets
+                    key={record.id}
+                    planId={record.id}
+                    canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
+                />
+            ) : (
+                <p className="text-muted-foreground text-sm">
+                    Aset yang dikenai rencana dapat dipilih setelah rencana
+                    disimpan.
                 </p>
             );
         }
