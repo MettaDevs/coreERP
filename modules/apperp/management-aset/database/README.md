@@ -61,6 +61,15 @@ perhitungan ulang idempoten. Permintaan pemeliharaan menambah `aset_m_jenis_perm
 dan `aset_tr_permintaan_pemeliharaan`. Rinciannya di docs **Pemeliharaan preventif** dan
 **Permintaan pemeliharaan**.
 
+Asuransi menambah master `aset_m_jenis_asuransi` dan `aset_m_polis_asuransi` (nomor unik per
+entitas legal, indeks parsial), serta `aset_tr_pertanggungan_asuransi`: satu aset pada satu polis
+untuk satu periode, dengan `CHECK` periode dan nilai positif. Garansi dan kontrak servis menambah
+`aset_tr_garansi_aset`, `aset_tr_kontrak_servis`, dan `aset_tr_kontrak_servis_aset` (satu aset sekali
+per kontrak, indeks unik parsial). Downtime menambah master `aset_m_alasan_downtime` (`masuk_kpi`) dan
+`aset_tr_downtime_aset`; indeks unik parsial `(tenant_id, aset_id) WHERE selesai IS NULL` menjaga satu
+downtime terbuka per aset. Rinciannya di docs **Asuransi aset**, **Garansi dan kontrak servis**, dan
+**Downtime dan KPI pemeliharaan**.
+
 Master sebab dan tindakan memiliki `minta_keterangan`. Jika aktif, baris pekerjaan wajib
 menyimpan teks bebas pada `sebab_kerusakan_keterangan` atau
 `tindakan_perbaikan_keterangan`; teks tersebut dikosongkan bila pilihan tidak memintanya.

@@ -16,9 +16,10 @@ use stdClass;
  * memilikinya; selain itu buku komersial — buku tanpa master atau buku ber-lapisan posting `current` —
  * dan bila ada lebih dari satu, yang kodenya paling awal.
  *
- * Business Central membaca nilai asuransi dari *Insurance Depr. Book* pada *FA Setup*, yang bila
- * dikosongkan diisi *Default Depr. Book* (tabel `FA Setup`, validasi field 7). Modul ini belum punya
- * setelan buku asuransi tersendiri, jadi aturannya sama dengan bawaan BC itu.
+ * Business Central membaca nilai asuransi dari *Insurance Depr. Book* pada *FA Setup*, yang diisi
+ * *Default Depr. Book* saat buku bawaan dipilih selagi buku asuransi masih kosong (tabel `FA Setup`,
+ * validasi *Default Depr. Book*). Modul ini belum punya setelan buku asuransi tersendiri, jadi
+ * aturannya sama dengan bawaan BC itu.
  */
 final class AssetBookValues
 {

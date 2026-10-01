@@ -43,7 +43,7 @@ Pertanggungan terhitung pada tanggal D bila periodenya mencakup D **dan** polisn
 - **Total yang ditanggung (polis, D)** = jumlah nilai pertanggungan polis itu yang terhitung pada D.
 - **Selisih plafon** = nilai pertanggungan polis − total yang ditanggung polis. Negatif berarti melebihi plafon.
 - **Status aset**: *belum diasuransikan* bila total = 0; *kurang diasuransikan* bila 0 < total < nilai perolehan; selain itu *cukup*.
-- **Nilai perolehan** dibaca dari buku penyusutan bawaan pada Parameter aset tetap (*Default Depr. Book*) bila aset itu memilikinya, selain itu dari buku komersial (buku tanpa master atau ber-lapisan posting `current`, kode paling awal), atau dari nilai perolehan di register bila aset belum punya buku. Aturannya satu, `Services/AssetBookValues`, dipakai juga pemeriksaan fisik aset. Ini sama dengan bawaan BC: *Insurance Depr. Book* yang kosong diisi *Default Depr. Book*.
+- **Nilai perolehan** dibaca dari buku penyusutan bawaan pada Parameter aset tetap (*Default Depr. Book*) bila aset itu memilikinya, selain itu dari buku komersial (buku tanpa master atau ber-lapisan posting `current`, kode paling awal), atau dari nilai perolehan di register bila aset belum punya buku. Aturannya satu, `Services/AssetBookValues`, dipakai juga pemeriksaan fisik aset. Ini sama dengan bawaan BC: *Insurance Depr. Book* yang masih kosong diisi *Default Depr. Book* saat buku bawaan dipilih (validasi field itu pada tabel `FA Setup`).
 
 "Hari ini" selalu menurut zona pengguna (`RequestContext::timezone()`).
 

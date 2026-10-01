@@ -167,6 +167,22 @@ dan register aset untuk isian manual — tanpa hak tulis atas ketiganya. Keputus
 ada di `docs/apps/management-aset/transaction/monitoring-aset/` pada repo CoreERP. Laporannya
 `management-aset.laporan-monitoring-aset` (Excel, hanya monitoring yang sudah selesai).
 
+## Asuransi, garansi, dan downtime
+
+Tiga fitur pendamping aset, masing-masing dengan halaman docs sendiri pada repo CoreERP
+(`docs/apps/management-aset/transaction/asuransi-aset/`, `garansi-kontrak-servis/`, dan
+`downtime-kpi/`):
+
+- **Asuransi aset** (`/api/v1/polis-asuransi`, `/api/v1/asuransi-aset`): polis dengan penanggung
+  dari vendor Core, pertanggungan aset berperiode sebagai riwayat, dan ringkasan aset yang belum
+  atau kurang diasuransikan terhadap nilai perolehan. Tanpa jurnal, seperti *Insurance* BC.
+- **Garansi dan kontrak servis** (`/api/v1/garansi-aset`, `/api/v1/kontrak-servis`): garansi per aset,
+  kontrak servis bergaris aset, daftar yang berakhir dalam 30/60/90 hari, dan pemberitahuan garansi
+  aktif pada work order (`/api/v1/pemeliharaan-aset/referensi/garansi`), yang tidak menahan apa pun.
+- **Downtime dan KPI** (`/api/v1/downtime-aset`, `/api/v1/kpi-pemeliharaan`): downtime dicatat sendiri
+  atau dibuka dan ditutup work order yang jenis pekerjaannya menuntut aset berhenti; KPI availability,
+  MTBF, MTTR, kerusakan, henti, dan work order selesai dihitung saat dibaca oleh `Services/MaintenanceKpi`.
+
 ## Penjualan, pemusnahan, dan penyesuaian nilai
 
 Penjualan dan pemusnahan disimpan sebagai **draf** lalu **diposting**, seperti jurnal aset tetap
@@ -395,6 +411,10 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |
 | `management-aset.penyesuaian-nilai-aset` | `PNLA` | `legal_entity` |
+| `management-aset.polis-asuransi` | `POLA` | `legal_entity` |
+| `management-aset.kontrak-servis` | `KSVA` | `legal_entity` |
+| `management-aset.jenis-asuransi` | `JASR` | `tenant` |
+| `management-aset.alasan-downtime` | `ALDT` | `tenant` |
 | `management-aset.maintenance-job-types` | `JPMA` | `tenant` |
 | `management-aset.maintenance-job-type-variants` | `VJMA` | `tenant` |
 | `management-aset.maintenance-job-type-defaults` | `DJMA` | `tenant` |
