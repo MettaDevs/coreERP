@@ -199,10 +199,11 @@ class DocumentAttachmentTest extends TestCase
         $terdaftar = app(AttachmentRecordTypes::class)->recordTypes();
         sort($terdaftar);
 
-        // Fase 1 dari README gap 7, ditambah pemeriksaan fisik aset (foto bukti) yang datang sesudahnya.
+        // Fase 1 dari README gap 7, ditambah pemeriksaan fisik aset (foto bukti) dan permintaan
+        // pemeliharaan (foto kerusakan) yang datang sesudahnya.
         $this->assertSame([
             'aset_tr_aset', 'aset_tr_dokumen_siklus_aset', 'aset_tr_monitoring_aset', 'aset_tr_mutasi_aset', 'aset_tr_pemeliharaan_aset',
-            'aset_tr_penerimaan_aset', 'aset_tr_perencanaan_aset', 'aset_tr_permintaan_pengadaan_aset',
+            'aset_tr_penerimaan_aset', 'aset_tr_perencanaan_aset', 'aset_tr_permintaan_pemeliharaan', 'aset_tr_permintaan_pengadaan_aset',
             'hr_workers', 'vendors',
         ], $terdaftar);
         $this->assertSame(DataClass::EndUserIdentifiableInformation, app(AttachmentRecordTypes::class)->for('hr_workers')?->dataClass());

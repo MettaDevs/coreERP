@@ -2193,3 +2193,244 @@ ChangeHistoryPage:
       type:
       - integer
       - 'null'
+# Pemeliharaan preventif dan permintaan pemeliharaan.
+CounterType:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    required: [satuan_id, satuan]
+    properties:
+      satuan_id: {$ref: '#/components/schemas/Ulid'}
+      satuan: {type: [string, 'null'], description: Salinan kode satuan Core untuk tampilan.}
+CounterTypeCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    required: [satuan_id]
+    properties: {satuan_id: {$ref: '#/components/schemas/Ulid'}}
+CounterTypePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - type: object
+    properties: {satuan_id: {$ref: '#/components/schemas/Ulid'}}
+CounterTypeResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/CounterType'}}
+CounterTypeList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/CounterType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+AssetTypeCounterTransfer:
+  type: object
+  required: [data, version]
+  properties:
+    data:
+      type: object
+      properties:
+        remaining: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: [string, 'null']}}}}
+        selected: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: [string, 'null']}}}}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+CounterReadingWrite:
+  type: object
+  required: [aset_id, jenis_counter_id, dibaca_pada, nilai]
+  properties:
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    jenis_counter_id: {$ref: '#/components/schemas/Ulid'}
+    dibaca_pada: {type: string, description: 'Tanggal dan jam baca, YYYY-MM-DD HH:MM:SS.'}
+    nilai: {type: number, minimum: 0, description: Angka yang tertera di meter.}
+    reset: {type: boolean, default: false, description: Meter diganti atau direset; angka ini angka awal meter baru dan tidak menambah total.}
+    keterangan: {type: [string, 'null'], maxLength: 2000}
+CounterReading:
+  type: object
+  required: [id, aset_id, jenis_counter_id, dibaca_pada, nilai, nilai_total, reset, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    aset_kode: {type: string}
+    aset_nama: {type: string}
+    jenis_counter_id: {$ref: '#/components/schemas/Ulid'}
+    jenis_counter_kode: {type: string}
+    jenis_counter_nama: {type: string}
+    satuan: {type: [string, 'null']}
+    dibaca_pada: {type: string}
+    nilai: {type: string, description: Desimal dua angka di belakang koma, sebagai teks.}
+    nilai_total: {type: string, description: Pemakaian kumulatif melewati penggantian meter; dihitung server.}
+    reset: {type: boolean}
+    keterangan: {type: [string, 'null']}
+    dicatat_oleh_nama: {type: [string, 'null']}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+AssetCounter:
+  type: object
+  properties:
+    jenis_counter_id: {$ref: '#/components/schemas/Ulid'}
+    kode: {type: string}
+    nama: {type: string}
+    satuan: {type: [string, 'null']}
+    terakhir:
+      oneOf:
+      - type: 'null'
+      - type: object
+        properties: {dibaca_pada: {type: string}, nilai: {type: string}, nilai_total: {type: string}}
+MaintenancePlanFields:
+  type: object
+  properties:
+    tanggal_mulai: {type: string, format: date, description: Titik hitung baris berbasis waktu bila objek tidak menyebut tanggal mulai sendiri.}
+    toleransi_hari_sebelum: {type: integer, minimum: 0, maximum: 365}
+    toleransi_hari_sesudah: {type: integer, minimum: 0, maximum: 365, description: Jatuh tempo tidak diusulkan bila sudah ada work order jenis pekerjaan yang sama dalam rentang ini.}
+MaintenancePlan:
+  allOf: [{$ref: '#/components/schemas/MasterRecord'}, {$ref: '#/components/schemas/MaintenancePlanFields'}]
+MaintenancePlanCreate:
+  allOf: [{$ref: '#/components/schemas/MasterCreate'}, {$ref: '#/components/schemas/MaintenancePlanFields'}, {type: object, required: [tanggal_mulai]}]
+MaintenancePlanPatch:
+  allOf: [{$ref: '#/components/schemas/MasterPatch'}, {$ref: '#/components/schemas/MaintenancePlanFields'}]
+MaintenancePlanResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenancePlan'}}
+MaintenancePlanList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenancePlan'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenancePlanLineWrite:
+  type: object
+  required: [dasar, maintenance_job_type_id, tipe_work_order_id]
+  description: |
+    Dasar tanggal_mulai dan work_order_terakhir membutuhkan interval dan satuan_interval;
+    nilai_counter membutuhkan jenis_counter_id dan interval_counter. Isian milik dasar lain
+    dikosongkan server.
+  properties:
+    id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Baris yang sudah ada; kosong untuk baris baru.}
+    dasar: {type: string, enum: [tanggal_mulai, work_order_terakhir, nilai_counter]}
+    interval: {type: [integer, 'null'], minimum: 1, maximum: 1000}
+    satuan_interval: {type: [string, 'null'], enum: [hari, minggu, bulan, tahun, null]}
+    jenis_counter_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    interval_counter: {type: [number, 'null'], exclusiveMinimum: 0}
+    toleransi_counter: {type: [number, 'null'], minimum: 0, description: Usulan muncul saat total counter mencapai batas dikurangi angka ini; harus lebih kecil dari interval.}
+    maintenance_job_type_id: {$ref: '#/components/schemas/Ulid'}
+    variant_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    trade_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    tipe_work_order_id: {$ref: '#/components/schemas/Ulid'}
+    tingkat_layanan_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    selesai_dalam_hari: {type: [integer, 'null'], minimum: 0, maximum: 3650}
+    deskripsi: {type: [string, 'null'], maxLength: 2000, description: Disalin ke keterangan work order.}
+    aktif: {type: boolean, default: true}
+MaintenancePlanLine:
+  allOf:
+  - $ref: '#/components/schemas/MaintenancePlanLineWrite'
+  - type: object
+    properties:
+      line_number: {type: integer}
+      job_type_kode: {type: string}
+      job_type_nama: {type: string}
+      jenis_counter_nama: {type: [string, 'null']}
+      jenis_counter_satuan: {type: [string, 'null']}
+      tipe_work_order_nama: {type: string}
+      version: {$ref: '#/components/schemas/RecordVersion'}
+MaintenancePlanTargetWrite:
+  type: object
+  description: Tepat satu dari aset_id dan jenis_aset_id. Objek jenis aset mencakup seluruh aset jenis itu saat jadwal dihitung.
+  properties:
+    id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    jenis_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    tanggal_mulai: {type: [string, 'null'], format: date}
+    aktif: {type: boolean, default: true}
+MaintenancePlanTarget:
+  allOf:
+  - $ref: '#/components/schemas/MaintenancePlanTargetWrite'
+  - type: object
+    properties:
+      aset_kode: {type: [string, 'null']}
+      aset_nama: {type: [string, 'null']}
+      jenis_aset_kode: {type: [string, 'null']}
+      jenis_aset_nama: {type: [string, 'null']}
+      version: {$ref: '#/components/schemas/RecordVersion'}
+MaintenanceScheduleLine:
+  type: object
+  required: [id, rencana_pemeliharaan_id, rencana_baris_id, aset_id, jatuh_tempo, status, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    rencana_pemeliharaan_id: {$ref: '#/components/schemas/Ulid'}
+    rencana_baris_id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    responsible_org_unit_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    jatuh_tempo: {type: string, format: date}
+    nilai_jatuh_tempo: {type: [string, 'null'], description: Batas total counter yang dicapai; kosong untuk baris berbasis waktu.}
+    nilai_counter: {type: [string, 'null'], description: Total counter saat usulan dihitung.}
+    status: {type: string, enum: [usulan, work_order_dibuat, diabaikan]}
+    terlambat: {type: boolean, description: Usulan yang jatuh temponya sebelum hari ini menurut zona waktu pengguna.}
+    pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    work_order_kode: {type: [string, 'null']}
+    rencana_kode: {type: string}
+    rencana_nama: {type: string}
+    job_type_nama: {type: string}
+    aset_kode: {type: string}
+    aset_nama: {type: string}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+MaintenanceRequestType:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties:
+      tipe_work_order_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Tipe bawaan work order yang dibuat dari permintaan jenis ini.}
+      tipe_work_order: {oneOf: [{$ref: '#/components/schemas/MasterSummary'}, {type: 'null'}]}
+MaintenanceRequestTypeCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    properties: {tipe_work_order_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}}
+MaintenanceRequestTypePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - type: object
+    properties: {tipe_work_order_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}}
+MaintenanceRequestTypeResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceRequestType'}}
+MaintenanceRequestTypeList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceRequestType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceRequestWrite:
+  type: object
+  required: [legal_entity_id, responsible_org_unit_id, jenis_permintaan_id, deskripsi]
+  description: Salah satu dari aset_id dan lokasi_aset_id wajib.
+  properties:
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    responsible_org_unit_id: {$ref: '#/components/schemas/Ulid'}
+    jenis_permintaan_id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    lokasi_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    deskripsi: {type: string, maxLength: 4000}
+    tingkat_layanan_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    sebab_kerusakan_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+MaintenanceRequest:
+  allOf:
+  - $ref: '#/components/schemas/MaintenanceRequestWrite'
+  - type: object
+    required: [id, kode, status, version]
+    properties:
+      id: {$ref: '#/components/schemas/Ulid'}
+      kode: {type: string}
+      status: {type: string, enum: [draft, diajukan, diterima, ditolak, work_order_dibuat]}
+      diajukan_pada: {type: [string, 'null'], format: date-time}
+      diputuskan_pada: {type: [string, 'null'], format: date-time}
+      diputuskan_oleh_user_id: {type: [string, 'null']}
+      alasan_penolakan: {type: [string, 'null']}
+      pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+      work_order_kode: {type: [string, 'null']}
+      jenis_permintaan_nama: {type: string}
+      aset_kode: {type: [string, 'null']}
+      aset_nama: {type: [string, 'null']}
+      lokasi_nama: {type: [string, 'null']}
+      unit_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
+      dilaporkan_oleh_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
+      diputuskan_oleh_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
+      version: {$ref: '#/components/schemas/RecordVersion'}
+MaintenanceRequestResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceRequest'}}

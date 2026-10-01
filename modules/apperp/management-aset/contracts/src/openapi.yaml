@@ -54,6 +54,10 @@ tags:
   description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Monitoring aset
   description: Pemeriksaan fisik aset di satu lokasi; mencatat dan membekukan temuan tanpa mengubah register.
+- name: Pemeliharaan preventif
+  description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
+- name: Permintaan pemeliharaan
+  description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke aplikasi finance.
 - name: Reference data
@@ -70,6 +74,8 @@ x-bundle:
   - paths/mutasi-aset.yaml
   - paths/monitoring-aset.yaml
   - paths/pemeliharaan-aset.yaml
+  - paths/pemeliharaan-preventif.yaml
+  - paths/permintaan-pemeliharaan.yaml
   - paths/penyusutan.yaml
   - paths/laporan.yaml
   components:

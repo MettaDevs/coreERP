@@ -22,6 +22,7 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
+use Modules\Apperp\ManagementAset\Models\master\MaintenancePlanLine;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
@@ -77,6 +78,7 @@ abstract class MasterDataController extends Controller
         'aset_m_maintenance_checklist_variable_value' => MaintenanceChecklistVariableValue::class,
         'aset_m_maintenance_job_type_default' => MaintenanceJobTypeDefault::class,
         'aset_m_maintenance_job_type_variant' => MaintenanceJobTypeVariant::class,
+        'aset_m_rencana_pemeliharaan_baris' => MaintenancePlanLine::class,
         'aset_m_model_aset' => ModelAset::class,
         'aset_m_tipe_atribut_nilai' => TipeAtributNilai::class,
         'aset_tr_buku_aset' => BukuAset::class,
