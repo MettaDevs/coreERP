@@ -57,8 +57,15 @@ security:
         - management-aset.dekomisioning-aset.verify
         - management-aset.penjualan-aset.read
         - management-aset.penjualan-aset.create
+        - management-aset.penjualan-aset.post
         - management-aset.pemusnahan-aset.read
         - management-aset.pemusnahan-aset.create
+        - management-aset.pemusnahan-aset.post
+        - management-aset.penyesuaian-nilai-aset.read
+        - management-aset.penyesuaian-nilai-aset.create
+        - management-aset.penyesuaian-nilai-aset.update
+        - management-aset.penyesuaian-nilai-aset.archive
+        - management-aset.penyesuaian-nilai-aset.post
         - management-aset.penyusutan.read
         - management-aset.penyusutan.create
         - management-aset.penyusutan.finalize

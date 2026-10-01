@@ -12,6 +12,10 @@ description: |
   | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed | Sudah |
   | `asset.depreciation` | Proses "Post penyusutan" satu periode | Sudah |
   | `asset.depreciation_reversal` | Penyusutan satu periode dibalik | Sudah |
+  | `asset.disposal_sale` | Penjualan aset diposting | Sudah |
+  | `asset.disposal_scrap` | Pemusnahan aset diposting | Sudah |
+  | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
+  | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
 
   **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
   *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.
@@ -25,3 +29,7 @@ examples:
   - asset.opening_balance
   - asset.depreciation
   - asset.depreciation_reversal
+  - asset.disposal_sale
+  - asset.disposal_scrap
+  - asset.write_down
+  - asset.appreciation

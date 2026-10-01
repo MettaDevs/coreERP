@@ -158,6 +158,7 @@ export default withMermaid({
             { text: 'Register aset', link: '/apps/management-aset/transaction/register-aset/' },
             { text: 'Penempatan dan mutasi', link: '/apps/management-aset/transaction/penempatan/' },
             { text: 'Proses penyusutan', link: '/apps/management-aset/transaction/penyusutan/' },
+            { text: 'Penyesuaian nilai aset', link: '/apps/management-aset/transaction/penyesuaian-nilai-aset/' },
             { text: 'Pemeliharaan aset', link: '/apps/management-aset/transaction/pemeliharaan-aset/' },
             { text: 'Pemeliharaan preventif', link: '/apps/management-aset/transaction/pemeliharaan-preventif/' },
             { text: 'Permintaan pemeliharaan', link: '/apps/management-aset/transaction/permintaan-pemeliharaan/' },

@@ -47,7 +47,7 @@ tags:
 - name: Master data
   description: Master aset dan master maintenance.
 - name: Lifecycle aset
-  description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+  description: Dokumen lifecycle aset, register, mutasi, serta penjualan dan pemusnahan yang diposting beserta jurnal pelepasannya.
 - name: Penerimaan aset
   description: Dokumen penerimaan aset; satu kedatangan barang, banyak aset. Satu-satunya pintu masuk ke register.
 - name: Mutasi aset
@@ -58,6 +58,8 @@ tags:
   description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
 - name: Permintaan pemeliharaan
   description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
+- name: Penyesuaian nilai aset
+  description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya ke aplikasi finance.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke aplikasi finance.
 - name: Reference data
@@ -73,6 +75,8 @@ x-bundle:
   - paths/penerimaan-aset.yaml
   - paths/mutasi-aset.yaml
   - paths/monitoring-aset.yaml
+  - paths/pelepasan-aset.yaml
+  - paths/penyesuaian-nilai-aset.yaml
   - paths/pemeliharaan-aset.yaml
   - paths/pemeliharaan-preventif.yaml
   - paths/permintaan-pemeliharaan.yaml

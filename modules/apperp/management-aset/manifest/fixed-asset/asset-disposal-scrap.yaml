@@ -15,14 +15,27 @@ security:
       name: Buat usulan pemusnahan aset
       entry_point: management-aset.pemusnahan-aset.api
       access: create
+    # Posting melepas aset, menutup bukunya, dan mengirim jurnal pelepasan ke aplikasi finance.
+    - code: management-aset.pemusnahan-aset.post
+      name: Posting pemusnahan aset
+      entry_point: management-aset.pemusnahan-aset.api
+      access: invoke
   privileges:
     - code: management-aset.pemusnahan-aset.maintain
       name: Kelola pemusnahan aset
       permissions: [management-aset.pemusnahan-aset.read, management-aset.pemusnahan-aset.create]
+    - code: management-aset.pemusnahan-aset.post-to-finance
+      name: Posting pemusnahan aset
+      permissions: [management-aset.pemusnahan-aset.read, management-aset.pemusnahan-aset.post]
   duties:
     - code: management-aset.pemusnahan-aset.manage
       name: Kelola pemusnahan aset
       privileges: [management-aset.pemusnahan-aset.maintain]
+    # Duty tersendiri, seperti "Post penyusutan ke aplikasi finance": role yang menyusun draf tidak
+    # diam-diam dapat melepas aset dan mengirim jurnalnya.
+    - code: management-aset.pemusnahan-aset.posting
+      name: Posting pemusnahan aset
+      privileges: [management-aset.pemusnahan-aset.post-to-finance]
 number_sequences:
   references:
     - code: management-aset.pemusnahan-aset

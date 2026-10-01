@@ -59,11 +59,19 @@ Satu proses = satu entitas legal × satu buku × satu tanggal akhir periode = sa
 
 **Pembalikan mengikuti periode aslinya** (TODO 11.3). Bila periode asli sudah di-post, pembalikan menerbitkan `asset.depreciation_reversal` untuk porsi aset itu saja, merujuk posting asalnya, bertanggal periode asal (K-29). Bila belum, tidak ada posting, dan periode aslinya tidak pernah ikut proses post.
 
+## Sesudah penurunan atau kenaikan nilai
+
+Penurunan dan kenaikan nilai yang diposting lewat [penyesuaian nilai aset](/apps/management-aset/transaction/penyesuaian-nilai-aset/) adalah bagian nilai buku (`write_down_amount` dan `appreciation_amount` di `aset_tr_buku_aset`). Penyusutan berikutnya dihitung dari nilai buku yang baru:
+
+- **Garis lurus** pada buku yang pernah disesuaikan membagi nilai buku dikurangi nilai sisa ke sisa masa manfaat, bukan harga perolehan ke seluruh masa manfaat (PSAK 48 / IAS 36 ¶63; garis lurus Business Central memang selalu menghitung dari nilai buku dan sisa umur). Buku yang tidak pernah disesuaikan tetap memakai rumus lamanya, jadi angka penyusutan yang sudah berjalan tidak bergeser.
+- **Garis lurus sisa umur dan saldo menurun** sudah menghitung dari nilai buku, jadi tidak berubah.
+- Penyesuaian ditolak selama buku masih punya usulan yang belum difinalkan, atau sudah disusutkan sesudah tanggal penyesuaian; aturan yang sama dengan pelepasan (`Services/BookPeriods`).
+
 ## Hubungan dengan koreksi aset
 
 Beberapa larangan pada register aset berasal dari sini:
 
-- Nilai perolehan dan nilai sisa **tidak bisa diubah** kalau sudah ada periode penyusutan. Balikkan periodenya dulu. Sebelum ada periode, koreksi nilai perolehan menerbitkan jurnal koreksinya sendiri (`asset.acquisition_adjustment`, lihat [Koreksi nilai perolehan](/apps/management-aset/transaction/register-aset/#koreksi-nilai-perolehan)).
+- Nilai perolehan dan nilai sisa **tidak bisa diubah** kalau sudah ada periode penyusutan. Balikkan periodenya dulu. Sebelum ada periode, koreksi nilai perolehan menerbitkan jurnal koreksinya sendiri (`asset.acquisition_adjustment`, lihat [Koreksi nilai perolehan](/apps/management-aset/transaction/register-aset/#koreksi-nilai-perolehan)). Koreksi sebelum ada periode menyamakan nilai buku dengan nilai perolehan baru dikurangi penurunan nilai dan ditambah kenaikan nilai yang sudah diposting.
 - Tanggal mulai dipakai hanya bisa digeser kalau **belum ada** periode. Buku yang sudah berjalan memakai tanggal itu sebagai dasar periode yang terlanjur final.
 
 ## Yang datang dari Core

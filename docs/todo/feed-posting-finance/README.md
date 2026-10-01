@@ -406,6 +406,9 @@ Hasil studi halaman *Vendors* di F&O dan BC (TODO 2.1), dan bentuk yang dibangun
 ## Di luar cakupan
 
 - Pelepasan aset (jual/musnah) dan laba/rugi pelepasan. Jenis posting-nya dicadangkan di kontrak.
+  *Dikerjakan sesudahnya (1 Oktober 2026)*: `asset.disposal_sale`, `asset.disposal_scrap`, beserta
+  penurunan dan kenaikan nilai (`asset.write_down`, `asset.appreciation`); lihat
+  [Dokumen siklus aset](../../apps/management-aset/transaction/siklus-aset/index.md#jurnal-pelepasan).
 - Reklasifikasi akumulasi saat aset pindah antar klinik (BU). Pindah antar poli dalam satu klinik
   sudah aman, karena hanya penyusutan berikutnya yang pindah dimensi.
 - Koreksi nilai perolehan setelah ada periode penyusutan.

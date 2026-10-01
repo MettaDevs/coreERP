@@ -1,0 +1,69 @@
+# Penyesuaian nilai aset: penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku
+# penyusutan, padanan FA Posting Type Write-Down dan Appreciation di Business Central. Memposting mengubah
+# nilai buku aset dan mengirim jurnalnya ke aplikasi finance, jadi duty-nya terpisah dari menyusun draf,
+# seperti "Post penyusutan ke aplikasi finance".
+security:
+  entry_points:
+    - code: management-aset.penyesuaian-nilai-aset.form
+      name: Layar penyesuaian nilai aset
+      type: form
+    - code: management-aset.penyesuaian-nilai-aset.api
+      name: API penyesuaian nilai aset
+      type: api
+  permissions:
+    - code: management-aset.penyesuaian-nilai-aset.read
+      name: Lihat penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.form
+      access: read
+    - code: management-aset.penyesuaian-nilai-aset.create
+      name: Buat penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.api
+      access: create
+    - code: management-aset.penyesuaian-nilai-aset.update
+      name: Ubah penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.api
+      access: update
+    - code: management-aset.penyesuaian-nilai-aset.archive
+      name: Arsipkan penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.api
+      access: delete
+    - code: management-aset.penyesuaian-nilai-aset.post
+      name: Posting penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.api
+      access: invoke
+  privileges:
+    # Penyusun perlu memilih aset dan buku penyusutannya; hanya permission baca yang dipasang.
+    - code: management-aset.penyesuaian-nilai-aset.maintain
+      name: Susun penyesuaian nilai aset
+      permissions:
+        - management-aset.penyesuaian-nilai-aset.read
+        - management-aset.penyesuaian-nilai-aset.create
+        - management-aset.penyesuaian-nilai-aset.update
+        - management-aset.aset.read
+        - management-aset.buku-penyusutan.read
+    - code: management-aset.penyesuaian-nilai-aset.retire
+      name: Arsipkan draf penyesuaian nilai aset
+      permissions:
+        - management-aset.penyesuaian-nilai-aset.archive
+    - code: management-aset.penyesuaian-nilai-aset.post-to-finance
+      name: Posting penyesuaian nilai aset
+      permissions:
+        - management-aset.penyesuaian-nilai-aset.read
+        - management-aset.penyesuaian-nilai-aset.post
+  duties:
+    - code: management-aset.penyesuaian-nilai-aset.manage
+      name: Kelola penyesuaian nilai aset
+      privileges:
+        - management-aset.penyesuaian-nilai-aset.maintain
+        - management-aset.penyesuaian-nilai-aset.retire
+    - code: management-aset.penyesuaian-nilai-aset.posting
+      name: Posting penyesuaian nilai aset
+      privileges:
+        - management-aset.penyesuaian-nilai-aset.post-to-finance
+number_sequences:
+  references:
+    - code: management-aset.penyesuaian-nilai-aset
+      name: Nomor penyesuaian nilai aset
+      default_prefix: PNLA
+      allowed_scopes:
+        - legal_entity

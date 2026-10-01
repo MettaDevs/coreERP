@@ -17,7 +17,8 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
  * dibedakan oleh `jenis_dokumen`.
  *
  * Tabelnya tidak memakai soft delete — dokumen siklus dibatalkan lewat `status`, tidak pernah
- * dihapus. `aset_id` boleh kosong karena dokumen dapat dibuat sebelum asetnya tercatat.
+ * dihapus. Penjualan dan pemusnahan berstatus `draft`, `posted`, atau `cancelled`; asetnya baru
+ * dilepas saat diposting. `aset_id` boleh kosong karena dokumen dapat dibuat sebelum asetnya tercatat.
  *
  * `nilai` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan float.
  *
@@ -68,7 +69,7 @@ class DokumenSiklusAset extends Model
     public const FIELD_HIDDEN = [
         'jenis_dokumen' => 'Jenis dokumen sudah ditentukan laporannya (pemusnahan atau penjualan).',
         'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
-        'status' => 'Pemusnahan dan penjualan tidak punya alur persetujuan sendiri; statusnya selalu Draf.',
+        'status' => 'Laporan pemusnahan dan penjualan hanya membaca dokumen yang sudah diposting.',
         'workflow_instance_id' => 'Rujukan teknis ke alur persetujuan dekomisioning, tidak bermakna sebagai filter.',
     ];
 

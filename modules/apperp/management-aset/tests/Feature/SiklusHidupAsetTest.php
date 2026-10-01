@@ -216,7 +216,7 @@ class SiklusHidupAsetTest extends TestCase
         $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
         $this->decommission($aset);
 
-        $this->document('penjualan-aset', $aset, '2026-08-31')->assertCreated();
+        $this->dispose('penjualan-aset', $aset, '2026-08-31')->assertOk();
 
         $this->assertSame('disposed', DB::table('aset_tr_aset')->where('id', $aset)->value('lifecycle_state'));
         $this->assertSame('closed', DB::table('aset_tr_buku_aset')->where('id', $book)->value('status'));
@@ -231,7 +231,7 @@ class SiklusHidupAsetTest extends TestCase
         $book = $this->bookedAset();
         $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
         $this->decommission($aset);
-        $this->document('pemusnahan-aset', $aset, '2026-08-31')->assertCreated();
+        $this->dispose('pemusnahan-aset', $aset, '2026-08-31')->assertOk();
 
         $this->correct($aset, ['serial_number' => 'SN-baru'])->assertStatus(409);
     }
@@ -243,7 +243,7 @@ class SiklusHidupAsetTest extends TestCase
         $this->propose($books[0], '2026-07-01', '2026-07-31')->assertCreated();
         $dilepas = (string) DB::table('aset_tr_buku_aset')->where('id', $books[2])->value('aset_id');
         $this->decommission($dilepas);
-        $this->document('penjualan-aset', $dilepas, '2026-06-30')->assertCreated();
+        $this->dispose('penjualan-aset', $dilepas, '2026-06-30')->assertOk();
 
         $response = $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal-massal', [
@@ -399,6 +399,21 @@ class SiklusHidupAsetTest extends TestCase
     private function decommission(string $asetId): void
     {
         DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
+    }
+
+    /**
+     * Draf penjualan atau pemusnahan, lalu diposting: aset baru dilepas saat diposting.
+     *
+     * @return TestResponse<Response>
+     */
+    private function dispose(string $type, string $asetId, string $tanggal): TestResponse
+    {
+        $draf = (string) $this->document($type, $asetId, $tanggal)->assertCreated()->json('data.id');
+
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$type.'.post'])
+            ->postJson('/api/modules/management-aset/v1/'.$type.'/'.$draf.'/posting', [
+                'version' => DB::table('aset_tr_dokumen_siklus_aset')->where('id', $draf)->value('version'),
+            ]);
     }
 
     /** @return TestResponse<Response> */

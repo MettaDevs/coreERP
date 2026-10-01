@@ -48,7 +48,7 @@ tags:
 - name: Master data
   description: Master aset dan master maintenance.
 - name: Lifecycle aset
-  description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+  description: Dokumen lifecycle aset, register, mutasi, serta penjualan dan pemusnahan yang diposting beserta jurnal pelepasannya.
 - name: Penerimaan aset
   description: Dokumen penerimaan aset; satu kedatangan barang, banyak aset. Satu-satunya pintu masuk ke register.
 - name: Mutasi aset
@@ -59,6 +59,9 @@ tags:
   description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
 - name: Permintaan pemeliharaan
   description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
+- name: Penyesuaian nilai aset
+  description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya
+    ke aplikasi finance.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke
     aplikasi finance.
@@ -4893,6 +4896,388 @@ paths:
           description: Monitoring tanpa baris, ada baris yang belum diperiksa, atau sudah selesai
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/v1/{disposalDocument}/{id}:
+    parameters:
+    - $ref: '#/components/parameters/DisposalDocument'
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: showAssetDisposal
+      summary: Membaca satu penjualan atau pemusnahan beserta asetnya dan keadaan jurnalnya
+      responses:
+        '200':
+          description: Dokumen pelepasan
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDisposalResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Lifecycle aset
+      operationId: updateAssetDisposal
+      summary: Mengubah tanggal, nilai, atau keterangan draf
+      description: |
+        Butuh izin membuat dokumen jenis itu (`management-aset.<jenis>.create`); dokumen siklus tidak
+        punya izin ubah. Asetnya tidak dapat diganti. Pemusnahan tidak membawa nilai penjualan.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetDisposalWrite'
+              - $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Draf setelah diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDisposalResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Dokumen sudah diposting atau dibatalkan, atau isian tidak sah
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/{disposalDocument}/{id}/batal:
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: cancelAssetDisposal
+      summary: Membatalkan draf; dokumen siklus tidak pernah dihapus
+      parameters:
+      - $ref: '#/components/parameters/DisposalDocument'
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Dokumen berstatus `cancelled`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDisposalResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Dokumen sudah diposting atau dibatalkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/{disposalDocument}/{id}/pratinjau-posting:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: previewAssetDisposalPosting
+      summary: Pratinjau jurnal pelepasan draf, tanpa menyimpan apa pun
+      description: |
+        Butuh izin memposting atau membuat dokumen jenis itu. `data` berisi `currency_code`, `blockers`
+        (daftar `{field, message}` yang menahan posting: aset belum dihentikan pemakaiannya atau sudah
+        dilepas, usulan penyusutan yang belum difinalkan, penyusutan final yang berakhir sesudah tanggal
+        pelepasan, nilai pemusnahan, atau nilai yang lebih halus dari presisi mata uang), `note` (kenapa
+        tidak ada jurnal, misalnya group aset tanpa buku yang di-post), `amounts` — saldo buku yang di-post
+        `{book, acquisition_value, accumulated_depreciation, write_down_amount, appreciation_amount,
+        net_book_value, proceeds, gain_loss}` — dan `posting` `{posting_id, status, posting_date, currency,
+        total, lines, problems}` atau `null`. Pemeriksaannya sama persis dengan posting.
+      parameters:
+      - $ref: '#/components/parameters/DisposalDocument'
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Pratinjau jurnal pelepasan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Dokumen sudah diposting atau dibatalkan
+        '500':
+          description: Jurnal tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
+  /api/v1/{disposalDocument}/{id}/posting:
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: postAssetDisposal
+      summary: Memposting draf — jurnal pelepasan terbit, aset dilepas, bukunya ditutup
+      description: |
+        Butuh izin `management-aset.<jenis>.post`. Jurnal hanya terbit dari buku yang di-post ke
+        aplikasi finance untuk group asetnya; posting yang pemetaan akunnya belum lengkap tetap terbit
+        sebagai `held` dan asetnya tetap dilepas. Penghalangnya sama dengan pratinjau dan dijawab 422
+        berkunci field-nya.
+      parameters:
+      - $ref: '#/components/parameters/DisposalDocument'
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Dokumen berstatus `posted`, dengan `posting` berisi keadaan jurnalnya atau `null`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDisposalResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+        '500':
+          description: Jurnal pelepasan gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); aset
+            tidak dilepas
+  /api/v1/penyesuaian-nilai-aset:
+    get:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: listAssetValueAdjustments
+      summary: Menampilkan penyesuaian nilai aset dalam jangkauan organisasi pengguna
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - posted
+      - name: jenis
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - write_down
+          - appreciation
+      - name: dari
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Daftar penyesuaian beserta kode dan nama buku, jumlah baris, dan total nilai
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetValueAdjustment'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: createAssetValueAdjustment
+      summary: Membuat draf penyesuaian; nomor diterbitkan Number Sequence Core per entitas legal
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyPenyesuaianNilai'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetValueAdjustmentWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+        '201':
+          description: Draf dibuat beserta barisnya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Buku tidak ada, aset di luar jangkauan, milik entitas legal lain, sudah dilepas, atau muncul dua kali
+  /api/v1/penyesuaian-nilai-aset/{id}:
+    get:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: showAssetValueAdjustment
+      summary: Membaca satu penyesuaian beserta nilai buku tiap aset
+      description: |
+        Selama draf, `nilai_buku_sebelum` dibaca dari buku aset sekarang dan `nilai_buku_sesudah` dihitung
+        darinya; sesudah diposting keduanya nilai yang dibekukan saat posting.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Penyesuaian beserta barisnya
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: updateAssetValueAdjustment
+      summary: Mengubah draf dan menyamakan barisnya dengan daftar yang dikirim
+      description: |
+        `details` wajib dikirim, walau kosong. Baris dicocokkan menurut `aset_id`: yang masih dikirim
+        dipertahankan beserta nomornya, yang tidak dikirim diarsipkan. `legal_entity_id` wajib sama dengan
+        milik dokumen.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetValueAdjustmentWrite'
+              - $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Penyesuaian setelah diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Penyesuaian sudah diposting, atau isian tidak sah
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+    delete:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: archiveAssetValueAdjustment
+      summary: Mengarsipkan draf penyesuaian
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '204':
+          description: Draf diarsipkan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Penyesuaian yang sudah diposting tidak dapat diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/penyesuaian-nilai-aset/{id}/pratinjau-posting:
+    get:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: previewAssetValueAdjustmentPosting
+      summary: Pratinjau jurnal penyesuaian draf, tanpa menyimpan apa pun
+      description: |
+        Butuh izin `management-aset.penyesuaian-nilai-aset.post` atau `.update`. `data` berisi `blockers`
+        (daftar `{field, message}`: dokumen tanpa baris, aset sudah dilepas atau tanpa buku dokumen, penurunan
+        nilai melebihi nilai buku, usulan penyusutan yang belum difinalkan, penyusutan final sesudah tanggal
+        penyesuaian, atau masalah mata uang berkunci `currency_code`), `note` (kenapa tidak ada jurnal, misalnya
+        buku yang tidak di-post ke finance), dan `posting` `{posting_id, status, posting_date, currency, total,
+        lines, problems}` atau `null`.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Pratinjau jurnal penyesuaian
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Penyesuaian sudah diposting
+        '500':
+          description: Jurnal tidak dapat disusun karena kesalahan sistem (`error.code` = `posting_failed`)
+  /api/v1/penyesuaian-nilai-aset/{id}/posting:
+    post:
+      tags:
+      - Penyesuaian nilai aset
+      operationId: postAssetValueAdjustment
+      summary: Memposting draf — nilai buku berubah, jurnalnya terbit, dokumen terkunci
+      description: |
+        Butuh izin `management-aset.penyesuaian-nilai-aset.post`. Penghalangnya sama dengan pratinjau dan
+        dijawab 422 berkunci field-nya. Posting yang pemetaan akunnya belum lengkap tetap terbit sebagai
+        `held` dan nilai bukunya tetap berubah.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Penyesuaian berstatus `posted`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetValueAdjustmentResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+        '500':
+          description: Jurnal gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); nilai buku tidak
+            berubah
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -6690,6 +7075,26 @@ components:
         type: string
         maxLength: 143
         pattern: ^[A-Za-z0-9._:-]+$
+    IdempotencyKeyPenyesuaianNilai:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Sama seperti `IdempotencyKey`, untuk penyesuaian nilai aset: kunci diteruskan ke Core diawali
+        `penyesuaian-nilai-aset:`, sehingga batasnya 135 karakter.
+      schema:
+        type: string
+        maxLength: 135
+        pattern: ^[A-Za-z0-9._:-]+$
+    DisposalDocument:
+      name: disposalDocument
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - penjualan-aset
+        - pemusnahan-aset
     IdempotencyKeyTransaksi:
       name: Idempotency-Key
       in: header
@@ -6912,6 +7317,237 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/AsetTransferDetailWrite'
+    AssetDisposalWrite:
+      type: object
+      description: Isian draf penjualan atau pemusnahan yang boleh diubah. Asetnya tidak dapat diganti.
+      properties:
+        tanggal:
+          description: Tanggal pelepasan, sekaligus tanggal jurnal dan tanggal buku aset ditutup.
+          type: string
+          format: date
+        nilai:
+          description: Nilai penjualan; kosong berarti nol. Pemusnahan tidak membawa nilai.
+          type: number
+          minimum: 0
+          nullable: true
+        keterangan:
+          type: string
+          maxLength: 2000
+          nullable: true
+    AssetDisposal:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        jenis_dokumen:
+          type: string
+          enum:
+          - penjualan-aset
+          - pemusnahan-aset
+        status:
+          type: string
+          enum:
+          - draft
+          - posted
+          - cancelled
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        aset_kode:
+          type: string
+          nullable: true
+        aset_nama:
+          type: string
+          nullable: true
+        aset_lifecycle_state:
+          type: string
+          nullable: true
+        currency_code:
+          type: string
+          nullable: true
+        tanggal:
+          type: string
+          format: date
+        nilai:
+          type: string
+          nullable: true
+        keterangan:
+          type: string
+          nullable: true
+        posting:
+          description: Keadaan jurnal pelepasan sesudah diposting, atau `null` (draf, atau tidak ada yang dijurnal).
+          type: object
+          nullable: true
+          properties:
+            posting_id:
+              type: string
+            status:
+              type: string
+    AssetDisposalResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/AssetDisposal'
+    AssetValueAdjustmentWrite:
+      type: object
+      required:
+      - legal_entity_id
+      - responsible_org_unit_id
+      - jenis
+      - buku_id
+      - tanggal
+      - keterangan
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis:
+          description: '`write_down` menurunkan nilai buku, `appreciation` menaikkannya.'
+          type: string
+          enum:
+          - write_down
+          - appreciation
+        buku_id:
+          description: Buku penyusutan yang disesuaikan. Jurnal hanya terbit untuk aset yang buku ini di-post ke finance.
+          $ref: '#/components/schemas/Ulid'
+        tanggal:
+          description: Tanggal nilai buku berubah dan tanggal jurnal.
+          type: string
+          format: date
+        keterangan:
+          description: Alasan penyesuaian; ikut ke keterangan jurnal di aplikasi finance.
+          type: string
+          maxLength: 250
+        details:
+          description: Wajib dikirim pada PATCH, walau kosong. Satu aset paling banyak sekali.
+          type: array
+          items:
+            type: object
+            required:
+            - aset_id
+            - nilai
+            properties:
+              aset_id:
+                $ref: '#/components/schemas/Ulid'
+              nilai:
+                description: Selalu positif, paling banyak dua desimal; arahnya ditentukan `jenis`.
+                type: number
+                exclusiveMinimum: 0
+              keterangan:
+                type: string
+                maxLength: 500
+                nullable: true
+    AssetValueAdjustment:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        jenis:
+          type: string
+          enum:
+          - write_down
+          - appreciation
+        status:
+          type: string
+          enum:
+          - draft
+          - posted
+        version:
+          $ref: '#/components/schemas/RecordVersion'
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_nama:
+          type: string
+          nullable: true
+        buku_id:
+          $ref: '#/components/schemas/Ulid'
+        buku_kode:
+          type: string
+          nullable: true
+        buku_nama:
+          type: string
+          nullable: true
+        buku_di_post:
+          description: Hanya pada jawaban satu dokumen. Lapisan posting buku itu bukan `none`.
+          type: boolean
+        tanggal:
+          type: string
+          format: date
+        keterangan:
+          type: string
+        diposting_pada:
+          type: string
+          format: date-time
+          nullable: true
+        posting_id:
+          description: Posting finance yang terbit saat diposting; kosong bila tidak ada yang dijurnal.
+          type: string
+          nullable: true
+        posting:
+          description: Hanya pada jawaban satu dokumen. Keadaan jurnalnya sekarang.
+          type: object
+          nullable: true
+          properties:
+            posting_id:
+              type: string
+            status:
+              type: string
+        jumlah_baris:
+          description: Hanya pada daftar.
+          type: integer
+        total_nilai:
+          description: Hanya pada daftar.
+          type: string
+        details:
+          description: Hanya pada jawaban satu dokumen.
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              line_number:
+                type: integer
+              aset_id:
+                $ref: '#/components/schemas/Ulid'
+              aset_kode:
+                type: string
+                nullable: true
+              aset_nama:
+                type: string
+                nullable: true
+              nilai:
+                type: string
+              keterangan:
+                type: string
+                nullable: true
+              nilai_buku_sebelum:
+                type: string
+                nullable: true
+              nilai_buku_sesudah:
+                type: string
+                nullable: true
+    AssetValueAdjustmentResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/AssetValueAdjustment'
     AssetMonitoringWrite:
       type: object
       description: |
@@ -8805,6 +9441,44 @@ components:
           - type: 'null'
         grant_offset_account_id:
           description: Lawan hibah, hanya untuk penerimaan dengan cara perolehan `hibah`; hibah tidak dikreditkan ke hutang.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        write_down_account_id:
+          description: Akumulasi penurunan nilai (BC Write-Down Account), dikreditkan saat penurunan nilai diposting dan dibalik
+            saat aset dilepas.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        write_down_expense_account_id:
+          description: Beban penurunan nilai (BC Write-Down Expense Acc.), akun laba rugi.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        appreciation_account_id:
+          description: Kenaikan nilai aset (BC Appreciation Account), didebit saat kenaikan nilai diposting dan dibalik saat
+            aset dilepas.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        appreciation_offset_account_id:
+          description: Lawan kenaikan nilai (BC Appreciation Bal. Account), lazimnya surplus revaluasi.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        disposal_proceeds_account_id:
+          description: Hasil penjualan aset (BC Sales Bal. Acc.), didebit sebesar nilai jual saat penjualan diposting.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        disposal_gain_account_id:
+          description: Laba pelepasan (BC Gains Acc. on Disposal), akun laba rugi.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        disposal_loss_account_id:
+          description: Rugi pelepasan (BC Losses Acc. on Disposal), akun laba rugi; juga menerima seluruh nilai buku aset
+            yang dimusnahkan.
           oneOf:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'

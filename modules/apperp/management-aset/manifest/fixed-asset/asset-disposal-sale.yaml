@@ -15,14 +15,27 @@ security:
       name: Buat usulan penjualan aset
       entry_point: management-aset.penjualan-aset.api
       access: create
+    # Posting melepas aset, menutup bukunya, dan mengirim jurnal pelepasan ke aplikasi finance.
+    - code: management-aset.penjualan-aset.post
+      name: Posting penjualan aset
+      entry_point: management-aset.penjualan-aset.api
+      access: invoke
   privileges:
     - code: management-aset.penjualan-aset.maintain
       name: Kelola penjualan aset
       permissions: [management-aset.penjualan-aset.read, management-aset.penjualan-aset.create]
+    - code: management-aset.penjualan-aset.post-to-finance
+      name: Posting penjualan aset
+      permissions: [management-aset.penjualan-aset.read, management-aset.penjualan-aset.post]
   duties:
     - code: management-aset.penjualan-aset.manage
       name: Kelola penjualan aset
       privileges: [management-aset.penjualan-aset.maintain]
+    # Duty tersendiri, seperti "Post penyusutan ke aplikasi finance": role yang menyusun draf tidak
+    # diam-diam dapat melepas aset dan mengirim jurnalnya.
+    - code: management-aset.penjualan-aset.posting
+      name: Posting penjualan aset
+      privileges: [management-aset.penjualan-aset.post-to-finance]
 number_sequences:
   references:
     - code: management-aset.penjualan-aset
