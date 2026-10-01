@@ -3,9 +3,9 @@
 namespace Tests\Feature\Foundation\Vendor;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Models\TenantMembership;
-use App\Models\TenantNumberSequence;
 use App\Models\User;
 use App\Support\Modules\Contracts\DaftarVendor;
 use Database\Seeders\AppCatalogSeeder;

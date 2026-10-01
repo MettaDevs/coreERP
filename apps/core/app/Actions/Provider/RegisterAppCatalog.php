@@ -2,10 +2,10 @@
 
 namespace App\Actions\Provider;
 
-use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
+use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Models\AppDataPolicy;
 use App\Models\CoreApp;
-use App\Models\NumberSequenceReference;
 use App\Models\Permission;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;

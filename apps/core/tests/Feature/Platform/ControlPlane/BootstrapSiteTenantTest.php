@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Models\ModuleInstallation;
 use App\Models\Tenant;
 use App\Models\TenantMembership;

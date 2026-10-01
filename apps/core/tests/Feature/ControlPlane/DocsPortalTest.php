@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\ControlPlane;
 
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Models\ProviderAccess;
 use App\Models\User;
-use App\Support\Finance\MoneyPrecision;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;

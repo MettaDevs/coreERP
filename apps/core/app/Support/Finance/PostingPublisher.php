@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Finance;
 
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Models\FinancePosting;
 use App\Models\FinancePostingEvent;

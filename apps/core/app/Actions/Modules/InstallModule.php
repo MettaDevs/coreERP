@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Modules;
 
-use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Foundation\NumberSequence\Actions\EnsureNumberSequenceDrafts;
 use App\Models\ModuleInstallation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentConnection;

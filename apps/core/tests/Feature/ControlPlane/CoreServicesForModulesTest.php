@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\NumberSequenceReference;
-use App\Models\TenantNumberSequence;
+use App\Foundation\NumberSequence\Models\NumberSequenceReference;
+use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\PenerbitNomor;

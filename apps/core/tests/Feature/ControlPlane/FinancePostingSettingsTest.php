@@ -3,11 +3,11 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\CurrencyPrecision;
+use App\Foundation\Currency\Models\CurrencyPrecision;
+use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Models\FinanceSettlementMode;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Finance\MoneyPrecision;
 use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use Database\Seeders\AppCatalogSeeder;
@@ -308,7 +308,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->actingAs($this->owner)->get('/settings/currencies')
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('settings/currencies')
+                ->component('foundation/currency/currencies')
                 ->where('canManage', true)
                 ->where('currencies.0.code', 'IDR')
                 ->where('currencies.0.amount_decimals', 2)

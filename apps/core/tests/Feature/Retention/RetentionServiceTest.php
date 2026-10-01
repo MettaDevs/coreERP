@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Retention;
 
 use App\Actions\Onboarding\RegisterBusiness;
-use App\Models\NumberSequenceReference;
+use App\Foundation\NumberSequence\Models\NumberSequenceReference;
+use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Models\TenantMembership;
-use App\Models\TenantNumberSequence;
 use App\Models\User;
 use App\Support\ChangeLog\AlwaysLoggedTables;
 use App\Support\Reporting\ExportQueue;

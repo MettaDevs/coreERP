@@ -3,15 +3,15 @@
 namespace App\Foundation\Vendor\Http\Controllers;
 
 use App\Foundation\AddressBook\Models\Party;
+use App\Foundation\NumberSequence\Models\NumberSequenceReference;
+use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Actions\SaveVendor;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
-use App\Models\NumberSequenceReference;
 use App\Models\Organization;
 use App\Models\TenantMembership;
-use App\Models\TenantNumberSequence;
 use App\Support\Access\CoreSecurityCatalog;
-use App\Support\Finance\CoreNumberSequences;
 use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
