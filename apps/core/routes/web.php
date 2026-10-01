@@ -1,13 +1,10 @@
 <?php
 
-use App\Foundation\AddressBook\Http\Controllers\OrganizationContactController;
-use App\Foundation\AddressBook\Http\Controllers\OrganizationLocationController;
 use App\Foundation\Currency\Http\Controllers\CurrencyPrecisionController;
 use App\Foundation\FinancePosting\Http\Controllers\FinancePostingMonitorController;
 use App\Foundation\FinancePosting\Http\Controllers\FinancePostingSettingController;
 use App\Foundation\FinancePosting\Http\Controllers\ReferenceAccountController;
 use App\Foundation\FiscalCalendar\Http\Controllers\FiscalCalendarController;
-use App\Foundation\Geography\Http\Controllers\AddressSetupController;
 use App\Foundation\NumberSequence\Http\Controllers\NumberSequenceController;
 use App\Foundation\UnitOfMeasure\Http\Controllers\UnitOfMeasureController;
 use App\Foundation\Vendor\Http\Controllers\VendorController;
@@ -21,11 +18,14 @@ use App\Platform\Access\Http\Controllers\MembershipController;
 use App\Platform\Access\Http\Controllers\RoleController;
 use App\Platform\Access\Http\Controllers\SecurityConfigurationController;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\AddressBook\Http\Controllers\OrganizationContactController;
+use App\Platform\AddressBook\Http\Controllers\OrganizationLocationController;
 use App\Platform\Attachments\Http\Controllers\AttachmentController;
 use App\Platform\Attachments\Http\Middleware\ResolveAttachmentContext;
 use App\Platform\ChangeLog\Http\Controllers\ChangeLogController;
 use App\Platform\Docs\Http\Controllers\DocsPortalController;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Geography\Http\Controllers\AddressSetupController;
 use App\Platform\Identity\Http\Controllers\IdentityMonitorController;
 use App\Platform\Identity\Http\Controllers\SsoBackchannelLogoutController;
 use App\Platform\Identity\Http\Controllers\SsoLoginController;
@@ -184,7 +184,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
     Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
     Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
-    Route::inertia('settings/global-address-book', 'foundation/address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::inertia('settings/global-address-book', 'platform/address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));

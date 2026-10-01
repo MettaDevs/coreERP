@@ -30,7 +30,7 @@ WhatsApp adalah jenis kontak tersendiri, bukan telepon berlabel, karena kop dan 
 
 ## Buku alamat organisasi
 
-Kartu organisasi di `settings/organization` punya bagian **Alamat Utama & Cabang** dan **Informasi Kontak & Komunikasi** untuk legal entity, dan padanannya untuk operating unit. Keduanya dilayani Core lewat `api/v1/organizations/{organization}/locations` dan `.../contacts`, dengan kode di `app/Foundation/AddressBook/Support/OrganizationAddressBook.php` dan controller di `app/Foundation/AddressBook/Http/Controllers/`.
+Kartu organisasi di `settings/organization` punya bagian **Alamat Utama & Cabang** dan **Informasi Kontak & Komunikasi** untuk legal entity, dan padanannya untuk operating unit. Keduanya dilayani Core lewat `api/v1/organizations/{organization}/locations` dan `.../contacts`, dengan kode di `app/Platform/AddressBook/Support/OrganizationAddressBook.php` dan controller di `app/Platform/AddressBook/Http/Controllers/`.
 
 Aturan yang ditegakkan kode, dan alasannya:
 
@@ -65,10 +65,10 @@ Party untuk pelanggan dan pegawai belum punya API. Saat app pertama membutuhkann
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/core/app/Foundation/AddressBook/Models/{Party,Location,PartyLocation,PartyLocationPurpose,LocationPurpose,PostalAddress,ElectronicAddress}.php`, `apps/core/app/Platform/Organization/Models/OrganizationParty.php`, `apps/core/app/Foundation/Geography/Models/CountryRegion.php` | Model buku alamat |
-| `apps/core/app/Foundation/AddressBook/Support/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
-| `apps/core/app/Foundation/AddressBook/Support/PostalAddressFormatter.php` | Bentuk tercetak alamat |
-| `apps/core/app/Foundation/AddressBook/Http/Controllers/` | Endpoint alamat dan kontak organisasi |
+| `apps/core/app/Platform/AddressBook/Models/{Party,Location,PartyLocation,PartyLocationPurpose,LocationPurpose,PostalAddress,ElectronicAddress}.php`, `apps/core/app/Platform/Organization/Models/OrganizationParty.php`, `apps/core/app/Platform/Geography/Models/CountryRegion.php` | Model buku alamat |
+| `apps/core/app/Platform/AddressBook/Support/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
+| `apps/core/app/Platform/AddressBook/Support/PostalAddressFormatter.php` | Bentuk tercetak alamat |
+| `apps/core/app/Platform/AddressBook/Http/Controllers/` | Endpoint alamat dan kontak organisasi |
 | `apps/core/resources/js/components/organization/address-book-section.tsx` | Dua bagian pada kartu organisasi |
 | `apps/core/tests/Feature/ControlPlane/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
 | `apps/core/tests/Feature/ControlPlane/SharedLocationTest.php` | Tempat bersama, arsip tautan, kegunaan ganda, kontak per tempat, isolasi tenant |

@@ -2,7 +2,7 @@
 
 namespace App\Foundation\Vendor\Models;
 
-use App\Foundation\AddressBook\Models\Party;
+use App\Platform\AddressBook\Models\Party;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;

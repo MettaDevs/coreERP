@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Foundation\Geography\Models\AddressHierarchy\Province;
-use App\Foundation\Geography\Models\CountryRegion;
+use App\Platform\Geography\Models\AddressHierarchy\Province;
+use App\Platform\Geography\Models\CountryRegion;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

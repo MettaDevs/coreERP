@@ -13,8 +13,8 @@ lalu Business Foundation, lalu Base App. Rencana dan alasannya ada di
 
 | Lapis | Namespace | Isinya |
 | --- | --- | --- |
-| Platform | `App\Platform\<Fitur>` | Yang dibutuhkan setiap aplikasi bisnis sebelum ada satu pun transaksi: tenant, lingkungan, identitas, akses, organisasi, runtime module, laporan, log perubahan, lampiran, retensi, observability, integrasi, lisensi |
-| Foundation | `App\Foundation\<Fitur>` | Data acuan bisnis yang dipakai lintas module: buku alamat, wilayah, satuan ukur, mata uang, nomor urut, kalender fiskal dan kerja, vendor, workflow, posting finance |
+| Platform | `App\Platform\<Fitur>` | Yang dibutuhkan setiap aplikasi bisnis sebelum ada satu pun transaksi: tenant, lingkungan, identitas, akses, organisasi, buku alamat, wilayah, runtime module, laporan, log perubahan, lampiran, retensi, observability, integrasi, lisensi |
+| Foundation | `App\Foundation\<Fitur>` | Data acuan bisnis yang dipakai lintas module: satuan ukur, mata uang, nomor urut, kalender fiskal dan kerja, vendor, workflow, posting finance |
 | Module | `modules/<vendor>/<module>` (root repo) | Aplikasi bisnis. Hanya boleh menyebut facade `App\Platform\Modules\Contracts` |
 
 Daftar fitur yang berlaku adalah isi folder `app/Platform/` dan `app/Foundation/` itu sendiri.
@@ -37,7 +37,7 @@ app/<Lapis>/<Fitur>/
 ```
 
 Folder yang tidak dibutuhkan sebuah fitur memang tidak ada. Sub-folder yang bermakna dipertahankan,
-misalnya `Foundation/Geography/Models/AddressHierarchy/`.
+misalnya `Platform/Geography/Models/AddressHierarchy/`.
 
 Facade module tidak ikut pola per fitur: semuanya tinggal di satu namespace,
 `App\Platform\Modules\Contracts`, sedangkan pelaksananya di `ModuleServices` fitur pemiliknya.
@@ -164,7 +164,7 @@ Batas module ke Core dijaga terpisah oleh `ModuleNamespaceBoundaryTest`.
 | `app/Foundation/NumberSequence/` | [Number sequence](/dev/14-number-sequences) |
 | `app/Foundation/FiscalCalendar/` | [Kalender fiskal](/dev/15-fiscal-calendars) |
 | `app/Foundation/UnitOfMeasure/` | [Satuan ukur](/dev/16-units-of-measure) |
-| `app/Foundation/Geography/Models/CountryRegion.php`, `app/Foundation/AddressBook/Models/Party.php`, `PartyLocation.php`, `ElectronicAddress.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema), [Buku alamat](/dev/24-global-address-book) |
+| `app/Platform/Geography/Models/CountryRegion.php`, `app/Platform/AddressBook/Models/Party.php`, `PartyLocation.php`, `ElectronicAddress.php` | [Query scope dan schema](/dev/08-query-scopes-and-schema), [Buku alamat](/dev/24-global-address-book) |
 
 ### Workflow
 

@@ -153,4 +153,4 @@ feed finance.
 - [ ] Gate CI: suite test tiap modul berjalan dengan hanya modul itu yang terpasang
 - [ ] Lokasi aset: alamat dari buku alamat Core (diwariskan), departemen bawaan per lokasi
 - [ ] K-W: identitas Worker (`hr_workers`, `hr_positions`, `hr_jobs`, penugasan posisi, tautan ke pengguna) pindah ke `Foundation\Worker`; modul HR mempertahankan data kepegawaian
-- [ ] K-2: buku alamat (Party) pindah ke `Platform\AddressBook` — diputuskan pemilik 1 Oktober 2026; menghapus pengecualian `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`
+- [x] K-2: buku alamat (Party) pindah ke `Platform\AddressBook` — diputuskan pemilik 1 Oktober 2026; menghapus pengecualian `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`. Wilayah ikut pindah ke `Platform\Geography`, karena buku alamat memakai `CountryRegion` dan address setup di F&O adalah bagian global address book; tanpa itu lahir dua pelanggaran arah baru

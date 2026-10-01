@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Foundation\Vendor\Actions;
 
-use App\Foundation\AddressBook\Models\Party;
-use App\Foundation\AddressBook\Models\PartyRoleRegistration;
 use App\Foundation\NumberSequence\Actions\NumberSequenceService;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\AddressBook\Models\Party;
+use App\Platform\AddressBook\Models\PartyRoleRegistration;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
