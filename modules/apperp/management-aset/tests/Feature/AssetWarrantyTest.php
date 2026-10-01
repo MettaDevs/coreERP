@@ -125,6 +125,9 @@ class AssetWarrantyTest extends TestCase
             'policy_code' => self::KEBIJAKAN_TANGGUNG_JAWAB, 'legal_entity_id' => $this->legalEntityId, 'organization_id' => $this->unitId,
         ]]);
         $scoped()->getJson(self::CONTRACT_URL.'/'.$id)->assertOk()->assertJsonCount(1, 'data.aset')->assertJsonPath('data.lines_count', 2);
+        // Detail aset membaca kontrak yang menanggungnya.
+        $this->as(self::MANAGER)->getJson(self::CONTRACT_URL.'?aset_id='.$theirs)->assertOk()->assertJsonCount(1, 'data');
+        $this->as(self::MANAGER)->getJson(self::CONTRACT_URL.'?aset_id='.$this->seedAsset($this->jenisAset, 'ALK-H'))->assertOk()->assertJsonCount(0, 'data');
         // Menyimpan tanpa aset miliknya sendiri tidak mengeluarkan aset unit lain yang tidak ia lihat.
         $scoped()->patchJson(self::CONTRACT_URL.'/'.$id, [...$this->contractPayload([], $this->day(-10), $this->day(300)), 'version' => $this->contractVersion($id)])->assertOk();
         $this->assertSame([$theirs], DB::table('aset_tr_kontrak_servis_aset')->where('kontrak_servis_id', $id)->whereNull('deleted_at')->pluck('aset_id')->all());

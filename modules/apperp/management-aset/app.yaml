@@ -54,6 +54,9 @@ ui:
         - id: tipe-atribut
           label: Tipe atribut
           permission: management-aset.tipe-atribut.read
+        - id: jenis-asuransi
+          label: Jenis asuransi
+          permission: management-aset.jenis-asuransi.read
         - id: buku-penyusutan
           label: Buku penyusutan
           permission: management-aset.buku-penyusutan.read
@@ -102,6 +105,9 @@ ui:
         - id: rencana-pemeliharaan
           label: Rencana pemeliharaan
           permission: management-aset.rencana-pemeliharaan.read
+        - id: alasan-downtime
+          label: Alasan downtime
+          permission: management-aset.alasan-downtime.read
         - id: sebab-kerusakan
           label: Sebab kerusakan
           permission: management-aset.sebab-kerusakan.read
@@ -132,6 +138,12 @@ ui:
         - id: mutasi-aset
           label: Mutasi aset
           permission: management-aset.mutasi-aset.read
+        - id: asuransi-aset
+          label: Asuransi aset
+          permission: management-aset.polis-asuransi.read
+        - id: garansi-kontrak-servis
+          label: Garansi dan kontrak servis
+          permission: management-aset.garansi-aset.read
         - id: permintaan-pemeliharaan
           label: Permintaan pemeliharaan
           permission: management-aset.permintaan-pemeliharaan.read
@@ -144,6 +156,9 @@ ui:
         - id: pembacaan-counter
           label: Pembacaan counter
           permission: management-aset.pembacaan-counter.read
+        - id: downtime-aset
+          label: Downtime aset
+          permission: management-aset.downtime-aset.read
         - id: dekomisioning-aset
           label: Dekomisioning aset
           permission: management-aset.dekomisioning-aset.read
@@ -172,6 +187,9 @@ ui:
         - id: laporan-pemeliharaan-aset
           label: Laporan pemeliharaan aset
           permission: management-aset.pemeliharaan-aset.read
+        - id: kpi-pemeliharaan
+          label: KPI pemeliharaan
+          permission: management-aset.kpi-pemeliharaan.read
         - id: laporan-penjualan-aset
           label: Laporan penjualan aset
           permission: management-aset.penjualan-aset.read

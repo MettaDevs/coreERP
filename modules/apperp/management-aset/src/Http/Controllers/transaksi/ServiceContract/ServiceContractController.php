@@ -46,12 +46,16 @@ class ServiceContractController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->guard($request, 'read');
-        $filter = $request->validate(['legal_entity_id' => ['nullable', 'ulid']]);
+        $filter = $request->validate(['legal_entity_id' => ['nullable', 'ulid'], 'aset_id' => ['nullable', 'ulid']]);
         $query = $this->scoped(ServiceContract::query(), $request)
             ->withCount('lines')
             ->orderByDesc('berlaku_sampai');
         if ($filter['legal_entity_id'] ?? null) {
             $query->where(self::TABLE.'.legal_entity_id', $filter['legal_entity_id']);
+        }
+        // Kontrak yang menanggung satu aset, untuk bagian garansi di detail aset.
+        if ($filter['aset_id'] ?? null) {
+            $query->whereHas('lines', fn ($lines) => $lines->where('aset_id', $filter['aset_id']));
         }
         $tenant = $this->tenant($request);
         $today = $this->today();

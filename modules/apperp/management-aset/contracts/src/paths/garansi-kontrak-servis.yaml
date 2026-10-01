@@ -48,7 +48,7 @@
   get:
     tags: [Garansi dan kontrak servis]
     operationId: listServiceContracts
-    parameters: [{name: legal_entity_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}]
+    parameters: [{name: legal_entity_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}, {name: aset_id, in: query, required: false, description: Hanya kontrak yang menanggung aset ini., schema: {$ref: '#/components/schemas/Ulid'}}]
     responses: {'200': {description: Daftar kontrak dalam jangkauan entitas legal pengguna, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/ServiceContract'}}}}}}}}
   post:
     tags: [Garansi dan kontrak servis]

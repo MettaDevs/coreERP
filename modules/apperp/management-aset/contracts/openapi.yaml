@@ -6958,6 +6958,12 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/Ulid'
+      - name: aset_id
+        in: query
+        required: false
+        description: Hanya kontrak yang menanggung aset ini.
+        schema:
+          $ref: '#/components/schemas/Ulid'
       responses:
         '200':
           description: Daftar kontrak dalam jangkauan entitas legal pengguna
