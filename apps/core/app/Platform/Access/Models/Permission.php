@@ -2,7 +2,7 @@
 
 namespace App\Platform\Access\Models;
 
-use App\Models\AppEntryPoint;
+use App\Platform\Modules\Models\AppEntryPoint;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

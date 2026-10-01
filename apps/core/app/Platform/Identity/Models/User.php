@@ -3,8 +3,8 @@
 namespace App\Platform\Identity\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\ProviderAccess;
 use App\Platform\ControlPlane\OwnedByControlPlane;
+use App\Platform\Modules\Models\ProviderAccess;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;

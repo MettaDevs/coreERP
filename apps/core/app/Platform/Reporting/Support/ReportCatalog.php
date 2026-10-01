@@ -2,8 +2,8 @@
 
 namespace App\Platform\Reporting\Support;
 
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\LaunchableAppCatalog;
 use Illuminate\Support\Facades\DB;
 use stdClass;
 

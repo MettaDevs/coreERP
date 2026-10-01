@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Observability;
 
-use App\Http\Middleware\ResolveModuleContext;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
+use App\Platform\Modules\Support\ModuleRequestContext;
 use App\Platform\Observability\Support\LaporanKesalahan;
-use App\Support\Modules\ModuleRequestContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use PDOException;

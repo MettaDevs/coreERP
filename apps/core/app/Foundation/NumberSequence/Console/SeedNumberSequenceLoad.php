@@ -3,7 +3,7 @@
 namespace App\Foundation\NumberSequence\Console;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

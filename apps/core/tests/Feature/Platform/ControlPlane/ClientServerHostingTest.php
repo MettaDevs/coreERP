@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\ControlPlane;
 
-use App\Actions\Modules\DisableModule;
-use App\Actions\Modules\InstallModule;
-use App\Actions\Modules\UninstallModule;
 use App\Platform\ControlPlane\Console\PurgeEnvironment;
 use App\Platform\ControlPlane\Jobs\UpgradeEnvironment as UpgradeEnvironmentJob;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Modules\Actions\DisableModule;
+use App\Platform\Modules\Actions\InstallModule;
+use App\Platform\Modules\Actions\UninstallModule;
+use App\Platform\Modules\Support\TenantScope;
 use App\Platform\Tenant\Models\Tenant;
-use App\Support\Modules\TenantScope;
 use Closure;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\NumberSequenceProfileSeeder;

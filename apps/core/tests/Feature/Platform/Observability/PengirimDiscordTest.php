@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Observability;
 
+use App\Platform\Modules\Support\ModuleRequestContext;
 use App\Platform\Observability\Support\LaporanKesalahan;
 use App\Platform\Observability\Support\PengirimDiscord;
-use App\Support\Modules\ModuleRequestContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request as PermintaanHttp;
 use Illuminate\Http\Request;

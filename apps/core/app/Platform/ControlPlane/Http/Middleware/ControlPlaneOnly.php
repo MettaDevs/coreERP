@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Http\Middleware;
 
-use App\Http\Middleware\AuthenticateAppService;
+use App\Platform\Modules\Http\Middleware\AuthenticateAppService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Environment\Support;
 
 use App\Platform\Environment\Models\Environment;
-use App\Support\Modules\TenantScope;
+use App\Platform\Modules\Support\TenantScope;
 use Illuminate\Contracts\Container\Container;
 use Throwable;
 

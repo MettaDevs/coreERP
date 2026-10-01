@@ -4,8 +4,8 @@ namespace Tests\Feature\Foundation\FiscalCalendar;
 
 use App\Foundation\FiscalCalendar\Actions\FiscalCalendarService;
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
-use App\Models\AppServiceCredential;
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\AppServiceCredential;
+use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;

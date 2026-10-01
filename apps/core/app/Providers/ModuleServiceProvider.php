@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Support\Modules\CoreServices;
-use App\Support\Modules\ModuleRegistry;
-use App\Support\Modules\ModulSedangDipindah;
+use App\Platform\Modules\Support\CoreServices;
+use App\Platform\Modules\Support\ModuleRegistry;
+use App\Platform\Modules\Support\ModulSedangDipindah;
 use Illuminate\Support\ServiceProvider;
 
 /**

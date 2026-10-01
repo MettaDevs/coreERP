@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\ModulSedangDipindah;
-use App\Support\Modules\TenantScope;
+use App\Platform\Modules\Support\ModulSedangDipindah;
+use App\Platform\Modules\Support\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;

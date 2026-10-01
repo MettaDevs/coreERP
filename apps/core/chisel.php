@@ -273,7 +273,7 @@ return Chisel::script(__DIR__)
             ->removeLinesContaining('"@php artisan install:features --ansi"');
 
         $c->files(
-            'app/Console/Commands/InstallFeaturesCommand.php',
+            'app/Platform/Modules/Console/InstallFeaturesCommand.php',
             'chisel.php',
             'chisel-paths.php',
         )->delete();

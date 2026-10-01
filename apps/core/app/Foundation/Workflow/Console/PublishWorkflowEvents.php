@@ -3,8 +3,8 @@
 namespace App\Foundation\Workflow\Console;
 
 use App\Platform\Environment\Support\ActiveEnvironment;
-use App\Support\Modules\ModuleManifest;
-use App\Support\Modules\ModuleRegistry;
+use App\Platform\Modules\Support\ModuleManifest;
+use App\Platform\Modules\Support\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;

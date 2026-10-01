@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Access\Support;
 
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\LaunchableAppCatalog;
 
 /**
  * Permission Core yang efektif untuk satu keanggotaan, lewat rantai yang sama dengan module: role -> duty ->

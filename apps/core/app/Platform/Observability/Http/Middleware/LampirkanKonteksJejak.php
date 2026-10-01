@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Platform\Observability\Http\Middleware;
 
-use App\Http\Middleware\ResolveModuleContext;
+use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
+use App\Platform\Modules\Support\ModuleRequestContext;
 use App\Platform\Observability\Support\JejakAktif;
 use App\Platform\Observability\Support\PelaporKesalahan;
-use App\Support\Modules\ModuleRequestContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

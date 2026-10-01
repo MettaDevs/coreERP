@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Provider\RegisterAppCatalog;
+use App\Platform\Modules\Actions\RegisterAppCatalog;
 use Illuminate\Database\Seeder;
 
 /**

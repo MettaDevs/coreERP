@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Access\Support;
 
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\ModuleInstallation;
 use App\Support\Modules\Contracts\LinkedWorkerResolver;
 use App\Support\Modules\Contracts\LinkedWorkerResolvers;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;

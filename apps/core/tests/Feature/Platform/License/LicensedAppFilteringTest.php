@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\License;
 
-use App\Models\AppServiceCredential;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\AppServiceCredential;
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Platform\Attachments\Http\Middleware;
 
-use App\Http\Middleware\ResolveModuleContext;
 use App\Platform\Attachments\Models\DocumentAttachment;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Http\Middleware\ResolveModuleContext;
 use App\Support\Modules\Contracts\AttachmentRecordType;
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use Closure;

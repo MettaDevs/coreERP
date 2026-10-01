@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Tenant;
 
-use App\Models\ModuleInstallation;
+use App\Platform\Modules\Models\ModuleInstallation;
 use App\Platform\Tenant\Models\Tenant;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

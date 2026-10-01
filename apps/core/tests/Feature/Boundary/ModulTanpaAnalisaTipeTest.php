@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\ModulTanpaAnalisaTipe;
+use App\Platform\Modules\Support\ModulTanpaAnalisaTipe;
 use DateTimeImmutable;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\DataProvider;

@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\ProviderAccess;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Models\ProviderAccess;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 

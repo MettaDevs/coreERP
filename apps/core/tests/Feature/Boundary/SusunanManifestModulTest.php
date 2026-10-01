@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\ModuleManifestFiles;
-use App\Support\Modules\ModuleRegistry;
-use App\Support\Modules\ModulSedangDipindah;
+use App\Platform\Modules\Support\ModuleManifestFiles;
+use App\Platform\Modules\Support\ModuleRegistry;
+use App\Platform\Modules\Support\ModulSedangDipindah;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;

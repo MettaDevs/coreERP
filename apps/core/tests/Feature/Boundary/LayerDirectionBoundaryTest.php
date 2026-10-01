@@ -39,6 +39,23 @@ class LayerDirectionBoundaryTest extends TestCase
         'App\\Platform\\ControlPlane\\Console\\CopyEnvironment -> App\\Foundation\\Workflow\\Console\\PublishWorkflowEvents',
         'App\\Platform\\Integration\\Http\\Controllers\\IntegrationClientController -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
         'App\\Platform\\Integration\\Http\\Middleware\\AuthenticateIntegrationClient -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
+        // Pemasangan module langsung menyiapkan data Foundation. Perbaikan: Foundation mendengarkan
+        // kejadian "module terpasang".
+        'App\\Platform\\Modules\\Actions\\InstallModule -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
+        'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
+        'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Models\\NumberSequenceReference',
+        // CoreServices menyambungkan semua facade bisnis. Perbaikan (PR facade): tiap fitur Foundation
+        // mendaftarkan implementasi facade-nya sendiri.
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Currency\\ModuleServices\\PresisiMataUangCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\DaftarAkunCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\PenerbitPostingCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\SetelanPostingFinanceCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\Support\\PostingAccountResolverRegistry',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FiscalCalendar\\ModuleServices\\KalenderFiskalCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\NumberSequence\\ModuleServices\\PenerbitNomorCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\UnitOfMeasure\\ModuleServices\\DaftarSatuanCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Vendor\\ModuleServices\\DaftarVendorCore',
+        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Workflow\\ModuleServices\\MesinWorkflowCore',
         'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
         'App\\Platform\\Organization\\Models\\OrganizationParty -> App\\Foundation\\AddressBook\\Models\\Party',
         'App\\Platform\\Reporting\\Support\\PrintIdentityStore -> App\\Foundation\\AddressBook\\Support\\OrganizationAddressBook',
