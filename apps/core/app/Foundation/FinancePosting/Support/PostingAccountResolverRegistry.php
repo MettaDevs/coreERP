@@ -10,7 +10,7 @@ use App\Platform\Modules\Contracts\PostingAccountResolvers;
 /**
  * Pemeta akun module yang terdaftar di proses ini, berkunci id module.
  *
- * Diikat sebagai satu benda (`CoreServices::PEMETAAN_TUNGGAL`), supaya pendaftaran dari penyedia
+ * Diikat sebagai satu benda (`FinancePostingServiceProvider`), supaya pendaftaran dari penyedia
  * layanan module dan pembacaan oleh penerbit posting memegang daftar yang sama.
  */
 final class PostingAccountResolverRegistry implements PostingAccountResolvers

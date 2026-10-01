@@ -2,11 +2,11 @@
 
 namespace App\Platform\Integration\Http\Middleware;
 
-use App\Foundation\FinancePosting\Support\IntegrationClientAccounts;
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Support\IntegrationClientAccounts;
 use App\Platform\Modules\Http\Middleware\AuthenticateAppService;
 use App\Platform\Modules\Support\TenantScope;
 use Closure;

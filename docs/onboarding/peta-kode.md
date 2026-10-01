@@ -33,6 +33,7 @@ app/<Lapis>/<Fitur>/
   Jobs/                         job antrean
   Support/                      semua kelas lain
   ModuleServices/               pelaksana facade module (`…Core`)
+  <Fitur>ServiceProvider.php    ikatan milik fitur Foundation, didaftarkan di bootstrap/providers.php
 ```
 
 Folder yang tidak dibutuhkan sebuah fitur memang tidak ada. Sub-folder yang bermakna dipertahankan,

@@ -34,29 +34,11 @@ class LayerDirectionBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED = [
-        // Hanya rujukan docblock, muncul saat PublishWorkflowEvents pindah ke Foundation/Workflow.
-        // Perbaikan: hapus `use`, sebut nama perintah artisan-nya saja.
-        'App\\Platform\\ControlPlane\\Console\\ConvertEnvironment -> App\\Foundation\\Workflow\\Console\\PublishWorkflowEvents',
-        'App\\Platform\\ControlPlane\\Console\\CopyEnvironment -> App\\Foundation\\Workflow\\Console\\PublishWorkflowEvents',
-        'App\\Platform\\Integration\\Http\\Controllers\\IntegrationClientController -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
-        'App\\Platform\\Integration\\Http\\Middleware\\AuthenticateIntegrationClient -> App\\Foundation\\FinancePosting\\Support\\IntegrationClientAccounts',
         // Pemasangan module langsung menyiapkan data Foundation. Perbaikan: Foundation mendengarkan
         // kejadian "module terpasang".
         'App\\Platform\\Modules\\Actions\\InstallModule -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
         'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Actions\\EnsureNumberSequenceDrafts',
         'App\\Platform\\Modules\\Actions\\RegisterAppCatalog -> App\\Foundation\\NumberSequence\\Models\\NumberSequenceReference',
-        // CoreServices menyambungkan semua facade bisnis. Perbaikan (PR facade): tiap fitur Foundation
-        // mendaftarkan implementasi facade-nya sendiri.
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Currency\\ModuleServices\\CurrencyRoundingCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\AccountDirectoryCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\PostingFeedCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\ModuleServices\\FinancePostingSettingsCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FinancePosting\\Support\\PostingAccountResolverRegistry',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\FiscalCalendar\\ModuleServices\\FiscalCalendarDirectoryCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\NumberSequence\\ModuleServices\\NumberSequenceIssuerCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\UnitOfMeasure\\ModuleServices\\UnitOfMeasureDirectoryCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Vendor\\ModuleServices\\VendorDirectoryCore',
-        'App\\Platform\\Modules\\Support\\CoreServices -> App\\Foundation\\Workflow\\ModuleServices\\WorkflowEngineCore',
         'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
         'App\\Platform\\Organization\\Models\\OrganizationParty -> App\\Foundation\\AddressBook\\Models\\Party',
         'App\\Platform\\Reporting\\Support\\PrintIdentityStore -> App\\Foundation\\AddressBook\\Support\\OrganizationAddressBook',

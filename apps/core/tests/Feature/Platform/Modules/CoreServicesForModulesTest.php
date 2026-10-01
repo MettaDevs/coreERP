@@ -29,7 +29,7 @@ class CoreServicesForModulesTest extends TestCase
 
     public function test_semua_antarmuka_terpasang_di_wadah(): void
     {
-        foreach (CoreServices::PEMETAAN as $antarmuka => $pelaksana) {
+        foreach (CoreServices::contracts() as $antarmuka) {
             $this->assertInstanceOf($antarmuka, $this->app->make($antarmuka), $antarmuka.' belum terpasang.');
         }
     }

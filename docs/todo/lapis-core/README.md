@@ -110,11 +110,11 @@ Dengan keputusan di atas ada **23 import** yang melanggar arah. Semuanya jatuh k
 
 | Pola | Contoh | Perbaikan |
 | --- | --- | --- |
-| `CoreServices` (Platform/Modules) menyambungkan semua facade bisnis | `CoreServices` → `NumberSequenceIssuerCore`, `VendorDirectoryCore`, `WorkflowEngineCore`, `PostingFeedCore`, … (13 import) | Tiap fitur Foundation mendaftarkan implementasi facade-nya sendiri di service provider fitur itu. Platform hanya menyediakan tempat pendaftarannya. Ini pembalikan arah, seperti di BC |
+| ~~`CoreServices` (Platform/Modules) menyambungkan semua facade bisnis~~ | ~~`CoreServices` → `NumberSequenceIssuerCore`, `VendorDirectoryCore`, `WorkflowEngineCore`, `PostingFeedCore`, … (10 import)~~ | Selesai di PR 8b: tiap fitur Foundation mengikat pelaksananya sendiri di `<Fitur>ServiceProvider`, `CoreServices` hanya menyebut antarmukanya |
 | Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation | `InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure` (5 import) | Foundation mendengarkan kejadian tenant/module. Kontrak `TenantProvisioned` sudah ada; kejadian "module terpasang" ditambahkan bila belum ada |
 | Reporting memakai presisi uang dan buku alamat | `ValueFormat`, `ValueFormats` → `MoneyPrecision`; `PrintIdentityStore` → `OrganizationAddressBook` (3 import) | Lewat facade (`CurrencyRounding` sudah ada) atau penyedia yang didaftarkan Foundation |
-| Integration dan onboarding menyentuh milik fitur lain | `AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance); `RegisterBusiness` → `Client` (ControlPlane) (3 import) | Tentukan pemilik saat PR domain itu. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
-| ControlPlane menyebut perintah workflow di docblock (ditemukan saat PR 5) | `ConvertEnvironment`, `CopyEnvironment` → `PublishWorkflowEvents` (Workflow) (2 import) | Hanya rujukan docblock; perbaikan: hapus `use`, sebut nama perintah artisan-nya saja |
+| Integration dan onboarding menyentuh milik fitur lain | ~~`AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance)~~; `RegisterBusiness` → `Client` (ControlPlane) (1 import tersisa) | `IntegrationClientAccounts` pindah ke `Platform\Integration\Support` di PR 8b: isinya hanya akun aplikasi klien integrasi (`User` dan `IntegrationClient`, keduanya Platform), tanpa satu pun model posting. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
+| ~~ControlPlane menyebut perintah workflow di docblock (ditemukan saat PR 5)~~ | ~~`ConvertEnvironment`, `CopyEnvironment` → `PublishWorkflowEvents` (Workflow) (2 import)~~ | Selesai di PR 8b: `use` dihapus, docblock menyebut `workflow-events:publish` |
 | Model tenant mengenal client milik pusat | `Tenant` → `Client` (ControlPlane) (1 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: isi kelas `Tenant` tidak diubah |
 | Model organisasi menunjuk data Foundation | `LegalEntity` → `FiscalCalendar`; `OrganizationParty` → `Party` (AddressBook) (2 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: PR pemindahan tidak mengubah isi kelas. `OrganizationParty` → `Party` bergantung pada K-2 |
 
@@ -175,8 +175,12 @@ dan `Console/Commands/ConfigureLocalCoreCommand.php`. Alasannya tercatat di peta
 
 ### Yang tersisa
 
-- [ ] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur. Sampai saat itu baris
-      `CoreServices -> …Core` tetap di `ALLOWED`
+- [x] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur. Tujuh fitur Foundation
+      (Currency, FinancePosting, FiscalCalendar, NumberSequence, UnitOfMeasure, Vendor, Workflow)
+      kini punya `<Fitur>ServiceProvider` di `bootstrap/providers.php`, dengan umur ikatan yang sama
+      (`bind`, `singleton` untuk `PostingAccountResolvers`, `scoped` untuk `ParameterWorkflow`).
+      Ikut dibereskan: docblock `ConvertEnvironment`/`CopyEnvironment` dan `IntegrationClientAccounts`.
+      `ALLOWED` turun dari 26 menjadi 12 baris
 - [ ] **Pembalikan arah pemasangan dan onboarding:** `InstallModule`, `RegisterAppCatalog`, dan
       `RegisterBusiness` berhenti menyiapkan data Foundation secara langsung (pola kedua pada tabel
       pelanggaran)

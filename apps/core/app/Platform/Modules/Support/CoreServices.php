@@ -4,16 +4,6 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Support;
 
-use App\Foundation\Currency\ModuleServices\CurrencyRoundingCore;
-use App\Foundation\FinancePosting\ModuleServices\AccountDirectoryCore;
-use App\Foundation\FinancePosting\ModuleServices\FinancePostingSettingsCore;
-use App\Foundation\FinancePosting\ModuleServices\PostingFeedCore;
-use App\Foundation\FinancePosting\Support\PostingAccountResolverRegistry;
-use App\Foundation\FiscalCalendar\ModuleServices\FiscalCalendarDirectoryCore;
-use App\Foundation\NumberSequence\ModuleServices\NumberSequenceIssuerCore;
-use App\Foundation\UnitOfMeasure\ModuleServices\UnitOfMeasureDirectoryCore;
-use App\Foundation\Vendor\ModuleServices\VendorDirectoryCore;
-use App\Foundation\Workflow\ModuleServices\WorkflowEngineCore;
 use App\Platform\Access\Support\LinkedWorkerResolverRegistry;
 use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
@@ -56,15 +46,21 @@ use Illuminate\Contracts\Foundation\Application;
  *
  * Semua antarmuka menerima **id, bukan objek Core**. Module yang harus mengambil objek Core
  * lebih dulu sudah menyentuh model Core, dan batas yang dibuat daftar ini kembali kabur.
+ *
+ * Kelas ini milik Platform, jadi ia hanya mengikat pelaksana milik Platform. Antarmuka yang
+ * pelaksananya tinggal di Foundation tetap disebut di sini (`FOUNDATION_CONTRACTS`,
+ * `FOUNDATION_SINGLETONS`), tetapi diikat oleh penyedia layanan fitur pemiliknya
+ * (`<Fitur>ServiceProvider` di akar folder fitur itu, terdaftar di `bootstrap/providers.php`).
+ * Platform tidak pernah menyebut kelas Foundation; arah ini dijaga `LayerDirectionBoundaryTest`.
  */
 final class CoreServices
 {
-    /** @var array<class-string, class-string> */
+    /**
+     * Antarmuka yang pelaksananya milik Platform, diikat `bind` di sini.
+     *
+     * @var array<class-string, class-string>
+     */
     public const PEMETAAN = [
-        NumberSequenceIssuer::class => NumberSequenceIssuerCore::class,
-        FiscalCalendarDirectory::class => FiscalCalendarDirectoryCore::class,
-        UnitOfMeasureDirectory::class => UnitOfMeasureDirectoryCore::class,
-        WorkflowEngine::class => WorkflowEngineCore::class,
         OrganizationDirectory::class => OrganizationDirectoryCore::class,
         TenantContext::class => TenantContextCore::class,
         // Berdiri sendiri di samping TenantContext, tidak digabung ke dalamnya. Tenant
@@ -78,25 +74,38 @@ final class CoreServices
         // Tanpa ini module harus menyebut kelas Core yang menyimpan tenant aktif, dan
         // batas yang berbunyi satu kalimat langsung runtuh.
         TenantRunner::class => TenantRunnerCore::class,
-        // Feed posting finance: module yang menyusun jurnal membaca kebijakan penyelesaian
-        // dan cutover entitas legal, dan membulatkan nilai dengan presisi yang sama dengan
-        // yang dipakai penerbit posting.
-        FinancePostingSettings::class => FinancePostingSettingsCore::class,
-        CurrencyRounding::class => CurrencyRoundingCore::class,
-        // Feed posting finance: akun milik aplikasi finance pelanggan, dipilih di pemetaan
-        // posting module dan dibaca ulang setiap kali posting terbit.
-        AccountDirectory::class => AccountDirectoryCore::class,
-        // Vendor milik Core (party berperan vendor per entitas legal), dipilih di dokumen
-        // penerimaan module dan disalin nomor serta namanya ke posting saat terbit.
-        VendorDirectory::class => VendorDirectoryCore::class,
-        // Feed posting finance: module menerbitkan jurnalnya di dalam transaksi dokumen sumbernya,
-        // dan memakai pratinjau yang sama untuk menampilkan masalah sebelum konfirmasi.
-        PostingFeed::class => PostingFeedCore::class,
         // Laporan: layar pratinjau module memformat nilai bertipe (`money`, `date`, …) dengan
         // aturan yang sama dengan renderer Core, supaya layar dan hasil cetak tidak berbeda.
         ReportFormatter::class => ReportFormatterCore::class,
         // Log perubahan: module membuka riwayat record miliknya sesudah memeriksa haknya sendiri.
         ChangeHistory::class => ChangeHistoryCore::class,
+    ];
+
+    /**
+     * Antarmuka yang pelaksananya milik Foundation. Diikat `bind` (dibuat baru tiap kali dipakai)
+     * oleh penyedia layanan fitur pemiliknya, bukan di sini.
+     *
+     * @var list<class-string>
+     */
+    public const FOUNDATION_CONTRACTS = [
+        NumberSequenceIssuer::class,
+        FiscalCalendarDirectory::class,
+        UnitOfMeasureDirectory::class,
+        WorkflowEngine::class,
+        // Feed posting finance: module yang menyusun jurnal membaca kebijakan penyelesaian
+        // dan cutover entitas legal, dan membulatkan nilai dengan presisi yang sama dengan
+        // yang dipakai penerbit posting.
+        FinancePostingSettings::class,
+        CurrencyRounding::class,
+        // Feed posting finance: akun milik aplikasi finance pelanggan, dipilih di pemetaan
+        // posting module dan dibaca ulang setiap kali posting terbit.
+        AccountDirectory::class,
+        // Vendor milik Core (party berperan vendor per entitas legal), dipilih di dokumen
+        // penerimaan module dan disalin nomor serta namanya ke posting saat terbit.
+        VendorDirectory::class,
+        // Feed posting finance: module menerbitkan jurnalnya di dalam transaksi dokumen sumbernya,
+        // dan memakai pratinjau yang sama untuk menampilkan masalah sebelum konfirmasi.
+        PostingFeed::class,
     ];
 
     /**
@@ -115,10 +124,6 @@ final class CoreServices
      */
     public const PEMETAAN_TUNGGAL = [
         ModuleReportProviders::class => ModuleReportProviderRegistry::class,
-        // Feed posting finance: posting yang dibentuk ulang membaca akunnya dari pemetaan module
-        // yang berlaku sekarang, supaya Validasi ulang dapat melepas posting yang tertahan karena
-        // pemetaannya dulu kosong.
-        PostingAccountResolvers::class => PostingAccountResolverRegistry::class,
         // Log perubahan: nilai mentah (ULID, kode status) diterjemahkan pemilik tabelnya menjadi nama.
         ChangeLogValueResolvers::class => ChangeLogValueResolverRegistry::class,
         // Lampiran dokumen: pemilik tabel menjawab hak atas record induknya dengan aturannya sendiri.
@@ -129,6 +134,29 @@ final class CoreServices
         // data yang sama dengan layarnya; Core hanya mengantrekan dan menulis berkasnya.
         ListExportSources::class => ListExportRegistry::class,
     ];
+
+    /**
+     * Daftar isian milik Foundation. Diikat `singleton` beserta aliasnya oleh penyedia layanan
+     * fitur pemiliknya, dengan alasan yang sama seperti `PEMETAAN_TUNGGAL`.
+     *
+     * @var list<class-string>
+     */
+    public const FOUNDATION_SINGLETONS = [
+        // Feed posting finance: posting yang dibentuk ulang membaca akunnya dari pemetaan module
+        // yang berlaku sekarang, supaya Validasi ulang dapat melepas posting yang tertahan karena
+        // pemetaannya dulu kosong. Diikat `FinancePostingServiceProvider`.
+        PostingAccountResolvers::class,
+    ];
+
+    /**
+     * Seluruh antarmuka yang dibuat baru tiap kali dipakai, dari lapis mana pun pelaksananya.
+     *
+     * @return list<class-string>
+     */
+    public static function contracts(): array
+    {
+        return [...array_keys(self::PEMETAAN), ...self::FOUNDATION_CONTRACTS];
+    }
 
     public static function daftarkan(Application $app): void
     {
