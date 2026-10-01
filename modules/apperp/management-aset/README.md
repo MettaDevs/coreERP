@@ -183,6 +183,17 @@ masa manfaat, dan pelepasan membalik kedua saldonya. Akun ketiganya ada di posti
 Rinciannya di `docs/apps/management-aset/transaction/siklus-aset/` dan
 `docs/apps/management-aset/transaction/penyesuaian-nilai-aset/` pada repo CoreERP.
 
+## Reklasifikasi aset
+
+Reklasifikasi aset (`/api/v1/reklasifikasi-aset`, padanan FA Reclass. Journal Business Central) memindah
+aset ke group aset lain (`pindah_group`), atau memecah persen atau nilai perolehan ke aset baru yang lahir
+saat diposting (`pecah`). Setiap saldo setiap buku — harga perolehan, akumulasi penyusutan, penurunan dan
+kenaikan nilai, nilai sisa — ikut dipindah dengan perbandingan yang sama, beserta umur yang sudah berjalan.
+Bila group berubah, jurnal `asset.reclassification` memindah saldo dari akun posting group lama ke akun
+posting group baru untuk buku yang di-post ke finance. Posting punya duty sendiri; penyusutan sampai
+tanggal reklasifikasi harus sudah final. Rinciannya di
+`docs/apps/management-aset/transaction/reklasifikasi-aset/` pada repo CoreERP.
+
 ## Penyusutan massal
 
 `POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
@@ -392,6 +403,7 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |
 | `management-aset.penyesuaian-nilai-aset` | `PNLA` | `legal_entity` |
+| `management-aset.reklasifikasi-aset` | `RKLA` | `legal_entity` |
 | `management-aset.maintenance-job-types` | `JPMA` | `tenant` |
 | `management-aset.maintenance-job-type-variants` | `VJMA` | `tenant` |
 | `management-aset.maintenance-job-type-defaults` | `DJMA` | `tenant` |

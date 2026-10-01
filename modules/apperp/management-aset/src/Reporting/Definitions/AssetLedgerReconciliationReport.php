@@ -7,10 +7,8 @@ namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Modules\Contracts\PostingFeed;
 use Brick\Math\BigDecimal;
-use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\master\AssetPostingGroup;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
@@ -239,10 +237,15 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
                 if (! isset($komponen[$kunci])) {
                     continue;
                 }
-                $jumlah = [];
-                foreach ([...array_values(self::BUCKETS), self::UNPUBLISHED] as $bucket) {
-                    $jumlah[$bucket] = $komponen[$kunci][$bucket] ?? BigDecimal::zero();
-                }
+                $ambil = static fn (string $bucket): BigDecimal => $komponen[$kunci][$bucket] ?? BigDecimal::zero();
+                $jumlah = [
+                    'sudah_dibukukan' => $ambil('sudah_dibukukan'),
+                    'dicatat_manual' => $ambil('dicatat_manual'),
+                    'menunggu' => $ambil('menunggu'),
+                    'tertahan' => $ambil('tertahan'),
+                    'ditolak' => $ambil('ditolak'),
+                    self::UNPUBLISHED => $ambil(self::UNPUBLISHED),
+                ];
                 $register = array_reduce($jumlah, static fn (BigDecimal $total, BigDecimal $nilai): BigDecimal => $total->plus($nilai), BigDecimal::zero());
                 $akunId = $postingGroup[$groupId]?->getAttribute($kolom);
                 $lines[] = [
@@ -318,10 +321,13 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
      * tanggal itu, atau group sekarang bila tidak ada. Pada tanggal reklasifikasi sendiri aset masih di group
      * asal: penyusutan sampai tanggal itu harus sudah final sebelum reklasifikasi diposting, dan reklasifikasi
      * itulah yang membawa saldonya ke group baru.
+     *
+     * @param  literal-string  $dateExpression  Kolom tanggal mutasi di query pemanggil, ditulis di kode.
+     * @return literal-string
      */
-    private function groupAt(string $dateExpression): Expression
+    private function groupAt(string $dateExpression): string
     {
-        return DB::raw("coalesce((select r.group_aset_asal_id from aset_tr_reklasifikasi_aset_buku r where r.tenant_id = aset_tr_aset.tenant_id and r.aset_asal_id = aset_tr_aset.id and r.jenis = 'pindah_group' and r.tanggal >= {$dateExpression} order by r.tanggal, r.created_at limit 1), aset_tr_aset.group_aset_id) as grp");
+        return "coalesce((select r.group_aset_asal_id from aset_tr_reklasifikasi_aset_buku r where r.tenant_id = aset_tr_aset.tenant_id and r.aset_asal_id = aset_tr_aset.id and r.jenis = 'pindah_group' and r.tanggal >= {$dateExpression} order by r.tanggal, r.created_at limit 1), aset_tr_aset.group_aset_id) as grp";
     }
 
     /**
@@ -343,7 +349,8 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
             ->leftJoin('aset_tr_penerimaan_aset as penerimaan', fn (JoinClause $join) => $join->on('penerimaan.id', '=', 'aset_tr_aset.penerimaan_aset_id')->on('penerimaan.tenant_id', '=', 'aset_tr_aset.tenant_id'))
             ->whereIn('aset_tr_aset.id', $aset)
             ->where('aset_tr_aset.acquired_on', '<=', $perTanggal)
-            ->select(['buku.buku_id', 'buku.acquisition_value', 'buku.opening_accumulated_depreciation', 'aset_tr_aset.penerimaan_aset_id', 'penerimaan.cara_perolehan', $this->groupAt('aset_tr_aset.acquired_on')])
+            ->select(['buku.buku_id', 'buku.acquisition_value', 'buku.opening_accumulated_depreciation', 'aset_tr_aset.penerimaan_aset_id', 'penerimaan.cara_perolehan'])
+            ->selectRaw($this->groupAt('aset_tr_aset.acquired_on'))
             ->selectSub($pecah('buku_aset_tujuan_id'), 'masuk')
             ->selectSub($pecah('buku_aset_asal_id'), 'keluar')
             ->toBase()
@@ -364,7 +371,8 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
             ->whereIn('aset_tr_aset.id', $aset)
             ->where('aset_tr_penyusutan_aset.status', 'final')
             ->where('aset_tr_penyusutan_aset.period_ends_on', '<=', $perTanggal)
-            ->select(['buku.buku_id', 'aset_tr_penyusutan_aset.posted_posting_id', $this->groupAt('aset_tr_penyusutan_aset.period_ends_on')])
+            ->select(['buku.buku_id', 'aset_tr_penyusutan_aset.posted_posting_id'])
+            ->selectRaw($this->groupAt('aset_tr_penyusutan_aset.period_ends_on'))
             ->selectRaw('sum(aset_tr_penyusutan_aset.amount) as jumlah')
             ->groupBy('grp', 'buku.buku_id', 'aset_tr_penyusutan_aset.posted_posting_id')
             ->toBase()
@@ -386,7 +394,8 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
             ->where('dokumen.status', AssetValueAdjustment::POSTED)
             ->whereNull('dokumen.deleted_at')
             ->where('dokumen.tanggal', '<=', $perTanggal)
-            ->select(['dokumen.buku_id', 'dokumen.jenis', 'dokumen.posting_id', $this->groupAt('dokumen.tanggal')])
+            ->select(['dokumen.buku_id', 'dokumen.jenis', 'dokumen.posting_id'])
+            ->selectRaw($this->groupAt('dokumen.tanggal'))
             ->selectRaw('sum(aset_tr_penyesuaian_nilai_aset_details.nilai) as jumlah')
             ->groupBy('grp', 'dokumen.buku_id', 'dokumen.jenis', 'dokumen.posting_id')
             ->toBase()
@@ -406,7 +415,7 @@ final class AssetLedgerReconciliationReport implements ReportDefinition
             ->join('aset_tr_reklasifikasi_aset as dokumen', fn (JoinClause $join) => $join->on('dokumen.id', '=', 'aset_tr_reklasifikasi_aset_buku.reklasifikasi_aset_id')->on('dokumen.tenant_id', '=', 'aset_tr_reklasifikasi_aset_buku.tenant_id'))
             ->whereIn('aset_tr_reklasifikasi_aset_buku.aset_'.$sisi.'_id', $aset)
             ->where('aset_tr_reklasifikasi_aset_buku.tanggal', '<=', $perTanggal)
-            ->select(['aset_tr_reklasifikasi_aset_buku.buku_id', 'aset_tr_reklasifikasi_aset_buku.dijurnal', 'dokumen.posting_id', DB::raw('aset_tr_reklasifikasi_aset_buku.group_aset_'.$sisi.'_id as grp')])
+            ->select(['aset_tr_reklasifikasi_aset_buku.buku_id', 'aset_tr_reklasifikasi_aset_buku.dijurnal', 'dokumen.posting_id', 'aset_tr_reklasifikasi_aset_buku.group_aset_'.$sisi.'_id as grp'])
             ->selectRaw('sum(nilai_perolehan) as acq, sum(akumulasi_penyusutan) as acm, sum(penurunan_nilai) as wd, sum(kenaikan_nilai) as ap')
             ->groupBy('grp', 'aset_tr_reklasifikasi_aset_buku.buku_id', 'aset_tr_reklasifikasi_aset_buku.dijurnal', 'dokumen.posting_id')
             ->toBase()

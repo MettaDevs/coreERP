@@ -223,12 +223,22 @@ final class ReclassificationPosting
             $perolehanAset = BigDecimal::of((string) $row->aset->acquisition_value);
             $books = [];
             foreach ($row->books as $bukuId => $book) {
-                $bagian = ['book' => $book];
-                foreach (self::SALDO as $kunci => $kolom) {
-                    $saldo = BigDecimal::of((string) $book->{$kolom});
-                    $bagian[$kunci] = $pecah ? $this->share($row, $perolehanAset, $saldo, $desimal) : $saldo;
+                if (! $book instanceof stdClass) {
+                    continue;
                 }
-                $books[(string) $bukuId] = $bagian;
+                $bagian = function (string $kolom) use ($book, $pecah, $row, $perolehanAset, $desimal): BigDecimal {
+                    $saldo = BigDecimal::of((string) $book->{$kolom});
+
+                    return $pecah ? $this->share($row, $perolehanAset, $saldo, $desimal) : $saldo;
+                };
+                $books[(string) $bukuId] = [
+                    'book' => $book,
+                    'acquisition' => $bagian('acquisition_value'),
+                    'accumulated' => $bagian('accumulated_depreciation'),
+                    'write_down' => $bagian('write_down_amount'),
+                    'appreciation' => $bagian('appreciation_amount'),
+                    'residual' => $bagian('residual_value'),
+                ];
             }
             $diPost = $this->assets->bukuDiPostId($asal);
             $rencana[] = [
@@ -408,6 +418,8 @@ final class ReclassificationPosting
     /**
      * Bagian satu saldo yang dipecah, dibulatkan sekali ke presisi mata uang: persentase dibagi 100, atau
      * nilai perolehan yang diketik dibagi harga perolehan register aset.
+     *
+     * @param  int<0, max>  $desimal
      */
     private function share(stdClass $row, BigDecimal $perolehanAset, BigDecimal $saldo, int $desimal): BigDecimal
     {

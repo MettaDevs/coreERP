@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
 use Brick\Math\BigDecimal;
-use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
@@ -350,13 +348,13 @@ final class AssetBookValueReport implements ReportDefinition
         return $query;
     }
 
-    /** @return list<Expression> Kolom pemindahan reklasifikasi diberi awalan arahnya. */
+    /** @return list<string> Kolom pemindahan reklasifikasi diberi awalan arahnya. */
     private function reclassColumns(string $alias, string $prefix): array
     {
-        $columns = [DB::raw("{$alias}.all_acq as {$prefix}_all_acq")];
+        $columns = ["{$alias}.all_acq as {$prefix}_all_acq"];
         foreach (array_keys(self::RECLASS) as $key) {
-            $columns[] = DB::raw("{$alias}.before_{$key} as {$prefix}_before_{$key}");
-            $columns[] = DB::raw("{$alias}.range_{$key} as {$prefix}_range_{$key}");
+            $columns[] = "{$alias}.before_{$key} as {$prefix}_before_{$key}";
+            $columns[] = "{$alias}.range_{$key} as {$prefix}_range_{$key}";
         }
 
         return $columns;

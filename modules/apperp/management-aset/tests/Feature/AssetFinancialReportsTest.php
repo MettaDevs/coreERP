@@ -146,8 +146,8 @@ class AssetFinancialReportsTest extends TestCase
         $this->usulkanPeriode('2026-11-01', '2026-11-30');
         $usulan = (string) DB::table('aset_tr_penyusutan_aset as p')->join('aset_tr_buku_aset as b', 'b.id', '=', 'p.buku_aset_id')
             ->where(['b.aset_id' => $this->aset['satu'], 'b.buku_id' => $this->komersial])->where('p.period_ends_on', '2026-11-30')->value('p.amount');
-        $november = $this->dataset('laporan-proyeksi-penyusutan-aset', ['dari' => '2026-11', 'sampai' => '2026-11'])['tables']['baris'];
-        $this->assertSame($usulan, collect($november)->firstWhere('kode', $this->kode('satu'))['penyusutan']);
+        $november = $this->perKode($this->dataset('laporan-proyeksi-penyusutan-aset', ['dari' => '2026-11', 'sampai' => '2026-11'])['tables']['baris']);
+        $this->assertSame($usulan, $november[$this->kode('satu')]['penyusutan']);
 
         $this->assertGagal('paling panjang', fn () => $this->dataset('laporan-proyeksi-penyusutan-aset', ['dari' => '2026-01', 'sampai' => '2031-12']));
     }

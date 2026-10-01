@@ -63,6 +63,9 @@ const DisposalPage = lazy(() => import('./transactions/disposal/DisposalPage'));
 const ValueAdjustmentPage = lazy(
     () => import('./transactions/value-adjustment/ValueAdjustmentPage'),
 );
+const ReclassificationPage = lazy(
+    () => import('./transactions/reclassification/ReclassificationPage'),
+);
 const MonitoringPage = lazy(
     () => import('./transactions/monitoring-aset/MonitoringPage'),
 );
@@ -85,7 +88,7 @@ const AssetPostingGroupPage = lazy(
 /**
  * Halaman laporan, berkunci id entri menunya.
  *
- * Keenamnya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
+ * Semuanya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
  * membedakannya hanya data, dan data itu ditulis di satu peta, bukan satu cabang `if`
  * per laporan. Izinnya sama dengan izin entri menu di `app.yaml` dan izin definisi
  * laporannya; laporan baru cukup menambah satu entri di sini.
@@ -117,6 +120,22 @@ const REPORT_PAGES: Record<
     'laporan-pemusnahan-aset': {
         permission: 'management-aset.pemusnahan-aset.read',
         Page: lazy(() => import('./laporan/LaporanPemusnahanAsetPage')),
+    },
+    'laporan-nilai-buku-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanNilaiBukuAsetPage')),
+    },
+    'laporan-proyeksi-penyusutan-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanProyeksiPenyusutanAsetPage')),
+    },
+    'laporan-perolehan-aset': {
+        permission: 'management-aset.aset.read',
+        Page: lazy(() => import('./laporan/LaporanPerolehanAsetPage')),
+    },
+    'laporan-rekonsiliasi-aset-buku-besar': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanRekonsiliasiAsetPage')),
     },
 };
 
@@ -289,6 +308,24 @@ export default function App({
                 className="h-full min-h-0 overflow-hidden"
             >
                 <ValueAdjustmentPage
+                    context={konteks}
+                    permissions={permissions}
+                    segments={segments}
+                />
+            </main>
+        );
+    }
+
+    if (
+        view === 'reklasifikasi-aset' &&
+        permissions.includes('management-aset.reklasifikasi-aset.read')
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <ReclassificationPage
                     context={konteks}
                     permissions={permissions}
                     segments={segments}

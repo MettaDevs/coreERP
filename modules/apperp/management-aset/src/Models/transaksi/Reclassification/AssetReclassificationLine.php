@@ -40,6 +40,15 @@ class AssetReclassificationLine extends Model
     use BelongsToTenant;
     use HasUlids, SoftDeletes;
 
+    /**
+     * Nama aset baru adalah nama barang, bukan nama orang, sama seperti `nama` di register aset.
+     *
+     * @var array<string, DataClass>
+     */
+    public const COLUMN_CLASSIFICATION = [
+        'nama_aset_baru' => DataClass::CustomerContent,
+    ];
+
     protected $table = 'aset_tr_reklasifikasi_aset_details';
 
     protected $fillable = [

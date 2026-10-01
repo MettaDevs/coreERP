@@ -67,6 +67,10 @@ Penurunan dan kenaikan nilai yang diposting lewat [penyesuaian nilai aset](/apps
 - **Garis lurus sisa umur dan saldo menurun** sudah menghitung dari nilai buku, jadi tidak berubah.
 - Penyesuaian ditolak selama buku masih punya usulan yang belum difinalkan, atau sudah disusutkan sesudah tanggal penyesuaian; aturan yang sama dengan pelepasan (`Services/BookPeriods`).
 
+## Sesudah aset dipecah
+
+[Reklasifikasi aset](/apps/management-aset/transaction/reklasifikasi-aset/) jenis pecah memindah bagian setiap saldo buku ke aset baru, dan jumlah periode yang sudah disusutkan buku asal sampai tanggal reklasifikasi menjadi `elapsed_periods_offset` buku aset baru, seperti saldo awal aset lama. Penyusutan berikutnya kedua aset berjumlah sama dengan penyusutan aset sebelum dipecah. Reklasifikasi ditolak dengan aturan `Services/BookPeriods` yang sama. Proposal memakai `DepreciationCalculator::applyAlternativeProfile()`, dan laporan proyeksi penyusutan memakai method yang sama.
+
 ## Hubungan dengan koreksi aset
 
 Beberapa larangan pada register aset berasal dari sini:
