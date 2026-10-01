@@ -2,8 +2,6 @@
 
 namespace App\Providers;
 
-use App\Foundation\Vendor\Support\VendorAttachments;
-use App\Foundation\Workflow\Support\ParameterWorkflow;
 use App\Platform\Access\Support\CorePermissions;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\DataPolicyAccessResolver;
@@ -15,7 +13,6 @@ use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
 use App\Platform\License\Support\SiteLicense;
-use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Observability\Support\PelaporKesalahan;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\EloquentUserProvider;
@@ -64,10 +61,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(CurrentWorkspace::class);
         $this->app->scoped(CorePermissions::class);
         $this->app->scoped(DataPolicyAccessResolver::class);
-
-        // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
-        // permintaan, dan sebuah workflow bercabang akan menanyakannya berkali-kali.
-        $this->app->scoped(ParameterWorkflow::class);
 
         /*
          * Scoped, dan itu yang membuat `lupakan()` pada kelas itu jarang diperlukan.
@@ -137,10 +130,6 @@ class AppServiceProvider extends ServiceProvider
         // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
         // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
         OutboundGuard::install();
-
-        // Lampiran dokumen (gap 7): vendor adalah record milik Core yang boleh diberi lampiran. Module
-        // mendaftarkan record miliknya dari penyedia layanannya sendiri.
-        $this->app->make(AttachmentRecordTypes::class)->register(new VendorAttachments);
 
         // Gate lama tetap bernama sama, tetapi kini membaca permission ubah kelompok layarnya masing-masing
         // lewat rantai security role (SEC-22), bukan penanda owner/admin.

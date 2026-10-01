@@ -527,7 +527,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | `apps/core/app/Platform/Modules/Contracts/InvalidPosting.php` | Exception untuk bug penerbit |
 | `apps/core/app/Platform/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
 | `apps/core/app/Foundation/FinancePosting/Support/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
-| `apps/core/app/Foundation/FinancePosting/ModuleServices/PostingFeedCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Platform/Modules/Support/CoreServices.php` |
+| `apps/core/app/Foundation/FinancePosting/ModuleServices/PostingFeedCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Foundation/FinancePosting/FinancePostingServiceProvider.php` |
 | `apps/core/app/Foundation/FinancePosting/Support/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |
 | `apps/core/app/Foundation/FinancePosting/Support/PostingInput.php` | Masukan yang sudah dinormalkan, beserta hash-nya |
 | `apps/core/app/Platform/Organization/Support/BusinessUnitResolver.php` | Business unit induk lewat hierarki manajemen pada tanggal posting |
@@ -541,7 +541,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | `apps/core/app/Foundation/FinancePosting/Console/PushFinancePostings.php` | Perintah `finance-postings:push` |
 | `apps/core/app/Foundation/FinancePosting/Http/Controllers/Internal/FinancePostingFeedController.php` | Pull dan ack |
 | `apps/core/app/Platform/Integration/Http/Middleware/AuthenticateIntegrationClient.php` | Token, IP, scope, salinan sandbox, dan pelaku permintaan |
-| `apps/core/app/Foundation/FinancePosting/Support/IntegrationClientAccounts.php` | Akun aplikasi klien integrasi |
+| `apps/core/app/Platform/Integration/Support/IntegrationClientAccounts.php` | Akun aplikasi klien integrasi |
 | `apps/core/app/Platform/Integration/Http/Middleware/AuthenticateInternalCaller.php` | Rute yang dibaca module dan klien integrasi sekaligus |
 | `apps/core/app/Foundation/FinancePosting/Http/Controllers/FinancePostingMonitorController.php` | Layar pantau dan aksinya |
 | `apps/core/app/Foundation/FinancePosting/Http/Controllers/FinancePostingSettingController.php` | Setelan feed per entitas legal |

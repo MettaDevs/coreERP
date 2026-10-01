@@ -35,6 +35,10 @@ dijelaskan dalam satu kalimat tidak akan dipatuhi.
 Namespace ini tetap satu walaupun Core dipecah menjadi lapis Platform dan Foundation (keputusan K-1
 di `docs/todo/lapis-core/README.md`): kontrak untuk nomor, vendor, posting, atau laporan tinggal
 berdampingan di sini, sementara pelaksananya hidup di folder `ModuleServices` fitur pemiliknya.
+Yang mengikat pelaksana ke kontraknya juga fitur pemiliknya: pelaksana milik Platform diikat
+`CoreServices`, pelaksana milik Foundation diikat `<Fitur>ServiceProvider` di akar folder fitur itu
+(terdaftar di `bootstrap/providers.php`), karena Platform tidak boleh menyebut kelas Foundation.
+`CoreServices` tetap menyebut seluruh kontraknya, termasuk yang pelaksananya di Foundation.
 Sampai 1 Oktober 2026 namespace-nya `App\Support\Modules\Contracts` dengan nama berbahasa Indonesia
 (`PenerbitNomor`, `MilikTenant`, …); sejak itu seluruh nama kontrak berbahasa Inggris
 (`NumberSequenceIssuer`, `BelongsToTenant`, …), dan penjaga di bawah menolak namespace lama.

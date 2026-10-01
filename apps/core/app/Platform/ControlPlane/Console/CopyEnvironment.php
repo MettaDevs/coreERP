@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Console;
 
-use App\Foundation\Workflow\Console\PublishWorkflowEvents;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
@@ -851,7 +850,7 @@ final class CopyEnvironment extends Command
      * Menandai seluruh event yang belum terbit sebagai terbit, tanpa mengirim satu pun.
      *
      * Ini bahaya paling konkret yang benar-benar ada di repo hari ini, dan ia tidak butuh module
-     * baru untuk muncul. `PublishWorkflowEvents` memilih barisnya dengan `published_at IS NULL`
+     * baru untuk muncul. `workflow-events:publish` memilih barisnya dengan `published_at IS NULL`
      * **tanpa batas umur sama sekali**, dan alamat tujuannya datang dari config yang sama persis
      * dengan yang dipakai produksi. Tanpa langkah ini, penjadwal di sandbox mengirim **ulang**
      * keputusan produksi ke sistem sungguhan dalam hitungan menit sesudah salinannya selesai.

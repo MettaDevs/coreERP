@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Console;
 
-use App\Foundation\Workflow\Console\PublishWorkflowEvents;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
@@ -57,7 +56,7 @@ use Throwable;
  * Ada satu, dan hanya satu. Tiga titik di repo ini bertanya `ActiveEnvironment::outboundAllowed()`:
  * penerbit event workflow, pengirim laporan kesalahan ke Discord, dan jaring HTTP global. Dua yang
  * terakhir tidak menumpuk apa pun — laporan yang ditekan hilang saat itu juga, dan panggilan yang
- * ditolak melempar di tempat. Yang pertama menumpuk: `PublishWorkflowEvents` memilih barisnya
+ * ditolak melempar di tempat. Yang pertama menumpuk: `workflow-events:publish` memilih barisnya
  * dengan `published_at IS NULL` **tanpa batas umur sama sekali**.
  *
  * Jadi `outbox_events` milik sebuah demo adalah antrean, bukan riwayat. Selama demo ia tidak
@@ -68,12 +67,12 @@ use Throwable;
  *
  * Karena itu konversi **melucuti antrean itu lebih dulu**, dan urutannya mengikat: lucuti, baru
  * nyalakan. Kebalikannya menyisakan jendela tempat proses yang mati meninggalkan antrean yang sudah
- * hidup dan tidak akan pernah dibersihkan siapa pun — jalur pelucutan milik `PublishWorkflowEvents`
+ * hidup dan tidak akan pernah dibersihkan siapa pun — jalur pelucutan milik `workflow-events:publish`
  * hanya berjalan ketika `outboundAllowed()` **salah**, sehingga sesudah bendera menyala tidak ada lagi
  * kesempatan kedua.
  *
  * Ditandai terbit, bukan dihapus. Itu pilihan yang sama dengan yang sudah diambil jalur pelucutan
- * di `PublishWorkflowEvents`, dan alasannya sama: baris yang tidak pernah ditandai akan diambil
+ * di `workflow-events:publish`, dan alasannya sama: baris yang tidak pernah ditandai akan diambil
  * ulang setiap menit selamanya, dan antrean yang tidak pernah menyusut menyembunyikan baris yang
  * benar-benar gagal terkirim. Penghapusan fisik juga dilarang repo ini.
  *
@@ -350,7 +349,7 @@ final class ConvertEnvironment extends Command
      *
      * Alasannya panjang dan ada di docblock kelas. Yang perlu diingat saat membaca method ini:
      * ini satu-satunya kesempatan. Sesudah `outbound_allowed` menyala, jalur pelucutan milik
-     * `PublishWorkflowEvents` tidak pernah berjalan lagi untuk lingkungan ini.
+     * `workflow-events:publish` tidak pernah berjalan lagi untuk lingkungan ini.
      *
      * Disaring `tenant_id`, dan itu wajib. Sebuah lingkungan yang `database_name`-nya kosong ikut
      * database koneksi bawaan — keadaan pooled dan on-prem — dan di sana `outbox_events` memuat

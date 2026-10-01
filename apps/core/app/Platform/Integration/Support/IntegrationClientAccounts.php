@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Foundation\FinancePosting\Support;
+namespace App\Platform\Integration\Support;
 
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;

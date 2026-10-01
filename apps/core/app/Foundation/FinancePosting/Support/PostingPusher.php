@@ -10,6 +10,7 @@ use App\Foundation\FinancePosting\Models\FinancePostingEvent;
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Support\IntegrationClientAccounts;
 use App\Platform\Integration\Support\SignedPush;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Str;
