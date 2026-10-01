@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
-use App\Models\FinancePosting;
-use App\Models\FinanceReferenceAccount;
+use App\Foundation\FinancePosting\Models\FinancePosting;
+use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Models\User;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;

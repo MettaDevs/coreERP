@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Models\FinanceReferenceAccount;
+use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;

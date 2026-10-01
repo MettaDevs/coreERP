@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Models\FinancePosting;
+use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PostingTidakSah;
 use Illuminate\Foundation\Testing\RefreshDatabase;
