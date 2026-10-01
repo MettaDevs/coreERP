@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\Workflow;
+namespace App\Foundation\Workflow\Http\Controllers;
 
+use App\Foundation\Workflow\Support\DefinisiParameterWorkflow;
+use App\Foundation\Workflow\Support\ParameterWorkflow;
+use App\Foundation\Workflow\Support\WorkflowGraph;
 use App\Http\Controllers\Controller;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Access\CoreSecurityCatalog;
-use App\Support\DefinisiParameterWorkflow;
 use App\Support\Modules\Contracts\RowVersion;
-use App\Support\ParameterWorkflow;
-use App\Support\WorkflowGraph;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,7 +64,7 @@ class WorkflowConfigurationController extends Controller
             'workflows' => $workflows,
         ];
 
-        return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('settings/workflows', $payload);
+        return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('foundation/workflow/workflows', $payload);
     }
 
     /**
@@ -136,7 +136,7 @@ class WorkflowConfigurationController extends Controller
             'members' => DB::table('tenant_memberships as memberships')->join('users', 'users.id', '=', 'memberships.user_id')->where('memberships.tenant_id', $membership->tenant_id)->where('memberships.status', 'active')->orderBy('users.name')->get(['memberships.id', 'users.name', 'users.email']),
         ];
 
-        return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('settings/workflow-editor', $payload);
+        return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('foundation/workflow/workflow-editor', $payload);
     }
 
     public function graph(Request $request, string $workflow): JsonResponse

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support;
+namespace App\Foundation\Workflow\Support;
 
 /**
  * Daftar parameter workflow yang bisa diatur tenant: kode, tipe, bawaan, dan kalimatnya.

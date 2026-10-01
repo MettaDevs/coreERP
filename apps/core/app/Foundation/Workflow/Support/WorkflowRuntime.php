@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support;
+namespace App\Foundation\Workflow\Support;
 
 use App\Platform\Tenant\Models\TenantMembership;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;

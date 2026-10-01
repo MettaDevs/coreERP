@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Workflow;
+namespace App\Foundation\Workflow\Http\Controllers;
 
+use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Http\Controllers\Controller;
-use App\Support\WorkflowRuntime;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,7 +24,7 @@ class WorkflowInboxController extends Controller
             ->latest('items.created_at')
             ->get(['items.id', 'items.created_at', 'instances.source_document_type', 'instances.source_document_id', 'types.name as workflow_name', 'apps.name as app_name']);
 
-        return Inertia::render('workflow-inbox', ['items' => $items]);
+        return Inertia::render('foundation/workflow/workflow-inbox', ['items' => $items]);
     }
 
     public function decide(Request $request, string $workItem, WorkflowRuntime $runtime): RedirectResponse

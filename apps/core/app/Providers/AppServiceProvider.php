@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Foundation\Vendor\Support\VendorAttachments;
+use App\Foundation\Workflow\Support\ParameterWorkflow;
 use App\Models\Passkey;
 use App\Models\User;
 use App\Platform\Environment\Support\ActiveEnvironment;
@@ -16,7 +17,6 @@ use App\Support\DataPolicyAccessResolver;
 use App\Support\License\SiteLicense;
 use App\Support\Modules\Contracts\AttachmentRecordTypes;
 use App\Support\Observabilitas\PelaporKesalahan;
-use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\Events\Authenticated;

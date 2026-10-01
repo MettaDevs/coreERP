@@ -5,7 +5,7 @@ use App\Foundation\FiscalCalendar\Http\Controllers\Internal\FiscalCalendarDirect
 use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceController;
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
-use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
+use App\Foundation\Workflow\Http\Controllers\Internal\InternalWorkflowInstanceController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;

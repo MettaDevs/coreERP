@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\ControlPlane\Console;
 
-use App\Console\Commands\PublishWorkflowEvents;
+use App\Foundation\Workflow\Console\PublishWorkflowEvents;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;

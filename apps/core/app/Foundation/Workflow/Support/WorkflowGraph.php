@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support;
+namespace App\Foundation\Workflow\Support;
 
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;

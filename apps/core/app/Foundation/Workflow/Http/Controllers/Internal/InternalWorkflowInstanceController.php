@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Workflow;
+namespace App\Foundation\Workflow\Http\Controllers\Internal;
 
+use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Http\Controllers\Controller;
-use App\Support\WorkflowRuntime;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

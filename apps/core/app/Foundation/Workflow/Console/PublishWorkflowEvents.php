@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Foundation\Workflow\Console;
 
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Support\Modules\ModuleManifest;

@@ -1,15 +1,15 @@
 <?php
 
-namespace Tests\Feature\ControlPlane;
+namespace Tests\Feature\Foundation\Workflow;
 
+use App\Foundation\Workflow\Support\DefinisiParameterWorkflow;
+use App\Foundation\Workflow\Support\ParameterWorkflow;
+use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\DefinisiParameterWorkflow;
-use App\Support\ParameterWorkflow;
-use App\Support\WorkflowRuntime;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
