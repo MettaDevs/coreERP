@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\Contracts\AuditColumns;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\DataClassificationRegistry;
+use App\Platform\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
+use App\Platform\Modules\Contracts\DataClassificationRegistry;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 use ReflectionClass;

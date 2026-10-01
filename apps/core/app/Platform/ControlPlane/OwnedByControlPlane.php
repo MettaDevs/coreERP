@@ -7,7 +7,7 @@ namespace App\Platform\ControlPlane;
 /**
  * Penanda bahwa sebuah tabel hidup di sisi **pusat**, bukan di sisi environment.
  *
- * Ia cerminan `MilikTenant`. Yang itu menandai tabel milik satu tenant dan menyaringnya; yang ini
+ * Ia cerminan `BelongsToTenant`. Yang itu menandai tabel milik satu tenant dan menyaringnya; yang ini
  * menandai tabel yang justru **tidak** milik tenant mana pun — identitas, pelanggan, daftar tenant,
  * registry environment, dan akses operator. Semuanya global terhadap seluruh tenant, dan karena itu
  * tidak pernah ikut berpindah ketika sebuah environment disalin.

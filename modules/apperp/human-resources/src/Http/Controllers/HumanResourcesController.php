@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\HumanResources\Http\Controllers;
 
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -27,7 +27,7 @@ use Modules\Apperp\HumanResources\Services\PenerbitNomorHr;
  * terlihat sebagai kegagalan, hanya sebagai daftar yang isinya kebetulan banyak.
  *
  * Karena itu penyaringannya tidak lagi ditulis di sini sama sekali. Keempat modelnya memakai
- * `MilikTenant`, yang menyisipkan saringan pada setiap query **dan** membatalkan penyimpanan
+ * `BelongsToTenant`, yang menyisipkan saringan pada setiap query **dan** membatalkan penyimpanan
  * baris milik tenant lain. Yang tidak perlu ditulis tidak bisa lupa ditulis.
  */
 final class HumanResourcesController extends Controller

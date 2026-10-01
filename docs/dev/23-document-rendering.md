@@ -20,8 +20,8 @@ Karena itu mesinnya milik Core, seperti Number Sequence, Workflow, dan Fiscal Ca
 
 | Lapis | Padanan BC | Pemilik | Di mana |
 | --- | --- | --- | --- |
-| Dataset | Report dataset | Developer module | Kelas definisi laporan di module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses |
-| Katalog laporan | Report object | Developer module | Dibaca dari kelas dataset lewat `PenyediaLaporanModul::catalog()` saat `app:register-manifest`, disalin ke tabel `app_reports` Core |
+| Dataset | Report dataset | Developer module | Kelas definisi laporan di module, diserahkan lewat kontrak `ModuleReportProvider` di dalam proses |
+| Katalog laporan | Report object | Developer module | Dibaca dari kelas dataset lewat `ModuleReportProvider::catalog()` saat `app:register-manifest`, disalin ke tabel `app_reports` Core |
 | Layout bawaan | Extension layout | Release app | Berkas `.docx`/`.xlsx` di app, dibaca Core lewat kontrak yang sama dan disimpan per versi release |
 | Layout unggahan | User-defined layout | Tenant | Tabel `report_layouts` Core, ber-`tenant_id`, opsional `legal_entity_id` |
 | Layout default | Report Selections + Document Layouts | Tenant per legal entity | Tabel `report_layout_defaults` Core; legal entity mengalahkan tenant |
@@ -36,7 +36,7 @@ Dua batas yang mengikat semua app:
 
 Bentuk permintaannya bergantung pada tempat app berjalan:
 
-- **Module** mendaftarkan `PenyediaLaporanModul` ke `DaftarLaporan` sekali saat boot, dan Core memanggilnya sebagai fungsi. Konteks pengguna dibawa **sebagai argumen**, bukan dibaca dari permintaan — ekspor berjalan di worker antrean, tempat tidak ada `Request` maupun sesi, dan keadaan global yang benar pada permintaan biasa tetapi kosong pada worker adalah persis kegagalan yang paling sulit ditemukan. Isi konteksnya sama dengan yang dulu dibawa token: tenant, entitas legal, unit kerja, id pengguna, permission efektif, dan lingkup kebijakan data.
+- **Module** mendaftarkan `ModuleReportProvider` ke `ModuleReportProviders` sekali saat boot, dan Core memanggilnya sebagai fungsi. Konteks pengguna dibawa **sebagai argumen**, bukan dibaca dari permintaan — ekspor berjalan di worker antrean, tempat tidak ada `Request` maupun sesi, dan keadaan global yang benar pada permintaan biasa tetapi kosong pada worker adalah persis kegagalan yang paling sulit ditemukan. Isi konteksnya sama dengan yang dulu dibawa token: tenant, entitas legal, unit kerja, id pengguna, permission efektif, dan lingkup kebijakan data.
 
 Pemeriksaan izin tetap terjadi dua kali pada kedua bentuk, dan itu bukan pemeriksaan ganda yang mubazir: Core memeriksa "boleh menjalankan laporan ini", app memeriksa "boleh membaca data yang dilaporkan".
 
@@ -48,13 +48,13 @@ Tidak ada framework yang dibangun ulang. Untuk satu laporan:
 
 1. Satu kelas dataset: kode, nama, keterangan, permission datanya, aturan parameter, layout bawaannya, daftar placeholder, dan query yang memakai scope organisasi yang sama dengan endpoint detailnya.
 2. Satu layout bawaan `.docx` atau `.xlsx`, dibangkitkan dari kode lewat command supaya perubahannya terbaca di review.
-3. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya.
+3. Cara Core mencapainya: module mendaftarkan `ModuleReportProvider` dari penyedia layanannya.
 4. Tombol Cetak pada halaman record yang meminta Shell mencetak.
 
 **Tidak ada blok manifest.** Sampai 28 September 2026 laporan juga ditulis di blok `reports` manifest,
 dan dua sumber itu menyimpang: laporan yang terlewat di manifest tampil di pratinjau, lalu menjawab
 404 saat dicetak. Sekarang `app:register-manifest` membaca katalognya dari kelas dataset lewat
-`PenyediaLaporanModul::catalog()`: kode berawalan id module, nama, keterangan, permission, nama
+`ModuleReportProvider::catalog()`: kode berawalan id module, nama, keterangan, permission, nama
 parameter (kunci aturan parameternya), dan layout bawaan. Kelas dataset menjadi satu-satunya
 sumber, sama seperti objek report di Business Central. Manifest module yang masih memuat blok
 `reports` ditolak.
@@ -68,7 +68,7 @@ Empat hal yang diminta Core:
 | Berkas layout bawaan | Isi `.docx`/`.xlsx` yang ikut rilis |
 | Dataset | Data yang sudah disaring; kegagalan disampaikan sebagai pesan siap-baca bila record tidak ada atau di luar scope |
 
-Keempatnya adalah method pada `PenyediaLaporanModul`. Sampai 10 September 2026 ada bentuk kedua
+Keempatnya adalah method pada `ModuleReportProvider`. Sampai 10 September 2026 ada bentuk kedua
 — `GET internal/v1/laporan/{kode}`, `GET internal/v1/laporan/{kode}/layouts/{key}`, dan
 `POST internal/v1/laporan/{kode}/dataset` — untuk app yang berjalan sebagai container tersendiri. Ia
 dibuang bersama app berkontainer terakhir.
@@ -146,10 +146,10 @@ Padanan "+ Filter" di request page Business Central (K-30). Setiap laporan punya
 | BC | CoreERP |
 | --- | --- |
 | `dataitem` laporan, satu bagian filter per data item | `ReportDefinition::dataItems()` di module: data item (misalnya Aset, atau Dokumen lalu Baris) dengan model tabelnya dan alias tabel itu di query laporan |
-| Field tabel beserta Caption | Katalog field per model: konstanta `FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, dan `FIELD_HIDDEN` dibaca `App\Support\Modules\Contracts\TableFields`; tipe kolom dibaca dari database |
+| Field tabel beserta Caption | Katalog field per model: konstanta `FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, dan `FIELD_HIDDEN` dibaca `App\Platform\Modules\Contracts\TableFields`; tipe kolom dibaca dari database |
 | `RequestFilterFields` | Kolom bawaan data item (`defaultFields`), langsung tampil tanpa ditambahkan |
 | `DataItemTableView` | Batasan di query laporan dan kebijakan data organisasi; filter tambahan hanya mempersempit |
-| Sintaks filter | `App\Support\Modules\Contracts\FieldFilterExpression`: `..`, `\|`, `&`, `<>`, `<`, `<=`, `>`, `>=`, `*`, `?`, `@`, `''`, dan `t` untuk hari ini |
+| Sintaks filter | `App\Platform\Modules\Contracts\FieldFilterExpression`: `..`, `\|`, `&`, `<>`, `<`, `<=`, `>`, `>=`, `*`, `?`, `@`, `''`, dan `t` untuk hari ini |
 | Field Option dan TableRelation | Kolom pilihan dan rujukan dipilih dari daftar; beberapa pilihan berarti *atau* |
 
 - **Semua kolom.** Kolom teknis (`id`, `tenant_id`, `version`, `deleted_at`, `creation_key`, jejak pengguna) dan kolom berkelas `AccountData` tidak pernah ditawarkan. Kolom lain wajib diberi nama tampilan atau disembunyikan dengan alasannya; penjaganya `ReportFieldCatalogTest` di module aset, sehingga kolom baru di tabel data item tidak diam-diam hilang dari "+ Tambah filter".
@@ -206,7 +206,7 @@ Module tidak punya alamat: Core memanggilnya di dalam proses yang sama. Tidak ad
 
 1. **Permission.** Laporan menyebut permission data app yang wajib dipegang pengguna; Core memeriksanya saat tombol ditekan, app memeriksanya lagi saat dataset diminta.
 2. **Data policy.** Dataset memakai scope organisasi yang sama dengan endpoint detail; jalur dataset tidak punya jalan pintas.
-3. **Kontrak.** `PenyediaLaporanModul` terdaftar saat boot, dan ada test yang membuktikan ketiga methodnya menjawab dari jalur yang sungguhan.
+3. **Kontrak.** `ModuleReportProvider` terdaftar saat boot, dan ada test yang membuktikan ketiga methodnya menjawab dari jalur yang sungguhan.
 4. **Load.** Endpoint permintaan ekspor Core dan endpoint dataset app masuk skenario load test; `apps/core/loadtest/k6/reporting-e2e.js` menjalankan alur penuh pada stack lokal.
 5. **Dokumentasi.** Halaman fitur di `docs/apps/<app>/` menyebut kode laporan, placeholder, dan permission-nya.
 

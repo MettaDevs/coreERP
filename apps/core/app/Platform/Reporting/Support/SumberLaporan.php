@@ -6,11 +6,11 @@ namespace App\Platform\Reporting\Support;
 
 use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Identity\Support\UserClock;
+use App\Platform\Modules\Contracts\ModuleReportProvider;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
-use App\Platform\Modules\Support\PelaksanaTenant;
+use App\Platform\Modules\Support\TenantRunnerCore;
 use App\Platform\Reporting\Support\Rendering\RenderException;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\PenyediaLaporanModul;
 use RuntimeException;
 use stdClass;
 use Throwable;
@@ -19,7 +19,7 @@ use Throwable;
  * Dari mana definisi, layout bawaan, dan dataset sebuah laporan diambil.
  *
  * Hanya ada satu jalur: `app_id` sebuah laporan selalu module yang berjalan di dalam proses
- * ini, dan laporannya dibaca langsung lewat {@see PenyediaLaporanModul}. Jalur HTTP ke app di
+ * ini, dan laporannya dibaca langsung lewat {@see ModuleReportProvider}. Jalur HTTP ke app di
  * luar proses dibuang bersama seluruh jalur hosting container; tidak ada lagi app yang
  * dilayaninya.
  *
@@ -33,10 +33,10 @@ use Throwable;
 final class SumberLaporan
 {
     public function __construct(
-        private readonly DaftarLaporanModul $daftar,
+        private readonly ModuleReportProviderRegistry $daftar,
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $kebijakan,
-        private readonly PelaksanaTenant $pelaksana,
+        private readonly TenantRunnerCore $pelaksana,
         private readonly ValueFormats $formats,
         private readonly UserClock $clock,
     ) {}
@@ -48,7 +48,7 @@ final class SumberLaporan
     {
         $penyedia = $this->penyedia($report);
 
-        return $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->definisi(
+        return $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->definition(
             $this->kodeLokal($report, $penyedia),
             $konteks,
         ), $legalEntityId, $orgUnitId);
@@ -58,7 +58,7 @@ final class SumberLaporan
     {
         $penyedia = $this->penyedia($report);
 
-        return $this->jalankan($report, $membership, fn (array $konteks): string => $penyedia->layoutBawaan(
+        return $this->jalankan($report, $membership, fn (array $konteks): string => $penyedia->defaultLayout(
             $this->kodeLokal($report, $penyedia),
             $key,
             $konteks,
@@ -82,7 +82,7 @@ final class SumberLaporan
 
         [$isi, $definisi, $formats] = $this->jalankan($report, $membership, function (array $konteks) use ($penyedia, $kode, $parameters): array {
             $isi = $penyedia->dataset($kode, $konteks, $parameters);
-            $definisi = $penyedia->definisi($kode, $konteks)['fields'];
+            $definisi = $penyedia->definition($kode, $konteks)['fields'];
 
             return [$isi, $definisi, $this->formats->forFields((string) $konteks['tenant_id'], $definisi, (string) $konteks['timezone'])];
         }, $legalEntityId, $orgUnitId);
@@ -90,7 +90,7 @@ final class SumberLaporan
         return ReportData::fromArray($isi, $formats, $definisi);
     }
 
-    private function penyedia(stdClass $report): PenyediaLaporanModul
+    private function penyedia(stdClass $report): ModuleReportProvider
     {
         $penyedia = $this->daftar->untuk((string) $report->app_id);
 
@@ -107,7 +107,7 @@ final class SumberLaporan
         // Module terdaftar tapi tidak mengenal kode laporannya berarti katalog dan module
         // sudah tidak sepakat — biasanya karena manifest lebih baru daripada kode yang
         // terpasang. Ia gagal dengan sebabnya, bukan dengan kode laporan yang kosong.
-        if (! $penyedia->punya($this->kodeLokal($report, $penyedia))) {
+        if (! $penyedia->has($this->kodeLokal($report, $penyedia))) {
             throw new RenderException(
                 "Laporan `{$report->code}` terdaftar di katalog tetapi tidak dikenal module {$report->app_name}. ".
                 'Manifest dan kode module tidak sepadan.'
@@ -118,9 +118,9 @@ final class SumberLaporan
     }
 
     /** Kode laporan di sisi module: kode katalog tanpa awalan id module. */
-    private function kodeLokal(stdClass $report, PenyediaLaporanModul $penyedia): string
+    private function kodeLokal(stdClass $report, ModuleReportProvider $penyedia): string
     {
-        return substr((string) $report->code, strlen($penyedia->idModule()) + 1);
+        return substr((string) $report->code, strlen($penyedia->moduleId()) + 1);
     }
 
     /**
@@ -161,7 +161,7 @@ final class SumberLaporan
         ];
 
         try {
-            return $this->pelaksana->jalankanUntuk(
+            return $this->pelaksana->runFor(
                 (string) $konteks['tenant_id'],
                 static fn (): mixed => $panggilan($konteks),
             );

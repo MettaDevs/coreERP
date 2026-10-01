@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -24,7 +24,7 @@ use Throwable;
  */
 class PenerbitNomorAset
 {
-    public function __construct(private readonly PenerbitNomor $penerbit) {}
+    public function __construct(private readonly NumberSequenceIssuer $penerbit) {}
 
     /**
      * Menerbitkan satu nomor untuk reference milik module ini.
@@ -34,7 +34,7 @@ class PenerbitNomorAset
     public function issue(string $reference, string $tenantId, string $idempotencyKey, ?string $legalEntityId = null): string
     {
         try {
-            $hasil = $this->penerbit->terbitkan(
+            $hasil = $this->penerbit->issue(
                 [
                     'tenant_id' => $tenantId,
                     'app_id' => 'management-aset',
@@ -47,7 +47,7 @@ class PenerbitNomorAset
             throw $this->gagal('number_sequence_failed', $kegagalan->getMessage(), $reference, $tenantId, $kegagalan);
         }
 
-        // Kontrak `PenerbitNomor` sudah menjamin kunci `number` ada dan berupa string, jadi
+        // Kontrak `NumberSequenceIssuer` sudah menjamin kunci `number` ada dan berupa string, jadi
         // yang tersisa untuk diperiksa hanyalah nomor kosong — satu-satunya bentuk jawaban
         // tidak valid yang masih mungkin lolos dari penerbit.
         $nomor = $hasil['number'];

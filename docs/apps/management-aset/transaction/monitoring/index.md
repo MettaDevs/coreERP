@@ -22,7 +22,7 @@ Yang penting: **teks kosongnya menyebut alasan dan penggantinya.** Layar kosong 
 
 1. Endpoint barunya masuk kontrak dalam perubahan yang sama.
 2. Permission-nya sudah ada di manifest — periksa dulu sebelum menambah yang baru.
-3. Pengaturan yang menyentuh akun menunjuk daftar akun referensi Core lewat kontrak `DaftarAkun`, seperti posting group, bukan tabel akun sendiri di modul ini.
+3. Pengaturan yang menyentuh akun menunjuk daftar akun referensi Core lewat kontrak `AccountDirectory`, seperti posting group, bukan tabel akun sendiri di modul ini.
 
 ## Halaman terkait
 

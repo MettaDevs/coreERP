@@ -89,8 +89,8 @@ graph LR
 
 ::: warning Sudah berubah untuk modul di dalam runtime
 Contoh di bawah menggambarkan app yang berjalan sebagai proses tersendiri. Modul yang dimuat
-runtime yang sama mengajukan lewat kontrak `App\Support\Modules\Contracts\MesinWorkflow` dan
-menerima keputusannya sebagai event `KeputusanWorkflowDiambil`, bukan lewat HTTP; lihat
+runtime yang sama mengajukan lewat kontrak `App\Platform\Modules\Contracts\WorkflowEngine` dan
+menerima keputusannya sebagai event `WorkflowDecisionTaken`, bukan lewat HTTP; lihat
 [kontrak module ke Core](04-api-and-integration.md#kontrak-module-ke-core). Jalur HTTP di bawah tetap
 berlaku untuk app di luar proses.
 :::

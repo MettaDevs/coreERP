@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,8 +33,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class PenempatanAset extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

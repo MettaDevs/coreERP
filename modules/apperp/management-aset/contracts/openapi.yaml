@@ -141,7 +141,7 @@ paths:
       summary: Unit kerja tenant milik Core, untuk dropdown yang menampilkan nama
       description: |
         Modul menyimpan id unit kerja sebagai teks opaque dan tidak pernah menanyakannya
-        ke database Core; daftar ini dibaca lewat kontrak `DirektoriOrganisasi` di dalam
+        ke database Core; daftar ini dibaca lewat kontrak `OrganizationDirectory` di dalam
         proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
 
         Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
@@ -4076,7 +4076,7 @@ paths:
       operationId: listAsetReceiptVendors
       summary: Vendor aktif satu entitas legal untuk pemilih vendor penerimaan
       description: |
-        Vendor milik Core (K-06), dibaca lewat kontrak `DaftarVendor`. Semua anggota tenant boleh
+        Vendor milik Core (K-06), dibaca lewat kontrak `VendorDirectory`. Semua anggota tenant boleh
         melihat vendor, jadi yang diperiksa hanya izin membaca penerimaan.
       parameters:
       - name: legal_entity_id
@@ -7691,7 +7691,7 @@ components:
     PostingGroupAsetAccounts:
       type: object
       description: |
-        Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`DaftarAkun`),
+        Delapan akun jurnal satu group aset, masing-masing id daftar akun referensi Core (`AccountDirectory`),
         bukan nomornya. `null` berarti belum dipetakan; posting yang membutuhkannya tertahan di Core.
 
         Pada permintaan PUT body juga membawa `version` (atau kirim header `If-Match`): versi baris yang

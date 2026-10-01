@@ -6,7 +6,7 @@ Ada dua pintu, dan yang menentukan bukan selera melainkan tempat pemanggilnya be
 
 | Pemanggil | Pintu |
 | --- | --- |
-| Module di runtime Core | Kontrak `App\Support\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
+| Module di runtime Core | Kontrak `App\Platform\Modules\Contracts\NumberSequenceIssuer` — pemanggilan fungsi biasa |
 | Addon pihak ketiga di luar runtime | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
 
 ## Pemilik kebenaran
@@ -149,12 +149,12 @@ Manual harus sesuai format dan unik. Manual tidak memajukan counter. Continuous 
 
 ## Penerbitan dari module, di dalam proses
 
-Module memanggil `PenerbitNomor::terbitkan()` atau `cadangkan()`. Antarmukanya menerima **id**,
+Module memanggil `NumberSequenceIssuer::issue()` atau `reserve()`. Antarmukanya menerima **id**,
 bukan objek Core: module yang harus mengambil objek sequence lebih dulu justru melanggar batas yang
 antarmuka itu buat ada.
 
 ```php
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 
 $nomor = $penerbit->terbitkan(
     ['tenant_id' => $tenantId, 'app_id' => 'management-aset', 'legal_entity_id' => $legalEntityId],
@@ -355,7 +355,7 @@ Layanan ini mengasumsikan pemanggilnya bisa salah, termasuk salah yang merusak. 
 ## Aturan implementasi module
 
 1. Nyatakan reference dan allowed scope di manifest module.
-2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor`. Jangan query tabel sequence Core.
+2. Minta nomor hanya lewat pintu resminya — kontrak `NumberSequenceIssuer`. Jangan query tabel sequence Core.
 3. Gunakan idempotency key yang **stabil** dari transaksi module. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
 4. Jangan menyimpulkan reservation kedaluwarsa berarti transaksi gagal. Hanya cancel bila transaksi memang tidak tersimpan.
 5. Jangan mengaktifkan atau mengubah format dari kode module; itu keputusan owner/admin tenant.

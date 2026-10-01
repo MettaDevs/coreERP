@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting;
 
-use App\Support\Modules\Contracts\FilterField;
-use App\Support\Modules\Contracts\TableFields;
+use App\Platform\Modules\Contracts\FilterField;
+use App\Platform\Modules\Contracts\TableFields;
 use Illuminate\Database\Eloquent\Model;
 
 /**

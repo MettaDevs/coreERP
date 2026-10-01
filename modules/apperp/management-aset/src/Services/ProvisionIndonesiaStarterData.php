@@ -733,7 +733,7 @@ final class ProvisionIndonesiaStarterData
     /**
      * Menyimpan satu baris master lewat modelnya.
      *
-     * `tenant_id` tetap ditulis walau `MilikTenant` sanggup mengisinya sendiri. Penyediaan
+     * `tenant_id` tetap ditulis walau `BelongsToTenant` sanggup mengisinya sendiri. Penyediaan
      * data awal menerima tenant sebagai argumen, bukan dari permintaan HTTP, jadi
      * menuliskannya membuat trait itu membatalkan penyimpanan ketika tenant yang diminta
      * berbeda dari tenant aktif — persis keadaan yang paling mahal bila lolos diam-diam.

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\Support;
 
-use App\Support\Modules\Contracts\ListExportSource;
-use App\Support\Modules\Contracts\ListExportSources;
+use App\Platform\Modules\Contracts\ListExportSource;
+use App\Platform\Modules\Contracts\ListExportSources;
 
 /** Daftar layar yang boleh diekspor, diisi penyedia layanan tiap module saat boot. */
 final class ListExportRegistry implements ListExportSources

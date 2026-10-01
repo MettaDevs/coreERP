@@ -10,7 +10,7 @@ use App\Foundation\FinancePosting\Models\FinanceSettlementMode;
 /**
  * Setelan feed posting finance per entitas legal: aktif atau tidak, cutover, dan mode penyelesaian.
  *
- * Dibaca penerbit posting di Core dan, lewat kontrak `SetelanPostingFinance`, oleh module. Entitas
+ * Dibaca penerbit posting di Core dan, lewat kontrak `FinancePostingSettings`, oleh module. Entitas
  * legal yang belum pernah disetel dianggap feed tidak aktif, tanpa cutover, dan memakai mode
  * `direct_payable` (K-10).
  */

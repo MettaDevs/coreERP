@@ -253,7 +253,7 @@ Satu database untuk Core dan seluruh module, dapat diakses dari pgAdmin melalui 
 Password ada pada `.env` di folder orchestration. Port hanya bind ke `localhost`; PostgreSQL yang
 sudah terpasang di host tidak dipakai stack ini.
 
-Batas antar module di dalam database itu dijaga **awalan nama tabel** dan trait `MilikTenant`,
+Batas antar module di dalam database itu dijaga **awalan nama tabel** dan trait `BelongsToTenant`,
 bukan database terpisah. Aturannya di [standar module](02-module-standard.md#nama-tabel).
 
 ## Checklist menambah module baru

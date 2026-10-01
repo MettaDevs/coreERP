@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Observability;
 
-use App\Platform\Modules\Support\PelaksanaTenant;
+use App\Platform\Modules\Support\TenantRunnerCore;
 use App\Platform\Modules\Support\TenantScope;
 use App\Platform\Observability\Support\LaporanKesalahan;
 use RuntimeException;
@@ -73,7 +73,7 @@ class KonteksLaporanKonsolTest extends TestCase
         // Ikatan yang sama dengan yang dibaca TenantScope. Ia bukan tebakan: tanpa ikatan itu
         // query module tidak berjalan sama sekali, jadi pekerjaan yang menyentuh data sebuah
         // tenant pasti memilikinya.
-        $laporan = app(PelaksanaTenant::class)->jalankanUntuk(
+        $laporan = app(TenantRunnerCore::class)->runFor(
             '01kyvaf15a83dn64qp2zfr88pn',
             fn (): string => $this->laporan(),
         );

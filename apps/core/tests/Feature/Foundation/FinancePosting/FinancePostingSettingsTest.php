@@ -6,10 +6,10 @@ use App\Foundation\Currency\Models\CurrencyPrecision;
 use App\Foundation\Currency\Support\MoneyPrecision;
 use App\Foundation\FinancePosting\Models\FinanceSettlementMode;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\CurrencyRounding;
+use App\Platform\Modules\Contracts\FinancePostingSettings;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\PresisiMataUang;
-use App\Support\Modules\Contracts\SetelanPostingFinance;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,8 +55,8 @@ class FinancePostingSettingsTest extends TestCase
             ->assertJsonPath('data.current_mode', 'direct_payable')
             ->assertJsonPath('data.modes', []);
 
-        $setelan = $this->app->make(SetelanPostingFinance::class);
-        $this->assertSame('direct_payable', $setelan->modePenyelesaian($le, '2026-09-22'));
+        $setelan = $this->app->make(FinancePostingSettings::class);
+        $this->assertSame('direct_payable', $setelan->settlementMode($le, '2026-09-22'));
         $this->assertNull($setelan->cutover($le));
     }
 
@@ -66,12 +66,12 @@ class FinancePostingSettingsTest extends TestCase
         $this->tambahMode($le, 'clearing', '2026-01-01')->assertCreated();
         $this->tambahMode($le, 'direct_payable', '2026-07-01')->assertCreated();
 
-        $setelan = $this->app->make(SetelanPostingFinance::class);
+        $setelan = $this->app->make(FinancePostingSettings::class);
         // Sebelum baris pertama berlaku, bawaan yang dipakai.
-        $this->assertSame('direct_payable', $setelan->modePenyelesaian($le, '2025-12-31'));
-        $this->assertSame('clearing', $setelan->modePenyelesaian($le, '2026-01-01'));
-        $this->assertSame('clearing', $setelan->modePenyelesaian($le, '2026-06-30'));
-        $this->assertSame('direct_payable', $setelan->modePenyelesaian($le, '2026-07-01'));
+        $this->assertSame('direct_payable', $setelan->settlementMode($le, '2025-12-31'));
+        $this->assertSame('clearing', $setelan->settlementMode($le, '2026-01-01'));
+        $this->assertSame('clearing', $setelan->settlementMode($le, '2026-06-30'));
+        $this->assertSame('direct_payable', $setelan->settlementMode($le, '2026-07-01'));
     }
 
     public function test_tanggal_berlaku_tidak_boleh_ganda(): void
@@ -128,7 +128,7 @@ class FinancePostingSettingsTest extends TestCase
             'enabled' => true, 'cutover_date' => '2026-10-01', 'version' => 0,
         ])->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.cutover_date', '2026-10-01');
 
-        $this->assertSame('2026-10-01', $this->app->make(SetelanPostingFinance::class)->cutover($le));
+        $this->assertSame('2026-10-01', $this->app->make(FinancePostingSettings::class)->cutover($le));
 
         // Database menjaga aturan yang sama untuk jalur yang tidak lewat layar.
         $this->expectException(QueryException::class);
@@ -156,7 +156,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->putJson($url, ['enabled' => true, 'cutover_date' => '2027-02-01'])
             ->assertStatus(428)->assertJsonPath('error.code', 'version_required');
 
-        $this->assertSame('2027-01-01', $this->app->make(SetelanPostingFinance::class)->cutover($le));
+        $this->assertSame('2027-01-01', $this->app->make(FinancePostingSettings::class)->cutover($le));
     }
 
     public function test_menghapus_mode_membutuhkan_versi_yang_dibuka(): void
@@ -217,7 +217,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('tidak ditemukan');
 
-        $this->app->make(SetelanPostingFinance::class)->modePenyelesaian((string) Str::ulid(), '2026-09-22');
+        $this->app->make(FinancePostingSettings::class)->settlementMode((string) Str::ulid(), '2026-09-22');
     }
 
     public function test_pembulatan_nol_dan_dua_desimal_termasuk_nilai_negatif(): void
@@ -239,14 +239,14 @@ class FinancePostingSettingsTest extends TestCase
 
     public function test_tiga_baris_berharga_satuan_berdesimal_tetap_seimbang_bila_dibulatkan_per_baris(): void
     {
-        $presisi = $this->app->make(PresisiMataUang::class);
+        $presisi = $this->app->make(CurrencyRounding::class);
         $tenant = $this->membership->tenant_id;
         $hargaSatuan = '333333.333';
 
         // Dibulatkan per baris di sumber (K-20), lalu hutang disusun dari nilai yang sudah bulat.
-        $baris = array_map(fn (): string => $presisi->bulatkan($tenant, $hargaSatuan, 'IDR'), range(1, 3));
+        $baris = array_map(fn (): string => $presisi->roundAmount($tenant, $hargaSatuan, 'IDR'), range(1, 3));
         $debit = MoneyPrecision::sum(...$baris);
-        $kredit = MoneyPrecision::round(MoneyPrecision::sum(...$baris), $presisi->nilai($tenant, 'IDR'));
+        $kredit = MoneyPrecision::round(MoneyPrecision::sum(...$baris), $presisi->amountDecimals($tenant, 'IDR'));
 
         $this->assertSame(['333333.33', '333333.33', '333333.33'], $baris);
         $this->assertSame('999999.99', $debit);
@@ -257,21 +257,21 @@ class FinancePostingSettingsTest extends TestCase
 
     public function test_presisi_idr_bawaan_dan_dapat_disetel_per_tenant(): void
     {
-        $presisi = $this->app->make(PresisiMataUang::class);
+        $presisi = $this->app->make(CurrencyRounding::class);
         $tenant = $this->membership->tenant_id;
-        $this->assertSame(2, $presisi->nilai($tenant, 'IDR'));
-        $this->assertSame(3, $presisi->hargaSatuan($tenant, 'idr'));
+        $this->assertSame(2, $presisi->amountDecimals($tenant, 'IDR'));
+        $this->assertSame(3, $presisi->unitAmountDecimals($tenant, 'idr'));
 
         $this->actingAs($this->owner)->put('/settings/currencies/IDR', [
             'amount_decimals' => 0, 'unit_amount_decimals' => 3, 'version' => 0,
         ])->assertSessionHasNoErrors();
 
-        $presisi = $this->app->make(PresisiMataUang::class);
-        $this->assertSame(0, $presisi->nilai($tenant, 'IDR'));
-        $this->assertSame('500000001', $presisi->bulatkan($tenant, '500000000.50', 'IDR'));
+        $presisi = $this->app->make(CurrencyRounding::class);
+        $this->assertSame(0, $presisi->amountDecimals($tenant, 'IDR'));
+        $this->assertSame('500000001', $presisi->roundAmount($tenant, '500000000.50', 'IDR'));
 
         // Tenant lain tetap memakai bawaan.
-        $this->assertSame(2, $presisi->nilai((string) Str::ulid(), 'IDR'));
+        $this->assertSame(2, $presisi->amountDecimals((string) Str::ulid(), 'IDR'));
     }
 
     public function test_presisi_harga_satuan_tidak_boleh_lebih_kasar_dari_presisi_nilai(): void
@@ -300,7 +300,7 @@ class FinancePostingSettingsTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('belum disetel');
 
-        $this->app->make(PresisiMataUang::class)->nilai($this->membership->tenant_id, 'JPY');
+        $this->app->make(CurrencyRounding::class)->amountDecimals($this->membership->tenant_id, 'JPY');
     }
 
     public function test_halaman_mata_uang_menampilkan_idr_bawaan(): void

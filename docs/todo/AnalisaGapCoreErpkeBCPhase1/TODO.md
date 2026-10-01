@@ -61,7 +61,7 @@ kolom pelaku buat dan ubah yang terisi otomatis, dan test B-1 lulus.
 
 Rujukan: [README: Gap 1 dan 6](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-1-6).
 
-- [x] 1.1 Helper migration untuk kolom jejak, dipakai tabel baru. `AuditColumns` di `App\Support\Modules\Contracts`.
+- [x] 1.1 Helper migration untuk kolom jejak, dipakai tabel baru. `AuditColumns` di `App\Platform\Modules\Contracts`.
 - [x] 1.2 Pengisian otomatis dari pengguna yang sedang login, dan dari pengguna pemicu untuk job latar.
 - [x] 1.3 Migration yang menambahkan kolom jejak ke tabel tenant Core yang sudah ada.
 - [x] 1.4 Migration yang sama untuk tabel module (`management-aset`, `human-resources`).

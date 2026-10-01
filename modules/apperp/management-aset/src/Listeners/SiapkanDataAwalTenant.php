@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Listeners;
 
-use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 
 /**
@@ -37,7 +37,7 @@ final class SiapkanDataAwalTenant
 
     public function __construct(private readonly ProvisionIndonesiaStarterData $penyedia) {}
 
-    public function handle(TenantDisiapkan $event): void
+    public function handle(TenantProvisioned $event): void
     {
         $idModule = $event->data['app_ids'] ?? null;
 

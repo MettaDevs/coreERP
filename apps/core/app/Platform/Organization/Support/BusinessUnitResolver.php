@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * posting — bukan hari ini — supaya jurnal bulan lalu tetap masuk ke klinik yang benar walaupun
  * poli itu sudah dipindah minggu ini.
  *
- * Dipakai dua pemanggil yang harus sepakat: kontrak `DirektoriOrganisasi` untuk module, dan penerbit
+ * Dipakai dua pemanggil yang harus sepakat: kontrak `OrganizationDirectory` untuk module, dan penerbit
  * posting finance di Core. Satu kelas supaya pratinjau di layar modul dan jurnal yang benar-benar
  * terbit tidak pernah menurunkan business unit dengan cara berbeda.
  */

@@ -401,7 +401,7 @@ Perilaku BC yang perlu ditiru, dari halaman *Change basic settings*:
   lain ditulis selisihnya dari UTC pada saat itu, misalnya "UTC+09:00", karena singkatan seperti IST atau
   CST dipakai lebih dari satu zona. Tanggal tanpa jam (`date`) tidak digeser.
 - **Zona di konteks module.** Konteks laporan membawa `timezone`, dihitung dari pengguna dan entitas legal
-  catatan ekspor (worker tidak punya sesi); `KonteksPermintaan::timezone()` menjawab hal yang sama di rute
+  catatan ekspor (worker tidak punya sesi); `RequestContext::timezone()` menjawab hal yang sama di rute
   module. Laporan aset memakainya untuk periode bawaan, nama berkas, dan batas hari filter tanggal, dan
   mengirim waktu cetak, waktu dibuat, serta waktu mulai dan selesai aktual work order sebagai `datetime`.
 
@@ -459,7 +459,7 @@ tabel pengguna Core.
   ditolak 422; sebelumnya akun yang tidak ditemukan saat menambah pekerja berakhir 500.
 - **Pekerja di layar anggota Core.** Kolom **Pekerja** di Identity & access → Anggota menampilkan nama dan
   nomor pegawai. Core bertanya lewat kontrak baru `LinkedWorkerResolvers`
-  (`apps/core/app/Support/Modules/Contracts/`), yang diisi module HR; hanya module yang terpasang untuk
+  (`apps/core/app/Platform/Modules/Contracts/`), yang diisi module HR; hanya module yang terpasang untuk
   tenant itu yang ditanya, dan kolomnya tidak tampil bila tidak ada.
 
 Tidak ada kolom baru, jadi klasifikasi data (area 5) tidak berubah: `core_membership_id` sudah
@@ -608,7 +608,7 @@ final class Worker extends Model
 
 ### Yang sudah dibangun (area 5)
 
-- **Enum dan deklarasi** di `App\Support\Modules\Contracts`, supaya module dapat memakainya: `DataClass`
+- **Enum dan deklarasi** di `App\Platform\Modules\Contracts`, supaya module dapat memakainya: `DataClass`
   (tujuh nilai BC), atribut `DataClassification` untuk bawaan tabel, konstanta `COLUMN_CLASSIFICATION` di
   model untuk kolom yang berbeda, dan antarmuka `DataClassificationRegistry` untuk tabel tanpa model
   (K-19). Registry Core ada di `App\Models\UnmodeledTables`; module menaruh registry-nya di `src/Models`.
@@ -724,7 +724,7 @@ diputuskan di K-07.
   `App\Models\DocumentAttachment`; bawaan tabel `CustomerContent` seperti BC, dengan `file_name` sebagai
   data pribadi karena orang menamai berkas dengan nama orang.
 - **Pendaftaran jenis record lewat kontrak** `AttachmentRecordType` dan `AttachmentRecordTypes` di
-  `App\Support\Modules\Contracts`. Pemilik tabel menyatakan klasifikasi lampirannya dan menjawab boleh
+  `App\Platform\Modules\Contracts`. Pemilik tabel menyatakan klasifikasi lampirannya dan menjawab boleh
   membuka, boleh mengubah, dan ada-tidaknya baris dokumen. Core memasang konteks module pemiliknya lebih
   dulu (`ResolveAttachmentContext` memakai `ResolveModuleContext`), jadi jawabannya memakai permission dan
   kebijakan organisasi yang sama dengan layar record itu. Core tidak membaca tabel module.

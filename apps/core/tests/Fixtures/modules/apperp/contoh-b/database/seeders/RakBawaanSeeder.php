@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB\Database\Seeders;
 
-use App\Support\Modules\Contracts\SeederModule;
+use App\Platform\Modules\Contracts\TenantSeeder;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohB\Models\Rak;
 
@@ -14,7 +14,7 @@ use Modules\Apperp\ContohB\Models\Rak;
  * Ia ada supaya test bisa membuktikan hal yang paling mudah salah: memasang satu module
  * tidak boleh mengisi data awal module lain.
  */
-final class RakBawaanSeeder extends SeederModule
+final class RakBawaanSeeder extends TenantSeeder
 {
     public function run(): void
     {

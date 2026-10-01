@@ -7,8 +7,8 @@ namespace App\Foundation\Vendor\Support;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\Modules\Contracts\AttachmentRecordType;
-use App\Support\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\DataClass;
 
 /**
  * Lampiran vendor (kontrak, dokumen pajak), record milik Core. Haknya sama dengan layar Vendor: dibuka dengan

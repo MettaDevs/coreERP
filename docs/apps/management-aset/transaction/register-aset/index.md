@@ -278,7 +278,7 @@ graph TD
 
 Punya permission belum cukup. Setiap pembacaan dan penulisan aset masih disaring lagi lewat `OrganizationScope`, memakai kebijakan `management-aset.asset-responsibility`.
 
-Core menyusun daftar badan hukum dan unit kerja yang boleh diakses pengguna, dan modul membacanya lewat kontrak `KonteksPermintaan`. Kueri disaring berdasarkan daftar itu. Dua orang dengan permission yang sama persis tetap melihat daftar aset yang berbeda sesuai unit kerja mereka. **Jangan pernah mempercayai id organisasi yang dikirim dari browser.**
+Core menyusun daftar badan hukum dan unit kerja yang boleh diakses pengguna, dan modul membacanya lewat kontrak `RequestContext`. Kueri disaring berdasarkan daftar itu. Dua orang dengan permission yang sama persis tetap melihat daftar aset yang berbeda sesuai unit kerja mereka. **Jangan pernah mempercayai id organisasi yang dikirim dari browser.**
 
 ---
 
@@ -304,7 +304,7 @@ Kepala dokumen membawa **cara perolehan** (`pembelian` bawaan, atau `hibah`), **
 
 **Yang tidak menolak**: pemetaan akun yang kosong atau nonaktif, dan unit tanpa nomor. Postingnya terbit sebagai `held` dan penerimaannya tetap selesai (K-18); setelah pemetaannya dibenahi, Validasi ulang melepasnya. Penerimaan bernilai nol tidak menerbitkan posting.
 
-`PostingTidakSah` dari Core adalah bug penerbit (K-22): dilaporkan ke pemantauan kesalahan, transaksinya dibatalkan, dan layar menerima 500 `posting_failed` dengan pesan yang dapat dibaca.
+`InvalidPosting` dari Core adalah bug penerbit (K-22): dilaporkan ke pemantauan kesalahan, transaksinya dibatalkan, dan layar menerima 500 `posting_failed` dengan pesan yang dapat dibaca.
 
 ## Saldo awal aset lama
 
@@ -385,7 +385,7 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | Nomor aset (`kode`) | Number Sequence Core | Diminta dengan `legal_entity_id`, karena penomorannya bisa direset per tahun buku |
 | Tahun buku | Fiscal calendar Core | Dipakai untuk menentukan periode penyusutan |
 | Satuan ukur atribut | Unit of Measure Core | Memastikan standar satuan seragam lintas modul |
-| Hak akses dan batas organisasi | Kontrak `KonteksTenant` dan `KonteksPermintaan` | Tidak pernah dibaca dari tabel Core langsung, walau berada di database yang sama |
+| Hak akses dan batas organisasi | Kontrak `TenantContext` dan `RequestContext` | Tidak pernah dibaca dari tabel Core langsung, walau berada di database yang sama |
 
 ---
 

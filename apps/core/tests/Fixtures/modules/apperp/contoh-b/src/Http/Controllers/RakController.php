@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Http\JsonResponse;
 use Modules\Apperp\ContohB\Models\Rak;
 
@@ -13,8 +13,8 @@ use Modules\Apperp\ContohB\Models\Rak;
  *
  * Tiga hal yang ditunjukkan dengan sengaja:
  *
- * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `KonteksTenant`
- *    dan `KonteksPermintaan` adalah dua dari pintu resmi yang didaftar `CoreServices`.
+ * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `TenantContext`
+ *    dan `RequestContext` adalah dua dari pintu resmi yang didaftar `CoreServices`.
  * 2. Setiap query menyaring `tenant_id`. Tidak ada lagi database terpisah yang menahan
  *    kebocoran, jadi satu query yang lupa menyaring membocorkan data seluruh tenant.
  * 3. Izin yang diperiksa memakai awalan module ini sendiri. Kode izin module lain tidak akan
@@ -26,9 +26,9 @@ use Modules\Apperp\ContohB\Models\Rak;
  */
 final class RakController
 {
-    public function index(KonteksPermintaan $akses): JsonResponse
+    public function index(RequestContext $akses): JsonResponse
     {
-        abort_unless($akses->punyaIzin('contoh-b.rak.read'), 403);
+        abort_unless($akses->hasPermission('contoh-b.rak.read'), 403);
 
         return new JsonResponse([
             'data' => Rak::query()

@@ -8,7 +8,7 @@ use App\Platform\Access\Http\Requests\RoleRequest;
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Support\AccessGuards;
 use App\Platform\Access\Support\CoreSecurityCatalog;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

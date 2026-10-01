@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -171,8 +171,8 @@ class LokasiAsetTest extends TestCase
         DB::table('aset_m_lokasi_aset')->where('id', $atas)->update(['parent_id' => $bawah]);
 
         DB::enableQueryLog();
-        $dimensi = $this->app->make(PelaksanaUntukTenant::class)
-            ->jalankanUntuk($this->tenantId, fn (): ?string => $this->app->make(LocationDimension::class)->resolve($bawah));
+        $dimensi = $this->app->make(TenantRunner::class)
+            ->runFor($this->tenantId, fn (): ?string => $this->app->make(LocationDimension::class)->resolve($bawah));
         $pembacaan = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'aset_m_lokasi_aset'))->count();
 
         $this->assertNull($dimensi);

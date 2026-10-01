@@ -163,7 +163,7 @@ Tiga hal yang paling sering salah pada modul pertama seseorang:
   ditemukan pada permintaan pertama di runtime.
 - **Penyedia layanan module** yang memuat rute dan halaman adalah satu-satunya pintu masuknya ke
   runtime. Ia tidak didaftarkan di `config/app.php`; Core menemukannya dari manifest.
-- **Module hanya boleh menyebut `App\Support\Modules\Contracts`.** Kelas Core lain di luar namespace
+- **Module hanya boleh menyebut `App\Platform\Modules\Contracts`.** Kelas Core lain di luar namespace
   itu terlarang, dan ada penjaga batas yang memeriksanya.
 
 ::: tip Gate keluar
@@ -199,7 +199,7 @@ Pola kode keamanan mengikuti `<module>.<resource>.<aksi>` — Control Plane meno
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat role diberikan ke anggota |
 | `number_sequences.references` | Hanya bila module menerbitkan nomor | Reference muncul di layar **Nomor dokumen** (`settings/number-sequences`) untuk diaktifkan admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Tidak ditulis di manifest module | Laporan masuk katalog Core dari kelas dataset module lewat `PenyediaLaporanModul::catalog()`; layout, antrean, dan render milik Core. Lihat [dokumen cetak](/dev/23-document-rendering) |
+| `reports` | Tidak ditulis di manifest module | Laporan masuk katalog Core dari kelas dataset module lewat `ModuleReportProvider::catalog()`; layout, antrean, dan render milik Core. Lihat [dokumen cetak](/dev/23-document-rendering) |
 | `dependsOn` | Hanya bila module butuh module lain | Dependency disimpan dengan rentang versi; Core menolak target yang belum ada, versi yang tidak cocok, dan cycle. Module tanpa dependency memakai `{}` |
 
 Contoh reference nomor:
@@ -216,7 +216,7 @@ number_sequences:
 `default_prefix` wajib **tepat empat huruf kapital**. `code` wajib berawalan ID module dan unik lintas app. `allowed_scopes` hanya boleh berisi `tenant`, `legal_entity`, atau `operating_unit`.
 
 Module **tidak** menerbitkan nomornya sendiri. Setelah admin mengaktifkan reference, module meminta
-nomor lewat kontrak `PenerbitNomor` — pemanggilan fungsi biasa, yang karena itu bisa berada di dalam
+nomor lewat kontrak `NumberSequenceIssuer` — pemanggilan fungsi biasa, yang karena itu bisa berada di dalam
 transaksi dokumen yang sedang disimpan.
 
 Deklarasikan data policy **hanya bila** resource-nya memang perlu dibatasi organisasi. Ikuti Data policy decision gate di `.agents/skills/coreerp-architecture/SKILL.md`.
@@ -240,7 +240,7 @@ tabel** yang diturunkan dari nama folder module, dan awalan itu wajib pada setia
 kecuali — termasuk tabel bantu seperti penyaring kejadian ganda, yang justru paling mudah lupa
 diberi penanda dan paling mudah bertabrakan.
 
-Semua record milik tenant membawa `tenant_id`, dan modelnya memakai trait `MilikTenant`. Data
+Semua record milik tenant membawa `tenant_id`, dan modelnya memakai trait `BelongsToTenant`. Data
 operasional membawa `org_unit_id` bila memang relevan.
 
 **Tidak ada foreign key, Eloquent relation, atau query ke tabel milik module lain.** Kalau kamu
@@ -263,7 +263,7 @@ Yang perlu ditulis bergantung pada batas mana yang dilewati:
 
 | Batas | Bentuk | Perlu berkas kontrak? |
 | --- | --- | --- |
-| Module ke Core | Antarmuka di `App\Support\Modules\Contracts` | Tidak — kontraknya sudah ada di Core |
+| Module ke Core | Antarmuka di `App\Platform\Modules\Contracts` | Tidak — kontraknya sudah ada di Core |
 | Module ke module, di satu runtime | Event Laravel in-process | Ya bila event itu juga akan diterbitkan ke luar |
 | Permukaan yang dipanggil dari luar runtime | REST/OpenAPI atau AsyncAPI | Ya |
 | Rute yang hanya dipanggil halaman module sendiri | Rute biasa di `routes/api.php` | Tidak |
@@ -290,13 +290,13 @@ Kontrak menggambarkan implementasi nyata, bukan rencana. Event yang tidak dipubl
 
 Titik paling rawan. Aturannya:
 
-- Konteks tenant dibaca dari **middleware konteks module**, lewat kontrak `KonteksTenant` dan
-  `KonteksPermintaan`. Tidak pernah dari body atau query.
+- Konteks tenant dibaca dari **middleware konteks module**, lewat kontrak `TenantContext` dan
+  `RequestContext`. Tidak pernah dari body atau query.
 - Grup rute module memasang `konteks-module:<id module>`. Middleware itu menerima id module sebagai
   parameter dan karena itu dipasang di grup rute module, bukan sebagai middleware global: izin
   bersifat per app, dan middleware global tidak tahu ia sedang melayani module yang mana.
 - Jangan menerima `tenant_id` atau scope organisasi bebas dari klien.
-- Nomor dokumen diminta lewat `PenerbitNomor`, tidak diterbitkan sendiri.
+- Nomor dokumen diminta lewat `NumberSequenceIssuer`, tidak diterbitkan sendiri.
 - Operasi tulis menghormati `Idempotency-Key`.
 
 Pola yang terbukti di Management Aset: satu base controller memegang perilaku bersama — hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, penjagaan arsip — sehingga tiap resource tidak menulis ulang penjagaan yang sama.
@@ -342,7 +342,7 @@ sebuah `CustomEvent` pada `window` yang didengarkan shell — bukan impor langsu
 Core, karena impor semacam itu memutus batas module.
 
 Yang harus ada di module: kelas dataset (sekaligus sumber katalog laporannya) dan pendaftaran
-`PenyediaLaporanModul` dari penyedia layanannya. Semuanya dijelaskan di
+`ModuleReportProvider` dari penyedia layanannya. Semuanya dijelaskan di
 [dokumen cetak, layout, dan ekspor](/dev/23-document-rendering).
 
 ### Bahasa dan komponen

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Reporting;
 
-use App\Support\Modules\Contracts\FieldFilterExpression;
-use App\Support\Modules\Contracts\FieldType;
-use App\Support\Modules\Contracts\FilterField;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+use App\Platform\Modules\Contracts\FieldType;
+use App\Platform\Modules\Contracts\FilterField;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;

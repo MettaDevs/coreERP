@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Models;
 
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -27,8 +27,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 final class Barang extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
     use SoftDeletes;
 
     protected $table = 'contoh_a_m_barang';

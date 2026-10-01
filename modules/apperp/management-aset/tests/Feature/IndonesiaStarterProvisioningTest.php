@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
-use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\TenantProvisioned;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -173,7 +173,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
      * tenant yang salah. `event()` telanjang di sini akan membuat test menempuh keadaan yang
      * tidak pernah dipakai produksi.
      *
-     * Yang dipakai `PelaksanaUntukTenant`, sebuah kontrak, bukan `PengirimEventModul` milik
+     * Yang dipakai `TenantRunner`, sebuah kontrak, bukan `PengirimEventModul` milik
      * Core. Keduanya melakukan hal yang sama, dan itu memang kelemahan yang diterima sadar:
      * test ini jadi meniru pengirimnya alih-alih memanggilnya, sehingga perubahan pada
      * pengirim tidak akan terlihat di sini. Yang menutup celah itu test pendaftaran usaha di
@@ -184,10 +184,10 @@ class IndonesiaStarterProvisioningTest extends TestCase
      */
     private function pancarkan(string $tenantId, array $appIds = ['management-aset']): void
     {
-        app(PelaksanaUntukTenant::class)->jalankanUntuk(
+        app(TenantRunner::class)->runFor(
             $tenantId,
             static fn (): bool => event(
-                new TenantDisiapkan((string) Str::ulid(), $tenantId, $tenantId, null, ['app_ids' => $appIds]),
+                new TenantProvisioned((string) Str::ulid(), $tenantId, $tenantId, null, ['app_ids' => $appIds]),
             ) !== null,
         );
     }

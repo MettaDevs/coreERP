@@ -20,7 +20,7 @@ return new class extends Migration
             $table->ulid('id')->primary();
 
             // Setiap tabel module membawa `tenant_id`. Tidak ada lagi database terpisah yang
-            // menahan kebocoran; yang menahannya trait `MilikTenant` pada modelnya, dan trait
+            // menahan kebocoran; yang menahannya trait `BelongsToTenant` pada modelnya, dan trait
             // itu tidak punya apa-apa untuk disaring bila kolom ini tidak ada.
             $table->ulid('tenant_id')->index();
             $table->string('kode', 50);

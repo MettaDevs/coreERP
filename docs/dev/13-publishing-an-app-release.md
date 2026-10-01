@@ -82,7 +82,7 @@ tetapi belum dapat menolak pelepasan sebuah module karena belum ada operasi pele
 dijalankan.
 
 Halaman module menerima konteks tenant dari request Core yang sama, dan setiap query module menyaring
-`tenant_id` lewat `MilikTenant`. Tidak ada `tenant_id` bebas yang boleh datang dari request browser.
+`tenant_id` lewat `BelongsToTenant`. Tidak ada `tenant_id` bebas yang boleh datang dari request browser.
 
 Metadata keamanan adalah milik manifest module, bukan daftar yang ditulis di kode Core. CI mengubah `app.yaml` menjadi payload registrasi; Control Plane memvalidasi bahwa setiap kode memakai awalan ID app, bahwa permission menunjuk entry point yang dideklarasikan, privilege hanya memakai permission app tersebut, dan duty hanya memakai privilege app tersebut. Menambah rule bisnis atau permission pada sebuah module tidak memerlukan perubahan source Core.
 

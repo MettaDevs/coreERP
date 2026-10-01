@@ -65,7 +65,7 @@ dapat ditemukan orang berikutnya — bukan karena ia menunggu dikerjakan.
 Ketika Human Resources masih app tersendiri, penugasan seorang pekerja ke sebuah posisi juga
 memberinya role beserta lingkup unit kerjanya, lewat panggilan HTTP ke Core. Panggilan itu hilang
 bersama kerangka app lama, dan **Core belum punya kontrak penggantinya** — tidak satu pun antarmuka
-di `App\Support\Modules\Contracts` menyentuh penugasan role.
+di `App\Platform\Modules\Contracts` menyentuh penugasan role.
 
 Mempertahankan klien HTTP-nya bukan pilihan yang lebih aman: setelan alamat Core ikut hilang, jadi
 pemanggilan itu sekarang menembak alamat kosong dan **selalu** gagal — setiap penugasan untuk pekerja

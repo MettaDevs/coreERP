@@ -2,7 +2,7 @@
 
 namespace App\Platform\ChangeLog\Support;
 
-use App\Support\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Support\Facades\DB;
 
 /**

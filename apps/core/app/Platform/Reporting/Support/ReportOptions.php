@@ -6,10 +6,10 @@ namespace App\Platform\Reporting\Support;
 
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Support\UserClock;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Reporting\Models\ReportLastUsedOption;
 use App\Platform\Reporting\Models\ReportPreset;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Platform\ChangeLog\ModuleServices;
 
 use App\Platform\Identity\Models\User;
-use App\Support\Modules\Contracts\ChangeHistory;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\ChangeHistory;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,7 +18,7 @@ final class ChangeHistoryCore implements ChangeHistory
 {
     public function __construct(
         private readonly ChangeLogValueResolvers $resolvers,
-        private readonly PelaksanaUntukTenant $pelaksana,
+        private readonly TenantRunner $pelaksana,
     ) {}
 
     public function forRecord(string $tenantId, string $table, string $recordId, int $page = 1): array
@@ -96,7 +96,7 @@ final class ChangeHistoryCore implements ChangeHistory
 
         // Model module menyaring lewat tenant aktif; riwayat juga dibaca dari rute admin Core yang tidak
         // melewati middleware konteks module, jadi tenant-nya disebut di sini.
-        return $this->pelaksana->jalankanUntuk($tenantId, function () use ($resolver, $tenantId, $values): array {
+        return $this->pelaksana->runFor($tenantId, function () use ($resolver, $tenantId, $values): array {
             $display = [];
             foreach ($values as $field => $set) {
                 $display[$field] = $resolver->display($tenantId, $field, array_map('strval', array_keys($set)));

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -45,11 +45,11 @@ class LayarManagementAsetTest extends TestCase
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
 
-        // Data awal Indonesia yang dikirim lewat `TenantDisiapkan` — 363 master bernomor, sekitar
+        // Data awal Indonesia yang dikirim lewat `TenantProvisioned` — 363 master bernomor, sekitar
         // 4.400 statement per test — tidak dibaca satu test pun di sini: yang diperiksa navigasi,
         // izin, dan catatan pemasangan milik Core. Data itu diuji sendiri di
         // `IndonesiaStarterProvisioningTest`.
-        Event::fake([TenantDisiapkan::class]);
+        Event::fake([TenantProvisioned::class]);
 
         $this->pemilik = app(RegisterBusiness::class)->handle([
             'name' => 'Pemilik',

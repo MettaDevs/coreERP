@@ -1,6 +1,6 @@
 <?php
 
-use App\Support\Modules\Contracts\ChangeLogDefaults;
+use App\Platform\Modules\Contracts\ChangeLogDefaults;
 use Illuminate\Database\Migrations\Migration;
 
 /**

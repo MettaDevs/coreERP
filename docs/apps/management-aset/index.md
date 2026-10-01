@@ -65,7 +65,7 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 
 Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
-**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat kontrak di `App\Support\Modules\Contracts`, bukan lewat jaringan.
+**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat kontrak di `App\Platform\Modules\Contracts`, bukan lewat jaringan.
 
 ## Kontrak
 
@@ -80,11 +80,11 @@ Rute itu hanya dipanggil halaman modul ini sendiri, di dalam proses dan repo yan
 dipertahankan sebagai catatan, bukan sebagai janji ke pemanggil luar. Pemeriksa cakupannya sudah
 dihapus — alasannya di [Kontrak](/apps/management-aset/arsitektur/kontrak).
 
-Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant lewat trait `MilikTenant`.
+Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant lewat trait `BelongsToTenant`.
 
 **Reference nomor** — daftar lengkapnya di berkas fitur `manifest/` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
 
-**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. Modul mengonsumsi keputusannya lewat event `KeputusanWorkflowDiambil` yang dipancarkan di dalam transaksi keputusan Core; setelah `approved` diterapkan, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
+**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. Modul mengonsumsi keputusannya lewat event `WorkflowDecisionTaken` yang dipancarkan di dalam transaksi keputusan Core; setelah `approved` diterapkan, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
 
 ## Struktur kode
 

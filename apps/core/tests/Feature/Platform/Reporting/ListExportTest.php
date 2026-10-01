@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +52,7 @@ class ListExportTest extends TestCase
         Storage::fake('reporting-test');
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
-        Event::fake([TenantDisiapkan::class]);
+        Event::fake([TenantProvisioned::class]);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant ekspor daftar',
             'app_ids' => ['management-aset'], 'email' => 'owner@daftar.test', 'password' => 'password',

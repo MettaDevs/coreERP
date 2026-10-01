@@ -8,12 +8,12 @@ use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Foundation\FinancePosting\Support\PostingPublisher;
 use App\Foundation\FinancePosting\Support\StatusPostingBerubah;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PostingTidakSah;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -187,7 +187,7 @@ class FinancePostingMonitorTest extends TestCase
             try {
                 $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-'.Str::random(6), 'url' => $salah]));
                 $this->fail("Tautan {$salah} seharusnya ditolak.");
-            } catch (PostingTidakSah $kesalahan) {
+            } catch (InvalidPosting $kesalahan) {
                 $this->assertStringContainsString('source_document.url', $kesalahan->getMessage());
             }
         }
@@ -346,7 +346,7 @@ class FinancePostingMonitorTest extends TestCase
     /** @param  array<string, mixed>  $masukan */
     private function terbitkan(array $masukan): void
     {
-        DB::transaction(fn (): array => app(PenerbitPosting::class)->terbitkan($masukan));
+        DB::transaction(fn (): array => app(PostingFeed::class)->publish($masukan));
     }
 
     private function pemilik(string $email, string $bisnis): User

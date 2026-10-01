@@ -2,9 +2,9 @@
 
 namespace App\Foundation\Workflow\Support;
 
+use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
 use App\Platform\Modules\Support\PengirimEventModul;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -290,7 +290,7 @@ class WorkflowRuntime
         // middleware rute module — jadi tanpa ini setiap query model module di dalam listener
         // melempar "tanpa tenant aktif", dan kegagalannya membatalkan keputusan yang sah.
         $this->pengirim->kirim(
-            new KeputusanWorkflowDiambil($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi),
+            new WorkflowDecisionTaken($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi),
             $tenantId,
         );
     }

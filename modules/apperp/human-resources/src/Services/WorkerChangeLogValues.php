@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use Modules\Apperp\HumanResources\Models\Worker;
 
 /**
@@ -14,7 +14,7 @@ use Modules\Apperp\HumanResources\Models\Worker;
  */
 final class WorkerChangeLogValues implements ChangeLogValueResolver
 {
-    public function __construct(private readonly DirektoriOrganisasi $organisasi) {}
+    public function __construct(private readonly OrganizationDirectory $organisasi) {}
 
     public function table(): string
     {
@@ -27,7 +27,7 @@ final class WorkerChangeLogValues implements ChangeLogValueResolver
             return [];
         }
 
-        return collect($this->organisasi->anggota($tenantId))
+        return collect($this->organisasi->members($tenantId))
             ->whereIn('id', $values)
             ->mapWithKeys(fn (array $anggota): array => [(string) $anggota['id'] => (string) $anggota['nama']])
             ->all();

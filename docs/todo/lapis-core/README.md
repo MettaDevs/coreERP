@@ -87,7 +87,7 @@ Hasil pemetaan 426 berkas PHP di `apps/core/app` pada `origin/main` 1 Oktober 20
 | Platform/Reporting | 33 | `Support/Reporting`, `Http/Controllers/Reporting`, `RunReportExport`, `ReportFormatterCore`, `ReportPreset`, `ReportLastUsedOption` |
 | Platform/Identity | 32 | `Support/Sso`, `Http/Controllers/Auth`, `Actions/Fortify`, `Concerns`, `Http/Controllers/Settings`, model `User`, `Passkey`, `ExternalIdentity`, `SsoLoginAttempt`, `TenantIdentityProvider`, `TemporaryPassword` |
 | Platform/Access | 29 | `Support/Access`, `Actions/Access`, `Http/Controllers/Access`, model role/duty/privilege/permission, `DataPolicy*`, `RoleHierarchy`, `SodConflictEvaluator` |
-| Platform/Organization | 27 | `Actions/Organization`, `Http/Controllers/Organization`, model organisasi/legal entity/operating unit/hierarchy, `BusinessUnitResolver`, `DirektoriOrganisasiCore`, direktori internal organisasi dan posisi HR |
+| Platform/Organization | 27 | `Actions/Organization`, `Http/Controllers/Organization`, model organisasi/legal entity/operating unit/hierarchy, `BusinessUnitResolver`, `OrganizationDirectoryCore`, direktori internal organisasi dan posisi HR |
 | Platform/ControlPlane | 23 | model `Site*`, `ConsoleSetting`, `OperatorAuditEvent`, `Client`, perintah lingkungan (provision/copy/restore/purge/upgrade), `UpgradeEnvironment`, `FleetController`, `ControlPlaneOnly` |
 | Platform/Tenant | 16 | model `Tenant`, `TenantMembership`, `InvitationCode`, `Actions/Onboarding`, `Http/Controllers/Onboarding`, provisioning dan entitlement internal |
 | Platform/Environment | 9 | model `Environment`, `EnvironmentOperation`, `ActiveEnvironment`, `EnvironmentAddress`, `EnvironmentConnection`, `OutboundGuard`, `ResolveEnvironment`, `CurrentWorkspace` |
@@ -95,11 +95,11 @@ Hasil pemetaan 426 berkas PHP di `apps/core/app` pada `origin/main` 1 Oktober 20
 | Platform/Attachments, Retention | ±10 | `Support/Attachments`, `Support/Retention`, `DocumentAttachment`, `AttachmentController`, `RetentionController`, `ApplyRetention` |
 | Foundation/Finance | 27 | `Support/Finance`, `Http/Controllers/Finance` (kecuali `IntegrationClientController`), model `Finance*`, facade akun/posting |
 | Foundation/Geography | 24 | `Models/ReferenceData`, `CountryRegion`, `AddressSetupController`, `Services/AddressHierarchy`, perintah impor wilayah dan kode pos |
-| Foundation/NumberSequence | 21 | semua `NumberSequence*`, `CoreNumberSequences`, `PenerbitNomorCore` |
+| Foundation/NumberSequence | 21 | semua `NumberSequence*`, `CoreNumberSequences`, `NumberSequenceIssuerCore` |
 | Foundation/AddressBook | 13 | model `Party*`, `PostalAddress`, `ElectronicAddress`, `Location*`, `Support/AddressBook`, `Http/Controllers/GlobalAddressBook` |
 | Foundation/FiscalCalendar, WorkingCalendar, Workflow | 9 + 8 + 9 | nama sama |
 | Foundation/Vendor, UnitOfMeasure, Currency | 6 + 5 + 4 | nama sama; `MoneyPrecision` ke Currency |
-| Facade (`Support/Modules/Contracts`) | 38 | lihat [Facade module](#facade-module) |
+| Facade (`Platform/Modules/Contracts`) | 38 | lihat [Facade module](#facade-module) |
 
 Sebelum setiap PR, jalankan ulang pemetaan atas `origin/main`. Berkas baru yang lahir sesudah
 tanggal di atas harus ikut dipetakan.
@@ -110,9 +110,9 @@ Dengan keputusan di atas ada **23 import** yang melanggar arah. Semuanya jatuh k
 
 | Pola | Contoh | Perbaikan |
 | --- | --- | --- |
-| `CoreServices` (Platform/Modules) menyambungkan semua facade bisnis | `CoreServices` → `PenerbitNomorCore`, `DaftarVendorCore`, `MesinWorkflowCore`, `PenerbitPostingCore`, … (13 import) | Tiap fitur Foundation mendaftarkan implementasi facade-nya sendiri di service provider fitur itu. Platform hanya menyediakan tempat pendaftarannya. Ini pembalikan arah, seperti di BC |
-| Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation | `InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure` (5 import) | Foundation mendengarkan kejadian tenant/module. Kontrak `TenantDisiapkan` sudah ada; kejadian "module terpasang" ditambahkan bila belum ada |
-| Reporting memakai presisi uang dan buku alamat | `ValueFormat`, `ValueFormats` → `MoneyPrecision`; `PrintIdentityStore` → `OrganizationAddressBook` (3 import) | Lewat facade (`PresisiMataUang` sudah ada) atau penyedia yang didaftarkan Foundation |
+| `CoreServices` (Platform/Modules) menyambungkan semua facade bisnis | `CoreServices` → `NumberSequenceIssuerCore`, `VendorDirectoryCore`, `WorkflowEngineCore`, `PostingFeedCore`, … (13 import) | Tiap fitur Foundation mendaftarkan implementasi facade-nya sendiri di service provider fitur itu. Platform hanya menyediakan tempat pendaftarannya. Ini pembalikan arah, seperti di BC |
+| Pemasangan module dan onboarding tenant langsung menyiapkan data Foundation | `InstallModule`, `RegisterAppCatalog`, `RegisterBusiness` → `EnsureNumberSequenceDrafts`, `ProvisionDefaultUnitsOfMeasure` (5 import) | Foundation mendengarkan kejadian tenant/module. Kontrak `TenantProvisioned` sudah ada; kejadian "module terpasang" ditambahkan bila belum ada |
+| Reporting memakai presisi uang dan buku alamat | `ValueFormat`, `ValueFormats` → `MoneyPrecision`; `PrintIdentityStore` → `OrganizationAddressBook` (3 import) | Lewat facade (`CurrencyRounding` sudah ada) atau penyedia yang didaftarkan Foundation |
 | Integration dan onboarding menyentuh milik fitur lain | `AuthenticateIntegrationClient`, `IntegrationClientController` → `IntegrationClientAccounts` (Finance); `RegisterBusiness` → `Client` (ControlPlane) (3 import) | Tentukan pemilik saat PR domain itu. `RegisterBusiness` → `Client` bisa dibiarkan sebagai pengecualian tercatat karena pintu itu dimatikan di v1 |
 | ControlPlane menyebut perintah workflow di docblock (ditemukan saat PR 5) | `ConvertEnvironment`, `CopyEnvironment` → `PublishWorkflowEvents` (Workflow) (2 import) | Hanya rujukan docblock; perbaikan: hapus `use`, sebut nama perintah artisan-nya saja |
 | Model tenant mengenal client milik pusat | `Tenant` → `Client` (ControlPlane) (1 import) | Pengecualian tercatat, keputusan pemilik produk 1 Oktober 2026: isi kelas `Tenant` tidak diubah |
@@ -128,22 +128,20 @@ memperpendek daftar itu, tidak boleh memperpanjangnya.
 
 ## Facade module
 
-Isi `App\Support\Modules\Contracts` adalah API publik Core bagi module. Sebagian besar masih
-bernama Indonesia (`PenerbitNomor`, `DaftarVendor`, `MesinWorkflow`, `KalenderFiskal`,
-`PenyediaLaporanModul`, …), begitu pula implementasinya di `Services/Modules` (`PenerbitNomorCore`,
-`DaftarAkunCore`, …). Semuanya diganti ke nama Inggris dalam pekerjaan ini. Biayanya naik dengan
-setiap module dan kontrak baru, dan saat ini baru dua module yang memakainya.
+Isi `App\Platform\Modules\Contracts` adalah API publik Core bagi module. Sampai PR facade isinya
+tinggal di `App\Support\Modules\Contracts` dan sebagian besar bernama Indonesia (`PenerbitNomor`,
+`DaftarVendor`, `MesinWorkflow`, `KalenderFiskal`, `PenyediaLaporanModul`, …), begitu pula
+pelaksananya (`PenerbitNomorCore`, `DaftarAkunCore`, …). PR facade memindahkannya dan mengganti
+semuanya ke nama Inggris (`NumberSequenceIssuer`, `VendorDirectory`, `WorkflowEngine`,
+`FiscalCalendarDirectory`, `ModuleReportProvider`, …); tabel pemetaan lengkapnya ada di deskripsi
+pull request itu.
 
-**Keputusan terbuka K-1: letak facade.** Pilihannya:
-
-1. Tetap satu namespace publik, misalnya `App\Platform\Modules\Contracts\…`. Test Boundary paling
-   sederhana, tapi pemilik kontrak tidak terlihat dari letaknya.
-2. Per fitur: `App\Foundation\NumberSequence\Contracts\NumberSequenceIssuer`, dan module hanya
-   boleh memakai `App\*\*\Contracts\*`. Ini pola BC: tiap module punya facade sendiri, sisanya
-   internal. Pemilik kontrak jelas.
-
-Rekomendasi: **pilihan 2**. Kontrak baru yang lahir sebelum K-1 diputuskan tetap ditaruh di
-`App\Support\Modules\Contracts`, **dengan nama Inggris**.
+**K-1: letak facade — diputuskan pemilik produk: tetap satu namespace,
+`App\Platform\Modules\Contracts`, dengan nama Inggris.** Bukan per fitur. Aturan "module hanya boleh
+menyebut satu namespace" tetap berlaku; hanya namespacenya yang berganti, dan
+`ModuleNamespaceBoundaryTest` menolak namespace lama. Pelaksana tiap kontrak tetap tinggal di
+`ModuleServices` fitur pemiliknya. Pilihan yang tidak diambil: facade per fitur
+(`App\Foundation\NumberSequence\Contracts\…`, module memakai `App\*\*\Contracts\*`).
 
 ## Urutan pekerjaan
 
@@ -164,9 +162,9 @@ Satu domain per PR. Reporting paling akhir karena sesi analisa gap masih mengerj
 - [ ] **PR 7 — Platform/Identity, Platform/Access,** dan fitur Platform kecil (ChangeLog,
       Observability, Integration, License, Docs, Attachments, Retention). Pecah `access.tsx` dan
       `security-configuration.tsx`
-- [ ] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/`, dan
-      bongkar `CoreServices` menjadi pendaftaran per fitur. **Kabari sesi analisa gap sebelum
-      mulai**
+- [x] **PR 8 — facade:** ganti nama ke Inggris, pindah sesuai K-1, sesuaikan `modules/`
+- [ ] **PR 8b:** bongkar `CoreServices` menjadi pendaftaran per fitur (sengaja dipisah dari PR 8;
+      sampai saat itu sepuluh baris `CoreServices -> …Core` tetap di `ALLOWED`)
 - [ ] **PR 9 — Platform/Reporting,** setelah K-30 masuk main. **Kabari sesi analisa gap sebelum
       mulai**
 - [ ] **Penutup:** daftar pengecualian Boundary kosong. Perbarui `docs/dev` (peta kode, grand
@@ -193,7 +191,7 @@ Sesi "Analisa Gap Core ERP ke BC Phase 1" sedang memegang:
 - **Reporting**: `Support/Reporting/**`, `Http/Controllers/Reporting/**`, `resources/js/lib/reports.ts`,
   komponen dialog cetak. Perkiraan 1–2 hari untuk K-30
 - **Facade**: kontrak baru untuk katalog field tabel dan pengurai ekspresi filter, plus perubahan
-  `PenyediaLaporanModul`
+  `ModuleReportProvider`
 - `modules/apperp/management-aset/src/Reporting/**` dan `ui/laporan/**`
 
 PR 8 dan PR 9 menunggu pekerjaan itu masuk main. Sesi itu juga diminta tidak menambah import dari

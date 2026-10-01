@@ -2,8 +2,8 @@
 
 namespace App\Platform\Tenant\Console;
 
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Modules\Support\PengirimEventModul;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -82,7 +82,7 @@ class BackfillTenantProvisioningEvents extends Command
             // Tanpa pemancaran di sini, backfill hanya menghasilkan baris yang ditandai
             // terkirim tanpa ada yang menyiapkan data awalnya — tenant lama tetap kosong.
             $this->pengirim->kirim(
-                new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => $appIds]),
+                new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => $appIds]),
                 (string) $tenant->id,
             );
             $created++;

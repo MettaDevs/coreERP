@@ -17,7 +17,7 @@ use Symfony\Component\Yaml\Yaml;
  * permission, privilege, duty, referensi nomor, dan jenis workflow — boleh ditulis di sana, tetapi
  * module yang dikerjakan banyak orang menaruhnya di `manifest/`, satu berkas per fitur yang
  * dikelompokkan per area. Laporan tidak termasuk: katalognya dibaca dari definisi laporan module
- * lewat `PenyediaLaporanModul::catalog()`. Bentuknya meniru Business Central: `app.json` hanya memuat
+ * lewat `ModuleReportProvider::catalog()`. Bentuknya meniru Business Central: `app.json` hanya memuat
  * identitas, dan setiap objek adalah berkas sendiri di folder areanya. Tujuannya sama dengan
  * `routes/api/<fitur>.php`: orang yang mengerjakan fitur berbeda tidak menyunting berkas yang sama,
  * jadi merge mereka tidak bentrok.

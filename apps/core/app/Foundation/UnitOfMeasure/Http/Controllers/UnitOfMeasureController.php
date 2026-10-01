@@ -5,7 +5,7 @@ namespace App\Foundation\UnitOfMeasure\Http\Controllers;
 use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

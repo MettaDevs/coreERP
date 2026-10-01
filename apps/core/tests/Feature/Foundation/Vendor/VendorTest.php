@@ -5,9 +5,9 @@ namespace Tests\Feature\Foundation\Vendor;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\DaftarVendor;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -239,9 +239,9 @@ class VendorTest extends TestCase
         $this->actingAs($this->owner)->getJson('/api/v1/vendors/party-options?q=pemasok')->assertOk()
             ->assertJsonCount(0, 'data');
 
-        $daftar = app(DaftarVendor::class);
-        $this->assertNull($daftar->satu($this->membership->tenant_id, $vendorLain['id']));
-        $this->assertSame([], $daftar->aktif($this->membership->tenant_id, $leLain));
+        $daftar = app(VendorDirectory::class);
+        $this->assertNull($daftar->find($this->membership->tenant_id, $vendorLain['id']));
+        $this->assertSame([], $daftar->active($this->membership->tenant_id, $leLain));
     }
 
     public function test_kontrak_hanya_menawarkan_vendor_aktif_tetapi_tetap_membaca_yang_nonaktif(): void
@@ -250,16 +250,16 @@ class VendorTest extends TestCase
         $alkes = $this->buat(['party_name' => 'CV Alkes Jaya', 'status' => 'inactive'])->json('data');
         $this->buat(['party_name' => 'PT Sarana Farma'])->assertCreated();
         $tenant = $this->membership->tenant_id;
-        $daftar = app(DaftarVendor::class);
+        $daftar = app(VendorDirectory::class);
 
-        $this->assertSame(['VND-000001', 'VND-000003'], array_column($daftar->aktif($tenant, $this->le, 'sarana'), 'number'));
-        $this->assertSame(['VND-000001'], array_column($daftar->aktif($tenant, $this->le, 'VND-000001'), 'number'));
-        $this->assertSame([], $daftar->aktif($tenant, $this->le, 'alkes'));
+        $this->assertSame(['VND-000001', 'VND-000003'], array_column($daftar->active($tenant, $this->le, 'sarana'), 'number'));
+        $this->assertSame(['VND-000001'], array_column($daftar->active($tenant, $this->le, 'VND-000001'), 'number'));
+        $this->assertSame([], $daftar->active($tenant, $this->le, 'alkes'));
         $this->assertSame(
             ['id' => $alkes['id'], 'number' => 'VND-000002', 'name' => 'CV Alkes Jaya', 'tax_number' => null, 'status' => 'inactive', 'legal_entity_id' => $this->le],
-            $daftar->satu($tenant, $alkes['id']),
+            $daftar->find($tenant, $alkes['id']),
         );
-        $this->assertSame('PT Sarana Medika', $daftar->satu($tenant, $sarana['id'])['name'] ?? null);
+        $this->assertSame('PT Sarana Medika', $daftar->find($tenant, $sarana['id'])['name'] ?? null);
     }
 
     public function test_sinkron_updated_since_hanya_mengembalikan_yang_berubah_termasuk_ganti_nama(): void

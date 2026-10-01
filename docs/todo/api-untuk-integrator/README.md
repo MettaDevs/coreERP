@@ -20,7 +20,7 @@ itu diperiksa CI. Setengah yang lain belum — dan yang menghalangi bukan arsite
 | Kontrak OpenAPI per modul | `modules/<penerbit>/<module>/contracts/openapi.yaml` |
 | Izin per sumber daya | kode seperti `management-aset.group-aset.read` pada `app.yaml` |
 | Idempotensi | header `Idempotency-Key`, sudah dihormati jalur tulis |
-| Penyaringan tenant | `MilikTenant`, menjaga baca **dan** tulis |
+| Penyaringan tenant | `BelongsToTenant`, menjaga baca **dan** tulis |
 
 Jumlah rutenya dapat dilihat sendiri dengan `php artisan route:list --path=api/modules`; jangan
 menyalin angkanya ke dalam dokumen ini, karena ia bertambah tiap modul baru.

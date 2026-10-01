@@ -4,10 +4,10 @@ namespace App\Platform\Retention\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Retention\Support\RetentionPolicies;
 use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -42,7 +42,7 @@ final class HalamanModulController
      */
     private static ?array $menu = null;
 
-    public function __invoke(Request $request, KonteksPermintaan $akses, string $view): Response
+    public function __invoke(Request $request, RequestContext $akses, string $view): Response
     {
         $menu = self::menu();
 
@@ -57,7 +57,7 @@ final class HalamanModulController
         // Gagal menutup. Entri menu tanpa `permission` pada manifest tidak dianggap terbuka
         // untuk semua orang; ia dianggap salah tulis, dan layarnya ditutup sampai manifestnya
         // dibetulkan.
-        abort_unless($izin !== null && $akses->punyaIzin($izin), 403);
+        abort_unless($izin !== null && $akses->hasPermission($izin), 403);
 
         return Inertia::render('management-aset::Modul', [
             'view' => $view,
@@ -72,12 +72,12 @@ final class HalamanModulController
             // Izin dikirim bersama halaman, bukan diambil lewat permintaan kedua. Ini yang
             // menggantikan `ContextController`: layar tidak lagi menunggu satu perjalanan
             // jaringan sebelum tahu tombol mana yang boleh tampil.
-            'permissions' => $akses->izin(),
+            'permissions' => $akses->permissions(),
 
             'konteks' => [
                 'legal_entity_id' => $request->attributes->get('coreerp.legal_entity_id'),
                 'org_unit_id' => $request->attributes->get('coreerp.org_unit_id'),
-                'user_id' => $akses->penggunaId(),
+                'user_id' => $akses->userId(),
             ],
         ]);
     }

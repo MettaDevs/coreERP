@@ -82,7 +82,7 @@ class NoInternalHttpTest extends TestCase
             'percobaan ulang, token service yang tidak sinkron, dan 503 yang harus dijelaskan ke',
             'pengguna. Yang paling mahal: permintaan itu berjalan di luar transaksi database module,',
             'sehingga nomor yang sudah terbit tidak ikut batal ketika dokumennya gagal disimpan.',
-            'Pakai antarmuka di App\\Support\\Modules\\Contracts.',
+            'Pakai antarmuka di App\\Platform\\Modules\\Contracts.',
         ]));
     }
 
@@ -218,9 +218,9 @@ class NoInternalHttpTest extends TestCase
      * menempuh tiga dari empat jalur yang dulu HTTP, dalam satu permintaan berantai:
      *
      * 1. **Satuan** dibaca lewat `DaftarSatuanAset`, yang dulu memanggil direktori satuan Core.
-     * 2. **Nomor** diterbitkan lewat `PenerbitNomor` — dua kali, sekali untuk aset dan sekali
+     * 2. **Nomor** diterbitkan lewat `NumberSequenceIssuer` — dua kali, sekali untuk aset dan sekali
      *    untuk dokumen dekomisioning.
-     * 3. **Kalender fiskal** dibaca lewat `KalenderFiskal`. Ini yang paling mudah lolos diam-diam:
+     * 3. **Kalender fiskal** dibaca lewat `FiscalCalendarDirectory`. Ini yang paling mudah lolos diam-diam:
      *    module memang **menelan** kegagalannya dan jatuh kembali ke tahun kalender, tanpa satu
      *    pun kesalahan yang terlihat — hanya angka yang berbeda. Karena itu ia diperiksa lewat
      *    akibatnya. Profil berdasar tahun fiskal dengan konvensi setengah tahun menaruh tanggal

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Reporting\ModuleServices;
 
+use App\Platform\Modules\Contracts\ReportFormatter;
 use App\Platform\Reporting\Support\ValueFormats;
-use App\Support\Modules\Contracts\ReportFormatter;
 
 /**
  * Meneruskan pemformatan pratinjau laporan module ke aturan yang sama dengan renderer Core.

@@ -7,7 +7,7 @@ namespace Tests\Feature\Boundary;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Setiap model Eloquent milik module memakai `MilikTenant`.
+ * Setiap model Eloquent milik module memakai `BelongsToTenant`.
  *
  * Ini penjaga yang menjawab pertanyaan paling mahal pada penempatan gabungan: satu model yang
  * lupa disaring membocorkan data seluruh pelanggan, dan kebocoran itu tidak pernah gagal dengan
@@ -41,7 +41,7 @@ class ModelModuleMilikTenantTest extends TestCase
 
                 $diperiksa++;
 
-                if (preg_match('/\buse\s+MilikTenant\s*;/', $isi) !== 1) {
+                if (preg_match('/\buse\s+BelongsToTenant\s*;/', $isi) !== 1) {
                     $pelanggaran[] = $modul.'/'.basename($berkas);
                 }
             }
@@ -50,7 +50,7 @@ class ModelModuleMilikTenantTest extends TestCase
         $this->assertGreaterThan(0, $diperiksa, 'Tidak satu pun model module terbaca; pemindaiannya salah alamat.');
 
         $this->assertSame([], $pelanggaran, sprintf(
-            "Model module tidak memakai MilikTenant: %s\n".
+            "Model module tidak memakai BelongsToTenant: %s\n".
             'Model yang tidak tersaring membocorkan baris milik tenant lain pada penempatan gabungan, '.
             'dan kebocoran itu tidak gagal dengan sendirinya — ia tampak seperti daftar yang isinya '.
             'kebetulan banyak. Model dasar tidak cukup: yang tidak mewarisinya tidak ikut terjaga.',

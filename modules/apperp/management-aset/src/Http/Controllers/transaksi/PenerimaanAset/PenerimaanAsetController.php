@@ -2,11 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset;
 
-use App\Support\Modules\Contracts\DaftarVendor;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PresisiMataUang;
-use App\Support\Modules\Contracts\RowVersion;
-use App\Support\Modules\Contracts\SetelanPostingFinance;
+use App\Platform\Modules\Contracts\CurrencyRounding;
+use App\Platform\Modules\Contracts\FinancePostingSettings;
+use App\Platform\Modules\Contracts\PostingFeed;
+use App\Platform\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\VendorDirectory;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -124,11 +124,11 @@ class PenerimaanAsetController extends Controller
         $penerimaan->details = $this->baris($id);
         $tenant = $this->tenant($request);
         // Vendor milik Core: nomor dan namanya dibaca ulang, bukan disalin ke dokumen (K-06).
-        $vendor = $penerimaan->vendor_id === null ? null : app(DaftarVendor::class)->satu($tenant, (string) $penerimaan->vendor_id);
+        $vendor = $penerimaan->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $penerimaan->vendor_id);
         $penerimaan->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
         // Keadaan jurnalnya di feed posting finance, sesudah diselesaikan: perolehan, atau saldo awal.
         $penerimaan->posting = $penerimaan->status === PenerimaanStatus::SELESAI
-            ? app(PenerbitPosting::class)->status($tenant, AcquisitionPosting::postingId($id, (string) $penerimaan->cara_perolehan))
+            ? app(PostingFeed::class)->status($tenant, AcquisitionPosting::postingId($id, (string) $penerimaan->cara_perolehan))
             : null;
 
         return response()->json(['data' => $penerimaan], 200, ['ETag' => RowVersion::etag((int) $penerimaan->version)]);
@@ -465,7 +465,7 @@ class PenerimaanAsetController extends Controller
         foreach ($data['details'] as $detail) {
             $jumlah = (int) $detail['jumlah'];
             $aset += $jumlah;
-            $nilai = $nilai->plus(app(PresisiMataUang::class)->bulatkan($tenant, (string) BigDecimal::of((string) $detail['nilai_per_unit'])->multipliedBy($jumlah), (string) $data['currency_code']));
+            $nilai = $nilai->plus(app(CurrencyRounding::class)->roundAmount($tenant, (string) BigDecimal::of((string) $detail['nilai_per_unit'])->multipliedBy($jumlah), (string) $data['currency_code']));
             $akumulasi = $akumulasi->plus(BigDecimal::of((string) $detail['akumulasi_per_unit'])->multipliedBy($jumlah));
         }
 
@@ -507,7 +507,7 @@ class PenerimaanAsetController extends Controller
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
-        return response()->json(['data' => app(DaftarVendor::class)->aktif($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
+        return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
     }
 
     /**
@@ -841,7 +841,7 @@ class PenerimaanAsetController extends Controller
         // dikalikan saat jurnal disusun adalah angka yang diketik.
         $mataUang = strtoupper((string) $data['currency_code']);
         try {
-            $desimal = app(PresisiMataUang::class)->hargaSatuan($this->tenant($request), $mataUang);
+            $desimal = app(CurrencyRounding::class)->unitAmountDecimals($this->tenant($request), $mataUang);
         } catch (RuntimeException $kegagalan) {
             throw ValidationException::withMessages(['currency_code' => $kegagalan->getMessage()]);
         }
@@ -887,14 +887,14 @@ class PenerimaanAsetController extends Controller
                     $pesan[$kolom] = 'Saldo awal tidak punya vendor maupun faktur; kosongkan isian ini.';
                 }
             }
-            $cutover = app(SetelanPostingFinance::class)->cutover((string) $data['legal_entity_id']);
+            $cutover = app(FinancePostingSettings::class)->cutover((string) $data['legal_entity_id']);
             $masalah = $cutover === null ? null : AcquisitionPosting::masalahCutover((string) $data['tanggal'], $cutover);
             if ($masalah !== null) {
                 $pesan['tanggal'] = $masalah;
             }
         }
 
-        $desimal = app(PresisiMataUang::class)->nilai($this->tenant($request), strtoupper((string) $data['currency_code']));
+        $desimal = app(CurrencyRounding::class)->amountDecimals($this->tenant($request), strtoupper((string) $data['currency_code']));
         $bukuGroup = [];
         foreach ($data['details'] as $indeks => $detail) {
             $kunci = 'details.'.$indeks.'.';
@@ -981,7 +981,7 @@ class PenerimaanAsetController extends Controller
         if (($data['vendor_id'] ?? null) === null) {
             return;
         }
-        $vendor = app(DaftarVendor::class)->satu($this->tenant($request), (string) $data['vendor_id']);
+        $vendor = app(VendorDirectory::class)->find($this->tenant($request), (string) $data['vendor_id']);
         if ($vendor === null || $vendor['legal_entity_id'] !== $data['legal_entity_id']) {
             throw ValidationException::withMessages(['vendor_id' => 'Pilih vendor milik entitas legal penerimaan ini.']);
         }

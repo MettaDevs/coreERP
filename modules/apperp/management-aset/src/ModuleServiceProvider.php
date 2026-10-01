@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
-use App\Support\Modules\Contracts\AttachmentRecordTypes;
-use App\Support\Modules\Contracts\ChangeLogValueResolvers;
-use App\Support\Modules\Contracts\DaftarLaporan;
-use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
-use App\Support\Modules\Contracts\ListExportSources;
-use App\Support\Modules\Contracts\PostingAccountResolvers;
-use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Platform\Modules\Contracts\AttachmentRecordTypes;
+use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
+use App\Platform\Modules\Contracts\ListExportSources;
+use App\Platform\Modules\Contracts\ModuleReportProviders;
+use App\Platform\Modules\Contracts\PostingAccountResolvers;
+use App\Platform\Modules\Contracts\TenantProvisioned;
+use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -101,7 +101,7 @@ final class ModuleServiceProvider extends ServiceProvider
         // Laporan module dibaca mesin laporan Core langsung di dalam proses ini. Tanpa
         // pendaftaran ini Core tidak tahu module punya laporan, dan ia jatuh ke jalur HTTP
         // lama — alamat yang sudah tidak ada.
-        $this->app->make(DaftarLaporan::class)->daftarkan($this->app->make(PenyediaLaporan::class));
+        $this->app->make(ModuleReportProviders::class)->register($this->app->make(PenyediaLaporan::class));
 
         // Ekspor daftar di layar lewat antrean ekspor Core (K-27): register aset sebagai pilot. Core meminta
         // barisnya ke sini dengan hak dan kebijakan data yang sama dengan layar Inventarisasi aset.
@@ -129,11 +129,11 @@ final class ModuleServiceProvider extends ServiceProvider
         // Keputusan persetujuan tidak lagi datang sebagai permintaan HTTP. Listener ini
         // berjalan di dalam transaksi keputusan Core, jadi dokumen dan instance workflow
         // berpindah status bersama-sama.
-        Event::listen(KeputusanWorkflowDiambil::class, TerapkanKeputusanDekomisioning::class);
+        Event::listen(WorkflowDecisionTaken::class, TerapkanKeputusanDekomisioning::class);
 
         // Tenant baru: sama, arah masuk. Berjalan di dalam transaksi pendaftaran usaha,
         // sehingga tenant yang tersimpan pasti sudah punya data awalnya.
-        Event::listen(TenantDisiapkan::class, SiapkanDataAwalTenant::class);
+        Event::listen(TenantProvisioned::class, SiapkanDataAwalTenant::class);
 
         $this->app->booted(function (): void {
             // Grup `web` diperlukan, bukan pilihan gaya: konteks module dibaca dari sesi Core

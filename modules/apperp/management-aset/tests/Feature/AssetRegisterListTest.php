@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -63,7 +63,7 @@ class AssetRegisterListTest extends TestCase
      */
     private function bound(callable $call): mixed
     {
-        return app(PelaksanaUntukTenant::class)->jalankanUntuk($this->tenantId, $call);
+        return app(TenantRunner::class)->runFor($this->tenantId, $call);
     }
 
     /**

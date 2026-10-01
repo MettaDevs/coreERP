@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\MesinWorkflow;
+use App\Platform\Modules\Contracts\RequestContext;
+use App\Platform\Modules\Contracts\WorkflowEngine;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -33,8 +33,8 @@ class PersetujuanAset
     private const TIPE_DEKOMISIONING = 'management-aset.dekomisioning-aset-verification';
 
     public function __construct(
-        private readonly MesinWorkflow $mesin,
-        private readonly KonteksPermintaan $konteks,
+        private readonly WorkflowEngine $mesin,
+        private readonly RequestContext $konteks,
     ) {}
 
     /**
@@ -49,11 +49,11 @@ class PersetujuanAset
     public function ajukanDekomisioning(string $tenantId, string $legalEntityId, string $kunciIdempoten, string $documentId, string $asetId): string
     {
         try {
-            $hasil = $this->mesin->ajukan(
+            $hasil = $this->mesin->submit(
                 $tenantId,
                 'management-aset',
                 self::TIPE_DEKOMISIONING,
-                $this->konteks->penggunaId(),
+                $this->konteks->userId(),
                 $documentId,
                 'dekomisioning:'.$kunciIdempoten,
                 [

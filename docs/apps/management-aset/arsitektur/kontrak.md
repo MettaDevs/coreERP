@@ -52,7 +52,7 @@ yang dijalankan adalah pemeriksa milik Core atas `contracts/openapi-internal.yam
 Yang menggantikannya adalah batas permukaannya sendiri: rute `/api/v1/...` module hanya
 dipanggil UI module ini, di dalam proses dan repo yang sama, sehingga penyimpangan terlihat
 pada test module dan pada UI yang memanggilnya. Permukaan yang benar-benar melewati batas
-module tidak lagi berbentuk HTTP — ia kontrak PHP (`PenyediaLaporanModul`) dan event
+module tidak lagi berbentuk HTTP — ia kontrak PHP (`ModuleReportProvider`) dan event
 Laravel in-process.
 
 Rinciannya ada di `modules/apperp/management-aset/contracts/README.md`.

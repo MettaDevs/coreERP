@@ -13,12 +13,12 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\EnvironmentAddress;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Actions\InstallModule;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Modules\Support\AppDependencyGraph;
 use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Modules\Support\PengirimEventModul;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -295,7 +295,7 @@ class RegisterBusiness
                     // pemasangan, dan urutan nomor module dibuat — dan penyediaan data awal
                     // membutuhkan ketiganya.
                     app(PengirimEventModul::class)->kirim(
-                        new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
+                        new TenantProvisioned($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
                         (string) $tenant->id,
                     );
                 }

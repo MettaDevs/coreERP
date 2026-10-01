@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\PostingAccountResolver;
+use App\Platform\Modules\Contracts\PostingAccountResolver;
 use Modules\Apperp\ManagementAset\Models\master\AssetPostingGroup;
 
 /**

@@ -4,13 +4,13 @@ namespace App\Platform\Reporting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Reporting\Support\LayoutRef;
 use App\Platform\Reporting\Support\LayoutStore;
 use App\Platform\Reporting\Support\PrintIdentityStore;
 use App\Platform\Reporting\Support\ReportCatalog;
 use App\Platform\Reporting\Support\SumberLaporan;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

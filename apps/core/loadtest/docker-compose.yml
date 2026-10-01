@@ -4,7 +4,7 @@
 # dengan database, image, dan tiruan Core sendiri. Bentuk itu masuk akal ketika module masih
 # aplikasi berkontainer yang memanggil Core lewat HTTP. Ia tidak masuk akal lagi: module
 # dimuat runtime Core, memakai database yang sama, dan menerbitkan nomor lewat kontrak
-# `PenerbitNomor` di dalam proses yang sama. Yang ditiru `stub-core` karena itu tidak ada lagi
+# `NumberSequenceIssuer` di dalam proses yang sama. Yang ditiru `stub-core` karena itu tidak ada lagi
 # yang bisa ditiru, dan tiruannya dihapus pada F7-03 bersama compose keduanya.
 #
 # Yang tetap dipertahankan dari keduanya adalah satu-satunya hal yang tidak dapat dipalsukan

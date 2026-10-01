@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -28,8 +28,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class MaintenanceChecklistVariableValue extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     protected $table = 'aset_m_maintenance_checklist_variable_value';
 

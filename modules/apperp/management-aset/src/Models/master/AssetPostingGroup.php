@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * Padanan *FA Posting Groups* Business Central. Bukan master berkode: identitasnya pasangan
  * group aset dan `effective_from`.
  *
- * Setiap kolom akun menyimpan id daftar akun referensi milik Core (`DaftarAkun`), bukan nomornya,
+ * Setiap kolom akun menyimpan id daftar akun referensi milik Core (`AccountDirectory`), bukan nomornya,
  * supaya impor ulang daftar akun yang mengganti nomor atau nama tidak memutus pemetaan (K-05).
  *
  * @property string $id
@@ -39,8 +39,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class AssetPostingGroup extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
     use SoftDeletes;
 
     /**

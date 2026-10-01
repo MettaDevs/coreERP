@@ -79,7 +79,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
         $this->assertGreaterThan(0, $moduleDiperiksa, 'Tidak ada module yang diperiksa; penjaga ini akan lulus tanpa menguji apa pun.');
         $this->assertSame([], array_values(array_unique($pelanggaran)), implode("\n", [
             'Module menyentuh kelas Core di luar kontrak.',
-            'Satu-satunya permukaan yang boleh disebut module adalah App\\Support\\Modules\\Contracts.',
+            'Satu-satunya permukaan yang boleh disebut module adalah App\\Platform\\Modules\\Contracts.',
             'Butuh sesuatu yang belum ada di sana? Usulkan antarmuka baru; jangan mengambil jalan',
             'pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module akan ikut',
             'pecah tanpa peringatan.',
@@ -89,16 +89,25 @@ class ModuleNamespaceBoundaryTest extends TestCase
     public function test_pemeriksa_kelas_core_membedakan_kontrak_dari_kelas_biasa(): void
     {
         $contoh = implode("\n", [
-            'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
-            'use App\\Support\\Modules\\Contracts\\MilikTenant;',
+            'use App\\Platform\\Modules\\Contracts\\NumberSequenceIssuer;',
+            'use App\\Platform\\Modules\\Contracts\\BelongsToTenant;',
             'use App\\Platform\\Tenant\\Models\\Tenant;',
             'use App\\Platform\\Environment\\Support\\CurrentWorkspace;',
+            // Tetangga Contracts di fitur yang sama tetap kelas Core biasa.
+            'use App\\Platform\\Modules\\Support\\TenantScope;',
+            // Namespace kontrak sebelum pemindahan lapis-core (K-1) sudah tidak berlaku.
+            'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
         ]);
 
         $this->assertSame(
-            ['App\\Platform\\Environment\\Support\\CurrentWorkspace', 'App\\Platform\\Tenant\\Models\\Tenant'],
+            [
+                'App\\Platform\\Environment\\Support\\CurrentWorkspace',
+                'App\\Platform\\Modules\\Support\\TenantScope',
+                'App\\Platform\\Tenant\\Models\\Tenant',
+                'App\\Support\\Modules\\Contracts\\PenerbitNomor',
+            ],
             PemindaiModul::kelasCoreYangDisebut($contoh),
-            'Hanya isi Contracts yang boleh; model Core dan kelas Support lain tidak.',
+            'Hanya isi App\\Platform\\Modules\\Contracts yang boleh; model Core, kelas Support lain, dan namespace kontrak lama tidak.',
         );
     }
 

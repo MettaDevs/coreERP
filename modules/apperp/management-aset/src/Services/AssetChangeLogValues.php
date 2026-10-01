@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\ChangeLogValueResolver;
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\ChangeLogValueResolver;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
@@ -16,7 +16,7 @@ use Modules\Apperp\ManagementAset\Support\StatusAset;
  */
 final class AssetChangeLogValues implements ChangeLogValueResolver
 {
-    public function __construct(private readonly DirektoriOrganisasi $organisasi) {}
+    public function __construct(private readonly OrganizationDirectory $organisasi) {}
 
     public function table(): string
     {
@@ -29,7 +29,7 @@ final class AssetChangeLogValues implements ChangeLogValueResolver
             'lifecycle_state' => array_intersect_key(StatusAset::LABELS, array_flip($values)),
             'lokasi_aset_id' => $this->names(LokasiAset::withTrashed()->whereIn('id', $values)->get(['id', 'nama'])->all()),
             'kondisi_aset_id' => $this->names(KondisiAset::withTrashed()->whereIn('id', $values)->get(['id', 'nama'])->all()),
-            'responsible_org_unit_id' => collect($this->organisasi->unitOperasi($tenantId))
+            'responsible_org_unit_id' => collect($this->organisasi->operatingUnits($tenantId))
                 ->whereIn('id', $values)->pluck('nama', 'id')->map(fn ($nama): string => (string) $nama)->all(),
             default => [],
         };

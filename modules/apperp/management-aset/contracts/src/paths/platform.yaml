@@ -77,7 +77,7 @@
     summary: Unit kerja tenant milik Core, untuk dropdown yang menampilkan nama
     description: |
       Modul menyimpan id unit kerja sebagai teks opaque dan tidak pernah menanyakannya
-      ke database Core; daftar ini dibaca lewat kontrak `DirektoriOrganisasi` di dalam
+      ke database Core; daftar ini dibaca lewat kontrak `OrganizationDirectory` di dalam
       proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
 
       Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau

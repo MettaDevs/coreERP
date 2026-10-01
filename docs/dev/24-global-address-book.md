@@ -55,7 +55,7 @@ Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed p
 - Menyimpan vendor baru menulis party (bila baru), akun vendor, dan baris `party_role_registrations` berperan `vendor` dengan `owning_app_id = core` dalam satu transaksi.
 - Satu party paling banyak satu vendor per legal entity; database menolak yang kedua.
 - Nomor dari reference `core.vendor` ([Number sequences](14-number-sequences.md#reference-milik-core-sendiri)); nomor dan legal entity tidak dapat diubah sesudah disimpan.
-- Module membaca vendor lewat kontrak `DaftarVendor`, sistem di luar CoreERP lewat `GET /api/internal/v1/vendors` dengan token klien integrasi.
+- Module membaca vendor lewat kontrak `VendorDirectory`, sistem di luar CoreERP lewat `GET /api/internal/v1/vendors` dengan token klien integrasi.
 
 ## Yang belum ada
 

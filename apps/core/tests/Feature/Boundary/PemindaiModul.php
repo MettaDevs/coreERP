@@ -219,7 +219,7 @@ final class PemindaiModul
      * **Test juga tidak, dan alasannya berbeda dari migration.** Test menyemai baris untuk
      * tenant yang ditentukannya sendiri — termasuk tenant kedua, yang justru dipakai untuk
      * membuktikan data tenant pertama tidak bocor. Menyimpan baris itu lewat model dibatalkan
-     * `MilikTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
+     * `BelongsToTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
      * Menuntut test memakai model berarti membuat test isolasi tenant mustahil ditulis, yaitu
      * membuang penjagaan yang paling penting demi menegakkan aturannya.
      *
@@ -321,7 +321,7 @@ final class PemindaiModul
     public static function namespaceYangDisebut(string $isi): array
     {
         // Lookbehind-nya penting. Tanpa itu, pola ini juga cocok di tengah
-        // App\\Support\\Modules\\Contracts\\..., lalu membaca "Contracts" sebagai nama
+        // App\\Platform\\Modules\\Contracts\\..., lalu membaca "Contracts" sebagai nama
         // publisher — sebuah module yang tidak pernah ada. Yang dicari hanya `Modules` di
         // awal sebuah nama, bukan sebagai potongan di tengahnya. Nama yang diawali satu
         // garis miring — bentuk lengkap seperti \\Modules\\Apperp\\... — tetap ditangkap,
@@ -342,12 +342,15 @@ final class PemindaiModul
     /**
      * Kelas Core yang disebut sebuah isi berkas, kecuali yang memang dikontrakkan.
      *
-     * Yang diizinkan hanya `App\\Support\\Modules\\Contracts`, dan itu satu-satunya
+     * Yang diizinkan hanya `App\\Platform\\Modules\\Contracts`, dan itu satu-satunya
      * kalimat aturannya. Sebelumnya seluruh `App\\Support\\Modules` diizinkan supaya model
      * module bisa menyebut `TenantScope` — dan itu berarti kelas apa pun yang kelak ditaruh
      * di folder itu ikut boleh disentuh module, tanpa ada yang menahan dan tanpa ada yang
-     * memutuskan. Sekarang model memakai trait `MilikTenant` dan seeder mewarisi
-     * `SeederModule`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
+     * memutuskan. Sekarang model memakai trait `BelongsToTenant` dan seeder mewarisi
+     * `TenantSeeder`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
+     *
+     * Namespace lama `App\\Support\\Modules\\Contracts` (sampai pemindahan lapis-core, K-1)
+     * tidak lagi diizinkan: yang dicocokkan adalah awalan baru, bukan kata `Contracts`.
      *
      * @return list<string>
      */
@@ -360,7 +363,7 @@ final class PemindaiModul
         foreach ($cocok[0] as $nama) {
             $rapi = str_replace('\\\\', '\\', $nama);
 
-            if (str_starts_with($rapi, 'App\\Support\\Modules\\Contracts\\')) {
+            if (str_starts_with($rapi, 'App\\Platform\\Modules\\Contracts\\')) {
                 continue;
             }
 

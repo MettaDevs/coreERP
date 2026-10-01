@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\AttachmentRecordType;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\KonteksPermintaan;
+use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Apperp\HumanResources\Models\Worker;
 
@@ -48,7 +48,7 @@ final class WorkerAttachments implements AttachmentRecordType
     public function canChange(string $tenantId, string $recordId): bool
     {
         return $this->visible($recordId)
-            && app(KonteksPermintaan::class)->punyaIzin('human-resources.workers.create');
+            && app(RequestContext::class)->hasPermission('human-resources.workers.create');
     }
 
     public function hasLine(string $tenantId, string $recordId, int $lineNumber): bool
@@ -59,13 +59,13 @@ final class WorkerAttachments implements AttachmentRecordType
     /** Pengguna boleh melihat pekerja dan pekerja itu berada di lingkup unit kerjanya. */
     private function visible(string $recordId): bool
     {
-        $context = app(KonteksPermintaan::class);
-        if (! $context->punyaIzin('human-resources.workers.read')) {
+        $context = app(RequestContext::class);
+        if (! $context->hasPermission('human-resources.workers.read')) {
             return false;
         }
 
         $query = Worker::query()->whereKey($recordId);
-        $scope = $context->kebijakanData()[self::POLICY_CODE] ?? null;
+        $scope = $context->dataPolicies()[self::POLICY_CODE] ?? null;
         if (! is_array($scope) || ($scope['all'] ?? false) !== true) {
             $units = $this->operatingUnitIds(is_array($scope) ? ($scope['scope_grants'] ?? null) : null);
             $query->whereHas('assignments', function (Builder $assignment) use ($units): void {

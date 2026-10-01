@@ -3,7 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -245,8 +245,8 @@ class AssetPostingGroupTest extends TestCase
         $this->simpan($group, '2026-01-01', $this->wajib())->assertCreated();
         $this->simpan($group, '2026-07-01', [...$this->wajib(), 'acquisition_account_id' => $this->akun['ppn']])->assertCreated();
         $akun = app(AssetPostingAccounts::class);
-        $berlaku = fn (string $tanggal): ?AssetPostingGroup => $this->app->make(PelaksanaUntukTenant::class)
-            ->jalankanUntuk($this->tenantId, fn (): ?AssetPostingGroup => $akun->effective($group, $tanggal));
+        $berlaku = fn (string $tanggal): ?AssetPostingGroup => $this->app->make(TenantRunner::class)
+            ->runFor($this->tenantId, fn (): ?AssetPostingGroup => $akun->effective($group, $tanggal));
 
         $this->assertNull($berlaku('2025-12-31'));
         $this->assertSame('2026-01-01', $berlaku('2026-01-01')?->effective_from->toDateString());
@@ -255,8 +255,8 @@ class AssetPostingGroupTest extends TestCase
         $this->assertNotNull($juli);
         $this->assertSame('2026-07-01', $juli->effective_from->toDateString());
         // Tenant lain tidak pernah membaca posting group tenant ini.
-        $this->assertNull($this->app->make(PelaksanaUntukTenant::class)
-            ->jalankanUntuk($this->buatTenantUji(), fn (): ?AssetPostingGroup => $akun->effective($group, '2026-07-01')));
+        $this->assertNull($this->app->make(TenantRunner::class)
+            ->runFor($this->buatTenantUji(), fn (): ?AssetPostingGroup => $akun->effective($group, '2026-07-01')));
 
         foreach (AcquisitionMethod::ALL as $cara) {
             $this->assertSame($this->akun['ppn'], $akun->acquisitionAccount($juli, $cara));

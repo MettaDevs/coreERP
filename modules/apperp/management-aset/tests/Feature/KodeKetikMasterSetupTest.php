@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Platform\Modules\Contracts\TenantRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -111,7 +111,7 @@ class KodeKetikMasterSetupTest extends TestCase
 
     public function test_buku_starter_mendapat_kode_ketik_dan_master_lain_tetap_bernomor(): void
     {
-        $this->app->make(PelaksanaUntukTenant::class)->jalankanUntuk(
+        $this->app->make(TenantRunner::class)->runFor(
             $this->tenantId,
             fn (): array => $this->app->make(ProvisionIndonesiaStarterData::class)->forTenant($this->tenantId),
         );

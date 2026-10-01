@@ -16,7 +16,7 @@ Sejak 24 September 2026 modul aset menerbitkan `asset.acquisition` setiap kali p
 module                              Core                                   pembaca
 ──────                              ────                                   ───────
 simpan dokumen ──┐
-                 └─▶ PenerbitPosting ─▶ finance_postings ─── pull ─────────▶ aplikasi finance
+                 └─▶ PostingFeed ─▶ finance_postings ─── pull ─────────▶ aplikasi finance
                      (transaksi         held · pending ·    atau push
                       dokumen itu)      manual
                                         posted · rejected ◀──── ack ────────
@@ -30,11 +30,11 @@ Posting ditulis di dalam transaksi database dokumen sumbernya. Dokumen yang bata
 | --- | --- |
 | `posting_id` dan `id` | `posting_id` dipilih module, tetap untuk satu dokumen sumber, unik per tenant, dan menjadi kunci idempotensi di Core maupun di pembaca. `id` adalah ULID baris; di luar database ia hanya dipakai layar pantau. Rute ack memakai `posting_id`; rute layar pantau memakai `id`. |
 | `payload` dan `input` | `payload` adalah bentuk kontrak persis seperti yang disajikan ke pembaca. `input` adalah permintaan asli module, disimpan supaya posting yang tertahan dapat dibentuk ulang dari sumber yang sama. `source_document.url` dan `mapping` hanya ada di `input`. |
-| Exception dan `held` | Jurnal yang tidak mungkin benar — tidak seimbang, satu baris berisi debit sekaligus kredit, nilai lebih halus dari presisi mata uang — adalah bug penerbit: `PostingTidakSah` dilempar dan dokumennya batal. Pemetaan yang belum lengkap bukan bug: posting tetap terbit sebagai `held` dan dokumennya tetap tersimpan. |
+| Exception dan `held` | Jurnal yang tidak mungkin benar — tidak seimbang, satu baris berisi debit sekaligus kredit, nilai lebih halus dari presisi mata uang — adalah bug penerbit: `InvalidPosting` dilempar dan dokumennya batal. Pemetaan yang belum lengkap bukan bug: posting tetap terbit sebagai `held` dan dokumennya tetap tersimpan. |
 | `held`, `manual`, `rejected` | Ketiganya tidak disajikan ke pembaca, tetapi yang memutuskan berbeda. `held` diputuskan Core karena pemetaan. `manual` diputuskan Core karena cutover atau feed mati, atau diputuskan pengguna. `rejected` diputuskan pembaca. |
 | Disajikan dan di-ack | `served_count` hanya menghitung berapa kali posting ikut jawaban pull. Pembaca yang melakukan pull belum tentu membukukan. Yang mengakhiri posting hanya ack. |
 | Terkirim dan di-ack (mode push) | Jawaban 2xx tanpa body ack berarti terkirim. Posting tetap `pending` sampai di-ack lewat API. |
-| Mode untuk transaksi baru dan mode koreksi | Posting baru memakai mode yang dipilih module dari `SetelanPostingFinance::modePenyelesaian()` pada tanggal dokumennya. Koreksi dan pembalikan mewarisi mode posting asalnya, walaupun setelan entitas legal sudah berganti (K-10). |
+| Mode untuk transaksi baru dan mode koreksi | Posting baru memakai mode yang dipilih module dari `FinancePostingSettings::settlementMode()` pada tanggal dokumennya. Koreksi dan pembalikan mewarisi mode posting asalnya, walaupun setelan entitas legal sudah berganti (K-10). |
 
 ## Status
 
@@ -110,11 +110,11 @@ Tabel lain yang dibaca penerbit:
 | `finance_posting_settings` | Feed aktif dan tanggal cutover per entitas legal |
 | `currency_precisions` | Jumlah desimal nilai per mata uang. IDR punya bawaan di `MoneyPrecision::DEFAULTS`. |
 
-`finance_settlement_modes` tidak dibaca penerbit untuk posting baru. Module yang membacanya lewat kontrak `SetelanPostingFinance`, lalu mengirim `settlement_mode` dan `requires_vendor`.
+`finance_settlement_modes` tidak dibaca penerbit untuk posting baru. Module yang membacanya lewat kontrak `FinancePostingSettings`, lalu mengirim `settlement_mode` dan `requires_vendor`.
 
 ## Endpoint dan hak akses
 
-Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PenerbitPosting`, di dalam proses yang sama.
+Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PostingFeed`, di dalam proses yang sama.
 
 | Endpoint | Guna | Penjaga |
 | --- | --- | --- |
@@ -139,15 +139,15 @@ Kenapa dibagi begitu:
 
 ## Penerbit dan urutan pemeriksaannya
 
-Semua posting lahir di `PostingPublisher`. Kontrak `PenerbitPosting` meneruskan ke kelas itu, begitu juga validasi ulang dan penilaian ulang cutover, supaya pratinjau di layar module dan posting yang benar-benar terbit tidak pernah diperiksa dengan cara berbeda.
+Semua posting lahir di `PostingPublisher`. Kontrak `PostingFeed` meneruskan ke kelas itu, begitu juga validasi ulang dan penilaian ulang cutover, supaya pratinjau di layar module dan posting yang benar-benar terbit tidak pernah diperiksa dengan cara berbeda.
 
-**`terbitkan()` harus dipanggil di dalam transaksi dokumen sumbernya.** Di luar transaksi ia melempar `LogicException`. Ia tidak membuka transaksi sendiri, sehingga dokumen yang batal membawa postingnya ikut batal. Penyimpanannya berjalan di dalam SAVEPOINT (transaksi bersarang): bentrokan `posting_id` dengan permintaan lain yang menyimpan bersamaan tidak boleh membatalkan transaksi dokumen pemanggil, karena PostgreSQL membatalkan seluruh transaksi pada kesalahan pertama.
+**`publish()` harus dipanggil di dalam transaksi dokumen sumbernya.** Di luar transaksi ia melempar `LogicException`. Ia tidak membuka transaksi sendiri, sehingga dokumen yang batal membawa postingnya ikut batal. Penyimpanannya berjalan di dalam SAVEPOINT (transaksi bersarang): bentrokan `posting_id` dengan permintaan lain yang menyimpan bersamaan tidak boleh membatalkan transaksi dokumen pemanggil, karena PostgreSQL membatalkan seluruh transaksi pada kesalahan pertama.
 
 Pemeriksaannya berlapis, dan urutannya disengaja:
 
 | Lapis | Gagal berarti | Akibatnya |
 | --- | --- | --- |
-| 1. Bentuk | Jurnal yang tidak mungkin benar, apa pun pemetaannya | `PostingTidakSah` dilempar. Dokumen sumber ikut batal. |
+| 1. Bentuk | Jurnal yang tidak mungkin benar, apa pun pemetaannya | `InvalidPosting` dilempar. Dokumen sumber ikut batal. |
 | 2. Cutover | Posting ini tidak boleh dikirim | Terbit sebagai `manual` |
 | 3. Pemetaan | Akun atau dimensi belum dapat dibentuk | Terbit sebagai `held`, dengan masalah per baris |
 
@@ -161,7 +161,7 @@ Pemeriksaannya berlapis, dan urutannya disengaja:
 - `posting_date` dan `document_date` persis `Y-m-d`; `occurred_at` wajib membawa offset zona waktu (K-21).
 - `source_document.module` dan `source_document.type` terisi. `source_document.url`, bila ada, harus jalur di dalam aplikasi yang diawali satu `/`: tautan ke host lain dari data posting akan menjadi pintu pengalihan ke luar CoreERP.
 - Paling banyak satu dari `reverses_posting_id` dan `adjusts_posting_id`. Posting asalnya harus ada di entitas legal yang sama. Mode yang kosong diwarisi dari posting asal; mode yang berbeda dari posting asal ditolak (K-10).
-- `vendor_id` adalah vendor entitas legal yang sama, dan `requires_vendor: true` tanpa vendor ditolak. Layar module yang memilih vendor per entitas legal dan mewajibkannya, jadi vendor kosong atau salah entitas yang sampai ke penerbit adalah bug module, bukan keadaan yang diserahkan ke pengguna. Status vendor tidak diperiksa: memilih vendor aktif adalah tugas layar module lewat `DaftarVendor::aktif()`.
+- `vendor_id` adalah vendor entitas legal yang sama, dan `requires_vendor: true` tanpa vendor ditolak. Layar module yang memilih vendor per entitas legal dan mewajibkannya, jadi vendor kosong atau salah entitas yang sampai ke penerbit adalah bug module, bukan keadaan yang diserahkan ke pengguna. Status vendor tidak diperiksa: memilih vendor aktif adalah tugas layar module lewat `VendorDirectory::active()`.
 - `lines` berisi sedikitnya dua baris dan paling banyak `PostingPublisher::MAX_LINES`. Jurnal yang lebih panjang harus diringkas, seperti posting penyusutan yang diringkas per group aset dan dimensi (K-14, K-30).
 - Nilai debit dan kredit adalah string desimal tanpa tanda dan tanpa pemisah ribuan. Bilangan bulat PHP diterima; float tidak. Setiap baris berisi tepat satu sisi yang tidak nol. Nilai negatif tidak ada: arah jurnal dibawa sisinya, jadi selisih negatif ditulis di sisi sebaliknya.
 - Nilai tidak boleh lebih halus dari presisi mata uang. Nilai yang lebih kasar dilengkapi nolnya — `"500000000"` menjadi `"500000000.00"` pada presisi dua.
@@ -170,7 +170,7 @@ Pemeriksaannya berlapis, dan urutannya disengaja:
 
 **Kenapa exception, bukan `held`.** Jurnal yang tidak seimbang adalah bug penerbit (K-22). Menyerahkannya ke pengguna berarti menyuruh orang mencari selisih yang dibuat kode. Exception membatalkan dokumen dan sampai ke SigNoz lewat [pelapor kesalahan](28-pelaporan-kesalahan.md) biasa.
 
-**Kenapa nilai yang terlalu halus ditolak, bukan dibulatkan.** Aturannya K-20: nilai dibulatkan **di sumber, per baris**, lewat `PresisiMataUang`, lalu jurnal disusun dari nilai yang sudah bulat sehingga seimbang dengan sendirinya. Sistem lama tidak pernah seimbang karena front office menyimpan lebih banyak desimal daripada finance. Membulatkan diam-diam di Core akan menyembunyikan selisih yang sama.
+**Kenapa nilai yang terlalu halus ditolak, bukan dibulatkan.** Aturannya K-20: nilai dibulatkan **di sumber, per baris**, lewat `CurrencyRounding`, lalu jurnal disusun dari nilai yang sudah bulat sehingga seimbang dengan sendirinya. Sistem lama tidak pernah seimbang karena front office menyimpan lebih banyak desimal daripada finance. Membulatkan diam-diam di Core akan menyembunyikan selisih yang sama.
 
 ### Lapis 2: cutover
 
@@ -223,7 +223,7 @@ Kuncinya `(tenant_id, posting_id)`. `publish()` mencari `posting_id` itu lebih d
 
 - **Belum ada** → posting baru.
 - **Sudah ada dengan `input_hash` yang sama** → posting yang ada dikembalikan apa adanya, dengan `created: false` dan `published_at` yang lama.
-- **Sudah ada dengan `input_hash` berbeda** → `PostingTidakSah`. Dokumen yang sudah terbit dikoreksi lewat posting koreksi, bukan diterbitkan ulang dengan isi lain.
+- **Sudah ada dengan `input_hash` berbeda** → `InvalidPosting`. Dokumen yang sudah terbit dikoreksi lewat posting koreksi, bukan diterbitkan ulang dengan isi lain.
 
 Dua permintaan yang menyimpan `posting_id` yang sama bersamaan diselesaikan indeks unik: yang kalah menangkap `UniqueConstraintViolationException` di dalam SAVEPOINT-nya, membaca posting pemenang, lalu membandingkan hash yang sama.
 
@@ -231,7 +231,7 @@ Dua permintaan yang menyimpan `posting_id` yang sama bersamaan diselesaikan inde
 
 Akibatnya: menerbitkan ulang dengan deskripsi atau `details` yang berbeda mengembalikan posting lama tanpa memperbaruinya. Teks penjelas yang berubah tidak boleh menghasilkan jurnal kedua, dan juga tidak mengubah jurnal yang mungkin sudah di-pull pembaca.
 
-`pratinjau()` mengikuti aturan yang sama: `posting_id` yang sudah terbit mengembalikan posting yang ada, dan isi berbeda tetap dilempar.
+`preview()` mengikuti aturan yang sama: `posting_id` yang sudah terbit mengembalikan posting yang ada, dan isi berbeda tetap dilempar.
 
 Di sisi pembaca, idempotensinya `UNIQUE(posting_id)`. Posting yang sama bisa sampai lebih dari sekali — disajikan ulang pada setiap pull, atau dikirim ulang setelah jawaban yang hilang — dan menerimanya lagi tidak boleh menghasilkan jurnal kedua.
 
@@ -243,7 +243,7 @@ Di sisi pembaca, idempotensinya `UNIQUE(posting_id)`. Posting yang sama bisa sam
 - Posting dibentuk ulang dari `input` yang tersimpan, lewat `normalize()` dan `evaluate()` yang sama dengan penerbitan. `posting_id` dan `published_at` tetap; baris jurnal di `finance_posting_lines` ditulis ulang.
 - Hasilnya bisa `pending`, tetap `held` dengan daftar masalah yang diperbarui, atau `manual` bila setelan feed sudah berubah.
 - Karena seluruh masukan dinormalkan ulang, yang dibaca ulang bukan hanya akun, dimensi, dan cutover, tetapi juga kode entitas legal dan salinan vendor. Presisinya tidak: posting dibentuk ulang dengan `currency_decimals` miliknya, presisi saat ia terbit, karena perubahan presisi mata uang hanya berlaku untuk posting berikutnya (K-20).
-- Masukan yang dulu sah bisa kini ditolak — misalnya vendornya sudah diarsipkan. Controller melaporkan `PostingTidakSah` itu ke pemantauan kesalahan, lalu menjawab 422 "Posting ini tidak dapat dibentuk ulang".
+- Masukan yang dulu sah bisa kini ditolak — misalnya vendornya sudah diarsipkan. Controller melaporkan `InvalidPosting` itu ke pemantauan kesalahan, lalu menjawab 422 "Posting ini tidak dapat dibentuk ulang".
 - Perubahannya ditulis di dalam kunci baris (`lockForUpdate`). Posting yang di antaranya sudah `posted` atau `rejected`, yang sudah sampai ke pembaca, atau yang baru ditandai manual oleh pengguna, dibiarkan. Posting dipilih sebelum dikunci, jadi tanda pengguna yang jatuh di antaranya hanya terlihat di dalam kunci.
 - Peristiwa `revalidated` dicatat bersama penggunanya.
 - **Akun dibaca ulang dari pemetaan module**, bukan hanya dari masukan yang tersimpan. Baris yang membawa `mapping.reference` menanyakan akunnya ke module pemilik dokumen sumber lewat `PostingAccountResolver`, yang didaftarkan module ke `PostingAccountResolvers` saat boot. Tanpa itu, posting yang tertahan karena pemetaannya dulu kosong (`ACCOUNT_NOT_MAPPED`) tidak pernah lepas: masukan yang tersimpan tetap menyebut akun kosong walaupun posting group sudah diisi. Hanya akun yang dibaca ulang; nilai, unit, dan susunan baris tetap. Masukan dan hash-nya ikut diperbarui, supaya module yang menerbitkan ulang dokumen yang sama dengan pemetaan terbaru mendapat posting yang sama, bukan penolakan "isi jurnal berbeda". Pemeta yang gagal dilaporkan ke pemantauan kesalahan dan baris itu memakai akun yang tersimpan. Padanannya source document framework F&O: distribusi akuntansi diturunkan ulang dari setelan yang berlaku selama jurnalnya belum ditransfer.
@@ -273,7 +273,7 @@ Yang tidak pernah dipilih: `posted`, `rejected`, `manual` dengan `manual_reason 
 
 Untuk setiap posting yang dipilih: feed mati → `manual` dengan `feed_disabled`; sebelum cutover → `manual` dengan `before_cutover`; selain itu posting yang bukan `pending` dibentuk ulang seperti validasi ulang, sehingga menjadi `pending` atau `held`. Posting `pending` yang tetap sah dibiarkan, termasuk `payload`-nya. Setiap posting yang dibentuk ulang atau dijadikan manual dicatat sebagai peristiwa `cutover_reevaluated`; `meta.reevaluated_postings` hanya menghitung yang statusnya berubah.
 
-Setelan disimpan lebih dulu, lalu penilaian ulang berjalan per posting, masing-masing dalam transaksinya sendiri — bukan satu transaksi bersama setelannya. Posting yang gagal dibentuk ulang (`PostingTidakSah`, misalnya vendornya sudah diarsipkan) dilaporkan ke pemantauan kesalahan dan dibiarkan di statusnya, dan penilaian ulang lanjut ke posting berikutnya.
+Setelan disimpan lebih dulu, lalu penilaian ulang berjalan per posting, masing-masing dalam transaksinya sendiri — bukan satu transaksi bersama setelannya. Posting yang gagal dibentuk ulang (`InvalidPosting`, misalnya vendornya sudah diarsipkan) dilaporkan ke pemantauan kesalahan dan dibiarkan di statusnya, dan penilaian ulang lanjut ke posting berikutnya.
 
 ## Ack dan konflik
 
@@ -386,33 +386,33 @@ Satu endpoint melayani semua jenis (K-23). Menambah jenis tidak membutuhkan tabe
 
 ### 2. Susun masukan di pembungkus sisi module
 
-Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, seperti `modules/apperp/management-aset/src/Services/AcquisitionPosting.php` untuk penerimaan aset: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `PostingTidakSah` menjadi pesan untuk pengguna (TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php`. Yang perlu diperhatikan:
+Buat satu kelas di module yang memegang kontrak `PostingFeed`, seperti `modules/apperp/management-aset/src/Services/AcquisitionPosting.php` untuk penerimaan aset: kelas itu menyusun masukan dari dokumen module dan menerjemahkan `InvalidPosting` menjadi pesan untuk pengguna (TODO 9.7), sehingga pemanggil di module tidak menyentuh bentuk kontrak secara langsung. Bentuk masukan lengkapnya ada di docblock `apps/core/app/Platform/Modules/Contracts/PostingFeed.php`. Yang perlu diperhatikan:
 
-- **`tenant_id`** dari `KonteksTenant::tenantId()`, tidak pernah dari permintaan.
+- **`tenant_id`** dari `TenantContext::tenantId()`, tidak pernah dari permintaan.
 - **`posting_id` deterministik dari dokumen sumbernya**, misalnya kode singkat jenisnya ditambah id dokumen, seperti `AST-ACQ-…` pada contoh kontrak. Menyelesaikan dokumen yang sama dua kali harus menghasilkan `posting_id` yang sama, supaya idempotensi bekerja. Proses yang boleh dijalankan berulang untuk periode yang sama membutuhkan nomor urut proses di dalam `posting_id`, seperti rencana "Post penyusutan" (TODO 11.2.4). Paling panjang 120 karakter.
 - **Tanggal.** `posting_date` adalah tanggal akuntansi dari dokumen, bukan dari jam server. `document_date` tanggal di dokumen. `occurred_at` jam kejadian dengan offset zona waktu (K-21).
-- **`settlement_mode` dan `requires_vendor`.** Bila jurnal jenis ini bergantung pada kebijakan penyelesaian, baca `SetelanPostingFinance::modePenyelesaian()` pada tanggal dokumennya, dan kirim `requires_vendor: true` untuk pembelian dengan `direct_payable`. Penerbit tidak membaca setelan mode untuk posting baru; ia mempercayai module. Untuk koreksi dan pembalikan, kosongkan mode: penerbit mewarisinya dari posting asal. Koreksi yang akun lawannya bergantung pada mode itu, seperti koreksi nilai perolehan aset, membaca mode posting asal dari `PenerbitPosting::status()` lalu mengirimnya — jangan menghitungnya lagi dari setelan, karena setelan dapat berubah sesudah posting asal terbit. Mode yang berbeda dari posting asal dilempar sebagai `PostingTidakSah`.
-- **Vendor** dari `DaftarVendor` milik entitas legal itu.
+- **`settlement_mode` dan `requires_vendor`.** Bila jurnal jenis ini bergantung pada kebijakan penyelesaian, baca `FinancePostingSettings::settlementMode()` pada tanggal dokumennya, dan kirim `requires_vendor: true` untuk pembelian dengan `direct_payable`. Penerbit tidak membaca setelan mode untuk posting baru; ia mempercayai module. Untuk koreksi dan pembalikan, kosongkan mode: penerbit mewarisinya dari posting asal. Koreksi yang akun lawannya bergantung pada mode itu, seperti koreksi nilai perolehan aset, membaca mode posting asal dari `PostingFeed::status()` lalu mengirimnya — jangan menghitungnya lagi dari setelan, karena setelan dapat berubah sesudah posting asal terbit. Mode yang berbeda dari posting asal dilempar sebagai `InvalidPosting`.
+- **Vendor** dari `VendorDirectory` milik entitas legal itu.
 - **`source_document`**: `module` berisi id module, `type`, `number`, `description`, `id`, dan `url` opsional. `url` adalah jalur layar dokumen itu di module, `/<id module>/<id entri menu>/…` (lihat [UI modul di dalam shell](27-ui-modul-dalam-shell.md)). `url` dan `id` tidak ikut `payload`; `url` hanya dipakai layar pantau untuk menautkan dokumennya.
-- **`lines[].account_id`** adalah id akun dari `DaftarAkun`, diambil dari pemetaan module — bukan nomor akun, karena nomor dapat berubah pada impor ulang (K-05). Kirim `null` bila pemetaannya belum ada: posting akan `held`, bukan dilempar.
-- **Nilai** dibulatkan per baris lewat `PresisiMataUang::bulatkan()` sebelum dijumlah, lalu jurnal disusun dari nilai yang sudah bulat. Jangan memakai `round()` PHP atau float. Tidak ada nilai negatif: selisih negatif ditulis di sisi sebaliknya.
+- **`lines[].account_id`** adalah id akun dari `AccountDirectory`, diambil dari pemetaan module — bukan nomor akun, karena nomor dapat berubah pada impor ulang (K-05). Kirim `null` bila pemetaannya belum ada: posting akan `held`, bukan dilempar.
+- **Nilai** dibulatkan per baris lewat `CurrencyRounding::roundAmount()` sebelum dijumlah, lalu jurnal disusun dari nilai yang sudah bulat. Jangan memakai `round()` PHP atau float. Tidak ada nilai negatif: selisih negatif ditulis di sisi sebaliknya.
 - **`lines[].org_unit_id`** adalah operating unit yang menanggung baris itu, sumber kedua dimensinya. Untuk akun laba rugi, unit itu harus department.
 - **`lines[].mapping`**: `label` menamai asal akun baris itu, misalnya "Group KENDARAAN · harga perolehan", dan `fix_url` jalur layar pemetaan di module. Keduanya dipakai pesan masalah dan tombol "Buka pemetaan akun" di layar pantau dan pratinjau, dan tidak ikut `payload`. `fix_url` yang bukan jalur di dalam aplikasi ditolak, sama seperti `source_document.url`. `reference` adalah kunci pemetaan dalam bahasa module (modul aset: `posting-group:<group>:<kolom>`); isi bersama pendaftaran `PostingAccountResolver` di penyedia layanan module, supaya [Validasi ulang](#validasi-ulang) membaca akun dari pemetaan terbaru. Karena itu satu baris sebaiknya menyebut satu pemetaan: baris yang menjumlahkan dua pemetaan tidak dapat dibaca ulang.
 - **`details`** objek bebas, hanya informasi untuk pelacakan. Pembaca tidak boleh menjurnal dari sana. Harga satuan dengan presisi yang lebih halus hanya boleh muncul di sini, tidak pernah di baris jurnal.
 
 ### 3. Terbitkan di dalam transaksi dokumen
 
-Panggil `PenerbitPosting::terbitkan()` di dalam `DB::transaction` yang sama dengan penyimpanan dokumennya. `held` bukan kegagalan: dokumen tersimpan, posting menunggu pemetaannya.
+Panggil `PostingFeed::publish()` di dalam `DB::transaction` yang sama dengan penyimpanan dokumennya. `held` bukan kegagalan: dokumen tersimpan, posting menunggu pemetaannya.
 
-`PostingTidakSah` harus membatalkan dokumennya. Module boleh menangkapnya untuk menampilkan "dokumen gagal disimpan karena kesalahan sistem", tetapi tidak boleh menelannya lalu menyimpan dokumen tanpa posting. Bila exception itu diterjemahkan menjadi pesan, panggil `report()` lebih dulu, supaya ia tetap sampai ke pemantauan kesalahan — layar pantau melakukan hal yang sama saat validasi ulang gagal.
+`InvalidPosting` harus membatalkan dokumennya. Module boleh menangkapnya untuk menampilkan "dokumen gagal disimpan karena kesalahan sistem", tetapi tidak boleh menelannya lalu menyimpan dokumen tanpa posting. Bila exception itu diterjemahkan menjadi pesan, panggil `report()` lebih dulu, supaya ia tetap sampai ke pemantauan kesalahan — layar pantau melakukan hal yang sama saat validasi ulang gagal.
 
 ### 4. Tampilkan pratinjau sebelum konfirmasi
 
-`PenerbitPosting::pratinjau()` menjalankan pemeriksaan yang sama tanpa menyimpan apa pun, dan tidak membutuhkan transaksi. Masalahnya dikembalikan bila hasilnya `held`; tampilkan dengan komponen `PostingCheck` (`import { PostingCheck } from '@/components/finance/posting-check'`) sebelum pengguna menekan konfirmasi (K-22).
+`PostingFeed::preview()` menjalankan pemeriksaan yang sama tanpa menyimpan apa pun, dan tidak membutuhkan transaksi. Masalahnya dikembalikan bila hasilnya `held`; tampilkan dengan komponen `PostingCheck` (`import { PostingCheck } from '@/components/finance/posting-check'`) sebelum pengguna menekan konfirmasi (K-22).
 
 Satu hal yang mudah terlewat: untuk entitas legal yang feed-nya mati, atau dokumen bertanggal sebelum cutover, pratinjau menjawab `manual` **tanpa** masalah, karena cutover diperiksa sebelum pemetaan. Pratinjau tidak menunjukkan pemetaan yang kurang pada keadaan itu.
 
-`PenerbitPosting::status()` mengembalikan keadaan posting untuk ditampilkan di dokumen sumbernya, termasuk nomor voucher pembaca, daftar masalahnya, dan `settlement_mode` yang tercatat saat posting itu terbit.
+`PostingFeed::status()` mengembalikan keadaan posting untuk ditampilkan di dokumen sumbernya, termasuk nomor voucher pembaca, daftar masalahnya, dan `settlement_mode` yang tercatat saat posting itu terbit.
 
 ### 5. Daftarkan jenisnya di kontrak
 
@@ -515,7 +515,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 ## Celah yang diketahui
 
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
-- **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PenerbitPosting::pratinjau()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
+- **Tidak ada endpoint pratinjau HTTP di Core (TODO 7.6.5), dan memang tidak dibutuhkan.** Diputuskan bersama TODO 9.3: layar module memanggil `PostingFeed::preview()` lewat controller module-nya sendiri, seperti `GET /penerimaan-aset/{id}/pratinjau-posting` di modul aset.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
 
@@ -523,11 +523,11 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/core/app/Support/Modules/Contracts/PenerbitPosting.php` | Kontrak module: bentuk masukan dan hasil |
-| `apps/core/app/Support/Modules/Contracts/PostingTidakSah.php` | Exception untuk bug penerbit |
-| `apps/core/app/Support/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
+| `apps/core/app/Platform/Modules/Contracts/PostingFeed.php` | Kontrak module: bentuk masukan dan hasil |
+| `apps/core/app/Platform/Modules/Contracts/InvalidPosting.php` | Exception untuk bug penerbit |
+| `apps/core/app/Platform/Modules/Contracts/PostingAccountResolver.php`, `PostingAccountResolvers.php` | Kontrak yang module penuhi: akun dari pemetaannya saat posting dibentuk ulang, dan daftarnya |
 | `apps/core/app/Support/Finance/PostingAccountResolverRegistry.php` | Daftar pemeta akun, satu benda untuk seluruh proses |
-| `apps/core/app/Services/Modules/PenerbitPostingCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Support/Modules/CoreServices.php` |
+| `apps/core/app/Services/Modules/PostingFeedCore.php` | Pelaksana kontrak, diikat di `apps/core/app/Support/Modules/CoreServices.php` |
 | `apps/core/app/Support/Finance/PostingPublisher.php` | Penerbitan, pratinjau, validasi ulang, tandai manual, dan penilaian ulang cutover |
 | `apps/core/app/Support/Finance/PostingInput.php` | Masukan yang sudah dinormalkan, beserta hash-nya |
 | `apps/core/app/Support/BusinessUnitResolver.php` | Business unit induk lewat hierarki manajemen pada tanggal posting |
@@ -561,7 +561,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - [Buku alamat](24-global-address-book.md) — vendor sebagai peran party.
 - [Number sequence](14-number-sequences.md) — nomor vendor `core.vendor`, reference milik Core.
 - [UI modul di dalam shell](27-ui-modul-dalam-shell.md) — alamat layar module untuk `source_document.url` dan `mapping.fix_url`.
-- [Pelaporan kesalahan](28-pelaporan-kesalahan.md) — ke mana `PostingTidakSah` pergi.
+- [Pelaporan kesalahan](28-pelaporan-kesalahan.md) — ke mana `InvalidPosting` pergi.
 - [admin.erp](31-admin-erp-control-plane.md#kesehatan-feed-posting-finance) — ringkasan jumlah per status, `pending` tertua, pull terakhir, serta push terakhir dan push yang gagal tiap server klien (`finance-postings:summary`).
 - [Integrasi sistem eksternal](12-external-module-integration.md) — aturan umum sistem luar yang bertukar data dengan module.
 - [Healthcare finance subledger](17-healthcare-finance-subledger.md) — rancangan posting ke Finance/GL yang lebih luas.

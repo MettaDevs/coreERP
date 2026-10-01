@@ -112,7 +112,7 @@ field kontrak lain di repo ini.
 Modul aset                         Core                                   Pembaca
 ─────────────                      ──────────────────────────             ─────────────────────
 penerimaan selesai ──┐
-saldo awal ──────────┼─ PenerbitPosting ─▶ finance_postings ─pull/push▶ old-finance (sekarang, pull)
+saldo awal ──────────┼─ PostingFeed ─▶ finance_postings ─pull/push▶ old-finance (sekarang, pull)
 koreksi nilai ───────┤   (satu transaksi)   held / pending      ◀──ack─── modul Finance (nanti)
 post penyusutan ─────┤                      posted / rejected          konektor lain (nanti)
 reversal ────────────┘                      manual
@@ -313,7 +313,7 @@ pernah di-post, tidak ada posting pembalikan.
 
 ## Validasi dan penahanan
 
-`PenerbitPosting` memeriksa semua hal berikut sebelum posting berstatus `pending`:
+`PostingFeed` memeriksa semua hal berikut sebelum posting berstatus `pending`:
 
 1. Jurnal seimbang, setiap baris hanya berisi debit atau kredit (tidak dua-duanya), dan setiap
    nilai memakai presisi mata uangnya.

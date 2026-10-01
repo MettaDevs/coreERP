@@ -103,7 +103,7 @@ Operating unit tidak memiliki kode organisasi umum. Jika proses regulator atau i
 - Huruf besar dan angka, dipisah tanda hubung tunggal, paling panjang 30 karakter.
 - Boleh diganti. Posting yang sudah terbit menyimpan nomor pada saat terbit, jadi yang berubah hanya posting berikutnya.
 
-Business unit sebuah department diturunkan dari hierarki bertujuan `management` pada versi `published` yang berlaku di tanggal posting: leluhur terdekat bertipe `business_unit`, termasuk unit itu sendiri. Dua hierarki manajemen yang menunjuk business unit berbeda tidak ditebak; hasilnya kosong. Module membacanya lewat `DirektoriOrganisasi::unitBisnisInduk()`.
+Business unit sebuah department diturunkan dari hierarki bertujuan `management` pada versi `published` yang berlaku di tanggal posting: leluhur terdekat bertipe `business_unit`, termasuk unit itu sendiri. Dua hierarki manajemen yang menunjuk business unit berbeda tidak ditebak; hasilnya kosong. Module membacanya lewat `OrganizationDirectory::parentBusinessUnits()`.
 
 ## Registrasi dan setup awal
 

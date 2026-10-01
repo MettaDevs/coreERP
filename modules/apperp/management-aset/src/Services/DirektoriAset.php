@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 
 /**
  * Unit kerja dan orang milik Core, diterjemahkan menjadi nama yang dikenali pengguna.
@@ -30,7 +30,7 @@ final class DirektoriAset
     /** @var array<string, array<string, string>> */
     private array $anggotaTerhafal = [];
 
-    public function __construct(private readonly DirektoriOrganisasi $direktori) {}
+    public function __construct(private readonly OrganizationDirectory $direktori) {}
 
     /**
      * Unit kerja tenant sebagai pilihan dropdown.
@@ -41,7 +41,7 @@ final class DirektoriAset
     {
         return array_map(
             static fn (array $unit): array => ['id' => $unit['id'], 'nama' => $unit['nama']],
-            $this->direktori->unitOperasi($tenantId),
+            $this->direktori->operatingUnits($tenantId),
         );
     }
 
@@ -63,7 +63,7 @@ final class DirektoriAset
                 'nama' => $anggota['nama'],
                 'email' => $anggota['email'],
             ],
-            $this->direktori->anggota($tenantId),
+            $this->direktori->members($tenantId),
         );
     }
 
@@ -87,7 +87,7 @@ final class DirektoriAset
     private function petaUnit(string $tenantId): array
     {
         return $this->unitTerhafal[$tenantId] ??= array_column(
-            $this->direktori->unitOperasi($tenantId),
+            $this->direktori->operatingUnits($tenantId),
             'nama',
             'id',
         );
@@ -97,7 +97,7 @@ final class DirektoriAset
     private function petaAnggota(string $tenantId): array
     {
         return $this->anggotaTerhafal[$tenantId] ??= array_column(
-            $this->direktori->anggota($tenantId),
+            $this->direktori->members($tenantId),
             'nama',
             'user_id',
         );

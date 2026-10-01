@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
-use App\Support\Modules\Contracts\MilikTenant;
+use App\Platform\Modules\Contracts\BelongsToTenant;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -39,8 +39,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class MaintenanceChecklistTemplateLine extends Model
 {
+    use BelongsToTenant;
     use HasUlids;
-    use MilikTenant;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

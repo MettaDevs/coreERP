@@ -165,7 +165,8 @@ there.
 Core code lives in three layers that mirror Business Central: `App\Platform\<Feature>` (engine with no
 business vocabulary), `App\Foundation\<Feature>` (shared business masters and services), and
 `modules/` (sellable business capabilities). Dependencies point downward only: Platform never uses
-Foundation, and a module reaches Core only through the contract namespace. The layer is a code
+Foundation, and a module reaches Core only through the single contract namespace `App\Platform\Modules\Contracts`
+(English names, guarded by `ModuleNamespaceBoundaryTest`). The layer is a code
 arrangement only — it never appears in a table name, permission code, event name, or URL.
 `LayerDirectionBoundaryTest` guards it; known exceptions live in its `ALLOWED` list and in
 `docs/todo/lapis-core/README.md`, and that list may only shrink.

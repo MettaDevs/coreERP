@@ -103,7 +103,7 @@
     operationId: listAsetReceiptVendors
     summary: Vendor aktif satu entitas legal untuk pemilih vendor penerimaan
     description: |
-      Vendor milik Core (K-06), dibaca lewat kontrak `DaftarVendor`. Semua anggota tenant boleh
+      Vendor milik Core (K-06), dibaca lewat kontrak `VendorDirectory`. Semua anggota tenant boleh
       melihat vendor, jadi yang diperiksa hanya izin membaca penerimaan.
     parameters:
     - name: legal_entity_id

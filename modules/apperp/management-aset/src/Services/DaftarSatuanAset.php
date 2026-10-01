@@ -2,7 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -18,13 +18,13 @@ use RuntimeException;
  */
 class DaftarSatuanAset
 {
-    public function __construct(private readonly DaftarSatuan $satuan) {}
+    public function __construct(private readonly UnitOfMeasureDirectory $satuan) {}
 
     /** @return list<array{id:string,code:string,name:string,symbol:?string,decimal_places:int}> */
     public function active(string $tenantId): array
     {
         /** @var list<array{id:string,code:string,name:string,symbol:?string,decimal_places:int}> $hasil */
-        $hasil = $this->satuan->aktif($tenantId);
+        $hasil = $this->satuan->active($tenantId);
 
         return $hasil;
     }
@@ -36,7 +36,7 @@ class DaftarSatuanAset
     public function resolve(string $tenantId, array $ids): array
     {
         try {
-            $satuan = $this->satuan->resolusi($tenantId, $ids);
+            $satuan = $this->satuan->resolve($tenantId, $ids);
         } catch (ValidationException) {
             // Core melempar `ValidationException` dengan kunci `unit_ids` — nama field milik
             // permintaan **Core**, bukan milik module. Dibiarkan lewat, ia muncul di jawaban

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Http\Controllers;
 
-use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\KonteksTenant;
-use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
+use App\Platform\Modules\Contracts\RequestContext;
+use App\Platform\Modules\Contracts\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohA\Models\Barang;
@@ -16,10 +16,10 @@ use Modules\Apperp\ContohA\Models\Barang;
  *
  * Empat hal yang ditunjukkan dengan sengaja:
  *
- * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `KonteksTenant`,
- *    `KonteksPermintaan`, dan `PenerbitNomor` adalah tiga dari pintu resmi yang didaftar
+ * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `TenantContext`,
+ *    `RequestContext`, dan `NumberSequenceIssuer` adalah tiga dari pintu resmi yang didaftar
  *    `CoreServices`; menyentuh kelas Core di luar daftar itu ditolak penjaga batas.
- * 2. Penyaringan `tenant_id` tidak ditulis di sini sama sekali. `MilikTenant` yang
+ * 2. Penyaringan `tenant_id` tidak ditulis di sini sama sekali. `BelongsToTenant` yang
  *    menyaring bacaan, mengisi tenant pada baris baru, dan membatalkan penyimpanan yang
  *    ditujukan ke tenant lain. Yang tidak ditulis tidak bisa salah ditulis — dan penyaringan
  *    tangan di sini justru membuat penjaganya tidak terukur, karena query tetap benar walau
@@ -33,9 +33,9 @@ use Modules\Apperp\ContohA\Models\Barang;
  */
 final class BarangController
 {
-    public function index(KonteksPermintaan $akses): JsonResponse
+    public function index(RequestContext $akses): JsonResponse
     {
-        abort_unless($akses->punyaIzin('contoh-a.barang.read'), 403);
+        abort_unless($akses->hasPermission('contoh-a.barang.read'), 403);
 
         return new JsonResponse([
             'data' => Barang::query()
@@ -44,13 +44,13 @@ final class BarangController
         ]);
     }
 
-    public function store(KonteksTenant $konteks, KonteksPermintaan $akses, PenerbitNomor $penerbit): JsonResponse
+    public function store(TenantContext $konteks, RequestContext $akses, NumberSequenceIssuer $penerbit): JsonResponse
     {
-        abort_unless($akses->punyaIzin('contoh-a.barang.create'), 403);
+        abort_unless($akses->hasPermission('contoh-a.barang.create'), 403);
 
         $tenantId = $konteks->tenantId();
 
-        $nomor = $penerbit->terbitkan(
+        $nomor = $penerbit->issue(
             ['tenant_id' => $tenantId, 'app_id' => 'contoh-a'],
             'contoh-a.barang',
             (string) Str::ulid(),

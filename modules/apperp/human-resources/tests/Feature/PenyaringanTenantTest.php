@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Apperp\HumanResources\Tests\Feature;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\TenantRunner;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Closure;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -44,7 +44,7 @@ use Tests\TestCase;
  *
  * 1. **Batas organisasi** — lingkup kebijakan data menahan unit kerja yang bukan tanggung
  *    jawab pengguna. Ini yang diuji test lama, dan ia ada di dalam module.
- * 2. **Batas tenant** — `MilikTenant` menahan baris milik pelanggan lain. Ini tidak pernah bisa
+ * 2. **Batas tenant** — `BelongsToTenant` menahan baris milik pelanggan lain. Ini tidak pernah bisa
  *    diuji sebelumnya: tiap tenant punya databasenya sendiri, jadi tidak ada satu pun query
  *    yang bisa melihat tenant lain walaupun ia mau. Sekarang semua tenant satu tabel, dan
  *    kebocorannya tidak pernah gagal dengan sendirinya — ia tampak seperti daftar yang isinya
@@ -90,7 +90,7 @@ class PenyaringanTenantTest extends TestCase
      *
      * Pekerja tenant sendiri sengaja dibuat lewat endpoint, bukan disisipkan langsung ke tabel.
      * Dengan begitu jalur tulisnya ikut terbukti: nomor induk diterbitkan Core lewat kontrak di
-     * dalam transaksi yang sama, dan `MilikTenant` yang mengisi `tenant_id` — bukan controller,
+     * dalam transaksi yang sama, dan `BelongsToTenant` yang mengisi `tenant_id` — bukan controller,
      * yang sekarang tidak menuliskannya sama sekali.
      */
     public function test_daftar_pekerja_tidak_pernah_memuat_baris_tenant_lain(): void
@@ -123,7 +123,7 @@ class PenyaringanTenantTest extends TestCase
      * Menyimpan baris atas nama tenant lain dibatalkan, bukan diterima diam-diam.
      *
      * Ini bagian penyaringan yang tidak pernah tertangkap dua test di atas: sebuah scope baca
-     * tidak melihat baris yang sedang ditulis. Sebelum `MilikTenant` menjaga penulisan, module
+     * tidak melihat baris yang sedang ditulis. Sebelum `BelongsToTenant` menjaga penulisan, module
      * bisa menyimpan baris dengan `tenant_id` milik orang lain sementara tenant aktif berbeda,
      * dan tidak ada satu pun yang menahannya — bukan `NOT NULL`, karena kolomnya terisi.
      */
@@ -134,7 +134,7 @@ class PenyaringanTenantTest extends TestCase
 
         $this->expectException(RuntimeException::class);
 
-        $this->app->make(PelaksanaUntukTenant::class)->jalankanUntuk($tenantId, function () use ($tenantLain): void {
+        $this->app->make(TenantRunner::class)->runFor($tenantId, function () use ($tenantLain): void {
             Worker::query()->create([
                 'tenant_id' => $tenantLain,
                 'creation_key' => 'pekerja-tenant-lain',
@@ -599,7 +599,7 @@ class PenyaringanTenantTest extends TestCase
     /**
      * Baris module disisipkan lewat query builder, bukan lewat model, dan itu disengaja.
      *
-     * `MilikTenant` membatalkan penyimpanan baris milik tenant selain tenant aktif — persis
+     * `BelongsToTenant` membatalkan penyimpanan baris milik tenant selain tenant aktif — persis
      * yang dibuktikan test ketiga. Menuntut penyemaian memakai model berarti membuat test
      * kebocoran antar tenant mustahil ditulis, yaitu membuang penjagaan terpenting demi
      * menegakkan aturannya.

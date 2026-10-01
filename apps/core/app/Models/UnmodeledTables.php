@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassificationRegistry;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassificationRegistry;
 
 /**
  * Klasifikasi data tabel tenant milik Core yang tidak punya model Eloquent (K-19). Tabel yang punya

@@ -4,8 +4,8 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Platform\Access\Models\Role;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\RowVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;

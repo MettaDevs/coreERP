@@ -6,8 +6,8 @@ namespace Tests\Feature\Foundation\NumberSequence;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Support\ModuleMigrator;
-use App\Support\Modules\Contracts\PenerbitNomor;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -59,16 +59,16 @@ class NumberSequenceInTransactionTest extends TestCase
     public function test_nomor_ikut_batal_saat_transaksi_dokumen_gagal(): void
     {
         $konteks = $this->sequenceContoh();
-        $penerbit = $this->app->make(PenerbitNomor::class);
+        $penerbit = $this->app->make(NumberSequenceIssuer::class);
 
-        $pertama = $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $pertama = $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid());
         $this->assertSame('000001', $pertama['number']);
 
         $sebelum = $this->nomorBerikutnya();
 
         try {
             DB::transaction(function () use ($penerbit, $konteks): void {
-                $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+                $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid());
 
                 // Dokumennya gagal disimpan. Di dunia dua database, nomor di atas sudah
                 // terlanjur tersimpan di database Core dan hilang selamanya.
@@ -85,7 +85,7 @@ class NumberSequenceInTransactionTest extends TestCase
             'Baris penerbitan dari transaksi yang gagal ikut tersimpan; berarti ia berada di luar transaksi dokumen.'
         );
 
-        $berikutnya = $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $berikutnya = $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid());
 
         $this->assertSame('000002', $berikutnya['number'], 'Urutan berlubang: nomor 000002 hilang karena dokumen yang gagal.');
     }
@@ -93,9 +93,9 @@ class NumberSequenceInTransactionTest extends TestCase
     public function test_nomor_tetap_terbit_saat_transaksi_dokumen_berhasil(): void
     {
         $konteks = $this->sequenceContoh();
-        $penerbit = $this->app->make(PenerbitNomor::class);
+        $penerbit = $this->app->make(NumberSequenceIssuer::class);
 
-        $hasil = DB::transaction(fn (): array => $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid()));
+        $hasil = DB::transaction(fn (): array => $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid()));
 
         $this->assertSame('000001', $hasil['number']);
         $this->assertSame(1, DB::table('number_sequence_issues')->count());
@@ -104,7 +104,7 @@ class NumberSequenceInTransactionTest extends TestCase
     public function test_dua_koneksi_menerbitkan_nomor_berbeda_tanpa_duplikat(): void
     {
         $konteks = $this->sequenceContoh();
-        $penerbit = $this->app->make(PenerbitNomor::class);
+        $penerbit = $this->app->make(NumberSequenceIssuer::class);
 
         // Koneksi kedua berdiri untuk instance API kedua: dua proses, satu PostgreSQL.
         // Itu bentuk penempatan yang direncanakan, jadi ia yang diuji.
@@ -112,11 +112,11 @@ class NumberSequenceInTransactionTest extends TestCase
         $kedua = DB::connection('pgsql_test_secondary');
 
         $utama->beginTransaction();
-        $satu = $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $satu = $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid());
         $utama->commit();
 
         $kedua->beginTransaction();
-        $dua = $penerbit->terbitkan($konteks, 'sample-app.document', (string) Str::ulid());
+        $dua = $penerbit->issue($konteks, 'sample-app.document', (string) Str::ulid());
         $kedua->commit();
 
         $this->assertNotSame($satu['number'], $dua['number'], 'Dua koneksi menerbitkan nomor yang sama.');

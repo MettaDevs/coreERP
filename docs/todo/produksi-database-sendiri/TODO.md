@@ -61,7 +61,7 @@ database bersama, dan pilihan database bersama tetap berperilaku persis seperti 
   - [ ] 2.1.1 Ditolak 422 bila dikirim bersama `first_environment_hosting = client_server`.
   - [ ] 2.1.2 Diabaikan (atau ditolak, putuskan) untuk demo dan `none`.
 - [ ] 2.2 `RegisterBusiness`: production database sendiri lahir `provisioning` dengan `database_name` kosong dan penanda terisi.
-- [ ] 2.3 `RegisterBusiness` bagian `afterCommit`: lewati `InstallModule`, event `TenantDisiapkan`, dan `EnsureNumberSequenceDrafts` untuk environment yang akan mendapat database sendiri. Pemasangannya milik penyiapan (area 3).
+- [ ] 2.3 `RegisterBusiness` bagian `afterCommit`: lewati `InstallModule`, event `TenantProvisioned`, dan `EnsureNumberSequenceDrafts` untuk environment yang akan mendapat database sendiri. Pemasangannya milik penyiapan (area 3).
   - [ ] 2.3.1 Periksa demo sebagai environment pertama. Dari pembacaan kode, `afterCommit` hari ini tidak melewatkan demo, sehingga module demo mungkin terpasang di database bersama sebelum demonya disiapkan. Buktikan dengan test dulu; bila benar, perbaiki di butir yang sama.
 - [ ] 2.4 Controller menjawab `environment_id` dan status environment pertama, supaya admin.erp tahu production itu masih perlu disiapkan.
 - [ ] 2.5 Jangan sentuh endpoint pendaftaran mandiri (`api/v1/business-registrations`) selain yang perlu agar ia tetap jalan. Ia hilang di v1 (K-04).
@@ -74,7 +74,7 @@ production database bersama tidak pernah bisa disiapkan ulang menjadi database b
 **Ditutup test:** B-3.
 
 - [ ] 3.1 `ProvisionEnvironment` dan `EnvironmentProvisioningController` menolak environment yang memilih database bersama, termasuk yang berstatus `degraded`. Pesannya menyebut sebabnya.
-- [ ] 3.2 Pastikan penyiapan production memasang module sesuai entitlement (`InstallEntitledModules`), membuat urutan nomor draf, dan memancarkan `TenantDisiapkan` di database environment, sama seperti demo.
+- [ ] 3.2 Pastikan penyiapan production memasang module sesuai entitlement (`InstallEntitledModules`), membuat urutan nomor draf, dan memancarkan `TenantProvisioned` di database environment, sama seperti demo.
 - [ ] 3.3 `outbound_allowed` production tetap `true` setelah disiapkan (constraint `environments_keluar_ikut_jenis`).
 - [ ] 3.4 Owner dan keanggotaan tetap di database pusat; login di alamat production database sendiri berhasil dan sesinya tersimpan di pusat.
 

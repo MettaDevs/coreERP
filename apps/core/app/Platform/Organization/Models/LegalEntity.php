@@ -3,8 +3,8 @@
 namespace App\Platform\Organization\Models;
 
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
-use App\Support\Modules\Contracts\DataClass;
-use App\Support\Modules\Contracts\DataClassification;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

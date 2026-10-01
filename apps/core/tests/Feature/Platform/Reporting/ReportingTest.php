@@ -3,13 +3,13 @@
 namespace Tests\Feature\Platform\Reporting;
 
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Reporting\Jobs\RunReportExport;
-use App\Platform\Reporting\Support\DaftarLaporanModul;
+use App\Platform\Reporting\Support\ModuleReportProviderRegistry;
 use App\Platform\Retention\Support\RetentionPolicies;
 use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -103,11 +103,11 @@ class ReportingTest extends TestCase
 
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->daftarkanKatalogDariManifest();
-        // Data awal Indonesia yang dikirim lewat `TenantDisiapkan` — 363 master bernomor, sekitar
+        // Data awal Indonesia yang dikirim lewat `TenantProvisioned` — 363 master bernomor, sekitar
         // 3.500 statement per test — tidak dipakai laporan mana pun di sini: `buatWorkOrder()`
         // menyusun master yang dibutuhkannya sendiri. Data itu diuji sendiri di
         // `IndonesiaStarterProvisioningTest`.
-        Event::fake([TenantDisiapkan::class]);
+        Event::fake([TenantProvisioned::class]);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant laporan',
             'app_ids' => ['management-aset'], 'email' => 'owner@laporan.test', 'password' => 'password',
@@ -776,7 +776,7 @@ class ReportingTest extends TestCase
      */
     private function reportFromModuleCatalog(): array
     {
-        foreach (app(DaftarLaporanModul::class)->untuk('management-aset')?->catalog() ?? [] as $laporan) {
+        foreach (app(ModuleReportProviderRegistry::class)->untuk('management-aset')?->catalog() ?? [] as $laporan) {
             if ($laporan['code'] === self::KODE_LAPORAN) {
                 return $laporan;
             }

@@ -47,7 +47,7 @@ Semua di atas, plus **penjaga batas** dan **gate load test**. Module tidak seles
 Penjaga batasnya hidup sebagai test biasa di `apps/core/tests/Feature/Boundary/` dan ikut
 `php artisan test`. Ia memindai seluruh isi `modules/`, jadi module baru langsung masuk cakupannya
 tanpa satu pun berkas yang perlu didaftarkan. Yang ditolaknya: tabel tanpa awalan module, tabel
-milik module lain yang disentuh, model tenant tanpa `MilikTenant`, namespace yang menyeberang,
+milik module lain yang disentuh, model tenant tanpa `BelongsToTenant`, namespace yang menyeberang,
 kerangka aplikasi Laravel di dalam folder module, rute module tanpa middleware konteks, dan
 manifest yang susunannya tidak sah.
 

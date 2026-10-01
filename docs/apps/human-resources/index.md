@@ -23,7 +23,7 @@ App bisnis kedua. Menyimpan fakta tenaga kerja: pekerja, jabatan, posisi, dan pe
 
 **Bukan milik app ini** — identity, tenant membership, security role, dan scope organisasi. Semuanya tetap milik Core.
 
-HR **tidak membuat identity kedua** dan **tidak menyentuh tabel Core maupun modul lain**. Pekerja ditautkan ke `core_membership_id` yang diperoleh lewat kontrak `DirektoriOrganisasi`; email hanya dipakai untuk mencari dan menampilkan anggota.
+HR **tidak membuat identity kedua** dan **tidak menyentuh tabel Core maupun modul lain**. Pekerja ditautkan ke `core_membership_id` yang diperoleh lewat kontrak `OrganizationDirectory`; email hanya dipakai untuk mencari dan menampilkan anggota.
 
 ::: tip Kenapa app ini penting untuk platform
 HR adalah pemilik kebenaran workforce dan position. [Gate fondasi Core](/dev/10-core-foundation-gates) menempatkan *automatic role assignment* sebagai menunggu app ini: Core mengevaluasi rule, tapi fakta bisnis posisi diterbitkan HR. Selama HR belum stabil, automatic role assignment belum boleh dibangun.
@@ -37,7 +37,7 @@ Kasus dua business unit — satu orang bekerja di dua tempat tanpa identity gand
 2. HR membuat satu pekerja, menautkannya ke `core_membership_id`.
 3. HR membuat dua posisi pada operating unit berbeda.
 4. HR membuat dua penugasan aktif untuk pekerja itu. **Satu posisi hanya dapat diisi satu pekerja pada periode yang sama.**
-5. Core memberi role manual per scope. Konteks dan izin dibaca langsung dari permintaan yang sedang dilayani lewat kontrak `KonteksTenant` dan `KonteksPermintaan` — tidak ada lagi token yang dipertukarkan.
+5. Core memberi role manual per scope. Konteks dan izin dibaca langsung dari permintaan yang sedang dilayani lewat kontrak `TenantContext` dan `RequestContext` — tidak ada lagi token yang dipertukarkan.
 
 ::: warning Sinkronisasi role otomatis berhenti berjalan
 Jalur lamanya memanggil Core lewat HTTP untuk menerapkan aturan penugasan role otomatis, dan Core

@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use App\Support\Modules\Contracts\DaftarAkun;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\AccountDirectory;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,7 +24,7 @@ use Modules\Apperp\ManagementAset\Models\master\GroupAset;
  * `fixed-asset-posting-profiles` yang sudah ada di manifest (keputusan pemilik produk,
  * 22 September 2026), supaya role yang hanya melihat tidak ikut mengubah akun jurnal.
  *
- * Akun dipilih lewat kontrak `DaftarAkun` dan hanya boleh akun yang berlaku untuk semua entitas
+ * Akun dipilih lewat kontrak `AccountDirectory` dan hanya boleh akun yang berlaku untuk semua entitas
  * legal: posting group berlaku untuk seluruh tenant, sedangkan akun khusus satu entitas akan
  * tertahan di Core begitu dipakai entitas lain.
  */
@@ -32,7 +32,7 @@ class AssetPostingGroupController extends Controller
 {
     private const PERMISSION = 'management-aset.fixed-asset-posting-profiles.';
 
-    public function __construct(private readonly DaftarAkun $daftarAkun) {}
+    public function __construct(private readonly AccountDirectory $daftarAkun) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -53,7 +53,7 @@ class AssetPostingGroupController extends Controller
             }
         }
 
-        $details = $this->daftarAkun->banyak($tenantId, array_values($accountIds));
+        $details = $this->daftarAkun->findMany($tenantId, array_values($accountIds));
 
         $groups = [];
         $needingAttention = 0;
@@ -108,7 +108,7 @@ class AssetPostingGroupController extends Controller
         $this->requirePermission($request, 'read');
         $query = $request->validate(['q' => ['sometimes', 'nullable', 'string', 'max:100']])['q'] ?? '';
 
-        return response()->json(['data' => $this->daftarAkun->cari($this->tenantId($request), null, (string) $query)]);
+        return response()->json(['data' => $this->daftarAkun->search($this->tenantId($request), null, (string) $query)]);
     }
 
     public function upsert(Request $request, string $groupAsetId, string $effectiveFrom): JsonResponse
@@ -182,7 +182,7 @@ class AssetPostingGroupController extends Controller
      */
     private function rejectInvalidAccounts(string $tenantId, array $accounts, ?AssetPostingGroup $existing): void
     {
-        $known = $this->daftarAkun->banyak($tenantId, array_values(array_unique(array_filter($accounts))));
+        $known = $this->daftarAkun->findMany($tenantId, array_values(array_unique(array_filter($accounts))));
         $errors = [];
         foreach ($accounts as $column => $accountId) {
             if ($accountId === null || $existing?->getAttribute($column) === $accountId) {

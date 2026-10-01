@@ -6,7 +6,7 @@ namespace Tests\Feature\Platform\Modules;
 
 use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Modules\Support\ModulSedangDipindah;
-use App\Platform\Reporting\Support\DaftarLaporanModul;
+use App\Platform\Reporting\Support\ModuleReportProviderRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RecursiveDirectoryIterator;
@@ -63,7 +63,7 @@ class RegisterAppManifestModuleTest extends TestCase
         // Laporan tidak ditulis di manifest: katalognya dibaca dari definisi laporan module.
         $diManifest = [
             ...$this->countEntriesInManifestFiles(),
-            'reports' => count(app(DaftarLaporanModul::class)->untuk('management-aset')?->catalog() ?? []),
+            'reports' => count(app(ModuleReportProviderRegistry::class)->untuk('management-aset')?->catalog() ?? []),
         ];
 
         foreach ($diManifest as $kelompok => $jumlah) {
@@ -100,7 +100,7 @@ class RegisterAppManifestModuleTest extends TestCase
     }
 
     /**
-     * Laporan module punya satu sumber: definisinya, dibaca lewat `PenyediaLaporanModul::catalog()`.
+     * Laporan module punya satu sumber: definisinya, dibaca lewat `ModuleReportProvider::catalog()`.
      * Blok `reports` yang masih ditulis di manifest ditolak, bukan diabaikan atau digabung,
      * karena dua sumber untuk satu katalog pasti menyimpang.
      */

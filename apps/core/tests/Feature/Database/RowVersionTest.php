@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
-use App\Support\Modules\Contracts\AuditColumns;
-use App\Support\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\AuditColumns;
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Exceptions\HttpResponseException;

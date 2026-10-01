@@ -3,7 +3,7 @@
 // Berkasnya tetap di folder module karena permukaan yang diuji milik module; yang berubah
 // adalah stack di bawahnya. Sejak F7-03 ia berjalan di atas `apps/core/loadtest/`:
 // satu compose, empat instance Core di belakang nginx, satu PostgreSQL, dan TIDAK ADA tiruan
-// Core. Nomor diterbitkan `PenerbitNomor` di dalam proses yang sama, jadi oracle nomor pindah
+// Core. Nomor diterbitkan `NumberSequenceIssuer` di dalam proses yang sama, jadi oracle nomor pindah
 // dari `/__stats` milik stub ke tabel `number_sequence_issues` — lihat `verify.sql`.
 //
 // Dua profil, karena keduanya menjawab pertanyaan berbeda:

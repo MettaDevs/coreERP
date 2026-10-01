@@ -3,8 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Foundation\FinancePosting\Models\FinancePosting;
-use App\Support\Modules\Contracts\PenerbitPosting;
-use App\Support\Modules\Contracts\PostingTidakSah;
+use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\PostingFeed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -133,16 +133,16 @@ class AcquisitionPostingTest extends TestCase
         $group = $this->group('KENDARAAN', 'Kendaraan');
         $id = $this->draf([], [$this->baris($group, 2, 1_000_000)]);
         Exceptions::fake();
-        $this->app->instance(PenerbitPosting::class, new class implements PenerbitPosting
+        $this->app->instance(PostingFeed::class, new class implements PostingFeed
         {
-            public function terbitkan(array $posting): array
+            public function publish(array $posting): array
             {
-                throw new PostingTidakSah('Jurnal tidak seimbang: debit 1, kredit 2.');
+                throw new InvalidPosting('Jurnal tidak seimbang: debit 1, kredit 2.');
             }
 
-            public function pratinjau(array $posting): array
+            public function preview(array $posting): array
             {
-                throw new PostingTidakSah('Jurnal tidak seimbang: debit 1, kredit 2.');
+                throw new InvalidPosting('Jurnal tidak seimbang: debit 1, kredit 2.');
             }
 
             public function status(string $tenantId, string $postingId): ?array
@@ -153,7 +153,7 @@ class AcquisitionPostingTest extends TestCase
 
         $this->selesaikan($id)->assertStatus(500)->assertJsonPath('error.code', 'posting_failed');
 
-        Exceptions::assertReported(PostingTidakSah::class);
+        Exceptions::assertReported(InvalidPosting::class);
         $this->assertSame('draft', DB::table('aset_tr_penerimaan_aset')->where('id', $id)->value('status'));
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->count());
         $this->assertSame(0, FinancePosting::query()->count());

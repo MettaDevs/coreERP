@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\HumanResources\Services;
 
-use App\Support\Modules\Contracts\LinkedWorkerResolver;
+use App\Platform\Modules\Contracts\LinkedWorkerResolver;
 use Modules\Apperp\HumanResources\Models\Worker;
 
 /**
  * Pekerja yang tertaut ke akun pengguna, untuk layar anggota Core (TODO analisa gap BC 9.2).
  *
- * Core memanggilnya dengan tenant yang ditanyakan sebagai tenant aktif, jadi `MilikTenant` menyaring barisnya;
+ * Core memanggilnya dengan tenant yang ditanyakan sebagai tenant aktif, jadi `BelongsToTenant` menyaring barisnya;
  * pekerja yang diarsipkan tidak ikut karena `SoftDeletes`.
  */
 final class LinkedWorkers implements LinkedWorkerResolver
