@@ -8,6 +8,9 @@ Status mengikuti [aturan backlog](/todo/): `[ ]` belum, `[~]` sedang dikerjakan,
 **dan** ada test yang membuktikannya. Setiap area punya **Tempat**, **Setelah** (area yang harus
 selesai lebih dulu), dan **Selesai bila** (kriteria terima).
 
+**Keadaan 1 Oktober 2026: fase 1 selesai.** Semua area (0–9) sudah `[x]`. Yang tersisa hanya 8.3, butir opsional
+yang sengaja ditunda (K-29).
+
 **Bagian A** berisi pekerjaan pembuatannya. **Bagian B** berisi test yang membuktikannya. Sebuah butir
 A baru boleh `[x]` bila test B-nya lulus.
 
@@ -202,7 +205,7 @@ pengguna.
 - [x] 7.8 Pengingat di Shell selama tanggal kerja bukan hari ini, mengarah ke My Profile, bisa ditutup
       untuk sisa sesi. Setelah ditutup, tanggal kerja tetap terlihat.
 
-### 8. [ ] Penyempurnaan ekspor laporan (gap 10)
+### 8. [x] Penyempurnaan ekspor laporan (gap 10)
 
 **Tempat:** Core (reporting) · **Setelah:** 4, 0.8 · **Selesai bila:** gangguan sesaat diulang terbatas,
 kegagalan tetap tidak diulang, masa simpan lewat layanan retensi, dan test B-8 lulus.
@@ -216,7 +219,8 @@ Rujukan: [README: Gap 10](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-10).
 - [x] 8.2 Masa simpan hasil ekspor lewat layanan retensi (area 4). Layanan dan pemakaiannya di
       `RunReportExport` sudah ada sejak area 4; test yang menjalankan job-nya kini membuktikan `expires_at`
       mengikuti setelan tenant dan penghapusan membuang baris beserta berkasnya.
-- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum. Tetap ditunda (K-29).
+- [ ] 8.3 Opsional: batas baris dapat dinaikkan per laporan di bawah batas maksimum. Ditunda (K-29), bukan
+      syarat selesai area 8.
 - [x] 8.4 Ekspor daftar yang sedang tampil (K-27): lewat antrean ekspor server, bukan frontend, untuk semua
       baris yang cocok dengan filter dan urutan layar; xlsx bertipe sampai batas lembar Excel, CSV
       sesudahnya sampai `reporting.list_export_max_csv_rows`. Pilot register aset.
