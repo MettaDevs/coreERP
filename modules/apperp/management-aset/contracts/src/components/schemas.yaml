@@ -356,6 +356,193 @@ AssetValueAdjustmentResponse:
   properties:
     data:
       $ref: '#/components/schemas/AssetValueAdjustment'
+AssetReclassificationWrite:
+  type: object
+  required:
+  - legal_entity_id
+  - responsible_org_unit_id
+  - jenis
+  - tanggal
+  - keterangan
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    jenis:
+      description: '`pindah_group` memindah seluruh aset ke group lain; `pecah` memindah sebagian nilainya ke aset baru. Tidak dapat diganti sesudah draf disimpan.'
+      type: string
+      enum: [pindah_group, pecah]
+    tanggal:
+      description: Tanggal nilai berpindah dan tanggal jurnal.
+      type: string
+      format: date
+    keterangan:
+      description: Alasan reklasifikasi; ikut ke keterangan jurnal di aplikasi finance.
+      type: string
+      maxLength: 250
+    details:
+      description: Wajib dikirim pada PATCH, walau kosong. Pada pindah group satu aset paling banyak sekali; pecah boleh memecah satu aset ke beberapa baris.
+      type: array
+      items:
+        type: object
+        required: [aset_id]
+        properties:
+          id:
+            description: Id baris yang sudah ada, untuk mempertahankan nomornya pada PATCH.
+            type: string
+            nullable: true
+          aset_id:
+            $ref: '#/components/schemas/Ulid'
+          group_aset_tujuan_id:
+            description: Wajib untuk pindah group. Untuk pecah, kosong berarti aset baru tetap di group aset asal.
+            type: string
+            nullable: true
+          persen:
+            description: Pecah saja, salah satu dengan `nilai_perolehan`. Bagian setiap saldo setiap buku yang dipindah, di atas 0 dan di bawah 100, paling banyak enam desimal.
+            type: number
+            nullable: true
+          nilai_perolehan:
+            description: Pecah saja, salah satu dengan `persen`. Harga perolehan yang dipindah; saldo lain dipindah dengan perbandingan yang sama terhadap harga perolehan register aset.
+            type: number
+            nullable: true
+          nama_aset_baru:
+            description: Pecah saja. Kosong berarti nama aset asal.
+            type: string
+            maxLength: 255
+            nullable: true
+          keterangan:
+            type: string
+            maxLength: 500
+            nullable: true
+AssetReclassification:
+  type: object
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    kode:
+      type: string
+    jenis:
+      type: string
+      enum: [pindah_group, pecah]
+    status:
+      type: string
+      enum: [draft, posted]
+    version:
+      $ref: '#/components/schemas/RecordVersion'
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_nama:
+      type: string
+      nullable: true
+    tanggal:
+      type: string
+      format: date
+    keterangan:
+      type: string
+    diposting_pada:
+      type: string
+      format: date-time
+      nullable: true
+    posting_id:
+      description: Posting finance yang terbit saat diposting; kosong bila tidak ada baris yang berpindah group pada buku yang di-post ke finance.
+      type: string
+      nullable: true
+    posting:
+      description: Hanya pada jawaban satu dokumen. Keadaan jurnalnya sekarang.
+      type: object
+      nullable: true
+      properties:
+        posting_id:
+          type: string
+        status:
+          type: string
+    jumlah_baris:
+      description: Hanya pada daftar.
+      type: integer
+    details:
+      description: Hanya pada jawaban satu dokumen.
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            $ref: '#/components/schemas/Ulid'
+          line_number:
+            type: integer
+          aset_id:
+            $ref: '#/components/schemas/Ulid'
+          aset_kode:
+            type: string
+            nullable: true
+          aset_nama:
+            type: string
+            nullable: true
+          nilai_perolehan_aset:
+            description: Harga perolehan register aset asal sekarang.
+            type: string
+            nullable: true
+          group_aset_asal_id:
+            description: Group aset sekarang selama draf; dibekukan saat diposting.
+            type: string
+            nullable: true
+          group_aset_asal_nama:
+            type: string
+            nullable: true
+          group_aset_tujuan_id:
+            type: string
+            nullable: true
+          group_aset_tujuan_nama:
+            type: string
+            nullable: true
+          persen:
+            type: string
+            nullable: true
+          nilai_perolehan:
+            type: string
+            nullable: true
+          nama_aset_baru:
+            type: string
+            nullable: true
+          keterangan:
+            type: string
+            nullable: true
+          aset_baru_id:
+            type: string
+            nullable: true
+          aset_baru_kode:
+            type: string
+            nullable: true
+          nilai_perolehan_dipindah:
+            type: string
+            nullable: true
+          books:
+            description: Kosong selama draf. Yang dipindah per buku penyusutan saat diposting.
+            type: array
+            items:
+              type: object
+              properties:
+                buku_id:
+                  $ref: '#/components/schemas/Ulid'
+                nilai_perolehan:
+                  type: string
+                akumulasi_penyusutan:
+                  type: string
+                penurunan_nilai:
+                  type: string
+                kenaikan_nilai:
+                  type: string
+                dijurnal:
+                  description: Buku ini dibawa jurnal `asset.reclassification`.
+                  type: boolean
+AssetReclassificationResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      $ref: '#/components/schemas/AssetReclassification'
 AssetMonitoringWrite:
   type: object
   description: |

@@ -29,6 +29,52 @@ Daftar lengkapnya didaftarkan di `src/ModuleServiceProvider.php` pada `ReportReg
 
 Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `daftar-work-order`).
 
+## Laporan keuangan aset
+
+Empat laporan padanan laporan aset tetap Business Central, semuanya Excel, satu baris per butir dengan baris total bila totalnya bermakna. Semuanya membaca catatan module ini saja; tidak ada yang membaca buku besar aplikasi finance. Menunya di **Laporan** pada `app.yaml`; test-nya `tests/Feature/AssetFinancialReportsTest.php`, di atas satu riwayat yang memuat perolehan, penyusutan, penurunan nilai, pindah group, pecah aset, dan penjualan.
+
+| Kode | Padanan BC | Parameter | Hak data | Kelas |
+| --- | --- | --- | --- | --- |
+| `laporan-nilai-buku-aset` | Fixed Asset - Book Value 01/02 | `dari`, `sampai` (bawaan awal tahun sampai hari ini), filter aset, `buku_id` | `penyusutan.read` | `AssetBookValueReport` |
+| `laporan-rekonsiliasi-aset-buku-besar` | Fixed Asset - G/L Analysis | `per_tanggal` (bawaan hari ini), filter aset | `penyusutan.read` | `AssetLedgerReconciliationReport` |
+| `laporan-proyeksi-penyusutan-aset` | Fixed Asset - Projected Value | `dari`, `sampai` bulan (bawaan 12 bulan mulai bulan ini, paling panjang 60), filter aset, `buku_id` | `penyusutan.read` | `AssetDepreciationProjectionReport` |
+| `laporan-perolehan-aset` | Fixed Asset Acquisition List | `dari`, `sampai` (bawaan awal tahun sampai hari ini), filter aset | `aset.read` | `AssetAcquisitionListReport` |
+
+Tidak ada permission baru: ketiga laporan nilai memakai hak yang sama dengan laporan penyusutan, dan daftar perolehan hak yang sama dengan register aset. Tanpa pilihan buku, laporan nilai buku dan proyeksi membaca buku komersial saja (lapisan `current`), seperti laporan penyusutan; menjumlahkan buku fiskal bersama membuat totalnya dobel.
+
+**Mutasi nilai buku.** Register tidak menyimpan buku besar per transaksi seperti FA Ledger Entry BC, jadi mutasinya disusun dari catatan yang membentuk saldo buku aset, masing-masing pada tanggalnya:
+
+| Mutasi | Sumber | Tanggal |
+| --- | --- | --- |
+| Perolehan | harga perolehan buku − yang masuk lewat reklasifikasi + yang keluar (harga perolehan dasar); akumulasi saldo awal aset lama ikut sebagai penyusutan | tanggal perolehan aset |
+| Penyusutan | periode **final** `aset_tr_penyusutan_aset`, termasuk baris pembalik yang negatif | akhir periode |
+| Penurunan dan kenaikan nilai | baris dokumen penyesuaian nilai yang sudah diposting | tanggal dokumen |
+| Reklasifikasi masuk dan keluar | `aset_tr_reklasifikasi_aset_buku`; pindah group tidak tampil karena saldo buku asetnya tidak berubah | tanggal reklasifikasi |
+| Pelepasan | seluruh saldo buku yang ditutup — sesudah ditutup tidak ada yang mengubahnya lagi | `closed_on` |
+
+Nilai buku akhir = nilai buku awal + perolehan − penyusutan − penurunan + kenaikan + reklasifikasi masuk − keluar − pelepasan, dan harga perolehan serta akumulasi punya persamaan yang sama. Pada hari ini saldo akhirnya sama dengan saldo buku aset di register; test-nya memeriksa keduanya. Buku tanpa saldo maupun mutasi dalam rentang, termasuk aset pecahan sebelum ia lahir, tidak tampil.
+
+**Rekonsiliasi ke buku besar.** Satu baris per group aset dan akun neraca posting group: harga perolehan, akumulasi penyusutan, akumulasi penurunan nilai, dan kenaikan nilai, dengan saldo alaminya (debit untuk harga perolehan dan kenaikan nilai, kredit untuk akumulasi). Setiap mutasi di atas — hanya pada buku yang di-post ke finance (K-26) — dibawa satu posting, dan saldonya dipecah menurut keadaan posting itu di feed (`PostingFeed::status`):
+
+| Kolom | Keadaan posting |
+| --- | --- |
+| Sudah dibukukan | `posted` — sudah ada ack dari aplikasi finance |
+| Dicatat manual | `manual` — sebelum cutover, feed mati, atau ditandai manual |
+| Menunggu | `pending` |
+| Tertahan | `held` |
+| Ditolak | `rejected` |
+| Belum dikirim | belum ada posting: penyusutan final yang belum di-post, aset tanpa penerimaan, atau pecah di dalam satu group yang memang tidak dijurnal |
+
+"Belum ada di buku besar" = saldo register − sudah dibukukan − dicatat manual. Posting tiap mutasi: perolehan dan saldo awalnya ke jurnal penerimaan (`AST-ACQ-`/`AST-OPB-`, koreksi nilai perolehan ikut keadaan jurnal itu), penyusutan ke `posted_posting_id` periodenya, penyesuaian nilai dan reklasifikasi ke `posting_id` dokumennya, pelepasan ke `AST-DSP-<id aset>`. Mutasi masuk ke group aset pada tanggalnya: aset yang pindah group masih di group asal pada tanggal reklasifikasi itu sendiri, karena penyusutan sampai tanggal itu harus final sebelum reklasifikasi diposting. Nomor dan nama akun dibaca dari posting group yang berlaku pada tanggal laporan.
+
+Batasnya sengaja: module tidak membaca buku besar milik aplikasi finance — itu sistem lain. Yang dapat ia pastikan hanya bagian rantainya sendiri, yaitu mutasi register mana yang sudah terkirim dan dalam keadaan apa. Saldo buku besar dicocokkan di aplikasi finance dengan kolom "Sudah dibukukan" dan "Dicatat manual". Group tanpa buku yang di-post ke finance tidak ikut.
+
+**Proyeksi penyusutan.** Memakai `DepreciationCalculator` yang sama dengan proposal penyusutan, termasuk perpindahan ke profil alternatif (dipindah dari controller ke `DepreciationCalculator::applyAlternativeProfile()` supaya tidak ada rumus kedua). Proyeksi berjalan dari keadaan buku sekarang: mulai periode sesudah periode final terakhir — usulan yang belum difinalkan ikut dihitung ulang — dan setiap periode mengurangi nilai buku yang dipakai periode berikutnya. Umur berjalan = `elapsed_periods_offset` + periode asli yang final, sama dengan proposal. Periode berakhir pada akhir bulan, kuartal, semester, atau tahun kalender menurut frekuensi profil. Buku yang tidak disusutkan, sudah ditutup, atau berprofil konsumsi tidak diproyeksikan, dan periode tanpa penyusutan tidak tampil.
+
+**Daftar perolehan.** Aset dengan tanggal perolehan di rentang. Nilai perolehan = harga perolehan register sekarang + bagian yang sudah dipecah ke aset lain, yaitu nilai saat diperoleh. Cara perolehan dan dokumen asal dari penerimaan yang melahirkannya; aset yang dicatat langsung di register tertulis "Dicatat langsung di register". Aset pecahan tidak ikut: ia lahir dari reklasifikasi, bukan diperoleh.
+
+**Laporan penyusutan ikut membaca pecah aset.** Akumulasi `laporan-penyusutan-aset` = akumulasi saldo awal + periode final + akumulasi yang masuk dikurangi yang keluar lewat pecah aset sampai akhir bulan, supaya buku aset pecahan dan aset asalnya tetap sama dengan register.
+
 ## Yang diminta Core
 
 `PenyediaLaporan` mendaftarkan diri ke `ModuleReportProviders` sekali saat boot penyedia layanan modul.
@@ -70,6 +116,9 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 | `laporan-monitoring-aset` | Monitoring (`aset_tr_monitoring_aset`, `monitoring`, `kode`); Baris monitoring (`aset_tr_monitoring_aset_details`, tanpa alias) | hanya baris yang cocok tercetak |
 | `daftar-mutasi-aset` | Mutasi (`aset_tr_mutasi_aset`, `mutasi`, `kode`); Baris mutasi (`aset_tr_mutasi_aset_details`, tanpa alias) | hanya baris yang cocok tercetak |
 | `daftar-work-order` | Work order (`aset_tr_pemeliharaan_aset`, tanpa alias, `kode`); Baris pekerjaan (`aset_tr_pemeliharaan_aset_details`, tanpa alias) | work order tanpa baris yang cocok tidak ikut, jumlah baris dan jam dihitung dari baris yang cocok; tanpa filter baris, work order tanpa baris tetap tampil |
+| `laporan-nilai-buku-aset`, `laporan-proyeksi-penyusutan-aset` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`); Buku aset (`aset_tr_buku_aset`, `buku`) | buku aset yang dibaca |
+| `laporan-perolehan-aset` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang dibaca |
+| `laporan-rekonsiliasi-aset-buku-besar` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang mutasinya dihitung; menurut keadaan aset sekarang |
 
 Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, `FIELD_HIDDEN`), dan `tests/Feature/ReportFieldCatalogTest.php` menolak kolom yang belum diberi nama atau alasan disembunyikan. Jadwal work order (`diharapkan_*`, `dijadwalkan_*`) sengaja tidak ditawarkan: tersimpan tanpa zona, sedangkan filter tanggal-jam membacanya sebagai UTC. `berita-acara-serah-terima` dan `work-order` dicetak per satu dokumen yang dipilih, jadi tidak punya data item.
 
@@ -105,6 +154,7 @@ Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`
 | `src/Console/Commands/BuildBuiltinLayouts.php` | Perintah yang menjalankan semua pembangun |
 | `resources/laporan/` | Layout bawaan per kode laporan |
 | `tests/Feature/PenyediaLaporanTest.php` | Definisi, layout bawaan, dataset dengan permission dan scope, filter daftar |
+| `tests/Feature/AssetFinancialReportsTest.php` | Laporan keuangan aset: mutasi nilai buku, rekonsiliasi, proyeksi, daftar perolehan |
 | `src/Reporting/AssetReportFilters.php` | Filter aset bersama: aturan, penerapan pada query, dan nama di kepala laporan |
 | `src/Reporting/Lists/AssetRegisterList.php` | Register aset sebagai daftar yang dapat diekspor Core |
 | `tests/Feature/AssetRegisterListTest.php` | Baris ekspor register aset mengikuti hak, cakupan unit kerja, dan pencarian |

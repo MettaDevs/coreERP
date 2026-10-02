@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
@@ -99,7 +98,7 @@ class DepreciationController extends Controller
         $calculator = app(DepreciationCalculator::class);
         // Saldo menurun berpindah ke profil alternatif begitu garis lurus sisa umur
         // menghasilkan angka lebih besar, supaya aset tetap habis di akhir masa manfaat.
-        $this->applyAlternativeProfile($book, $calculator, $elapsedPeriods);
+        $calculator->applyAlternativeProfile($book, $elapsedPeriods);
         $amount = $calculator->amount($book, $elapsedPeriods, $data['consumption_amount'] ?? null);
         $placement = PenempatanAset::query()->where('aset_id', $book->aset_id)->whereDate('effective_on', '<=', $data['period_ends_on'])->orderByDesc('effective_on')->orderByDesc('id')->toBase()->first();
         abort_unless($placement?->usage_org_unit_id, 422, 'Aset belum memiliki unit penggunaan untuk periode ini.');
@@ -179,7 +178,7 @@ class DepreciationController extends Controller
                 ->where('buku_aset_id', $book->id)
                 ->whereNull('reverses_period_id')
                 ->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
-            $this->applyAlternativeProfile($book, $calculator, $elapsedPeriods);
+            $calculator->applyAlternativeProfile($book, $elapsedPeriods);
             $amount = $calculator->amount($book, $elapsedPeriods);
             if ($amount <= 0.0) {
                 $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'sudah_habis'];
@@ -232,31 +231,6 @@ class DepreciationController extends Controller
             ->whereNull('reverses_period_id')->exists();
 
         return $exists ? 'sudah_ada' : null;
-    }
-
-    /**
-     * Memindahkan buku ke profil alternatif bila saldo menurun sudah kalah dari garis
-     * lurus sisa umur. Dipakai proposal tunggal maupun massal agar keduanya tidak
-     * menyimpang satu sama lain.
-     */
-    private function applyAlternativeProfile(stdClass $book, DepreciationCalculator $calculator, int $elapsedPeriods): void
-    {
-        if (! $calculator->shouldSwitch($book, $elapsedPeriods)) {
-            return;
-        }
-        // `withTrashed()` mempertahankan perilaku lama: profil alternatif yang sudah
-        // diarsipkan tetap dipakai buku yang terlanjur menunjuknya, karena aturannya
-        // sudah menempel pada buku itu sejak asetnya diterima.
-        $alternative = ProfilPenyusutan::withTrashed()
-            ->where('id', $book->alternative_profile_id)
-            ->toBase()->first(['method', 'frequency', 'rate_percent', 'manual_schedule']);
-        if (! $alternative) {
-            return;
-        }
-        $book->method = $alternative->method;
-        $book->frequency = $alternative->frequency;
-        $book->rate_percent = $alternative->rate_percent;
-        $book->manual_schedule = $alternative->manual_schedule;
     }
 
     /**

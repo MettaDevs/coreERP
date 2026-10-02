@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Services;
 
 use Illuminate\Support\Carbon;
+use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use stdClass;
 
 /**
@@ -129,6 +130,31 @@ final class DepreciationCalculator
     private function valueAdjusted(stdClass $book): bool
     {
         return (float) ($book->write_down_amount ?? 0) !== 0.0 || (float) ($book->appreciation_amount ?? 0) !== 0.0;
+    }
+
+    /**
+     * Memindahkan buku ke profil alternatif bila saldo menurun sudah kalah dari garis
+     * lurus sisa umur. Dipakai proposal tunggal, proposal massal, dan laporan proyeksi
+     * penyusutan agar ketiganya tidak menyimpang satu sama lain.
+     */
+    public function applyAlternativeProfile(stdClass $book, int $elapsedPeriods): void
+    {
+        if (! $this->shouldSwitch($book, $elapsedPeriods)) {
+            return;
+        }
+        // `withTrashed()` mempertahankan perilaku lama: profil alternatif yang sudah
+        // diarsipkan tetap dipakai buku yang terlanjur menunjuknya, karena aturannya
+        // sudah menempel pada buku itu sejak asetnya diterima.
+        $alternative = ProfilPenyusutan::withTrashed()
+            ->where('id', $book->alternative_profile_id)
+            ->toBase()->first(['method', 'frequency', 'rate_percent', 'manual_schedule']);
+        if (! $alternative) {
+            return;
+        }
+        $book->method = $alternative->method;
+        $book->frequency = $alternative->frequency;
+        $book->rate_percent = $alternative->rate_percent;
+        $book->manual_schedule = $alternative->manual_schedule;
     }
 
     public function periodsPerYear(?string $frequency): int

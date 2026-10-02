@@ -4,7 +4,7 @@ Halaman ini untuk developer. Perilaku dasar master ada di [Master data](/apps/ma
 
 Posting group menjawab satu pertanyaan: **jurnal aset dari group ini masuk ke akun mana.** Satu baris adalah lima belas akun untuk satu group aset, berlaku sejak satu tanggal. Padanannya *FA Posting Groups* di Business Central dan *fixed asset posting profile* di F&O.
 
-Penerimaan, saldo awal, "Post penyusutan" (area 9 sampai 11 feed posting finance), [penyesuaian nilai aset](/apps/management-aset/transaction/penyesuaian-nilai-aset/), dan [pelepasan aset](/apps/management-aset/transaction/siklus-aset/#jurnal-pelepasan) membaca akunnya dari sini. Selama akunnya kosong, posting yang membutuhkannya tertahan di Core.
+Penerimaan, saldo awal, "Post penyusutan" (area 9 sampai 11 feed posting finance), [penyesuaian nilai aset](/apps/management-aset/transaction/penyesuaian-nilai-aset/), [reklasifikasi aset antar group](/apps/management-aset/transaction/reklasifikasi-aset/), dan [pelepasan aset](/apps/management-aset/transaction/siklus-aset/#jurnal-pelepasan) membaca akunnya dari sini. Selama akunnya kosong, posting yang membutuhkannya tertahan di Core.
 
 ## Konsep yang mudah tertukar
 

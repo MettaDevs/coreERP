@@ -73,6 +73,57 @@ trait MenyiapkanNilaiBukuAset
         return [$group, $komersial, $fiskal];
     }
 
+    /**
+     * Group kedua yang memakai buku komersial dan fiskal yang sama dengan group pertama — syarat reklasifikasi
+     * antar group — dengan akun neraca sendiri (1-2400, 1-2490, 1-2495, 1-2410).
+     */
+    private function groupBukuSama(string $kode, string $nama, string $komersial, string $fiskal): string
+    {
+        foreach ([
+            'akumulasi_alkes' => ['1469', '1-2490', 'Akumulasi Penyusutan - Alat Kesehatan'],
+            'turun_alkes' => ['1468', '1-2495', 'Akumulasi Penurunan Nilai - Alat Kesehatan'],
+            'naik_alkes' => ['1461', '1-2410', 'Revaluasi Aset Tetap - Alat Kesehatan'],
+        ] as $kunci => [$eksternal, $kodeAkun, $namaAkun]) {
+            $this->akun[$kunci] ??= FinanceReferenceAccount::query()->create([
+                'tenant_id' => $this->tenantId, 'legal_entity_id' => null, 'external_id' => $eksternal,
+                'code' => $kodeAkun, 'name' => $namaAkun, 'type' => 'balance_sheet', 'active' => true,
+            ])->id;
+        }
+        $group = $this->groupTanpaBuku($kode, $nama);
+        $this->sebagaiPengguna($this->tenantId, $this->izinMaster('group-aset'))
+            ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', ['version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'), 'rows' => [
+                ['buku_id' => $komersial, 'useful_life_periods' => 48, 'convention' => 'full_month', 'depreciate' => true],
+                ['buku_id' => $fiskal, 'useful_life_periods' => 48, 'convention' => 'full_month', 'depreciate' => true],
+            ]])->assertOk();
+        $this->petakan($group, [
+            'acquisition_account_id' => $this->akun['alkes'],
+            'accumulated_depreciation_account_id' => $this->akun['akumulasi_alkes'],
+            'depreciation_expense_account_id' => $this->akun['beban'],
+            'payable_account_id' => $this->akun['hutang'],
+            'write_down_account_id' => $this->akun['turun_alkes'],
+            'write_down_expense_account_id' => $this->akun['beban_turun'],
+            'appreciation_account_id' => $this->akun['naik_alkes'],
+            'appreciation_offset_account_id' => $this->akun['surplus'],
+        ]);
+
+        return $group;
+    }
+
+    private function turunkanNilai(string $aset, string $buku, string $tanggal, int $nilai): void
+    {
+        $izin = ['management-aset.penyesuaian-nilai-aset.create', 'management-aset.penyesuaian-nilai-aset.post'];
+        $id = (string) $this->sebagaiPengguna($this->tenantId, $izin)
+            ->withHeader('Idempotency-Key', 'pnla-'.Str::ulid())
+            ->postJson(self::API.'penyesuaian-nilai-aset', [
+                'legal_entity_id' => $this->le, 'responsible_org_unit_id' => $this->poli, 'jenis' => 'write_down',
+                'buku_id' => $buku, 'tanggal' => $tanggal, 'keterangan' => 'Rusak berat',
+                'details' => [['aset_id' => $aset, 'nilai' => $nilai]],
+            ])->assertCreated()->json('data.id');
+        $this->sebagaiPengguna($this->tenantId, $izin)
+            ->postJson(self::API.'penyesuaian-nilai-aset/'.$id.'/posting', ['version' => DB::table('aset_tr_penyesuaian_nilai_aset')->where('id', $id)->value('version')])
+            ->assertOk();
+    }
+
     private function bukuBerprofilUji(string $kode, string $nama, string $postingLayer): string
     {
         $profil = $this->masterUji('profil-penyusutan', [

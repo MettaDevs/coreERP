@@ -16,6 +16,7 @@ description: |
   | `asset.disposal_scrap` | Pemusnahan aset diposting | Sudah |
   | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
   | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
+  | `asset.reclassification` | Reklasifikasi aset antar group aset diposting | Sudah |
 
   **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
   *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.
@@ -33,3 +34,4 @@ examples:
   - asset.disposal_scrap
   - asset.write_down
   - asset.appreciation
+  - asset.reclassification

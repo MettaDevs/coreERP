@@ -153,6 +153,9 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 | `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. Penjualan dan pemusnahan berstatus `draft`, `posted`, atau `cancelled`; aset baru dilepas saat diposting. |
 | `tr_penyesuaian_nilai_aset` | Header penyesuaian nilai: jenis (`write_down`/`appreciation`), buku penyusutan, tanggal, alasan, status, `posting_id`. Nomor unik per entitas legal (indeks parsial). |
 | `tr_penyesuaian_nilai_aset_details` | Satu aset per baris dengan nilai penyesuaian; nilai buku sebelum dan sesudah dibekukan saat diposting. |
+| `tr_reklasifikasi_aset` | Header reklasifikasi: jenis (`pindah_group`/`pecah`), tanggal, alasan, status, `posting_id`. Nomor unik per entitas legal (indeks parsial). |
+| `tr_reklasifikasi_aset_details` | Satu aset asal per baris: group tujuan, untuk pecah persen atau nilai perolehan dan nama aset baru; group asal, aset baru, dan nilai perolehan yang dipindah dibekukan saat diposting. |
+| `tr_reklasifikasi_aset_buku` | Yang dipindah per baris per buku penyusutan saat diposting, keluar dari buku aset asal dan masuk ke buku aset tujuan. Ditulis sekali, tanpa `deleted_at`; dibaca laporan nilai buku dan rekonsiliasi. |
 | `tr_perencanaan_aset` | Header perencanaan aset per entitas legal dan unit kerja. |
 | `tr_perencanaan_aset_details` | Rincian jenis aset, jumlah, harga perkiraan, dan spesifikasi yang diminta. |
 | `tr_aset_atribut` | Nilai atribut bertipe per aset; tipe dasar pemiliknya dikunci saat baris pertama tersimpan. |

@@ -17,9 +17,13 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Apperp\ManagementAset\Console\Commands\BuildBuiltinLayouts;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetAcquisitionListReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetBookValueReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDepreciationProjectionReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDepreciationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalSaleReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalScrapReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetLedgerReconciliationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMonitoringReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
@@ -78,6 +82,10 @@ final class ModuleServiceProvider extends ServiceProvider
             $registry->register(new AssetDisposalScrapReport);
             $registry->register(new AssetDisposalSaleReport);
             $registry->register(new AssetMonitoringReport);
+            $registry->register(new AssetBookValueReport);
+            $registry->register(new AssetDepreciationProjectionReport);
+            $registry->register(new AssetAcquisitionListReport);
+            $registry->register(new AssetLedgerReconciliationReport);
 
             return $registry;
         });

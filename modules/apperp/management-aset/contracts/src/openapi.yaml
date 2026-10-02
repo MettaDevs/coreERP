@@ -66,6 +66,8 @@ tags:
   description: Pencatatan downtime aset dan KPI pemeliharaan yang dihitung saat dibaca.
 - name: Penyesuaian nilai aset
   description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya ke aplikasi finance.
+- name: Reklasifikasi aset
+  description: Pindah group aset dan pecah aset, beserta jurnal pemindahan saldonya antar group ke aplikasi finance.
 - name: Penyusutan
   description: Proposal, finalisasi, dan pembalikan penyusutan, serta "Post penyusutan" yang mengirim jurnal ringkasnya ke aplikasi finance.
 - name: Reference data
@@ -83,6 +85,7 @@ x-bundle:
   - paths/monitoring-aset.yaml
   - paths/pelepasan-aset.yaml
   - paths/penyesuaian-nilai-aset.yaml
+  - paths/reklasifikasi-aset.yaml
   - paths/pemeliharaan-aset.yaml
   - paths/pemeliharaan-preventif.yaml
   - paths/permintaan-pemeliharaan.yaml
