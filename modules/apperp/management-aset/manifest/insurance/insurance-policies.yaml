@@ -1,0 +1,63 @@
+# Polis asuransi dan pertanggungan aset; padanan *Insurance*, *Insurance Journal*, dan *Ins. Coverage
+# Ledger Entries* Business Central. Tidak ada posting ke buku besar, seperti di BC. Area `insurance`
+# mengikuti folder FixedAssets/Insurance BC.
+security:
+  entry_points:
+    - code: management-aset.polis-asuransi.form
+      name: Layar polis asuransi
+      type: form
+    - code: management-aset.polis-asuransi.api
+      name: API polis asuransi
+      type: api
+  permissions:
+    - code: management-aset.polis-asuransi.read
+      name: Lihat polis asuransi dan pertanggungan aset
+      entry_point: management-aset.polis-asuransi.form
+      access: read
+    - code: management-aset.polis-asuransi.create
+      name: Buat polis asuransi
+      entry_point: management-aset.polis-asuransi.api
+      access: create
+    # Mengubah kartu polis sekaligus menambah, mengakhiri, mengganti nilai, dan mengarsipkan
+    # pertanggungannya: pertanggungan adalah isi polis, seperti baris jurnal asuransi di BC.
+    - code: management-aset.polis-asuransi.update
+      name: Ubah polis asuransi dan pertanggungannya
+      entry_point: management-aset.polis-asuransi.api
+      access: update
+    - code: management-aset.polis-asuransi.archive
+      name: Arsipkan polis asuransi
+      entry_point: management-aset.polis-asuransi.api
+      access: delete
+  privileges:
+    # Membaca register aset dan jenis asuransi ikut di sini: ringkasan aset yang belum diasuransikan dan
+    # pemilih aset pada pertanggungan membacanya. Tanpa hak tulis apa pun atas keduanya.
+    - code: management-aset.polis-asuransi.view
+      name: Lihat asuransi aset
+      permissions:
+        - management-aset.polis-asuransi.read
+        - management-aset.jenis-asuransi.read
+        - management-aset.aset.read
+    - code: management-aset.polis-asuransi.maintain
+      name: Susun polis dan pertanggungan asuransi
+      permissions:
+        - management-aset.polis-asuransi.read
+        - management-aset.polis-asuransi.create
+        - management-aset.polis-asuransi.update
+    - code: management-aset.polis-asuransi.retire
+      name: Arsipkan polis asuransi
+      permissions:
+        - management-aset.polis-asuransi.archive
+  duties:
+    - code: management-aset.polis-asuransi.manage
+      name: Kelola asuransi aset
+      privileges:
+        - management-aset.polis-asuransi.view
+        - management-aset.polis-asuransi.maintain
+        - management-aset.polis-asuransi.retire
+number_sequences:
+  references:
+    - code: management-aset.polis-asuransi
+      name: Nomor polis asuransi
+      default_prefix: POLA
+      allowed_scopes:
+        - legal_entity

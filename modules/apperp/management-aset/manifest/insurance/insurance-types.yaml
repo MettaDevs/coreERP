@@ -1,0 +1,50 @@
+# Jenis asuransi; padanan *Insurance Type* Business Central.
+security:
+  entry_points:
+    - code: management-aset.jenis-asuransi.form
+      name: Layar jenis asuransi
+      type: form
+    - code: management-aset.jenis-asuransi.api
+      name: API jenis asuransi
+      type: api
+  permissions:
+    - code: management-aset.jenis-asuransi.read
+      name: Lihat jenis asuransi
+      entry_point: management-aset.jenis-asuransi.form
+      access: read
+    - code: management-aset.jenis-asuransi.create
+      name: Tambah jenis asuransi
+      entry_point: management-aset.jenis-asuransi.api
+      access: create
+    - code: management-aset.jenis-asuransi.update
+      name: Ubah jenis asuransi
+      entry_point: management-aset.jenis-asuransi.api
+      access: update
+    - code: management-aset.jenis-asuransi.archive
+      name: Arsipkan jenis asuransi
+      entry_point: management-aset.jenis-asuransi.api
+      access: delete
+  privileges:
+    - code: management-aset.jenis-asuransi.maintain
+      name: Pelihara jenis asuransi
+      permissions:
+        - management-aset.jenis-asuransi.read
+        - management-aset.jenis-asuransi.create
+        - management-aset.jenis-asuransi.update
+    - code: management-aset.jenis-asuransi.retire
+      name: Arsipkan jenis asuransi
+      permissions:
+        - management-aset.jenis-asuransi.archive
+  duties:
+    - code: management-aset.jenis-asuransi.manage
+      name: Kelola jenis asuransi
+      privileges:
+        - management-aset.jenis-asuransi.maintain
+        - management-aset.jenis-asuransi.retire
+number_sequences:
+  references:
+    - code: management-aset.jenis-asuransi
+      name: Kode jenis asuransi
+      default_prefix: JASR
+      allowed_scopes:
+        - tenant

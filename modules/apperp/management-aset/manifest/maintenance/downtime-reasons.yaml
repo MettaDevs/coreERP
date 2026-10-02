@@ -1,0 +1,50 @@
+# Alasan downtime; padanan *Maintenance downtime reason codes* Dynamics 365 F&O, beserta *KPI include*.
+security:
+  entry_points:
+    - code: management-aset.alasan-downtime.form
+      name: Layar alasan downtime
+      type: form
+    - code: management-aset.alasan-downtime.api
+      name: API alasan downtime
+      type: api
+  permissions:
+    - code: management-aset.alasan-downtime.read
+      name: Lihat alasan downtime
+      entry_point: management-aset.alasan-downtime.form
+      access: read
+    - code: management-aset.alasan-downtime.create
+      name: Tambah alasan downtime
+      entry_point: management-aset.alasan-downtime.api
+      access: create
+    - code: management-aset.alasan-downtime.update
+      name: Ubah alasan downtime
+      entry_point: management-aset.alasan-downtime.api
+      access: update
+    - code: management-aset.alasan-downtime.archive
+      name: Arsipkan alasan downtime
+      entry_point: management-aset.alasan-downtime.api
+      access: delete
+  privileges:
+    - code: management-aset.alasan-downtime.maintain
+      name: Pelihara alasan downtime
+      permissions:
+        - management-aset.alasan-downtime.read
+        - management-aset.alasan-downtime.create
+        - management-aset.alasan-downtime.update
+    - code: management-aset.alasan-downtime.retire
+      name: Arsipkan alasan downtime
+      permissions:
+        - management-aset.alasan-downtime.archive
+  duties:
+    - code: management-aset.alasan-downtime.manage
+      name: Kelola alasan downtime
+      privileges:
+        - management-aset.alasan-downtime.maintain
+        - management-aset.alasan-downtime.retire
+number_sequences:
+  references:
+    - code: management-aset.alasan-downtime
+      name: Kode alasan downtime
+      default_prefix: ALDT
+      allowed_scopes:
+        - tenant

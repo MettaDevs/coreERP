@@ -25,7 +25,9 @@ export type MasterResource =
     | 'profil-penyusutan'
     | 'jenis-counter'
     | 'rencana-pemeliharaan'
-    | 'jenis-permintaan-pemeliharaan';
+    | 'jenis-permintaan-pemeliharaan'
+    | 'jenis-asuransi'
+    | 'alasan-downtime';
 
 export type MasterAction = 'read' | 'create' | 'update' | 'archive';
 
@@ -459,6 +461,38 @@ export const MASTERS: MasterConfig[] = [
                 summaryKey: 'tipe_work_order',
                 label: 'Tipe work order bawaan',
                 required: false,
+            },
+        ],
+    },
+    {
+        resource: 'jenis-asuransi',
+        nav: 'Jenis asuransi',
+        title: 'Jenis asuransi',
+        subtitle:
+            'Golongan polis asuransi aset, misalnya kebakaran atau kendaraan bermotor.',
+        kodeLabel: 'Kode jenis asuransi',
+        namaLabel: 'Nama jenis asuransi',
+        singular: 'jenis asuransi',
+    },
+    {
+        resource: 'alasan-downtime',
+        nav: 'Alasan downtime',
+        title: 'Alasan downtime',
+        subtitle:
+            'Sebab aset berhenti beroperasi, misalnya kerusakan atau henti terencana.',
+        kodeLabel: 'Kode alasan downtime',
+        namaLabel: 'Nama alasan downtime',
+        singular: 'alasan downtime',
+        extraFields: [
+            // Disimpan sebagai `masuk_kpi` (padanan *KPI include* F&O), tetapi diisi sebagai
+            // kebalikannya: alasan baru bawaannya dihitung, dan centang kosong berarti dihitung.
+            {
+                name: 'masuk_kpi',
+                label: 'Henti terencana, tidak dihitung pada KPI',
+                type: 'boolean',
+                help: 'Centang untuk henti yang memang direncanakan, misalnya servis berkala. Downtime beralasan ini tidak mengurangi ketersediaan aset dan tidak dihitung sebagai henti pada KPI pemeliharaan.',
+                toPayload: (value) => value !== true,
+                fromRecord: (raw) => raw === false,
             },
         ],
     },

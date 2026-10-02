@@ -25,6 +25,7 @@ import {
     toastSaveError,
 } from '../../api';
 import { requestPrint } from '../../print';
+import WarrantyNotice from '../warranty/WarrantyNotice';
 import type {
     ChecklistRow,
     Context,
@@ -1468,6 +1469,25 @@ export default function WorkOrderDetailPage({
                         />
                     </Field>
                     <div className="space-y-3">
+                        {/* Pemberitahuan garansi dan kontrak servis pada tanggal mulai work
+                            order; informasi saja, tidak menahan apa pun. */}
+                        <WarrantyNotice
+                            asetIds={record.details.map((job) => job.aset_id)}
+                            date={(
+                                record.dijadwalkan_mulai ||
+                                record.diharapkan_mulai ||
+                                ''
+                            ).slice(0, 10)}
+                            labelOf={(asetId) =>
+                                labelDari(
+                                    aset.find((option) => option.id === asetId),
+                                ) ??
+                                record.details.find(
+                                    (job) => job.aset_id === asetId,
+                                )?.aset_kode ??
+                                'Aset'
+                            }
+                        />
                         <div className="flex items-center justify-between">
                             <h3 className="font-medium">Baris pekerjaan</h3>
                             {draft && editing && (

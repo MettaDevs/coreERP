@@ -2948,6 +2948,280 @@ MaintenanceRequestResponse:
   type: object
   required: [data]
   properties: {data: {$ref: '#/components/schemas/MaintenanceRequest'}}
+VendorOption:
+  description: Vendor milik Core (K-06), dibaca lewat kontrak `VendorDirectory`.
+  type: object
+  required: [id, number, name, status, legal_entity_id]
+  properties: {id: {type: string}, number: {type: string}, name: {type: string}, tax_number: {type: [string, 'null']}, status: {type: string}, legal_entity_id: {type: string}}
+VendorSummary:
+  type: object
+  required: [id, number, name, status]
+  properties: {id: {type: string}, number: {type: string}, name: {type: string}, status: {type: string}}
+InsuranceTypeResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+InsuranceTypeList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+InsurancePolicyWrite:
+  type: object
+  required: [legal_entity_id, nama, nomor_polis, berlaku_mulai]
+  properties:
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    nama: {type: string, maxLength: 150}
+    nomor_polis: {type: string, maxLength: 60, description: Nomor polis dari penanggung (*Policy No.* BC).}
+    jenis_asuransi_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    vendor_id: {type: [string, 'null'], description: Penanggung; vendor entitas legal polis.}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: [string, 'null'], format: date}
+    premi_tahunan: {type: [number, 'null'], minimum: 0}
+    nilai_pertanggungan: {type: [number, 'null'], minimum: 0, description: Plafon polis (*Policy Coverage* BC).}
+    diblokir: {type: boolean, description: Polis diblokir menolak pertanggungan baru; yang sudah ada tetap menanggung.}
+    keterangan: {type: [string, 'null'], maxLength: 2000}
+InsuranceCoverage:
+  type: object
+  required: [id, polis_asuransi_id, aset_id, nilai_pertanggungan, berlaku_mulai, berlaku_sampai, berjalan]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    polis_asuransi_id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    aset_kode: {type: string}
+    aset_nama: {type: string}
+    nilai_pertanggungan: {type: string, description: Desimal dua angka sebagai teks.}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: [string, 'null'], format: date, description: Kosong berarti mengikuti masa berlaku polis.}
+    keterangan: {type: [string, 'null']}
+    berjalan: {type: boolean, description: Berlaku hari ini (zona pengguna).}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+InsuranceCoverageWrite:
+  type: object
+  required: [aset_id, nilai_pertanggungan, berlaku_mulai]
+  properties:
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    nilai_pertanggungan: {type: number, exclusiveMinimum: 0}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: [string, 'null'], format: date}
+    keterangan: {type: [string, 'null'], maxLength: 2000}
+    version: {$ref: '#/components/schemas/VersionField'}
+InsurancePolicy:
+  type: object
+  required: [id, kode, legal_entity_id, nama, nomor_polis, berlaku_mulai, berlaku_sampai, premi_tahunan, nilai_pertanggungan, diblokir, total_nilai_tertanggung, selisih_plafon, berlaku, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    kode: {type: string}
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    nama: {type: string}
+    nomor_polis: {type: string}
+    jenis_asuransi_id: {type: [string, 'null']}
+    jenis_asuransi_kode: {type: [string, 'null']}
+    jenis_asuransi_nama: {type: [string, 'null']}
+    vendor_id: {type: [string, 'null']}
+    vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: [string, 'null'], format: date}
+    premi_tahunan: {type: string}
+    nilai_pertanggungan: {type: string}
+    diblokir: {type: boolean}
+    keterangan: {type: [string, 'null']}
+    total_nilai_tertanggung: {type: string, description: Jumlah pertanggungan yang berlaku hari ini (*Total Value Insured* BC).}
+    selisih_plafon: {type: string, description: Plafon polis dikurangi total yang ditanggung (*Over/Under Insured* BC); negatif berarti melebihi plafon.}
+    berlaku: {type: boolean}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+    pertanggungan: {type: array, description: Hanya pada GET satu polis dan jawaban tindakannya., items: {$ref: '#/components/schemas/InsuranceCoverage'}}
+InsurancePolicyResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/InsurancePolicy'}}
+AssetInsurance:
+  type: object
+  required: [tanggal, total_nilai_tertanggung, nilai_perolehan, status, pertanggungan]
+  properties:
+    tanggal: {type: string, format: date}
+    total_nilai_tertanggung: {type: string}
+    nilai_perolehan: {type: string, description: Nilai perolehan buku komersial; nilai perolehan aset bila belum punya buku.}
+    nilai_buku: {type: [string, 'null']}
+    status: {type: string, enum: [tidak_diasuransikan, kurang_diasuransikan, cukup]}
+    pertanggungan: {type: array, items: {allOf: [{$ref: '#/components/schemas/InsuranceCoverage'}, {type: object, properties: {polis_kode: {type: string}, polis_nama: {type: string}, nomor_polis: {type: string}}}]}}
+AssetInsuranceSummaryRow:
+  type: object
+  required: [id, kode, nama, nilai_perolehan, total_nilai_tertanggung, kekurangan, status]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    kode: {type: string}
+    nama: {type: string}
+    legal_entity_id: {type: string}
+    jenis_aset_id: {type: string}
+    jenis_aset_nama: {type: [string, 'null']}
+    lokasi_aset_id: {type: [string, 'null']}
+    lokasi_aset_nama: {type: [string, 'null']}
+    nilai_perolehan: {type: string}
+    akumulasi_penyusutan: {type: [string, 'null']}
+    nilai_buku: {type: [string, 'null']}
+    total_nilai_tertanggung: {type: string}
+    kekurangan: {type: string, description: Nilai perolehan dikurangi total yang ditanggung, paling kecil nol.}
+    status: {type: string, enum: [tidak_diasuransikan, kurang_diasuransikan, cukup]}
+AssetWarrantyWrite:
+  type: object
+  required: [jenis_garansi, berlaku_mulai, berlaku_sampai]
+  properties:
+    vendor_id: {type: [string, 'null'], description: Penjamin; vendor entitas legal aset.}
+    jenis_garansi: {type: string, enum: [penuh, sebagian], description: Padanan *full* dan *partial coverage* warranty agreement F&O.}
+    nomor_referensi: {type: [string, 'null'], maxLength: 80}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: string, format: date}
+    catatan: {type: [string, 'null'], maxLength: 2000}
+AssetWarranty:
+  type: object
+  required: [id, aset_id, jenis_garansi, berlaku_mulai, berlaku_sampai, berlaku, sisa_hari, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    aset_kode: {type: string}
+    aset_nama: {type: string}
+    vendor_id: {type: [string, 'null']}
+    vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
+    jenis_garansi: {type: string, enum: [penuh, sebagian]}
+    jenis_garansi_label: {type: string}
+    nomor_referensi: {type: [string, 'null']}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: string, format: date}
+    catatan: {type: [string, 'null']}
+    berlaku: {type: boolean}
+    sisa_hari: {type: integer, minimum: 0}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+ExpiringCoverage:
+  type: object
+  required: [jenis, id, berlaku_sampai, sisa_hari, jumlah_aset]
+  properties:
+    jenis: {type: string, enum: [garansi, kontrak_servis]}
+    id: {$ref: '#/components/schemas/Ulid'}
+    referensi: {type: [string, 'null']}
+    aset_id: {type: [string, 'null']}
+    aset_kode: {type: [string, 'null']}
+    aset_nama: {type: [string, 'null']}
+    jumlah_aset: {type: integer}
+    vendor_nama: {type: [string, 'null']}
+    berlaku_sampai: {type: string, format: date}
+    sisa_hari: {type: integer}
+ActiveWarranty:
+  type: object
+  required: [aset_id, jenis, berlaku_sampai]
+  properties:
+    aset_id: {type: string}
+    jenis: {type: string, enum: [garansi, kontrak_servis]}
+    referensi: {type: [string, 'null']}
+    vendor_nama: {type: [string, 'null']}
+    jenis_garansi: {type: [string, 'null'], enum: [penuh, sebagian, null]}
+    cakupan: {type: [string, 'null']}
+    berlaku_sampai: {type: string, format: date}
+ServiceContractWrite:
+  type: object
+  required: [legal_entity_id, nomor_kontrak, vendor_id, berlaku_mulai, berlaku_sampai, aset_ids]
+  properties:
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    nomor_kontrak: {type: string, maxLength: 80}
+    vendor_id: {type: string}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: string, format: date}
+    cakupan: {type: [string, 'null'], maxLength: 4000}
+    nilai_kontrak: {type: [number, 'null'], minimum: 0}
+    keterangan: {type: [string, 'null'], maxLength: 2000}
+    aset_ids: {type: array, maxItems: 1000, uniqueItems: true, items: {$ref: '#/components/schemas/Ulid'}}
+ServiceContract:
+  type: object
+  required: [id, kode, legal_entity_id, nomor_kontrak, vendor_id, berlaku_mulai, berlaku_sampai, berlaku, sisa_hari, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    kode: {type: string}
+    legal_entity_id: {$ref: '#/components/schemas/Ulid'}
+    nomor_kontrak: {type: string}
+    vendor_id: {type: string}
+    vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
+    berlaku_mulai: {type: string, format: date}
+    berlaku_sampai: {type: string, format: date}
+    cakupan: {type: [string, 'null']}
+    nilai_kontrak: {type: [string, 'null']}
+    keterangan: {type: [string, 'null']}
+    lines_count: {type: [integer, 'null']}
+    berlaku: {type: boolean}
+    sisa_hari: {type: integer}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+    aset: {type: array, description: Hanya pada GET satu kontrak dan jawaban simpannya., items: {type: object, properties: {line_number: {type: integer}, aset_id: {type: string}, aset_kode: {type: string}, aset_nama: {type: string}}}}
+ServiceContractResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/ServiceContract'}}
+DowntimeReason:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties: {masuk_kpi: {type: boolean, description: Padanan *KPI include* F&O. Downtime beralasan ini dihitung pada availability dan jumlah henti.}}
+DowntimeReasonResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/DowntimeReason'}}
+DowntimeReasonList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/DowntimeReason'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+AssetDowntimeWrite:
+  type: object
+  required: [aset_id, mulai]
+  properties:
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    mulai: {type: string, description: Waktu; tanpa offset dibaca menurut zona pengguna.}
+    selesai: {type: [string, 'null']}
+    alasan_downtime_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Work order yang memuat aset ini.}
+    permintaan_pemeliharaan_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Permintaan pemeliharaan atas aset ini.}
+    keterangan: {type: [string, 'null'], maxLength: 2000}
+AssetDowntime:
+  type: object
+  required: [id, aset_id, mulai, selesai, sumber, durasi_jam, terbuka, masuk_kpi, version]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    aset_id: {$ref: '#/components/schemas/Ulid'}
+    aset_kode: {type: string}
+    aset_nama: {type: string}
+    mulai: {type: string, description: Waktu UTC.}
+    selesai: {type: [string, 'null'], description: Waktu UTC; kosong selama aset masih berhenti.}
+    alasan_downtime_id: {type: [string, 'null']}
+    alasan_downtime_kode: {type: [string, 'null']}
+    alasan_downtime_nama: {type: [string, 'null']}
+    masuk_kpi: {type: boolean}
+    pemeliharaan_aset_id: {type: [string, 'null']}
+    pemeliharaan_aset_kode: {type: [string, 'null']}
+    permintaan_pemeliharaan_id: {type: [string, 'null']}
+    permintaan_pemeliharaan_kode: {type: [string, 'null']}
+    sumber: {type: string, enum: [manual, work_order], description: '`work_order` dibuka dan ditutup perpindahan status work order.'}
+    keterangan: {type: [string, 'null']}
+    durasi_jam: {type: number, description: Catatan terbuka dihitung sampai saat ini.}
+    terbuka: {type: boolean}
+    version: {$ref: '#/components/schemas/RecordVersion'}
+MaintenanceKpiFigures:
+  type: object
+  properties:
+    jumlah_aset: {type: integer}
+    total_jam: {type: number}
+    downtime_jam: {type: number}
+    uptime_jam: {type: number}
+    availability_persen: {type: [number, 'null'], description: Uptime dibagi total waktu kali 100; kosong bila total waktu nol.}
+    jumlah_henti: {type: integer}
+    jumlah_kerusakan: {type: integer}
+    mtbf_jam: {type: number}
+    jam_perbaikan: {type: number}
+    mttr_jam: {type: number}
+    wo_selesai: {type: integer}
+MaintenanceKpiRow:
+  allOf:
+  - type: object
+    properties:
+      kunci: {type: [string, 'null'], description: Id aset, jenis aset, atau lokasi; kosong untuk aset tanpa lokasi.}
+      kode: {type: [string, 'null']}
+      nama: {type: [string, 'null']}
+  - $ref: '#/components/schemas/MaintenanceKpiFigures'
 PengaturanAsetTetap:
   type: object
   description: |

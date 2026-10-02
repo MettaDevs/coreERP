@@ -1,0 +1,64 @@
+# Downtime aset dan KPI pemeliharaan: padanan *Maintenance downtime* dan *Asset KPIs* Dynamics 365 F&O.
+/api/v1/alasan-downtime:
+  get:
+    tags: [Downtime dan KPI]
+    operationId: listDowntimeReasons
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    responses: {'200': {description: Daftar alasan downtime, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonList'}}}}}
+  post:
+    tags: [Downtime dan KPI]
+    operationId: createDowntimeReason
+    parameters: [$ref: '#/components/parameters/IdempotencyKey']
+    requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/MasterCreate'}, {type: object, properties: {masuk_kpi: {type: boolean, default: true}}}]}}}}
+    responses: {'201': {description: Alasan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+/api/v1/alasan-downtime/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Downtime dan KPI], operationId: getDowntimeReason, responses: {'200': {description: Alasan downtime, headers: {ETag: {$ref: '#/components/headers/ETag'}}, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}}}
+  patch: {tags: [Downtime dan KPI], operationId: updateDowntimeReason, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/MasterPatch'}, {type: object, properties: {masuk_kpi: {type: boolean}}}]}}}}, responses: {'200': {description: Alasan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+  delete: {tags: [Downtime dan KPI], operationId: archiveDowntimeReason, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/VersionInput'}}}}, responses: {'204': {description: Alasan diarsipkan}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+/api/v1/downtime-aset:
+  get:
+    tags: [Downtime dan KPI]
+    operationId: listAssetDowntime
+    description: Paling banyak 500 catatan atas aset dalam jangkauan pengguna. `dari` dan `sampai` adalah tanggal menurut zona pengguna; catatan yang sebagian berada di dalamnya ikut.
+    parameters:
+    - {name: aset_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}
+    - {name: pemeliharaan_aset_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}
+    - {name: dari, in: query, required: false, schema: {type: string, format: date}}
+    - {name: sampai, in: query, required: false, schema: {type: string, format: date}}
+    - {name: terbuka, in: query, required: false, description: Hanya catatan yang belum selesai., schema: {type: boolean}}
+    responses: {'200': {description: Daftar downtime, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: array, items: {$ref: '#/components/schemas/AssetDowntime'}}}}}}}}
+  post:
+    tags: [Downtime dan KPI]
+    operationId: recordAssetDowntime
+    description: |
+      Mencatat periode aset tidak dapat dipakai. Waktu tanpa offset dibaca menurut zona pengguna dan disimpan
+      dalam UTC; mulai dan selesai tidak boleh di masa depan. `selesai` kosong berarti aset masih berhenti, dan
+      satu aset paling banyak satu catatan terbuka. Catatan satu aset tidak boleh tumpang tindih. Permintaan
+      yang melahirkan work order ikut tercatat bila tidak dikirim.
+    parameters: [$ref: '#/components/parameters/IdempotencyKeyTransaksi']
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssetDowntimeWrite'}}}}
+    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Downtime dicatat, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetDowntime'}}}}}}, '422': {$ref: '#/components/responses/ValidationError'}}
+/api/v1/downtime-aset/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  patch: {tags: [Downtime dan KPI], operationId: correctAssetDowntime, description: Mengoreksi waktu, alasan, dan keterangan. Aset, work order, dan permintaan tidak dapat diganti., parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [mulai], properties: {mulai: {type: string}, selesai: {type: [string, 'null']}, alasan_downtime_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}, keterangan: {type: [string, 'null'], maxLength: 2000}, version: {$ref: '#/components/schemas/VersionField'}}}}}}, responses: {'200': {description: Downtime dikoreksi, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetDowntime'}}}}}}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+  delete: {tags: [Downtime dan KPI], operationId: archiveAssetDowntime, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/VersionInput'}}}}, responses: {'204': {description: Downtime diarsipkan}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
+/api/v1/kpi-pemeliharaan:
+  get:
+    tags: [Downtime dan KPI]
+    operationId: getMaintenanceKpis
+    description: |
+      KPI pemeliharaan per aset, jenis aset, atau lokasi untuk satu periode (tanggal zona pengguna, inklusif,
+      paling panjang 400 hari; bawaan awal bulan ini sampai hari ini). Dihitung saat dibaca. Rumusnya di
+      halaman fitur Downtime dan KPI pemeliharaan; ringkasnya: availability = (total − downtime) ÷ total × 100,
+      MTBF = total ÷ kerusakan (tanpa kerusakan = total), MTTR = jam perbaikan ÷ kerusakan (tanpa kerusakan =
+      jam perbaikan). Kalender 24 jam; periode yang melewati saat ini dihitung sampai saat ini.
+    parameters:
+    - {name: dari, in: query, required: false, schema: {type: string, format: date}}
+    - {name: sampai, in: query, required: false, schema: {type: string, format: date}}
+    - {name: kelompok, in: query, required: false, schema: {type: string, enum: [aset, jenis, lokasi], default: aset}}
+    - {name: legal_entity_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}
+    - $ref: '#/components/parameters/JenisAsetFilter'
+    - {name: lokasi_aset_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}
+    - {name: aset_id, in: query, required: false, schema: {$ref: '#/components/schemas/Ulid'}}
+    responses: {'200': {description: KPI per kelompok dan totalnya, content: {application/json: {schema: {type: object, required: [data, meta], properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceKpiRow'}}, meta: {type: object, properties: {dari: {type: string, format: date}, sampai: {type: string, format: date}, zona_waktu: {type: string}, kelompok: {type: string}, total: {$ref: '#/components/schemas/MaintenanceKpiFigures'}}}}}}}}, '403': {$ref: '#/components/responses/Forbidden'}, '422': {$ref: '#/components/responses/ValidationError'}}

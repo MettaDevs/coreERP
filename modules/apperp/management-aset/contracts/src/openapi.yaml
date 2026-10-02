@@ -58,6 +58,12 @@ tags:
   description: Counter aset, rencana pemeliharaan, dan usulan jadwal yang diubah menjadi work order.
 - name: Permintaan pemeliharaan
   description: Laporan kerusakan dari unit; diajukan, diterima atau ditolak, lalu dibuatkan satu work order.
+- name: Asuransi aset
+  description: Jenis asuransi, polis, dan pertanggungan aset per periode; ringkasan aset yang belum atau kurang diasuransikan.
+- name: Garansi dan kontrak servis
+  description: Garansi per aset dan kontrak servis vendor; daftar yang akan berakhir dan pemberitahuan untuk work order.
+- name: Downtime dan KPI
+  description: Pencatatan downtime aset dan KPI pemeliharaan yang dihitung saat dibaca.
 - name: Penyesuaian nilai aset
   description: Penurunan nilai (write-down) dan kenaikan nilai (appreciation) atas satu buku penyusutan, beserta jurnalnya ke aplikasi finance.
 - name: Reklasifikasi aset
@@ -83,6 +89,9 @@ x-bundle:
   - paths/pemeliharaan-aset.yaml
   - paths/pemeliharaan-preventif.yaml
   - paths/permintaan-pemeliharaan.yaml
+  - paths/downtime-kpi.yaml
+  - paths/garansi-kontrak-servis.yaml
+  - paths/asuransi.yaml
   - paths/penyusutan.yaml
   - paths/laporan.yaml
   components:

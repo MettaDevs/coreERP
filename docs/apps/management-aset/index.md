@@ -60,6 +60,9 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 | [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/) | Work order dan mesin statusnya |
 | [Pemeliharaan preventif](/apps/management-aset/transaction/pemeliharaan-preventif/) | Counter aset, rencana pemeliharaan, dan usulan jadwal yang menjadi work order |
 | [Permintaan pemeliharaan](/apps/management-aset/transaction/permintaan-pemeliharaan/) | Laporan kerusakan dari unit; diajukan, diputuskan, lalu dibuatkan work order |
+| [Downtime dan KPI pemeliharaan](/apps/management-aset/transaction/downtime-kpi/) | Henti aset, dicatat sendiri atau oleh work order, dan availability, MTBF, MTTR yang dihitung darinya |
+| [Garansi dan kontrak servis](/apps/management-aset/transaction/garansi-kontrak-servis/) | Garansi per aset, kontrak servis vendor, yang akan berakhir, dan pemberitahuan di work order |
+| [Asuransi aset](/apps/management-aset/transaction/asuransi-aset/) | Polis, pertanggungan aset berperiode, dan aset yang belum atau kurang diasuransikan |
 | [Laporan dan ekspor](/apps/management-aset/transaction/laporan/) | Dataset dan layout bawaan yang diminta Core untuk dicetak |
 | [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
 | [Monitoring aset](/apps/management-aset/transaction/monitoring-aset/) | Pemeriksaan fisik aset di satu lokasi; mencatat temuan tanpa mengubah register |

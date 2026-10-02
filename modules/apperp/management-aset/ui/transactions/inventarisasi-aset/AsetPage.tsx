@@ -84,6 +84,7 @@ export default function AsetPage({
             key={pertama}
             context={context}
             canUpdate={canUpdate}
+            permissions={permissions}
             asetId={pertama}
             mode={kedua === 'ubah' ? 'edit' : 'view'}
         />
