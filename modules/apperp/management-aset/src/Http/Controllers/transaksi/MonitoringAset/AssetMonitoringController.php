@@ -15,16 +15,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
-use Modules\Apperp\ManagementAset\Models\master\FixedAssetSetup;
 use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoring;
 use Modules\Apperp\ManagementAset\Models\transaksi\MonitoringAset\AssetMonitoringLine;
 use Modules\Apperp\ManagementAset\Reporting\AssetSpecification;
+use Modules\Apperp\ManagementAset\Services\AssetBookValues;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
@@ -497,10 +495,7 @@ class AssetMonitoringController extends Controller
      * Keadaan register untuk sejumlah aset, dibaca sekaligus.
      *
      * Penanggung jawab dibaca dari penempatan terakhir, karena aset tidak menyimpannya. Nilai dibaca
-     * dari buku penyusutan bawaan pada pengaturan aset tetap (Default Depr. Book BC) bila aset itu
-     * memilikinya. Selain itu dari buku komersial — buku tanpa master atau buku ber-lapisan `current` —
-     * dan bila ada lebih dari satu, yang kodenya paling awal, supaya satu aset selalu menghasilkan satu
-     * angka.
+     * dari buku bawaan pengaturan aset tetap atau buku komersial; aturannya di {@see AssetBookValues}.
      *
      * @param  list<string>  $asetIds
      * @return array<string, array{lifecycle_state: ?string, lokasi_aset_id: ?string, org_unit_id: ?string, custodian_user_id: ?string, nilai_perolehan: ?string, akumulasi_penyusutan: ?string, nilai_buku: ?string}>
@@ -512,23 +507,7 @@ class AssetMonitoringController extends Controller
         }
 
         $custodians = $this->latestCustodians($asetIds);
-        $books = [];
-        $defaultBook = FixedAssetSetup::defaultDepreciationBookId();
-        if ($defaultBook !== null) {
-            foreach (BukuAset::query()->whereIn('aset_id', $asetIds)->where('buku_id', $defaultBook)->toBase()
-                ->get(['aset_id', 'acquisition_value', 'accumulated_depreciation', 'net_book_value']) as $book) {
-                $books[(string) $book->aset_id] ??= $book;
-            }
-        }
-        $commercial = BukuAset::query()
-            ->whereIn('aset_id', $asetIds)
-            ->where(fn ($query) => $query->whereNull('buku_id')->orWhereIn('buku_id', BukuPenyusutan::query()->where('posting_layer', 'current')->select('id')))
-            ->orderBy('book_code')
-            ->toBase()
-            ->get(['aset_id', 'acquisition_value', 'accumulated_depreciation', 'net_book_value']);
-        foreach ($commercial as $book) {
-            $books[(string) $book->aset_id] ??= $book;
-        }
+        $books = app(AssetBookValues::class)->forAssets($asetIds);
 
         $state = [];
         foreach (Aset::withTrashed()->whereIn('id', $asetIds)->toBase()->get(['id', 'lifecycle_state', 'lokasi_aset_id', 'responsible_org_unit_id', 'acquisition_value']) as $aset) {

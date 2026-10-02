@@ -66,6 +66,25 @@ security:
         - management-aset.penyesuaian-nilai-aset.update
         - management-aset.penyesuaian-nilai-aset.archive
         - management-aset.penyesuaian-nilai-aset.post
+        # Polis dan kontrak servis milik entitas legal tanpa unit: cukup hibah pada entitas legalnya.
+        # Pertanggungan, garansi, downtime, dan KPI mengikuti unit penanggung jawab asetnya.
+        - management-aset.polis-asuransi.read
+        - management-aset.polis-asuransi.create
+        - management-aset.polis-asuransi.update
+        - management-aset.polis-asuransi.archive
+        - management-aset.garansi-aset.read
+        - management-aset.garansi-aset.create
+        - management-aset.garansi-aset.update
+        - management-aset.garansi-aset.archive
+        - management-aset.kontrak-servis.read
+        - management-aset.kontrak-servis.create
+        - management-aset.kontrak-servis.update
+        - management-aset.kontrak-servis.archive
+        - management-aset.downtime-aset.read
+        - management-aset.downtime-aset.create
+        - management-aset.downtime-aset.update
+        - management-aset.downtime-aset.archive
+        - management-aset.kpi-pemeliharaan.read
         - management-aset.penyusutan.read
         - management-aset.penyusutan.create
         - management-aset.penyusutan.finalize

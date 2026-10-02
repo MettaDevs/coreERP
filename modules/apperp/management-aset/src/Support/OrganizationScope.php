@@ -72,6 +72,23 @@ final class OrganizationScope
         });
     }
 
+    /**
+     * Penyaring untuk record milik entitas legal tanpa unit kerja, seperti polis asuransi dan kontrak
+     * servis: terlihat bila pengguna punya hibah pada entitas legal itu, unit mana pun. Sama dengan
+     * {@see self::allows()} yang dipanggil tanpa unit.
+     */
+    public function legalEntityQuery(mixed $query, Request $request, string $legalEntityColumn): mixed
+    {
+        $scope = $this->scope($request);
+        if ($scope['all']) {
+            return $query;
+        }
+
+        $legalEntities = array_values(array_unique(array_filter(array_column($scope['scope_grants'], 'legal_entity_id'))));
+
+        return $legalEntities === [] ? $query->whereRaw('1 = 0') : $query->whereIn($legalEntityColumn, $legalEntities);
+    }
+
     /** @return array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>} */
     private function scope(Request $request): array
     {

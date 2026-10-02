@@ -21,6 +21,9 @@ import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
+import AssetDowntimeSection from '../downtime/AssetDowntimeSection';
+import AssetInsuranceSection from '../insurance/AssetInsuranceSection';
+import AssetWarrantySection from '../warranty/AssetWarrantySection';
 import {
     AcquisitionAdjustmentPreview,
     pesanKoreksi,
@@ -59,11 +62,14 @@ type Mode = 'view' | 'edit';
 export default function AsetDetailPage({
     context,
     canUpdate,
+    permissions,
     asetId,
     mode,
 }: {
     context: Context;
     canUpdate: boolean;
+    /** Izin pengguna; bagian asuransi, garansi, dan downtime tampil hanya bila boleh dibaca. */
+    permissions: string[];
     asetId?: string;
     mode: Mode;
 }) {
@@ -760,6 +766,56 @@ export default function AsetDetailPage({
                                 )}
                             </CollapsibleSection>
                         )}
+
+                        {readOnly &&
+                            asetId &&
+                            permissions.includes(
+                                'management-aset.polis-asuransi.read',
+                            ) && (
+                                <CollapsibleSection
+                                    value="asuransi"
+                                    title="Asuransi"
+                                >
+                                    <AssetInsuranceSection asetId={asetId} />
+                                </CollapsibleSection>
+                            )}
+
+                        {readOnly &&
+                            asetId &&
+                            (permissions.includes(
+                                'management-aset.garansi-aset.read',
+                            ) ||
+                                permissions.includes(
+                                    'management-aset.kontrak-servis.read',
+                                )) && (
+                                <CollapsibleSection
+                                    value="garansi"
+                                    title="Garansi dan kontrak servis"
+                                >
+                                    <AssetWarrantySection
+                                        asetId={asetId}
+                                        canReadWarranties={permissions.includes(
+                                            'management-aset.garansi-aset.read',
+                                        )}
+                                        canReadContracts={permissions.includes(
+                                            'management-aset.kontrak-servis.read',
+                                        )}
+                                    />
+                                </CollapsibleSection>
+                            )}
+
+                        {readOnly &&
+                            asetId &&
+                            permissions.includes(
+                                'management-aset.downtime-aset.read',
+                            ) && (
+                                <CollapsibleSection
+                                    value="downtime"
+                                    title="Downtime"
+                                >
+                                    <AssetDowntimeSection asetId={asetId} />
+                                </CollapsibleSection>
+                            )}
 
                         {readOnly && asetId && (
                             <CollapsibleSection

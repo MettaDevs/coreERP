@@ -4,8 +4,10 @@ use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\CounterTypeController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\DowntimeReasonController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupBukuPenyusutanController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\InsuranceTypeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ItemChecklistMaintenanceController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\JenisAsetAtributController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\JenisAsetAtributDefinisiController;
@@ -66,6 +68,8 @@ $masters = [
     'jenis-counter' => CounterTypeController::class,
     'rencana-pemeliharaan' => MaintenancePlanController::class,
     'jenis-permintaan-pemeliharaan' => MaintenanceRequestTypeController::class,
+    'jenis-asuransi' => InsuranceTypeController::class,
+    'alasan-downtime' => DowntimeReasonController::class,
 ];
 
 // Matriks group x buku disunting di dalam form group, jadi ia memakai permission

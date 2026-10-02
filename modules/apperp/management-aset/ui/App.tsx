@@ -84,6 +84,11 @@ const MaintenanceSchedulePage = lazy(
 const CounterReadingPage = lazy(
     () => import('./transactions/counter-readings/CounterReadingPage'),
 );
+const InsurancePage = lazy(
+    () => import('./transactions/insurance/InsurancePage'),
+);
+const WarrantyPage = lazy(() => import('./transactions/warranty/WarrantyPage'));
+const DowntimePage = lazy(() => import('./transactions/downtime/DowntimePage'));
 const PengaturanAsetTetapPage = lazy(
     () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPage'),
 );
@@ -94,7 +99,7 @@ const AssetPostingGroupPage = lazy(
 /**
  * Halaman laporan, berkunci id entri menunya.
  *
- * Keenamnya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
+ * Semuanya berbentuk sama — satu izin baca, satu halaman tanpa props — jadi yang
  * membedakannya hanya data, dan data itu ditulis di satu peta, bukan satu cabang `if`
  * per laporan. Izinnya sama dengan izin entri menu di `app.yaml` dan izin definisi
  * laporannya; laporan baru cukup menambah satu entri di sini.
@@ -118,6 +123,10 @@ const REPORT_PAGES: Record<
     'laporan-pemeliharaan-aset': {
         permission: 'management-aset.pemeliharaan-aset.read',
         Page: lazy(() => import('./laporan/LaporanPemeliharaanAsetPage')),
+    },
+    'kpi-pemeliharaan': {
+        permission: 'management-aset.kpi-pemeliharaan.read',
+        Page: lazy(() => import('./transactions/downtime/MaintenanceKpiPage')),
     },
     'laporan-penjualan-aset': {
         permission: 'management-aset.penjualan-aset.read',
@@ -395,6 +404,41 @@ export default function App({
                     context={konteks}
                     permissions={permissions}
                 />
+            </main>
+        );
+    }
+
+    // Asuransi, garansi dan kontrak servis, serta downtime: daftar dengan form di dialog.
+    if (
+        view === 'asuransi-aset' &&
+        permissions.includes('management-aset.polis-asuransi.read')
+    ) {
+        return (
+            <main>
+                <InsurancePage context={konteks} permissions={permissions} />
+            </main>
+        );
+    }
+
+    if (
+        view === 'garansi-kontrak-servis' &&
+        (permissions.includes('management-aset.garansi-aset.read') ||
+            permissions.includes('management-aset.kontrak-servis.read'))
+    ) {
+        return (
+            <main>
+                <WarrantyPage context={konteks} permissions={permissions} />
+            </main>
+        );
+    }
+
+    if (
+        view === 'downtime-aset' &&
+        permissions.includes('management-aset.downtime-aset.read')
+    ) {
+        return (
+            <main>
+                <DowntimePage permissions={permissions} />
             </main>
         );
     }
