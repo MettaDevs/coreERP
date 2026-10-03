@@ -42,7 +42,7 @@ Selain itu, master tetap milik modulnya.
 | Master | Letak | Keterangan |
 | --- | --- | --- |
 | Vendor, satuan, mata uang, kalender fiskal dan kerja, number sequence, organisasi, buku alamat, wilayah | Foundation / Platform | sudah benar |
-| Worker, Position, Job (`hr_*`) | modul HR | **pindah ke Foundation** (K-W, diputuskan 1 Oktober 2026), lihat di bawah |
+| Worker, Position, Job (`hr_*`) | modul HR | **pindah ke Foundation** (K-W, diputuskan 1 Oktober 2026; **ditunda** 3 Oktober 2026), lihat di bawah |
 | Jenis, group, kondisi, pabrikan, dan model aset; buku dan profil penyusutan; kelompok harta fiskal; posting group aset; seluruh master pemeliharaan; lokasi aset | modul aset | tetap di modul: khusus aset, juga khusus di Asset management dan Fixed assets D365 |
 
 Master yang **belum ada** dan wajib lahir di Foundation begitu pertama dibutuhkan, bukan di modul yang
@@ -104,7 +104,8 @@ modul HR. Ini mengubah keputusan gap 3 (#221).
 
 **Diputuskan pemilik pada 1 Oktober 2026: setuju.**
 
-Rincian desain yang menunggu persetujuan: [K-W: identitas Worker di Foundation](./k-w-worker.md).
+**Ditunda pemilik produk pada 3 Oktober 2026.** Arah keputusannya tetap, tetapi tidak dikerjakan sampai pemilik
+membukanya lagi. Rincian desainnya disimpan sebagai proposal: [K-W: identitas Worker di Foundation](./k-w-worker.md).
 
 ## Sisa bentuk microservice yang diganti
 
@@ -157,5 +158,5 @@ feed finance.
 - [ ] Duty bawaan modul menyertakan hak master yang ia pakai
 - [ ] Gate CI: suite test tiap modul berjalan dengan hanya modul itu yang terpasang
 - [ ] Lokasi aset: alamat dari buku alamat Core (diwariskan), departemen bawaan per lokasi
-- [ ] K-W: identitas Worker (`hr_workers`, `hr_positions`, `hr_jobs`, penugasan posisi, tautan ke pengguna) pindah ke `Foundation\Worker`; modul HR mempertahankan data kepegawaian
+- [ ] K-W (ditunda 3 Oktober 2026): identitas Worker (`hr_workers`, `hr_positions`, `hr_jobs`, penugasan posisi, tautan ke pengguna) pindah ke `Foundation\Worker`; modul HR mempertahankan data kepegawaian
 - [x] K-2: buku alamat (Party) pindah ke `Platform\AddressBook` — diputuskan pemilik 1 Oktober 2026; menghapus pengecualian `OrganizationParty -> Party` dan `PrintIdentityStore -> OrganizationAddressBook`. Wilayah ikut pindah ke `Platform\Geography`, karena buku alamat memakai `CountryRegion` dan address setup di F&O adalah bagian global address book; tanpa itu lahir dua pelanggaran arah baru

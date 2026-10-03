@@ -5,6 +5,10 @@ Pemilik produk sudah menyetujui arahnya pada 1 Oktober 2026: **identitas pekerja
 `App\Foundation\Worker`, data kepegawaian tetap di modul HR**. Halaman ini memuat yang perlu disetujui
 sebelum dibangun. Belum ada kode, migration, atau manifest yang diubah.
 
+> **Status: ditunda.** Pada 3 Oktober 2026 pemilik produk menunda pekerjaan ini. Proposal disimpan apa
+> adanya supaya tidak perlu disusun ulang; dua belas keputusan di dalamnya **belum** dijawab. Jangan
+> membangunnya sebelum pemilik membuka kembali K-W dan menjawab keputusan-keputusan itu.
+
 Ringkasnya:
 
 - Worker, Job, Position, dan penugasan posisi pindah ke Foundation sebagai tabel Core `workers`,
