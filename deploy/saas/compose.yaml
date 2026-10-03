@@ -129,6 +129,13 @@ x-app-environment: &app-environment
   SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
   SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
   COREERP_SENTRY_URL: ${COREERP_SENTRY_URL:-}
+  # Laporan kesalahan Core ke satu channel Discord, bertaut ke kejadiannya di Sentry. Webhook-nya secret,
+  # jadi hanya ada di berkas env server; kosong berarti mati. Kesalahan yang sama dikirim paling sering
+  # sekali per JEDA_DETIK. Konsol tidak ikut: ia tidak punya pelapor Discord, dan peringatannya cukup lewat
+  # aturan Sentry.
+  COREERP_DISCORD_WEBHOOK_URL: ${COREERP_DISCORD_WEBHOOK_URL:-}
+  COREERP_DISCORD_MENTION: ${COREERP_DISCORD_MENTION:-}
+  COREERP_DISCORD_JEDA_DETIK: ${COREERP_DISCORD_JEDA_DETIK:-60}
 
 services:
   # ------------------------------------------------------------------ data

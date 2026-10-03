@@ -129,6 +129,14 @@ dibaca dari `lastEventId` hub — di worker yang hidup lama nilai itu bisa milik
 DSN tidak pernah ditulis di repo. Klien on-prem yang mau memakai Sentry mengisi DSN project miliknya
 sendiri.
 
+**Peringatan ke orang datang dari dua jalan di SaaS dev.** Aturan Sentry "Telegram Alert on New Issue" pada
+kedua project mengirim setiap issue baru ke bot Telegram, lewat Sentry App dan relay di server dev pertama
+(`/opt/sentry-telegram-relay.py`, layanan `sentry-telegram-relay`). Core sendiri mengirim ke satu channel
+Discord lewat `DiscordNotifier` bila `COREERP_DISCORD_WEBHOOK_URL` diisi di berkas env server. Relay itu
+harus mendengar di `172.17.0.1:9010`, bukan `127.0.0.1`: Traefik berjalan di container, dan dari sana
+`127.0.0.1` adalah container itu sendiri — 27 September sampai 3 Oktober 2026 setiap peringatan berakhir
+502 tanpa satu pun pesan sampai.
+
 ### Discord
 
 Kenapa ada sama sekali: berkas dan SigNoz hanya menjawab pertanyaan yang sudah diajukan.
