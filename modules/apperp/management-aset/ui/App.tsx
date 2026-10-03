@@ -155,6 +155,10 @@ const REPORT_PAGES: Record<
         permission: 'management-aset.penyusutan.read',
         Page: lazy(() => import('./laporan/LaporanRekonsiliasiAsetPage')),
     },
+    'laporan-pengadaan-aset': {
+        permission: 'management-aset.permintaan-pembelian-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPengadaanAsetPage')),
+    },
 };
 
 /**

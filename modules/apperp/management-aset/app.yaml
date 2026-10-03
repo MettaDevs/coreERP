@@ -216,6 +216,11 @@ ui:
         - id: laporan-rekonsiliasi-aset-buku-besar
           label: Rekonsiliasi aset ke buku besar
           permission: management-aset.penyusutan.read
+        # Rencana -> permintaan pembelian -> penerimaan. Berbeda dari daftar perolehan, yang berangkat dari
+        # register; lihat docs/apps/management-aset/transaction/laporan.
+        - id: laporan-pengadaan-aset
+          label: Laporan pengadaan aset
+          permission: management-aset.permintaan-pembelian-aset.read
 database:
   logical_name: app_erp_management_aset
   migrations: database/migrations

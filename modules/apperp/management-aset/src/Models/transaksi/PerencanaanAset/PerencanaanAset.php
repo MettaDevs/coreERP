@@ -49,6 +49,41 @@ class PerencanaanAset extends Model
         'responsible_user_id' => DataClass::EndUserPseudonymousIdentifiers,
     ];
 
+    /**
+     * Nama tampilan kolom untuk filter tambahan laporan pengadaan aset (K-30).
+     *
+     * @var array<string, string>
+     */
+    public const FIELD_CAPTIONS = [
+        'kode' => 'Nomor rencana',
+        'planning_org_unit_id' => 'Unit organisasi',
+        'planned_on' => 'Tanggal rencana',
+        'planning_year' => 'Tahun anggaran',
+        'planning_type' => 'Jenis perencanaan',
+        'funding_source' => 'Sumber dana',
+        'responsible_user_id' => 'Penanggung jawab',
+        'total_estimated_value' => 'Nilai rencana',
+        'status' => 'Status',
+        'description' => 'Keterangan',
+    ];
+
+    /** @var array<string, array<string, string>> */
+    public const FIELD_OPTIONS = [
+        'planning_type' => ['regular' => 'Reguler', 'additional' => 'Tambahan'],
+        'status' => ['draft' => 'Draf'],
+    ];
+
+    /** @var array<string, string> Resource pemilih untuk kolom rujukan. */
+    public const FIELD_LOOKUPS = [
+        'planning_org_unit_id' => 'reference-data/unit-kerja',
+        'responsible_user_id' => 'reference-data/anggota',
+    ];
+
+    /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
+    public const FIELD_HIDDEN = [
+        'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
+    ];
+
     protected $table = 'aset_tr_perencanaan_aset';
 
     protected $fillable = [

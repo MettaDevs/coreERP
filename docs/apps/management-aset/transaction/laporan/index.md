@@ -32,6 +32,7 @@ Sumber daftarnya satu: pendaftaran `ReportRegistry` di `src/ModuleServiceProvide
 | `management-aset.laporan-pemusnahan-aset` | `AssetDisposalScrapReport` | `dari`, `sampai`, filter aset bersama, buku | Excel: satu baris per aset yang dimusnahkan | `pemusnahan-aset.read` |
 | `management-aset.laporan-penjualan-aset` | `AssetDisposalSaleReport` | `dari`, `sampai`, filter aset bersama, buku | Excel: satu baris per aset yang dijual | `penjualan-aset.read` |
 | `management-aset.laporan-monitoring-aset` | `AssetMonitoringReport` | periode, filter aset, kondisi, lokasi, penanggung jawab, unit | Excel: satu baris per aset pada monitoring yang sudah selesai | `monitoring-aset.read` |
+| `management-aset.laporan-pengadaan-aset` | `AssetProcurementReport` | `dari`, `sampai`, jenis aset, unit, status pengadaan | Excel: satu baris per barang yang direncanakan atau diminta, dengan total nilai | `permintaan-pembelian-aset.read` |
 
 Kelasnya di `src/Reporting/Definitions/`. Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `daftar-work-order`).
 
@@ -48,6 +49,37 @@ Satu baris per baris pekerjaan work order, yaitu satu aset yang dirawat atau dip
 - **Satuan dan jumlah** selalu "Unit" dan 1: satu baris pekerjaan menangani satu aset utuh, dan aset tidak punya satuan ukur sendiri.
 - Work order yang diarsipkan tidak ikut; semua status lainnya ikut kecuali disaring.
 - **Tidak ada kolom biaya.** Padanan Business Central, report 5634 "Maintenance - Details", menampilkan nominal tiap entri pemeliharaan, tetapi work order di modul ini belum mencatat biaya bahan, jasa, maupun tagihan vendor, dan spesifikasi QA juga tidak memintanya. Kolomnya ditambahkan setelah sumber datanya ada.
+
+### Laporan pengadaan aset
+
+Mengikuti pengadaan dari rencana, ke permintaan pembelian, sampai penerimaan: berapa yang direncanakan, diminta, dan sudah diterima per barang, beserta sisanya. Spesifikasi QA hanya menyebut "Trend Pengadaan Aset" di dasbor; kolom dan filternya mengikuti konvensi laporan QA lain (No., No. bukti, tanggal, item aset, spesifikasi, satuan, jumlah, unit organisasi), diperluas per tahap.
+
+**Satu baris = satu kebutuhan**, bukan satu dokumen:
+
+| Baris | Asalnya | Yang dihitung di baris itu |
+| --- | --- | --- |
+| Baris rencana | `aset_tr_perencanaan_aset_details` pada rencana yang tidak diarsipkan | semua baris permintaan yang menunjuk baris rencana itu (`planning_detail_id`), dan semua penerimaan dari permintaan-permintaan itu |
+| Permintaan tanpa rencana | baris permintaan yang `planning_detail_id`-nya kosong, atau menunjuk baris rencana yang rencananya sudah diarsipkan | penerimaan dari baris permintaan itu (`permintaan_pembelian_detail_id`) |
+
+Dengan begitu jumlah rencana, diminta, dan diterima ada di baris yang sama dan tidak ada yang terhitung dua kali, meskipun satu rencana dipenuhi beberapa permintaan dan satu permintaan dipenuhi beberapa penerimaan. Nomor dokumen yang lebih dari satu ditulis berurutan dipisah koma.
+
+Yang dibaca hanya yang memang ada di datanya:
+
+- **Diminta** = jumlah baris permintaan yang tidak dibatalkan (`cancelled`) dan tidak diarsipkan. Permintaan belum punya alur pengajuan maupun persetujuan, jadi draf ikut dihitung; begitu alurnya ada, aturan ini ditinjau ulang.
+- **Diterima** = jumlah baris penerimaan berstatus `selesai`, yaitu aset yang sudah lahir di register; penerimaan draf belum melahirkan apa pun. **Nilai diterima** = nilai per unit × jumlah, dibulatkan sekali per baris seperti jurnal perolehan (K-20), **tanpa PPN**. Fase ini hanya IDR (K-19), jadi totalnya dijumlah langsung.
+- **Nilai rencana** = perkiraan di baris rencana. Permintaan tidak memikul harga, jadi tidak ada nilai diminta.
+- **Vendor** hanya ada di penerimaan; rencana dan permintaan tidak menyebut pemasok. Namanya dibaca dari vendor Core (K-06).
+- **Belum diminta** = rencana − diminta, dan **belum diterima** = diminta − diterima; keduanya tidak pernah negatif.
+- **Status** diturunkan dari angka itu: Belum diminta (belum ada permintaan yang berlaku), Belum diterima, Diterima sebagian, Diterima penuh. Filter status menyaring hasil turunan ini.
+- **Satuan** baris rencana adalah salinan nama satuannya; permintaan hanya menyimpan id satuan Core, dan satuan yang sudah dinonaktifkan tertulis "—".
+- **Tanggal** baris adalah tanggal dokumen awalnya — tanggal rencana, atau tanggal permintaan bila tanpa rencana — dan filter periode membaca tanggal yang sama. Tanggal permintaan yang tampil adalah yang paling awal, tanggal penerimaan yang paling akhir.
+- **Lingkup unit kerja** (`management-aset.asset-responsibility`) ditegakkan pada setiap dokumen: rencana pada unit perencananya, permintaan pada unit pemintanya, penerimaan pada unit penanggung jawabnya. Dokumen di luar jangkauan tidak dibaca dan tidak dihitung.
+
+Hak datanya `permintaan-pembelian-aset.read`: permintaan pembelian adalah dokumen pusat rantai ini, dan yang memegangnya perlu melihat rencana yang belum diminta. Tidak ada permission baru, jadi peran yang sudah ada tidak perlu migration.
+
+**Bedanya dengan daftar perolehan aset.** `laporan-perolehan-aset` berangkat dari **register**: aset yang sudah ada, dengan nilai perolehannya dan dokumen asalnya — termasuk hibah, saldo awal, dan penerimaan tanpa permintaan pembelian. Laporan pengadaan berangkat dari **kebutuhan**: termasuk yang belum diminta atau belum datang sama sekali, dan berhenti di penerimaan. Penerimaan tanpa permintaan pembelian tidak ikut di laporan pengadaan karena tidak ada kebutuhan yang dipenuhinya; ia tetap terbaca di daftar perolehan. Pertanyaan "aset apa yang masuk bulan ini dan berapa nilainya" dijawab daftar perolehan; "rencana tahun ini sudah sampai mana" dijawab laporan pengadaan.
+
+**Padanan.** Dynamics 365 F&O tidak punya satu laporan untuk rantai rencana → permintaan → penerimaan. Yang terdekat daftar baris *purchase requisition* beserta status barisnya (Draft, In review, Approved, Cancelled, Closed — [Purchase requisition overview](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/purchase-requisitions-overview)), lalu *product receipt* pada pesanan pembelian yang lahir darinya. Business Central tidak punya rencana maupun permintaan pembelian; yang terdekat report 709 "Inventory Purchase Orders", yang menampilkan sisa yang belum diterima per baris pesanan. Rencana pengadaan di modul ini tidak punya padanan langsung di keduanya.
 
 ## Laporan keuangan aset
 
@@ -140,6 +172,7 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 | `laporan-perolehan-aset` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang dibaca |
 | `laporan-rekonsiliasi-aset-buku-besar` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang mutasinya dihitung; menurut keadaan aset sekarang |
 | `laporan-pemeliharaan-aset` | Work order (`aset_tr_pemeliharaan_aset`, `wo`, `kode`); Baris pekerjaan (`aset_tr_pemeliharaan_aset_details`, tanpa alias) | hanya baris yang cocok tercetak |
+| `laporan-pengadaan-aset` | Rencana pengadaan (`aset_tr_perencanaan_aset`, `rencana`, `kode`) | hanya baris rencana yang cocok tercetak; permintaan tanpa rencana tidak ikut selama filter ini diisi |
 
 Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, `FIELD_HIDDEN`), dan `tests/Feature/ReportFieldCatalogTest.php` menolak kolom yang belum diberi nama atau alasan disembunyikan. Jadwal work order (`diharapkan_*`, `dijadwalkan_*`) sengaja tidak ditawarkan: tersimpan tanpa zona, sedangkan filter tanggal-jam membacanya sebagai UTC. `berita-acara-serah-terima` dan `work-order` dicetak per satu dokumen yang dipilih, jadi tidak punya data item.
 
@@ -176,6 +209,7 @@ Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`
 | `resources/laporan/` | Layout bawaan per kode laporan |
 | `tests/Feature/PenyediaLaporanTest.php` | Definisi, layout bawaan, dataset dengan permission dan scope, filter daftar |
 | `tests/Feature/AssetFinancialReportsTest.php` | Laporan keuangan aset: mutasi nilai buku, rekonsiliasi, proyeksi, daftar perolehan |
+| `tests/Feature/AssetProcurementReportTest.php` | Laporan pengadaan aset: rantai rencana → permintaan → penerimaan, filter, hak, lingkup unit, tenant, pratinjau dan Excel |
 | `tests/Feature/ReportScreenCodeTest.php` | Kode laporan yang dipakai layar terdaftar di `ReportRegistry` |
 | `src/Reporting/AssetReportFilters.php` | Filter aset bersama: aturan, penerapan pada query, dan nama di kepala laporan |
 | `src/Reporting/Lists/AssetRegisterList.php` | Register aset sebagai daftar yang dapat diekspor Core |
