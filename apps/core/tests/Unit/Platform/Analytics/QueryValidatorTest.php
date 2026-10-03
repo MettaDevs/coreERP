@@ -86,6 +86,16 @@ class QueryValidatorTest extends TestCase
                 return ['all' => true, 'scope_grants' => []];
             }
 
+            public function mayUsePersonalData(): bool
+            {
+                return false;
+            }
+
+            public function lockedFilters(string $dataset): array
+            {
+                return [];
+            }
+
             public function timezone(): string
             {
                 return 'Asia/Makassar';
@@ -104,6 +114,11 @@ class QueryValidatorTest extends TestCase
             public function timeoutMs(): int
             {
                 return 8000;
+            }
+
+            public function fingerprint(CompiledDataset $dataset): string
+            {
+                return 'uji';
             }
 
             public function describe(): string
