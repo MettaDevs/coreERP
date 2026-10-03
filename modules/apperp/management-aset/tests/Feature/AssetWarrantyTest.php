@@ -46,6 +46,10 @@ class AssetWarrantyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Endpoint menghitung "hari ini" menurut zona pengguna, sedangkan `day()` memakai tanggal UTC. Antara
+        // pukul 17.00 dan 24.00 UTC keduanya berbeda satu hari dan sisa hari meleset satu. Jam 05.00 UTC
+        // jatuh di tanggal yang sama untuk WIB, WITA, dan WIT.
+        $this->travelTo(now('UTC')->startOfDay()->addHours(5));
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->unitId = (string) Str::ulid();
