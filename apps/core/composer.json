@@ -39,6 +39,7 @@
         "php-http/guzzle7-adapter": "^1.1",
         "phpoffice/phpspreadsheet": "4.0",
         "phpoffice/phpword": "1.3",
+        "sentry/sentry-laravel": "^4.28",
         "symfony/yaml": "^8.1"
     },
     "require-dev": {

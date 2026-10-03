@@ -298,6 +298,38 @@ class DiscordNotifierTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_kejadian_yang_terkirim_ke_sentry_ditautkan_ke_sentry_bukan_signoz(): void
+    {
+        config()->set('coreerp.sentry_url', 'https://sentry.test/organizations/contoh/');
+        Http::fake([self::WEBHOOK => Http::response('', 204)]);
+
+        DiscordNotifier::send($this->laporan(), 'b5f0a1c2d3e4f5a6b7c8d9e0f1a2b3c4');
+
+        Http::assertSent(function (PermintaanHttp $permintaan): bool {
+            $embed = $permintaan->data()['embeds'][0];
+            $tautan = 'https://sentry.test/organizations/contoh/issues/?query=b5f0a1c2d3e4f5a6b7c8d9e0f1a2b3c4';
+            $this->assertSame($tautan, $embed['url']);
+            $this->assertStringContainsString('[Buka kejadiannya di Sentry]('.$tautan.')', (string) $embed['description']);
+            $this->assertStringNotContainsString('SigNoz', (string) $embed['description']);
+
+            return true;
+        });
+    }
+
+    public function test_tanpa_kejadian_sentry_tautan_signoz_tetap_dipakai(): void
+    {
+        // Kiriman ke Sentry yang gagal (atau DSN yang kosong) tidak boleh menghapus tautan yang ada.
+        config()->set('coreerp.sentry_url', 'https://sentry.test/organizations/contoh');
+        Http::fake([self::WEBHOOK => Http::response('', 204)]);
+
+        DiscordNotifier::send($this->laporan(), null);
+
+        Http::assertSent(fn (PermintaanHttp $permintaan): bool => str_contains(
+            (string) $permintaan->data()['embeds'][0]['description'],
+            'Buka catatannya di SigNoz',
+        ));
+    }
+
     public function test_discord_yang_mati_tidak_menjadi_kesalahan_kedua(): void
     {
         Http::fake(fn () => throw new RuntimeException('jaringan diblokir'));

@@ -7,6 +7,7 @@ use ControlPlane\Http\Middleware\ThrottleRequestsPerRoute;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Sentry\Laravel\Integration;
 
 /*
  * Konsol operator vendor.
@@ -43,6 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Kesalahan konsol dikirim ke project Sentry-nya sendiri bila `SENTRY_LARAVEL_DSN` diisi; tanpa DSN
+        // pemanggil ini diam. Konsol tidak punya pelapor sendiri seperti Core (`ErrorReporter`), jadi
+        // penangan bawaan Sentry cukup.
+        Integration::handles($exceptions);
     })
     ->create();

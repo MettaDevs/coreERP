@@ -64,7 +64,7 @@ final class DiscordNotifier
         'trace_id' => 'jejak',
     ];
 
-    public static function send(ErrorReport $report): void
+    public static function send(ErrorReport $report, ?string $sentryEventId = null): void
     {
         try {
             $webhook = self::webhook();
@@ -88,7 +88,7 @@ final class DiscordNotifier
                 return;
             }
 
-            self::sendTo($webhook, self::payload($report));
+            self::sendTo($webhook, self::payload($report, $sentryEventId));
         } catch (Throwable) {
             // Lihat catatan kelas. Kegagalan mengirim tidak pernah menjadi kesalahan kedua.
         }
@@ -104,11 +104,12 @@ final class DiscordNotifier
     /**
      * @return array<string, mixed>
      */
-    private static function payload(ErrorReport $report): array
+    private static function payload(ErrorReport $report, ?string $sentryEventId): array
     {
         $mention = (string) config('coreerp.discord.mention', '');
         $attributes = $report->toAttributes();
-        $link = self::sigNozLink($attributes);
+        $sentryLink = self::sentryLink($sentryEventId);
+        $link = $sentryLink ?? self::sigNozLink($attributes);
 
         return [
             'content' => self::truncate(trim($mention.' '.self::summary($attributes)), self::CONTENT_LIMIT),
@@ -120,7 +121,7 @@ final class DiscordNotifier
             'embeds' => [array_filter([
                 'title' => self::truncate((string) ($attributes['exception.type'] ?? 'Kesalahan'), 250),
                 'url' => $link,
-                'description' => self::body($attributes, $link),
+                'description' => self::body($attributes, $link, $sentryLink !== null),
                 'color' => self::RED,
             ], static fn (mixed $value): bool => $value !== null)],
         ];
@@ -151,7 +152,7 @@ final class DiscordNotifier
      *
      * @param  array<string, scalar|null>  $attributes
      */
-    private static function body(array $attributes, ?string $link): string
+    private static function body(array $attributes, ?string $link, bool $toSentry): string
     {
         $lines = [];
         foreach (self::SENT_ATTRIBUTES as $key => $label) {
@@ -162,7 +163,7 @@ final class DiscordNotifier
         }
 
         $tail = $link !== null
-            ? "\n".self::linkFooter($attributes, $link)
+            ? "\n".($toSentry ? '[Buka kejadiannya di Sentry]('.$link.')' : self::linkFooter($attributes, $link))
             : "\n(laporan utuh ada di berkas log)";
 
         return "```\n".implode("\n", $lines)."\n```".$tail;
@@ -240,6 +241,19 @@ final class DiscordNotifier
         // membuka halaman kosong yang terlihat seperti catatannya tidak pernah sampai.
         return $base.'/logs/logs-explorer?relativeTime=1d&compositeQuery='
             .rawurlencode((string) json_encode($query));
+    }
+
+    /**
+     * Tautan ke kejadian di Sentry: pencarian Sentry membuka kejadian itu langsung bila yang dicari id
+     * kejadiannya. `coreerp.sentry_url` adalah alamat publik organisasinya, misalnya
+     * `https://sentry.contoh.id/organizations/<org>` — DSN tidak dipakai karena alamatnya bisa alamat
+     * internal yang tidak terbuka dari peramban.
+     */
+    private static function sentryLink(?string $eventId): ?string
+    {
+        $base = rtrim((string) config('coreerp.sentry_url', ''), '/');
+
+        return $eventId === null || $eventId === '' || $base === '' ? null : $base.'/issues/?query='.rawurlencode($eventId);
     }
 
     private static function sigNozBaseUrl(): ?string
