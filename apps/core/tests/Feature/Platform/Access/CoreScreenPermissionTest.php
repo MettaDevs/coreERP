@@ -41,20 +41,22 @@ class CoreScreenPermissionTest extends TestCase
         ]);
     }
 
-    public function test_the_core_catalog_registers_twenty_three_duties_down_to_entry_points(): void
+    public function test_the_core_catalog_registers_twenty_eight_duties_down_to_entry_points(): void
     {
         $duties = SecurityDuty::query()->where('app_id', CoreSecurityCatalog::APP_ID)->with('privileges.permissions')->get();
 
         // Delapan belas dari katalog layar Core, dua dari log perubahan (Lihat riwayat, Kelola log), dua dari retensi data,
-        // satu dari preset laporan bersama.
-        $this->assertCount(23, $duties);
+        // satu dari preset laporan bersama, dan lima dari engine analitik (3 Okt 2026, KA-14: lihat dasbor, susun dan
+        // analisis, dasbor bersama, publikasi, data pribadi).
+        $this->assertCount(28, $duties);
         foreach ($duties as $duty) {
             $this->assertNotEmpty($duty->privileges, $duty->code);
             foreach ($duty->privileges as $privilege) {
                 $this->assertNotEmpty($privilege->permissions, $privilege->code);
                 foreach ($privilege->permissions as $permission) {
                     $this->assertNotSame($privilege->code, $permission->code);
-                    $this->assertContains($permission->access_level, ['read', 'update', 'invoke']);
+                    // `create` sejak 3 Okt 2026: membuat dasbor pribadi analitik (`core.analytics.dashboard.create`).
+                    $this->assertContains($permission->access_level, ['read', 'update', 'create', 'invoke']);
                 }
             }
         }

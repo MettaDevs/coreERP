@@ -267,7 +267,7 @@ query.
 
 ---
 
-### 4. [ ] Keamanan baca
+### 4. [~] Keamanan baca
 
 **Tempat:** `app/Platform/Analytics/Security/*`, migration katalog keamanan (setelah KA-14),
 `CoreSecurityCatalog` · **Setelah:** 0, 1 · **Keputusan:** KA-05, KA-14, KA-15 · **Skill:**
@@ -276,25 +276,46 @@ query.
 data pribadi menjaga kolom, saringan, urutan, dan drill, dan rantai izin terdaftar (bila KA-14 sudah
 disetujui).
 
-- [ ] 4.1 `AnalyticsPrincipal` dan `UserPrincipal` lengkap (batas baris dan waktu dari config,
-  `fingerprint()`).
-- [ ] 4.2 `DatasetAccess`: terpasang dan berlisensi lewat `LaunchableAppCatalog::for()`, permission lewat
-  `permissionsFor()`.
-- [ ] 4.3 `DataPolicyScope`: hibah kebijakan dataset → `DataPolicyFilter`; `lockedFilters()` dipasang
-  sebagai saringan yang tidak dapat dilepas.
+Bagian pertama dikirim 3 Oktober 2026: semua butir kecuali 4.4 dan `PersonalDataGateTest`, yang
+menunggu klasifikasi field di `CompiledDataset` dari area 1 dan menyusul di pull request kedua.
+
+- [x] 4.1 `AnalyticsPrincipal` dan `UserPrincipal` lengkap (batas baris dan waktu dari config,
+  `fingerprint()`). *Dikirim:* `fingerprint()` menerima `CompiledDataset`, bukan kode dataset:
+  sidik jarinya butuh kode kebijakan dataset, dan pemanggilnya (cache area 9, di `RunQuery`) sudah
+  memegang dataset itu. Hak data pribadi dibaca lewat `CorePermissions`, yang sama dengan gate rute.
+- [x] 4.2 `DatasetAccess`: terpasang dan berlisensi lewat `LaunchableAppCatalog::for()`, permission lewat
+  `permissionsFor()`. *Dikirim:* lewat `LaunchableAppCatalog::readyModules()`, bagian kesiapan yang
+  dikeluarkan dari `for()` dan dipakai keduanya. `for()` sendiri butuh keanggotaan dan menjalankan
+  rantai izin seluruh module, padahal langkah 4 sudah memeriksa permission yang tepat; principal
+  hanya membawa tenant.
+- [x] 4.3 `DataPolicyScope`: hibah kebijakan dataset → `DataPolicyFilter`; `lockedFilters()` dipasang
+  sebagai saringan yang tidak dapat dilepas. *Dikirim:* dipanggil `QueryCompiler` sebagai langkah 2.
+  Saringan terkunci yang kosong atau menyebut field yang tidak dikenal dataset berarti nol baris.
 - [ ] 4.4 `PersonalDataGate`: katalog, dimensi, saringan, urutan, kolom drill; label nama orang untuk
   field `EndUserPseudonymousIdentifiers` hanya bagi yang berhak. Untuk query, ia mengimplementasikan
   `Query\FieldUseGate` yang sudah dipanggil `QueryValidator` (area 2.4), mengikatnya di container, dan
   menjadikan parameter validator tidak lagi opsional. Test yang dibutuhkan: query yang memakai kolom
   tertutup sebagai pengelompok, saringan, dan rentang waktu ditolak 403 `analytics.field_personal_data`
-  berpath; `AnalyticsQueryException` belum punya pabrik untuk kode itu, jadi tambahkan.
-- [ ] 4.5 `ScopeFingerprint`: hash hibah terurut + hak data pribadi + saringan terkunci.
-- [ ] 4.6 **Setelah KA-14 disetujui**: migration katalog keamanan
+  berpath; `AnalyticsQueryException` belum punya pabrik untuk kode itu, jadi tambahkan. *Menunggu
+  area 1:* klasifikasi setiap field (`DataClass`) dan penanda dimensi bersama pengguna di
+  `CompiledDataset`.
+- [x] 4.5 `ScopeFingerprint`: hash hibah terurut + hak data pribadi + saringan terkunci. *Dikirim:*
+  tenant ikut di-hash; hibah hanya diurutkan, tidak digabung; dataset tanpa kebijakan tidak
+  menghitung hibah.
+- [x] 4.6 **Setelah KA-14 disetujui**: migration katalog keamanan
   ([contoh](/todo/analitik/keamanan#rantai-izin-yang-diusulkan)), konstanta `CoreSecurityCatalog`,
   gate rute, dan saklar 0.1 dilepas. Bila susunan yang disetujui berbeda, perbarui halaman keamanan
-  lebih dulu.
-- [ ] 4.7 Test: `PersonalDataGateTest`; `DataPolicyFilterTest` yang memakai kasus yang sama dengan test
+  lebih dulu. *Dikirim:* `2026_10_03_120000_register_analytics_security_catalog`, kode persis
+  seperti yang disetujui. Konstanta hanya untuk kode yang dipakai kode aplikasi sekarang
+  (`ANALYTICS_EXPLORE_INVOKE`, `ANALYTICS_PERSONAL_DATA_READ`); area 6 dan 15 menambah miliknya.
+  Halaman Analisis data dan `POST query` dijaga `core.analytics.explore.invoke`, begitu juga menunya.
+  Saklar `analytics.enabled`, middleware 404-nya, dan prop `analyticsEnabled` dibuang.
+- [~] 4.7 Test: `PersonalDataGateTest`; `DataPolicyFilterTest` yang memakai kasus yang sama dengan test
   `OrganizationScope` module aset; principal tanpa hibah → nol baris; principal dengan `all` → semua.
+  *Dikirim:* `DataPolicyFilterTest` (paritas dengan `OrganizationScope::query()` dan
+  `legalEntityQuery()`; module aset tidak punya test `OrganizationScope` sendiri), `AnalyticsPermissionTest`,
+  `ScopeFingerprintTest`, dan dua test baru di `WalkingSkeletonTest`. `PersonalDataGateTest` menyusul
+  bersama 4.4.
 
 `OrganizationScope` module aset **tidak** diubah di area ini. Memindahkannya ke `DataPolicyFilter`
 boleh di area 23 sebagai pekerjaan module; sampai itu, test paritas yang menjaga keduanya sama.

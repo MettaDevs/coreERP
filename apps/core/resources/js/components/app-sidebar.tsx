@@ -157,8 +157,9 @@ export function AppSidebar() {
                           },
                       ]
                     : []),
-                // Engine analitik di balik saklar sementara, sampai permission dasbornya (KA-14) disetujui.
-                ...(props.auth.membership && props.analyticsEnabled
+                // Halaman Analisis data menjalankan analisis bebas, jadi menunya untuk pemegang permission yang
+                // sama dengan rutenya (`core.analytics.explore.invoke`, KA-14). Hanya penyaring tampilan.
+                ...(isAllowed('core.analytics.explore.invoke')
                     ? [
                           {
                               label: 'Analisis data',

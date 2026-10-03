@@ -43,6 +43,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Security;
 
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use Carbon\CarbonImmutable;
 
 /**
@@ -78,16 +79,19 @@ interface AnalyticsPrincipal
     public function timeoutMs(): int;
 
     /** Sidik jari jangkauan untuk kunci cache; lihat ScopeFingerprint. */
-    public function fingerprint(string $dataset): string;
+    public function fingerprint(CompiledDataset $dataset): string;
 
     /** Untuk log: `membership:…`, `publication:…`, `embed:…`. */
     public function describe(): string;
 }
 ```
 
-Area 0 mengirim subset antarmuka ini — tanpa `mayUsePersonalData()`, `lockedFilters()`, dan
-`fingerprint()`, yang ditambahkan area 4 — beserta `UserPrincipal::fromMembership()` dan
-`DatasetAccess` tipis untuk langkah 3 dan 4 urutan otorisasi di atas.
+Area 0 mengirim subset antarmuka ini beserta `UserPrincipal::fromMembership()` dan `DatasetAccess`
+tipis untuk langkah 3 dan 4 urutan otorisasi di atas. Area 4 melengkapinya (3 Oktober 2026):
+`mayUsePersonalData()`, `lockedFilters()`, dan `fingerprint()`. `fingerprint()` menerima
+`CompiledDataset`, bukan kode dataset seperti rancangan awal, karena sidik jarinya butuh kode kebijakan
+dataset dan pemanggilnya sudah memegang dataset itu. `DatasetAccess` membaca kesiapan module dari
+`LaunchableAppCatalog::readyModules()`, penentu yang sama dengan peluncur (`for()`).
 
 | Principal | Dibuat dari | Permission dan hibah | Data pribadi |
 | --- | --- | --- | --- |
@@ -106,6 +110,16 @@ kepemilikannya. Hak publikasi tidak boleh hidup lebih lama daripada pembuatnya.
 `DataPolicyFilter` pada kolom yang dinyatakan dataset ([model semantik](/todo/analitik/model-semantik#datapolicyfilter)).
 Dataset yang resource-nya dilindungi kebijakan tetapi tidak menyatakan kolomnya **ditolak saat
 didaftarkan**, bukan dijalankan tanpa saringan.
+
+Sesudah kebijakan, `DataPolicyScope` memasang saringan terkunci principal (`lockedFilters()`) lewat
+`FieldFilterExpression`, sebelum saringan pengguna. Saringan terkunci yang nilainya kosong, atau yang
+menyebut field yang tidak (lagi) dikenal dataset, berarti **nol baris**: `FieldFilterExpression`
+sendiri membaca nilai kosong sebagai "tanpa saringan". Ekspresi yang tidak terbaca dibiarkan naik
+sebagai galat, karena ia cacat konfigurasi publikasi, bukan isian pemanggil.
+
+`DataPolicyFilterTest` (Core) menjaga `DataPolicyFilter` tetap sama dengan `OrganizationScope` module
+aset untuk kasus hibah yang sama — penuh, tanpa hibah, satu unit, unit dengan turunan, dua legal entity,
+hibah rusak — pada mode legal entity + unit dan legal entity saja.
 
 ### Test paritas kebijakan data
 
@@ -294,6 +308,12 @@ return new class extends Migration
 
 Kode yang dipakai kode aplikasi masuk `CoreSecurityCatalog` sebagai konstanta (`ANALYTICS_DASHBOARD_READ`
 dan seterusnya), dan rute layar memakai `CoreSecurityCatalog::gate(...)`.
+
+*Dikirim area 4 (3 Oktober 2026):* migration `2026_10_03_120000_register_analytics_security_catalog`
+dengan kode di atas tanpa perubahan, dan `down()` lengkap. Konstanta yang lahir hanya yang sudah dipakai
+kode aplikasi: `ANALYTICS_EXPLORE_INVOKE` (halaman Analisis data, `POST api/v1/analytics/query`, dan
+menunya) dan `ANALYTICS_PERSONAL_DATA_READ` (`UserPrincipal::mayUsePersonalData()`); area 6 dan 15
+menambah miliknya. Saklar sementara `analytics.enabled` beserta middleware 404-nya sudah dibuang.
 
 ## Dasbor, widget, dan query tersimpan
 

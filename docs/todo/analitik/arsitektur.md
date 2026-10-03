@@ -34,8 +34,8 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat | 0, 3 |
 | Hasil | `Query\ResultSet`, `Query\ResultColumn`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label rujukan, deret waktu tanpa celah, total | 0 (tipis), 3 |
 | Principal | `Security\AnalyticsPrincipal` + `UserPrincipal`, `PublicationPrincipal` | Siapa yang bertanya: tenant, izin, hibah kebijakan, hak data pribadi, zona waktu | 0 (tipis), 4 |
-| Akses dataset | `Security\DatasetAccess` | Module terpasang dan berlisensi, lalu permission baca resource | 0 (tipis), 4 |
-| Kebijakan data | `Security\DataPolicyScope` → `Contracts\DataPolicyFilter` | Hibah → predikat SQL pada kolom yang dinyatakan dataset | 4 |
+| Akses dataset | `Security\DatasetAccess` | Module terpasang dan berlisensi (`LaunchableAppCatalog::readyModules()`), lalu permission baca resource | 0 (tipis), 4 |
+| Kebijakan data | `Security\DataPolicyScope` → `Contracts\DataPolicyFilter` | Hibah → predikat SQL pada kolom yang dinyatakan dataset, lalu saringan terkunci principal | 4 |
 | Data pribadi | `Security\PersonalDataGate` | Menyembunyikan dan menolak field data pribadi | 4 |
 | Sidik jari scope | `Security\ScopeFingerprint` | Kunci cache yang memisahkan pengguna dengan jangkauan berbeda | 4, 9 |
 | Cache | `Cache\QueryCache` | Hasil di tabel tenant, kunci terhadap serbuan, TTL | 9 |
@@ -181,9 +181,10 @@ apps/core/app/Platform/Analytics/
 │   └── Formula/            Lexer.php  Parser.php  Node/*  SqlEmitter.php      (fase 2)
 ├── Security/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
-│   ├── PublicationPrincipal.php  DataPolicyScope.php  PersonalDataGate.php  ScopeFingerprint.php
+│   ├── DataPolicyScope.php  ScopeFingerprint.php                                  (4)
+│   ├── PublicationPrincipal.php  PersonalDataGate.php
 ├── Cache/QueryCache.php
-├── Support/QueryLog.php  AnalyticsSecurityCatalog.php
+├── Support/QueryLog.php
 ├── Models/
 │   ├── Dashboard.php  Widget.php  SavedQuery.php  QueryLogEntry.php  QueryCacheEntry.php
 │   ├── Publication.php  EmbedToken.php                                        (fase 2)
@@ -191,7 +192,7 @@ apps/core/app/Platform/Analytics/
 │   ├── Controllers/  QueryController  ExploreController                           (0)
 │   │                 DatasetController  DashboardController
 │   │                 WidgetController  WidgetDataController  SavedQueryController
-│   ├── Middleware/   EnsureAnalyticsEnabled                    (0, dibuang bersama saklar)
+│   ├── Middleware/   (EnsureAnalyticsEnabled area 0 dibuang area 4 bersama saklarnya)
 │   ├── Requests/     StoreDashboardRequest  UpdateWidgetRequest  RunQueryRequest …
 │   └── Presenters/   DashboardPresenter  ResultSetPresenter
 ├── External/       PublicationController.php  OData/*                         (fase 2)
@@ -286,7 +287,6 @@ dipasang sesudahnya di proses yang sama langsung terbaca. `find()` dan `all()` t
 
 | Kunci | Bawaan | Gunanya |
 | --- | --- | --- |
-| `enabled` (0) | `false` | Saklar sementara sampai KA-14 disetujui; `true` di `.env.example` lokal |
 | `timeouts.interactive_ms` (0) | 8000 | `statement_timeout` untuk layar |
 | `timeouts.external_ms` | 20000 | Untuk publikasi, OData, embed |
 | `timeouts.job_ms` | 60000 | Untuk job (fase 3) |

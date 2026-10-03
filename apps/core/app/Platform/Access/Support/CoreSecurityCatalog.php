@@ -70,6 +70,16 @@ final class CoreSecurityCatalog
     public const ACCESS_MANAGE_DUTY = 'core.access.manage';
 
     /**
+     * Menjalankan analisis bebas di halaman Analisis data dan pembangun widget (KA-14). Katalog analitik lengkap
+     * ditulis migration `2026_10_03_120000_register_analytics_security_catalog`; kode lainnya masuk ke sini saat
+     * kode aplikasi mulai memakainya.
+     */
+    public const ANALYTICS_EXPLORE_INVOKE = 'core.analytics.explore.invoke';
+
+    /** Memakai field data pribadi di analitik (KA-14, PQ-04): hanya role Owner yang memegangnya otomatis. */
+    public const ANALYTICS_PERSONAL_DATA_READ = 'core.analytics.personal-data.read';
+
+    /**
      * Middleware rute untuk satu permission layar Core, misalnya `->middleware(CoreSecurityCatalog::gate(...))`.
      *
      * Permission-nya diberi tanda kutip karena middleware `can` membaca argumen tanpa kutip sebagai nama parameter

@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Analytics;
 
 use App\Platform\Access\Models\RoleAssignment;
+use App\Platform\Analytics\Actions\RunQuery;
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
+use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\DataPolicyScope;
+use App\Platform\Analytics\Security\ScopeFingerprint;
 use App\Platform\Analytics\Security\UserPrincipal;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\TenantProvisioned;
@@ -22,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use LogicException;
 use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
@@ -33,8 +39,9 @@ use Tests\TestCase;
  * Yang dibuktikan di sini adalah setiap lapis tersambung dan setiap penangkal bekerja: tenant tidak
  * bercampur, permission baca resource menjaga dataset, hibah kebijakan data menyempitkan baris persis
  * seperti layar module, uang tidak dijumlah lintas mata uang, dan eksekusi baca-saja tidak meninggalkan
- * jejak di transaksi pemanggilnya. Setiap test pernah dilihat merah dengan merusak penangkalnya; caranya
- * ditulis di pull request area 0.
+ * jejak di transaksi pemanggilnya. Area 4 menambah jangkauan principal: hibah seluruh organisasi, saringan
+ * terkunci yang hanya menyempitkan, dan sidik jari scope. Setiap test pernah dilihat merah dengan merusak
+ * penangkalnya; caranya ditulis di pull request area 0 dan area 4.
  *
  * Core tidak menulis ke tabel aset di mana pun pada jalur ini. Test ini menyisipkan aset langsung ke tabel
  * module hanya sebagai data awal, seperti `ListExportTest`.
@@ -60,7 +67,6 @@ class WalkingSkeletonTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['analytics.enabled' => true]);
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
         Event::fake([TenantProvisioned::class]);
@@ -225,7 +231,7 @@ class WalkingSkeletonTest extends TestCase
         $this->organization((string) $this->membership->tenant_id, 'operating_unit', 'Unit sesudah analitik');
     }
 
-    public function test_switch_off_answers_not_found_for_page_and_api(): void
+    public function test_page_offers_a_tile_and_a_chart_from_the_first_readable_dataset(): void
     {
         $this->actingAs($this->owner)->get('/analytics/explore')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
@@ -234,13 +240,7 @@ class WalkingSkeletonTest extends TestCase
                 ->where('preview.tile.query', ['dataset' => self::DATASET, 'measures' => ['count']])
                 ->where('preview.tile.caption', 'Jumlah aset')
                 ->where('preview.chart.query', ['dataset' => self::DATASET, 'dimensions' => ['lifecycle_state'], 'measures' => ['acquisition_value']])
-                ->where('preview.chart.caption', 'Nilai perolehan per status aset')
-                ->where('analyticsEnabled', true));
-
-        config(['analytics.enabled' => false]);
-
-        $this->actingAs($this->owner)->get('/analytics/explore')->assertNotFound();
-        $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', ['dataset' => self::DATASET, 'measures' => ['count']])->assertNotFound();
+                ->where('preview.chart.caption', 'Nilai perolehan per status aset'));
     }
 
     public function test_page_without_readable_dataset_offers_nothing(): void
@@ -352,6 +352,55 @@ class WalkingSkeletonTest extends TestCase
         }
     }
 
+    /*
+     * Area 4: jangkauan principal ({@see DataPolicyScope}) dan sidik jarinya ({@see ScopeFingerprint}).
+     */
+
+    public function test_full_grant_reads_every_row_and_the_scope_fingerprint_follows_the_grant(): void
+    {
+        $everything = $this->member(['management-aset.aset.manage'], [[null, null]]);
+        $this->actingAs($everything)->postJson('/api/v1/analytics/query', ['dataset' => self::DATASET, 'measures' => ['count']])->assertOk()
+            ->assertJsonPath('rows', [['count' => 5]]);
+
+        $dataset = app(DatasetRegistry::class)->find(self::DATASET);
+        $this->assertNotNull($dataset);
+        $fingerprint = fn (User $user): string => UserPrincipal::fromMembership($user->activeMembership() ?? throw new LogicException('Tanpa keanggotaan.'), 'UTC')->fingerprint($dataset);
+
+        // Dua pengguna dengan hibah sama berbagi sidik jari (dan kelak cache); hibah berbeda tidak pernah.
+        $unitA = $fingerprint($this->member(['management-aset.aset.manage'], [[$this->legalEntity, $this->unitA]]));
+        $this->assertSame($unitA, $fingerprint($this->member(['management-aset.aset.manage'], [[$this->legalEntity, $this->unitA]])));
+        $this->assertNotSame($unitA, $fingerprint($this->member(['management-aset.aset.manage'], [[$this->legalEntity, $this->unitB]])));
+        $this->assertNotSame($unitA, $fingerprint($everything));
+        // Hak data pribadi mengubah label yang boleh tampil, jadi ikut membedakan.
+        $this->assertNotSame($fingerprint($everything), $fingerprint($this->member(['management-aset.aset.manage', 'core.analytics.personal-data'], [[null, null]])));
+    }
+
+    public function test_locked_filters_only_narrow_and_an_empty_or_unknown_one_reads_nothing(): void
+    {
+        /**
+         * @param  array<string, string|list<string>>  $locked
+         * @param  array<string, string|list<string>>  $filters
+         */
+        $count = function (array $locked, array $filters = []): int {
+            $result = app(RunQuery::class)->handle(
+                $this->lockedTo($locked),
+                new AnalyticsQuery(self::DATASET, [], ['count'], $filters, null, [], null, false, false),
+            )->toArray();
+
+            return (int) $result['rows'][0]['count'];
+        };
+
+        $this->assertSame(5, $count([]));
+        $this->assertSame(3, $count(['lifecycle_state' => ['received']]));
+        // Saringan pengguna menyempitkan di atas saringan terkunci, tidak pernah menggantikannya.
+        $this->assertSame(0, $count(['lifecycle_state' => ['received']], ['lifecycle_state' => ['disposed', 'decommissioned']]));
+        $this->assertSame(1, $count(['lifecycle_state' => ['received', 'disposed']], ['lifecycle_state' => ['disposed']]));
+        // Gagal tertutup: daftar kosong, teks kosong, dan field yang tidak dikenal dataset berarti nol baris.
+        $this->assertSame(0, $count(['lifecycle_state' => []]));
+        $this->assertSame(0, $count(['currency_code' => '  ']));
+        $this->assertSame(0, $count(['kolom_yang_sudah_tidak_ada' => 'x']));
+    }
+
     private function business(string $name, string $email): User
     {
         return app(RegisterBusiness::class)->handle([
@@ -361,9 +410,11 @@ class WalkingSkeletonTest extends TestCase
 
     /**
      * Anggota tenant A dengan duty ini saja, dan hibah kebijakan aset per pasangan legal entity dan unit.
+     * Duty *Susun dasbor dan analisis data* selalu ikut, supaya gate rute analitik (area 4) terlewati dan
+     * yang diuji adalah langkah sesudahnya. Pasangan `[null, null]` adalah hibah seluruh organisasi.
      *
      * @param  list<string>  $duties
-     * @param  list<array{0: string, 1: string}>  $grants
+     * @param  list<array{0: ?string, 1: ?string}>  $grants
      */
     private function member(array $duties, array $grants = []): User
     {
@@ -371,7 +422,7 @@ class WalkingSkeletonTest extends TestCase
         $membership = TenantMembership::query()->create([
             'tenant_id' => $this->membership->tenant_id, 'user_id' => $user->id, 'status' => 'active',
         ]);
-        $this->grantDuties($membership, $duties);
+        $this->grantDuties($membership, ['core.analytics.analyze', ...$duties]);
 
         $assignment = RoleAssignment::query()->where('membership_id', $membership->id)->firstOrFail();
         foreach ($grants as [$legalEntity, $unit]) {
@@ -392,6 +443,76 @@ class WalkingSkeletonTest extends TestCase
         foreach ($dates as $code => $date) {
             DB::table('aset_tr_aset')->where('kode', $code)->update(['acquired_on' => $date]);
         }
+    }
+
+    /**
+     * Owner tenant A dengan saringan terkunci, seperti principal publikasi kelak (area 15): method lain
+     * diteruskan ke principal pengguna sungguhan.
+     *
+     * @param  array<string, string|list<string>>  $locked
+     */
+    private function lockedTo(array $locked): AnalyticsPrincipal
+    {
+        return new readonly class(UserPrincipal::fromMembership($this->membership, 'UTC'), $locked) implements AnalyticsPrincipal
+        {
+            /** @param array<string, string|list<string>> $locked */
+            public function __construct(private UserPrincipal $user, private array $locked) {}
+
+            public function tenantId(): string
+            {
+                return $this->user->tenantId();
+            }
+
+            public function holdsPermission(string $moduleId, string $permission): bool
+            {
+                return $this->user->holdsPermission($moduleId, $permission);
+            }
+
+            public function policyScope(string $policyCode): array
+            {
+                return $this->user->policyScope($policyCode);
+            }
+
+            public function mayUsePersonalData(): bool
+            {
+                return false;
+            }
+
+            public function lockedFilters(string $dataset): array
+            {
+                return $this->locked;
+            }
+
+            public function timezone(): string
+            {
+                return $this->user->timezone();
+            }
+
+            public function now(): CarbonImmutable
+            {
+                return $this->user->now();
+            }
+
+            public function rowLimit(): int
+            {
+                return $this->user->rowLimit();
+            }
+
+            public function timeoutMs(): int
+            {
+                return $this->user->timeoutMs();
+            }
+
+            public function fingerprint(CompiledDataset $dataset): string
+            {
+                return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
+            }
+
+            public function describe(): string
+            {
+                return 'locked:'.$this->user->describe();
+            }
+        };
     }
 
     private function organization(string $tenantId, string $classification, string $name): string

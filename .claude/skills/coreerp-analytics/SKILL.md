@@ -12,12 +12,14 @@ publications (JSON/CSV, OData v4, embeds).
 **Status.** Area 0 (walking skeleton) shipped on 3 October 2026: the dataset contract
 (`App\Platform\Modules\Contracts\Analytics`), `DatasetRegistry`, the query parser, validator,
 compiler, and read-only executor, `Actions\RunQuery`, `POST /api/v1/analytics/query`, and a temporary
-`/analytics/explore` page, all behind `analytics.enabled`. Area 1 (4 October 2026) completed the
+`/analytics/explore` page. Area 1 (4 October 2026) completed the
 dataset contract (`join()`, `reference()`, `shared()`, `fromQuery()`, `field()`, `version()`, …),
 `DatasetValidator` (two stages: `declare()` without a database, `compile()` per database),
 `SharedDimensions` with label resolvers (Foundation features register vendor and currency), the
 `contoh-a` fixture datasets for engine tests, `AnalyticsDatasetsBoundaryTest`, and
-`php artisan analytics:datasets`. Everything else is still a plan. The plan,
+`php artisan analytics:datasets`. Area 4 replaced the `analytics.enabled` switch with the analytics
+permission chain (KA-14) and added `DataPolicyScope`, locked filters, `ScopeFingerprint`, and
+`PersonalDataGate`. Everything else is still a plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
 If code and this skill disagree, trust the code and fix the skill in the same pull request.
@@ -67,8 +69,11 @@ If code and this skill disagree, trust the code and fix the skill in the same pu
   `analytics.read` / `analytics.embed`. Every outside surface is hand-written in
   `apps/core/contracts/internal/integrasi-analitik.yaml`.
 - **Permission codes come only from the catalog migration the owner approved** (KA-14, 3 October
-  2026), written in area 4.6 with exactly the codes in `keamanan.md`. Codes that reach tenant roles
-  cannot be renamed silently. Until area 4.6 lands, the engine sits behind `analytics.enabled`.
+  2026): `2026_10_03_120000_register_analytics_security_catalog`, exactly the codes in `keamanan.md`.
+  Codes that reach tenant roles cannot be renamed silently. Every analytics route names its gate with
+  `CoreSecurityCatalog::gate(...)` (the explore page and `POST query` use
+  `core.analytics.explore.invoke`); add a `CoreSecurityCatalog` constant only when code uses the code.
+  Only the Owner role holds the duties automatically, personal data included (PQ-04).
 
 ## Declaring a dataset
 

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Security;
 
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use Carbon\CarbonImmutable;
 
 /**
  * Pihak yang menjalankan query. Setiap jalur masuk membuat principal-nya sendiri; mesin query hanya
  * mengenal antarmuka ini, jadi tidak ada cabang "kalau dari API, lewati …".
  *
- * Isi kerangka berjalan (area 0) adalah subset antarmuka di `docs/todo/analitik/keamanan.md`. Area 4
+ * Bentuknya di `docs/todo/analitik/keamanan.md` bagian *Principal*. Area 0 mengirim subsetnya; area 4
  * menambahkan `mayUsePersonalData()`, `lockedFilters()`, dan `fingerprint()` tanpa mengubah method yang
  * sudah ada.
  */
@@ -30,6 +31,23 @@ interface AnalyticsPrincipal
      */
     public function policyScope(string $policyCode): array;
 
+    /**
+     * Boleh memakai field data pribadi (`EndUserIdentifiableInformation`) dan melihat nama orang di balik
+     * id pengguna atau pekerja. Publikasi dan embed tidak pernah boleh (KA-05).
+     */
+    public function mayUsePersonalData(): bool;
+
+    /**
+     * Saringan yang tidak dapat dilepas principal ini untuk satu dataset (publikasi, embed), bentuknya sama
+     * dengan `filters` query: kunci field => ekspresi filter atau daftar pilihan. Kosong untuk pengguna.
+     *
+     * Saringan terkunci yang nilainya kosong berarti **nol baris**, tidak pernah "semua"
+     * ({@see DataPolicyScope}).
+     *
+     * @return array<string, string|list<string>>
+     */
+    public function lockedFilters(string $dataset): array;
+
     /** Zona waktu IANA principal, untuk "hari ini", saringan tanggal-jam, dan cap waktu hasil. */
     public function timezone(): string;
 
@@ -40,6 +58,12 @@ interface AnalyticsPrincipal
 
     /** `statement_timeout` dalam milidetik. */
     public function timeoutMs(): int;
+
+    /**
+     * Sidik jari jangkauan principal atas satu dataset, untuk kunci cache: dua principal dengan sidik jari
+     * sama pasti melihat baris yang sama. Hitungannya {@see ScopeFingerprint}.
+     */
+    public function fingerprint(CompiledDataset $dataset): string;
 
     /** Untuk log: `membership:…`, `publication:…`, `embed:…`. */
     public function describe(): string;
