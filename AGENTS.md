@@ -78,6 +78,14 @@ Yang berlaku pada module, dan tidak boleh dilonggarkan dengan alasan apa pun:
 - Setiap tabel module membawa `tenant_id`, dan setiap query menyaringnya.
 - Nama event, envelope, dan aturan versinya tidak berubah.
 
+Arah sebaliknya berbeda: **Core boleh membaca tabel module secara langsung**, misalnya untuk laporan
+dan analitik. Keputusan pemilik produk, 3 Oktober 2026. Alasannya pelanggan bisa membeli satu module
+saja: module yang membaca module lain tidak dapat dipasang sendirian, sedangkan Core ada di setiap
+pemasangan. Bacaan Core tetap menyaring tenant, menerapkan kebijakan data yang dinyatakan module,
+mengambil nama tabel dan kolom dari yang didaftarkan module (bukan ditulis mati), dan hanya membaca —
+menulis tetap lewat module pemiliknya. Syarat lengkapnya di
+[`docs/dev/02-module-standard.md`](docs/dev/02-module-standard.md#ownership-dan-data).
+
 Bila kelak masih ada repo app lama yang ditarik masuk, repo itu wajib bersih dan seluruh commit-nya
 sudah terdorong ke remote lebih dulu. Itu langkah pertama pemindahannya, bukan anggapan: penarikan
 yang berjalan di atas repo yang belum terdorong menelan pekerjaan yang belum ada di mana pun.

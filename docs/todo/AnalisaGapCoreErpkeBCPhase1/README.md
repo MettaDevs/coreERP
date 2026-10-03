@@ -727,7 +727,8 @@ diputuskan di K-07.
   `App\Platform\Modules\Contracts`. Pemilik tabel menyatakan klasifikasi lampirannya dan menjawab boleh
   membuka, boleh mengubah, dan ada-tidaknya baris dokumen. Core memasang konteks module pemiliknya lebih
   dulu (`ResolveAttachmentContext` memakai `ResolveModuleContext`), jadi jawabannya memakai permission dan
-  kebijakan organisasi yang sama dengan layar record itu. Core tidak membaca tabel module.
+  kebijakan organisasi yang sama dengan layar record itu. Core tidak menilai hak itu sendiri, karena
+  hak atas record induk milik module.
 - **Klasifikasi mengikuti induk**: disalin ke kolom `data_class` saat diunggah. `hr_workers` dan `vendors`
   `EndUserIdentifiableInformation` (vendor bisa perorangan, aturan yang sama dengan `vendors.tax_number`);
   dokumen aset `CustomerContent`.

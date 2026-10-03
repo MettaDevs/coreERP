@@ -297,7 +297,7 @@ Control Plane sudah memakai `organizations`, subtype legal entity/operating unit
 
 ## Aturan tetap
 
-1. Tidak ada query atau foreign key lintas module database.
+1. Module tidak membuat query atau foreign key ke tabel module lain. Core boleh membaca tabel module dengan syarat di [ownership dan data](02-module-standard.md#ownership-dan-data), dan foreign key dari tabel module hanya menunjuk tabel Core.
 2. Organization identity tidak menyimpan parent/depth permanen.
 3. Setiap organization mempunyai tepat satu klasifikasi legal entity atau operating unit.
 4. Closure selalu terikat ke satu hierarchy version.

@@ -57,6 +57,27 @@ What holds, and is never relaxed:
 - Every module table carries `tenant_id`, and every query filters on it.
 - Event names, envelopes, and versioning rules do not change.
 
+The reverse direction is different: **Core may read module tables directly** — for reporting,
+analytics, or any engine that serves every module. This is the owner's decision of 3 October 2026,
+and it corrects earlier wording that said Core never reads module tables. What stays forbidden is a
+module reading another module's tables. The reason is commercial as much as technical: a customer may
+buy a single module, a module that reads another cannot be installed alone, and Core is present in
+every installation. A read performed by Core follows four rules:
+
+- Table and column names come from what the module registered — a catalog, a dataset class, a declared
+  model — never hard-coded in Core. The module may not be installed, and the repository forbids
+  hard-coding module names.
+- It filters `tenant_id` and applies the data policy the module declared for that resource, through
+  the fields the module named for it (see the data policy gate below).
+- A read that combines several modules is offered only when every module involved is installed for
+  that tenant.
+- It reads only. Writes go through the owning module, where validation, numbering, workflow, and
+  posting live.
+
+Mechanisms that ask the module instead — report datasets, list export, attachment rights, the linked
+worker — remain valid designs. They ask because the module owns the shape of that data and the
+record-level permission, not because Core is forbidden to read.
+
 The older shape — an app in an `app-erp-*` repository with its own container, database, and service
 token behind a reverse proxy — has no subject left, and every line that served it was removed: app
 placement, provider release registration, the `/apps-content/...` content path, the iframe host page,
@@ -140,12 +161,15 @@ records:
    the required legal-entity and operating-unit dimensions, and whether an
    organization grant may include descendants.
 3. The app contract must state which business record fields/relations it uses
-   to enforce the policy. Those implementation details remain inside the app;
-   Core must not receive table names, query its database, or own its query.
+   to enforce the policy. The module enforces it on its own endpoints. When
+   Core reads the module's tables itself (allowed; see "One module shape"),
+   Core applies the same policy through those declared fields — never through
+   its own guess about which column means legal entity or operating unit.
 4. Core owns the policy catalog, role-assignment grants, hierarchy/version
    resolution, effective dates, provenance, audit, and signed policy-specific
    context claims. The app owns enforcement on every list, search, detail,
-   create, update, delete, and sensitive action endpoint.
+   create, update, delete, and sensitive action endpoint it serves; Core owns
+   enforcement on every read it performs itself.
 5. A workspace selection may default a filter or new-record value only. It is
    never authorization, and browser-supplied organization IDs are never proof
    of access.

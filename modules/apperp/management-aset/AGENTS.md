@@ -1,6 +1,6 @@
 # App ERP Management Aset
 
-App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memiliki API, UI, database, migration, dan contract sendiri.
+Module bisnis di `modules/apperp/management-aset`, berjalan di runtime Core dan memakai database tenant yang sama dengan Core; tabelnya berawalan `aset_`. Ia membawa rute, UI, migration, dan contract-nya sendiri.
 
 - Baca `README.md` untuk daftar master, rantai klasifikasi, hak akses, dan penomoran. Aturan platform ada di `docs/dev/` pada repo CoreERP; buka hanya dokumen yang relevan.
 - Jaga perubahan dan dependency tetap minimal. Jangan membuat abstraksi atau compatibility layer spekulatif.
@@ -21,7 +21,7 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 
 ## Batas yang tidak boleh dilanggar
 
-- App ini **tidak pernah** menyentuh database Core, dan Core tidak menyentuh database ini. Pertukaran hanya lewat REST/OpenAPI, event/AsyncAPI, dan token konteks bertanda tangan.
+- Module ini **tidak pernah** menyentuh tabel module lain, dan memanggil Core hanya lewat `App\Platform\Modules\Contracts`. Arah sebaliknya berbeda: Core boleh membaca tabel module ini secara langsung, misalnya untuk laporan dan analitik (keputusan pemilik produk, 3 Oktober 2026); syaratnya di `docs/dev/02-module-standard.md` bagian *Ownership dan data*. Karena itu kolom yang mewakili legal entity dan unit kerja untuk kebijakan data harus dinyatakan, bukan hanya dipakai di query module.
 - Setiap endpoint dan event yang menyeberang batas app wajib ada di `contracts/`. Tidak ada test yang gagal karena contract kurang lengkap, jadi periksa manual sebelum menyatakan selesai.
 - Contract ditulis tangan dan merupakan sumber kebenaran, bukan hasil generate dari kode. Ambang ~1500 baris sudah terlampaui, jadi sumbernya kini dipecah di `contracts/src/` (`paths/` dan `components/`) dan `contracts/openapi.yaml` adalah **bundle hasil generate** — jangan pernah menyuntingnya langsung, isinya ditimpa tiap build. Sunting `contracts/src/`, lalu jalankan `python contracts/bundle.py`. `python contracts/bundle.py --check` memastikan bundle sinkron dengan sumbernya. Bundle sengaja tetap bernama `contracts/openapi.yaml` supaya `api.openapi` di `app.yaml` dan Control Plane membaca path yang sama seperti sebelum dipecah.
 - Mengubah contract event berarti mengubah kedua sisi. Pasangan `contracts/asyncapi.yaml` di sini adalah `CoreERP/apps/core/contracts/asyncapi.yaml`; keduanya berubah dalam pekerjaan yang sama.

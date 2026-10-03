@@ -9,10 +9,11 @@ namespace App\Platform\Modules\Contracts;
  * Excel" pada list page Business Central: baris dan kolom yang tampil, dengan filter halaman itu, tanpa
  * layout.
  *
- * Core tidak pernah membaca tabel module. Ia hanya menyimpan permintaannya, memeriksa hak menjalankannya,
- * lalu meminta baris kepada pemilik daftar di worker antrean dan menuliskannya ke berkas. Module yang
- * menegakkan permission baca dan kebijakan data organisasi, **persis seperti daftar di layarnya**: ekspor
- * tidak boleh memuat baris yang tidak dapat dilihat pengguna itu di layar.
+ * Core menyimpan permintaannya, memeriksa hak menjalankannya, lalu meminta baris kepada pemilik daftar di
+ * worker antrean dan menuliskannya ke berkas. Ia tidak membaca tabel daftar itu sendiri — walaupun Core
+ * boleh membaca tabel module — karena kolom dan filternya milik layar module. Module yang menegakkan
+ * permission baca dan kebijakan data organisasi, **persis seperti daftar di layarnya**: ekspor tidak boleh
+ * memuat baris yang tidak dapat dilihat pengguna itu di layar.
  *
  * `$context` berbentuk sama dengan konteks laporan ({@see ModuleReportProvider}): `tenant_id`,
  * `legal_entity_id`, `org_unit_id`, `user_id`, `permissions`, `data_policies`, dan `timezone`. Ia dibawa

@@ -247,6 +247,28 @@ mesin database.** Jangan menuliskan bahwa mesin database yang menjaganya: kalima
 pembaca berikutnya menganggap sebuah `JOIN` lintas module akan ditolak PostgreSQL, padahal ia akan
 berjalan mulus sampai seseorang menjalankan penjaganya.
 
+**Arah sebaliknya berbeda: Core boleh membaca tabel module secara langsung.** Keputusan pemilik
+produk, 3 Oktober 2026, yang meluruskan kalimat lama di beberapa halaman bahwa Core tidak pernah
+membaca tabel module. Alasannya pelanggan bisa membeli satu module saja. Module yang membaca tabel
+module lain tidak dapat dipasang sendirian, sedangkan Core ada di setiap pemasangan. Mesin yang
+melayani semua module, seperti laporan dan analitik, karena itu boleh membaca tabel module, dengan
+empat syarat:
+
+- **Nama tabel dan kolom datang dari yang didaftarkan module**: katalog, kelas dataset, atau model
+  yang dinyatakan. Nama itu tidak ditulis mati di kode Core, karena module bisa tidak terpasang dan
+  repo ini melarang nama module ditulis mati.
+- **Tenant disaring dan kebijakan data module diterapkan** lewat kolom yang dinyatakan module untuk
+  kebijakan itu, sama seperti endpoint module sendiri. Core tidak menebak kolom mana yang berarti
+  legal entity atau unit kerja.
+- **Bacaan yang menggabungkan beberapa module hanya ditawarkan bila semuanya terpasang** untuk tenant
+  itu.
+- **Hanya membaca.** Menulis tetap lewat module pemiliknya, karena validasi, nomor, workflow, dan
+  posting hidup di sana.
+
+Jalur yang sudah ada dan bertanya kepada module — dataset laporan, ekspor daftar, hak lampiran,
+tautan pekerja — tetap benar. Ia bertanya karena bentuk data dan hak atas record-nya milik module,
+bukan karena Core dilarang membaca.
+
 Tiga aturan yang mengikuti dari satu database bersama:
 
 - **Foreign key dari tabel module hanya boleh menunjuk tabel milik Core**, tidak pernah ke tabel
@@ -506,7 +528,8 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
 
 - **Hak mengikuti record induk.** Lampiran tidak punya permission sendiri. Jawaban module dibaca lewat
   `RequestContext` dan model module yang memakai `BelongsToTenant`, jadi `tenantId` tidak perlu ditulis
-  ulang di query. Core tidak pernah membaca tabel module.
+  ulang di query. Core tidak menilai hak itu sendiri, karena permission dan kebijakan organisasi
+  record induk milik module.
 - **Baris dokumen menempel ke dokumennya.** Lampiran pada baris dokumen didaftarkan pada tabel header
   dengan nomor baris, seperti `Line No.` di BC; tabel `_details` tidak didaftarkan sendiri.
 - **Rute milik Core**, dipanggil layar dengan sesi login: `GET` dan `POST

@@ -8,10 +8,10 @@ namespace App\Platform\Modules\Contracts;
  * Satu jenis record yang boleh diberi lampiran dokumen (gap 7, K-09), didaftarkan pemilik tabelnya.
  *
  * Lampiran semua record disimpan Core di satu tabel, `document_attachments`, seperti `Document Attachment`
- * di Business Central. Yang tidak dipegang Core adalah hak atas record induknya: Core tidak pernah membaca
- * tabel module, jadi ia bertanya kepada pemilik tabel lewat kontrak ini. Pemiliknya menjawab dengan aturan
- * yang sama dengan saat record itu dibuka atau diubah di layarnya sendiri: permission dan kebijakan
- * organisasinya. Karena itu lampiran tidak pernah lebih terbuka daripada record-nya.
+ * di Business Central. Yang tidak dipegang Core adalah hak atas record induknya: permission dan kebijakan
+ * organisasi record itu milik module, jadi Core bertanya kepada pemilik tabel lewat kontrak ini. Pemiliknya
+ * menjawab dengan aturan yang sama dengan saat record itu dibuka atau diubah di layarnya sendiri. Karena itu
+ * lampiran tidak pernah lebih terbuka daripada record-nya.
  *
  * Module mendaftarkannya ke {@see AttachmentRecordTypes} dari penyedia layanannya. Sebelum bertanya, Core
  * memasang konteks module yang disebut {@see self::moduleId()} pada permintaan itu, sama seperti rute module

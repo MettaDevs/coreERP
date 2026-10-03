@@ -97,17 +97,21 @@ Jadi dua orang dengan permission yang sama persis tetap bisa melihat daftar aset
 
 | Milik Core | Milik app ini |
 | --- | --- |
-| Katalog kebijakan | Penegakan pada tiap endpoint |
+| Katalog kebijakan | Penegakan pada tiap endpoint modul |
 | Pemberian hak lewat penugasan role | Menyebut kolom mana yang mewakili badan hukum dan unit kerja |
 | Penyelesaian hierarki dan versinya | — |
 | Tanggal berlaku dan jejak audit | — |
+| Penegakan pada bacaan yang dilakukan Core sendiri | — |
 
-Modul tidak pernah mengirim nama tabelnya ke Core, dan Core tidak pernah menyentuh tabel modul.
-Yang dipertukarkan hanya kode kebijakan dan daftar hak.
+Untuk endpoint modul, yang dipertukarkan dengan Core hanya kode kebijakan dan daftar hak; modul yang
+menegakkannya lewat `OrganizationScope`. Core boleh membaca tabel modul ini secara langsung, misalnya
+untuk laporan dan analitik (keputusan pemilik produk, 3 Oktober 2026). Saat itu Core menerapkan
+kebijakan yang sama lewat kolom yang dinyatakan modul, bukan menebaknya; syarat lengkapnya di
+[ownership dan data](/dev/02-module-standard#ownership-dan-data).
 
-Batas itu tidak berubah karena keduanya kini satu proses dan satu database. Yang berubah adalah
-siapa yang menegakkannya: dulu database terpisah, sekarang penjaga batas di
-`apps/core/tests/Feature/Boundary/`.
+Yang tetap dilarang adalah modul lain membaca tabel modul ini. Batas itu tidak berubah karena semua
+modul kini satu proses dan satu database. Yang berubah adalah siapa yang menegakkannya: dulu database
+terpisah, sekarang penjaga batas di `apps/core/tests/Feature/Boundary/`.
 
 ## Di mana kodenya
 

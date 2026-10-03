@@ -1,11 +1,15 @@
 # Reporting, read replica, dan event projection
 
-> **Bacaan halaman ini untuk module.** Contoh di bawah memakai satu database per app karena itu
-> bentuk yang membuat masalahnya paling jelas. Untuk module yang berjalan di runtime Core, batas
-> yang sama berlaku pada kumpulan tabel berawalan, bukan pada database terpisah: laporan gabungan
-> tetap dibangun dari projection event, bukan dari join langsung ke tabel module lain. Yang hilang
-> hanyalah lag replikasi antar database; ownership dan larangan join lintas module tidak hilang.
-> Lihat [grand design](01-grand-design.md).
+> **Bacaan halaman ini untuk module.** Contoh di bawah memakai satu database per app, bentuk lama
+> yang sudah dibuang. Untuk module yang berjalan di runtime Core aturannya berbeda arah:
+>
+> - **Module tidak membaca tabel module lain**, jadi module tidak menyusun laporan gabungan sendiri.
+> - **Core boleh membaca tabel module secara langsung**, termasuk menggabungkan beberapa module yang
+>   terpasang untuk tenant itu (keputusan pemilik produk, 3 Oktober 2026). Syaratnya di
+>   [ownership dan data](02-module-standard.md#ownership-dan-data).
+>
+> Projection event dan read replica di bawah tetap pilihan untuk beban berat dan analitik historis,
+> bukan syarat untuk setiap laporan gabungan.
 
 ## Tiga sumber baca yang berbeda
 
@@ -76,4 +80,5 @@ Pada semua profile, business module tetap tidak mengetahui apakah consumer adala
 
 - [API dan integration bridge](04-api-and-integration.md) — event contract sumber projection
 - [Query scope dan schema](08-query-scopes-and-schema.md) — konvensi tabel projection
-- [Grand design dan boundary platform](01-grand-design.md) — kenapa join lintas app tidak tersedia
+- [Grand design dan boundary platform](01-grand-design.md) — batas data antar module
+- [Ownership dan data](02-module-standard.md#ownership-dan-data) — syarat Core membaca tabel module
