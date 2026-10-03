@@ -217,6 +217,33 @@ Menaikkan `opcache.memory_consumption`, `opcache.max_accelerated_files`, `realpa
 dalam derau. opcache lokal sudah sehat apa adanya (1.680 skrip, hit rate 99,89%, nol restart). Yang
 mahal semata-mata `stat` ke `D:\`, jadi hanya yang mengurangi jumlah `stat` yang berpengaruh.
 
+### 6. PHP di mode worker membaca kode sekali, jadi `-HotReload` mematikan mode worker
+
+Sejak 3 Oktober 2026 peran web adalah FrankenPHP dalam mode worker (Laravel Octane): kode PHP dimuat
+sekali per worker, dan suntingan tidak terbaca sampai worker dimulai ulang. Stack `-HotReload` karena
+itu menyetel `FRANKENPHP_WORKER=0` untuk `core-app`: FrankenPHP berjalan tanpa mode worker, Laravel
+di-boot ulang tiap permintaan, dan suntingan terbaca di permintaan berikutnya — perilaku yang sama
+dengan Apache dulu, dengan harga yang sama (±430 ms per permintaan lewat bind mount `D:\`).
+
+Dua jalan pintas sudah dicoba dan gagal, diukur 3 Oktober 2026:
+
+- **`--max-requests=1`.** Worker baru diganti *sesudah* melayani satu permintaan. Worker yang menyala
+  sebelum suntingan lalu menganggur memegang kelas yang dimuatnya saat boot, jadi ±15% permintaan pada
+  detik-detik pertama sesudah suntingan masih menjawab isi lama — salah satunya isi beberapa menit
+  sebelumnya. `opcache.revalidate_freq=0` tidak menolongnya, dan di bind mount Windows ia memaksa
+  `stat` setiap berkas di setiap permintaan.
+- **Watcher bawaan FrankenPHP (`--watch`).** Ia bersandar pada inotify, dan perubahan berkas dari
+  Windows tidak pernah sampai ke container lewat bind mount Docker Desktop: `inotifywait` di dalam
+  container tidak menerima satu event pun selama 40 detik setelah berkasnya diubah dari host.
+
+Sesudah image dibangun ulang (`-Build -HotReload`), `start.ps1` membuang volume `core-vendor` dan
+`core-bootstrap-cache` supaya terisi ulang dari image; volume lama tidak memuat `laravel/octane`.
+
+Akibatnya stack `-HotReload` **tidak** menangkap keadaan yang tertinggal antar permintaan. Stack tanpa
+`-HotReload` (`start.ps1 -Build`) menjalankan mode worker yang sama dengan server, dan di sanalah
+perubahan yang menyentuh singleton, cache statis, atau koneksi database diperiksa — aturannya di
+[standar module](02-module-standard.md#kode-berjalan-di-worker-yang-hidup-lama).
+
 ### Kalau mengukurnya sendiri, jangan memakai `?t=` buatan
 
 Setiap permintaan `app.css?t=<angka>` yang dibuat tangan **menambah satu modul permanen** ke graf

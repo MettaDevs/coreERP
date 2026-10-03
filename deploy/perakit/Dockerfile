@@ -16,17 +16,23 @@
 # Satu image untuk semua klien: app yang boleh dibuka tenant dijaga lisensi, bukan dengan membuang
 # module dari image. `MODUL` dan `scripts/edisi-pangkas.php` karena itu tidak dipakai di sini.
 #
-# ## Kenapa Debian slim, bukan php:8.4-apache
+# ## Kenapa FrankenPHP, dan kenapa tetap Debian slim
 #
-# Image `php` resmi membawa perkakas kompilasi ($PHPIZE_DEPS) secara permanen — lapisan 355 MB tak
-# terkompres yang tidak pernah dipakai di server klien. Diukur 15 September 2026 pada Core dan seluruh
-# module: 237,1 MB terkompres dengan `php:8.4-apache`. PHP dari paket Debian tidak membawanya.
+# Sejak 3 Oktober 2026 peran web dilayani FrankenPHP dalam mode worker lewat Laravel Octane: Laravel
+# di-boot sekali per worker, bukan per permintaan. Diukur pada endpoint aset dengan 2 CPU, kapasitasnya
+# naik dari 125 menjadi 350 pengguna serentak. Sebelumnya image ini Apache prefork + mod_php dari paket
+# Debian.
 #
-# Perl tetap ada (±14 MB terkompres): `apache2-bin` Debian menuntut `perl:any`, dan PRD melarang
-# mencabut paket secara paksa. Mencabutnya dengan `dpkg --force-depends` memang menghemat 14 MB, tetapi
-# meninggalkan dpkg dalam keadaan rusak — `apt-get install` apa pun sesudahnya menarik Perl kembali atau
-# berhenti. Selisih itu hanya dibayar sekali per klien: ia di lapisan basis, dan rilis biasa hanya
-# menambah lapisan kode.
+# FrankenPHP menuntut PHP ZTS, dan PHP paket Debian NTS — jadi PHP tidak lagi datang dari apt. Ia
+# dibangun di tahap `php` dari image FrankenPHP resmi (turunan image `php` ZTS), lalu hanya hasilnya
+# yang disalin: binari `frankenphp` dan `php`, `libphp.so`, ekstensi, dan ini-nya. Perkakas kompilasi
+# ($PHPIZE_DEPS, lapisan 355 MB tak terkompres) tetap tidak pernah menjadi lapisan image akhir — alasan
+# yang sama yang dulu membuat image ini memakai Debian slim alih-alih `php:8.4-apache`.
+#
+# Pustaka yang dibutuhkan hasil salinan itu dipasang lewat apt, dari daftar yang dihitung di tahap `php`
+# (`ldd` atas setiap binari dan ekstensi, lalu `dpkg -S`). Dengan begitu dpkg tetap sehat dan tahu
+# setiap berkas di luar /usr/local, dan yang dipasang persis yang dipakai — tidak ada daftar tangan yang
+# bisa basi ketika ekstensi bertambah.
 
 FROM composer:2 AS vendor
 WORKDIR /repo
@@ -72,57 +78,76 @@ COPY apps/core/public ./public
 COPY apps/core/vite.config.ts apps/core/tsconfig.json ./
 RUN npm run build
 
-# Ekstensi opentelemetry tidak dipaketkan Debian. Ia dikompilasi di tahap terpisah dan hanya berkas
-# .so-nya yang disalin, supaya perkakas kompilasi tidak pernah menjadi lapisan image akhir.
-#
-# Versinya dipin: `pecl install` tanpa versi menarik rilis terbaru saat build, sehingga commit yang sama
+# PHP ZTS, FrankenPHP, dan ekstensinya. Versi image dan opentelemetry dipin: tanpa pin, commit yang sama
 # dapat menghasilkan image berbeda bulan depan.
-FROM debian:trixie-slim AS otel
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends php8.4-dev php-pear make gcc libc6-dev ca-certificates \
-    && pecl install opentelemetry-1.2.1 \
-    && cp "$(php-config8.4 --extension-dir)/opentelemetry.so" /opentelemetry.so
+#
+# Ekstensi yang dipasang di sini ditambah yang sudah dikompilasi ke dalam PHP resmi (curl, mbstring, xml,
+# sqlite3, readline, sodium) sama dengan yang dulu datang dari paket Debian; `uji-image.sh` menagihnya.
+# `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
+FROM dunglas/frankenphp:1.12.7-php8.4-trixie AS php
+RUN install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache opentelemetry-1.2.1
+# Paket Debian pemilik setiap pustaka yang dibutuhkan binari, libphp, dan ekstensi. Pustaka di /usr/local
+# bukan milik paket mana pun; ia disalin langsung ke tahap akhir.
+#
+# `realpath` wajib: trixie memakai usrmerge, jadi `ldd` menyebut /lib/x86_64-linux-gnu/... sementara dpkg
+# mencatat berkasnya di /usr/lib/x86_64-linux-gnu/..., dan `dpkg -S` atas jalur pertama tidak menemukan
+# pemiliknya.
+RUN set -eu; \
+    for f in /usr/local/bin/frankenphp /usr/local/bin/php /usr/local/lib/*.so* $(find "$(php-config --extension-dir)" -name '*.so'); do \
+        ldd "$f" | awk '/=> \//{print $3}'; \
+    done | sort -u | xargs -r realpath | sort -u | grep -v '^/usr/local/' > /tmp/pustaka.txt; \
+    xargs -r dpkg -S < /tmp/pustaka.txt | cut -d: -f1 | sort -u > /paket-runtime.txt; \
+    test -s /paket-runtime.txt; \
+    mkdir -p /keluaran/usr/local/bin /keluaran/usr/local/lib/php; \
+    cp /usr/local/bin/frankenphp /usr/local/bin/php /keluaran/usr/local/bin/; \
+    cp -a /usr/local/lib/*.so* /keluaran/usr/local/lib/; \
+    cp -a /usr/local/lib/php/extensions /keluaran/usr/local/lib/php/; \
+    cp -a /usr/local/etc /keluaran/usr/local/; \
+    cp /usr/local/etc/php/php.ini-production /keluaran/usr/local/etc/php/php.ini; \
+    sed 's/^memory_limit = .*/memory_limit = -1/' /usr/local/etc/php/php.ini-production > /keluaran/usr/local/etc/php/php-cli.ini
 
 # `pg_dump` dan `pg_restore` dipakai `environment:copy` dan cadangan agen. Hanya kedua binarinya yang
 # disalin; paket postgresql-client membawa psql, Perl, dan skrip pembungkus yang tidak dipakai image
-# ini. Pustaka yang dibutuhkan keduanya, libpq5, sudah ada lewat php8.4-pgsql.
+# ini.
 #
 # Versi 17: `pg_dump` menolak server yang lebih baru daripada dirinya tetapi bekerja terhadap yang lebih
 # lama. Klien on-prem menjalankan postgres:16, dan halaman rilis menyebut 17; 17 aman terhadap keduanya.
 FROM debian:trixie-slim AS pgklien
 ARG VERSI_KLIEN_PG=17
 RUN apt-get update && apt-get install -y --no-install-recommends "postgresql-client-${VERSI_KLIEN_PG}"
+# Paket pemilik pustaka kedua binari itu, dihitung dengan cara yang sama dengan tahap `php`.
+RUN for f in /usr/lib/postgresql/${VERSI_KLIEN_PG}/bin/pg_dump /usr/lib/postgresql/${VERSI_KLIEN_PG}/bin/pg_restore; do \
+        ldd "$f" | awk '/=> \//{print $3}'; \
+    done | sort -u | xargs -r realpath | sort -u | xargs -r dpkg -S | cut -d: -f1 | sort -u > /paket-pg.txt \
+    && test -s /paket-pg.txt
 
 FROM debian:trixie-slim
 ARG VERSI_KLIEN_PG=17
-# gd dibutuhkan PhpSpreadsheet; zip oleh PhpWord dan PhpSpreadsheet. Sisanya — curl, mbstring, xml,
-# sqlite3, readline, opcache — dibawa image php resmi yang dipakai SaaS secara bawaan; tanpa mereka
-# ekstensi yang termuat di on-prem berbeda dari SaaS.
+# `php.ini` adalah `php.ini-production` milik PHP itu sendiri — padanan php.ini Debian yang dulu dipakai:
+# display_errors mati, batas memori 128M untuk peran web. Binari `php` membaca `php-cli.ini` lebih dulu,
+# yang sama kecuali batas memorinya dicabut, seperti php.ini CLI Debian dulu: worker antrean (ekspor
+# laporan), penjadwal, `migrate`, dan `environment:copy` tidak pernah dibatasi 128M. Batas unggah mengikuti
+# batas lampiran dokumen, 10 MB (`coreerp.attachments.max_kb`), sama dengan apps/core/Dockerfile.
+# `expose_php` dimatikan supaya jawaban tidak mengumumkan versi PHP.
 #
-# Konfigurasi Apache meniru image php resmi yang dipakai SaaS — prefork + mod_php, DocumentRoot di
-# public Core, AllowOverride All untuk .htaccess Laravel, log ke stdout/stderr — supaya perilaku web
-# on-prem sama dengan SaaS.
+# Peran web berjalan sebagai www-data tetapi tetap membuka port 80, supaya proxy, healthcheck, dan compose
+# di depannya tidak berubah: `setcap` memberi binari frankenphp hak itu, lalu perkakasnya dicabut lewat
+# apt (bukan paksa, jadi dpkg tetap sehat). Caddy menulis konfigurasi dan datanya ke $XDG_CONFIG_HOME dan
+# $XDG_DATA_HOME, yang diserahkan ke www-data.
+ENV PHP_INI_DIR=/usr/local/etc/php XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
+COPY --from=php /paket-runtime.txt /tmp/paket-runtime.txt
+COPY --from=pgklien /paket-pg.txt /tmp/paket-pg.txt
+COPY --from=php /keluaran/ /
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates apache2 libapache2-mod-php8.4 \
-        php8.4-cli php8.4-bcmath php8.4-curl php8.4-gd php8.4-intl php8.4-mbstring php8.4-pgsql \
-        php8.4-sqlite3 php8.4-xml php8.4-zip php8.4-opcache php8.4-readline \
-    && (a2dismod -f mpm_event || true) \
-    && a2enmod mpm_prefork php8.4 rewrite \
-    && sed -ri 's!/var/www/html!/var/www/repo/apps/core/public!g' /etc/apache2/sites-available/000-default.conf \
-    && printf '<Directory /var/www/>\n\tOptions -Indexes\n\tAllowOverride All\n</Directory>\nDirectoryIndex index.php index.html\n' > /etc/apache2/conf-available/coreerp.conf \
-    && a2enconf coreerp \
-    && ln -sfT /dev/stderr /var/log/apache2/error.log \
-    && ln -sfT /dev/stdout /var/log/apache2/access.log \
-    && ln -sfT /dev/stdout /var/log/apache2/other_vhosts_access.log \
-    && printf '#!/bin/sh\nset -e\n. /etc/apache2/envvars\nmkdir -p "$APACHE_RUN_DIR" "$APACHE_LOCK_DIR" "$APACHE_LOG_DIR"\nrm -f "$APACHE_PID_FILE"\nexec apache2 -DFOREGROUND "$@"\n' > /usr/local/bin/apache2-foreground \
-    && chmod +x /usr/local/bin/apache2-foreground \
-    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/*
+    && cat /tmp/paket-runtime.txt /tmp/paket-pg.txt | sort -u | xargs apt-get install -y --no-install-recommends ca-certificates libcap2-bin \
+    && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && apt-get purge -y --auto-remove libcap2-bin \
+    && ldconfig \
+    && printf 'upload_max_filesize = 10M\npost_max_size = 12M\n' > "$PHP_INI_DIR/conf.d/coreerp-uploads.ini" \
+    && printf 'expose_php = Off\n' > "$PHP_INI_DIR/conf.d/coreerp-expose.ini" \
+    && mkdir -p /config /data && chown -R www-data:www-data /config /data \
+    && rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /tmp/paket-runtime.txt /tmp/paket-pg.txt
 COPY --from=pgklien /usr/lib/postgresql/${VERSI_KLIEN_PG}/bin/pg_dump /usr/lib/postgresql/${VERSI_KLIEN_PG}/bin/pg_restore /usr/local/bin/
-COPY --from=otel /opentelemetry.so /tmp/opentelemetry.so
-RUN mv /tmp/opentelemetry.so "$(php -r 'echo ini_get("extension_dir");')/" \
-    && echo 'extension=opentelemetry.so' > /etc/php/8.4/mods-available/opentelemetry.ini \
-    && phpenmod opentelemetry
 WORKDIR /repo
 # Pohon app dan module diambil dari tahap vendor — bersama vendor dan wayfinder — dan aset dari tahap
 # assets. Konteks pembangunan tidak pernah disalin langsung ke tahap ini.

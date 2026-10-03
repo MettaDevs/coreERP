@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\ControlPlane;
 
 use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Support\Env;
 use Tests\TestCase;
 
 /**
@@ -44,6 +45,12 @@ class TrustedProxyTest extends TestCase
         $_SERVER['COREERP_TRUSTED_PROXIES'] = '*';
         $_ENV['COREERP_TRUSTED_PROXIES'] = '*';
         putenv('COREERP_TRUSTED_PROXIES=*');
+
+        // Repository env statis per proses dan mengingat variabel yang pernah ia isi dari `.env`.
+        // Bila test lain sudah mem-boot aplikasi di proses yang sama, pemuatan `.env` berikutnya
+        // menimpa `*` di atas dengan nilai kosong milik `.env` — test ini merah hanya ketika ia
+        // kebetulan bukan test pertama di prosesnya. `enablePutenv()` membuang repository itu.
+        Env::enablePutenv();
 
         parent::setUp();
     }

@@ -43,9 +43,11 @@ x-api: &api
   # Artinya angka latensi di sini tidak lagi mengukur bootstrap penuh. Yang diukur F7-10: cache
   # menghemat 3–5 ms per permintaan pada endpoint tanpa database, dan hilang di belakang kerja
   # database pada skenario sungguhan — ambang gate-nya tidak bergeser.
-  volumes:
-    - ./apache-loadtest.conf:/etc/apache2/conf-enabled/zz-loadtest.conf:ro
   environment: &api-environment
+    # 32 worker FrankenPHP x 4 instance = maksimal 128 koneksi ke PgBouncer, sama dengan batas
+    # Apache prefork yang dipakai sampai 3 Oktober 2026. Bedanya, koneksi worker Octane tetap
+    # terbuka sepanjang umur worker, jadi kolam PgBouncer terisi penuh sejak awal.
+    OCTANE_WORKERS: "32"
     APP_ENV: production
     APP_DEBUG: "false"
     APP_KEY: base64:l1oHqTLOtVdmz0RRR7Yq1u7oPvHRxDTk1kL7RiEwv3E=

@@ -124,7 +124,9 @@ final class TableFields
     /** @return array<string, string> Nama kolom => nama tipe database, urut seperti di tabel. */
     private static function columnTypes(Model $model): array
     {
-        $key = $model->getConnectionName().'|'.$model->getTable();
+        // Dikunci nama database, bukan nama koneksi: koneksi bawaan bernama null tetapi menunjuk database
+        // tenant yang berbeda dari permintaan ke permintaan, dan satu worker Octane melayani semuanya.
+        $key = $model->getConnection()->getDatabaseName().'|'.$model->getTable();
         if (! isset(self::$columnTypes[$key])) {
             $types = [];
             foreach ($model->getConnection()->getSchemaBuilder()->getColumns($model->getTable()) as $column) {

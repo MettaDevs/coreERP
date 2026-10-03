@@ -214,7 +214,7 @@ Satu image, tiga peran, dipilih lewat `CONTAINER_ROLE`:
 
 | `CONTAINER_ROLE` | Perintah | Replika |
 | --- | --- | --- |
-| `web` (default) | `apache2-foreground` | Bebas |
+| `web` (default) | `php artisan octane:frankenphp` (FrankenPHP mode worker) | Bebas |
 | `scheduler` | `php artisan schedule:work` | **Tepat satu per cluster** |
 | `worker` | `php artisan queue:work` | Bebas |
 
