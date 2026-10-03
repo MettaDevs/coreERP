@@ -46,17 +46,21 @@ final class AssetTransferListLayout extends BuiltinLayoutBuilder
         $sheet->setCellValue('B7', '${jumlah_baris}');
         $sheet->setCellValue('C7', 'Dicetak');
         $sheet->setCellValue('D7', '${dicetak_pada}');
-        $sheet->setCellValue('A8', 'Filter tambahan');
-        $sheet->setCellValue('B8', '${filter_tambahan}');
+        foreach ([
+            'A8' => 'Group aset', 'B8' => '${filter_group}', 'C8' => 'Kelompok harta fiskal', 'D8' => '${filter_golongan}', 'E8' => 'Jenis aset', 'F8' => '${filter_jenis}',
+            'A9' => 'Aset', 'B9' => '${filter_aset}', 'C9' => 'Filter tambahan', 'D9' => '${filter_tambahan}',
+        ] as $cell => $value) {
+            $sheet->setCellValue($cell, $value);
+        }
 
         foreach ($headings as $index => $heading) {
-            $sheet->setCellValue([$index + 1, 9], $heading);
-            $sheet->setCellValue([$index + 1, 10], '${baris.'.$macros[$index].'}');
+            $sheet->setCellValue([$index + 1, 11], $heading);
+            $sheet->setCellValue([$index + 1, 12], '${baris.'.$macros[$index].'}');
             $sheet->getColumnDimensionByColumn($index + 1)->setWidth(
                 in_array($macros[$index], ['aset_nama', 'alasan', 'keterangan'], true) ? 36 : 18,
             );
         }
-        $this->sheetTableHeader($sheet, 9, count($headings));
+        $this->sheetTableHeader($sheet, 11, count($headings));
 
         $this->saveSpreadsheet($spreadsheet, $path);
     }
