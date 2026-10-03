@@ -56,6 +56,8 @@ Rencana **belum** memesan apa pun. Dokumen permintaan pembelian adalah langkah b
 
 Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
 
+Sejauh mana rencana sudah diminta dan diterima dibaca di [Laporan pengadaan aset](/apps/management-aset/transaction/laporan/#laporan-pengadaan-aset): satu baris per baris rencana, dengan permintaan yang menunjuknya (`planning_detail_id`) dan penerimaan dari permintaan itu.
+
 ## Di mana kodenya
 
 | Berkas | Isinya |

@@ -26,6 +26,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalScrapReport
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetLedgerReconciliationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMaintenanceReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMonitoringReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetProcurementReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
@@ -88,6 +89,7 @@ final class ModuleServiceProvider extends ServiceProvider
             $registry->register(new AssetAcquisitionListReport);
             $registry->register(new AssetLedgerReconciliationReport);
             $registry->register(new AssetMaintenanceReport);
+            $registry->register(new AssetProcurementReport);
 
             return $registry;
         });
