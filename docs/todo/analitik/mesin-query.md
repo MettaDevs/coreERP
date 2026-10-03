@@ -204,8 +204,13 @@ Urutan di bawah bukan selera; setiap langkah bergantung pada langkah sebelumnya.
    `SoftDeletes` ikut dari model — atau `fromSub(sumber, 'base')` ditambah `where base.tenant_id = ?`
    untuk dataset bersumber query. Tabel dasar tidak pernah diberi alias.
 2. **Join yang dibutuhkan saja.** `JoinPlanner` mengumpulkan alias yang disebut dimensi, measure,
-   saringan, dan kolom kebijakan, lalu memasang join itu saja. Setiap join membawa
-   `alias.tenant_id = <tabel dasar>.tenant_id`, dan `alias.deleted_at IS NULL` kecuali join label.
+   saringan, dan kolom kebijakan, lalu memasang join itu saja, beserta join yang menjadi jalannya. Setiap
+   join membawa `alias.tenant_id = <tabel dasar>.tenant_id`, dan `alias.deleted_at IS NULL` kecuali join
+   label. Semuanya `LEFT JOIN` dengan syarat di `ON`: join hanya dipasang bila kolomnya disebut, jadi join
+   yang membuang baris membuat jumlah baris berubah hanya karena pengguna menambah satu pengelompok. Baris
+   yang induknya terarsip atau (karena data rusak) milik tenant lain tetap dihitung dengan kolom join
+   kosong, dan kebijakan data pada kolom join tetap gagal tertutup — kolom kosong tidak cocok dengan hibah
+   apa pun. Ini juga yang dilakukan `whereHas()` ber-`SoftDeletes` di layar module untuk pengguna berhibah.
 3. **Kebijakan data**, sebelum saringan pengguna, lewat `DataPolicyFilter::apply()` pada kolom yang
    dinyatakan. Saringan pengguna hanya dapat menyempitkan, tidak pernah melebarkan.
 4. **Saringan pengguna dan rentang waktu** lewat `FieldFilterExpression::apply()`.
@@ -213,7 +218,10 @@ Urutan di bawah bukan selera; setiap langkah bergantung pada langkah sebelumnya.
 6. **Dimensi tersirat**: kolom mata uang dan satuan dari measure uang dan kuantitas (KA-22).
 7. **Measure** dengan alias `m0`, `m1`, ….
 8. **Urutan dan batas**: `ORDER BY` pada alias, `LIMIT n + 1`.
-9. **Total**: query kedua dengan langkah 1–4 dan 6 yang sama, tanpa dimensi lain.
+9. **Total**: query kedua dengan langkah 1–4 dan 6 yang sama, tanpa dimensi lain dan tanpa batas baris —
+   total seluruh kelompok, bukan hanya yang lolos top-N. Kolom mata uang dan satuan memakai alias yang
+   sama dengan di hasil, juga bila mata uang dipilih sebagai dimensi, supaya total tetap satu baris per mata
+   uang dan berkunci sama.
 
 ```php
 <?php
@@ -306,61 +314,40 @@ pemanggil masuk ke SQL selain lewat binding.
 menandai `selectRaw()`, `orderByRaw()`, `groupByRaw()`, dan `whereRaw()` dengan `literal-string`, dan
 Larastan menolak string yang memuat nama kolom dari definisi dataset — termasuk alias `"d{$i}"`, karena
 bilangan yang disisipkan membuat string tidak lagi literal. Repo ini tidak memakai `@phpstan-ignore`
-maupun baris baseline baru. Yang dipakai `QueryCompiler` area 0, dan yang perlu diikuti area 3:
+maupun baris baseline baru. Yang dipakai `QueryCompiler`:
 
 | Kebutuhan | Cara tanpa SQL mentah |
 | --- | --- |
 | Kolom dimensi | `addSelect('<tabel>.<kolom> as d0')`, lalu `groupBy('d0')` — grammar membungkus keduanya |
-| Measure | `selectExpression(new MeasureExpression($aggregate, $kolom), 'm0')`; ekspresinya objek `Illuminate\Contracts\Database\Query\Expression` yang menyusun SQL lewat grammar (`getValue(Grammar)`) |
+| Label rujukan | `addSelect('r0.nama as d0_label')`, lalu `groupBy('d0_label')` |
+| Join | `leftJoin('<tabel> as <alias>', fn (JoinClause $j) => $j->on(…)->on('<alias>.tenant_id', '=', '<tabel dasar>.tenant_id')->whereNull('<alias>.deleted_at'))` |
+| Ember waktu | `selectExpression(new TimeBucketExpression(…), 'd0')`, lalu `groupBy('d0')` |
+| Measure | `selectExpression(MeasureExpression::for($dataset, $measure), 'm0')`; ekspresinya objek `Illuminate\Contracts\Database\Query\Expression` yang menyusun SQL lewat grammar (`getValue(Grammar)`) |
+| Saringan tetap measure | Ekspresi yang sama dengan `FILTER (WHERE …)` berplaceholder; nilainya lewat `addBinding($expression->bindings(), 'select')` |
 | Urutan | `orderBy('m0', 'desc')`, `orderBy('d0')` |
-| Saringan tetap measure (area 3) | Ekspresi yang sama ditambah `FILTER (WHERE …)`; nilainya lewat `addBinding($bindings, 'select')` |
-| `NULLS LAST` (area 3) | Belum ada; `orderBy()` tidak menerimanya dan nama alias tidak dapat dipakai di dalam ekspresi `ORDER BY` PostgreSQL. Measure `count` dan `sum` tidak pernah kosong; `avg`, `min`, `max` yang kosong sementara jatuh di depan pada urutan turun |
+| `NULLS LAST` | `orderBy(new IsNullExpression($ekspresi))` tepat sebelum `orderBy('m0', 'desc')`: kunci `(<ekspresi>) is null` naik menaruh yang kosong di akhir. `orderBy()` tidak menerima `nulls last`, dan alias tidak dapat dipakai di dalam ekspresi `ORDER BY`, jadi kuncinya mengulang ekspresi kolomnya — kolom untuk dimensi, agregat (dengan binding `order`) untuk measure. Hanya pada urutan turun, dan hanya untuk kolom yang dapat kosong: dimensi, dan measure `avg`, `min`, `max` |
 
-Area 2 menambahkan ke compiler hanya kunci yang sudah dibaca parser, supaya tidak ada yang diabaikan
-diam-diam. `time_range` dikompilasi persis seperti di sketsa (langkah 4): `RelativeRange::expression()` lalu
-`FieldFilterExpression::apply()`, dan `InvalidFilterExpression`-nya menjadi `analytics.invalid_filter`
-berpath `time_range.range`. `sort` pengguna menggantikan urutan bawaan (`m0` turun) lewat `orderBy(alias, arah)`;
-pengelompok yang belum ikut diurutkan tetap menjadi pemutus seri. Yang belum dikompilasi — ember waktu
-(`dimensions.N.granularity`) dan `totals` — **ditolak 422 `analytics.invalid_query`** ("belum tersedia"),
-bukan diabaikan; area 3 menggantinya dengan kompilasi sungguhan.
+Kunci query yang sudah dibaca parser semuanya dikompilasi: `time_range` lewat `RelativeRange::expression()`
+lalu `FieldFilterExpression::apply()`, dengan `InvalidFilterExpression` menjadi `analytics.invalid_filter`
+berpath `time_range.range`; `sort` pengguna menggantikan urutan bawaan, dan pengelompok yang belum ikut
+diurutkan tetap menjadi pemutus seri; ember waktu dan `totals` sejak area 3. Urutan bawaan: setiap dimensi
+berember waktu naik, selain itu measure pertama turun.
 
 ### Measure
 
-```php
-/** @return array{0: string, 1: list<mixed>} */
-public function sql(CompiledDataset $dataset, CompiledMeasure $measure): array
-{
-    $column = $measure->field === null ? '*' : $this->grammar->wrap($dataset->qualified($measure->field));
-    $expression = match ($measure->aggregate) {
-        Aggregate::Count => "count({$column})",
-        Aggregate::CountDistinct => "count(distinct {$column})",
-        Aggregate::Sum => "coalesce(sum({$column}), 0)",
-        Aggregate::Average => "avg({$column})",
-        Aggregate::Minimum => "min({$column})",
-        Aggregate::Maximum => "max({$column})",
-    };
+`MeasureExpression::getValue(Grammar)` menyusun SQL-nya; `bindings()` memulangkan nilai saringan tetap
+dalam urutan placeholder:
 
-    if ($measure->where === []) {
-        return [$expression, []];
-    }
+| Agregat | Tanpa saringan tetap | Dengan saringan tetap |
+| --- | --- | --- |
+| `count` | `count(*)` atau `count("t"."x")` | `count(*) filter (where "t"."status" in (?))` |
+| `count_distinct` | `count(distinct "t"."x")` | `count(distinct "t"."x") filter (where …)` |
+| `sum` | `coalesce(sum("t"."x"), 0)` | `coalesce(sum("t"."x") filter (where …), 0)` |
+| `avg`, `min`, `max` | `avg("t"."x")` | `avg("t"."x") filter (where …)` |
 
-    // Saringan tetap measure: hanya kesamaan dan daftar nilai, sudah divalidasi saat dataset didaftarkan.
-    $conditions = [];
-    $bindings = [];
-    foreach ($measure->where as $field => $values) {
-        $wrapped = $this->grammar->wrap($dataset->qualified($field));
-        $values = (array) $values;
-        if ($values === [null]) {
-            $conditions[] = "{$wrapped} is null";
-            continue;
-        }
-        $conditions[] = $wrapped.' in ('.implode(', ', array_fill(0, count($values), '?')).')';
-        array_push($bindings, ...$values);
-    }
-
-    return ["{$expression} filter (where ".implode(' and ', $conditions).')', $bindings];
-}
-```
+`FILTER` melekat pada panggilan agregatnya, jadi untuk `sum` ia ditulis **di dalam** `coalesce`;
+`coalesce(sum(x), 0) filter (…)` ditolak PostgreSQL. Saringan tetap hanya kesamaan dan daftar nilai yang
+sudah divalidasi saat dataset didaftarkan; nilai `null` di daftar menjadi `… is null`.
 
 Dua hal yang disengaja:
 
@@ -379,19 +366,33 @@ yang berisi waktu UTC.
 
 | Tipe kolom | Ekspresi bucket bulan untuk pengguna `Asia/Makassar` |
 | --- | --- |
-| `date` | `date_trunc('month', "t"."acquired_on")::date` |
+| `date` | `date_trunc('month', "t"."acquired_on"::timestamp)::date` |
 | `timestamp` (tanpa zona, berisi UTC) | `date_trunc('month', ("t"."created_at" at time zone 'UTC') at time zone 'Asia/Makassar')::date` |
 | `timestamptz` | `date_trunc('month', "t"."posted_at" at time zone 'Asia/Makassar')::date` |
 
-- **Kolom `date` tidak dikonversi.** Tanggal perolehan adalah tanggal kalender, bukan saat.
+- **Kolom `date` tidak dikonversi.** Tanggal perolehan adalah tanggal kalender, bukan saat. Cast ke
+  `timestamp` (tanpa zona) memilih varian `date_trunc` yang tidak membaca zona sesi; tanpa cast,
+  PostgreSQL memilih `timestamptz` dan hasilnya bergantung pada zona sesi yang kebetulan UTC.
 - **Zona ditulis sebagai literal, bukan binding**, setelah dicocokkan dengan
-  `DateTimeZone::listIdentifiers()`. Binding di `SELECT` dan `GROUP BY` menjadi dua parameter
-  berbeda bagi PostgreSQL, dan pengelompokan ditolak.
+  `DateTimeZone::listIdentifiers()` (`TimeBucketExpression` menolak nama lain). Ekspresi yang sama
+  muncul dua kali — kolom hasil dan kunci kosong-di-akhir — dan dua binding menjadi dua parameter berbeda
+  bagi PostgreSQL, yang lalu tidak mengenalinya sebagai ekspresi yang dikelompokkan.
 - **Jangan memakai `to_char()` pada `timestamptz`.** Ia memakai zona sesi (UTC): awal Oktober di
   Makassar adalah 30 September pukul 16.00 UTC, dan `to_char` menulisnya sebagai September.
 - **Minggu mulai Senin** (`date_trunc('week', …)` di PostgreSQL memang ISO).
 - **Celah deret waktu diisi di PHP** (`GapFiller`) dari rentang yang diminta: bulan tanpa transaksi
-  tetap muncul dengan nol untuk `count`/`sum` dan kosong untuk `avg`/`min`/`max`. Batasnya 1000 titik.
+  tetap muncul dengan nol untuk `count`/`sum` dan kosong untuk `avg`/`min`/`max`, untuk setiap kombinasi
+  dimensi lain (termasuk mata uang tersirat) yang muncul di hasil. Batasnya 1000 titik.
+  - Rentangnya token `time_range` (`@this_year`) bila field-nya field ember itu, sehingga bulan kosong di
+    ujung rentang ikut muncul; selain itu — ekspresi tanggal biasa, rentang pada field lain, atau tanpa
+    rentang — dari periode pertama sampai terakhir di hasil.
+  - Ember waktu pertama yang diisi; dimensi berember lain diperlakukan seperti dimensi biasa.
+  - Tidak diisi bila hasil terpotong (periode yang hilang mungkin terpotong, bukan kosong), bila urutan
+    pertama bukan periode itu (pengguna meminta urutan lain, misalnya nilai terbesar), bila lebih dari
+    1000 titik, atau bila baris sesudah diisi melebihi batas baris query.
+  - Baris disusun per periode. Di dalam satu periode, baris yang ada tetap dalam urutan SQL-nya dan baris
+    isian menyusul — tepat untuk urutan turun menurut measure, mendekati untuk urutan naik menurut dimensi
+    lain.
 
 Test yang wajib: transaksi pada 30 September 2026 pukul 16.30 UTC masuk bucket **Oktober** bagi
 pengguna WITA dan bucket September bagi pengguna UTC.
@@ -405,8 +406,13 @@ pengguna WITA dan bucket September bagi pengguna UTC.
 | Dimensi bersama (`shared()`) | Resolver dimensi bersama di Core, sekali per himpunan id | Setelah query |
 | Ya/tidak | "Ya" / "Tidak" | Setelah query |
 
-Label dikirim di kolom pendamping `<kunci>__label`. Nilai mentah tetap dikirim, karena drill dan
-slicer butuh id, bukan nama.
+Label dikirim di kolom pendamping `<kunci>__label`, tepat sesudah nilainya. Nilai mentah tetap dikirim,
+karena drill dan slicer butuh id, bukan nama. Label yang tidak dikenal — id yang tidak ada di tenant ini,
+atau nama orang yang ditahan — bernilai `null`, dan layar menampilkan nilai mentahnya; pilihan yang tidak
+dikenal memakai nilai mentahnya sebagai label. Periode dan kolom tersirat (mata uang dan satuan yang tidak
+dipilih) tidak berlabel. Label nama orang (`EndUserIdentifiableInformation`) hanya bagi principal yang
+berhak membaca data pribadi; sampai area 4 menambahkan `mayUsePersonalData()` ke principal,
+`LabelResolver` menahannya untuk semua.
 
 ## Eksekusi baca-saja
 
@@ -464,6 +470,10 @@ final class QueryExecutor
 `InvalidFilterExpression` dari `FieldFilterExpression` diterjemahkan ke 422 `analytics.invalid_filter`
 dengan path field-nya, sebelum query sampai ke database.
 
+`QueryExecutor::explain()` membaca rencana `EXPLAIN (FORMAT TEXT)` — tanpa `ANALYZE`, jadi query-nya tidak
+dijalankan — untuk query hasil dan query total, di transaksi baca-saja yang sama. Pemakainya
+`analytics:explain`.
+
 Test yang wajib untuk eksekutor:
 
 - Dipanggil di dalam transaksi test, lalu `INSERT` di transaksi yang sama **berhasil** — bukti
@@ -506,7 +516,8 @@ Test yang wajib untuk eksekutor:
   pernah keluar dari server.
 - **Uang dan desimal dikirim sebagai string.** `numeric` PostgreSQL lebih presisi daripada float
   JavaScript; layar memformatnya, bukan menghitungnya.
-- `totals` berupa daftar, satu baris per mata uang dan satuan.
+- `totals` berupa daftar, satu baris per mata uang dan satuan, atas seluruh kelompok (bukan hanya yang
+  lolos `limit`); kosong bila tidak diminta.
 - Periode dikirim sebagai tanggal awal bucket (`2026-09-01`) beserta `granularity`; layar yang
   menulis "Sep 2026".
 
@@ -642,5 +653,7 @@ Fase 2 (area 12). Drill-through memakai query terpisah yang memilih baris, bukan
 
 - `php artisan analytics:datasets` — daftar dataset per module, versi, jumlah field dan measure, dan
   hasil validasi.
-- `php artisan analytics:explain {widget|--query=…} --tenant=…` — SQL hasil compile beserta
-  `EXPLAIN (FORMAT TEXT)` di tenant itu, tanpa `ANALYZE`, untuk melihat indeks yang dipakai.
+- `php artisan analytics:explain --query=<json> --tenant=<id> --user=<email>` — SQL hasil compile (dan SQL
+  total bila diminta) beserta `EXPLAIN (FORMAT TEXT)` di tenant itu, tanpa `ANALYZE`, untuk melihat indeks
+  yang dipakai. Query disusun sebagai pengguna itu — hak, hibah kebijakan data, zona waktu — lewat langkah
+  yang sama dengan `RunQuery`. Argumen widget menyusul bersama penyimpanan dasbor (area 6).

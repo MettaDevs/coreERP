@@ -185,8 +185,6 @@ class WalkingSkeletonTest extends TestCase
             [['filters' => ['nama' => '*laptop*']], 'analytics.field_unknown', 'filters.nama'],
             [['dimensions' => ['lifecycle_state', 'kode']], 'analytics.field_unknown', 'dimensions.1'],
             [['measures' => ['count', 'nilai_buku']], 'analytics.field_unknown', 'measures.1'],
-            // Pengelompokan menurut waktu terbaca dan sah, tetapi baru dikompilasi area 3: ditolak, tidak diabaikan.
-            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity'],
             [['limit' => 5001], 'analytics.limit_exceeded', 'limit'],
         ];
         foreach ($cases as [$part, $code, $field]) {
@@ -340,9 +338,7 @@ class WalkingSkeletonTest extends TestCase
             [['filters' => ['acquired_on' => 'bukan tanggal']], 'analytics.invalid_filter', 'filters.acquired_on', 'bukan tanggal'],
             [['sort' => [['key' => 'lifecycle_state', 'direction' => 'asc']]], 'analytics.invalid_query', 'sort.0.key', 'tidak ada di pilihan'],
             [['sort' => [['key' => 'count', 'direction' => 'naik']]], 'analytics.invalid_query', 'sort.0.direction', 'asc atau desc'],
-            [['totals' => true], 'analytics.invalid_query', 'totals', 'belum tersedia'],
             [['compare' => 'previous_period'], 'analytics.invalid_query', 'compare', 'belum tersedia'],
-            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity', 'belum tersedia'],
         ];
 
         foreach ($cases as [$part, $code, $field, $message]) {
@@ -350,6 +346,54 @@ class WalkingSkeletonTest extends TestCase
                 ->assertStatus(422)->assertJsonPath('error.code', $code)->assertJsonPath('error.field', $field)
                 ->assertJsonPath('error.message', fn (string $text): bool => str_contains($text, $message));
         }
+    }
+
+    /**
+     * Area 3 lewat endpoint yang sama dengan layar: ember bulan beserta celahnya dan total per mata uang,
+     * dalam bentuk JSON yang dibaca layar. Label rujukan dan dimensi bersama diuji `QueryCompilerTest`,
+     * karena dataset aset baru menyatakannya di area 5.
+     */
+    public function test_time_buckets_gaps_and_totals_reach_the_screen(): void
+    {
+        $this->setAcquiredOn(['AST-A1' => '2026-07-10', 'AST-A2' => '2026-09-15', 'AST-A3' => '2026-09-30', 'AST-B1' => '2026-07-01', 'AST-B2' => '2026-09-02']);
+
+        $response = $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [
+            'dataset' => self::DATASET,
+            'dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']],
+            'measures' => ['count', 'acquisition_value'],
+            'filters' => ['currency_code' => 'IDR'],
+            'totals' => true,
+        ])->assertOk();
+
+        $response->assertJsonPath('columns.0', ['key' => 'acquired_on', 'kind' => 'dimension', 'caption' => 'Tanggal perolehan', 'type' => 'period', 'granularity' => 'month']);
+        // Agustus tanpa aset tetap muncul dengan nol.
+        $response->assertJsonPath('rows', [
+            ['acquired_on' => '2026-07-01', 'currency_code' => 'IDR', 'count' => 2, 'acquisition_value' => '300000000.00'],
+            ['acquired_on' => '2026-08-01', 'currency_code' => 'IDR', 'count' => 0, 'acquisition_value' => '0'],
+            ['acquired_on' => '2026-09-01', 'currency_code' => 'IDR', 'count' => 2, 'acquisition_value' => '60000000.50'],
+        ]);
+        $response->assertJsonPath('totals', [['currency_code' => 'IDR', 'count' => 4, 'acquisition_value' => '360000000.50']]);
+    }
+
+    public function test_explain_prints_the_compiled_sql_and_its_plan_for_one_member(): void
+    {
+        $options = [
+            '--query' => (string) json_encode(['dataset' => self::DATASET, 'dimensions' => ['group_aset_id'], 'measures' => ['acquisition_value'], 'totals' => true]),
+            '--tenant' => (string) $this->membership->tenant_id,
+            '--user' => 'owner-a@analitik.test',
+        ];
+
+        $this->artisan('analytics:explain', $options)
+            ->expectsOutputToContain('Dataset '.self::DATASET.' versi 1')
+            ->expectsOutputToContain('from "aset_tr_aset" where "aset_tr_aset"."tenant_id" = ')
+            ->expectsOutputToContain('Rencana (EXPLAIN, tanpa ANALYZE)')
+            ->expectsOutputToContain('Rencana total')
+            ->assertSuccessful();
+
+        $this->artisan('analytics:explain', [...$options, '--user' => 'bukan-anggota@analitik.test'])
+            ->expectsOutputToContain('bukan anggota aktif')->assertFailed();
+        $this->artisan('analytics:explain', [...$options, '--query' => '{"dataset": "'.self::DATASET.'", "measures": ["nilai_buku"]}'])
+            ->expectsOutputToContain('tidak dikenal')->assertFailed();
     }
 
     private function business(string $name, string $email): User

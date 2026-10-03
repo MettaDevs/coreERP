@@ -30,9 +30,9 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryNormalizer`, `Query\QueryValidator` | JSON → objek tak berubah → bentuk normal; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
 | Titik panggil data pribadi | `Query\FieldUseGate` | Antarmuka yang dipanggil `QueryValidator` dengan semua kolom yang dipakai query; `Security\PersonalDataGate` (area 4) mengimplementasikannya | 2, 4 |
-| Compiler | `Query\QueryCompiler`, `Query\MeasureExpression`, `Query\TimeBucketSql`, `Query\JoinPlanner` | Objek query → query builder Laravel di atas model module, tanpa SQL mentah (lihat [mesin query](/todo/analitik/mesin-query#dari-objek-ke-sql)) | 0 (tipis), 3 |
-| Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat | 0, 3 |
-| Hasil | `Query\ResultSet`, `Query\ResultColumn`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label rujukan, deret waktu tanpa celah, total | 0 (tipis), 3 |
+| Compiler | `Query\QueryCompiler`, `Query\JoinPlanner`, `Query\MeasureExpression`, `Query\TimeBucketExpression`, `Query\IsNullExpression` | Objek query → query builder Laravel di atas model module, tanpa SQL mentah (lihat [mesin query](/todo/analitik/mesin-query#dari-objek-ke-sql)); query total ikut disusun di sini | 0 (tipis), 3 |
+| Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat; `explain()` untuk `analytics:explain` | 0, 3 |
+| Hasil | `Query\ResultSet`, `Query\ResultColumn`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label, deret waktu tanpa celah, total | 0 (tipis), 3 |
 | Principal | `Security\AnalyticsPrincipal` + `UserPrincipal`, `PublicationPrincipal` | Siapa yang bertanya: tenant, izin, hibah kebijakan, hak data pribadi, zona waktu | 0 (tipis), 4 |
 | Akses dataset | `Security\DatasetAccess` | Module terpasang dan berlisensi, lalu permission baca resource | 0 (tipis), 4 |
 | Kebijakan data | `Security\DataPolicyScope` → `Contracts\DataPolicyFilter` | Hibah → predikat SQL pada kolom yang dinyatakan dataset | 4 |
@@ -172,12 +172,11 @@ apps/core/app/Platform/Analytics/
 │   ├── AnalyticsQuery.php  Dimension.php  TimeRange.php  TimeGranularity.php       (0)
 │   ├── QueryParser.php  QueryValidator.php                                        (0)
 │   ├── QueryNormalizer.php  RelativeRange.php  FieldUseGate.php                   (2)
-│   ├── QueryCompiler.php  MeasureExpression.php  CompiledQuery.php                (0)
-│   ├── JoinPlanner.php  TimeBucketSql.php
-│   ├── QueryExecutor.php                                                          (0)
-│   ├── QueryLimits.php
-│   ├── ResultSet.php  ResultColumn.php  AnalyticsQueryException.php               (0)
-│   ├── LabelResolver.php  GapFiller.php  TotalsQuery.php
+│   ├── QueryCompiler.php  MeasureExpression.php  CompiledQuery.php                (0, 3)
+│   ├── JoinPlanner.php  TimeBucketExpression.php  IsNullExpression.php            (3)
+│   ├── QueryExecutor.php                                                          (0, 3)
+│   ├── ResultSet.php  ResultColumn.php  AnalyticsQueryException.php               (0, 3)
+│   ├── LabelResolver.php  GapFiller.php                                           (3)
 │   └── Formula/            Lexer.php  Parser.php  Node/*  SqlEmitter.php      (fase 2)
 ├── Security/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
@@ -197,7 +196,7 @@ apps/core/app/Platform/Analytics/
 ├── External/       PublicationController.php  OData/*                         (fase 2)
 ├── Embed/          EmbedTokenIssuer.php  AuthenticateEmbedToken.php  EmbedPageController.php
 ├── Templates/      TemplateInstaller.php                                      (fase 2)
-├── Console/        AnalyticsDatasetsCommand.php (1)  AnalyticsExplainCommand.php  PurgeAnalyticsCache.php
+├── Console/        AnalyticsDatasetsCommand.php (1)  AnalyticsExplainCommand.php (3)  PurgeAnalyticsCache.php
 └── Rollups/        (fase 3)
 
 apps/core/app/Platform/Modules/Contracts/
@@ -267,6 +266,14 @@ yang dikirim area 1: melempar `LogicException` untuk kunci tak dikenal seperti `
 validator dari klasifikasi model pemilik kolom (`COLUMN_CLASSIFICATION`, kolom jejak, lalu
 `#[DataClassification]`) sekali per kompilasi dataset; field dataset bersumber query menyatakan
 klasifikasinya sendiri.
+
+**Yang dibaca compiler dan hasil (area 3):** `baseQuery()`, `qualified()`, `filterField()`, `joins()`,
+`reference()`, `labelColumnsFor()` (hanya `label`; kode rujukan belum dikirim di hasil), `timeType()`,
+`sharedDimension()`, `measure()`, `policy`, dan `defaultTime()`. Tidak ada method baru yang diminta.
+Yang dipegang area lain dari area 3: `CompiledQuery` (`builder`, `totals`, `columns`, `limit`) untuk
+memeriksa SQL tanpa membaca data; `ResultSet::toArray()` sebagai bentuk JSON hasil; dan titik pasang cache
+dan log area 9 di `RunQuery`, di sekeliling isi closure `runFor()` sesudah pemeriksaan hak. Kolom yang
+menentukan join — termasuk kolom saringan terkunci area 4 — dikumpulkan `QueryCompiler::filterColumns()`.
 
 Registry membaca **definisi** sekali per proses (tahap tanpa database, `DatasetValidator::declare()`) dan
 **hasil kompilasi** sekali per database (`DatasetValidator::compile()`, dikunci alamat, nama database, dan

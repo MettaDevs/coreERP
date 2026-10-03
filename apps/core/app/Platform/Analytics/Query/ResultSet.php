@@ -12,12 +12,14 @@ use App\Platform\Analytics\Security\AnalyticsPrincipal;
  * dan ditulis di `docs/todo/analitik/mesin-query.md` bagian *Bentuk hasil*, beserta tipe TypeScript-nya
  * di `resources/js/lib/analytics/types.ts`.
  *
- * - Alias SQL (`d0`, `c0`, `m0`) dipetakan kembali ke kunci dataset; alias tidak pernah keluar dari server.
+ * - Alias SQL (`d0`, `d0_label`, `c0`, `m0`) dipetakan kembali ke kunci dataset; alias tidak pernah keluar
+ *   dari server.
  * - Jumlah baris (`count`) dikirim sebagai angka; nilai lain — uang, desimal — sebagai **string**, karena
  *   `numeric` PostgreSQL lebih presisi daripada angka JavaScript. Layar memformatnya, bukan menghitungnya.
- * - Field pilihan membawa label di kolom pendamping `<kunci>__label`; nilai mentahnya tetap dikirim untuk
- *   saringan dan drill.
- * - `totals` berupa daftar, satu baris per mata uang dan satuan. Kosong sampai area 3 menghitungnya.
+ * - Dimensi berlabel membawa label di kolom pendamping `<kunci>__label` ({@see LabelResolver}); nilai
+ *   mentahnya tetap dikirim untuk saringan dan drill.
+ * - Periode dikirim sebagai tanggal awal ember (`2026-09-01`); celah deret waktunya diisi {@see GapFiller}.
+ * - `totals` berupa daftar, satu baris per mata uang dan satuan; kosong bila tidak diminta.
  */
 final readonly class ResultSet
 {
@@ -37,7 +39,7 @@ final readonly class ResultSet
     /**
      * @param  array{rows: list<object>, totals: list<object>}  $executed
      */
-    public static function from(CompiledDataset $dataset, AnalyticsQuery $query, CompiledQuery $compiled, array $executed, AnalyticsPrincipal $principal, int $durationMs): self
+    public static function from(CompiledDataset $dataset, AnalyticsQuery $query, CompiledQuery $compiled, array $executed, AnalyticsPrincipal $principal, int $durationMs, LabelResolver $labels): self
     {
         $rows = $executed['rows'];
         $truncated = count($rows) > $compiled->limit;
@@ -45,10 +47,17 @@ final readonly class ResultSet
             $rows = array_slice($rows, 0, $compiled->limit);
         }
 
+        $map = static fn (object $row): array => self::row($compiled->columns, $row);
+        $rows = $labels->apply($dataset, $compiled->columns, array_map($map, $rows), $principal);
+        // Hasil terpotong tidak diisi: periode yang hilang mungkin terpotong, bukan kosong.
+        if (! $truncated) {
+            $rows = GapFiller::fill($dataset, $query, $compiled->columns, $rows, $principal->now(), $compiled->limit);
+        }
+
         return new self(
             columns: $compiled->columns,
-            rows: array_map(static fn (object $row): array => self::row($dataset, $compiled->columns, $row), $rows),
-            totals: array_map(static fn (object $row): array => self::row($dataset, $compiled->columns, $row), $executed['totals']),
+            rows: $rows,
+            totals: $labels->apply($dataset, $compiled->columns, array_map($map, $executed['totals']), $principal),
             meta: [
                 'dataset' => $dataset->code,
                 'dataset_version' => $dataset->version,
@@ -80,7 +89,7 @@ final readonly class ResultSet
      * @param  list<ResultColumn>  $columns
      * @return array<string, scalar|null>
      */
-    private static function row(CompiledDataset $dataset, array $columns, object $row): array
+    private static function row(array $columns, object $row): array
     {
         $values = get_object_vars($row);
         $out = [];
@@ -92,17 +101,18 @@ final readonly class ResultSet
             }
 
             $value = $values[$column->alias];
-            $value = match (true) {
+            $out[$column->key] = match (true) {
                 $value === null => null,
-                $column->kind === ResultColumn::MEASURE && $column->counts => (int) $value,
+                $column->kind === ResultColumn::MEASURE && $column->counts() => (int) $value,
                 $column->kind === ResultColumn::MEASURE, ! is_scalar($value) => (string) $value,
                 default => $value,
             };
-            $out[$column->key] = $value;
 
+            // Label rujukan module dari join label; label lain diisi LabelResolver di tempat ini, tepat sesudah
+            // nilainya.
             if ($column->labelKey !== null) {
-                $options = $dataset->filterField($column->key)->options;
-                $out[$column->labelKey] = $value === null ? null : ($options[(string) $value] ?? (string) $value);
+                $label = $column->labelAlias === null ? null : ($values[$column->labelAlias] ?? null);
+                $out[$column->labelKey] = $label === null ? null : (string) $label;
             }
         }
 

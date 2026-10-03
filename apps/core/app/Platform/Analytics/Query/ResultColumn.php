@@ -12,6 +12,10 @@ use App\Platform\Modules\Contracts\FieldType;
  * Satu kolom hasil query. `alias` adalah nama kolom di SQL (`d0`, `c0`, `m0`) dan tidak pernah keluar
  * dari server; yang dikirim adalah `key`, kunci field atau measure dataset. Bentuk JSON-nya ada di
  * `docs/todo/analitik/mesin-query.md` bagian *Bentuk hasil*.
+ *
+ * Dimensi yang berlabel membawa `labelKey` (`<kunci>__label`): pilihan, ya/tidak, rujukan module, dan
+ * dimensi bersama. Label rujukan module ikut dipilih di SQL lewat join label (`labelAlias`, `d0_label`);
+ * yang lain diterjemahkan {@see LabelResolver} sesudah query. Periode dan kolom tersirat tidak berlabel.
  */
 final readonly class ResultColumn
 {
@@ -34,22 +38,29 @@ final readonly class ResultColumn
         public ?string $currencyKey = null,
         public ?string $unitKey = null,
         public bool $implicit = false,
-        public bool $counts = false,
+        public ?Aggregate $aggregate = null,
+        public ?string $labelAlias = null,
     ) {}
 
     public static function dimension(string $alias, Dimension $dimension, CompiledDataset $dataset): self
     {
         $field = $dataset->filterField($dimension->field);
+        $period = $dimension->granularity !== null;
+        $reference = ! $period && $dataset->reference($field->key) !== null;
+        // Nilai mentahnya tetap dikirim di samping label, untuk saringan, slicer, dan drill.
+        $labelled = ! $period && ($reference
+            || in_array($field->type, [FieldType::Option, FieldType::Boolean], true)
+            || $dataset->sharedDimension($field->key) !== null);
 
         return new self(
             alias: $alias,
             key: $field->key,
             kind: self::DIMENSION,
             caption: $field->caption,
-            type: $dimension->granularity === null ? $field->type->value : 'period',
+            type: $period ? 'period' : $field->type->value,
             granularity: $dimension->granularity?->value,
-            // Label pilihan dikirim di kolom pendamping; nilai mentahnya tetap dikirim untuk saringan dan drill.
-            labelKey: $field->type === FieldType::Option ? $field->key.'__label' : null,
+            labelKey: $labelled ? $field->key.'__label' : null,
+            labelAlias: $reference ? $alias.'_label' : null,
         );
     }
 
@@ -81,8 +92,14 @@ final readonly class ResultColumn
             format: $measure->format->value,
             currencyKey: $measure->currency,
             unitKey: $measure->unit,
-            counts: in_array($measure->aggregate, [Aggregate::Count, Aggregate::CountDistinct], true),
+            aggregate: $measure->aggregate,
         );
+    }
+
+    /** Measure jumlah baris, yang dikirim sebagai bilangan bulat; measure lain dikirim sebagai teks desimal. */
+    public function counts(): bool
+    {
+        return in_array($this->aggregate, [Aggregate::Count, Aggregate::CountDistinct], true);
     }
 
     /** @return array<string, string|bool> */
