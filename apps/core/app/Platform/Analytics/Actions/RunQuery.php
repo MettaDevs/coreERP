@@ -7,6 +7,7 @@ namespace App\Platform\Analytics\Actions;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\LabelResolver;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
 use App\Platform\Analytics\Query\QueryNormalizer;
@@ -30,7 +31,12 @@ use App\Platform\Modules\Contracts\TenantRunner;
  *    `TenantScope`, yang gagal tertutup bila tenant belum terikat, dan rute Core tidak melewati
  *    middleware konteks module yang biasanya mengikatnya.
  *
- * Tempat area 9 memasang cache dan log query, dan area 6 memanggilnya dari data widget.
+ * Hasilnya ({@see ResultSet}) sudah berlabel, celah deret waktunya terisi, dan totalnya terhitung — semua
+ * di dalam `runFor()`, karena resolver label dimensi bersama juga membaca data tenant.
+ *
+ * Tempat area 9 memasang cache dan log query: di sekeliling isi closure `runFor()` (compile, eksekusi,
+ * dan penyusunan hasil), sesudah langkah 1–3, sehingga hasil cache tidak pernah melewati pemeriksaan hak.
+ * Area 6 memanggilnya dari data widget.
  */
 final class RunQuery
 {
@@ -42,6 +48,7 @@ final class RunQuery
         private readonly QueryCompiler $compiler,
         private readonly QueryExecutor $executor,
         private readonly TenantRunner $tenants,
+        private readonly LabelResolver $labels,
     ) {}
 
     /** @throws AnalyticsQueryException */
@@ -57,7 +64,7 @@ final class RunQuery
             $started = hrtime(true);
             $executed = $this->executor->run($compiled, $principal->timeoutMs());
 
-            return ResultSet::from($dataset, $query, $compiled, $executed, $principal, intdiv(hrtime(true) - $started, 1_000_000));
+            return ResultSet::from($dataset, $query, $compiled, $executed, $principal, intdiv(hrtime(true) - $started, 1_000_000), $this->labels);
         });
     }
 }

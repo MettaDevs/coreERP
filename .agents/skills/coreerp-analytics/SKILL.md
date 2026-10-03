@@ -19,7 +19,10 @@ dataset contract (`join()`, `reference()`, `shared()`, `fromQuery()`, `field()`,
 `contoh-a` fixture datasets for engine tests, `AnalyticsDatasetsBoundaryTest`, and
 `php artisan analytics:datasets`. Area 4 replaced the `analytics.enabled` switch with the analytics
 permission chain (KA-14) and added `DataPolicyScope`, locked filters, `ScopeFingerprint`, and
-`PersonalDataGate`. Everything else is still a plan. The plan,
+`PersonalDataGate`. Area 3 (4 October 2026) completed the compiler and results: `JoinPlanner`, time
+buckets (`TimeBucketExpression`), measure filters, totals per currency, default order with empty values
+last, `LabelResolver`, `GapFiller`, and `php artisan analytics:explain`. Everything else is still a
+plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
 If code and this skill disagree, trust the code and fix the skill in the same pull request.
@@ -115,7 +118,9 @@ key needs `version(n+1)` and leaves affected widgets showing "Kolom … sudah ti
 
 - Never alias the base table: `TenantScope` is injected with the real table name.
 - Joins always carry `alias.tenant_id = <base>.tenant_id`; data joins add `alias.deleted_at IS NULL`;
-  label joins include archived rows so archived masters keep their names.
+  label joins include archived rows so archived masters keep their names. Every join is a `LEFT JOIN`
+  with its conditions in `ON`, attached only when the query names one of its columns, so adding a
+  grouping never changes the row count.
 - Select dimensions as `d0, d1…`, implicit currency/unit as `c0…`, measures as `m0…`, and group and
   order **by alias**. A parameterised expression repeated in `GROUP BY` becomes a different parameter
   and PostgreSQL rejects the grouping.
@@ -123,8 +128,14 @@ key needs `version(n+1)` and leaves affected widgets showing "Kolom … sudah ti
   `date_trunc(g, (col at time zone 'UTC') at time zone '<tz>')::date`; `timestamptz` →
   `date_trunc(g, col at time zone '<tz>')::date`. The zone is a literal checked against
   `DateTimeZone::listIdentifiers()`. Never `to_char()` a `timestamptz` — it uses the session zone.
-- Measure filters compile to `FILTER (WHERE …)` with bindings; `sum` is wrapped in `coalesce(…, 0)`;
+- Measure filters compile to `FILTER (WHERE …)` with bindings; `sum` is wrapped in `coalesce(…, 0)` —
+  around the filter, `coalesce(sum(x) filter (where …), 0)`, since `FILTER` belongs to the aggregate call;
   `avg/min/max` stay null on empty groups.
+- `NULLS LAST` cannot go through `orderBy()`: a descending sort on a nullable column (any dimension;
+  `avg/min/max` measures) is preceded by an `IsNullExpression` key repeating the column's expression,
+  because PostgreSQL does not accept an output alias inside an `ORDER BY` expression.
+- Totals reuse the same filtering steps, group only by the measures' currency/unit columns under the
+  same aliases as the result, and ignore `limit`.
 - User filter values go through `FieldFilterExpression::apply()` (K-30 BC syntax) — bindings only.
 - No raw SQL built from identifiers: Laravel's `selectRaw`/`orderByRaw`/`groupByRaw` take
   `literal-string`, and Larastan rejects interpolated column names and aliases. Select columns with
