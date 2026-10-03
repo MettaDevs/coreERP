@@ -188,8 +188,8 @@ class WalkingSkeletonTest extends TestCase
 
         $cases = [
             [['filters' => ['lifecycle_state' => ['hilang']]], 'analytics.invalid_filter', 'filters.lifecycle_state'],
-            [['filters' => ['nama' => '*laptop*']], 'analytics.field_unknown', 'filters.nama'],
-            [['dimensions' => ['lifecycle_state', 'kode']], 'analytics.field_unknown', 'dimensions.1'],
+            [['filters' => ['serial_number' => '*laptop*']], 'analytics.field_unknown', 'filters.serial_number'],
+            [['dimensions' => ['lifecycle_state', 'keterangan']], 'analytics.field_unknown', 'dimensions.1'],
             [['measures' => ['count', 'nilai_buku']], 'analytics.field_unknown', 'measures.1'],
             // Pengelompokan menurut waktu terbaca dan sah, tetapi baru dikompilasi area 3: ditolak, tidak diabaikan.
             [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity'],
@@ -236,16 +236,16 @@ class WalkingSkeletonTest extends TestCase
         $this->actingAs($this->owner)->get('/analytics/explore')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('platform/analytics/explore')
-                ->where('preview.dataset.code', self::DATASET)
-                ->where('preview.tile.query', ['dataset' => self::DATASET, 'measures' => ['count']])
-                ->where('preview.tile.caption', 'Jumlah aset')
-                ->where('preview.chart.query', ['dataset' => self::DATASET, 'dimensions' => ['lifecycle_state'], 'measures' => ['acquisition_value']])
-                ->where('preview.chart.caption', 'Nilai perolehan per status aset'));
+                // Pratinjau memakai dataset pertama yang boleh dibaca menurut kode; sejak module aset punya
+                // banyak dataset (area 5) itu bukan lagi register aset, jadi yang dipastikan hanya bentuknya.
+                ->where('preview.dataset.code', fn (string $code): bool => str_starts_with($code, 'management-aset.'))
+                ->where('preview.tile.query.measures', ['count'])
+                ->has('preview.chart.query.dimensions'));
     }
 
     public function test_page_without_readable_dataset_offers_nothing(): void
     {
-        $this->actingAs($this->member(['management-aset.pemeliharaan-aset.manage']))->get('/analytics/explore')->assertOk()
+        $this->actingAs($this->member(['management-aset.group-aset.manage']))->get('/analytics/explore')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/analytics/explore')->where('preview', null));
     }
 
@@ -334,7 +334,7 @@ class WalkingSkeletonTest extends TestCase
             [['dimensions' => ['lifecycle_state', 'group_aset_id', 'currency_code', 'acquired_on', 'responsible_org_unit_id']], 'analytics.limit_exceeded', 'dimensions', 'Maksimal 4'],
             [['time_range' => ['range' => '@next_month']], 'analytics.invalid_query', 'time_range.range', '@this_month'],
             [['time_range' => ['field' => 'lifecycle_state', 'range' => '@today']], 'analytics.invalid_query', 'time_range.field', 'bukan kolom tanggal'],
-            [['time_range' => ['field' => 'nama', 'range' => '@today']], 'analytics.field_unknown', 'time_range.field', 'tidak dikenal'],
+            [['time_range' => ['field' => 'serial_number', 'range' => '@today']], 'analytics.field_unknown', 'time_range.field', 'tidak dikenal'],
             [['time_range' => ['range' => 'bukan tanggal']], 'analytics.invalid_filter', 'time_range.range', 'bukan tanggal'],
             [['time_range' => ['range' => '']], 'analytics.invalid_query', 'time_range.range', 'Isi rentang waktu'],
             [['filters' => ['acquired_on' => 'bukan tanggal']], 'analytics.invalid_filter', 'filters.acquired_on', 'bukan tanggal'],
