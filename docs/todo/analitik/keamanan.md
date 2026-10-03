@@ -147,7 +147,7 @@ Tiga perilaku yang mudah terlewat:
 
 ## Rantai izin yang diusulkan
 
-**Menunggu persetujuan pemilik produk (KA-14).** Susunan di bawah mengikuti gate izin skill
+**Disetujui pemilik produk apa adanya, 3 Oktober 2026 (KA-14).** Susunan di bawah mengikuti gate izin skill
 `coreerp-architecture`: sumber daya dan tindakan dipisah, empat lapis tersimpan sebagai baris
 sendiri, kode privilege berbeda dari kode permission, dan access level dinyatakan.
 
@@ -273,7 +273,7 @@ return new class extends Migration
             }
         }
 
-        // Owner memegang semua duty Core, termasuk data pribadi (PQ-04 menunggu konfirmasi pemilik).
+        // Owner memegang semua duty Core, termasuk data pribadi (PQ-04, disetujui pemilik 3 Okt 2026).
         foreach (DB::table('roles')->where('is_owner', true)->pluck('id') as $roleId) {
             foreach (array_keys(self::DUTIES) as $duty) {
                 DB::table('security_role_duties')->insertOrIgnore(['role_id' => $roleId, 'duty_code' => $duty]);

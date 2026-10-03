@@ -151,7 +151,7 @@ baris di bagian yang disediakan.
 | `apps/core/routes/web.php` | — | 0 (satu baris `require`), 17 (rute embed di luar grup `web`) | Hanya baris itu |
 | `apps/core/config/analytics.php` | 0 | 3, 9, 15, 16, 17 | Kunci baru di bagian area |
 | `apps/core/app/Platform/Modules/Support/CoreServices.php` | — | 0 (`Datasets`), 14 (`SharedDimensions`), 18 (`DashboardTemplates`) | Satu baris di `SINGLETON_BINDINGS` |
-| `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 atau 6 (setelah KA-14), 15 | Konstanta baru di akhir |
+| `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 (butir 4.6; KA-14 disetujui 3 Okt 2026), 15 | Konstanta baru di akhir |
 | `apps/core/app/Platform/Retention/Support/RetentionPolicies.php` | — | 9, 17 | Satu `RetentionPolicy` per tabel |
 | `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | — | 15 | Dua entri di `SCOPES` |
 | `apps/core/resources/js/components/app-sidebar.tsx` | — | 7, 15 | Satu item per area |

@@ -85,11 +85,11 @@ Alasan setiap keputusan ada di PRD atau halaman yang disebut.
 | KA-08 | Saringan memakai sintaks BC milik filter tambahan laporan (K-30, `FieldFilterExpression`) ditambah token rentang tanggal relatif | Keputusan teknis |
 | KA-09 | Akses luar v1: publikasi lewat REST JSON/CSV, feed OData v4 baca-saja, dan embed bertoken. GraphQL tidak di v1 | Diputuskan dari riset yang diminta pemilik; pemilik dapat membaliknya |
 | KA-10 | Token embed opak, dicetak lewat API oleh backend situs pelanggan, berumur 10 menit, disimpan sebagai hash, diserahkan lewat fragment URL dan `postMessage`, tanpa cookie; `frame-ancestors` per embed | Keputusan teknis |
-| KA-11 | Pemanggil luar memakai klien integrasi yang sudah ada (`integration_clients`) dengan scope baru, dan hanya membaca **publikasi** yang dibuat pengguna tenant — bukan query bebas | **Menunggu persetujuan pemilik** |
+| KA-11 | Pemanggil luar memakai klien integrasi yang sudah ada (`integration_clients`) dengan scope baru, dan hanya membaca **publikasi** yang dibuat pengguna tenant — bukan query bebas | Disetujui pemilik, 3 Okt 2026 |
 | KA-12 | Grafik memakai Recharts 3.8 yang sudah terpasang (`@apperp/ui/chart`). Tata letak fase 1 grid CSS tanpa seret-lepas; react-grid-layout v2 ditimbang di fase 2 | Keputusan teknis; dependency baru di fase 2 butuh persetujuan |
 | KA-13 | Feed OData: subset buatan sendiri atau pustaka `flat3/lodata` | **Menunggu spike** (area 16) |
-| KA-14 | Rantai izin analitik: entry point, permission, privilege, dan duty di [keamanan](/todo/analitik/keamanan#rantai-izin-yang-diusulkan) | **Menunggu persetujuan pemilik** |
-| KA-15 | Hak membaca dataset = permission baca resource module yang sudah ada. Module tidak menambah kode izin untuk analitik | Usulan, disetujui bersama KA-14 |
+| KA-14 | Rantai izin analitik: entry point, permission, privilege, dan duty di [keamanan](/todo/analitik/keamanan#rantai-izin-yang-diusulkan) | Disetujui pemilik apa adanya, 3 Okt 2026 |
+| KA-15 | Hak membaca dataset = permission baca resource module yang sudah ada. Module tidak menambah kode izin untuk analitik | Disetujui pemilik bersama KA-14, 3 Okt 2026 |
 | KA-16 | Ringkasan (pra-agregasi) ala Analysis View BC di fase 3; bentuk dan pemicunya diputuskan saat itu | Ditunda |
 | KA-17 | Template dasbor bawaan berupa kode yang didaftarkan module; dasbor tenant berupa data. Memperbarui template tidak menimpa salinan tenant | Keputusan teknis |
 | KA-18 | Hasil query di-cache di tabel database tenant (`analytics_query_cache`), bukan di cache store bawaan yang menunjuk database pusat | Keputusan teknis; alasannya di [kinerja](/todo/analitik/kinerja-dan-uji-beban#cache) |

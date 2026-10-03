@@ -304,7 +304,7 @@ katalog, tidak ditulis mati di kode.
 | Antrean ekspor (`report_exports`) | Ekspor widget | Ada |
 | `RetentionService` | Retensi log query, token embed, cache | Ada |
 | `@apperp/ui/chart` (Recharts 3.8) | Grafik | Ada, belum dipakai siapa pun |
-| Keputusan pemilik KA-11, KA-14 | Area 6, 15–17 | Menunggu |
+| Keputusan pemilik KA-11, KA-14 | Area 6, 15–17 | Disetujui 3 Okt 2026 |
 | Spike KA-13 | Area 16 | Menunggu |
 | Email dan pemberitahuan sisi server | Area 20 | Belum ada |
 | Job dan jadwal per environment (TODO database sendiri 4.1, 4.2) | Area 20, 21 | Belum ada |
@@ -333,11 +333,11 @@ katalog, tidak ditulis mati di kode.
 
 | Kode | Pertanyaan | Usulan | Yang memutuskan |
 | --- | --- | --- | --- |
-| PQ-01 | Susunan permission, privilege, dan duty analitik (KA-14) | Lihat [rantai izin yang diusulkan](/todo/analitik/keamanan#rantai-izin-yang-diusulkan) | Pemilik |
-| PQ-02 | Pemanggil luar hanya membaca publikasi di v1 (KA-11)? | Ya. Query bebas dari luar menunggu akun aplikasi punya peran | Pemilik |
+| PQ-01 | Susunan permission, privilege, dan duty analitik (KA-14) | Lihat [rantai izin yang diusulkan](/todo/analitik/keamanan#rantai-izin-yang-diusulkan) | Pemilik — disetujui apa adanya, 3 Okt 2026 |
+| PQ-02 | Pemanggil luar hanya membaca publikasi di v1 (KA-11)? | Ya. Query bebas dari luar menunggu akun aplikasi punya peran | Pemilik — disetujui, 3 Okt 2026 |
 | PQ-03 | Mekanisme hak add-on (KA-06) | (a) Produk katalog `analytics` milik Core yang hanya butuh hak, tanpa catatan pemasangan; atau (b) penanda di lisensi dan paket admin.erp. Usulan (a), karena `TenantProducts` dan `SiteLicense::allowsApp` sudah bekerja per app id | Pemilik |
-| PQ-04 | Siapa yang otomatis memegang hak data pribadi analitik? | Hanya role Owner, mengikuti pola migration katalog Core; role lain diberi sengaja | Pemilik |
-| PQ-05 | Masa simpan log query bawaan | 90 hari, dapat diubah admin tenant, minimum 7 | Pemilik |
+| PQ-04 | Siapa yang otomatis memegang hak data pribadi analitik? | Hanya role Owner, mengikuti pola migration katalog Core; role lain diberi sengaja | Pemilik — disetujui, 3 Okt 2026 |
+| PQ-05 | Masa simpan log query bawaan | 90 hari, dapat diubah admin tenant, minimum 7 | Pemilik — disetujui, 3 Okt 2026 |
 | PQ-06 | Embed tanpa token (publik) untuk angka agregat yang tidak sensitif? | Tidak di v1 | Pemilik |
 | PQ-07 | Ambang kelompok kecil bawaan untuk publikasi (*k*) | 5 untuk dataset yang menyentuh pasien, mati untuk yang lain; penyusun publikasi boleh menaikkan | Pemilik bersama konsultan klinis |
 | PQ-08 | Tombol Analisis di layar daftar module (menyentuh UI module) | Opsional per module, mulai dari aset di fase 3 | Pemilik |
