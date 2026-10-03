@@ -301,7 +301,7 @@ boleh di area 23 sebagai pekerjaan module; sampai itu, test paritas yang menjaga
 
 ---
 
-### 5. [ ] Dataset module aset
+### 5. [~] Dataset module aset
 
 **Tempat:** `modules/apperp/management-aset/src/Analytics/*`, satu blok di `ModuleServiceProvider::boot()`,
 `modules/apperp/management-aset/tests/Feature/Analytics/*` · **Setelah:** 0, 1 · **Keputusan:** KA-15,
@@ -314,19 +314,87 @@ Untuk setiap dataset, **baca dulu controller daftar resource-nya**: permission y
 menentukan `permission()` dan `dataPolicy()`. Jangan menebak dari nama kolom. Nama kelas, tabel, dan
 kolom di bawah adalah arah; yang dipakai adalah yang ada di module.
 
-- [ ] 5.1 `asset-register` — register aset (lengkap dari area 0).
-- [ ] 5.2 `asset-receipts` — penerimaan aset: vendor (dimensi bersama), nilai, jumlah baris.
-- [ ] 5.3 `depreciation-entries` — riwayat penyusutan per buku dan periode; `book-values` — nilai buku
-  terakhir per aset per buku, dataset bersumber query.
-- [ ] 5.4 `work-orders`, `maintenance-requests`, `downtime` — kebijakan lewat join ke aset bila
-  resource-nya tidak punya unit sendiri, persis seperti endpoint daftarnya.
-- [ ] 5.5 `disposals` (penjualan dan pemusnahan: hasil, laba/rugi), `value-adjustments`,
-  `reclassifications`.
-- [ ] 5.6 `insurance-policies`, `warranties` — kebijakan mode legal entity saja bila endpoint daftarnya
-  memakai `legalEntityQuery`.
-- [ ] 5.7 `physical-checks` — pemeriksaan fisik aset.
-- [ ] 5.8 Test per dataset: isolasi tenant, paritas kebijakan, uang per mata uang, measure bersaringan,
+Dikerjakan 4 Oktober 2026, sebelum compiler area 3 digabung. Empat belas dataset sudah terdaftar, valid,
+dan diuji; yang menunggu area 3 hanya **measure bersaringan** (saringan tetap `where` belum dikompilasi,
+dan measure yang tidak dapat dijalankan tidak ditawarkan) dan **pengelompokan waktu berzona**, jadi area
+ini tetap `[~]`. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir masing-masing
+(*Dikirim:*).
+
+- [~] 5.1 `asset-register` — register aset (lengkap dari area 0). *Dikirim:* seluruh field katalog K-30
+  kecuali keterangan, nomor seri, dan nomor model; rujukan berlabel ke enam master (group, jenis, kondisi,
+  lokasi, pabrikan, model); dimensi bersama entitas legal, unit penanggung jawab, dan unit dimensi keuangan;
+  measure rata-rata nilai perolehan; rute record. `currency_code` tetap field teks, bukan dimensi bersama
+  mata uang seperti di sketsa: labelnya kode itu sendiri sampai master mata uang ada (FIN-20), dan mengganti
+  tipe field yang sudah dipakai layar tidak mendatangkan apa pun. *Menunggu area 3:* measure `disposed`.
+- [x] 5.2 `asset-receipts` — penerimaan aset. *Dikirim:* satu baris per **baris** dokumen penerimaan,
+  bersumber query: header penerimaan tidak punya total, dan baris menyimpan `jumlah` serta `nilai_per_unit`,
+  jadi nilai penerimaan (`jumlah × nilai_per_unit`, belum termasuk PPN) hanya dapat dihitung di query sumber.
+  Vendor ikut sebagai dimensi bersama. Kebijakan pada unit penanggung jawab **header**.
+- [x] 5.3 `depreciation-entries` dan `book-values`. *Dikirim:* keduanya bersumber query, karena periode dan
+  buku tidak punya kolom mata uang (mata uangnya dari aset), dan buku tidak punya kolom unit sama sekali.
+  `depreciation-entries` mengikuti `usage_org_unit_id` milik **periode** (unit pengguna), bukan unit
+  penanggung jawab asetnya, persis seperti `GET penyusutan`; pembalikan menyimpan jumlah negatif, jadi
+  jumlahnya bersih dengan sendirinya. `book-values` **bukan** `ROW_NUMBER()` "nilai buku terakhir": tabel
+  buku aset sudah menyimpan saldo terakhirnya (dipelihara finalisasi, pembalikan, dan penyesuaian nilai),
+  jadi yang diperlukan hanya menggabungkannya dengan aset untuk unit dan mata uang. Buku ditutup ikut
+  terbawa; daftar di layar hanya menawarkan buku aktif, dan statusnya dapat disaring.
+- [x] 5.4 `work-orders`, `maintenance-requests`, `downtime`. *Dikirim:* work order dan permintaan
+  pemeliharaan ternyata **tidak** perlu join untuk kebijakan: keduanya membawa `legal_entity_id` dan
+  `responsible_org_unit_id` sendiri (permintaan atas lokasi bahkan tidak punya aset). Hanya downtime yang
+  mengikuti aset, dan ia bersumber query dengan join dalam ke asetnya, supaya tidak menunggu `JoinPlanner`
+  area 3. Lama downtime dihitung hanya untuk catatan yang sudah ditutup (nilai yang bergantung pada jam
+  pembacaan tidak cocok untuk cache); catatan terbuka dihitung lewat field "Masih berhenti". Jam kerja ada
+  di **baris pekerjaan** work order, bukan di header, jadi dataset ini belum menjumlah jam; dataset baris
+  pekerjaan belum dibuat.
+- [x] 5.5 `disposals` menjadi `asset-sales` dan `asset-scraps`; `value-adjustments`; `reclassifications`.
+  *Dikirim:* penjualan dan pemusnahan satu tabel tetapi layar daftarnya dijaga permission berbeda
+  (`penjualan-aset.read`, `pemusnahan-aset.read`), dan satu dataset hanya punya satu permission — dataset
+  gabungan akan memperlihatkan pemusnahan kepada pengguna yang hanya boleh membaca penjualan. Laba atau rugi
+  pelepasan **tidak tersimpan** di tabel mana pun (dihitung saat pratinjau dan posting, lalu hanya ikut ke
+  jurnal), jadi measure-nya hanya hasil penjualan dan nilai perolehan aset yang dilepas. Penyesuaian nilai
+  dan reklasifikasi memegang nilainya di baris dan kebijakannya di header, jadi keduanya bersumber query;
+  `net_effect` memberi tanda nilai penyesuaian (kenaikan positif, penurunan negatif).
+- [x] 5.6 `insurance-policies`, `warranties`. *Dikirim:* polis memakai mode legal entity saja
+  (`legalEntityQuery`, tanpa kolom unit); garansi mengikuti unit asetnya dan bersumber query. Polis **belum
+  punya measure uang**: tabel polis tidak menyimpan mata uang, dan uang tanpa mata uang tidak boleh dijumlah
+  (KA-22). Premi tahunan dan nilai pertanggungan menunggu kolom mata uang pada polis; kontrak servis dan
+  pertanggungan per aset belum dijadikan dataset.
+- [x] 5.7 `physical-checks` — pemeriksaan fisik aset (monitoring aset). *Dikirim:* satu baris per aset pada
+  satu pemeriksaan, bersumber query; kebijakan pada header, yang unitnya boleh kosong — pemeriksaan tanpa
+  unit hanya terlihat bagi yang menjangkau seluruh organisasi, sama dengan layar daftarnya.
+- [~] 5.8 Test per dataset: isolasi tenant, paritas kebijakan, uang per mata uang, measure bersaringan,
   waktu berzona ([daftar](/todo/analitik/model-semantik#test-yang-wajib-menyertai-setiap-dataset)).
+  *Dikirim:* isolasi tenant, paritas kebijakan terhadap endpoint daftar module (hibah unit A, unit B,
+  seluruh organisasi, dan tanpa hibah), penolakan tanpa permission baca, dan uang per mata uang, di
+  `tests/Feature/Analytics/<Nama>DatasetTest.php`. Pemeriksaan umumnya ada di trait `ProbesAssetDatasets`
+  dan `ChecksMoneyPerCurrency` (dunia ujinya dua tenant sungguhan, rantai izin sungguhan, empat pengguna
+  yang dibuat sekali per test); setiap test dataset mengisi data awal dan jumlah baris yang diharapkan.
+  Setiap test paritas dilihat merah dengan merusak kolom kebijakannya. *Menunggu area 3:* measure
+  bersaringan dan pengelompokan waktu berzona.
+
+Query sumber dataset-dataset ini disusun dari `SourceQuery::from(Model::class)`, bukan `Model::query()`:
+kontrak `fromQuery()` meminta `Builder<Model>`, dan analisa tipe menolak `Builder<ModelKonkret>` karena
+parameter template `Builder` tidak kovarian. Hasilnya sama (`newQuery()` memasang scope tenant dan penanda
+arsip), tanpa menekan analisa tipe.
+
+**Peta dataset.** Semuanya memakai kebijakan `management-aset.asset-responsibility`.
+
+| Kode | Sumber | Permission | Kolom kebijakan |
+| --- | --- | --- | --- |
+| `asset-register` | model aset | `aset.read` | `legal_entity_id`, `responsible_org_unit_id` |
+| `asset-receipts` | baris penerimaan + header | `penerimaan-aset.read` | header: `legal_entity_id`, `responsible_org_unit_id` |
+| `depreciation-entries` | periode + buku + aset | `penyusutan.read` | periode: `legal_entity_id`, `usage_org_unit_id` |
+| `book-values` | buku + aset | `penyusutan.read` | aset: `legal_entity_id`, `responsible_org_unit_id` |
+| `work-orders` | model work order | `pemeliharaan-aset.read` | `legal_entity_id`, `responsible_org_unit_id` |
+| `maintenance-requests` | model permintaan | `permintaan-pemeliharaan.read` | `legal_entity_id`, `responsible_org_unit_id` |
+| `downtime` | downtime + aset | `downtime-aset.read` | aset: `legal_entity_id`, `responsible_org_unit_id` |
+| `asset-sales` | dokumen siklus (penjualan) + aset | `penjualan-aset.read` | dokumen: `legal_entity_id`, `responsible_org_unit_id` |
+| `asset-scraps` | dokumen siklus (pemusnahan) + aset | `pemusnahan-aset.read` | dokumen: `legal_entity_id`, `responsible_org_unit_id` |
+| `value-adjustments` | baris + header + aset | `penyesuaian-nilai-aset.read` | header: `legal_entity_id`, `responsible_org_unit_id` |
+| `reclassifications` | baris + header + aset | `reklasifikasi-aset.read` | header: `legal_entity_id`, `responsible_org_unit_id` |
+| `insurance-policies` | model polis | `polis-asuransi.read` | `legal_entity_id` saja |
+| `warranties` | garansi + aset | `garansi-aset.read` | aset: `legal_entity_id`, `responsible_org_unit_id` |
+| `physical-checks` | baris + header + aset | `monitoring-aset.read` | header: `legal_entity_id`, `responsible_org_unit_id` (boleh kosong) |
 
 KPI pemeliharaan (MTBF, MTTR, ketersediaan) **tidak** dijadikan dataset di fase ini: ia dihitung
 `MaintenanceKpi` dari beberapa tabel dengan logika jam yang tidak dapat dinyatakan sebagai agregat
