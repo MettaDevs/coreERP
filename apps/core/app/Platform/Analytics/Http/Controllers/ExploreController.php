@@ -50,8 +50,7 @@ final class ExploreController extends Controller
      */
     private function preview(CompiledDataset $dataset): ?array
     {
-        // Measure bersaringan tetap belum dikompilasi di kerangka ini (area 3), jadi tidak ditawarkan.
-        $measures = array_values(array_filter($dataset->measures(), static fn (CompiledMeasure $measure): bool => $measure->where === []));
+        $measures = array_values($dataset->measures());
         if ($measures === []) {
             return null;
         }

@@ -234,7 +234,7 @@ diperbarui.
 
 ---
 
-### 3. [ ] Compiler, eksekusi, dan hasil
+### 3. [x] Compiler, eksekusi, dan hasil
 
 **Tempat:** `app/Platform/Analytics/Query/{QueryCompiler, JoinPlanner, MeasureSql, TimeBucketSql,
 QueryExecutor, QueryLimits, CompiledQuery, ResultColumn, ResultSet, LabelResolver, GapFiller,
@@ -244,26 +244,63 @@ TotalsQuery, AnalyticsQueryException}.php`, `Console/AnalyticsExplainCommand.php
 batas zona waktu, uang campur, rollback ke savepoint, dan batas waktu yang benar-benar menghentikan
 query.
 
-- [ ] 3.1 `JoinPlanner`: hanya join yang disebut; `tenant_id` sama dan `deleted_at IS NULL` pada join
-  data; join label menyertakan baris terarsip.
-- [ ] 3.2 `MeasureSql`: enam agregat, `FILTER (WHERE …)`, `coalesce` untuk `sum`.
-- [ ] 3.3 `TimeBucketSql`: tiga jenis kolom waktu, zona sebagai literal yang dicocokkan dengan
-  `DateTimeZone::listIdentifiers()`, minggu mulai Senin.
-- [ ] 3.4 Dimensi tersirat mata uang dan satuan; rumus dan total ikut mewarisinya.
-- [ ] 3.5 Urutan bawaan (waktu naik, selain itu measure pertama turun), top-N, tanda `truncated`.
-- [ ] 3.6 Query total, satu baris per mata uang.
-- [ ] 3.7 `QueryExecutor` dan tabel pemetaan SQLSTATE; `InvalidFilterExpression` → 422 berpath.
-- [ ] 3.8 `LabelResolver`: pilihan, rujukan module, dimensi bersama (lewat registry area 1), ya/tidak.
-- [ ] 3.9 `GapFiller` sampai 1000 titik, per kombinasi dimensi lain.
-- [ ] 3.10 `ResultSet`: alias kembali ke kunci, desimal sebagai string, `meta` lengkap.
-- [ ] 3.11 `analytics:explain` (SQL + `EXPLAIN` tanpa `ANALYZE`).
-- [ ] 3.12 Test:
+Selesai 4 Oktober 2026. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir
+masing-masing (*Dikirim:*), dan [mesin query](/todo/analitik/mesin-query) serta
+[arsitektur](/todo/analitik/arsitektur) ikut diperbarui. Tiga berkas di **Tempat** tidak dibuat:
+`MeasureSql` dan `TimeBucketSql` menjadi objek `Expression` (`MeasureExpression` yang sudah ada sejak
+area 0, dan `TimeBucketExpression`), karena Larastan menolak SQL mentah yang memuat nama kolom; `TotalsQuery`
+menjadi satu method compiler, dan `QueryLimits` tidak dibutuhkan — batas baris dan waktu sudah dibaca
+principal, batas bentuk query dibaca validator.
+
+- [x] 3.1 `JoinPlanner`: hanya join yang disebut; `tenant_id` sama dan `deleted_at IS NULL` pada join
+  data; join label menyertakan baris terarsip. *Dikirim:* semua join `LEFT JOIN` dengan syaratnya di
+  `ON`, supaya menambah pengelompok tidak pernah mengubah jumlah baris; kolom join yang induknya terarsip
+  atau milik tenant lain menjadi kosong, dan kebijakan data pada kolom join tetap gagal tertutup. Join
+  yang menjadi jalan join lain ikut dipasang. Kolom kebijakan dan saringan ikut menentukan join; saringan
+  terkunci area 4 ditambahkan di `QueryCompiler::filterColumns()`.
+- [x] 3.2 `MeasureSql`: enam agregat, `FILTER (WHERE …)`, `coalesce` untuk `sum`. *Dikirim:* di
+  `MeasureExpression`. `FILTER` melekat pada panggilan agregat, jadi `coalesce` membungkus keduanya
+  (`coalesce(sum(x) filter (where …), 0)`); sketsa lama menaruh `FILTER` di luar `coalesce`, yang tidak
+  sah di PostgreSQL. Nilai saringan tetap lewat binding `select`.
+- [x] 3.3 `TimeBucketSql`: tiga jenis kolom waktu, zona sebagai literal yang dicocokkan dengan
+  `DateTimeZone::listIdentifiers()`, minggu mulai Senin. *Dikirim:* `TimeBucketExpression`; kolom `date`
+  di-cast ke `timestamp` lebih dulu supaya tidak bergantung pada zona sesi.
+- [x] 3.4 Dimensi tersirat mata uang dan satuan; rumus dan total ikut mewarisinya. *Dikirim:* dicocokkan
+  menurut kolom berkualifikasi, jadi mata uang yang dipilih sebagai dimensi tidak dikelompokkan dua kali.
+  Rumus milik area 13.
+- [x] 3.5 Urutan bawaan (waktu naik, selain itu measure pertama turun), top-N, tanda `truncated`.
+  *Dikirim:* "waktu" berarti dimensi berember waktu. `NULLS LAST` ditutup: kolom yang dapat kosong
+  (dimensi; measure `avg`, `min`, `max`) pada urutan turun didahului kunci `(<ekspresi>) is null`
+  (`IsNullExpression`), karena `orderBy()` tidak menerima `nulls last` dan alias tidak dapat dipakai di
+  dalam ekspresi `ORDER BY`.
+- [x] 3.6 Query total, satu baris per mata uang. *Dikirim:* langkah penyaringan yang sama dengan hasil,
+  tanpa batas baris (total seluruh kelompok, bukan hanya top-N), dikelompokkan menurut kolom mata uang dan
+  satuan dengan alias yang sama dengan di hasil — termasuk bila mata uang dipilih sebagai dimensi.
+- [x] 3.7 `QueryExecutor` dan tabel pemetaan SQLSTATE; `InvalidFilterExpression` → 422 berpath.
+  *Dikirim:* juga `explain()` di transaksi baca-saja yang sama.
+- [x] 3.8 `LabelResolver`: pilihan, rujukan module, dimensi bersama (lewat registry area 1), ya/tidak.
+  *Dikirim:* label rujukan module dari join label di SQL; label yang tidak dikenal kosong. Hak data
+  pribadi belum ada di principal, jadi label nama orang ditahan untuk semua sampai area 4 mengganti
+  `false` di `LabelResolver` dengan `$principal->mayUsePersonalData()`. Kolom tersirat tidak berlabel.
+- [x] 3.9 `GapFiller` sampai 1000 titik, per kombinasi dimensi lain. *Dikirim:* rentangnya token
+  `time_range` pada field yang sama, selain itu periode pertama sampai terakhir di hasil. Tidak mengisi bila
+  hasil terpotong, bila urutan pertama bukan periodenya, atau bila isiannya melebihi batas baris query.
+- [x] 3.10 `ResultSet`: alias kembali ke kunci, desimal sebagai string, `meta` lengkap.
+- [x] 3.11 `analytics:explain` (SQL + `EXPLAIN` tanpa `ANALYZE`). *Dikirim:* `--query=<json> --tenant=<id>
+  --user=<email>`; query disusun sebagai pengguna itu lewat langkah yang sama dengan `RunQuery`. Argumen
+  widget menyusul bersama area 6.
+- [x] 3.12 Test (`QueryCompilerTest`, `QueryExpressionsTest`, `GapFillerTest`,
+  `AnalyticsQueryExceptionTest`, dua test baru di `WalkingSkeletonTest`):
   - SQL hasil compile tidak pernah memberi alias tabel dasar;
   - baris anak yang (karena data rusak) menunjuk master tenant lain tidak membawa label tenant lain;
   - bucket bulan untuk `timestamp` UTC 30 September 16.30 = Oktober bagi WITA;
   - `pg_sleep` di dataset fixture berhenti di batas waktu → 422 `analytics.query_timeout`;
   - compiler yang dipaksa menulis gagal `25006`;
   - celah bulan terisi nol untuk `count`, kosong untuk `avg`.
+
+  *Dikirim:* dataset ber-`pg_sleep` dan dataset rata-rata yang dapat kosong ditulis di dalam test, bukan
+  di fixture `contoh-a`, supaya tidak ikut terdaftar di seluruh suite. Cara setiap penjaga dibuat merah
+  dicatat di pull request area 3.
 
 ---
 
