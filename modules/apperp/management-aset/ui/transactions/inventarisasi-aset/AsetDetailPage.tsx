@@ -48,6 +48,7 @@ import {
 } from './aset';
 import type { AttributeDefinition } from './attributes';
 import { toFieldConfig } from './attributes';
+import { printAssetLabels } from './labels';
 
 type Mode = 'view' | 'edit';
 
@@ -414,6 +415,16 @@ export default function AsetDetailPage({
                     >
                         Ubah
                     </ActionButton>
+                )}
+                {readOnly && asetId && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => printAssetLabels({ ids: [asetId] })}
+                        title="Cetak label berkode QR untuk ditempel pada aset ini"
+                    >
+                        Cetak label
+                    </Button>
                 )}
                 {readOnly && (
                     <Button

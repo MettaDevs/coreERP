@@ -1,4 +1,4 @@
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, QrCode } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -23,6 +23,7 @@ import { requestListExport } from '../../listExport';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import type { Aset } from './aset';
 import { LIFECYCLE, bukaAset, bukaAsetUbah, money } from './aset';
+import { printAssetLabels } from './labels';
 import { bukaPenerimaanDaftar, izin } from './penerimaan';
 
 /**
@@ -44,6 +45,8 @@ export default function AsetListPage({
     const [memuat, setMemuat] = useState(true);
     // Urutan yang sedang tampil, supaya berkas ekspor berurutan sama dengan layar.
     const [sort, setSort] = useState<DataTableSort | null>(null);
+    // Aset yang dicentang untuk dicetak labelnya. Tanpa centang, yang dicetak semua yang tampil.
+    const [selected, setSelected] = useState<string[]>([]);
 
     const { options: groupOptions } = useMasterOptions('group-aset');
     const { options: typeOptions } = useMasterOptions('jenis-aset');
@@ -200,6 +203,11 @@ export default function AsetListPage({
             filters: search.trim() ? { q: search.trim() } : {},
         });
 
+    const printLabels = () =>
+        selected.length
+            ? printAssetLabels({ ids: selected })
+            : printAssetLabels({ search, count: visible.length });
+
     const rowActions: DataTableRowAction[] = [
         { id: 'detail', label: 'Buka rincian' },
     ];
@@ -221,6 +229,22 @@ export default function AsetListPage({
                     <FileSpreadsheet />
                     Ekspor ke Excel
                 </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={printLabels}
+                    disabled={memuat || !visible.length}
+                    title={
+                        selected.length
+                            ? 'Cetak label berkode QR untuk aset yang dicentang'
+                            : 'Cetak label berkode QR untuk semua aset yang tampil. Centang aset untuk mencetak sebagian saja.'
+                    }
+                >
+                    <QrCode />
+                    {selected.length
+                        ? `Cetak label (${selected.length})`
+                        : 'Cetak label'}
+                </Button>
                 {/*
                  * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
                  * 2026 — juga yang datang satuan, yang menjadi dokumen berbaris satu.
@@ -239,6 +263,7 @@ export default function AsetListPage({
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
                 <p className="text-muted-foreground text-sm">
                     {visible.length} aset ditampilkan
+                    {selected.length ? `, ${selected.length} dicentang` : ''}
                 </p>
                 <div className="w-full sm:w-72">
                     <Input
@@ -275,6 +300,11 @@ export default function AsetListPage({
                         getRowLabel={(aset) => aset.kode}
                         sort={sort}
                         onSortChange={setSort}
+                        selection={{
+                            selectedKeys: selected,
+                            onSelectedKeysChange: (keys) =>
+                                setSelected(keys.map(String)),
+                        }}
                         actions={rowActions}
                         onRowClick={(aset) => bukaAset(aset.id)}
                         onRowAction={(action, aset) => {

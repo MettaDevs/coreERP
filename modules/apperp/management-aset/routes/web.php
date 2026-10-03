@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\HalamanModulController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AssetLabelController;
 
 /*
  * Layar module, dipisah dari jalur JSON di `routes/api.php`.
@@ -29,6 +30,11 @@ Route::middleware(['web', 'auth', 'konteks-module:management-aset'])
     ->prefix('management-aset')
     ->name('management-aset.')
     ->group(function (): void {
+        // Lembar label aset siap cetak. Halaman HTML berdiri sendiri, tanpa shell, karena yang
+        // dicetak peramban harus kertas labelnya saja. Didaftarkan sebelum `{view}` supaya tidak
+        // ditelan rute layar.
+        Route::get('label-aset', AssetLabelController::class)->name('label-aset');
+
         Route::get('{view}/{sisa?}', HalamanModulController::class)
             ->where('sisa', '.*')
             ->name('layar');

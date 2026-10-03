@@ -344,6 +344,26 @@ Nilai perolehan aset yang belum disusutkan dapat dikoreksi dari layar detail ase
 
 Sebelum disimpan, layar menampilkan jurnal koreksinya beserta masalahnya (`GET /aset/{id}/pratinjau-koreksi`, K-36), dan **alasan koreksi wajib**: alasannya ikut ke keterangan jurnal (`source_document.description` dan `details.reason`). Yang menolak koreksi: aset yang sudah punya periode penyusutan (409, seperti sebelumnya), aset yang sudah dilepas, alasan kosong, tanggal selain hari ini, nilai dengan lebih dari dua desimal, dan selisih yang lebih halus dari presisi mata uangnya. Pemetaan akun yang kosong tidak menolak: jurnalnya terbit `held` dan koreksinya tetap tersimpan (K-18).
 
+## Label aset berkode QR
+
+Label yang ditempel pada barang, lalu dipindai saat stock opname. Padanannya laporan **Fixed asset bar codes** (`AssetBarcode`) di Dynamics 365 Finance — *Fixed assets > Reports > Base data > Fixed asset bar codes* — yang dicetak dari field barcode aset ([Microsoft Learn](https://learn.microsoft.com/en-us/dynamicsax-2012/appuser-itpro/fixed-asset-bar-codes-report-assetbarcode)). Business Central tidak punya laporan label aset tetap; yang dimilikinya hanya modul Barcode di System Application untuk menyandikan teks menjadi gambar QR di dalam laporan.
+
+**Cara mencetak.** Di daftar Inventarisasi aset, centang asetnya lalu pilih **Cetak label**; tanpa centang, yang dicetak semua aset yang sedang tampil sesuai pencarian. Dari rincian satu aset, **Cetak label** mencetak label aset itu saja. Lembarnya terbuka di tab baru dan dicetak dari dialog cetak peramban dengan skala 100%.
+
+**Isi QR adalah kode aset, bukan alamat layar.** Ini setelan F&O *Bar code equals fixed asset number* tanpa field barcode tersendiri. Kode aset tidak pernah berganti, terbaca pemindai mana pun tanpa jaringan, dan hasil pindaian dari pemindai bergaya keyboard langsung masuk ke kotak cari register, yang memang mencari menurut kode. Alamat layar ikut berubah bila domain atau rute berubah, dan label yang sudah tertempel di ratusan barang tidak dapat ditarik untuk dicetak ulang. Bila kelak tenant butuh barcode yang berbeda dari nomor aset (misalnya label lama dari sistem sebelumnya), barulah field barcode tersendiri seperti F&O ditambahkan.
+
+**Lembarnya.** Kertas label A4 3 × 8 (24 label, 63,5 × 33,9 mm per label, margin atas 12,9 mm, margin samping 7,2 mm). Setiap label memuat QR dengan koreksi kesalahan tingkat M (tetap terbaca bila sekitar 15% tergores), kode aset, nama, lokasi, dan unit kerja penanggung jawab. Lokasi dan unit kerja adalah keadaan saat dicetak; setelah mutasi, cetak ulang labelnya bila keduanya perlu terbaca di barang.
+
+**Kenapa halaman cetak, bukan mesin laporan Core.** Mesin laporan mengisi layout Word/Excel dengan baris tabel yang diulang ke bawah, dan gambar hanya dikenalnya sebagai logo kop. Label adalah kisi tiga kolom dengan satu gambar QR per sel, dan itu tidak dapat diungkapkan layout tanpa mengubah renderer Core. Lembarnya karena itu halaman HTML berdiri sendiri, tanpa shell, dengan ukuran milimeter tetap; QR dibuat di server dengan `bacon/bacon-qr-code` yang sudah terpasang di Core.
+
+| Hal | Aturannya |
+| --- | --- |
+| Alamat | `GET /management-aset/label-aset?ids=<id>,<id>` untuk aset terpilih, atau `?q=` untuk hasil pencarian; tanpa keduanya semua aset |
+| Hak | `management-aset.aset.read`, sama dengan register. Tidak ada permission baru |
+| Cakupan | Kebijakan data tanggung jawab aset seperti `GET /aset`; aset di luar unit kerja atau milik tenant lain tidak dicetak dan tidak disebut |
+| Batas | 240 label (10 lembar) sekali cetak; lebih dari itu ditolak dengan pesan, juga di layar sebelum tab terbuka |
+| `ids` tanpa id sah | Tidak pernah jatuh menjadi "semua aset" |
+
 ## Aturan yang dijaga, dan alasannya
 
 **Group tidak bisa diganti setelah aset dibuat.** Buku penyusutan sudah terbentuk dari matriks group × buku saat penerimaan. Mengganti group berarti bukunya salah tanpa ada yang menyadari. Permintaan yang mencoba mengubahnya ditolak dengan pesan yang menjelaskan alasannya.
@@ -395,6 +415,9 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | --- | --- |
 | `src/Http/Controllers/transaksi/InventarisasiAset/AsetController.php` | Register aset, koreksi, pratinjau koreksi nilai, dan history |
 | `src/Services/AcquisitionAdjustment.php` | Jurnal koreksi nilai perolehan |
+| `src/Http/Controllers/transaksi/InventarisasiAset/AssetLabelController.php` | Lembar label aset berkode QR |
+| `resources/views/asset-labels.blade.php` | Tata letak lembar label A4 |
+| `ui/transactions/inventarisasi-aset/labels.ts` | Tombol Cetak label di daftar dan rincian aset |
 | `ui/transactions/inventarisasi-aset/AcquisitionAdjustmentPreview.tsx` | Pratinjau dan alasan koreksi nilai di detail aset |
 | `src/Http/Controllers/transaksi/MutasiAset/MutasiAsetController.php` | Dokumen mutasi dan penyelesaian serah terima |
 | `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
