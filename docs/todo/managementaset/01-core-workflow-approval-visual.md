@@ -113,6 +113,6 @@ workflow actions ([create workflow](https://learn.microsoft.com/en-us/dynamics36
 
 Aplikasi mengirim `POST /api/internal/v1/workflow-instances` dengan
 `Idempotency-Key`, source document stabil, legal entity, initiator membership,
-dan `decision_context` yang sesuai schema type. Core tidak membaca database
-aplikasi. Event keputusan dikonsumsi aplikasi secara idempoten untuk mengubah
-state dokumen bisnis.
+dan `decision_context` yang sesuai schema type. Keputusan workflow memakai
+`decision_context` itu, bukan bacaan ke tabel aplikasi. Event keputusan
+dikonsumsi aplikasi secara idempoten untuk mengubah state dokumen bisnis.

@@ -18,9 +18,10 @@ use stdClass;
  * kolom yang tampil dengan judul dan urutannya, filter dan urutan baris yang sedang dipakai, **semua**
  * baris yang cocok — bukan hanya yang sudah dimuat layar — tanpa layout atau template.
  *
- * Core tidak menyentuh tabel module. Barisnya diminta kepada pemilik daftar lewat {@see ListExportSource}
- * di worker antrean, dengan konteks pengguna yang sama dengan laporan: permission baca daftar itu dan
- * kebijakan data organisasinya diterapkan module persis seperti di layar.
+ * Barisnya diminta kepada pemilik daftar lewat {@see ListExportSource} di worker antrean, dengan konteks
+ * pengguna yang sama dengan laporan: permission baca daftar itu dan kebijakan data organisasinya diterapkan
+ * module persis seperti di layar. Core boleh membaca tabel module, tetapi kolom dan filter daftar ini milik
+ * layar module, dan ekspornya harus sama dengan yang dilihat pengguna.
  *
  * Baris ditulis satu per satu ke {@see TypedSheetWriter} selagi module membacanya bertahap, jadi memori
  * tetap datar berapa pun jumlahnya. Sampai batas satu lembar Excel hasilnya xlsx bertipe; lebih dari itu

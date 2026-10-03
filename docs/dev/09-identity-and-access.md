@@ -270,7 +270,7 @@ sod_conflicts
 access_audit_events
 ```
 
-Semua record tenant-owned membawa `tenant_id`. Join lintas module database tetap dilarang; module menerima identity, permission, dan claim data policy melalui token/API/event contract tepercaya.
+Semua record tenant-owned membawa `tenant_id`. Module tidak membaca tabel module lain, dan menerima identity, permission, serta claim data policy lewat kontrak `RequestContext` di dalam proses. Core boleh membaca tabel module; saat melakukannya, Core sendiri yang menerapkan data policy yang dinyatakan module untuk resource itu (lihat [ownership dan data](02-module-standard.md#ownership-dan-data)).
 
 ## Keadaan worktree saat ini
 

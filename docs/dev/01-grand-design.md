@@ -132,7 +132,7 @@ Diagram di atas berlaku untuk profile SaaS (`pooled` dan `isolated`). On-prem pe
 
 | Bagian | Memiliki | Tidak boleh mengambil alih |
 | --- | --- | --- |
-| Control Plane | Tenant, identity, catalog, entitlement, deployment, pemasangan module, usage records | Data transaksi module, aturan bisnis module, atau query lintas module |
+| Control Plane | Tenant, identity, catalog, entitlement, deployment, pemasangan module, usage records | Kepemilikan data transaksi dan aturan bisnis module. Membaca tabel module untuk laporan dan analitik boleh dan tidak mengambil alih kepemilikannya; syaratnya di [ownership dan data](02-module-standard.md#ownership-dan-data) |
 | Application Plane | UI, API, migration, business rule, dan kontrak module | Keputusan entitlement, atau mengaku terpasang tanpa catatan pemasangan |
 | Deployment/runtime | Container Core, endpoint, secret reference, health, dan routing pada placement | Mengubah source module hanya karena tenant ditempatkan pada silo |
 
@@ -238,7 +238,7 @@ Versi diagram yang dapat diedit di draw.io: [coreerp-saas-grand-design.drawio](.
 
 ## Invarian yang tidak boleh dilanggar
 
-1. Sebuah module tidak membaca atau menulis data module lain. Yang menolaknya adalah penjaga batas dan analisa statis. Batas yang dijaga pemeriksaan tetap batas.
+1. Sebuah module tidak membaca atau menulis data module lain. Yang menolaknya adalah penjaga batas dan analisa statis. Batas yang dijaga pemeriksaan tetap batas. Arah dari Core berbeda: Core boleh membaca tabel module, dengan syarat di [ownership dan data](02-module-standard.md#ownership-dan-data).
 2. Semua request business API membawa `TenantContext` yang diterbitkan identity service; `tenant_id` dari body request tidak dipercaya. Pada module, konteks itu dibaca dari kontrak `TenantContext` dan `RequestContext`, bukan dari isi permintaan.
 3. Database credential hanya tersedia untuk service pemiliknya. Control plane menyimpan `secret_ref`, bukan password database.
 4. Semua integrasi antar-app memakai OpenAPI, event contract, atau extension point yang dipublikasikan. Permukaan module yang hanya dipanggil di dalam runtime yang sama dikontrakkan sebagai antarmuka PHP di `App\Platform\Modules\Contracts`.

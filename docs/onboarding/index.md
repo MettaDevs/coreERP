@@ -21,7 +21,9 @@ Konsekuensinya ada tiga, dan ketiganya sering bikin kaget orang baru:
 **Satu module tidak boleh menyentuh data module lain.** Tidak ada `join` ke tabel milik module
 sebelah. Module berbagi satu database tenant, dan yang memisahkannya adalah awalan nama tabel
 beserta penjaga batas yang menolak pelanggarnya di pull request. Batas yang dijaga pemeriksaan
-tetap batas.
+tetap batas. Arahnya tidak simetris: **Core boleh membaca tabel module**, misalnya untuk laporan dan
+analitik, karena pelanggan bisa membeli satu module saja dan Core selalu ada di setiap pemasangan.
+Syaratnya di [ownership dan data](/dev/02-module-standard#ownership-dan-data).
 
 **Dua bentuk hidup berdampingan.** Module berjalan di runtime Core; app `app-erp-*` yang belum
 pindah masih berjalan sebagai container dengan database dan token layanan sendiri. Aturannya
