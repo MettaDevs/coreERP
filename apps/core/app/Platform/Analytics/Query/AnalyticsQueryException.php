@@ -53,6 +53,12 @@ final class AnalyticsQueryException extends RuntimeException
         return new self('analytics.field_unknown', 'Kolom "'.$key.'" tidak dikenal. Pilih kolom dari daftar.', 422, $field);
     }
 
+    /** Field berkelas data pribadi dipakai principal yang tidak berhak (area 4, `Security\PersonalDataGate`). */
+    public static function fieldPersonalData(string $field, string $caption): self
+    {
+        return new self('analytics.field_personal_data', 'Kolom "'.$caption.'" memuat data pribadi dan tidak dapat dipakai di analitik dengan hak Anda.', 403, $field);
+    }
+
     public static function measureUnknown(string $field, string $key): self
     {
         return new self('analytics.field_unknown', 'Nilai "'.$key.'" tidak dikenal. Pilih nilai dari daftar.', 422, $field);

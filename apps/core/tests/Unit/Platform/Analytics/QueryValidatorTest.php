@@ -13,8 +13,10 @@ use App\Platform\Analytics\Query\QueryNormalizer;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\PersonalDataGate;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
+use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\FieldType;
 use App\Platform\Modules\Contracts\FilterField;
 use Carbon\CarbonImmutable;
@@ -62,6 +64,7 @@ class QueryValidatorTest extends TestCase
             ],
             times: ['acquired_on', 'created_at'],
             defaultTime: $defaultTime,
+            classifications: array_map(static fn (): DataClass => DataClass::CustomerContent, $fields),
         );
     }
 
@@ -138,7 +141,7 @@ class QueryValidatorTest extends TestCase
     private function assertRejected(array $input, string $code, string $field, ?CompiledDataset $dataset = null, ?AnalyticsPrincipal $principal = null, ?FieldUseGate $gate = null): AnalyticsQueryException
     {
         try {
-            (new QueryValidator($gate))->validate($dataset ?? $this->dataset(), $this->parsed($input), $principal ?? $this->principal());
+            (new QueryValidator($gate ?? new PersonalDataGate))->validate($dataset ?? $this->dataset(), $this->parsed($input), $principal ?? $this->principal());
         } catch (AnalyticsQueryException $e) {
             $this->assertSame($code, $e->errorCode);
             $this->assertSame($field, $e->field);
@@ -152,7 +155,7 @@ class QueryValidatorTest extends TestCase
     /** @param array<string, mixed> $input */
     private function assertAccepted(array $input, ?CompiledDataset $dataset = null): void
     {
-        (new QueryValidator)->validate($dataset ?? $this->dataset(), $this->parsed($input), $this->principal());
+        (new QueryValidator(new PersonalDataGate))->validate($dataset ?? $this->dataset(), $this->parsed($input), $this->principal());
         $this->addToAssertionCount(1);
     }
 
@@ -258,7 +261,7 @@ class QueryValidatorTest extends TestCase
         $this->assertAccepted(['limit' => 5000]);
         $this->assertRejected(['limit' => 5001], 'analytics.limit_exceeded', 'limit');
         $this->assertRejected(['limit' => 101], 'analytics.limit_exceeded', 'limit', principal: $this->principal(100));
-        (new QueryValidator)->validate($this->dataset(), $this->parsed(['limit' => 100]), $this->principal(100));
+        (new QueryValidator(new PersonalDataGate))->validate($this->dataset(), $this->parsed(['limit' => 100]), $this->principal(100));
         $this->addToAssertionCount(1);
     }
 
@@ -324,6 +327,8 @@ class QueryValidatorTest extends TestCase
         $this->assertSame([[
             'dimensions.0' => 'group_id',
             'dimensions.1' => 'acquired_on',
+            // Measure ikut dilaporkan lewat kolom bahannya (area 4): `total` menjumlah `value`.
+            'measures.1' => 'value',
             'filters.lifecycle_state' => 'lifecycle_state',
             'filters.name' => 'name',
             'time_range.field' => 'acquired_on',
@@ -342,7 +347,8 @@ class QueryValidatorTest extends TestCase
             }
         };
 
-        (new QueryValidator($gate))->validate($this->dataset(), $this->parsed(['measures' => ['count', 'total'], 'limit' => 10]), $this->principal());
+        // `count` tidak membaca kolom apa pun; `total` membaca `value`, jadi ia memanggil gerbang (area 4).
+        (new QueryValidator($gate))->validate($this->dataset(), $this->parsed(['measures' => ['count'], 'limit' => 10]), $this->principal());
 
         $this->assertSame(0, $gate->calls);
     }
@@ -381,8 +387,10 @@ class QueryValidatorTest extends TestCase
         $this->assertSame(0, $gate->calls);
     }
 
-    public function test_the_container_builds_the_validator_without_a_gate_and_hands_it_one_when_bound(): void
+    public function test_the_container_hands_the_validator_the_personal_data_gate_unless_another_is_bound(): void
     {
+        // Area 4 mengikat gerbangnya; validator tidak dapat dibuat tanpa gerbang.
+        $this->assertInstanceOf(PersonalDataGate::class, $this->app->make(FieldUseGate::class));
         $this->assertInstanceOf(QueryValidator::class, $this->app->make(QueryValidator::class));
 
         $gate = new class implements FieldUseGate

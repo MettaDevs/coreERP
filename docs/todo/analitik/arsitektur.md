@@ -276,7 +276,8 @@ environment. Yang disimpan hanya definisi dan skema, tidak pernah data tenant: p
 tenant dan lisensi dibaca ulang di setiap `forTenant()`. Dataset rusak disimpan sebagai rusak (peringatan
 sekali per proses); dataset yang tabelnya belum ada di database itu tidak disimpan, sehingga module yang
 dipasang sesudahnya di proses yang sama langsung terbaca. `find()` dan `all()` tidak menyaring pemasangan;
-`forTenant()` menyaring module terpasang (catatan `core_module_installations`) dan berlisensi.
+`forTenant()` menyaring module terpasang (catatan `core_module_installations`) dan berlisensi, lewat
+`LaunchableAppCatalog::readyModules()` — penentu yang sama dengan peluncur dan `DatasetAccess` (area 4).
 `diagnose()` memeriksa ulang setiap dataset terdaftar tanpa simpanan dan tanpa log, untuk
 `analytics:datasets` dan `AnalyticsDatasetsBoundaryTest`.
 

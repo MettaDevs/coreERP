@@ -163,6 +163,22 @@ Tiga perilaku yang mudah terlewat:
   Penyembunyian dikerjakan pada hasil, dengan `count` baris sumber yang ditambahkan diam-diam ke query
   publikasi.
 
+*Dikirim area 4 (4 Oktober 2026):* `Security\PersonalDataGate` membaca `CompiledDataset::classification()`
+dan hak principal (`mayUsePersonalData()`).
+
+- **Query:** gerbang ini mengimplementasikan `Query\FieldUseGate`, yang dipanggil `QueryValidator` dengan
+  setiap field yang dipakai query: pengelompok, saringan, kolom rentang waktu, dan field yang dibaca
+  measure terpilih (kolom bahannya bila ia field, dan saringan tetapnya). `max(nama_pasien)` memulangkan
+  nama orang, jadi measure dijaga juga, bukan hanya disembunyikan dari katalog. Urutan terjaga karena
+  `sort` hanya memakai kunci terpilih.
+- **Katalog:** `visibleFields()` dan `visibleMeasures()` memakai aturan yang sama.
+- **Label:** nama orang di balik id pengguna disembunyikan `SharedDimensionRegistry::labels()` dengan hak
+  yang sama.
+- **Celah yang tersisa:** kolom bahan measure yang bukan field dataset (misalnya kolom yang dikecualikan
+  `fieldsFromModel(except: …)`) tidak punya klasifikasi di `CompiledDataset`, jadi gerbang tidak dapat
+  memeriksanya. Sekarang tidak ada dataset seperti itu yang memakai `min`/`max`. Penutupnya aturan
+  `DatasetValidator`: kolom bahan `min`/`max` wajib field dataset, atau klasifikasinya ikut dikompilasi.
+
 ## Rantai izin yang diusulkan
 
 **Disetujui pemilik produk apa adanya, 3 Oktober 2026 (KA-14).** Susunan di bawah mengikuti gate izin skill
