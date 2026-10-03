@@ -30,6 +30,13 @@ dipakai apa adanya lewat `fieldsFromModel()`.
 Semua kelas di bawah tinggal di `apps/core/app/Platform/Modules/Contracts/Analytics/`, kecuali
 `DataPolicyFilter` yang tinggal satu tingkat di atasnya karena dipakai juga di luar analitik.
 
+Sejak area 0 (3 Oktober 2026) sebagian sudah ada di repo dan kodenya yang menjadi rujukan: `Dataset`,
+`Datasets`, `Aggregate`, `MeasureFormat`, `DataPolicyFilter`, dan `DatasetDefinition` dengan
+`make()`, `model()`, `permission()`, `dataPolicy()`, `fieldsFromModel()`, `measure()`, `time()`, dan
+`toArray()`. Sisanya — `SharedDimension`, `reference()`, `shared()`, `join()`, `fromQuery()`,
+`field()`, `version()`, `recordRoute()`, `description()` — sketsa di bawah yang mengikat bentuknya
+sampai area 1 menulisnya.
+
 ### `Dataset` dan `Datasets`
 
 ```php

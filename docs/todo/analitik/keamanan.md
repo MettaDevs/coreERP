@@ -85,6 +85,10 @@ interface AnalyticsPrincipal
 }
 ```
 
+Area 0 mengirim subset antarmuka ini — tanpa `mayUsePersonalData()`, `lockedFilters()`, dan
+`fingerprint()`, yang ditambahkan area 4 — beserta `UserPrincipal::fromMembership()` dan
+`DatasetAccess` tipis untuk langkah 3 dan 4 urutan otorisasi di atas.
+
 | Principal | Dibuat dari | Permission dan hibah | Data pribadi |
 | --- | --- | --- | --- |
 | `UserPrincipal` | Keanggotaan sesi (`TenantMembership`) | Milik pengguna: `LaunchableAppCatalog::permissionsFor()` dan `DataPolicyAccessResolver::resolve()` | Bila memegang `core.analytics.personal-data.read` |

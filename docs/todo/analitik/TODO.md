@@ -147,14 +147,17 @@ baris di bagian yang disediakan.
 
 | Berkas | Dibuat oleh | Ditambah oleh | Cara menambah |
 | --- | --- | --- | --- |
-| `apps/core/routes/analytics.php` | 0 | 6, 8, 12, 13, 15, 16, 17, 18 | Satu blok per area, berkomentar nomor area |
-| `apps/core/routes/web.php` | — | 0 (satu baris `require`), 17 (rute embed di luar grup `web`) | Hanya baris itu |
+| `apps/core/routes/analytics.php` | 0 | 6, 8, 12, 13, 15, 16, 17, 18 | Satu blok per area, berkomentar nomor area; halaman `/analytics/...` di luar blok `api/v1/analytics` |
+| `apps/core/routes/web.php` | — | 0 (satu baris `require` di grup `auth`), 17 (rute embed di luar grup `web`) | Hanya baris itu |
 | `apps/core/config/analytics.php` | 0 | 3, 9, 15, 16, 17 | Kunci baru di bagian area |
+| `apps/core/app/Platform/Analytics/Actions/RunQuery.php` | 0 | 4, 9 | Langkah baru di tempatnya; urutan otorisasi yang ada tidak dipindah |
+| `apps/core/app/Platform/Analytics/Datasets/CompiledDataset.php` | 0 | 1, 3, 4 | Method baru; nama method yang ada dicatat di [arsitektur](/todo/analitik/arsitektur#compileddataset) |
 | `apps/core/app/Platform/Modules/Support/CoreServices.php` | — | 0 (`Datasets`), 14 (`SharedDimensions`), 18 (`DashboardTemplates`) | Satu baris di `SINGLETON_BINDINGS` |
 | `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 atau 6 (setelah KA-14), 15 | Konstanta baru di akhir |
 | `apps/core/app/Platform/Retention/Support/RetentionPolicies.php` | — | 9, 17 | Satu `RetentionPolicy` per tabel |
 | `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | — | 15 | Dua entri di `SCOPES` |
-| `apps/core/resources/js/components/app-sidebar.tsx` | — | 7, 15 | Satu item per area |
+| `apps/core/resources/js/components/app-sidebar.tsx` | — | 0 (entri sementara Analisis data), 7, 15 | Satu item per area |
+| `apps/core/app/Http/Middleware/HandleInertiaRequests.php`, `apps/core/resources/js/types/global.d.ts` | — | 0 (prop `analyticsEnabled`), 4 (membuangnya bersama saklar) | Hanya prop itu |
 | `apps/core/resources/js/lib/analytics/types.ts` | 0 | 2, 6, 12, 13 | Tipe baru di akhir; tipe yang ada hanya diperluas |
 | `apps/core/vite.config.ts` | — | 17 (entri embed) | Satu entri |
 | `modules/apperp/management-aset/src/ModuleServiceProvider.php` | — | 0, 5, 18 | Satu daftar dataset dan satu daftar template |

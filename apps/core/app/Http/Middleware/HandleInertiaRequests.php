@@ -137,6 +137,9 @@ class HandleInertiaRequests extends Middleware
             'entitledProducts' => fn (): array => $this->entitledProducts($membership),
             'launchableProducts' => fn (): array => $this->launchableProducts($membership),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // Saklar sementara engine analitik, untuk menu Analisis data. Hanya penyaring tampilan: rutenya
+            // sendiri menjawab 404 saat saklar mati. Hilang begitu rantai izin analitik (KA-14) disetujui.
+            'analyticsEnabled' => config()->boolean('analytics.enabled'),
             'flash' => [
                 'status' => fn (): ?string => $request->session()->get('status'),
                 'error' => fn (): ?string => $request->session()->get('error'),

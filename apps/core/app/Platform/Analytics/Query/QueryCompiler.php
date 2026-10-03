@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Platform\Analytics\Query;
+
+use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Modules\Contracts\DataPolicyFilter;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+use App\Platform\Modules\Contracts\InvalidFilterExpression;
+use LogicException;
+
+/**
+ * Menyusun query builder Laravel dari query analitik. Tidak menjalankan apa pun; eksekusinya milik
+ * {@see QueryExecutor}, supaya test dan alat operator dapat memeriksa SQL tanpa membaca data.
+ *
+ * Urutannya bukan selera; setiap langkah bergantung pada langkah sebelumnya:
+ *
+ * 1. Query dasar dari model dataset — `TenantScope` dan `SoftDeletes` ikut dari model. Tabel dasar tidak
+ *    pernah diberi alias, karena scope tenant disisipkan dengan nama tabel sebenarnya.
+ * 2. Kebijakan data lewat `DataPolicyFilter`, pada kolom yang dinyatakan dataset, **sebelum** saringan
+ *    pengguna. Saringan pengguna hanya dapat menyempitkan.
+ * 3. Saringan pengguna lewat `FieldFilterExpression` (sintaks BC filter tambahan K-30), nilai lewat binding.
+ * 4. Dimensi dengan alias posisi `d0, d1, …`, dikelompokkan **menurut alias**: ekspresi berparameter yang
+ *    diulang di `GROUP BY` menjadi parameter lain bagi PostgreSQL, dan pengelompokannya ditolak.
+ * 5. Kolom mata uang dan satuan measure sebagai dimensi tersirat `c0, …`, supaya uang tidak pernah
+ *    dijumlah lintas mata uang (KA-22).
+ * 6. Measure dengan alias `m0, m1, …`, lewat {@see MeasureExpression}.
+ * 7. Urutan dan batas: `LIMIT n + 1`, baris terakhir hanya penanda terpotong.
+ *
+ * Tidak ada nama kolom yang disambung ke SQL mentah: kolom dipilih lewat `addSelect()`/`groupBy()`/
+ * `orderBy()`, yang membungkusnya dengan grammar, dan measure lewat `selectExpression()`.
+ *
+ * Isi kerangka berjalan (area 0). Area 3 menambah join, ember waktu, saringan tetap measure, total,
+ * urutan pilihan pengguna, dan `NULLS LAST` untuk measure yang dapat kosong; area 4 menggantikan
+ * langkah 2 dengan `DataPolicyScope` beserta saringan terkunci.
+ */
+final class QueryCompiler
+{
+    /** @throws AnalyticsQueryException */
+    public function compile(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
+    {
+        $builder = $dataset->baseQuery();
+
+        if ($dataset->policy !== null) {
+            DataPolicyFilter::apply(
+                $builder,
+                $principal->policyScope($dataset->policy['code']),
+                $dataset->qualified($dataset->policy['legal_entity']),
+                $dataset->policy['operating_unit'] === null ? null : $dataset->qualified($dataset->policy['operating_unit']),
+            );
+        }
+
+        foreach ($query->filters as $key => $value) {
+            try {
+                FieldFilterExpression::apply($builder, $dataset->filterField($key), $value, $principal->timezone());
+            } catch (InvalidFilterExpression $e) {
+                throw AnalyticsQueryException::invalidFilter("filters.{$key}", $e->getMessage(), $e);
+            }
+        }
+
+        $columns = [];
+
+        foreach ($query->dimensions as $i => $dimension) {
+            if ($dimension->granularity !== null) {
+                throw new LogicException('Pengelompokan menurut waktu belum dikompilasi; pembaca query seharusnya sudah menolaknya.');
+            }
+            $alias = "d{$i}";
+            $builder->addSelect($dataset->qualified($dimension->field).' as '.$alias)->groupBy($alias);
+            $columns[] = ResultColumn::dimension($alias, $dimension, $dataset);
+        }
+
+        foreach ($this->implicitDimensions($dataset, $query) as $j => [$column, $caption]) {
+            $alias = "c{$j}";
+            $builder->addSelect($dataset->qualified($column).' as '.$alias)->groupBy($alias);
+            $columns[] = ResultColumn::implicit($alias, $column, $caption, $dataset);
+        }
+
+        foreach ($query->measures as $i => $key) {
+            $measure = $dataset->measure($key);
+            // Saringan tetap measure (`FILTER (WHERE …)`) milik area 3. Menolaknya lebih jujur daripada
+            // menghitungnya tanpa saringan.
+            if ($measure->where !== []) {
+                throw new LogicException("Measure `{$measure->key}` memakai saringan tetap, yang belum dikompilasi.");
+            }
+            $alias = "m{$i}";
+            $builder->selectExpression(new MeasureExpression($measure->aggregate, $measure->field === null ? null : $dataset->qualified($measure->field)), $alias);
+            $columns[] = ResultColumn::measure($alias, $key, $dataset);
+        }
+
+        // Urutan bawaan: measure pertama turun. Pengelompok menjadi pemutus seri, supaya hasil — dan baris
+        // mana yang terpotong — sama dari satu putaran ke putaran berikutnya.
+        $builder->orderBy('m0', 'desc');
+        foreach ($columns as $column) {
+            if ($column->kind === ResultColumn::DIMENSION) {
+                $builder->orderBy($column->alias);
+            }
+        }
+
+        $limit = $query->limit ?? $principal->rowLimit();
+        $builder->limit($limit + 1);
+
+        return new CompiledQuery($builder, null, $columns, $limit);
+    }
+
+    /**
+     * Kolom mata uang dan satuan dari measure yang dipilih, yang belum dipilih sebagai dimensi.
+     *
+     * @return list<array{0: string, 1: string}> kolom dan nama tampilan cadangannya
+     */
+    private function implicitDimensions(CompiledDataset $dataset, AnalyticsQuery $query): array
+    {
+        $chosen = array_map(static fn (Dimension $dimension): string => $dimension->field, $query->dimensions);
+        $implicit = [];
+
+        foreach ($query->measures as $key) {
+            $measure = $dataset->measure($key);
+            foreach ([[$measure->currency, 'Mata uang'], [$measure->unit, 'Satuan']] as [$column, $caption]) {
+                if ($column !== null && ! in_array($column, $chosen, true) && ! isset($implicit[$column])) {
+                    $implicit[$column] = [$column, $caption];
+                }
+            }
+        }
+
+        return array_values($implicit);
+    }
+}

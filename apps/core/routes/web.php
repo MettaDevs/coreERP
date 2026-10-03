@@ -309,6 +309,9 @@ Route::middleware(['auth'])->group(function () {
     ]))->name('control.apps');
     Route::get('control/identities', [IdentityMonitorController::class, 'index'])->name('control.identities');
 
+    // Engine analitik: halaman `/analytics/...` dan API `/api/v1/analytics/...`, di balik saklar `analytics.enabled`.
+    require __DIR__.'/analytics.php';
+
     Route::prefix('api/v1')->name('api.')->group(function () {
         Route::get('launch-manifest', AppLaunchManifestController::class)->name('launch-manifest.show');
         Route::put('workspace-context', [WorkspaceContextController::class, 'update'])
