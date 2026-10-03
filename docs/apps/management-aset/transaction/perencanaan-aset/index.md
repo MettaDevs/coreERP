@@ -11,7 +11,7 @@ Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuanny
 | `aset_tr_perencanaan_aset` | Dokumennya: nomor rencana, entitas, unit kerja, status, versi |
 | `aset_tr_perencanaan_aset_details` | Baris: barang apa, berapa banyak, satuan apa |
 
-Dokumen permintaan pembelian memakai bentuk yang sama — `aset_tr_permintaan_pengadaan_aset` dan `aset_tr_permintaan_pengadaan_aset_details` — tetapi perilakunya belum diputuskan.
+Dokumen permintaan pembelian memakai bentuk yang sama — `aset_tr_permintaan_pengadaan_aset` dan `aset_tr_permintaan_pengadaan_aset_details` — dengan perilaku yang lebih sedikit: lihat [Hubungannya dengan pengadaan](#hubungannya-dengan-pengadaan).
 
 Satuan diambil dari Core lewat `UnitOfMeasureClient`, bukan disimpan sebagai teks bebas. Kalau layanan satuan belum bisa dihubungi, permintaan gagal 503 — bukan menyimpan satuan yang tidak bisa diverifikasi.
 
@@ -52,7 +52,13 @@ Pola yang sama dipakai work order.
 
 ## Hubungannya dengan pengadaan
 
-Rencana **belum** memesan apa pun. Dokumen permintaan pembelian adalah langkah berikutnya, dan sampai sekarang rutenya sudah ada tetapi isinya belum dikerjakan — perilakunya belum diputuskan, jadi kontraknya sengaja belum ditulis.
+Rencana **belum** memesan apa pun. Langkah berikutnya dokumen permintaan pembelian (`RPPA`), yang tiap barisnya boleh menunjuk baris rencana lewat `planning_detail_id`. Yang sudah dikerjakan:
+
+- daftar, lihat, dan buat permintaan (nomor dari Core per entitas legal, `Idempotency-Key` wajib),
+- ubah selama masih **draf**,
+- batalkan selama masih draf atau diajukan (`POST …/permintaan-pembelian-aset/{id}/batal`).
+
+Yang belum ada: pengajuan dan persetujuan. Status `submitted` sudah dikenal kolomnya dan boleh dibatalkan, tetapi belum ada tindakan yang membawa permintaan ke sana, jadi semua permintaan yang hidup hari ini berstatus draf.
 
 Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
 
