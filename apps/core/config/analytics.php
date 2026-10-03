@@ -12,14 +12,6 @@
 */
 
 return [
-    /*
-     * Saklar sementara (area 0). Selama rantai izin analitik (KA-14) belum disetujui pemilik produk,
-     * belum ada permission analitik, jadi seluruh halaman dan API analitik menjawab 404 bila saklar mati
-     * dan menu Analisis data tidak tampil. Bawaan mati; `.env.example` menyalakannya untuk pengembangan
-     * lokal. Dilepas area 4 begitu KA-14 disetujui.
-     */
-    'enabled' => (bool) env('COREERP_ANALYTICS_ENABLED', false),
-
     'timeouts' => [
         // `statement_timeout` query dari layar, dalam milidetik. Query yang melewatinya dihentikan
         // database dan dijawab 422 `analytics.query_timeout`.

@@ -309,7 +309,7 @@ Route::middleware(['auth'])->group(function () {
     ]))->name('control.apps');
     Route::get('control/identities', [IdentityMonitorController::class, 'index'])->name('control.identities');
 
-    // Engine analitik: halaman `/analytics/...` dan API `/api/v1/analytics/...`, di balik saklar `analytics.enabled`.
+    // Engine analitik: halaman `/analytics/...` dan API `/api/v1/analytics/...`, dijaga permission analitik per rute.
     require __DIR__.'/analytics.php';
 
     Route::prefix('api/v1')->name('api.')->group(function () {

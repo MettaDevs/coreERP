@@ -21,13 +21,13 @@ use App\Platform\Analytics\Security\AnalyticsPrincipal;
  * milik `FieldFilterExpression`, yang menolaknya saat compile dengan path yang sama, juga sebelum ada
  * query ke database.
  *
- * Gerbang data pribadi opsional sampai area 4 mengikatnya (lihat {@see FieldUseGate}); parameter ini
- * menjadi wajib saat itu, supaya tidak ada jalur yang melewatinya.
+ * Gerbang data pribadi wajib (area 4, diikat ke `Security\PersonalDataGate` lewat {@see FieldUseGate}),
+ * supaya tidak ada jalur yang melewatinya.
  */
 final class QueryValidator
 {
     public function __construct(
-        private readonly ?FieldUseGate $fieldGate = null,
+        private readonly FieldUseGate $fieldGate,
     ) {}
 
     /** @throws AnalyticsQueryException */
@@ -64,6 +64,18 @@ final class QueryValidator
                 throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai "'.$measure.'" dipilih lebih dari sekali.');
             }
             $chosen[$measure] = true;
+            // Field yang dibaca measure ikut dilaporkan ke gerbang data pribadi: kolom bahannya bila ia field
+            // dataset, dan setiap field saringan tetapnya. Aturannya sama dengan katalog
+            // (`PersonalDataGate::visibleMeasures()`), supaya measure yang disembunyikan juga ditolak.
+            $definition = $dataset->measure($measure);
+            if ($definition->field !== null && $dataset->hasField($definition->field)) {
+                $uses["measures.{$i}"] = $definition->field;
+            }
+            foreach (array_keys($definition->where) as $key) {
+                if ($dataset->hasField($key)) {
+                    $uses["measures.{$i}.where.{$key}"] = $key;
+                }
+            }
         }
 
         $this->assertWithin($query->filters, 'limits.filters', 20, 'filters', 'Terlalu banyak saringan. Maksimal %d.');
@@ -97,7 +109,7 @@ final class QueryValidator
         // Terakhir: gerbang hanya melihat kolom yang sudah terbukti ada, dan pengguna tanpa hak tidak
         // belajar dari pesan galat sebelumnya kolom mana yang ada.
         if ($uses !== []) {
-            $this->fieldGate?->assertUsable($dataset, $principal, $uses);
+            $this->fieldGate->assertUsable($dataset, $principal, $uses);
         }
     }
 

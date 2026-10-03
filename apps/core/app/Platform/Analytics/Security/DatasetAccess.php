@@ -6,24 +6,25 @@ namespace App\Platform\Analytics\Security;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
-use App\Platform\License\Support\SiteLicense;
-use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 
 /**
  * Langkah 3 dan 4 urutan otorisasi satu query (`docs/todo/analitik/keamanan.md`): module dataset
  * terpasang untuk tenant dan berlisensi di server ini, lalu principal memegang permission baca resource
  * dataset (KA-15).
  *
- * Module yang tidak terpasang dijawab 404 seperti dataset yang tidak ada, bukan 403: katalog, hak, dan
- * pemasangan tiga fakta berbeda, dan "terpasang" hanya sah dari catatan pemasangannya
- * (`core_module_installations`), tidak pernah dari entitlement. Lisensi situs ikut diperiksa di sini
- * karena jalur module biasa memeriksanya di middleware konteks module, yang tidak dilewati rute Core.
+ * Kesiapan module dibaca dari `LaunchableAppCatalog::readyModules()`, penentu yang sama dengan peluncur
+ * app — terpasang menurut catatan pemasangannya (`core_module_installations`, tidak pernah dari
+ * entitlement) dan tercantum di lisensi situs. Lisensi ikut diperiksa di sini karena jalur module biasa
+ * memeriksanya di middleware konteks module, yang tidak dilewati rute Core. Permission dibaca principal
+ * lewat `LaunchableAppCatalog::permissionsFor()`.
  *
- * Isi kerangka berjalan (area 0); area 4 melengkapinya.
+ * Module yang tidak siap dijawab 404 seperti dataset yang tidak ada, bukan 403: katalog, hak, dan
+ * pemasangan tiga fakta berbeda, dan pengguna tanpa module itu tidak perlu tahu datanya ada.
  */
 final class DatasetAccess
 {
-    public function __construct(private readonly SiteLicense $license) {}
+    public function __construct(private readonly LaunchableAppCatalog $apps) {}
 
     /** @throws AnalyticsQueryException */
     public function authorize(AnalyticsPrincipal $principal, CompiledDataset $dataset): void
@@ -46,11 +47,6 @@ final class DatasetAccess
 
     private function available(AnalyticsPrincipal $principal, CompiledDataset $dataset): bool
     {
-        return $this->license->allowsApp($dataset->moduleId)
-            && ModuleInstallation::query()
-                ->where('tenant_id', $principal->tenantId())
-                ->where('module_id', $dataset->moduleId)
-                ->where('status', ModuleInstallation::STATUS_INSTALLED)
-                ->exists();
+        return in_array($dataset->moduleId, $this->apps->readyModules($principal->tenantId()), true);
     }
 }

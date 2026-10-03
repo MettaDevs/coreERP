@@ -72,7 +72,7 @@ $key = hash('sha256', json_encode([
     'dataset' => $dataset->code,
     'definition' => $dataset->hash(),              // definisi berubah saat rilis → cache lama tidak terbaca
     'query' => $query->normalized(),
-    'scope' => $principal->fingerprint($dataset->code),
+    'scope' => $principal->fingerprint($dataset),
     'timezone' => $principal->timezone(),
     'today' => $principal->now()->toDateString(),  // token relatif berubah arti setiap hari
 ], JSON_THROW_ON_ERROR));

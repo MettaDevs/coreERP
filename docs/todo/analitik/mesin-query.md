@@ -191,10 +191,11 @@ Tiga langkah, masing-masing satu kelas, dan urutannya tetap:
 
 Gerbang data pribadi (area 4) dipanggil lewat antarmuka kecil `Query\FieldUseGate`: terakhir, sesudah
 semua kunci terbukti dikenal, validator melaporkan setiap kolom dataset yang dipakai query sebagai peta
-path → kunci (`dimensions.0`, `filters.nama`, `time_range.field`). Urutan tidak dilaporkan terpisah karena
-`sort` hanya dapat memakai kunci yang sudah dipilih. Selama area 4 belum mengikat implementasinya,
-validator tidak memanggil apa pun; area 4 mengikatnya di container dan menjadikan parameter validator
-tidak lagi opsional.
+path → kunci (`dimensions.0`, `filters.nama`, `time_range.field`), ditambah field yang dibaca measure
+terpilih (`measures.1` untuk kolom bahannya bila ia field dataset, `measures.1.where.status` untuk saringan
+tetapnya). Urutan tidak dilaporkan terpisah karena `sort` hanya dapat memakai kunci yang sudah dipilih.
+Implementasinya `Security\PersonalDataGate` (area 4), diikat lewat atribut `#[Bind]` pada antarmukanya;
+parameter validator tidak opsional.
 
 ## Dari objek ke SQL
 

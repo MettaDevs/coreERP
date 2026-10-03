@@ -112,13 +112,11 @@ class LaunchableAppCatalog
         // Lisensi situs menyaring sesudahnya. Pemasangan dan izin sama-sama tinggal di database
         // server klien, dan database itu dapat diubah siapa pun yang memegang server-nya; daftar
         // app di lisensi bertanda tangan tidak. Peluncur, `/apps/{app}`, dan `launch-manifest`
-        // semuanya membaca daftar ini, jadi saringan di sini menutup ketiganya sekaligus.
-        $readyAppIds = array_values(array_filter(
-            array_intersect(
-                $this->installedModules($membership),
-                $authorizedAppIds->map(strval(...))->all(),
-            ),
-            app(SiteLicense::class)->allowsApp(...),
+        // semuanya membaca daftar ini, jadi saringan di sini menutup ketiganya sekaligus. Kesiapannya
+        // sendiri tinggal di `readyModules()`, yang juga dibaca engine analitik.
+        $readyAppIds = array_values(array_intersect(
+            $this->readyModules((string) $membership->tenant_id),
+            $authorizedAppIds->map(strval(...))->all(),
         ));
 
         return array_values(
@@ -162,6 +160,20 @@ class LaunchableAppCatalog
     }
 
     /**
+     * Module yang siap dipakai tenant ini: terpasang untuk tenant itu dan tercantum di lisensi situs.
+     *
+     * Satu penentu kesiapan untuk peluncur ({@see self::for()}) dan engine analitik, yang membaca tabel
+     * module tanpa melewati peluncur maupun middleware konteks module. Tanpa rantai izin: siapa yang boleh
+     * membuka module diputuskan pemanggilnya, dengan permission yang ia perlukan.
+     *
+     * @return list<string>
+     */
+    public function readyModules(string $tenantId): array
+    {
+        return array_values(array_filter($this->installedFor($tenantId), app(SiteLicense::class)->allowsApp(...)));
+    }
+
+    /**
      * Module yang terpasang untuk tenant ini.
      *
      * Ini penentu kesiapan bagi module, dan bentuknya sengaja jauh lebih sederhana daripada
@@ -173,8 +185,14 @@ class LaunchableAppCatalog
      */
     public function installedModules(TenantMembership $membership): array
     {
+        return $this->installedFor((string) $membership->tenant_id);
+    }
+
+    /** @return list<string> */
+    private function installedFor(string $tenantId): array
+    {
         $id = DB::table('core_module_installations')
-            ->where('tenant_id', $membership->tenant_id)
+            ->where('tenant_id', $tenantId)
             ->where('status', ModuleInstallation::STATUS_INSTALLED)
             ->orderBy('module_id')
             ->pluck('module_id')

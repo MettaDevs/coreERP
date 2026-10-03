@@ -6,6 +6,8 @@ namespace App\Platform\Analytics\Query;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\PersonalDataGate;
+use Illuminate\Container\Attributes\Bind;
 
 /**
  * Titik panggil gerbang data pribadi (area 4) dari {@see QueryValidator}: semua kolom dataset yang dipakai
@@ -20,18 +22,17 @@ use App\Platform\Analytics\Security\AnalyticsPrincipal;
  * - Urutan tidak dilaporkan terpisah: `sort` hanya boleh memakai kunci yang sudah dipilih sebagai
  *   pengelompok atau nilai, jadi kolom tertutup tidak dapat masuk lewat urutan tanpa lebih dulu lolos
  *   sebagai pengelompok.
- * - Kolom yang menjadi bahan measure bukan kolom yang dipakai query ini, jadi tidak dilaporkan; measure
- *   dijaga pada tingkat dataset oleh area 4.
+ * - Measure terpilih (`measures.N`, `measures.N.where.<kolom>`): kolom bahannya bila ia field dataset, dan
+ *   field saringan tetapnya (area 4). `max(nama_pasien)` memulangkan nama orang, dan katalog yang
+ *   menyembunyikan measure itu tidak cukup bila kuncinya masih dapat diketik.
  *
  * Gerbang yang menolak melempar {@see AnalyticsQueryException} (403 `analytics.field_personal_data`,
  * path salah satu kunci `$uses`) dan tidak pernah memulangkan "boleh" karena tidak tahu.
  *
- * **Belum ada implementasinya.** Selama area 4 belum mengikatnya, `QueryValidator` tidak memanggil apa
- * pun, yaitu keadaan yang sama dengan kerangka berjalan: tidak ada pemeriksaan data pribadi di jalur
- * ini, dan dataset yang terdaftar sekarang tidak menawarkan kolom data pribadi. Area 4 mengikat
- * antarmuka ini di container dan menjadikan parameter validator tidak lagi opsional; dari saat itu
- * query tidak punya jalur yang melewatinya.
+ * Implementasinya {@see PersonalDataGate} (area 4), diikat di container lewat atribut di bawah, dan
+ * parameter `QueryValidator` tidak opsional: query tidak punya jalur yang melewatinya.
  */
+#[Bind(PersonalDataGate::class)]
 interface FieldUseGate
 {
     /**
