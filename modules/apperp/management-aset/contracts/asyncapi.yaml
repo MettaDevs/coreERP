@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: Management Aset events
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Event yang **diterima** app ini. Sisi penerbitnya dikontrakkan pada
     `CoreERP/apps/core/contracts/asyncapi.yaml`; kedua file wajib
@@ -10,23 +10,22 @@ info:
     Sejak `v2`, `correlation_id` wajib dan berisi id dokumen dekomisioning yang
     dikirim app saat mengajukan workflow, sehingga keputusan yang datang berhari-hari
     kemudian dapat ditelusuri balik ke dokumen asalnya. `v1` tidak lagi diterima.
+
+    Kedua event diterima **di dalam proses** sebagai event Laravel yang didaftarkan
+    `src/ModuleServiceProvider.php`, di dalam transaksi Core yang menerbitkannya. Tidak ada
+    endpoint penerima, header, atau tanda tangan di sisi module ini. Header webhook di
+    kontrak Core hanya berlaku bagi penerima yang berjalan di luar proses.
 channels:
   core.tenant.provisioned.v1:
     address: core.tenant.provisioned.v1
-    description: Event Core yang meminta app menyediakan starter reference untuk tenant.
+    description: |
+      Tenant baru siap; module menyiapkan data awalnya.
+
+      Diterima di dalam proses sebagai event Laravel `TenantProvisioned` yang didengarkan
+      `SiapkanDataAwalTenant`, di dalam transaksi pendaftaran usaha.
     messages:
       tenantProvisioned:
         contentType: application/json
-        headers:
-          type: object
-          required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
-          properties:
-            X-CoreERP-Event-Timestamp:
-              type: string
-              description: Unix timestamp saat Core mengirim request.
-            X-CoreERP-Event-Signature:
-              type: string
-              description: hash_hmac SHA-256 atas timestamp dan raw body dengan secret CoreERP.
         payload:
           type: object
           required: [id, type, occurred_at, tenant_id, correlation_id, data]
@@ -58,7 +57,8 @@ channels:
 
       Bentuk `data` di bawah tetap dikontrakkan karena ia tetap satu isi untuk dua
       jalur: amplop yang sama masih ditulis ke outbox Core untuk penerima yang berada
-      di luar proses. Nasib akhir berkas kontrak milik module diputuskan pada F3-23.
+      di luar proses. Sejak F3-23 berkas ini dokumentasi, bukan kontrak yang dijaga CI;
+      lihat `contracts/README.md`.
     messages:
       workflowDecision:
         contentType: application/json

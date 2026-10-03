@@ -41,12 +41,21 @@
             box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
         }
         .label { display: flex; align-items: center; gap: 2mm; padding: 2mm 2.5mm; overflow: hidden; outline: 1px dashed #d1d5db; outline-offset: -1px; }
-        .qr { flex: none; width: 27mm; height: 27mm; }
+        /*
+         * Tinggi isi label 29,9 mm, sedangkan kode + nama + lokasi + unit dalam satu baris masing-masing
+         * hanya memakai separuhnya. Karena itu nama boleh empat baris dan lokasi serta unit dua baris:
+         * kasus terpanjang (kode 4 mm, nama 4 × 3,2 mm, lokasi dan unit 2 × 2 × 2,8 mm, jarak 1,8 mm)
+         * masih 29,6 mm, jadi teks memakai ruang atas-bawah yang ada tanpa pernah keluar dari label.
+         * QR 25 mm masih jauh di atas ukuran pindai untuk kode sependek ini, dan 2 mm yang dilepasnya
+         * menjadi lebar teks.
+         */
+        .qr { flex: none; width: 25mm; height: 25mm; }
         .qr svg { display: block; width: 100%; height: 100%; }
-        .text { min-width: 0; display: flex; flex-direction: column; gap: 0.8mm; }
+        .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.6mm; }
         .code { font-size: 9.5pt; font-weight: 700; letter-spacing: 0.02em; word-break: break-all; }
-        .name { font-size: 7.5pt; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .meta { font-size: 6.5pt; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .name, .meta { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+        .name { font-size: 7.5pt; line-height: 1.2; -webkit-line-clamp: 4; }
+        .meta { font-size: 6.5pt; line-height: 1.2; color: #374151; -webkit-line-clamp: 2; }
         @media print {
             body { background: #fff; }
             .toolbar { display: none; }

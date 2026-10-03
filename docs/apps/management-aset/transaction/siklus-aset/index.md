@@ -100,9 +100,7 @@ Contoh: ambulans 48.000.000, akumulasi 1.000.000, dijual 50.000.000 — Dr Akumu
 
 ## Yang belum dirancang
 
-`permintaan-pembelian-aset` rutenya sudah ada tetapi isinya belum dikerjakan. Perilaku yang akan dijanjikannya belum diputuskan, jadi tiga endpoint-nya sengaja **belum masuk kontrak**. Celah itu tercatat di daftar `DEFERRED` pada `contracts/check-contract-coverage.py` dan dicetak tiap kali pemeriksa jalan — supaya ia tidak terlupa, bukan supaya ia dimaafkan.
-
-Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahului keputusan menggambarkan bentuk yang tidak bisa diandalkan pemanggil.
+`permintaan-pembelian-aset` sudah bisa dibuat, diubah selama draf, dan dibatalkan (rinciannya di [Perencanaan aset](/apps/management-aset/transaction/perencanaan-aset/#hubungannya-dengan-pengadaan)). Yang belum dirancang adalah pengajuan dan persetujuannya: belum ada tindakan yang membawa permintaan ke status `submitted`, dan belum ada tipe workflow untuknya. Laporan pengadaan aset karena itu menghitung permintaan draf sebagai "diminta"; aturan itu ditinjau ulang begitu persetujuannya ada.
 
 ## Di mana kodenya
 
@@ -115,7 +113,7 @@ Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahulu
 | `tests/Feature/DisposalPostingTest.php` | Draf, pratinjau, posting, laba/rugi, penghalang, hak akses |
 | `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan workflow |
 | `src/Services/AssetApprovalWorkflow.php` | Pengajuan ke Core lewat kontrak |
-| `src/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rutenya ada, isinya belum dikerjakan |
+| `src/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — buat, ubah draf, batal; belum ada pengajuan dan persetujuan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
 | `ui/transactions/_shared/LifecycleDocumentPage.tsx` | Layar permintaan pembelian dan dekomisioning |
 | `ui/transactions/disposal/` | Layar penjualan dan pemusnahan: daftar, draf, pratinjau, posting |
