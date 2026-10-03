@@ -37,6 +37,16 @@
             html.dark { background-color: oklch(0.145 0 0); }
         </style>
 
+        {{-- Setelan Sentry untuk peramban; lihat resources/js/lib/sentry.ts. Kosong berarti mati. --}}
+        @if (config('app.sentry_browser_dsn'))
+            <meta name="sentry-dsn" content="{{ config('app.sentry_browser_dsn') }}">
+            <meta name="sentry-release" content="{{ config('sentry.release') }}">
+            <meta name="sentry-environment" content="{{ config('sentry.environment') ?? app()->environment() }}">
+            @auth
+                <meta name="sentry-user" content="{{ auth()->id() }}">
+            @endauth
+        @endif
+
         @vite(['resources/css/app.css', 'resources/js/app.tsx'])
         <x-inertia::head>
             <title>{{ config('app.name', 'Pusat Admin') }}</title>

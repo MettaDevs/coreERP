@@ -121,6 +121,14 @@ return [
     'sentry_url' => env('COREERP_SENTRY_URL'),
 
     /*
+     * DSN Sentry untuk peramban: kesalahan JavaScript dan sesi pengguna (Crash Free Sessions/Users di
+     * Sentry). Bukan `SENTRY_LARAVEL_DSN`, karena DSN server boleh menunjuk alamat internal yang tidak
+     * terjangkau dari peramban. DSN peramban memang terbaca siapa pun yang membuka halaman — itu sifat
+     * DSN Sentry, bukan kebocoran. Kosong berarti peramban tidak mengirim apa pun.
+     */
+    'sentry_browser_dsn' => env('SENTRY_BROWSER_DSN'),
+
+    /*
      * Pengiriman laporan kesalahan ke Discord.
      *
      * Kosong berarti mati, dan itulah bawaannya — termasuk pada pemasangan on-prem, yang

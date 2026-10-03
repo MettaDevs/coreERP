@@ -13,6 +13,7 @@
         "@apperp/ui": "*",
         "@inertiajs/react": "^3.0.0",
         "@inertiajs/vite": "^3.0.0",
+        "@sentry/react": "^10.76.0",
         "@tailwindcss/vite": "^4.1.11",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",

@@ -80,6 +80,20 @@
                 : ["resources/js/pages/{$page['component']}.tsx"];
         @endphp
 
+        {{--
+            Setelan Sentry untuk peramban, dibaca `resources/js/lib/sentry.ts` sebelum aplikasi dibuat.
+            Lewat meta, bukan variabel Vite: satu image dipakai banyak lingkungan, jadi DSN dan nomor
+            rilisnya baru diketahui saat berjalan. Pengguna hanya id-nya, untuk Crash Free Users.
+        --}}
+        @if (config('coreerp.sentry_browser_dsn'))
+            <meta name="sentry-dsn" content="{{ config('coreerp.sentry_browser_dsn') }}">
+            <meta name="sentry-release" content="{{ config('sentry.release') }}">
+            <meta name="sentry-environment" content="{{ config('sentry.environment') ?? app()->environment() }}">
+            @auth
+                <meta name="sentry-user" content="{{ auth()->id() }}">
+            @endauth
+        @endif
+
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', ...$berkasHalaman])
         <x-inertia::head>
