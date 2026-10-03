@@ -1,3 +1,4 @@
+import { installSentry } from '@/lib/sentry';
 import { createInertiaApp } from '@inertiajs/react';
 import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -15,6 +16,7 @@ type PageModule = { default: ComponentType<Record<string, unknown>> };
 const pages = import.meta.glob<PageModule>('./pages/**/*.tsx');
 
 initTheme();
+installSentry();
 
 void createInertiaApp({
     title: (title) => (title ? `${title} · Pusat Admin` : 'Pusat Admin'),

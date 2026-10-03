@@ -129,6 +129,10 @@ x-app-environment: &app-environment
   SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
   SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
   COREERP_SENTRY_URL: ${COREERP_SENTRY_URL:-}
+  # Nomor rilis yang sedang berjalan, diekspor `pasang-rilis.sh`; dan DSN untuk peramban, yang harus
+  # alamat publik karena dikirim dari komputer pengguna.
+  SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+  SENTRY_BROWSER_DSN: ${SENTRY_CORE_BROWSER_DSN:-}
   # Laporan kesalahan Core ke satu channel Discord, bertaut ke kejadiannya di Sentry. Webhook-nya secret,
   # jadi hanya ada di berkas env server; kosong berarti mati. Kesalahan yang sama dikirim paling sering
   # sekali per JEDA_DETIK. Konsol tidak ikut: ia tidak punya pelapor Discord, dan peringatannya cukup lewat
@@ -382,6 +386,8 @@ services:
       SENTRY_LARAVEL_DSN: ${SENTRY_KONSOL_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_BROWSER_DSN: ${SENTRY_KONSOL_BROWSER_DSN:-}
       # Klien SSO milik konsol sendiri ("CoreERP Admin"), terpisah dari klien Core. Kosong berarti
       # tanpa SSO: tombolnya tidak tampil dan konsol bekerja seperti sebelumnya.
       CONSOLE_SSO_ISSUER: ${CONSOLE_SSO_ISSUER:-}

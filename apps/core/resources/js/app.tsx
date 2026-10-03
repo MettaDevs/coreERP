@@ -7,6 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import halamanModule from '@/lib/halaman-module';
 import { pasangPelaporanKesalahan } from '@/lib/pelaporan-kesalahan';
+import { installSentry } from '@/lib/sentry';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -68,6 +69,7 @@ function halamanModuleUntuk(
  * Tanpa `VITE_OTEL_ENDPOINT` saat membangun, pemanggilan ini tidak melakukan apa pun.
  */
 pasangPelaporanKesalahan();
+installSentry();
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

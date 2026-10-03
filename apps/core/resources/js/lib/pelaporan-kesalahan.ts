@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react';
+import { reportToSentry } from '@/lib/sentry';
 
 /**
  * Pelaporan kesalahan peramban ke pengumpul OTLP.
@@ -205,6 +206,9 @@ export function laporkanKesalahan(
     sumber: SumberKesalahan,
     tambahan: Atribut = {},
 ): void {
+    // Sentry lebih dulu dan terpisah dari jalur OpenTelemetry di bawah, yang mati secara bawaan.
+    reportToSentry(kesalahan, sumber);
+
     if (!aktif()) {
         return;
     }

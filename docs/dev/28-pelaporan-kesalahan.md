@@ -129,6 +129,20 @@ dibaca dari `lastEventId` hub — di worker yang hidup lama nilai itu bisa milik
 DSN tidak pernah ditulis di repo. Klien on-prem yang mau memakai Sentry mengisi DSN project miliknya
 sendiri.
 
+**Rilis dan kesehatan rilis.** `pasang-rilis.sh` mengekspor `SENTRY_RELEASE=coreerp@<rilis>`, jadi setiap
+kejadian dan sesi tercatat pada rilisnya. Crash Free Sessions dan Crash Free Users dihitung dari **sesi
+peramban** — SDK PHP tidak membuat sesi — jadi kedua aplikasi memasang `@sentry/react`
+(`resources/js/lib/sentry.ts`). Setelannya dari meta di halaman akar (`sentry-dsn`, `sentry-release`,
+`sentry-environment`, `sentry-user`), karena satu image dipakai banyak lingkungan. Pengguna hanya id-nya, dan
+tanpa `SENTRY_BROWSER_DSN` meta-nya tidak dicetak. SDK peramban dimuat terpisah lewat `import()` dan hanya
+bila DSN ada; dimuat langsung ia menambah ±29 KB gzip ke bundel utama setiap pengguna. Jejak performa
+peramban tidak dinyalakan — Apdex datang dari server.
+
+| Variabel | SaaS | On-prem | Arti |
+|---|---|---|---|
+| `SENTRY_RELEASE` | diekspor `pasang-rilis.sh` | kosong | Nama rilis di Sentry |
+| `SENTRY_BROWSER_DSN` | dari `SENTRY_CORE_BROWSER_DSN` / `SENTRY_KONSOL_BROWSER_DSN` | kosong | DSN beralamat publik untuk peramban; DSN server boleh internal |
+
 **Peringatan ke orang datang dari dua jalan di SaaS dev.** Aturan Sentry "Telegram Alert on New Issue" pada
 kedua project mengirim setiap issue baru ke bot Telegram, lewat Sentry App dan relay di server dev pertama
 (`/opt/sentry-telegram-relay.py`, layanan `sentry-telegram-relay`). Core sendiri mengirim ke satu channel

@@ -121,6 +121,9 @@ docker logout "$registry" >/dev/null 2>&1 || true
 # dirujuk lewat digest yang baru ditarik, jadi compose tidak pernah menariknya lagi.
 export COREERP_IMAGE="$registry/$image_core"
 export CONSOLE_IMAGE="$registry/$image_konsol"
+# Nomor rilis untuk Sentry (Releases, Crash Free Sessions/Users per rilis), dari sumber yang sama dengan
+# image-nya: rilis yang sedang dipasang. Core dan konsol berbagi satu nama rilis di organisasi Sentry.
+export SENTRY_RELEASE="coreerp@$rilis"
 for variabel in "${!image_pihak_ketiga[@]}"; do
     export "$variabel=${image_pihak_ketiga[$variabel]}"
 done
