@@ -1,31 +1,36 @@
 # App ERP Management Aset
 
-## Contoh alur dekomisioning
+Module bisnis di `modules/apperp/management-aset`. Ia berjalan di runtime Core, memakai database tenant yang
+sama dengan Core, dan tabelnya berawalan `aset_`. Tidak ada lagi API, database, atau container sendiri; folder
+`api/` hanya menyisakan satu `Dockerfile` peninggalan masa itu.
 
-Pengguna membuat dokumen **Dekomisioning aset** untuk aset yang masih aktif. Aplikasi meminta persetujuan CoreERP. Setelah keputusan `approved` diterima melalui event bertanda tangan `core.workflow.decision.v2`, dokumen disetujui dan aset menjadi tidak aktif (`decommissioned`). Baru setelah itu aset boleh dijual atau dimusnahkan. Nomor dokumen memakai referensi `management-aset.dekomisioning-aset` (prefix `DKMA`).
+**Dokumentasi utamanya ada di [`docs/apps/management-aset/`](../../../docs/apps/management-aset/index.md)**
+(peta modul, batas tenant dan organisasi, master, transaksi, laporan). Berkas ini ringkasan untuk orang yang
+membuka folder modul; bila keduanya berbeda, yang di `docs/` yang dipercaya, dan berkas ini yang dibetulkan.
 
-Management Aset adalah app bisnis mandiri dengan API, UI, database, migration, dan contract sendiri.
+Alamat endpoint di bawah ditulis lengkap. Rute JSON module dipasang di bawah `api/modules/management-aset`
+(bukan `api/v1` milik Core), dan layarnya di `/management-aset/<id entri menu>`.
 
 ## Master data
 
-Dua belas master tersedia pada `GET /api/v1/{resource}`. Semuanya memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, dan `keterangan`, ditambah penanda `aktif`. Data selalu dibatasi oleh tenant pada token konteks yang ditandatangani Core.
+Master tersedia pada `GET /api/modules/management-aset/v1/{resource}`. Daftar yang berlaku adalah array `$masters` di `routes/api/master-data.php`; jumlahnya bertambah seiring modul tumbuh, jadi tabel di bawah hanya memuat master dasar. Semuanya memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, dan `keterangan`, ditambah penanda `aktif`. Data selalu dibatasi tenant dari konteks permintaan yang disusun Core (kontrak `RequestContext`), bukan dari isi permintaan.
 
-Rancangan pemisahan data per organisasi untuk datatable dan transaksi ada di [docs/rancangan-scope-data-aset.md](docs/rancangan-scope-data-aset.md). Saat ini aplikasi baru menerapkan batas tenant dan permission; scope organisasi masih menunggu contract CoreERP.
+Pemisahan data per organisasi diterangkan di [Batas tenant dan organisasi](../../../docs/apps/management-aset/arsitektur/batas-tenant-dan-organisasi.md) dan [rancangan scope data aset](../../../docs/apps/management-aset/arsitektur/rancangan-scope-data-aset.md). Permission transaksi yang dibatasi unit penanggung jawab didaftarkan di `manifest/asset-responsibility.yaml`.
 
 | No. | Master | Resource | Tabel | Induk |
 | --- | --- | --- | --- | --- |
-| 1 | Group aset | `group-aset` | `m_group_aset` | — |
-| 2 | Jenis aset | `jenis-aset` | `m_jenis_aset` | — |
-| 3 | Model aset | `model-aset` | `m_model_aset` | pabrikan aset (wajib), jenis aset (opsional) |
-| 4 | Kondisi aset | `kondisi-aset` | `m_kondisi_aset` | — |
-| 5 | Pabrikan dan model | `pabrikan-aset` | `m_pabrikan_aset` | Model dikelola pada grid pabrikan di layar gabungan |
-| 6 | Tipe lokasi aset | `tipe-lokasi-aset` | `m_tipe_lokasi_aset` | — |
-| 7 | Lokasi aset | `lokasi-aset` | `m_lokasi_aset` | lokasi aset (opsional, menunjuk dirinya sendiri), tipe lokasi (opsional) |
-| 8 | Item checklist maintenance | `item-checklist-maintenance` | `m_item_checklist_maintenance` | — |
-| 9 | Analisa maintenance | `analisa-maintenance` | `m_analisa_maintenance` | — |
-| 10 | Profil penyusutan | `profil-penyusutan` | `m_profil_penyusutan` | — |
-| 11 | Buku penyusutan | `buku-penyusutan` | `m_buku_penyusutan` | — |
-| 12 | Tipe atribut | `tipe-atribut` | `m_tipe_atribut` | — |
+| 1 | Group aset | `group-aset` | `aset_m_group_aset` | — |
+| 2 | Jenis aset | `jenis-aset` | `aset_m_jenis_aset` | — |
+| 3 | Model aset | `model-aset` | `aset_m_model_aset` | pabrikan aset (wajib), jenis aset (opsional) |
+| 4 | Kondisi aset | `kondisi-aset` | `aset_m_kondisi_aset` | — |
+| 5 | Pabrikan dan model | `pabrikan-aset` | `aset_m_pabrikan_aset` | Model dikelola pada grid pabrikan di layar gabungan |
+| 6 | Tipe lokasi aset | `tipe-lokasi-aset` | `aset_m_tipe_lokasi_aset` | — |
+| 7 | Lokasi aset | `lokasi-aset` | `aset_m_lokasi_aset` | lokasi aset (opsional, menunjuk dirinya sendiri), tipe lokasi (opsional) |
+| 8 | Item checklist maintenance | `item-checklist-maintenance` | `aset_m_item_checklist_maintenance` | — |
+| 9 | Analisa maintenance | `analisa-maintenance` | `aset_m_analisa_maintenance` | — |
+| 10 | Profil penyusutan | `profil-penyusutan` | `aset_m_profil_penyusutan` | — |
+| 11 | Buku penyusutan | `buku-penyusutan` | `aset_m_buku_penyusutan` | — |
+| 12 | Tipe atribut | `tipe-atribut` | `aset_m_tipe_atribut` | — |
 
 ### Setup maintenance v1
 
@@ -66,7 +71,7 @@ sesuai aturan referensi yang berlaku.
 
 ## Siklus hidup register aset
 
-Aset dibaca lengkap beserta nilai atributnya lewat `GET /api/v1/aset/{id}`, dan dikoreksi lewat `PATCH /api/v1/aset/{id}` (permission `management-aset.aset.update`). Dua hal sengaja tidak dapat diubah di sana:
+Aset dibaca lengkap beserta nilai atributnya lewat `GET /api/modules/management-aset/v1/aset/{id}`, dan dikoreksi lewat `PATCH /api/modules/management-aset/v1/aset/{id}` (permission `management-aset.aset.update`). Dua hal sengaja tidak dapat diubah di sana:
 
 - **Group aset**, karena buku penyusutan sudah dibentuk dari matriks group pada saat aset diterima. Menggantinya membuat buku yang berjalan tidak lagi cocok dengan groupnya.
 - **Nilai perolehan dan residu**, begitu buku aset sudah punya periode penyusutan. Balikkan periodenya lebih dahulu.
@@ -84,8 +89,8 @@ memuat beberapa aset yang berpindah bersama, karena memang begitu barang berpind
 di lapangan. Nomornya memakai reference `management-aset.mutasi-aset` (prefix `MUTA`) per
 badan hukum.
 
-Alurnya dua langkah. `POST /api/v1/mutasi-aset` membuat **draf** — nomor terbit, tetapi
-tidak satu aset pun berpindah. `POST /api/v1/mutasi-aset/{id}/selesaikan` yang benar-benar
+Alurnya dua langkah. `POST /api/modules/management-aset/v1/mutasi-aset` membuat **draf** — nomor terbit, tetapi
+tidak satu aset pun berpindah. `POST /api/modules/management-aset/v1/mutasi-aset/{id}/selesaikan` yang benar-benar
 memindahkannya: untuk tiap baris ia membekukan keadaan asal, menambah satu baris riwayat
 penempatan yang menyebut dokumennya, lalu memperbarui lokasi, unit penanggung jawab, dan
 dimensi keuangan asetnya. Dokumen yang sudah selesai tidak dapat disunting maupun
@@ -124,8 +129,8 @@ Tidak ada layar maupun dokumen cetak yang menampilkan ULID unit kerja atau ULID 
 Jawaban API memulangkan id **dan** namanya berpasangan — `tujuan_org_unit_nama`,
 `diserahkan_oleh_nama`, `diterima_oleh_nama`, serta `asal_org_unit_nama` dan
 `asal_custodian_nama` pada baris — dan form memakai dropdown berisi nama, bukan kotak ketik.
-Daftarnya dibaca lewat `GET /api/v1/reference-data/unit-kerja` dan
-`GET /api/v1/reference-data/anggota`, yang keduanya berdiri di atas kontrak Core
+Daftarnya dibaca lewat `GET /api/modules/management-aset/v1/reference-data/unit-kerja` dan
+`GET /api/modules/management-aset/v1/reference-data/anggota`, yang keduanya berdiri di atas kontrak Core
 `OrganizationDirectory`; modul tidak pernah menyentuh database Core.
 
 Nama diterjemahkan **saat dibaca**, bukan dibekukan sebagai snapshot. Nama orang dan nama
@@ -156,8 +161,8 @@ dari register: aset yang ditemukan wajib masih beredar dan tercatat di lokasi ya
 (bila tercatat di tempat lain, keterangannya otomatis "Tercatat di …"), aset yang tidak ditemukan
 dinilai menurut siklus hidupnya saja. Nomornya memakai reference `management-aset.monitoring-aset` per entitas legal.
 
-`POST /api/v1/monitoring-aset/{id}/isi-otomatis` memasukkan semua aset yang tercatat di lokasi
-dokumen, termasuk yang sudah dilepas. `POST /api/v1/monitoring-aset/{id}/selesaikan` membekukan
+`POST /api/modules/management-aset/v1/monitoring-aset/{id}/isi-otomatis` memasukkan semua aset yang tercatat di lokasi
+dokumen, termasuk yang sudah dilepas. `POST /api/modules/management-aset/v1/monitoring-aset/{id}/selesaikan` membekukan
 temuan beserta keadaan register dan nilai buku saat itu, lalu mengunci dokumen. **Register aset
 tidak pernah berubah karena monitoring**; tindak lanjutnya mutasi atau dekomisioning.
 
@@ -173,27 +178,27 @@ Tiga fitur pendamping aset, masing-masing dengan halaman docs sendiri pada repo 
 (`docs/apps/management-aset/transaction/asuransi-aset/`, `garansi-kontrak-servis/`, dan
 `downtime-kpi/`):
 
-- **Asuransi aset** (`/api/v1/polis-asuransi`, `/api/v1/asuransi-aset`): polis dengan penanggung
+- **Asuransi aset** (`/api/modules/management-aset/v1/polis-asuransi`, `/api/modules/management-aset/v1/asuransi-aset`): polis dengan penanggung
   dari vendor Core, pertanggungan aset berperiode sebagai riwayat, dan ringkasan aset yang belum
   atau kurang diasuransikan terhadap nilai perolehan. Tanpa jurnal, seperti *Insurance* BC.
-- **Garansi dan kontrak servis** (`/api/v1/garansi-aset`, `/api/v1/kontrak-servis`): garansi per aset,
+- **Garansi dan kontrak servis** (`/api/modules/management-aset/v1/garansi-aset`, `/api/modules/management-aset/v1/kontrak-servis`): garansi per aset,
   kontrak servis bergaris aset, daftar yang berakhir dalam 30/60/90 hari, dan pemberitahuan garansi
-  aktif pada work order (`/api/v1/pemeliharaan-aset/referensi/garansi`), yang tidak menahan apa pun.
-- **Downtime dan KPI** (`/api/v1/downtime-aset`, `/api/v1/kpi-pemeliharaan`): downtime dicatat sendiri
+  aktif pada work order (`/api/modules/management-aset/v1/pemeliharaan-aset/referensi/garansi`), yang tidak menahan apa pun.
+- **Downtime dan KPI** (`/api/modules/management-aset/v1/downtime-aset`, `/api/modules/management-aset/v1/kpi-pemeliharaan`): downtime dicatat sendiri
   atau dibuka dan ditutup work order yang jenis pekerjaannya menuntut aset berhenti; KPI availability,
   MTBF, MTTR, kerusakan, henti, dan work order selesai dihitung saat dibaca oleh `Services/MaintenanceKpi`.
 
 ## Penjualan, pemusnahan, dan penyesuaian nilai
 
 Penjualan dan pemusnahan disimpan sebagai **draf** lalu **diposting**, seperti jurnal aset tetap
-Business Central. Posting (`POST /api/v1/{penjualan-aset|pemusnahan-aset}/{id}/posting`, permission
+Business Central. Posting (`POST /api/modules/management-aset/v1/{penjualan-aset|pemusnahan-aset}/{id}/posting`, permission
 `.post` pada duty tersendiri `….posting`) menerbitkan jurnal pelepasan `asset.disposal_sale` /
 `asset.disposal_scrap` ke feed posting finance, menandai aset `disposed`, dan menutup seluruh bukunya.
 Pratinjau jurnalnya di `GET …/{id}/pratinjau-posting`. Penyusutan sampai tanggal pelepasan harus sudah
 final. Sebelum rilis ini dokumen pelepasan langsung melepas aset saat disimpan; dokumen lama ditandai
 `posted` lewat migration.
 
-Penyesuaian nilai aset (`/api/v1/penyesuaian-nilai-aset`) menurunkan (write-down) atau menaikkan
+Penyesuaian nilai aset (`/api/modules/management-aset/v1/penyesuaian-nilai-aset`) menurunkan (write-down) atau menaikkan
 (appreciation) nilai buku satu buku penyusutan, dengan jurnal `asset.write_down` / `asset.appreciation`
 untuk buku yang di-post ke finance. Penyusutan garis lurus berikutnya membagi nilai buku baru ke sisa
 masa manfaat, dan pelepasan membalik kedua saldonya. Akun ketiganya ada di posting group aset.
@@ -202,7 +207,7 @@ Rinciannya di `docs/apps/management-aset/transaction/siklus-aset/` dan
 
 ## Reklasifikasi aset
 
-Reklasifikasi aset (`/api/v1/reklasifikasi-aset`, padanan FA Reclass. Journal Business Central) memindah
+Reklasifikasi aset (`/api/modules/management-aset/v1/reklasifikasi-aset`, padanan FA Reclass. Journal Business Central) memindah
 aset ke group aset lain (`pindah_group`), atau memecah persen atau nilai perolehan ke aset baru yang lahir
 saat diposting (`pecah`). Setiap saldo setiap buku — harga perolehan, akumulasi penyusutan, penurunan dan
 kenaikan nilai, nilai sisa — ikut dipindah dengan perbandingan yang sama, beserta umur yang sudah berjalan.
@@ -213,13 +218,13 @@ tanggal reklasifikasi harus sudah final. Rinciannya di
 
 ## Penyusutan massal
 
-`POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
+`POST /api/modules/management-aset/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
 
 Buku yang tidak dapat diusulkan dilewati beserta alasannya (`sudah_ada`, `belum_mulai_menyusut`, `sudah_habis`, `tanpa_unit_penggunaan`), bukan menggagalkan seluruh proses — satu aset yang belum lengkap tidak boleh menahan ratusan lainnya. Metode `consumption` tidak ikut karena angka pemakaiannya berbeda tiap aset dan hanya diketahui per aset.
 
 ### Field di luar bentuk dasar
 
-Sebagian master membawa kolom sendiri di luar `kode`/`nama`/`keterangan`/`aktif`. Kolom itu dideklarasikan sekali per master lewat `extraRules()`/`extraPayload()`/`extraPresent()` pada controller, dan dirender di UI lewat `extraFields` pada `ui/src/master/masters.ts`. Tidak ada halaman bespoke per master.
+Sebagian master membawa kolom sendiri di luar `kode`/`nama`/`keterangan`/`aktif`. Kolom itu dideklarasikan sekali per master lewat `extraRules()`/`extraPayload()`/`extraPresent()` pada controller, dan dirender di UI lewat `extraFields` pada `ui/master/masters.ts`. Tidak ada halaman bespoke per master.
 
 **Group aset** membawa perlakuan finansial, mengikuti "Fixed asset group" F&O:
 
@@ -308,7 +313,7 @@ ke layar ini (K-18, K-22).
 
 - Hanya akun aktif yang berlaku untuk semua entitas legal yang dapat dipilih, karena posting
   group berlaku untuk seluruh tenant.
-- Menyimpan adalah `PUT /api/v1/posting-group-aset/{group}/{tanggal}`, jadi mengulangnya tidak
+- Menyimpan adalah `PUT /api/modules/management-aset/v1/posting-group-aset/{group}/{tanggal}`, jadi mengulangnya tidak
   menambah baris. Tanggal baru butuh `management-aset.fixed-asset-posting-profiles.create`,
   baris yang ada butuh `.update`, mengarsipkan butuh `.archive`; ketiganya di bawah duty
   `management-aset.fixed-asset-posting-profiles.manage`, terpisah dari duty lain supaya role
@@ -353,7 +358,7 @@ turun membalik arahnya. Jurnalnya bertanggal hari koreksi (K-34), merujuk `AST-A
 `AST-OPB-…` lewat `adjusts_posting_id`, dan bernomor `AST-ADJ-<id aset>-<nomor urut koreksi>`. Jurnal
 asal yang dicatat manual, atau aset tanpa jurnal perolehan, membuat koreksinya hanya mengubah
 register (K-35). Layar detail aset menampilkan pratinjau jurnalnya lewat
-`GET /api/v1/aset/{id}/pratinjau-koreksi`, dan alasan koreksi wajib diisi karena ikut ke keterangan
+`GET /api/modules/management-aset/v1/aset/{id}/pratinjau-koreksi`, dan alasan koreksi wajib diisi karena ikut ke keterangan
 jurnal (K-36).
 
 ### Post penyusutan
@@ -433,7 +438,7 @@ Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadt
 | `management-aset.maintenance-checklist-variables` | `VCMA` | `tenant` |
 | `management-aset.maintenance-checklist-templates` | `TCMA` | `tenant` |
 
-Format, status, dan counter adalah keputusan owner/admin tenant di Control Plane, bukan milik kode app. Materialisasi awal memakai profile non-continuous, tanpa mode manual, tanpa reset periode, preallocation 20, minimum 0, maksimum 19999, dan prefix + lima digit; owner/admin dapat mengubah pengaturan yang masih boleh diubah sebelum nomor digunakan.
+Format, status, dan counter adalah keputusan owner/admin tenant di halaman **Nomor dokumen** Core, bukan milik kode modul. Materialisasi awal memakai profile non-continuous, tanpa mode manual, tanpa reset periode, preallocation 20, minimum 1, maksimum 19999, dan prefix + lima digit; owner/admin dapat mengubah pengaturan yang masih boleh diubah sebelum nomor digunakan.
 
 `POST` wajib membawa header `Idempotency-Key`. Retry dengan kunci yang sama mengembalikan record yang sama beserta header `Idempotent-Replayed: true` dan tidak menerbitkan nomor kedua; kunci yang sama dengan isi berbeda dijawab `409 idempotency_conflict`.
 
@@ -447,25 +452,27 @@ Rencana membawa entitas legal dan unit kerja dari konteks CoreERP yang aktif, no
 
 1. Daftarkan manifest (`app.yaml` beserta folder `manifest/`) ke katalog dengan `php artisan app:register-manifest management-aset`. Registrasi perlu dikirim ulang setiap kali daftar permission, duty, atau reference nomor bertambah.
 2. Pasang module untuk tenant dengan `php artisan module:install management-aset <tenant>` — atau biarkan pendaftaran usaha melakukannya. Di sanalah migration module dijalankan dan catatan pemasangannya dibuat.
-3. Setelah module tercatat **terpasang**, Control Plane mematerialisasi seluruh reference pada **Nomor dokumen** dengan scope dari manifest. Verifikasi daftar dan preview di halaman tersebut; seed tenant baru baru menerbitkan nomor setelah tahap ini siap.
+3. Setelah module tercatat **terpasang**, Core mematerialisasi seluruh reference pada **Nomor dokumen** dengan scope dari manifest. Verifikasi daftar dan preview di halaman tersebut; seed tenant baru baru menerbitkan nomor setelah tahap ini siap.
 
 Halaman module ikut build shell Core dan menerima konteks tenant dari request Core yang sama; ia tidak menerima `tenant_id` dari browser dan tidak memakai token konteks.
 
 Manifest masih berversi `0.1.0`. Upgrade memerlukan compatibility matrix, backup, serta rollback terverifikasi (lihat `docs/dev/13-publishing-an-app-release.md`). Selama module berada pada release pengembangan, jalankan migration baru dengan `module:migrate` dan jangan memperlakukannya sebagai upgrade produksi.
 
-API health tersedia pada `GET /api/v1/health`. Contract lengkap berada di `contracts/openapi.yaml`, yang merupakan bundle hasil generate dari `contracts/src/`. Sunting sumbernya di `contracts/src/`, lalu jalankan `python contracts/bundle.py`; `--check` memverifikasi bundle masih sinkron.
+Health check module tersedia pada `GET /api/modules/management-aset/v1/health`. Contract lengkap berada di `contracts/openapi.yaml`, yang merupakan bundle hasil generate dari `contracts/src/`. Sunting sumbernya di `contracts/src/`, lalu jalankan `python contracts/bundle.py`; `--check` memverifikasi bundle masih sinkron.
 
 ## Workflow
 
-Manifest mendaftarkan tipe workflow **Verifikasi usulan pemusnahan aset**.
-Admin tenant memilih approver dan mengaktifkan versinya melalui pengaturan
-Workflow di CoreERP. Tipe ini menandai proses yang dapat dikonfigurasi; pengajuan
-dan keputusan verifikasi di aplikasi Aset akan ditambahkan bersama endpoint
-approval, bukan disimpulkan hanya dari konfigurasi.
+Manifest mendaftarkan dua tipe workflow. Admin tenant memilih approver dan mengaktifkan versinya melalui
+pengaturan Workflow di Core.
+
+| Tipe | Keadaan |
+| --- | --- |
+| `management-aset.dekomisioning-aset-verification` — Verifikasi usulan dekomisioning aset | Berjalan. Dokumen diajukan lewat kontrak `WorkflowEngine` (`Services\AssetApprovalWorkflow`), dan keputusannya diterapkan listener `TerapkanKeputusanDekomisioning` di dalam transaksi keputusan Core |
+| `management-aset.pemusnahan-aset-verification` — Verifikasi usulan pemusnahan aset | Baru dideklarasikan. Pengajuan dan penerapan keputusannya belum ada; jangan menyimpulkan bahwa proses ini berjalan hanya dari konfigurasinya |
 
 ## Struktur kode
 
-API memakai satu base controller `Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController` yang memegang seluruh perilaku bersama: hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, dan penjagaan arsip. Kode khusus master berada di `src/Http/Controllers/master/` dan `src/Models/master/`. UI master berada di `ui/master/`. Pola folder untuk fitur berikutnya tercatat pada `docs/agent.md`.
+API memakai satu base controller `Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController` yang memegang seluruh perilaku bersama: hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, dan penjagaan arsip. Kode khusus master berada di `src/Http/Controllers/master/` dan `src/Models/master/`. UI master berada di `ui/master/`. Pola folder untuk fitur berikutnya tercatat pada [struktur fitur](../../../docs/apps/management-aset/arsitektur/struktur-fitur.md).
 
 Test berada di `tests/Feature`. Selain CRUD, test menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak, hak satu master tidak merembet ke master lain, induk beranak yang belum diarsipkan tidak dapat diarsipkan, dan `kode` selalu berasal dari Core.
 
@@ -473,11 +480,12 @@ Test berada di `tests/Feature`. Selain CRUD, test menjaga hal yang tidak boleh r
 
 Test feature tidak cukup untuk menyatakan modul selesai. Ia menjalankan satu request pada satu proses, sehingga tidak dapat melihat koneksi database habis, nomor terbit dua kali, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
 
-`loadtest/` berisi stack lengkap: empat instance API di belakang nginx, PostgreSQL asli, stub Number Sequence yang sekaligus mencatat setiap nomor, dan skenario k6 dengan 1000 virtual user pada 128 tenant. Cara menjalankan, hasil terukur, dan batas kejujurannya ada di [loadtest/README.md](loadtest/README.md).
+`loadtest/` berisi stack lengkap: empat instance di belakang nginx, PostgreSQL asli, stub Number Sequence yang sekaligus mencatat setiap nomor, dan skenario k6 dengan 1000 virtual user pada 128 tenant. Cara menjalankan, hasil terukur, dan batas kejujurannya ada di [loadtest/README.md](loadtest/README.md).
 
 Hasil pada 1000 VU: nol pelanggaran lintas tenant, nol nomor ganda dari 4.342 nomor terbit, nol eskalasi hak, dan nol error 5xx dari aplikasi. SLO latensi terpenuhi sampai 16 request serentak pada laptop 12 core; di atas itu yang bertambah adalah antrean, bukan hasil.
 
-Load test ini juga yang menemukan bahwa penanganan koneksi database menjadi bottleneck jauh sebelum kode modul: tanpa koneksi persisten, PostgreSQL membakar 5,5 core hanya untuk fork proses baru setiap request. Karena itu tersedia `DB_PERSISTENT` pada `api/config/database.php`, default mati, dinyalakan pada deployment dengan worker proses tetap.
-# Dekomisioning aset
+Load test ini juga yang menemukan bahwa penanganan koneksi database menjadi bottleneck jauh sebelum kode modul: tanpa koneksi persisten, PostgreSQL membakar 5,5 core hanya untuk fork proses baru setiap request. Temuan itu berasal dari masa modul ini masih aplikasi tersendiri; sejak ia ikut runtime Core, koneksi diatur Core, dan peran web Core berjalan di FrankenPHP mode worker yang mempertahankan koneksinya antar-request.
 
-Aset yang akan dijual atau dimusnahkan terlebih dahulu diajukan untuk dekomisioning. Setelah approver menyetujui di CoreERP, event keputusan mengubah aset menjadi `decommissioned`; baru setelah itu aplikasi menerima usulan penjualan atau pemusnahan. Nomor dokumen memakai reference `management-aset.dekomisioning-aset` dengan prefix `DKMA` per badan hukum.
+## Dekomisioning aset
+
+Aset yang akan dijual atau dimusnahkan terlebih dahulu diajukan untuk dekomisioning. Setelah approver menyetujui di Core, event keputusan di dalam proses (`WorkflowDecisionTaken`) mengubah aset menjadi `decommissioned`; baru setelah itu aplikasi menerima usulan penjualan atau pemusnahan. Nomor dokumen memakai reference `management-aset.dekomisioning-aset` dengan prefix `DKMA` per badan hukum.

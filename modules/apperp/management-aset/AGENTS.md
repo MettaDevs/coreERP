@@ -2,7 +2,7 @@
 
 Module bisnis di `modules/apperp/management-aset`, berjalan di runtime Core dan memakai database tenant yang sama dengan Core; tabelnya berawalan `aset_`. Ia membawa rute, UI, migration, dan contract-nya sendiri.
 
-- Baca `README.md` untuk daftar master, rantai klasifikasi, hak akses, dan penomoran. Aturan platform ada di `docs/dev/` pada repo CoreERP; buka hanya dokumen yang relevan.
+- Dokumentasi utama modul ada di `docs/apps/management-aset/` (mulai dari `arsitektur/index.md`). `README.md` di folder ini ringkasan master, hak akses, dan penomoran; bila berbeda dengan `docs/`, yang di `docs/` yang benar. Aturan platform ada di `docs/dev/`; buka hanya dokumen yang relevan.
 - Jaga perubahan dan dependency tetap minimal. Jangan membuat abstraksi atau compatibility layer spekulatif.
 - Jangan pernah hardcode nama perusahaan, orang, atau modul besar. Semua itu konfigurasi/data, bukan konstanta kode.
 
@@ -15,20 +15,19 @@ Module bisnis di `modules/apperp/management-aset`, berjalan di runtime Core dan 
 - Laporan tidak ditulis di manifest. Katalog cetak Core dibaca dari kelas di `src/Reporting/Definitions/` lewat `PenyediaLaporan::catalog()`; manifest yang memuat blok `reports` ditolak saat `app:register-manifest`.
 - Kode lintas fitur saja yang boleh tetap di root/shared: controller dan model dasar, middleware, service integrasi, support, shell aplikasi, API client, dan style global.
 - Nama folder fitur memakai nama domain yang konsisten pada API dan UI. Jika fitur tumbuh, tambahkan subfolder lokal seperti `Components`, `Requests`, atau `Services` di dalam folder fitur; jangan membuat folder global baru hanya untuk satu fitur.
-- Detail pola dan contoh berada di `docs/agent.md` dan `docs/skills/struktur-fitur.md`.
-- Untuk dropdown bertingkat, reset semua nilai turunan saat induk berubah dan gunakan nilai kosong yang controlled; lihat `docs/skills/struktur-fitur.md`.
-- Untuk dropdown bertingkat, reset semua nilai turunan saat induk berubah dan pastikan UI benar-benar menampilkan pilihan kosong; ikuti aturan lengkap pada `docs/skills/struktur-fitur.md`.
+- Detail pola dan contoh berada di `docs/apps/management-aset/arsitektur/struktur-fitur.md`.
+- Untuk dropdown bertingkat, reset semua nilai turunan saat induk berubah, pakai nilai kosong yang controlled, dan pastikan UI benar-benar menampilkan pilihan kosong; aturan lengkapnya di halaman struktur fitur yang sama.
 
 ## Batas yang tidak boleh dilanggar
 
 - Module ini **tidak pernah** menyentuh tabel module lain, dan memanggil Core hanya lewat `App\Platform\Modules\Contracts`. Arah sebaliknya berbeda: Core boleh membaca tabel module ini secara langsung, misalnya untuk laporan dan analitik (keputusan pemilik produk, 3 Oktober 2026); syaratnya di `docs/dev/02-module-standard.md` bagian *Ownership dan data*. Karena itu kolom yang mewakili legal entity dan unit kerja untuk kebijakan data harus dinyatakan, bukan hanya dipakai di query module.
 - Setiap endpoint dan event yang menyeberang batas app wajib ada di `contracts/`. Tidak ada test yang gagal karena contract kurang lengkap, jadi periksa manual sebelum menyatakan selesai.
 - Contract ditulis tangan dan merupakan sumber kebenaran, bukan hasil generate dari kode. Ambang ~1500 baris sudah terlampaui, jadi sumbernya kini dipecah di `contracts/src/` (`paths/` dan `components/`) dan `contracts/openapi.yaml` adalah **bundle hasil generate** — jangan pernah menyuntingnya langsung, isinya ditimpa tiap build. Sunting `contracts/src/`, lalu jalankan `python contracts/bundle.py`. `python contracts/bundle.py --check` memastikan bundle sinkron dengan sumbernya. Bundle sengaja tetap bernama `contracts/openapi.yaml` supaya `api.openapi` di `app.yaml` dan Control Plane membaca path yang sama seperti sebelum dipecah.
-- Mengubah contract event berarti mengubah kedua sisi. Pasangan `contracts/asyncapi.yaml` di sini adalah `CoreERP/apps/core/contracts/asyncapi.yaml`; keduanya berubah dalam pekerjaan yang sama.
-- Event yang diterima wajib mengontrakkan header signature dan status kegagalannya, bukan hanya payload. Consumer tidak boleh menebak string yang ditandatangani dari source publisher.
+- Mengubah contract event berarti mengubah kedua sisi. Pasangan `contracts/asyncapi.yaml` di sini adalah `apps/core/contracts/asyncapi.yaml`; keduanya berubah dalam pekerjaan yang sama.
+- Event dari Core (`TenantProvisioned`, `WorkflowDecisionTaken`) kini diterima **di dalam proses** lewat listener yang didaftarkan `src/ModuleServiceProvider.php`, berjalan di dalam transaksi Core. Tidak ada lagi rute HTTP penerima event dan tidak ada tanda tangan yang diperiksa. `contracts/asyncapi.yaml` masih menggambarkan bentuk HTTP bertanda tangan dari masa modul ini aplikasi tersendiri — itu gap yang belum ditutup, jangan dijadikan acuan header.
 - `tenant_id` hanya berasal dari konteks permintaan yang disusun Core (`ResolveModuleContext`), dan dibaca module lewat kontrak `RequestContext`. Tidak pernah dari body, query, atau header bebas.
 - `kode` selalu diterbitkan Number Sequence Core. App tidak menyimpan counter dan mengabaikan `kode` yang dikirim klien.
-- Format, status, dan counter nomor adalah keputusan owner/admin tenant di Control Plane. Manifest hanya mendeklarasikan reference dan allowed scope.
+- Format, status, dan counter nomor adalah keputusan owner/admin tenant di halaman **Nomor dokumen** Core. Manifest hanya mendeklarasikan reference dan allowed scope.
 - Arsip adalah soft delete. Jangan mengganti dengan hard delete: record lama masih direferensikan data turunan.
 - Master klasifikasi **datar dan saling lepas**, mengikuti model Dynamics 365 F&O: aset menunjuk `group_aset_id` (sumbu finansial) dan `jenis_aset_id` (sumbu teknis) secara langsung dan sejajar. Jangan menambah tingkat klasifikasi baru sebagai tabel; pembedaan yang lebih rinci diselesaikan lewat atribut.
 - Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_aset.induk_aset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
@@ -39,7 +38,7 @@ Module bisnis di `modules/apperp/management-aset`, berjalan di runtime Core dan 
 2. Foreign key ke master lain wajib **gabungan dengan `tenant_id`** — `(tenant_id, parent_id)` → `(tenant_id, id)` — sehingga induk lintas tenant ditolak database, bukan hanya validasi aplikasi. Tabel induk perlu `unique(tenant_id, id)`.
 3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya, lalu slug-nya didaftarkan di `$masters` pada `routes/api/master-data.php`. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
 4. Tulis empat lapis Dynamics 365 secara terpisah — entry point, permission, privilege, duty — plus satu reference nomor di berkas baru `manifest/<area>/<master>.yaml`, pada area yang sesuai. Kode privilege tidak boleh sama dengan kode permission.
-5. Perbarui `contracts/src/` (lalu `python contracts/bundle.py`), `README.md`, dan `database/README.md` pada perubahan yang sama.
+5. Perbarui `contracts/src/` (lalu `python contracts/bundle.py`), halaman master terkait di `docs/apps/management-aset/master/`, `README.md`, dan `database/README.md` pada perubahan yang sama.
 
 ## Verifikasi sebelum menyatakan selesai
 
@@ -50,8 +49,10 @@ peninggalan masa modul ini dua aplikasi tersendiri. `ui/` memang masih ada — i
 layarnya — dan `api/` menyisakan satu `Dockerfile`, tetapi tidak satu pun dari keduanya
 punya `artisan` atau `package.json` lagi. Keduanya dijalankan dari `apps/core`.
 
-Satu run test pada satu waktu: `core_erp_test` dipakai bersama, dan dua run serentak saling
-menjatuhkan tabel sehingga gagalnya menyamar jadi regresi kode.
+Satu run test pada satu waktu per database test. Dua run serentak pada database yang sama saling
+menjatuhkan tabel sehingga gagalnya menyamar jadi regresi kode; worktree yang berjalan bersamaan
+memakai `DB_TEST_DATABASE` sendiri di `.env`-nya. Suite Core penuh dijalankan paralel dua tahap
+seperti di `AGENTS.md` akar repo.
 
 ```bash
 cd apps/core && php artisan test --testsuite=Module
@@ -73,4 +74,4 @@ Lalu **load test wajib** — lihat `loadtest/README.md`. Sebuah modul belum sele
 
 Minimum yang harus dipenuhi: 1000+ VU serentak, 100+ tenant, 2+ instance API di belakang load balancer, PostgreSQL asli, 90 detik pada beban penuh. Gate kebenaran (0 pelanggaran, 0 error aplikasi) berlaku di perangkat keras apa pun. Gate latensi diukur pada concurrency yang masih tertahan, bukan pada titik jenuh.
 
-Registrasi ulang katalog ke Control Plane diperlukan setiap kali entry point, permission, privilege, duty, atau reference nomor bertambah.
+Registrasi ulang katalog (`php artisan app:register-manifest management-aset`, di container `core-app` untuk stack lokal) diperlukan setiap kali menu, entry point, permission, privilege, duty, atau reference nomor berubah.
