@@ -8,7 +8,7 @@ dengan hak, kebijakan data, dan data pribadi yang terjaga, diuji di bawah beban.
 
 ---
 
-### 0. [ ] Kerangka berjalan
+### 0. [x] Kerangka berjalan
 
 **Tempat:** Core Platform, module aset, satu halaman Core · **Setelah:** PR #262 (aturan Core membaca
 tabel module) · **Keputusan:** KA-02, KA-03, KA-07, KA-24 · **Skill:** `coreerp-analytics`,
@@ -22,40 +22,73 @@ Gunanya membuktikan setiap lapis tersambung **sebelum** enam agen bekerja bersam
 tiga kontrak yang mereka pakai bersama: antarmuka PHP dataset, bentuk query JSON, dan bentuk hasil.
 Semuanya tipis; area 1–9 memperluasnya tanpa mengubah bentuk yang sudah ada.
 
-- [ ] 0.1 **Saklar sementara.** `config/analytics.php` dengan `enabled` (`COREERP_ANALYTICS_ENABLED`,
+Selesai 3 Oktober 2026. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir
+masing-masing (*Dikirim:*), dan halaman rancangan yang bersangkutan ikut diperbarui.
+
+- [x] 0.1 **Saklar sementara.** `config/analytics.php` dengan `enabled` (`COREERP_ANALYTICS_ENABLED`,
   bawaan `false`, `true` di `.env.example` lokal). Selama KA-14 belum disetujui, rute dan menu analitik
-  hanya terdaftar bila saklar menyala, dan endpoint dijaga keanggotaan tenant ditambah permission baca
+  hanya berlaku bila saklar menyala, dan endpoint dijaga keanggotaan tenant ditambah permission baca
   dataset. Kode permission analitik **tidak** dibuat sebelum KA-14 disetujui: kode yang sudah masuk
   role tenant tidak dapat diganti diam-diam (memori repo: kode kontrak bukan untuk disapu).
-- [ ] 0.2 **Kontrak tipis**: `Contracts\Analytics\{Dataset, Datasets, DatasetDefinition, Aggregate,
+  *Dikirim:* rute **tetap terdaftar**, dan middleware `EnsureAnalyticsEnabled` yang menjawab 404 saat
+  saklar mati, bukan pendaftaran bersyarat. Daftar rute dibaca Wayfinder untuk tipe layar dan di-cache
+  saat container naik; pendaftaran bersyarat membuat keduanya berbeda antar lingkungan, dan saklarnya
+  tidak dapat diuji dalam satu proses. Menu memakai prop bersama `analyticsEnabled`.
+- [x] 0.2 **Kontrak tipis**: `Contracts\Analytics\{Dataset, Datasets, DatasetDefinition, Aggregate,
   MeasureFormat}` dengan subset `model()`, `permission()`, `dataPolicy()`, `fieldsFromModel()`,
   `measure()` (Count, Sum, mata uang), `time()`; dan `Contracts\DataPolicyFilter` utuh. Bentuk
-  persis di [model semantik](/todo/analitik/model-semantik).
-- [ ] 0.3 **Registry**: `Analytics\Datasets\DatasetRegistry implements Datasets`, diikat di
+  persis di [model semantik](/todo/analitik/model-semantik). *Dikirim:* `measure()` sudah bertanda
+  tangan lengkap (`unit` dan `where` ikut tersimpan), `Aggregate` dan `MeasureFormat` lengkap.
+- [x] 0.3 **Registry**: `Analytics\Datasets\DatasetRegistry implements Datasets`, diikat di
   `CoreServices::SINGLETON_BINDINGS`. Validasi minimal (kode berawalan module, model ber-
-  `BelongsToTenant`); validasi lengkap di area 1.
-- [ ] 0.4 **Query minimal**: `AnalyticsQuery` (dataset, dimensi biasa, measure, saringan, limit),
-  `QueryParser`, validasi kunci dikenal.
-- [ ] 0.5 **Compiler minimal**: model dasar tanpa alias, `DataPolicyFilter` sebelum saringan,
+  `BelongsToTenant`); validasi lengkap di area 1. *Dikirim:* juga permission milik module sendiri, nama
+  kolom berbentuk pengenal, measure uang wajib menyebut kolom mata uang (KA-22), dan measure selain
+  `Count` wajib menyebut kolomnya. Definisi dibaca sekali per proses; field dibaca dari database setiap
+  kali (`TableFields` menyimpan tipe kolom per database), dan database yang belum punya tabel dataset
+  menjawab dataset tidak tersedia. Method `CompiledDataset` di
+  [arsitektur](/todo/analitik/arsitektur#compileddataset).
+- [x] 0.4 **Query minimal**: `AnalyticsQuery` (dataset, dimensi biasa, measure, saringan, limit),
+  `QueryParser`, validasi kunci dikenal. *Dikirim:* konstruktor `AnalyticsQuery` sudah berbentuk lengkap
+  (`Dimension`, `TimeRange`, `TimeGranularity` tipis); `QueryValidator` tipis memeriksa kunci terhadap
+  dataset, kunci ganda, dan `limit`. Kunci yang belum dibaca (`time_range`, `sort`, `totals`,
+  `fill_gaps`, dimensi berember waktu) ditolak 422 `analytics.invalid_query`, bukan diabaikan.
+- [x] 0.5 **Compiler minimal**: model dasar tanpa alias, `DataPolicyFilter` sebelum saringan,
   `FieldFilterExpression` untuk saringan, dimensi `d0…`, measure `m0…`, mata uang sebagai dimensi
-  tersirat, `LIMIT n + 1`.
-- [ ] 0.6 **Eksekutor** baca-saja persis seperti di [mesin query](/todo/analitik/mesin-query#eksekusi-baca-saja),
-  termasuk `rollBack()` di `finally`.
-- [ ] 0.7 **Principal pengguna minimal**: tenant, permission module dari
+  tersirat, `LIMIT n + 1`. *Dikirim:* tanpa SQL mentah sama sekali — Larastan menuntut `literal-string`
+  pada `selectRaw`/`orderByRaw`/`groupByRaw`, jadi kolom lewat `addSelect`/`groupBy`/`orderBy` dan
+  measure lewat `selectExpression(new MeasureExpression(…))`. Urutan bawaan `m0 desc` lalu dimensi;
+  `NULLS LAST` untuk measure yang dapat kosong, dan saringan tetap measure (`where`, sekarang ditolak
+  `LogicException`), milik area 3.
+- [x] 0.6 **Eksekutor** baca-saja persis seperti di [mesin query](/todo/analitik/mesin-query#eksekusi-baca-saja),
+  termasuk `rollBack()` di `finally`. *Dikirim:* galat database yang bukan kesalahan pengguna dilempar
+  apa adanya (`fromDatabase($e) ?? $e`), supaya tetap 500 dan dilaporkan.
+- [x] 0.7 **Principal pengguna minimal**: tenant, permission module dari
   `LaunchableAppCatalog::permissionsFor()`, hibah dari `DataPolicyAccessResolver::resolve()`, zona waktu
-  dari layanan yang dipakai `ReportSource::forModule()`.
-- [ ] 0.8 **Dataset aset minimal** `AssetRegisterDataset`: `lifecycle_state`, `group_aset_id`,
+  dari layanan yang dipakai `ReportSource::forModule()`. *Dikirim:* `UserPrincipal::fromMembership()`
+  dengan subset antarmuka `AnalyticsPrincipal`, dan `Security\DatasetAccess` tipis untuk langkah 3–4
+  urutan otorisasi (module terpasang dan berlisensi → 404, permission → 403).
+- [x] 0.8 **Dataset aset minimal** `AssetRegisterDataset`: `lifecycle_state`, `group_aset_id`,
   `count`, `acquisition_value` (uang, `currency_code`), kebijakan
   `management-aset.asset-responsibility` pada `legal_entity_id` + `responsible_org_unit_id`.
-  Didaftarkan di `ModuleServiceProvider::boot()` di samping pendaftaran laporan.
-- [ ] 0.9 **Endpoint** `POST /api/v1/analytics/query` di `routes/analytics.php`, yang di-require satu
-  baris dari grup `api/v1` di `routes/web.php`. Query dijalankan di dalam `TenantRunner::runFor()`.
-- [ ] 0.10 **Halaman** `pages/platform/analytics/explore.tsx` sementara: query tetap, satu tile
+  Didaftarkan di `ModuleServiceProvider::boot()` di samping pendaftaran laporan. *Dikirim:* juga field
+  `currency_code` dan `acquired_on` (field waktu utama).
+- [x] 0.9 **Endpoint** `POST /api/v1/analytics/query` di `routes/analytics.php`, yang di-require satu
+  baris dari `routes/web.php`. Query dijalankan di dalam `TenantRunner::runFor()`. *Dikirim:* baris
+  `require` ada di grup **`auth`**, bukan di dalam grup `api/v1`: berkas yang sama memuat halaman
+  `/analytics/...` (area 6.8 dan 8), yang tidak boleh berawalan `api/v1`. API di dalamnya memakai
+  `Route::prefix('api/v1/analytics')->name('api.analytics.')`. Satu query dijalankan `Actions\RunQuery`,
+  sama untuk setiap jalur masuk.
+- [x] 0.10 **Halaman** `pages/platform/analytics/explore.tsx` sementara: query tetap, satu tile
   (jumlah aset) dan satu grafik kolom (`@apperp/ui/chart`) nilai perolehan per status. Entri sidebar
-  hanya bila saklar menyala.
-- [ ] 0.11 **Penjaga**: `AnalyticsBoundaryTest` versi awal — tidak ada `Modules\` dan tidak ada nama
-  tabel berawalan module di `app/Platform/Analytics`.
-- [ ] 0.12 **Test** di `tests/Feature/Platform/Analytics/WalkingSkeletonTest.php`:
+  hanya bila saklar menyala. *Dikirim:* query **tidak ditulis mati** di layar, karena `AGENTS.md`
+  melarang nama module ditulis mati: `ExploreController` menyusunnya dari dataset pertama yang boleh
+  dibaca pengguna — measure hitung pertama untuk tile, measure uang pertama per field pilihan pertama
+  untuk grafik — dan judulnya dari nama tampilan dataset. Satu panel grafik per mata uang, dengan tabel
+  padanannya. Verifikasi layar di runtime dikerjakan sesi induk.
+- [x] 0.11 **Penjaga**: `AnalyticsBoundaryTest` versi awal — tidak ada `Modules\` dan tidak ada nama
+  tabel berawalan module di `app/Platform/Analytics`. Awalan dibaca dari `table_prefix` setiap
+  `app.yaml`, termasuk module contoh bahan uji.
+- [x] 0.12 **Test** di `tests/Feature/Platform/Analytics/WalkingSkeletonTest.php`:
   - dua tenant, angka tidak bercampur;
   - pengguna tanpa permission `management-aset.aset.read` → 403;
   - hibah unit A saja → hanya aset unit A; tanpa hibah → nol;
@@ -63,8 +96,14 @@ Semuanya tipis; area 1–9 memperluasnya tanpa mengubah bentuk yang sudah ada.
   - eksekutor dipanggil di dalam transaksi test, lalu `INSERT` di transaksi yang sama berhasil;
   - setiap test di atas dilihat merah sekali dengan merusak penangkalnya.
 
+  *Dikirim:* juga saringan dan galat berpath, module tidak terpasang → 404, saklar mati → 404 untuk
+  halaman dan API, halaman Inertia beserta query pratinjaunya, dan `DatasetRegistryTest` untuk
+  pemeriksaan minimal registry. Cara setiap penjaga dibuat merah dicatat di pull request area 0.
+
 **Berkas milik area ini:** semua berkas baru di atas. **Berkas bersama:** `routes/web.php` (satu baris),
-`CoreServices.php` (satu baris), `ModuleServiceProvider.php` aset (satu blok).
+`CoreServices.php` (satu baris), `ModuleServiceProvider.php` aset (satu blok),
+`components/app-sidebar.tsx` (satu entri), serta `HandleInertiaRequests.php` dan `types/global.d.ts`
+(prop `analyticsEnabled`, dibuang area 4 bersama saklarnya).
 
 ---
 

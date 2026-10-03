@@ -121,8 +121,10 @@ pola yang sama. Tabel cache dan log ada di [kinerja](/todo/analitik/kinerja-dan-
 ## API untuk layar
 
 Di bawah `api/v1/analytics`, sesi dan CSRF seperti API Core lain, didaftarkan di
-`routes/analytics.php` yang di-require dari grup `api/v1` di `routes/web.php`. Hanya layar Core
-pemakainya, jadi kontraknya hasil Scramble, bukan tulisan tangan.
+`routes/analytics.php` yang di-require dari grup `auth` di `routes/web.php` — bukan dari grup
+`api/v1`, karena berkas yang sama memuat halaman `/analytics/...`. Hanya layar Core pemakainya, jadi
+kontraknya hasil Scramble, bukan tulisan tangan. Sampai KA-14 disetujui, seluruh isinya di balik
+middleware saklar `EnsureAnalyticsEnabled` (area 0).
 
 | Metode dan path | Hak | Gunanya |
 | --- | --- | --- |
@@ -141,10 +143,10 @@ pemakainya, jadi kontraknya hasil Scramble, bukan tulisan tangan.
 | `GET/POST/PATCH/DELETE saved-queries` | Seperti dasbor | |
 
 ```php
-// routes/analytics.php — di dalam Route::prefix('api/v1')->name('api.') yang sudah ada.
+// routes/analytics.php — di-require dari grup `auth`; halaman di luar blok ini, API di dalamnya.
 use App\Platform\Access\Support\CoreSecurityCatalog as Security;
 
-Route::prefix('analytics')->name('analytics.')->group(function (): void {
+Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): void {
     Route::middleware(Security::gate(Security::ANALYTICS_DASHBOARD_READ))->group(function (): void {
         Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
         Route::get('datasets/{code}', [DatasetController::class, 'show'])->name('datasets.show');

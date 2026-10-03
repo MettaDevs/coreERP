@@ -256,6 +256,20 @@ final class QueryCompiler
 angka, garis bawah), dan `wrap()` menambahkan tanda kutip identifier. Tidak satu pun nilai dari
 pemanggil masuk ke SQL selain lewat binding.
 
+**Sketsa di atas tidak lolos analisa tipe, dan kode area 0 tidak menulisnya begitu.** Laravel 12
+menandai `selectRaw()`, `orderByRaw()`, `groupByRaw()`, dan `whereRaw()` dengan `literal-string`, dan
+Larastan menolak string yang memuat nama kolom dari definisi dataset — termasuk alias `"d{$i}"`, karena
+bilangan yang disisipkan membuat string tidak lagi literal. Repo ini tidak memakai `@phpstan-ignore`
+maupun baris baseline baru. Yang dipakai `QueryCompiler` area 0, dan yang perlu diikuti area 3:
+
+| Kebutuhan | Cara tanpa SQL mentah |
+| --- | --- |
+| Kolom dimensi | `addSelect('<tabel>.<kolom> as d0')`, lalu `groupBy('d0')` — grammar membungkus keduanya |
+| Measure | `selectExpression(new MeasureExpression($aggregate, $kolom), 'm0')`; ekspresinya objek `Illuminate\Contracts\Database\Query\Expression` yang menyusun SQL lewat grammar (`getValue(Grammar)`) |
+| Urutan | `orderBy('m0', 'desc')`, `orderBy('d0')` |
+| Saringan tetap measure (area 3) | Ekspresi yang sama ditambah `FILTER (WHERE …)`; nilainya lewat `addBinding($bindings, 'select')` |
+| `NULLS LAST` (area 3) | Belum ada; `orderBy()` tidak menerimanya dan nama alias tidak dapat dipakai di dalam ekspresi `ORDER BY` PostgreSQL. Measure `count` dan `sum` tidak pernah kosong; `avg`, `min`, `max` yang kosong sementara jatuh di depan pada urutan turun |
+
 ### Measure
 
 ```php
@@ -372,7 +386,9 @@ final class QueryExecutor
                 'totals' => $compiled->totals?->toBase()->get()->all() ?? [],
             ];
         } catch (QueryException $e) {
-            throw AnalyticsQueryException::fromDatabase($e);
+            // Galat yang bermakna bagi pengguna menjadi 422; cacat engine (menulis, SQL tidak sah) dilempar
+            // apa adanya supaya menjadi 500 yang dilaporkan.
+            throw AnalyticsQueryException::fromDatabase($e) ?? $e;
         } finally {
             // ROLLBACK, bukan COMMIT. Query baca tidak butuh commit, dan bila engine dipanggil di dalam
             // transaksi lain (test, job), rollback ke savepoint juga membatalkan SET LOCAL dan READ ONLY
@@ -499,7 +515,8 @@ dapat dilakukan pengguna.
 
 | Kode | HTTP | Pesan untuk pengguna |
 | --- | --- | --- |
-| `analytics.dataset_unknown` | 404 | Data ini tidak tersedia. Module-nya mungkin tidak terpasang. |
+| `analytics.invalid_query` | 422 | Bentuk query salah, dengan path bagian yang salah (`dimensions.1`); juga kunci yang belum dibaca engine. Contoh: Pilih sedikitnya satu nilai yang dihitung. |
+| `analytics.dataset_unknown` | 404 | Data ini tidak tersedia. Aplikasinya mungkin belum terpasang. |
 | `analytics.dataset_forbidden` | 403 | Anda tidak punya akses ke data ini. |
 | `analytics.field_unknown` | 422 | Kolom "…" tidak dikenal. Pilih kolom dari daftar. |
 | `analytics.field_personal_data` | 403 | Kolom "…" memuat data pribadi dan tidak dapat dipakai di analitik dengan hak Anda. |

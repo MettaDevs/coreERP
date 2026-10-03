@@ -23,16 +23,17 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 
 | Komponen | Kelas utama | Tanggung jawab | Area |
 | --- | --- | --- | --- |
-| Registry dataset | `Datasets\DatasetRegistry` | Mengumpulkan dataset dari module, memvalidasi definisinya, menyaring menurut module terpasang | 1 |
+| Satu query | `Actions\RunQuery` | Registry, akses, validasi, lalu compile dan eksekusi di dalam `TenantRunner::runFor()`; dipakai setiap jalur masuk, tempat cache dan log menumpang | 0, 9 |
+| Registry dataset | `Datasets\DatasetRegistry` | Mengumpulkan dataset dari module, memvalidasi definisinya, menyaring menurut module terpasang | 0 (tipis), 1 |
 | Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 1, 4 |
 | Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, periode, vendor: label dan pemilih | 14 |
-| Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryValidator` | JSON → objek tak berubah; batas jumlah; hanya anggota dataset | 2 |
+| Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryValidator` | JSON → objek tak berubah; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
-| Compiler | `Query\QueryCompiler`, `Query\MeasureSql`, `Query\TimeBucketSql`, `Query\JoinPlanner` | Objek query → query builder Laravel di atas model module | 3 |
-| Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat | 3 |
-| Hasil | `Query\ResultSet`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label rujukan, deret waktu tanpa celah, total | 3 |
-| Principal | `Security\AnalyticsPrincipal` + `UserPrincipal`, `PublicationPrincipal` | Siapa yang bertanya: tenant, izin, hibah kebijakan, hak data pribadi, zona waktu | 4 |
-| Akses dataset | `Security\DatasetAccess` | Module terpasang dan permission baca resource | 4 |
+| Compiler | `Query\QueryCompiler`, `Query\MeasureExpression`, `Query\TimeBucketSql`, `Query\JoinPlanner` | Objek query → query builder Laravel di atas model module, tanpa SQL mentah (lihat [mesin query](/todo/analitik/mesin-query#dari-objek-ke-sql)) | 0 (tipis), 3 |
+| Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat | 0, 3 |
+| Hasil | `Query\ResultSet`, `Query\ResultColumn`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label rujukan, deret waktu tanpa celah, total | 0 (tipis), 3 |
+| Principal | `Security\AnalyticsPrincipal` + `UserPrincipal`, `PublicationPrincipal` | Siapa yang bertanya: tenant, izin, hibah kebijakan, hak data pribadi, zona waktu | 0 (tipis), 4 |
+| Akses dataset | `Security\DatasetAccess` | Module terpasang dan berlisensi, lalu permission baca resource | 0 (tipis), 4 |
 | Kebijakan data | `Security\DataPolicyScope` → `Contracts\DataPolicyFilter` | Hibah → predikat SQL pada kolom yang dinyatakan dataset | 4 |
 | Data pribadi | `Security\PersonalDataGate` | Menyembunyikan dan menolak field data pribadi | 4 |
 | Sidik jari scope | `Security\ScopeFingerprint` | Kunci cache yang memisahkan pengguna dengan jangkauan berbeda | 4, 9 |
@@ -150,33 +151,44 @@ module di Core. Dimensi bersama menyelesaikan kebutuhan yang sama tanpa salah sa
 
 ## Susunan berkas
 
+Berkas bertanda `(0)` sudah ada sejak kerangka berjalan (area 0), dalam bentuk tipis yang diperluas
+area pemiliknya.
+
 ```text
 apps/core/app/Platform/Analytics/
 ├── AnalyticsServiceProvider.php        rute embed, rate limiter, jadwal pembersihan
+├── Actions/
+│   └── RunQuery.php                    (0) satu query dari ujung ke ujung, untuk setiap jalur masuk
 ├── Datasets/
-│   ├── DatasetRegistry.php             implements Contracts\Analytics\Datasets
+│   ├── DatasetRegistry.php             (0) implements Contracts\Analytics\Datasets
+│   ├── CompiledDataset.php  CompiledMeasure.php  InvalidDatasetDefinition.php      (0)
 │   ├── DatasetValidator.php            aturan definisi (kolom ada, kebijakan, klasifikasi)
 │   ├── DatasetCatalog.php              katalog per principal
 │   └── SharedDimensionRegistry.php     implements Contracts\Analytics\SharedDimensions
 ├── Query/
-│   ├── AnalyticsQuery.php  QueryParser.php  QueryValidator.php  QueryNormalizer.php
-│   ├── RelativeRange.php   TimeGranularity.php
-│   ├── QueryCompiler.php   JoinPlanner.php  MeasureSql.php  TimeBucketSql.php
-│   ├── QueryExecutor.php   QueryLimits.php
-│   ├── ResultSet.php       LabelResolver.php  GapFiller.php  TotalsQuery.php
-│   ├── AnalyticsQueryException.php
+│   ├── AnalyticsQuery.php  Dimension.php  TimeRange.php  TimeGranularity.php       (0)
+│   ├── QueryParser.php  QueryValidator.php                                        (0)
+│   ├── QueryNormalizer.php  RelativeRange.php
+│   ├── QueryCompiler.php  MeasureExpression.php  CompiledQuery.php                (0)
+│   ├── JoinPlanner.php  TimeBucketSql.php
+│   ├── QueryExecutor.php                                                          (0)
+│   ├── QueryLimits.php
+│   ├── ResultSet.php  ResultColumn.php  AnalyticsQueryException.php               (0)
+│   ├── LabelResolver.php  GapFiller.php  TotalsQuery.php
 │   └── Formula/            Lexer.php  Parser.php  Node/*  SqlEmitter.php      (fase 2)
 ├── Security/
-│   ├── AnalyticsPrincipal.php  UserPrincipal.php  PublicationPrincipal.php
-│   ├── DatasetAccess.php  DataPolicyScope.php  PersonalDataGate.php  ScopeFingerprint.php
+│   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
+│   ├── PublicationPrincipal.php  DataPolicyScope.php  PersonalDataGate.php  ScopeFingerprint.php
 ├── Cache/QueryCache.php
 ├── Support/QueryLog.php  AnalyticsSecurityCatalog.php
 ├── Models/
 │   ├── Dashboard.php  Widget.php  SavedQuery.php  QueryLogEntry.php  QueryCacheEntry.php
 │   ├── Publication.php  EmbedToken.php                                        (fase 2)
 ├── Http/
-│   ├── Controllers/  DatasetController  QueryController  DashboardController
+│   ├── Controllers/  QueryController  ExploreController                           (0)
+│   │                 DatasetController  DashboardController
 │   │                 WidgetController  WidgetDataController  SavedQueryController
+│   ├── Middleware/   EnsureAnalyticsEnabled                    (0, dibuang bersama saklar)
 │   ├── Requests/     StoreDashboardRequest  UpdateWidgetRequest  RunQueryRequest …
 │   └── Presenters/   DashboardPresenter  ResultSetPresenter
 ├── External/       PublicationController.php  OData/*                         (fase 2)
@@ -186,40 +198,67 @@ apps/core/app/Platform/Analytics/
 └── Rollups/        (fase 3)
 
 apps/core/app/Platform/Modules/Contracts/
-├── DataPolicyFilter.php
+├── DataPolicyFilter.php                                                       (0)
 └── Analytics/
-    ├── Dataset.php  Datasets.php  DatasetDefinition.php
-    ├── Aggregate.php  MeasureFormat.php  SharedDimension.php  SharedDimensions.php
+    ├── Dataset.php  Datasets.php  DatasetDefinition.php                       (0)
+    ├── Aggregate.php  MeasureFormat.php                                       (0)
+    ├── SharedDimension.php  SharedDimensions.php
     └── DashboardTemplate.php  DashboardTemplates.php                          (fase 2)
 
-apps/core/config/analytics.php
-apps/core/routes/analytics.php                 di-require dari routes/web.php (grup api/v1)
+apps/core/config/analytics.php                                                 (0)
+apps/core/routes/analytics.php     (0) di-require dari routes/web.php, grup `auth` (bukan grup `api/v1`):
+                                   halaman `/analytics/...` dan API `api/v1/analytics/...` di satu berkas
 apps/core/database/migrations/2026_10_xx_*_analytics_*.php
 apps/core/resources/js/
-├── pages/platform/analytics/  index.tsx  dashboard.tsx  explore.tsx  publications.tsx
+├── pages/platform/analytics/  explore.tsx (0, sementara)  index.tsx  dashboard.tsx  publications.tsx
 ├── components/analytics/      widget-frame.tsx  kpi-tile.tsx  chart-widget.tsx  table-widget.tsx
 │                              widget-builder.tsx  filter-editor.tsx  dataset-picker.tsx …
-├── lib/analytics/             types.ts  api.ts  format.ts  query.ts
+├── lib/analytics/             types.ts (0)  format.ts (0)  api.ts  query.ts
 └── embed/analytics.tsx                                                         (fase 2)
 
 modules/apperp/management-aset/src/Analytics/
-├── AssetRegisterDataset.php  WorkOrderDataset.php  DisposalDataset.php …
+├── AssetRegisterDataset.php (0)  WorkOrderDataset.php  DisposalDataset.php …
 └── (didaftarkan satu baris di ModuleServiceProvider::boot)
 ```
 
 Nama dan letak di atas adalah usulan yang mengikat antar-area: area lain menulis kode yang
 memanggilnya. Mengubahnya berarti memperbarui halaman ini dalam pull request yang sama.
 
+## CompiledDataset
+
+`Datasets\CompiledDataset` adalah dataset sesudah dibaca registry, dan satu-satunya bentuk dataset
+yang dipegang compiler, keamanan baca, dan API layar. Area 1 dan 4 sama-sama memperluasnya; nama
+method di bawah sudah dipakai kode area 0 dan tidak diganti tanpa memperbarui halaman ini.
+
+| Anggota | Isi |
+| --- | --- |
+| `code`, `caption`, `moduleId`, `version` | Kode dataset (berawalan id module), nama tampilan, module pemilik, versi definisi |
+| `model`, `table` | Model dasar module dan nama tabelnya; tabel dasar tidak pernah diberi alias |
+| `permission` | Permission baca resource module (KA-15) |
+| `policy` | `{code, legal_entity, operating_unit}` atau null; kolom kebijakan tanpa awalan tabel |
+| `baseQuery()` | `Model::query()` — `TenantScope` dan `SoftDeletes` ikut, dipasang saat query dijalankan |
+| `fields()`, `hasField($key)`, `filterField($key)` | Field sebagai `FilterField` K-30, kolomnya berkualifikasi nama tabel |
+| `measures()`, `hasMeasure($key)`, `measure($key)` | `CompiledMeasure`: `key`, `caption`, `aggregate`, `field`, `format`, `currency`, `unit`, `where` |
+| `qualified($name)` | Kolom berkualifikasi untuk kunci field atau nama kolom tabel dasar yang lolos pemeriksaan pengenal |
+| `times()`, `defaultTime()` | Field waktu dan field waktu utama |
+
+Registry area 0 membaca **definisi** sekali per proses dan **field** dari database setiap kali dataset
+diminta (`TableFields` menyimpan tipe kolom per nama database), karena satu proses melayani beberapa
+database environment. Database yang belum punya tabel dataset menjawab dataset tidak tersedia
+(`find()` null, 404 `analytics.dataset_unknown`). Area 1.5 memutuskan memoisasinya.
+
 ## Konfigurasi
 
-`apps/core/config/analytics.php`, dengan variabel env berawalan `COREERP_ANALYTICS_`:
+`apps/core/config/analytics.php`, dengan variabel env berawalan `COREERP_ANALYTICS_`. Kunci bertanda
+`(0)` sudah ada; yang lain ditambahkan area pemiliknya.
 
 | Kunci | Bawaan | Gunanya |
 | --- | --- | --- |
-| `timeouts.interactive_ms` | 8000 | `statement_timeout` untuk layar |
+| `enabled` (0) | `false` | Saklar sementara sampai KA-14 disetujui; `true` di `.env.example` lokal |
+| `timeouts.interactive_ms` (0) | 8000 | `statement_timeout` untuk layar |
 | `timeouts.external_ms` | 20000 | Untuk publikasi, OData, embed |
 | `timeouts.job_ms` | 60000 | Untuk job (fase 3) |
-| `limits.rows_interactive` | 5000 | Baris hasil kelompok dari layar |
+| `limits.rows_interactive` (0) | 5000 | Baris hasil kelompok dari layar; juga batas tertinggi `limit` |
 | `limits.rows_external_page` | 5000 | Baris per halaman luar |
 | `limits.dimensions` | 4 | Dimensi per query |
 | `limits.measures` | 12 | Measure per query |
@@ -249,11 +288,12 @@ Nilai on-prem satu container sengaja rendah. Menaikkannya keputusan operator, bu
 
 ## Penjaga batas yang baru
 
-Ditambahkan di `apps/core/tests/Feature/Boundary/` (area 1 dan 4):
+Ditambahkan di `apps/core/tests/Feature/Boundary/` (area 0, 1, dan 4):
 
 - **`AnalyticsBoundaryTest`** membaca berkas di `app/Platform/Analytics` dan menolak: nama namespace
-  `Modules\`, nama tabel yang berawalan salah satu awalan module di `modules/README.md`, dan
-  `DB::table(`/`DB::select(` di luar daftar kelas yang memang menyusun SQL (compiler, cache, log).
+  `Modules\` dan nama tabel yang berawalan salah satu awalan module — dibaca dari `table_prefix` setiap
+  `app.yaml`, termasuk module contoh bahan uji — termasuk di komentar (area 0); lalu
+  `DB::table(`/`DB::select(` di luar daftar kelas yang memang menyusun SQL (compiler, cache, log; area 1).
   Alasannya: Core boleh membaca tabel module, tetapi hanya lewat definisi yang didaftarkan module,
   tidak pernah dengan nama yang ditulis mati.
 - **`AnalyticsDatasetsBoundaryTest`** menjalankan `DatasetValidator` atas seluruh dataset yang

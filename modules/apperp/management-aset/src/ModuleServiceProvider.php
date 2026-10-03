@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
+use App\Platform\Modules\Contracts\Analytics\Datasets;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
 use App\Platform\Modules\Contracts\ListExportSources;
@@ -14,6 +15,7 @@ use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\ManagementAset\Analytics\AssetRegisterDataset;
 use Modules\Apperp\ManagementAset\Console\Commands\BuildBuiltinLayouts;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
@@ -114,6 +116,11 @@ final class ModuleServiceProvider extends ServiceProvider
         // pendaftaran ini Core tidak tahu module punya laporan, dan ia jatuh ke jalur HTTP
         // lama — alamat yang sudah tidak ada.
         $this->app->make(ModuleReportProviders::class)->register($this->app->make(PenyediaLaporan::class));
+
+        // Dataset analitik: engine analitik Core membaca tabel module ini hanya lewat definisi di sini —
+        // tabel, field, measure, dan kolom kebijakan data — dengan permission dan kebijakan yang sama
+        // dengan layar daftarnya.
+        $this->app->make(Datasets::class)->register($this->app->make(AssetRegisterDataset::class));
 
         // Ekspor daftar di layar lewat antrean ekspor Core (K-27): register aset sebagai pilot. Core meminta
         // barisnya ke sini dengan hak dan kebijakan data yang sama dengan layar Inventarisasi aset.

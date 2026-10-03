@@ -7,6 +7,7 @@ import {
     Building2,
     CalendarCheck,
     CalendarDays,
+    ChartColumn,
     Clock,
     Coins,
     Contact,
@@ -153,6 +154,16 @@ export function AppSidebar() {
                               label: 'Ekspor laporan',
                               icon: FileOutput,
                               href: '/reports/exports',
+                          },
+                      ]
+                    : []),
+                // Engine analitik di balik saklar sementara, sampai permission dasbornya (KA-14) disetujui.
+                ...(props.auth.membership && props.analyticsEnabled
+                    ? [
+                          {
+                              label: 'Analisis data',
+                              icon: ChartColumn,
+                              href: '/analytics/explore',
                           },
                       ]
                     : []),

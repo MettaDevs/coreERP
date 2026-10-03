@@ -6,11 +6,13 @@ namespace App\Platform\Modules\Support;
 
 use App\Platform\Access\Support\LinkedWorkerResolverRegistry;
 use App\Platform\AddressBook\ModuleServices\AddressDirectoryCore;
+use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
 use App\Platform\ChangeLog\Support\ChangeLogValueResolverRegistry;
 use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Modules\Contracts\AddressDirectory;
+use App\Platform\Modules\Contracts\Analytics\Datasets;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\ChangeHistory;
 use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
@@ -138,6 +140,9 @@ final class CoreServices
         // Ekspor daftar di layar (K-27): module pemilik daftar membaca barisnya dengan hak dan kebijakan
         // data yang sama dengan layarnya; Core hanya mengantrekan dan menulis berkasnya.
         ListExportSources::class => ListExportRegistry::class,
+        // Engine analitik: module menyatakan dataset — tabel, field, measure, kolom kebijakan — dan Core
+        // membaca tabelnya lewat definisi itu saja, tanpa menulis nama tabel module (docs/todo/analitik).
+        Datasets::class => DatasetRegistry::class,
     ];
 
     /**

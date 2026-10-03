@@ -9,10 +9,13 @@ CoreERP's own Power BI–style engine: modules declare datasets, Core compiles a
 against module tables, users build dashboards without code, and data leaves CoreERP only through
 publications (JSON/CSV, OData v4, embeds).
 
-**Status.** As of 3 October 2026 this is a plan, not code. The plan, its decisions (`KA-xx`), and the
-work areas live in `docs/todo/analitik/`. Once an area ships, its code and `docs/dev/35-analitik.md`
-are the authority, and area 11 rewrites this skill to describe what exists. If code and this skill
-disagree, trust the code and fix the skill in the same pull request.
+**Status.** Area 0 (walking skeleton) shipped on 3 October 2026: the dataset contract
+(`App\Platform\Modules\Contracts\Analytics`), `DatasetRegistry`, the query parser, validator,
+compiler, and read-only executor, `Actions\RunQuery`, `POST /api/v1/analytics/query`, and a temporary
+`/analytics/explore` page, all behind `analytics.enabled`. Everything else is still a plan. The plan,
+its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
+and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
+If code and this skill disagree, trust the code and fix the skill in the same pull request.
 
 ## Read first, by task
 
@@ -111,6 +114,10 @@ key needs `version(n+1)` and leaves affected widgets showing "Kolom … sudah ti
 - Measure filters compile to `FILTER (WHERE …)` with bindings; `sum` is wrapped in `coalesce(…, 0)`;
   `avg/min/max` stay null on empty groups.
 - User filter values go through `FieldFilterExpression::apply()` (K-30 BC syntax) — bindings only.
+- No raw SQL built from identifiers: Laravel's `selectRaw`/`orderByRaw`/`groupByRaw` take
+  `literal-string`, and Larastan rejects interpolated column names and aliases. Select columns with
+  `addSelect('<table>.<column> as d0')`, group and order with `groupBy()`/`orderBy()`, and build
+  aggregates as grammar-aware `Expression` objects passed to `selectExpression()` (`MeasureExpression`).
 - Decimals leave the server as strings.
 
 ## Screens

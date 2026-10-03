@@ -2,8 +2,9 @@
 
 Rencana kerja engine analitik CoreERP — padanan Power BI yang dibangun di dalam produk sendiri —
 bukan desain kanonik. Ditulis 3 Oktober 2026, sesudah pemilik produk memutuskan membangunnya
-sendiri. Belum ada satu baris kode engine; halaman-halaman di folder ini ditulis supaya beberapa
-agen dapat mengerjakannya bersamaan tanpa saling menunggu dan tanpa saling menimpa.
+sendiri. Halaman-halaman di folder ini ditulis supaya beberapa agen dapat mengerjakannya bersamaan
+tanpa saling menunggu dan tanpa saling menimpa. Kerangka berjalan (area 0) sudah dikirim pada hari yang
+sama; begitu kode sebuah bagian ada di repo, kodenya yang menjadi rujukan.
 
 **Kenapa dibangun.** Hampir setiap fasilitas kesehatan dari sekitar seratus pelanggan sistem lama
 meminta dasbor — persediaan, kasir, aset, dan lain-lain — dan keinginannya berbeda-beda. Dulu

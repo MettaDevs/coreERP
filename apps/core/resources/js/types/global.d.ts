@@ -21,6 +21,8 @@ declare module '@inertiajs/core' {
                 navigation: HostedNavigation;
             };
             sidebarOpen: boolean;
+            /** Saklar sementara engine analitik; hanya menyaring menu, rutenya sendiri menjawab 404 saat mati. */
+            analyticsEnabled: boolean;
             clock: { timezone: string; today: string } | null;
             workDate: {
                 value: string | null;
