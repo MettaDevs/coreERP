@@ -149,8 +149,9 @@ baris di bagian yang disediakan.
 | --- | --- | --- | --- |
 | `apps/core/routes/analytics.php` | 0 | 6, 8, 12, 13, 15, 16, 17, 18 | Satu blok per area, berkomentar nomor area; halaman `/analytics/...` di luar blok `api/v1/analytics` |
 | `apps/core/routes/web.php` | — | 0 (satu baris `require` di grup `auth`), 17 (rute embed di luar grup `web`) | Hanya baris itu |
-| `apps/core/config/analytics.php` | 0 | 3, 9, 15, 16, 17 | Kunci baru di bagian area |
-| `apps/core/app/Platform/Analytics/Actions/RunQuery.php` | 0 | 4, 9 | Langkah baru di tempatnya; urutan otorisasi yang ada tidak dipindah |
+| `apps/core/config/analytics.php` | 0 | 2 (`limits.*` bentuk query), 3, 9, 15, 16, 17 | Kunci baru di bagian area |
+| `apps/core/app/Platform/Analytics/Actions/RunQuery.php` | 0 | 2 (menyatukan bentuk query lebih dulu), 4, 9 | Langkah baru di tempatnya; urutan otorisasi yang ada tidak dipindah |
+| `apps/core/app/Platform/Analytics/Query/QueryCompiler.php` | 0 | 2 (rentang waktu dan urutan pengguna), 3, 4 | Langkah di tempatnya; kunci query yang sudah dibaca parser tidak boleh diabaikan, hanya dikompilasi atau ditolak |
 | `apps/core/app/Platform/Analytics/Datasets/CompiledDataset.php` | 0 | 1, 3, 4 | Method baru; nama method yang ada dicatat di [arsitektur](/todo/analitik/arsitektur#compileddataset) |
 | `apps/core/app/Platform/Modules/Support/CoreServices.php` | — | 0 (`Datasets`), 14 (`SharedDimensions`), 18 (`DashboardTemplates`) | Satu baris di `SINGLETON_BINDINGS` |
 | `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 (butir 4.6; KA-14 disetujui 3 Okt 2026), 15 | Konstanta baru di akhir |
