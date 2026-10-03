@@ -58,8 +58,9 @@ disagree, trust the code and fix the skill in the same pull request.
 - **Outside callers read publications only** (KA-11), via integration clients with scopes
   `analytics.read` / `analytics.embed`. Every outside surface is hand-written in
   `apps/core/contracts/internal/integrasi-analitik.yaml`.
-- **Permission codes are not created before the owner approves KA-14.** Codes that reach tenant roles
-  cannot be renamed silently. Until then the engine sits behind `analytics.enabled`.
+- **Permission codes come only from the catalog migration the owner approved** (KA-14, 3 October
+  2026), written in area 4.6 with exactly the codes in `keamanan.md`. Codes that reach tenant roles
+  cannot be renamed silently. Until area 4.6 lands, the engine sits behind `analytics.enabled`.
 
 ## Declaring a dataset
 
