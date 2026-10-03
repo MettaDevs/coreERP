@@ -121,16 +121,22 @@ COPY apps/core/public ./public
 COPY apps/core/vite.config.ts apps/core/tsconfig.json ./
 RUN npm run build
 
-FROM php:8.4-apache
+# FrankenPHP: PHP ZTS di dalam server Caddy, dijalankan dalam mode worker lewat Laravel Octane (lihat
+# `config/octane.php` dan peran `web` di `docker/entrypoint.sh`). Sampai 3 Oktober 2026 tahap ini
+# `php:8.4-apache` dengan prefork + mod_php, yang mem-boot ulang Laravel di setiap permintaan.
+#
+# Image ini turunan image `php` resmi varian ZTS, jadi perkakas `docker-php-ext-*` dan $PHPIZE_DEPS-nya
+# sama dengan sebelumnya; `install-php-extensions` bawaannya dipakai karena ia juga menangani `pecl`.
+# Versinya dipin karena alasan yang sama dengan opentelemetry di bawah.
+FROM dunglas/frankenphp:1.12.7-php8.4-trixie
 # gd dibutuhkan PhpSpreadsheet (layout Excel laporan); zip oleh PhpWord dan PhpSpreadsheet.
 #
-# `opentelemetry` tidak dibundel PHP, jadi ia dikompilasi lewat `pecl` di lapisan yang sama —
-# bukan lapisan sendiri, karena lapisan runtime inilah yang dikirim ke pelanggan. Alat
-# kompilasinya sengaja tidak ikut dipasang di sini: image `php` resmi sudah membawa $PHPIZE_DEPS
-# secara permanen, dan itu pula yang dipakai `docker-php-ext-install` di baris atas. Membuangnya
-# sesudah `pecl` selesai karena itu bukan penghematan yang gratis — ia mencabut perkakas milik
-# image dasar dan mematikan setiap `docker-php-ext-install` yang ditambahkan sesudah baris ini.
-# Yang memang sisa hanyalah sumber dan hasil build `pecl` di /tmp/pear, dan itu dibuang.
+# `opentelemetry` tidak dibundel PHP, jadi ia dikompilasi lewat `pecl` (oleh
+# `install-php-extensions`) di lapisan yang sama — bukan lapisan sendiri, karena lapisan runtime
+# inilah yang dikirim ke pelanggan. Alat kompilasinya sengaja tidak ikut dipasang di sini: image
+# `php` resmi sudah membawa $PHPIZE_DEPS secara permanen. Membuangnya sesudah `pecl` selesai bukan
+# penghematan yang gratis — ia mencabut perkakas milik image dasar dan mematikan setiap pemasangan
+# ekstensi yang ditambahkan sesudah baris ini.
 #
 # Versinya dipin, seperti `composer.lock` dan `npm ci` memin milik mereka. `pecl install`
 # tanpa versi menarik rilis terbaru pada saat build, jadi image yang dibangun bulan depan
@@ -163,21 +169,25 @@ ARG PASANG_OTEL=1
 # image dasarnya pindah ke rilis Debian yang membawa versi lain, dan pada hari itu barisnya gagal
 # saat membangun — bukan diam-diam memasang klien yang terlalu tua.
 ARG VERSI_KLIEN_PG=17
-RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip "postgresql-client-${VERSI_KLIEN_PG}" \
-    && docker-php-ext-configure gd --with-jpeg \
-    && docker-php-ext-install bcmath gd intl pdo_pgsql pgsql zip \
-    && if [ "$PASANG_OTEL" = "1" ]; then \
-        pecl install opentelemetry-1.2.1 \
-        && docker-php-ext-enable opentelemetry; \
-    fi \
-    && rm -rf /tmp/pear \
-    && a2enmod rewrite \
-    && sed -ri 's!/var/www/html!/var/www/repo/apps/core/public!g' /etc/apache2/sites-available/000-default.conf \
+#
+# Peran web berjalan sebagai www-data tetapi tetap membuka port 80, sama dengan Apache dulu, supaya
+# proxy, healthcheck, dan compose di depannya tidak berubah: `setcap` memberi binari frankenphp hak
+# itu. Caddy menulis konfigurasi dan datanya ke $XDG_CONFIG_HOME dan $XDG_DATA_HOME (/config dan /data
+# di image ini), yang milik root sampai diserahkan ke www-data.
+#
+# `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
+RUN apt-get update && apt-get install -y --no-install-recommends libcap2-bin "postgresql-client-${VERSI_KLIEN_PG}" \
+    && install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache \
+    && if [ "$PASANG_OTEL" = "1" ]; then install-php-extensions opentelemetry-1.2.1; fi \
+    && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && chown -R www-data:www-data /config /data \
     && rm -rf /var/lib/apt/lists/*
 # Batas unggah PHP mengikuti batas lampiran dokumen, 10 MB (`coreerp.attachments.max_kb`, K-22 analisa gap
 # BC). Bawaan PHP 2 MB menolak berkas yang lebih besar sebelum validasi Laravel berjalan, dengan pesan yang
 # tidak menyebut batasnya. `post_max_size` sedikit di atasnya untuk isian form lain di permintaan yang sama.
-RUN printf 'upload_max_filesize = 10M\npost_max_size = 12M\n' > "$PHP_INI_DIR/conf.d/coreerp-uploads.ini"
+RUN printf 'upload_max_filesize = 10M\npost_max_size = 12M\n' > "$PHP_INI_DIR/conf.d/coreerp-uploads.ini" \
+    # Jawaban tidak mengumumkan versi PHP (`X-Powered-By`).
+    && printf 'expose_php = Off\n' > "$PHP_INI_DIR/conf.d/coreerp-expose.ini"
 WORKDIR /repo
 # Ini satu-satunya tahap yang dikirim ke pelanggan, jadi ini satu-satunya tahap yang isinya
 # harus bersih. Tahap `vendor` dan `assets` di atas boleh memuat module apa pun sepanjang
@@ -231,3 +241,7 @@ RUN rm -f storage/logs/*.log \
 # otherwise the number sequence recovery job never runs.
 RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
 ENTRYPOINT ["docker/entrypoint.sh"]
+# Image FrankenPHP membawa HEALTHCHECK ke port admin Caddy (2019). Peran `worker` dan `scheduler` tidak
+# menjalankan Caddy, jadi warisan itu menandai keduanya unhealthy. Pemeriksaan kesehatan tetap milik
+# compose per peran, seperti saat image ini masih `php:8.4-apache` yang tidak membawa HEALTHCHECK.
+HEALTHCHECK NONE

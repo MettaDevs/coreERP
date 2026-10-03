@@ -742,6 +742,46 @@ Test module membangun **rantai izin sungguhan** — permission, privilege, duty,
 lalu bertindak sebagai penggunanya — dan membangun rantai baru per pemanggilan, bukan memakai satu
 rantai bersama. Rantai bersama membuat sebuah test lulus karena test lain sudah menyiapkan izinnya.
 
+### Kode berjalan di worker yang hidup lama
+
+Sejak 3 Oktober 2026 peran web dilayani FrankenPHP dalam mode worker lewat Laravel Octane
+(`php artisan octane:frankenphp` di `apps/core/docker/entrypoint.sh`). Laravel di-boot **sekali per
+worker**, lalu worker yang sama melayani ratusan permintaan dari tenant mana saja. Di Apache semua
+keadaan dibuang di akhir permintaan; di sini yang dibuang hanya salinan container milik permintaan itu.
+Yang tetap hidup ke permintaan berikutnya: properti statis, objek yang di-resolve saat boot (singleton,
+registry, penyedia layanan), koneksi database, dan variabel sesi PostgreSQL di koneksi itu.
+
+Aturannya, semuanya dari kejadian nyata saat pemindahan:
+
+1. **Data milik permintaan, pengguna, atau tenant tidak boleh disimpan di properti statis atau
+   singleton.** Ikat lewat `scoped()` (dibuang tiap permintaan, contohnya `CurrentWorkspace`), atau
+   hitung saat dipanggil. Cache statis hanya sah bila isinya sama untuk semua tenant dan jumlahnya
+   berbatas — dan kuncinya harus menyebut database bila isinya bergantung padanya
+   (`TableFields::columnTypes()` dikunci nama database, bukan nama koneksi).
+2. **Container, request, dan config tidak disuntikkan ke konstruktor kelas yang hidup lebih lama dari
+   satu permintaan.** Ambil saat dipanggil: `app()`, `request()`, `config()`, atau
+   `Container::getInstance()`. `TenantRunnerCore` sempat memegang container dari boot, sehingga tenant
+   yang diikatnya tidak pernah terbaca `TenantScope` dan halaman akses berakhir 500.
+3. **Koneksi database dan setelannya bertahan antar permintaan.** `set_config(..., false)` atau `SET`
+   tanpa `LOCAL` menempel pada koneksi yang dipakai ulang worker. Pakai `set_config(..., true)` di
+   dalam transaksi bila bisa. Yang tidak bisa dilepas `ResetDatabaseConnections` di akhir setiap
+   permintaan: ia mengosongkan pelaku kolom jejak dan saklar log perubahan, menutup koneksi
+   `environment_<id>` (tanpanya tiap environment yang pernah dilayani menyisakan satu koneksi per
+   worker), dan menutup koneksi yang tertinggal di tengah transaksi. Setelan sesi baru wajib ikut
+   dilepas di sana. Tanpa pelepasan itu, pendaftaran tamu sempat tercatat dibuat oleh pengguna tenant
+   lain dari permintaan sebelumnya.
+4. **Config yang diubah saat permintaan hilang di permintaan berikutnya, objek yang dibangun dari
+   config itu tidak.** Koneksi database, klien HTTP, dan objek lain yang dibangun dari config tetap
+   hidup di worker; pemeriksaan "sudah terdaftar?" yang hanya membaca config akan selalu menjawab
+   belum.
+
+Pendengar dan daftar `flush` Octane ada di `apps/core/config/octane.php`. Caranya diuji tanpa server:
+`tests/Feature/Platform/Modules/OctaneWorkerStateTest.php` meniru langkah Octane — `clone` container
+lalu `CurrentApplication::set()` — dan memeriksa bahwa yang ditulis dari boot terbaca permintaan. Di
+atas server sungguhan, probe lintas tenant di skenario uji beban menjadi penjaganya: satu worker
+bergantian melayani banyak tenant, jadi data yang tertinggal langsung tercatat sebagai pelanggaran.
+Rujukan umumnya bagian *Dependency Injection and Octane* pada dokumentasi Laravel Octane.
+
 ### Cetakan module baru
 
 `module:make` mengganti seluruh penanda pada cetakan sekaligus; mengganti sebagian menghasilkan

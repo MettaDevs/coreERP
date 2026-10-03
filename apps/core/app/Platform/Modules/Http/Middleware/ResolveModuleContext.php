@@ -90,13 +90,11 @@ final class ResolveModuleContext
         // yang punya model dan rute sekaligus — kedua module contoh hanya menyentuh modelnya
         // dari test yang mengikat tenantnya sendiri.
         //
-        // **Satu batas yang harus diketahui sebelum runtime ini dipindah ke Octane atau
-        // pekerja yang hidup lama:** ikatan ini menempel pada container aplikasi, dan container
-        // itu dibangun ulang per permintaan hanya pada FPM. Di proses yang hidup lama, tenant
-        // dari permintaan sebelumnya akan tersisa untuk permintaan berikutnya yang kebetulan
-        // tidak melewati middleware ini. Yang membuatnya aman hari ini adalah model
-        // penyajiannya, bukan kodenya — jadi pindah ke Octane menuntut ikatan ini dibereskan
-        // lebih dulu, bukan sesudahnya.
+        // Di Octane (peran web sejak 3 Oktober 2026) ikatan ini aman karena `app()` di dalam
+        // permintaan adalah salinan container milik permintaan itu, dan salinannya dibuang
+        // sesudah jawaban terkirim. Yang tidak aman adalah menulis ikatan ini ke container yang
+        // disimpan sejak boot — itulah sebabnya `TenantRunnerCore` mengambil container saat
+        // dipanggil, bukan lewat konstruktor.
         app()->instance(TenantScope::KEY, (string) $membership->tenant_id);
 
         $request->attributes->set(self::ACTIVE_MODULE, $moduleId);

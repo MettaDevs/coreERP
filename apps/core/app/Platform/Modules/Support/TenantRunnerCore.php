@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\Modules\Contracts\TenantRunner;
-use Illuminate\Contracts\Container\Container;
+use Illuminate\Container\Container;
 
 /**
  * Satu-satunya tempat tenant aktif diganti untuk sementara.
@@ -15,11 +15,14 @@ use Illuminate\Contracts\Container\Container;
  * salinan satu aturan adalah empat salinan yang akan menyimpang, dan menyimpangnya tidak
  * berisik: yang lupa memulihkan meninggalkan tenant sebelumnya menempel pada pekerjaan
  * berikutnya, dan pekerjaan itu berjalan mulus di tenant yang salah.
+ *
+ * Container diambil saat dipanggil, bukan disuntikkan, supaya selalu container yang sama dengan yang
+ * dibaca {@see TenantScope::activeTenant()} lewat `app()`. Di Octane keduanya berbeda: registry yang
+ * dibangun saat boot memegang container induk, sedangkan permintaan berjalan di salinannya. Ikatan yang
+ * ditulis ke container induk tidak pernah terbaca, dan query module berhenti dengan "tanpa tenant aktif".
  */
 final class TenantRunnerCore implements TenantRunner
 {
-    public function __construct(private readonly Container $container) {}
-
     /**
      * @template T
      *
@@ -34,14 +37,15 @@ final class TenantRunnerCore implements TenantRunner
         // menolak apa pun yang bukan string berisi, jadi null dan nilai bertipe lain sama-sama
         // berarti "tidak ada tenant aktif". Menyimpan nilai asing kembali apa adanya hanya
         // memindahkannya ke pekerjaan berikutnya.
-        $bound = $this->container->bound(TenantScope::KEY) ? $this->container->make(TenantScope::KEY) : null;
+        $container = Container::getInstance();
+        $bound = $container->bound(TenantScope::KEY) ? $container->make(TenantScope::KEY) : null;
         $previous = is_string($bound) ? $bound : null;
-        $this->container->instance(TenantScope::KEY, $tenantId);
+        $container->instance(TenantScope::KEY, $tenantId);
 
         try {
             return $action();
         } finally {
-            $this->container->instance(TenantScope::KEY, $previous);
+            $container->instance(TenantScope::KEY, $previous);
         }
     }
 }

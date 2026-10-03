@@ -10,7 +10,7 @@ Sejak 15 September 2026 tidak ada yang di-deploy dari `main`; alurnya di
 
 | Berkas | Untuk |
 | --- | --- |
-| `Dockerfile` | Image rilis ramping: Debian trixie slim, PHP dan Apache Debian, tanpa perkakas kompilasi |
+| `Dockerfile` | Image rilis ramping: Debian trixie slim dengan FrankenPHP (mode worker lewat Octane) dan PHP ZTS hasil salinan tahap build, tanpa perkakas kompilasi |
 | `uji-image.sh` | Syarat layak kirim: dpkg sehat, ekstensi termuat, `pg_dump` berjalan, hanya `apps/core`, aplikasi menyala terhadap PostgreSQL kosong |
 | `rakit.sh` | Sumber pada commit → build → uji → push image core, konsol, dan pendamping → manifest v2 → tanda tangan → daftar ke admin.erp |
 | `coreerp-rilis` | Pembungkus root yang dipanggil alur GitHub `rilis.yml` lewat sudo: hanya merakit dari commit yang sudah ada di `main` |

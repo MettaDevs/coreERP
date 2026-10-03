@@ -7,7 +7,7 @@
 # Keluar nol hanya bila seluruh syarat IMG-01 terpenuhi, dan berhenti pada syarat pertama yang dilanggar:
 #
 #   1. dpkg sehat — tidak ada paket yang dicabut paksa;
-#   2. ekstensi PHP yang dibutuhkan termuat, di CLI dan di SAPI Apache;
+#   2. ekstensi PHP yang dibutuhkan termuat, di binari php dan di libphp milik FrankenPHP;
 #   3. pg_dump dan pg_restore berjalan;
 #   4. hanya apps/core di /repo/apps, tanpa suite test dan resep pembangunan;
 #   5. aplikasi menyala: migration, seed, dan pendaftaran manifest berjalan ke PostgreSQL kosong seperti
@@ -46,14 +46,20 @@ lulus 'dpkg sehat, tidak ada dependensi yang dilanggar'
 
 # Nama seperti yang dicetak `php -m`. OPcache terdaftar sebagai "Zend OPcache".
 ekstensi_wajib=(intl gd pdo_pgsql pgsql zip bcmath 'Zend OPcache' opentelemetry mbstring curl xml)
-for sapi in cli apache2; do
-    termuat="$(di_image "PHP_INI_SCAN_DIR=/etc/php/8.4/$sapi/conf.d php -c /etc/php/8.4/$sapi/php.ini -m")" \
-        || gagal "php -m untuk SAPI $sapi gagal."
+# Dua jalan PHP di image ini: binari `php` (artisan, worker antrean, penjadwal) dan `libphp` yang
+# ditanam di FrankenPHP (peran web). `frankenphp php-cli` menjalankan skrip lewat libphp itu.
+for sapi in php frankenphp; do
+    if [ "$sapi" = php ]; then
+        termuat="$(di_image 'php -m')" || gagal 'php -m gagal.'
+    else
+        termuat="$(di_image 'printf "<?php echo implode(PHP_EOL, get_loaded_extensions());" > /tmp/ekstensi.php && frankenphp php-cli /tmp/ekstensi.php')" \
+            || gagal 'frankenphp php-cli gagal.'
+    fi
     for nama in "${ekstensi_wajib[@]}"; do
-        printf '%s\n' "$termuat" | grep -qxF "$nama" || gagal "Ekstensi $nama tidak termuat di SAPI $sapi."
+        printf '%s\n' "$termuat" | grep -qxF "$nama" || gagal "Ekstensi $nama tidak termuat di $sapi."
     done
 done
-lulus "ekstensi termuat di CLI dan Apache: ${ekstensi_wajib[*]}"
+lulus "ekstensi termuat di php dan FrankenPHP: ${ekstensi_wajib[*]}"
 
 versi_pg="$(di_image 'pg_dump --version && pg_restore --version')" || gagal 'pg_dump atau pg_restore tidak berjalan:' "$versi_pg"
 lulus "$(printf '%s' "$versi_pg" | tr '\n' ';' | sed 's/;$//; s/;/, /')"

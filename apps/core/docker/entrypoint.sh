@@ -39,12 +39,45 @@ bangun_cache() {
         || echo "Peringatan: route:cache gagal; setiap permintaan akan mendaftarkan ulang seluruh rute." >&2
 }
 
+# Berkas keadaan server Octane ditaruh di /tmp milik container, bukan `storage/logs` yang dipakai bersama
+# peran lain dan replika web lain lewat volume, supaya tidak saling menimpa. Diekspor sebelum config
+# di-cache, karena `config/octane.php` membacanya lewat env().
+export OCTANE_STATE_FILE="${OCTANE_STATE_FILE:-/tmp/octane-server-state.json}"
+
 bangun_cache
 
 case "${CONTAINER_ROLE:-web}" in
     web)
+        # FrankenPHP dalam mode worker lewat Octane: Laravel di-boot sekali per worker, bukan per
+        # permintaan. Port tetap 80 supaya proxy dan healthcheck di depan container tidak berubah;
+        # binari frankenphp membawa CAP_NET_BIND_SERVICE, jadi www-data boleh membukanya.
+        #
+        # Worker bawaan `auto`: FrankenPHP memakai dua kali jumlah CPU yang ia lihat, termasuk batas CPU
+        # container (2 CPU → 4 worker). Jangan dinaikkan tanpa mengukur: 3 Oktober 2026, endpoint aset,
+        # 2 CPU, 350 pengguna serentak, bergantian dua putaran — `auto` lulus (p95 320 dan 376 ms),
+        # 8 worker (p95 1,6–1,8 dtk) dan 16 worker (p95 0,55–0,8 dtk) gagal. Worker tambahan hanya
+        # berebut CPU yang sama. Setelah OCTANE_MAX_REQUESTS permintaan worker diganti baru, supaya
+        # kebocoran memori yang belum ketahuan tidak menumpuk tanpa batas.
+        #
+        # `variables_order=EGPCS` mengikuti contoh dokumentasi Octane: php.ini-production (image
+        # on-prem) memakai GPCS, yang mengosongkan $_ENV untuk proses yang menyalakan server.
+        #
+        # FRANKENPHP_WORKER=0 hanya untuk pengembangan dengan kode di-mount (`start.ps1 -HotReload` di
+        # erp-dev): FrankenPHP tanpa mode worker, Laravel di-boot ulang tiap permintaan seperti Apache,
+        # jadi suntingan PHP terbaca di permintaan berikutnya. Mode worker tidak bisa dipakai di sana.
+        # Worker yang menyala sebelum suntingan lalu menganggur memegang kelas yang dimuatnya saat boot,
+        # dan `--max-requests=1` baru mengganti worker sesudah ia melayani satu permintaan — diukur
+        # 3 Oktober 2026, ±15% permintaan pada detik-detik pertama sesudah suntingan masih menjawab isi
+        # lama. Watcher FrankenPHP (`--watch`) juga tidak menolong: ia bersandar pada inotify, dan
+        # perubahan dari Windows tidak pernah sampai lewat bind mount Docker Desktop.
         drop_to_www_data
-        exec apache2-foreground
+        if [ "${FRANKENPHP_WORKER:-1}" = '0' ]; then
+            exec runuser -u www-data -- frankenphp php-server --listen :80 --root /repo/apps/core/public
+        fi
+        exec runuser -u www-data -- php -d variables_order=EGPCS artisan octane:frankenphp --no-interaction \
+            --host=0.0.0.0 --port=80 --admin-port=2019 \
+            --workers="${OCTANE_WORKERS:-auto}" --max-requests="${OCTANE_MAX_REQUESTS:-500}" \
+            --log-level="${OCTANE_LOG_LEVEL:-warn}"
         ;;
     scheduler)
         # schedule:work ticks once a minute in-process. number-sequences:recover also guards itself with
@@ -53,7 +86,7 @@ case "${CONTAINER_ROLE:-web}" in
         exec runuser -u www-data -- php artisan schedule:work --no-interaction
         ;;
     worker)
-        # Same user as Apache's PHP. The worker writes report exports and layout copies into
+        # Same user as the web role's PHP. The worker writes report exports and layout copies into
         # storage/app, which the web role must then read and serve; a root-owned file there is
         # invisible to www-data and the download answers 410 for a file that exists.
         drop_to_www_data
