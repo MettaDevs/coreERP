@@ -107,7 +107,7 @@ masing-masing (*Dikirim:*), dan halaman rancangan yang bersangkutan ikut diperba
 
 ---
 
-### 1. [ ] Kontrak dataset lengkap dan registry
+### 1. [x] Kontrak dataset lengkap dan registry
 
 **Tempat:** `app/Platform/Modules/Contracts/Analytics/*`, `app/Platform/Analytics/Datasets/*`,
 `tests/Feature/Boundary/*`, `tests/Fixtures/modules/*` · **Setelah:** 0 · **Keputusan:** KA-03, KA-15,
@@ -116,31 +116,57 @@ API `DatasetDefinition` di [model semantik](/todo/analitik/model-semantik) terse
 `DatasetValidator` punya test yang merah untuk definisi rusak, dan dataset rusak di runtime dilewati
 tanpa menjatuhkan aplikasi.
 
-- [ ] 1.1 `DatasetDefinition` lengkap: `reference()`, `shared()`, `join()`, `fromQuery()`, `measure()`
+Selesai 4 Oktober 2026. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir
+masing-masing (*Dikirim:*), dan [model semantik](/todo/analitik/model-semantik) serta
+[arsitektur](/todo/analitik/arsitektur#compileddataset) ikut diperbarui.
+
+- [x] 1.1 `DatasetDefinition` lengkap: `reference()`, `shared()`, `join()`, `fromQuery()`, `measure()`
   dengan `where`, `currency`, `unit`, beberapa `time()`, `recordRoute()`, `version()` dengan `renamed`,
-  `description()`.
-- [ ] 1.2 `SharedDimension` dan kontrak `SharedDimensions` (registry resolver label). Resolver Core:
+  `description()`. *Dikirim:* juga `field()`. `fromQuery()` menerima query **Eloquent**, bukan query
+  builder sembarang, supaya modelnya dapat diperiksa; query sumber wajib memilih `tenant_id`.
+- [x] 1.2 `SharedDimension` dan kontrak `SharedDimensions` (registry resolver label). Resolver Core:
   legal entity dan unit kerja (tabel `organizations`), pengguna (nama anggota; label hanya untuk
   principal berhak data pribadi), mata uang. Resolver vendor didaftarkan
   `App\Foundation\Vendor`-nya sendiri dari penyedia layanannya, karena Platform tidak boleh menyebut
-  Foundation.
-- [ ] 1.3 `DatasetValidator` dengan seluruh aturan di tabel
+  Foundation. *Dikirim:* kontrak resolver `SharedDimensionResolver` dengan `labelClassification()`;
+  `SharedDimensionRegistry::labels(…, $mayUsePersonalData)` menahan label `EndUserIdentifiableInformation`.
+  Mata uang ternyata fitur Foundation (`App\Foundation\Currency`), jadi resolvernya didaftarkan fitur itu,
+  seperti vendor; labelnya kode ISO sampai master mata uang ada (FIN-20). Label vendor ikut berkelas data
+  pribadi, karena nama party di buku alamat berkelas itu. Ikatan `SharedDimensions` di `CoreServices`
+  maju dari area 14 ke area ini.
+- [x] 1.3 `DatasetValidator` dengan seluruh aturan di tabel
   [yang diperiksa](/todo/analitik/model-semantik#yang-diperiksa-datasetvalidator). Untuk aturan
   "permission yang dilindungi kebijakan mewajibkan `dataPolicy()`", baca kebijakan module dari manifest
-  gabungannya (`ModuleManifestFiles::read()`), bukan dari database.
-- [ ] 1.4 `CompiledDataset`: kolom terkualifikasi, `FilterField` per field untuk
+  gabungannya (`ModuleManifestFiles::read()`), bukan dari database. *Dikirim:* dua tahap — `declare()`
+  tanpa database dan `compile()` terhadap database — dan tujuh aturan tambahan yang dicatat di tabel itu
+  (kebijakan ada di manifest, kunci field yang membayangi kolom lain, alias join milik engine, kolom
+  `only`/`except`, rujukan, query sumber, versi).
+- [x] 1.4 `CompiledDataset`: kolom terkualifikasi, `FilterField` per field untuk
   `FieldFilterExpression`, kolom label, tipe database tiap kolom waktu (`date`, `timestamp`,
-  `timestamptz`), measure, kebijakan, dan `hash()` definisi untuk kunci cache.
-- [ ] 1.5 `DatasetRegistry` lengkap: kompilasi malas sekali per proses; `forTenant()` hanya dataset dari
+  `timestamptz`), measure, kebijakan, dan `hash()` definisi untuk kunci cache. *Dikirim:* daftar method
+  di [arsitektur](/todo/analitik/arsitektur#compileddataset), termasuk `classification()` untuk area 4,
+  `joins()`/`reference()`/`labelColumnsFor()` untuk `JoinPlanner` area 3, dan `baseQuery()` untuk
+  dataset bersumber query. Join dan join label **dinyatakan** di sini tetapi belum dipasang compiler
+  area 0; query yang memakai kolom join masih gagal sebagai galat SQL sampai area 3.
+- [x] 1.5 `DatasetRegistry` lengkap: kompilasi malas sekali per proses; `forTenant()` hanya dataset dari
   module yang terpasang dan berlisensi; dataset rusak dilewati dengan `Log::warning` tanpa data tenant.
-- [ ] 1.6 Fixture module di `tests/Fixtures/modules` dengan dua dataset (satu berkebijakan, satu
-  tidak), supaya test engine tidak bergantung pada module aset.
-- [ ] 1.7 `AnalyticsDatasetsBoundaryTest`: validator atas seluruh dataset terdaftar; dibuktikan merah
+  *Dikirim:* definisi sekali per proses, hasil kompilasi sekali **per database** (pekerja FrankenPHP
+  melayani beberapa database environment); dataset rusak dicatat sekali; tabel yang belum ada tidak
+  disimpan, supaya module yang dipasang sesudahnya langsung terbaca; `diagnose()` untuk perintah dan
+  penjaga.
+- [x] 1.6 Fixture module di `tests/Fixtures/modules` dengan dua dataset (satu berkebijakan, satu
+  tidak), supaya test engine tidak bergantung pada module aset. *Dikirim:* di `contoh-a`, bukan module
+  baru (menambah module contoh mengubah daftar module yang diuji banyak test lain): tabel
+  `contoh_a_tr_penjualan` dengan ketiga jenis kolom waktu, satu kolom data pribadi, dan id pengguna;
+  `contoh-a.penjualan` (kebijakan, join, rujukan, dimensi bersama, uang, measure bersaringan) dan
+  `contoh-a.barang` (tanpa kebijakan); manifest `manifest/barang.yaml` dan `manifest/penjualan.yaml`.
+- [x] 1.7 `AnalyticsDatasetsBoundaryTest`: validator atas seluruh dataset terdaftar; dibuktikan merah
   dengan fixture berkolom salah.
-- [ ] 1.8 `AnalyticsBoundaryTest` lengkap: juga `DB::table(`/`DB::select(` di luar daftar kelas yang
-  memang menyusun SQL.
-- [ ] 1.9 `php artisan analytics:datasets` — daftar per module, versi, jumlah field dan measure, hasil
-  validasi.
+- [x] 1.8 `AnalyticsBoundaryTest` lengkap: juga `DB::table(`/`DB::select(` di luar daftar kelas yang
+  memang menyusun SQL. *Dikirim:* daftarnya `SQL_COMPOSERS` (compiler, cache, log); `DB::select…`
+  menangkap `selectOne` juga.
+- [x] 1.9 `php artisan analytics:datasets` — daftar per module, versi, jumlah field dan measure, hasil
+  validasi. *Dikirim:* keluar dengan kode gagal bila ada dataset rusak, supaya dapat dipakai di CI.
 
 ---
 

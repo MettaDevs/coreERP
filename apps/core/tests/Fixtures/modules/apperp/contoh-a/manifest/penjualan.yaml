@@ -1,0 +1,40 @@
+# Penjualan dibatasi kebijakan data menurut unit kerja, seperti register aset. Dataset analitiknya
+# wajib menyatakan kolom kebijakan; tanpa itu validator dataset menolaknya.
+security:
+  data_policies:
+    - code: contoh-a.penjualan-unit
+      name: Penjualan menurut unit kerja
+      protected_permissions:
+        - contoh-a.penjualan.read
+      requires_legal_entity: true
+      requires_operating_unit: true
+      allows_descendants: true
+  entry_points:
+    - code: contoh-a.penjualan.form
+      name: Layar penjualan
+      type: form
+  permissions:
+    - code: contoh-a.penjualan.read
+      name: Lihat penjualan
+      entry_point: contoh-a.penjualan.form
+      access: read
+    # Bukan izin baca: dataset yang memakainya ditolak validator.
+    - code: contoh-a.penjualan.create
+      name: Catat penjualan
+      entry_point: contoh-a.penjualan.form
+      access: create
+  privileges:
+    - code: contoh-a.penjualan.view
+      name: Lihat penjualan
+      permissions:
+        - contoh-a.penjualan.read
+    - code: contoh-a.penjualan.record
+      name: Catat penjualan
+      permissions:
+        - contoh-a.penjualan.read
+        - contoh-a.penjualan.create
+  duties:
+    - code: contoh-a.penjualan.maintain
+      name: Kelola penjualan
+      privileges:
+        - contoh-a.penjualan.record

@@ -7,12 +7,14 @@ namespace App\Platform\Modules\Support;
 use App\Platform\Access\Support\LinkedWorkerResolverRegistry;
 use App\Platform\AddressBook\ModuleServices\AddressDirectoryCore;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
+use App\Platform\Analytics\Datasets\SharedDimensionRegistry;
 use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
 use App\Platform\ChangeLog\Support\ChangeLogValueResolverRegistry;
 use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Modules\Contracts\AddressDirectory;
 use App\Platform\Modules\Contracts\Analytics\Datasets;
+use App\Platform\Modules\Contracts\Analytics\SharedDimensions;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\ChangeHistory;
 use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
@@ -143,6 +145,9 @@ final class CoreServices
         // Engine analitik: module menyatakan dataset — tabel, field, measure, kolom kebijakan — dan Core
         // membaca tabelnya lewat definisi itu saja, tanpa menulis nama tabel module (docs/todo/analitik).
         Datasets::class => DatasetRegistry::class,
+        // Engine analitik: label dimensi bersama (unit kerja, entitas legal, pengguna, vendor, mata uang).
+        // Platform memasang resolver miliknya; fitur Foundation mendaftarkan miliknya dari penyedia layanannya.
+        SharedDimensions::class => SharedDimensionRegistry::class,
     ];
 
     /**

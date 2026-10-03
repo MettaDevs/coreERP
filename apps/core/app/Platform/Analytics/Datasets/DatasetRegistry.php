@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Datasets;
 
-use App\Platform\Modules\Contracts\Analytics\Aggregate;
+use App\Platform\License\Support\SiteLicense;
 use App\Platform\Modules\Contracts\Analytics\Dataset;
 use App\Platform\Modules\Contracts\Analytics\Datasets;
-use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
-use App\Platform\Modules\Contracts\BelongsToTenant;
-use App\Platform\Modules\Contracts\TableFields;
-use Illuminate\Database\Eloquent\Model;
+use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Dataset analitik yang didaftarkan module, padanan daftar query object yang dikenal Business Central.
@@ -21,19 +19,19 @@ use Illuminate\Support\Facades\Log;
  * `CoreServices::SINGLETON_BINDINGS` — diikat biasa, setiap pendaftaran masuk ke salinan yang langsung
  * dibuang.
  *
- * Dua tahap, dan pemisahnya disengaja:
+ * Dua tahap {@see DatasetValidator}, masing-masing dibaca malas dan disimpan selama proses hidup:
  *
- * - **Definisi dibaca sekali per proses**, saat dataset pertama kali diminta, bukan saat boot.
- *   `definition()` tidak menyentuh database, tetapi boot berjalan juga untuk `config:cache` dan
- *   `route:cache`, dan dataset rusak tidak boleh menjatuhkan keduanya. Pemeriksaannya minimal — kode
- *   berawalan id module, model ber-`BelongsToTenant`, nama kolom berbentuk pengenal, measure uang
- *   menyebut kolom mata uangnya — dan dataset yang gagal dilewati dengan `Log::warning`, sama seperti
- *   registry module melewati manifest rusak. Pemeriksaan lengkap (kolom benar-benar ada, permission
- *   ada di manifest, klasifikasi) milik `DatasetValidator` di area 1.
- * - **Field dibaca dari database setiap kali dataset diminta**, lewat `TableFields` yang menyimpan tipe
- *   kolom per nama database. Satu proses dapat melayani beberapa database environment, dan field yang
- *   dibekukan dari database pertama belum tentu benar untuk yang berikutnya. Database yang belum punya
- *   tabel dataset (module belum dipasang di environment itu) menjawab dataset tidak tersedia.
+ * - **Definisi, sekali per proses**, saat dataset pertama kali diminta, bukan saat boot: boot berjalan
+ *   juga untuk `config:cache` dan `route:cache`, dan dataset rusak tidak boleh menjatuhkan keduanya.
+ * - **Hasil kompilasi, sekali per database.** Satu proses — terutama pekerja FrankenPHP yang hidup lama —
+ *   melayani beberapa database environment, dan kolom satu database belum tentu sama dengan yang lain.
+ *   Yang disimpan hanya definisi dan skema, **tidak pernah data tenant**: pemasangan module per tenant
+ *   dan lisensi dibaca ulang di setiap {@see self::forTenant()}.
+ *
+ * Dataset rusak dilewati dengan `Log::warning` yang hanya menyebut kode dataset, module, dan sebabnya,
+ * sama seperti registry module melewati manifest rusak. Dataset yang tabelnya belum ada di database ini
+ * (module-nya belum dipasang di environment itu) tidak tersedia tanpa peringatan, dan **tidak disimpan**:
+ * module yang dipasang sesudahnya di proses yang sama langsung terbaca.
  */
 final class DatasetRegistry implements Datasets
 {
@@ -43,35 +41,162 @@ final class DatasetRegistry implements Datasets
     /** @var list<Dataset> */
     private array $registered = [];
 
-    /**
-     * @var array<string, array{module: string, caption: string, model: class-string<Model>, permission: string, policy: array{code: string, legal_entity: string, operating_unit: ?string}|null, only: list<string>, except: list<string>, from_model: bool, measures: array<string, CompiledMeasure>, times: list<string>, default_time: ?string, version: int}>|null
-     */
-    private ?array $definitions = null;
+    /** @var array<string, DeclaredDataset>|null definisi sah per kode, urut kode */
+    private ?array $declared = null;
+
+    /** @var array<string, array<string, CompiledDataset|InvalidDatasetDefinition>> per database, lalu per kode */
+    private array $compiled = [];
+
+    public function __construct(private readonly DatasetValidator $validator) {}
 
     public function register(Dataset $dataset): void
     {
         $this->registered[] = $dataset;
-        $this->definitions = null;
+        $this->declared = null;
+        $this->compiled = [];
     }
 
     /** Dataset menurut kodenya, atau null bila tidak terdaftar, definisinya rusak, atau tabelnya tidak ada di database ini. */
     public function find(string $code): ?CompiledDataset
     {
-        $definition = $this->definitions()[$code] ?? null;
+        $declared = $this->declared()[$code] ?? null;
 
-        return $definition === null ? null : $this->compile($code, $definition);
+        return $declared === null ? null : $this->compiled($declared);
     }
 
     /**
-     * Semua dataset yang terdaftar dan sah, urut kode supaya hasilnya sama antar proses.
+     * Semua dataset yang terdaftar dan sah di database ini, urut kode supaya hasilnya sama antar proses.
+     * Termasuk dataset module yang tidak terpasang untuk tenant mana pun; untuk satu tenant pakai
+     * {@see self::forTenant()}.
      *
      * @return list<CompiledDataset>
      */
     public function all(): array
     {
+        return $this->compiledAll(array_values($this->declared()));
+    }
+
+    /**
+     * Dataset yang boleh ditawarkan kepada tenant ini: module-nya terpasang untuk tenant itu (catatan
+     * `core_module_installations`, bukan entitlement) dan berlisensi di server ini. Permission baca
+     * resource tetap diperiksa per principal oleh `DatasetAccess`.
+     *
+     * @return list<CompiledDataset>
+     */
+    public function forTenant(string $tenantId): array
+    {
+        $installed = ModuleInstallation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', ModuleInstallation::STATUS_INSTALLED)
+            ->pluck('module_id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+        // Dibaca dari wadah setiap kali, bukan disuntikkan: lisensi diikat `scoped`, dan registry ini hidup
+        // sepanjang proses.
+        $license = app(SiteLicense::class);
+
+        return $this->compiledAll(array_values(array_filter(
+            $this->declared(),
+            static fn (DeclaredDataset $declared): bool => in_array($declared->moduleId, $installed, true) && $license->allowsApp($declared->moduleId),
+        )));
+    }
+
+    /**
+     * Hasil pemeriksaan setiap dataset terdaftar terhadap database ini, dihitung ulang tanpa simpanan
+     * dan tanpa log. Untuk `analytics:datasets` dan `AnalyticsDatasetsBoundaryTest`, yang harus melihat
+     * dataset rusak, bukan melewatinya.
+     *
+     * @return list<array{module: string, code: string, status: 'valid'|'unavailable'|'invalid', dataset: ?CompiledDataset, problem: ?string}>
+     */
+    public function diagnose(): array
+    {
         $out = [];
-        foreach ($this->definitions() as $code => $definition) {
-            $compiled = $this->compile($code, $definition);
+        $seen = [];
+
+        foreach ($this->registered as $dataset) {
+            $row = ['module' => $dataset->moduleId(), 'code' => $dataset->definition()->code, 'status' => 'invalid', 'dataset' => null, 'problem' => null];
+
+            try {
+                $declared = $this->validator->declare($dataset);
+                if (isset($seen[$declared->code])) {
+                    throw new InvalidDatasetDefinition('kodenya sudah dipakai dataset lain.');
+                }
+                $seen[$declared->code] = true;
+
+                if ($this->validator->available($declared)) {
+                    $row['dataset'] = $this->validator->compile($declared);
+                    $row['status'] = 'valid';
+                } else {
+                    $row['status'] = 'unavailable';
+                    $row['problem'] = 'tabel dasarnya belum ada di database ini (module belum dipasang di sini).';
+                }
+            } catch (InvalidDatasetDefinition $e) {
+                $row['problem'] = $e->getMessage();
+            }
+
+            $out[] = $row;
+        }
+
+        usort($out, static fn (array $a, array $b): int => [$a['module'], $a['code']] <=> [$b['module'], $b['code']]);
+
+        return $out;
+    }
+
+    /** @return list<Dataset> */
+    public function registered(): array
+    {
+        return $this->registered;
+    }
+
+    public static function isIdentifier(string $name): bool
+    {
+        return preg_match(self::IDENTIFIER, $name) === 1;
+    }
+
+    /** @return array<string, DeclaredDataset> */
+    private function declared(): array
+    {
+        if ($this->declared !== null) {
+            return $this->declared;
+        }
+
+        $out = [];
+        foreach ($this->registered as $dataset) {
+            $module = $dataset->moduleId();
+
+            try {
+                $declared = $this->validator->declare($dataset);
+            } catch (Throwable $e) {
+                // Kode module yang melempar apa pun saat menyusun definisinya adalah dataset rusak, bukan
+                // aplikasi yang rusak. Tanpa data tenant: yang dicatat hanya module dan sebabnya.
+                Log::warning('Dataset analitik dilewati: '.$e->getMessage(), ['module' => $module, 'exception' => $e::class]);
+
+                continue;
+            }
+
+            if (isset($out[$declared->code])) {
+                Log::warning('Dataset analitik dilewati: kodenya sudah dipakai dataset lain.', ['dataset' => $declared->code, 'module' => $module]);
+
+                continue;
+            }
+
+            $out[$declared->code] = $declared;
+        }
+
+        ksort($out);
+
+        return $this->declared = $out;
+    }
+
+    /**
+     * @param  list<DeclaredDataset>  $declared
+     * @return list<CompiledDataset>
+     */
+    private function compiledAll(array $declared): array
+    {
+        $out = [];
+        foreach ($declared as $dataset) {
+            $compiled = $this->compiled($dataset);
             if ($compiled !== null) {
                 $out[] = $compiled;
             }
@@ -80,221 +205,43 @@ final class DatasetRegistry implements Datasets
         return $out;
     }
 
-    public static function isIdentifier(string $name): bool
+    private function compiled(DeclaredDataset $declared): ?CompiledDataset
     {
-        return preg_match(self::IDENTIFIER, $name) === 1;
-    }
+        $database = $this->database($declared);
+        $known = $this->compiled[$database][$declared->code] ?? null;
 
-    /**
-     * @return array<string, array{module: string, caption: string, model: class-string<Model>, permission: string, policy: array{code: string, legal_entity: string, operating_unit: ?string}|null, only: list<string>, except: list<string>, from_model: bool, measures: array<string, CompiledMeasure>, times: list<string>, default_time: ?string, version: int}>
-     */
-    private function definitions(): array
-    {
-        if ($this->definitions !== null) {
-            return $this->definitions;
-        }
-
-        $out = [];
-        foreach ($this->registered as $dataset) {
-            $raw = $dataset->definition()->toArray();
-            $code = is_string($raw['code'] ?? null) ? $raw['code'] : '';
+        if ($known === null) {
+            // Tidak disimpan: tabel yang belum ada sekarang dapat dibuat pemasangan module berikutnya.
+            if (! $this->validator->available($declared)) {
+                return null;
+            }
 
             try {
-                $definition = $this->read($dataset->moduleId(), $raw);
+                $known = $this->validator->compile($declared);
             } catch (InvalidDatasetDefinition $e) {
-                // Tanpa data tenant: yang dicatat hanya kode dataset, module, dan sebabnya.
-                Log::warning('Dataset analitik dilewati: '.$e->getMessage(), ['dataset' => $code, 'module' => $dataset->moduleId()]);
-
-                continue;
+                Log::warning('Dataset analitik dilewati: '.$e->getMessage(), ['dataset' => $declared->code, 'module' => $declared->moduleId]);
+                $known = $e;
             }
-
-            if (isset($out[$code])) {
-                Log::warning('Dataset analitik dilewati: kodenya sudah dipakai dataset lain.', ['dataset' => $code, 'module' => $dataset->moduleId()]);
-
-                continue;
-            }
-
-            $out[$code] = $definition;
+            $this->compiled[$database][$declared->code] = $known;
         }
 
-        ksort($out);
-
-        return $this->definitions = $out;
+        return $known instanceof CompiledDataset ? $known : null;
     }
 
     /**
-     * @param  array<string, mixed>  $raw
-     * @return array{module: string, caption: string, model: class-string<Model>, permission: string, policy: array{code: string, legal_entity: string, operating_unit: ?string}|null, only: list<string>, except: list<string>, from_model: bool, measures: array<string, CompiledMeasure>, times: list<string>, default_time: ?string, version: int}
-     *
-     * @throws InvalidDatasetDefinition
+     * Kunci database koneksi model dataset saat ini. Koneksi bawaan bernama sama untuk setiap environment
+     * tetapi menunjuk database yang berbeda dari permintaan ke permintaan, jadi yang dipakai alamat dan
+     * nama databasenya, bukan nama koneksinya.
      */
-    private function read(string $moduleId, array $raw): array
+    private function database(DeclaredDataset $declared): string
     {
-        $code = $raw['code'] ?? null;
-        if (! is_string($code) || ! str_starts_with($code, $moduleId.'.') || $code === $moduleId.'.') {
-            throw new InvalidDatasetDefinition('kode dataset harus berawalan id module "'.$moduleId.'.".');
-        }
+        $connection = (new $declared->model)->getConnection();
 
-        $model = $raw['model'] ?? null;
-        if (! is_string($model) || ! is_subclass_of($model, Model::class)) {
-            throw new InvalidDatasetDefinition('dataset butuh model sebagai sumbernya.');
-        }
-        if (! in_array(BelongsToTenant::class, class_uses_recursive($model), true)) {
-            throw new InvalidDatasetDefinition('model dataset harus memakai BelongsToTenant, supaya penyaringan tenant milik model.');
-        }
-
-        $permission = $raw['permission'] ?? null;
-        if (! is_string($permission) || ! str_starts_with($permission, $moduleId.'.')) {
-            throw new InvalidDatasetDefinition('dataset butuh permission baca milik module-nya sendiri.');
-        }
-
-        $policy = $raw['policy'] ?? null;
-        if ($policy !== null) {
-            if (! is_array($policy) || ! is_string($policy['code'] ?? null) || ! is_string($policy['legal_entity'] ?? null)) {
-                throw new InvalidDatasetDefinition('kebijakan data butuh kode dan kolom legal entity.');
-            }
-            $operatingUnit = $policy['operating_unit'] ?? null;
-            $policy = [
-                'code' => $policy['code'],
-                'legal_entity' => $this->identifier($policy['legal_entity'], 'kolom legal entity kebijakan'),
-                'operating_unit' => $operatingUnit === null ? null : $this->identifier($operatingUnit, 'kolom unit kerja kebijakan'),
-            ];
-        }
-
-        $fromModel = $raw['fromModel'] ?? null;
-
-        return [
-            'module' => $moduleId,
-            'caption' => is_string($raw['caption'] ?? null) ? $raw['caption'] : $code,
-            'model' => $model,
-            'permission' => $permission,
-            'policy' => $policy,
-            'from_model' => is_array($fromModel),
-            'only' => $this->names(is_array($fromModel) ? ($fromModel['only'] ?? []) : []),
-            'except' => $this->names(is_array($fromModel) ? ($fromModel['except'] ?? []) : []),
-            'measures' => $this->measures($raw['measures'] ?? []),
-            'times' => array_map(fn (string $time): string => $this->identifier($time, 'field waktu'), $this->names($raw['times'] ?? [])),
-            'default_time' => is_string($raw['defaultTime'] ?? null) ? $raw['defaultTime'] : null,
-            'version' => is_int($raw['version'] ?? null) ? $raw['version'] : 1,
-        ];
-    }
-
-    /**
-     * @return array<string, CompiledMeasure>
-     *
-     * @throws InvalidDatasetDefinition
-     */
-    private function measures(mixed $measures): array
-    {
-        if (! is_array($measures) || $measures === []) {
-            throw new InvalidDatasetDefinition('dataset butuh sedikitnya satu measure.');
-        }
-
-        $out = [];
-        foreach ($measures as $key => $measure) {
-            $key = $this->identifier((string) $key, 'kunci measure');
-            if (! is_array($measure) || ! ($measure['aggregate'] ?? null) instanceof Aggregate || ! ($measure['format'] ?? null) instanceof MeasureFormat) {
-                throw new InvalidDatasetDefinition("measure {$key} tidak berbentuk benar.");
-            }
-
-            $field = $this->optionalIdentifier($measure['field'] ?? null, "kolom measure {$key}");
-            $currency = $this->optionalIdentifier($measure['currency'] ?? null, "kolom mata uang measure {$key}");
-            $unit = $this->optionalIdentifier($measure['unit'] ?? null, "kolom satuan measure {$key}");
-
-            // Uang tidak pernah dijumlah lintas mata uang dan kuantitas tidak lintas satuan (KA-22):
-            // compiler menambahkan kolom itu sebagai dimensi tersirat, jadi kolomnya wajib disebut.
-            if ($measure['format'] === MeasureFormat::Money && $currency === null) {
-                throw new InvalidDatasetDefinition("measure uang {$key} wajib menyebut kolom mata uangnya.");
-            }
-            if ($measure['format'] === MeasureFormat::Quantity && $unit === null) {
-                throw new InvalidDatasetDefinition("measure kuantitas {$key} wajib menyebut kolom satuannya.");
-            }
-            if ($measure['aggregate'] !== Aggregate::Count && $field === null) {
-                throw new InvalidDatasetDefinition("measure {$key} butuh kolom yang dihitung.");
-            }
-
-            $where = is_array($measure['where'] ?? null) ? $measure['where'] : [];
-            foreach (array_keys($where) as $column) {
-                $this->identifier((string) $column, "saringan tetap measure {$key}");
-            }
-
-            /** @var array<string, list<string|int|bool|null>|string|int|bool|null> $where */
-            $out[$key] = new CompiledMeasure(
-                key: $key,
-                caption: is_string($measure['caption'] ?? null) ? $measure['caption'] : $key,
-                aggregate: $measure['aggregate'],
-                field: $field,
-                format: $measure['format'],
-                currency: $currency,
-                unit: $unit,
-                where: $where,
-            );
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param  array{module: string, caption: string, model: class-string<Model>, permission: string, policy: array{code: string, legal_entity: string, operating_unit: ?string}|null, only: list<string>, except: list<string>, from_model: bool, measures: array<string, CompiledMeasure>, times: list<string>, default_time: ?string, version: int}  $definition
-     */
-    private function compile(string $code, array $definition): ?CompiledDataset
-    {
-        $model = new $definition['model'];
-        $table = $model->getTable();
-
-        // Database environment ini belum punya tabelnya: module-nya belum dipasang di sini. Itu keadaan wajar
-        // pada database per environment, bukan cacat, jadi tidak dicatat. Datasetnya memang tidak tersedia di
-        // database ini — jawabannya sama dengan dataset yang tidak terdaftar — dan dataset lain tetap berjalan.
-        if (! $model->getConnection()->getSchemaBuilder()->hasTable($table)) {
-            return null;
-        }
-
-        $fields = [];
-        if ($definition['from_model']) {
-            foreach (TableFields::for($definition['model'], $table) as $field) {
-                if (($definition['only'] !== [] && ! in_array($field->key, $definition['only'], true))
-                    || in_array($field->key, $definition['except'], true)) {
-                    continue;
-                }
-                $fields[$field->key] = $field;
-            }
-        }
-
-        return new CompiledDataset(
-            code: $code,
-            caption: $definition['caption'],
-            moduleId: $definition['module'],
-            version: $definition['version'],
-            model: $definition['model'],
-            table: $table,
-            permission: $definition['permission'],
-            policy: $definition['policy'],
-            fields: $fields,
-            measures: $definition['measures'],
-            times: $definition['times'],
-            defaultTime: $definition['default_time'],
-        );
-    }
-
-    /** @throws InvalidDatasetDefinition */
-    private function identifier(mixed $name, string $what): string
-    {
-        if (! is_string($name) || ! self::isIdentifier($name)) {
-            throw new InvalidDatasetDefinition($what.' harus berupa huruf kecil, angka, dan garis bawah.');
-        }
-
-        return $name;
-    }
-
-    /** @throws InvalidDatasetDefinition */
-    private function optionalIdentifier(mixed $name, string $what): ?string
-    {
-        return $name === null ? null : $this->identifier($name, $what);
-    }
-
-    /** @return list<string> */
-    private function names(mixed $names): array
-    {
-        return is_array($names) ? array_values(array_filter($names, 'is_string')) : [];
+        return json_encode([
+            $connection->getConfig('host'),
+            $connection->getConfig('port'),
+            $connection->getDatabaseName(),
+            $connection->getConfig('search_path'),
+        ], JSON_THROW_ON_ERROR);
     }
 }

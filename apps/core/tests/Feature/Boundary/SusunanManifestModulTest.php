@@ -314,10 +314,11 @@ class SusunanManifestModulTest extends TestCase
     /**
      * Manifest tanpa blok `security` tidak diperiksa, dan itu keputusan yang perlu ditulis.
      *
-     * `contoh-a` dan `contoh-b` memang tidak punya blok itu. Menuntut mereka memilikinya
-     * berarti menuntut module contoh membawa empat lapis izin yang tidak dipakai satu pun
-     * test — dan aturan yang dipenuhi asal ada isinya adalah aturan yang tidak menjaga apa
-     * pun. Yang dijaga di sini adalah rantai yang **sudah dinyatakan**, harus utuh.
+     * `contoh-b` memang tidak punya blok itu. Menuntutnya berarti menuntut module contoh
+     * membawa empat lapis izin yang tidak dipakai satu pun test — dan aturan yang dipenuhi
+     * asal ada isinya adalah aturan yang tidak menjaga apa pun. Yang dijaga di sini adalah
+     * rantai yang **sudah dinyatakan**, harus utuh. (`contoh-a` punya sejak engine analitik
+     * area 1, karena validator dataset membaca permission dan kebijakannya dari manifest.)
      */
     public function test_manifest_tanpa_blok_keamanan_dilewati_tanpa_membuat_merah(): void
     {

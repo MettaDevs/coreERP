@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA;
 
+use App\Platform\Modules\Contracts\Analytics\Datasets;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\ContohA\Analytics\BarangDataset;
+use Modules\Apperp\ContohA\Analytics\PenjualanDataset;
 
 /**
  * Penyedia layanan module. Ia yang memutuskan apa yang dimuat, bukan Core.
@@ -21,5 +24,11 @@ final class ModuleServiceProvider extends ServiceProvider
     {
         // `loadRoutesFrom` menghormati cache rute; memanggil Route::group di sini tidak.
         $this->loadRoutesFrom(dirname(__DIR__).'/routes/web.php');
+
+        // Dataset analitik bahan uji, supaya test engine tidak bergantung pada module aset.
+        $datasets = $this->app->make(Datasets::class);
+        foreach ([BarangDataset::class, PenjualanDataset::class] as $dataset) {
+            $datasets->register($this->app->make($dataset));
+        }
     }
 }

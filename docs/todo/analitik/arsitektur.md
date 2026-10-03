@@ -24,9 +24,9 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | Komponen | Kelas utama | Tanggung jawab | Area |
 | --- | --- | --- | --- |
 | Satu query | `Actions\RunQuery` | Registry, akses, validasi, lalu compile dan eksekusi di dalam `TenantRunner::runFor()`; dipakai setiap jalur masuk, tempat cache dan log menumpang | 0, 9 |
-| Registry dataset | `Datasets\DatasetRegistry` | Mengumpulkan dataset dari module, memvalidasi definisinya, menyaring menurut module terpasang | 0 (tipis), 1 |
+| Registry dataset | `Datasets\DatasetRegistry`, `Datasets\DatasetValidator` | Mengumpulkan dataset dari module, memvalidasi definisinya dua tahap, menyaring menurut module terpasang dan berlisensi | 0 (tipis), 1 |
 | Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 1, 4 |
-| Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, periode, vendor: label dan pemilih | 14 |
+| Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, vendor, mata uang: label (area 1); periode, pemilih, dan drill-across (area 14) | 1, 14 |
 | Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryNormalizer`, `Query\QueryValidator` | JSON → objek tak berubah → bentuk normal; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
 | Titik panggil data pribadi | `Query\FieldUseGate` | Antarmuka yang dipanggil `QueryValidator` dengan semua kolom yang dipakai query; `Security\PersonalDataGate` (area 4) mengimplementasikannya | 2, 4 |
@@ -161,11 +161,13 @@ apps/core/app/Platform/Analytics/
 ├── Actions/
 │   └── RunQuery.php                    (0) satu query dari ujung ke ujung, untuk setiap jalur masuk
 ├── Datasets/
-│   ├── DatasetRegistry.php             (0) implements Contracts\Analytics\Datasets
-│   ├── CompiledDataset.php  CompiledMeasure.php  InvalidDatasetDefinition.php      (0)
-│   ├── DatasetValidator.php            aturan definisi (kolom ada, kebijakan, klasifikasi)
+│   ├── DatasetRegistry.php             (0, 1) implements Contracts\Analytics\Datasets
+│   ├── CompiledDataset.php  CompiledMeasure.php  InvalidDatasetDefinition.php      (0, 1)
+│   ├── DatasetValidator.php  DeclaredDataset.php                                   (1) aturan definisi
+│   ├── CompiledJoin.php  CompiledReference.php                                     (1)
 │   ├── DatasetCatalog.php              katalog per principal
-│   └── SharedDimensionRegistry.php     implements Contracts\Analytics\SharedDimensions
+│   ├── SharedDimensionRegistry.php     (1) implements Contracts\Analytics\SharedDimensions
+│   └── OrganizationLabels.php  MemberLabels.php                                    (1) resolver milik Platform
 ├── Query/
 │   ├── AnalyticsQuery.php  Dimension.php  TimeRange.php  TimeGranularity.php       (0)
 │   ├── QueryParser.php  QueryValidator.php                                        (0)
@@ -195,7 +197,7 @@ apps/core/app/Platform/Analytics/
 ├── External/       PublicationController.php  OData/*                         (fase 2)
 ├── Embed/          EmbedTokenIssuer.php  AuthenticateEmbedToken.php  EmbedPageController.php
 ├── Templates/      TemplateInstaller.php                                      (fase 2)
-├── Console/        AnalyticsDatasetsCommand.php  AnalyticsExplainCommand.php  PurgeAnalyticsCache.php
+├── Console/        AnalyticsDatasetsCommand.php (1)  AnalyticsExplainCommand.php  PurgeAnalyticsCache.php
 └── Rollups/        (fase 3)
 
 apps/core/app/Platform/Modules/Contracts/
@@ -203,8 +205,12 @@ apps/core/app/Platform/Modules/Contracts/
 └── Analytics/
     ├── Dataset.php  Datasets.php  DatasetDefinition.php                       (0)
     ├── Aggregate.php  MeasureFormat.php                                       (0)
-    ├── SharedDimension.php  SharedDimensions.php
+    ├── SharedDimension.php  SharedDimensions.php  SharedDimensionResolver.php  (1)
     └── DashboardTemplate.php  DashboardTemplates.php                          (fase 2)
+
+apps/core/app/Foundation/Vendor/Support/VendorLabels.php,
+apps/core/app/Foundation/Currency/Support/CurrencyLabels.php   (1) didaftarkan penyedia layanan fiturnya
+                                                               ke SharedDimensions
 
 apps/core/config/analytics.php                                                 (0)
 apps/core/resources/schemas/analytics-query.schema.json                        (2) sumber bentuk query
@@ -232,30 +238,46 @@ memanggilnya. Mengubahnya berarti memperbarui halaman ini dalam pull request yan
 yang dipegang compiler, keamanan baca, dan API layar. Area 1 dan 4 sama-sama memperluasnya; nama
 method di bawah sudah dipakai kode area 0 dan tidak diganti tanpa memperbarui halaman ini.
 
-| Anggota | Isi |
-| --- | --- |
-| `code`, `caption`, `moduleId`, `version` | Kode dataset (berawalan id module), nama tampilan, module pemilik, versi definisi |
-| `model`, `table` | Model dasar module dan nama tabelnya; tabel dasar tidak pernah diberi alias |
-| `permission` | Permission baca resource module (KA-15) |
-| `policy` | `{code, legal_entity, operating_unit}` atau null; kolom kebijakan tanpa awalan tabel |
-| `baseQuery()` | `Model::query()` — `TenantScope` dan `SoftDeletes` ikut, dipasang saat query dijalankan |
-| `fields()`, `hasField($key)`, `filterField($key)` | Field sebagai `FilterField` K-30, kolomnya berkualifikasi nama tabel |
-| `measures()`, `hasMeasure($key)`, `measure($key)` | `CompiledMeasure`: `key`, `caption`, `aggregate`, `field`, `format`, `currency`, `unit`, `where` |
-| `qualified($name)` | Kolom berkualifikasi untuk kunci field atau nama kolom tabel dasar yang lolos pemeriksaan pengenal |
-| `times()`, `defaultTime()` | Field waktu dan field waktu utama |
+| Anggota | Isi | Area |
+| --- | --- | --- |
+| `code`, `caption`, `moduleId`, `version` | Kode dataset (berawalan id module), nama tampilan, module pemilik, versi definisi | 0 |
+| `description`, `recordRoute` | Penjelasan untuk katalog; alamat layar record dengan `{id}`, atau null | 1 |
+| `model`, `table` | Model dasar module dan nama tabelnya; tabel dasar tidak pernah diberi alias. Dataset bersumber query: model query sumbernya, dan `table` = `SOURCE_ALIAS` (`base`) | 0, 1 |
+| `permission` | Permission baca resource module (KA-15) | 0 |
+| `policy` | `{code, legal_entity, operating_unit}` atau null; kolom kebijakan tanpa awalan tabel, atau `alias.kolom` untuk tabel join | 0, 1 |
+| `baseQuery()` | `Model::query()` — `TenantScope` dan `SoftDeletes` ikut, dipasang saat query dijalankan. Dataset bersumber query: `FROM (<sumber>) AS base WHERE base.tenant_id = ?`, gagal tertutup tanpa tenant aktif | 0, 1 |
+| `isQuerySource()` | Dataset bersumber query (`fromQuery()`) | 1 |
+| `fields()`, `hasField($key)`, `filterField($key)` | Field sebagai `FilterField` K-30, kolomnya berkualifikasi nama tabel (atau alias join, atau `base`) | 0 |
+| `classification($key)` | `DataClass` kolom field; tidak pernah `AccountData` atau belum diklasifikasi — bahan gerbang data pribadi area 4 | 1 |
+| `columnType($key)` | Nama tipe PostgreSQL kolom field (`int4`, `numeric`, `varchar`, `date`, …) | 1 |
+| `timeType($key)` | `date`, `timestamp` (berisi UTC), atau `timestamptz` untuk field waktu — bahan SQL ember waktu area 3 | 1 |
+| `sharedDimension($key)` | `SharedDimension` yang ditunjuk field, atau null; labelnya dari `SharedDimensionRegistry::labels()` sesudah query | 1 |
+| `reference($key)`, `labelColumnsFor($key)` | `CompiledReference` (tabel master, alias join label `r0…`, kolom lokal, `id`, label, kode) dan kolom label berkualifikasi `['label' => 'r0.nama', 'code' => 'r0.kode']`; kosong untuk field selain rujukan module | 1 |
+| `joins()` | `CompiledJoin` per alias: model, tabel, kolom lokal dan tujuan berkualifikasi, `includeArchived`, `archivable` (model ber-`SoftDeletes`) | 1 |
+| `measures()`, `hasMeasure($key)`, `measure($key)` | `CompiledMeasure`: `key`, `caption`, `aggregate`, `field`, `format`, `currency`, `unit`, `where`; `field`/`currency`/`unit` kunci field, kolom tabel dasar, atau `alias.kolom` | 0, 1 |
+| `qualified($name)` | Kolom berkualifikasi untuk kunci field, nama kolom tabel dasar, `alias.kolom` join, atau `<tabel>.<kolom>` yang sudah berkualifikasi | 0, 1 |
+| `times()`, `defaultTime()` | Field waktu dan field waktu utama | 0 |
+| `renamed()` | Peta kunci lama ke kunci baru dari `version()`, untuk membaca widget lama (area 6.5) | 1 |
+| `hash()` | Sidik jari sha256 definisi sesudah dibaca terhadap database ini (64 heksadesimal), untuk kunci cache area 9 | 1 |
 
 **Yang dibaca `QueryValidator` (area 2)** dari tabel di atas: `hasField()`, `hasMeasure()`, `times()`, dan
-`defaultTime()`; ember waktu dan rentang waktu hanya sah pada kunci yang ada di `times()`. Tidak ada method
-baru yang diminta. Satu kebutuhan tersisa milik area 4: `FieldUseGate` perlu tahu kolom mana yang memuat
-data pribadi. Usulan, belum ada di kelas ini — `classification(string $key): DataClass`, yang melempar
-`LogicException` untuk kunci tak dikenal seperti `filterField()`, diisi registry dari
-`DataClassificationRegistry` sekali per kompilasi dataset. Area 1.4 atau area 4 menambahkannya, mana yang
-lebih dulu; yang kedua memakai yang sudah ada.
+`defaultTime()`; ember waktu dan rentang waktu hanya sah pada kunci yang ada di `times()`. Kebutuhan
+`FieldUseGate` area 4 — kolom mana yang memuat data pribadi — dijawab `classification(string $key): DataClass`
+yang dikirim area 1: melempar `LogicException` untuk kunci tak dikenal seperti `filterField()`, dan diisi
+validator dari klasifikasi model pemilik kolom (`COLUMN_CLASSIFICATION`, kolom jejak, lalu
+`#[DataClassification]`) sekali per kompilasi dataset; field dataset bersumber query menyatakan
+klasifikasinya sendiri.
 
-Registry area 0 membaca **definisi** sekali per proses dan **field** dari database setiap kali dataset
-diminta (`TableFields` menyimpan tipe kolom per nama database), karena satu proses melayani beberapa
-database environment. Database yang belum punya tabel dataset menjawab dataset tidak tersedia
-(`find()` null, 404 `analytics.dataset_unknown`). Area 1.5 memutuskan memoisasinya.
+Registry membaca **definisi** sekali per proses (tahap tanpa database, `DatasetValidator::declare()`) dan
+**hasil kompilasi** sekali per database (`DatasetValidator::compile()`, dikunci alamat, nama database, dan
+`search_path` koneksi), karena satu proses — terutama pekerja FrankenPHP — melayani beberapa database
+environment. Yang disimpan hanya definisi dan skema, tidak pernah data tenant: pemasangan module per
+tenant dan lisensi dibaca ulang di setiap `forTenant()`. Dataset rusak disimpan sebagai rusak (peringatan
+sekali per proses); dataset yang tabelnya belum ada di database itu tidak disimpan, sehingga module yang
+dipasang sesudahnya di proses yang sama langsung terbaca. `find()` dan `all()` tidak menyaring pemasangan;
+`forTenant()` menyaring module terpasang (catatan `core_module_installations`) dan berlisensi.
+`diagnose()` memeriksa ulang setiap dataset terdaftar tanpa simpanan dan tanpa log, untuk
+`analytics:datasets` dan `AnalyticsDatasetsBoundaryTest`.
 
 ## Konfigurasi
 
@@ -304,12 +326,15 @@ Ditambahkan di `apps/core/tests/Feature/Boundary/` (area 0, 1, dan 4):
 - **`AnalyticsBoundaryTest`** membaca berkas di `app/Platform/Analytics` dan menolak: nama namespace
   `Modules\` dan nama tabel yang berawalan salah satu awalan module — dibaca dari `table_prefix` setiap
   `app.yaml`, termasuk module contoh bahan uji — termasuk di komentar (area 0); lalu
-  `DB::table(`/`DB::select(` di luar daftar kelas yang memang menyusun SQL (compiler, cache, log; area 1).
+  `DB::table(`/`DB::select…(` di luar `SQL_COMPOSERS`: `Query/QueryCompiler.php`, `Cache/QueryCache.php`,
+  dan `Support/QueryLog.php` (area 1).
   Alasannya: Core boleh membaca tabel module, tetapi hanya lewat definisi yang didaftarkan module,
   tidak pernah dengan nama yang ditulis mati.
 - **`AnalyticsDatasetsBoundaryTest`** menjalankan `DatasetValidator` atas seluruh dataset yang
-  terdaftar di suite: kolom dan join ada di database, kolom kebijakan ada, field data pribadi
-  ditandai, permission ada di manifest module, kode dataset berawalan id module.
+  terdaftar di suite — module produk dan dataset bahan uji `contoh-a` — lewat
+  `DatasetRegistry::diagnose()`: kolom dan join ada di database, kolom kebijakan ada, field
+  berklasifikasi, permission dan kebijakan ada di manifest module, kode dataset berawalan id module
+  dan unik (area 1).
 
 Penjaga yang sudah ada tetap berlaku: `DataClassificationBoundaryTest` dan `AuditColumnsBoundaryTest`
 untuk tabel `analytics_*`, `ModuleNamespaceBoundaryTest` untuk kelas dataset module,
