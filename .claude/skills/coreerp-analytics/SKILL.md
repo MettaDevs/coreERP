@@ -12,7 +12,12 @@ publications (JSON/CSV, OData v4, embeds).
 **Status.** Area 0 (walking skeleton) shipped on 3 October 2026: the dataset contract
 (`App\Platform\Modules\Contracts\Analytics`), `DatasetRegistry`, the query parser, validator,
 compiler, and read-only executor, `Actions\RunQuery`, `POST /api/v1/analytics/query`, and a temporary
-`/analytics/explore` page, all behind `analytics.enabled`. Everything else is still a plan. The plan,
+`/analytics/explore` page, all behind `analytics.enabled`. Area 1 (4 October 2026) completed the
+dataset contract (`join()`, `reference()`, `shared()`, `fromQuery()`, `field()`, `version()`, …),
+`DatasetValidator` (two stages: `declare()` without a database, `compile()` per database),
+`SharedDimensions` with label resolvers (Foundation features register vendor and currency), the
+`contoh-a` fixture datasets for engine tests, `AnalyticsDatasetsBoundaryTest`, and
+`php artisan analytics:datasets`. Everything else is still a plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
 If code and this skill disagree, trust the code and fix the skill in the same pull request.
@@ -93,8 +98,10 @@ If code and this skill disagree, trust the code and fix the skill in the same pu
 4. Add `tests/Feature/Analytics/<Name>DatasetTest.php`: tenant isolation, policy parity against the
    module's list endpoint, money per currency, filtered measures, time-zone bucket boundaries. See each
    test fail once by breaking what it guards.
-5. Run `php artisan analytics:datasets` and the Boundary suite. No manifest, catalog, or migration
-   change is needed; read access reuses the module's existing read permission (KA-15).
+5. Run `php artisan analytics:datasets` (it prints why a dataset is rejected and exits non-zero) and
+   the Boundary suite (`AnalyticsDatasetsBoundaryTest`). No manifest, catalog, or migration change is
+   needed; read access reuses the module's existing read permission (KA-15), and the validator reads
+   permissions and data policies from the module's merged manifest, not the database.
 
 Changing a dataset: adding is free; renaming a key needs `version(n+1, renamed: [...])`; removing a
 key needs `version(n+1)` and leaves affected widgets showing "Kolom … sudah tidak tersedia".

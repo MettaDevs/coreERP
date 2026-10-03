@@ -8,8 +8,10 @@ use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 
 /**
- * Satu measure dataset sesudah dibaca registry. `field`, `currency`, dan `unit` adalah nama kolom tabel
- * dasar yang sudah lolos pemeriksaan pengenal; `where` saringan tetapnya, apa adanya dari definisi.
+ * Satu measure dataset sesudah dibaca registry. `field`, `currency`, dan `unit` adalah kunci field, nama
+ * kolom tabel dasar, atau `alias.kolom` join — semuanya sudah diperiksa ada di tabelnya, dan diubah
+ * menjadi kolom berkualifikasi lewat {@see CompiledDataset::qualified()}. `where` saringan tetapnya,
+ * berkunci field pilihan, ya/tidak, atau rujukan, apa adanya dari definisi.
  */
 final readonly class CompiledMeasure
 {

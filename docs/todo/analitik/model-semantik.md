@@ -30,12 +30,27 @@ dipakai apa adanya lewat `fieldsFromModel()`.
 Semua kelas di bawah tinggal di `apps/core/app/Platform/Modules/Contracts/Analytics/`, kecuali
 `DataPolicyFilter` yang tinggal satu tingkat di atasnya karena dipakai juga di luar analitik.
 
-Sejak area 0 (3 Oktober 2026) sebagian sudah ada di repo dan kodenya yang menjadi rujukan: `Dataset`,
-`Datasets`, `Aggregate`, `MeasureFormat`, `DataPolicyFilter`, dan `DatasetDefinition` dengan
-`make()`, `model()`, `permission()`, `dataPolicy()`, `fieldsFromModel()`, `measure()`, `time()`, dan
-`toArray()`. Sisanya — `SharedDimension`, `reference()`, `shared()`, `join()`, `fromQuery()`,
-`field()`, `version()`, `recordRoute()`, `description()` — sketsa di bawah yang mengikat bentuknya
-sampai area 1 menulisnya.
+Seluruh kontrak di halaman ini sudah ada di repo sejak area 0 dan area 1 (3–4 Oktober 2026), dan
+kodenya yang menjadi rujukan: `Dataset`, `Datasets`, `Aggregate`, `MeasureFormat`, `SharedDimension`,
+`SharedDimensions`, `SharedDimensionResolver`, `DataPolicyFilter`, dan `DatasetDefinition` lengkap.
+Sketsa di bawah dipertahankan untuk alasan dan contohnya; bedanya dengan kode yang dikirim area 1:
+
+- `fromQuery()` menerima closure yang memulangkan **query Eloquent** (`Illuminate\Database\Eloquent\Builder`),
+  bukan query builder sembarang: hanya dari query Eloquent validator dapat memeriksa modelnya
+  ber-`BelongsToTenant`, milik module itu, dan scope tenant-nya tidak dilepas. Query sumber wajib memilih
+  `tenant_id`, karena engine menyaring tenant sekali lagi di query luar (`base.tenant_id = ?`).
+- Dataset bersumber query tidak memakai `join()` (join disusun di dalam query sumber), dan `reference()`
+  serta `shared()`-nya hanya menempel pada field yang dinyatakan dengan `field()`.
+- `field()` tanpa `$column` menunjuk kolom tabel dasar bernama `$key`; tanpa `$classification`,
+  klasifikasinya dibaca dari model pemilik kolom (tabel dasar atau tabel join).
+- `reference()` dan `shared()` pada kunci yang belum menjadi field membuat field dari kolom tabel dasar
+  bernama sama, walau kolom itu tersembunyi dari katalog filter. Nama tampilannya dari `FIELD_CAPTIONS`
+  model; tanpa itu, `shared()` memakai `SharedDimension::caption()` (misalnya "Entitas legal"), dan
+  `reference()` ditolak. Field rujukan bertipe `reference`.
+- `measure()` `$field`, `$currency`, dan `$unit` boleh kunci field, kolom tabel dasar, atau `alias.kolom`.
+  Kunci `$where` adalah kunci field (pilihan, ya/tidak, atau rujukan), dan nilai field pilihan wajib salah
+  satu pilihannya.
+- `SharedDimension::caption()` adalah tambahan area 1: nama tampilan bawaan dimensi.
 
 ### `Dataset` dan `Datasets`
 
@@ -162,6 +177,23 @@ enum SharedDimension: string
     case Currency = 'foundation.currency';
 }
 ```
+
+### `SharedDimensions` dan `SharedDimensionResolver`
+
+Label dimensi bersama diterjemahkan resolver milik pemilik datanya, sekali per himpunan id sesudah
+agregasi. Platform memasang resolver entitas legal, unit kerja (tabel organisasi), dan pengguna (nama
+anggota tenant) di `SharedDimensionRegistry`; fitur Foundation mendaftarkan vendor dan mata uang dari
+penyedia layanannya sendiri, karena Platform tidak boleh menyebut Foundation:
+
+```php
+$this->app->make(SharedDimensions::class)->register(new VendorLabels);
+```
+
+Setiap resolver menyatakan klasifikasi labelnya (`labelClassification()`). Label
+`EndUserIdentifiableInformation` — nama pengguna, dan nama vendor karena party vendor dapat berupa
+orang — hanya diberikan `SharedDimensionRegistry::labels(…, $mayUsePersonalData)` kepada principal yang
+berhak membaca data pribadi; tanpa hak itu layar menampilkan id-nya saja. Label mata uang adalah kodenya
+sendiri sampai master mata uang dibangun (FIN-20).
 
 ### `DatasetDefinition`
 
@@ -640,8 +672,12 @@ Aturan sumber query, karena ia satu-satunya tempat module menyerahkan SQL-nya se
 - Tidak memuat saringan milik pengguna, sesi, atau permintaan. Saringan pengguna dan kebijakan data
   dipasang engine pada query luar, memakai kolom yang dinyatakan.
 - Setiap kolom yang dinyatakan sebagai field, measure, atau kolom kebijakan wajib ada di daftar
-  `SELECT` subquery. `DatasetValidator` memeriksanya dengan menjalankan subquery `LIMIT 0`.
+  `SELECT` subquery, begitu pula `tenant_id`. `DatasetValidator` memeriksanya dengan menjalankan query
+  dasar subquery (tanpa global scope) `LIMIT 0` di transaksi yang selalu dibatalkan, dan membaca tipe
+  kolomnya dari hasil itu.
 - Setiap field menyatakan klasifikasinya sendiri.
+- Query sumber disusun dari `Model::query()`. Yang melepas scope tenant (`withoutGlobalScope(s)`,
+  `newModelQuery()`) ditolak validator, dan saringan luar tetap menyaring bila lapis itu luput.
 
 ## Mendaftarkan dataset
 
@@ -659,9 +695,16 @@ permission yang sudah ada (KA-15), jadi menambah dataset tidak mengubah susunan 
 
 ## Yang diperiksa `DatasetValidator`
 
-Validator berjalan di dua tempat: saat registry pertama kali dibaca di runtime (dataset rusak
-**dilewati dan dicatat**, tidak menjatuhkan aplikasi, sama seperti registry module melewati manifest
-rusak), dan di `AnalyticsDatasetsBoundaryTest`, yang **gagal** untuk dataset rusak.
+Validator berjalan di tiga tempat: saat registry pertama kali dibaca di runtime (dataset rusak
+**dilewati dan dicatat** sekali per proses, tidak menjatuhkan aplikasi, sama seperti registry module
+melewati manifest rusak), di `AnalyticsDatasetsBoundaryTest`, yang **gagal** untuk dataset rusak, dan di
+`php artisan analytics:datasets`, yang menampilkan sebabnya dan keluar dengan kode gagal.
+
+Pemeriksaannya dua tahap. Tahap tanpa database (kode, sumber, namespace, permission dan kebijakan di
+manifest gabungan `ModuleManifestFiles::read()`, bentuk setiap pernyataan) sama untuk semua tenant dan
+disimpan sekali per proses. Tahap terhadap database (kolom ada, tipe, klasifikasi) disimpan per database,
+karena satu proses melayani beberapa database environment. Dataset yang tabel dasarnya belum ada di
+database itu (module belum dipasang di sana) tidak tersedia, tanpa peringatan, dan tidak disimpan.
 
 | Aturan | Pesan bila dilanggar | Kenapa |
 | --- | --- | --- |
@@ -680,6 +723,13 @@ rusak), dan di `AnalyticsDatasetsBoundaryTest`, yang **gagal** untuk dataset rus
 | `renamed` menunjuk kunci yang ada | — | Peta nama yang menunjuk kekosongan tidak menolong siapa pun |
 | `recordRoute` berawalan `/<moduleId>/` dan memuat `{id}` | — | — |
 | Kunci `snake_case`, maksimal 64 karakter | — | Kunci tampil di JSON dan URL OData |
+| Kebijakan yang disebut ada di manifest module | Kebijakan data X tidak ada di manifest module | Kode salah ketik = tanpa hibah = nol baris yang membingungkan |
+| Kunci field yang sama dengan nama kolom tabel dasar menunjuk kolom itu | Field X menunjuk Y, padahal tabel dasar punya kolom X | Kolom kebijakan dan measure ditulis dengan nama kolom, dan `qualified()` mendahulukan kunci field; field yang membayangi kolom lain membuat kebijakan menyaring kolom yang salah |
+| Alias join `snake_case` dan bukan huruf diikuti angka | Alias join dipakai engine | `d0`, `c0`, `m0`, `r0` dipakai engine di SQL |
+| Kolom `only`/`except` `fieldsFromModel()` ada di tabel, dan kolom `only` ada di katalog field model | Kolom X tidak ada di katalog field model | Kolom tersembunyi yang disebut `only` diam-diam hilang |
+| Rujukan menunjuk field teks atau rujukan, dan kolom `id`, label, serta kode ada di tabel master | Rujukan X harus menunjuk kolom id | — |
+| Query sumber: query Eloquent dari model module, scope tenant utuh, memilih `tenant_id`, dapat dijalankan | Query sumber tidak boleh melepas penyaringan tenant | Lapis pertama penyaringan tenant milik model |
+| Versi bilangan bulat 1 atau lebih | — | — |
 
 ## Test yang wajib menyertai setiap dataset
 

@@ -1,0 +1,24 @@
+# Rantai izin bahan uji engine analitik. Dataset analitik memakai permission baca resource yang
+# sudah ada di manifest module (KA-15), dan validator dataset membacanya dari sini — bukan dari
+# database, karena module contoh tidak pernah masuk katalog pelanggan.
+security:
+  entry_points:
+    - code: contoh-a.barang.form
+      name: Layar barang
+      type: form
+  permissions:
+    - code: contoh-a.barang.read
+      name: Lihat barang
+      entry_point: contoh-a.barang.form
+      access: read
+  privileges:
+    - code: contoh-a.barang.view
+      name: Lihat barang
+      permissions:
+        - contoh-a.barang.read
+  duties:
+    - code: contoh-a.barang.inquire
+      name: Telusuri barang dan penjualannya
+      privileges:
+        - contoh-a.barang.view
+        - contoh-a.penjualan.view

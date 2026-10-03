@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Apperp\ContohA\Models;
 
 use App\Platform\Modules\Contracts\BelongsToTenant;
+use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -25,11 +27,19 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $nama
  * @property bool $bawaan
  */
+#[DataClassification(DataClass::CustomerContent)]
 final class Barang extends Model
 {
     use BelongsToTenant;
     use HasUlids;
     use SoftDeletes;
+
+    /** Nama tampilan kolom untuk katalog field (K-30), dibaca dataset analitik bahan uji. */
+    public const FIELD_CAPTIONS = [
+        'kode' => 'Kode barang',
+        'nama' => 'Nama barang',
+        'bawaan' => 'Barang bawaan',
+    ];
 
     protected $table = 'contoh_a_m_barang';
 
