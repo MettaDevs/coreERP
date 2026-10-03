@@ -36,17 +36,25 @@ dan langsung terpetakan ke `SELECT … GROUP BY`.
 | `dimensions` | tidak | Kunci field, atau `{field, granularity}` untuk field waktu | 4 |
 | `measures` | ya | Kunci measure dataset; fase 2 juga kunci rumus | 12 |
 | `filters` | tidak | Kunci field → ekspresi sintaks BC (teks, angka, tanggal) atau daftar nilai (pilihan, ya/tidak, rujukan) | 20 field, aturan K-30 per nilai |
-| `time_range` | tidak | `field` (bawaan field waktu utama dataset) dan `range`: token relatif atau ekspresi tanggal | — |
-| `sort` | tidak | Kunci dimensi atau measure, `asc`/`desc` | 3 |
+| `time_range` | tidak | `field` (kolom waktu dataset; bawaan field waktu utama dataset) dan `range`: token relatif atau ekspresi tanggal | — |
+| `sort` | tidak | `{key, direction}`: `key` salah satu dimensi atau measure yang **dipilih**, `direction` `asc`/`desc` (wajib ditulis) | 3 |
 | `limit` | tidak | Top-N | ≤ `limits.rows_interactive` |
 | `totals` | tidak | Hitung total keseluruhan | — |
-| `fill_gaps` | tidak | Isi celah deret waktu; bawaan `true` bila ada dimensi waktu | 1000 titik |
+| `fill_gaps` | tidak | Isi celah deret waktu; bawaan `true` bila ada dimensi waktu, dan tanpa dimensi waktu isian ini tidak berarti apa-apa | 1000 titik |
 | `compare` | tidak, fase 2 | `previous_period` atau `previous_year` | — |
 | `formulas` | tidak, fase 2 | Rumus, lihat [bahasa rumus](#bahasa-rumus) | 5 |
 
-Skema JSON lengkapnya ditulis area 2 di `apps/core/resources/schemas/analytics-query.schema.json`
-dan dipakai tiga tempat sekaligus: validasi permintaan, tipe TypeScript layar, dan kontrak
-`integrasi-analitik.yaml`. Satu skema untuk ketiganya, supaya ketiganya tidak menyimpang.
+Batas jumlah di kolom kanan dibaca dari `config/analytics.php` (`limits.dimensions`, `limits.measures`,
+`limits.filters`, `limits.sort`) dan dijawab 422 `analytics.limit_exceeded`. `compare` dan `formulas`
+belum dibaca engine dan ditolak sebagai "belum tersedia", bukan diabaikan: query yang diam-diam
+mengabaikan perbandingan atau rumus memulangkan angka yang berbeda dari yang diminta.
+
+Skema JSON-nya ditulis area 2 di `apps/core/resources/schemas/analytics-query.schema.json` (draft 2020-12)
+sebagai sumber bentuk untuk tiga tempat: pembaca query di server, tipe TypeScript layar, dan kontrak
+`integrasi-analitik.yaml` (area 15). Repo ini tidak memasang pustaka validasi skema: `QueryParser`
+memvalidasi dengan aturannya sendiri, dan `QueryShapeSyncTest` memastikan skema, pembaca, tipe
+TypeScript (`types.ts`), dan daftar token di `query.ts` menyebut kunci, ukuran waktu, dan token yang sama.
+Kunci fase 2 baru masuk skema bersama pembacanya.
 
 ### Saringan
 
@@ -63,11 +71,22 @@ Nilai saringan memakai bentuk yang sama dengan filter tambahan laporan (K-30), d
 Saringan pada field yang tidak dikenal dataset ditolak, bukan diabaikan: saringan yang diabaikan
 diam-diam memulangkan angka yang lebih besar dari yang diminta pengguna.
 
+Isian kosong berarti tanpa saringan: teks kosong, `null`, dan daftar kosong. `null` memang yang tiba
+di server bila isian dikosongkan di layar, karena `ConvertEmptyStringsToNull` juga membersihkan badan
+JSON. `QueryNormalizer` membuang isian kosong sebelum validasi, jadi saringan kosong pada kolom yang
+salah ketik tidak ditolak — ia memang tidak menyaring apa pun, sama seperti di `FieldFilterExpression`.
+`''` (dua petik tunggal) bukan isian kosong: itu ekspresi "bernilai kosong" sintaks BC.
+
 ### Rentang waktu relatif
 
 `time_range.range` menerima ekspresi tanggal biasa atau token. Token diterjemahkan `RelativeRange`
 menjadi ekspresi `Y-m-d..Y-m-d` **menurut zona waktu pengguna**, lalu dijalankan
 `FieldFilterExpression` yang sudah tahu cara mengubah hari penuh di zona pengguna menjadi rentang UTC.
+Nilai yang diawali `@` selalu dibaca sebagai token: yang tidak dikenal ditolak 422 di `time_range.range`
+beserta daftar token yang sah, tidak dioper ke sintaks tanggal. Ekspresi tanggal biasa diperiksa
+`FieldFilterExpression` saat compile (`analytics.invalid_filter`, path `time_range.range`).
+`time_range.field` harus kolom waktu yang dinyatakan dataset; tanpa itu, dataset yang tidak punya
+field waktu utama menolak rentang waktu dengan meminta kolomnya disebut.
 
 | Token | Arti, untuk "sekarang" = Kamis 15 Oktober 2026 |
 | --- | --- |
@@ -84,6 +103,15 @@ menjadi ekspresi `Y-m-d..Y-m-d` **menurut zona waktu pengguna**, lalu dijalankan
 preset tenant dan menjadi tanggal tunggal; token analitik menjadi rentang. Menggabungkan keduanya
 mengubah arti token yang sudah tersimpan. Tahun fiskal (`@this_fiscal_year`) menyusul di fase 2
 lewat `FiscalCalendarDirectory`, karena butuh legal entity.
+
+`RelativeRange` berisi fungsi statis, seperti `RelativeDates` dan `FieldFilterExpression`, dan tidak
+membaca jam sendiri: pemanggil memberinya `AnalyticsPrincipal::now()` yang sudah berzona.
+`RelativeRange::expression($range, $now)` memulangkan ekspresi untuk `FieldFilterExpression` (ekspresi
+tanggal biasa dikembalikan apa adanya), dan `RelativeRange::bounds($token, $now)` memulangkan hari
+pertama dan terakhirnya, yang dibutuhkan `GapFiller` (area 3) untuk tahu titik waktu mana yang harus
+ada. Daftar tokennya `RelativeRange::TOKENS`, yang sama dengan daftar di `resources/js/lib/analytics/query.ts`
+dan dijaga `QueryShapeSyncTest`. Zona yang diuji: `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`, di
+pergantian tahun, hari kabisat, dan pergantian minggu (`RelativeRangeTest`).
 
 ## Dari JSON ke objek
 
@@ -144,10 +172,29 @@ final readonly class AnalyticsQuery
 }
 ```
 
-`QueryParser` membaca JSON menjadi objek ini dan menolak bentuk yang salah dengan galat berpath
-(`dimensions.1.granularity`). `QueryValidator` lalu memeriksa query terhadap dataset dan principal:
-setiap kunci dikenal, field data pribadi hanya bila principal berhak, batas jumlah, `limit` dalam
-batas, dimensi waktu hanya pada field waktu, `sort` hanya pada kunci yang dipilih.
+Tiga langkah, masing-masing satu kelas, dan urutannya tetap:
+
+1. **`QueryParser`** membaca JSON menjadi objek ini apa adanya dan menolak bentuk yang salah dengan galat
+   berpath (`dimensions.1.granularity`, `sort.0.direction`, `time_range.range`): tipe nilai, kunci yang
+   dikenal di setiap tingkat, panjang. Tidak ada yang diperiksa terhadap dataset di sini.
+2. **`QueryNormalizer`** menyatukan query yang setara: urutan kunci saringan, pilihan yang diurutkan dan
+   tidak berulang, spasi di ujung isian, saringan kosong dibuang, dan `fill_gaps` yang
+   dinyalakan tanpa dimensi waktu dimatikan, karena celah hanya ada di deret waktu. Urutan `dimensions`, `measures`, dan `sort` **tidak** diubah,
+   karena ia menentukan urutan kolom dan baris hasil. `RunQuery` memanggilnya, jadi setiap jalur masuk
+   yang membangun `AnalyticsQuery` sendiri — bukan hanya yang lewat `QueryParser` — menghasilkan
+   `meta.query_hash` dan kunci cache yang sama untuk query yang sama.
+3. **`QueryValidator`** memeriksa query terhadap `CompiledDataset` dan principal, sebelum ada SQL:
+   batas jumlah (`limits.*`), setiap kunci dikenal dan tidak dipilih dua kali (dimensi dan measure
+   berbagi satu ruang kunci, karena hasilnya memakai kunci itu sebagai nama kolom), ember waktu hanya pada
+   field waktu dataset, `time_range` memakai field waktu dan token yang dikenal, `sort` hanya pada kunci
+   yang dipilih dan tidak berulang, `limit` dalam batas principal, lalu gerbang data pribadi.
+
+Gerbang data pribadi (area 4) dipanggil lewat antarmuka kecil `Query\FieldUseGate`: terakhir, sesudah
+semua kunci terbukti dikenal, validator melaporkan setiap kolom dataset yang dipakai query sebagai peta
+path → kunci (`dimensions.0`, `filters.nama`, `time_range.field`). Urutan tidak dilaporkan terpisah karena
+`sort` hanya dapat memakai kunci yang sudah dipilih. Selama area 4 belum mengikat implementasinya,
+validator tidak memanggil apa pun; area 4 mengikatnya di container dan menjadikan parameter validator
+tidak lagi opsional.
 
 ## Dari objek ke SQL
 
@@ -191,7 +238,6 @@ final class QueryCompiler
         private readonly DataPolicyScope $policy,
         private readonly MeasureSql $measures,
         private readonly TimeBucketSql $time,
-        private readonly RelativeRange $ranges,
     ) {}
 
     public function compile(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
@@ -207,7 +253,7 @@ final class QueryCompiler
         }
         if ($query->timeRange !== null) {
             $field = $dataset->filterField($query->timeRange->field ?? $dataset->defaultTime());
-            FieldFilterExpression::apply($builder, $field, $this->ranges->expression($query->timeRange->range, $principal->now()), $principal->timezone());
+            FieldFilterExpression::apply($builder, $field, RelativeRange::expression($query->timeRange->range, $principal->now()), $principal->timezone());
         }
 
         $totals = $query->totals ? clone $builder : null;
@@ -269,6 +315,14 @@ maupun baris baseline baru. Yang dipakai `QueryCompiler` area 0, dan yang perlu 
 | Urutan | `orderBy('m0', 'desc')`, `orderBy('d0')` |
 | Saringan tetap measure (area 3) | Ekspresi yang sama ditambah `FILTER (WHERE …)`; nilainya lewat `addBinding($bindings, 'select')` |
 | `NULLS LAST` (area 3) | Belum ada; `orderBy()` tidak menerimanya dan nama alias tidak dapat dipakai di dalam ekspresi `ORDER BY` PostgreSQL. Measure `count` dan `sum` tidak pernah kosong; `avg`, `min`, `max` yang kosong sementara jatuh di depan pada urutan turun |
+
+Area 2 menambahkan ke compiler hanya kunci yang sudah dibaca parser, supaya tidak ada yang diabaikan
+diam-diam. `time_range` dikompilasi persis seperti di sketsa (langkah 4): `RelativeRange::expression()` lalu
+`FieldFilterExpression::apply()`, dan `InvalidFilterExpression`-nya menjadi `analytics.invalid_filter`
+berpath `time_range.range`. `sort` pengguna menggantikan urutan bawaan (`m0` turun) lewat `orderBy(alias, arah)`;
+pengelompok yang belum ikut diurutkan tetap menjadi pemutus seri. Yang belum dikompilasi — ember waktu
+(`dimensions.N.granularity`) dan `totals` — **ditolak 422 `analytics.invalid_query`** ("belum tersedia"),
+bukan diabaikan; area 3 menggantinya dengan kompilasi sungguhan.
 
 ### Measure
 

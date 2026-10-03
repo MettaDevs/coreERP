@@ -9,6 +9,7 @@ use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
+use App\Platform\Analytics\Query\QueryNormalizer;
 use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Query\ResultSet;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
@@ -20,7 +21,8 @@ use App\Platform\Modules\Contracts\TenantRunner;
  * embed. Setiap jalur membuat principal-nya sendiri lalu memanggil ini, sehingga tidak ada jalur yang
  * dapat melewati satu langkah pun:
  *
- * 1. Dataset dicari di registry; yang tidak dikenal menjadi 404.
+ * 1. Query disatukan ke bentuk normalnya ({@see QueryNormalizer}), lalu dataset dicari di registry; yang
+ *    tidak dikenal menjadi 404.
  * 2. Module terpasang dan berlisensi, lalu permission baca resource-nya ({@see DatasetAccess}).
  * 3. Query diperiksa terhadap dataset ({@see QueryValidator}), baru sesudah hak pasti — pengguna tanpa
  *    hak tidak belajar nama kolom dari pesan galat.
@@ -33,6 +35,7 @@ use App\Platform\Modules\Contracts\TenantRunner;
 final class RunQuery
 {
     public function __construct(
+        private readonly QueryNormalizer $normalizer,
         private readonly DatasetRegistry $datasets,
         private readonly DatasetAccess $access,
         private readonly QueryValidator $validator,
@@ -44,6 +47,7 @@ final class RunQuery
     /** @throws AnalyticsQueryException */
     public function handle(AnalyticsPrincipal $principal, AnalyticsQuery $query): ResultSet
     {
+        $query = $this->normalizer->normalize($query);
         $dataset = $this->datasets->find($query->dataset) ?? throw AnalyticsQueryException::datasetUnknown();
         $this->access->authorize($principal, $dataset);
         $this->validator->validate($dataset, $query, $principal);

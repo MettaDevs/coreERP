@@ -27,8 +27,9 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | Registry dataset | `Datasets\DatasetRegistry` | Mengumpulkan dataset dari module, memvalidasi definisinya, menyaring menurut module terpasang | 0 (tipis), 1 |
 | Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 1, 4 |
 | Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, periode, vendor: label dan pemilih | 14 |
-| Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryValidator` | JSON → objek tak berubah; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
+| Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryNormalizer`, `Query\QueryValidator` | JSON → objek tak berubah → bentuk normal; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
+| Titik panggil data pribadi | `Query\FieldUseGate` | Antarmuka yang dipanggil `QueryValidator` dengan semua kolom yang dipakai query; `Security\PersonalDataGate` (area 4) mengimplementasikannya | 2, 4 |
 | Compiler | `Query\QueryCompiler`, `Query\MeasureExpression`, `Query\TimeBucketSql`, `Query\JoinPlanner` | Objek query → query builder Laravel di atas model module, tanpa SQL mentah (lihat [mesin query](/todo/analitik/mesin-query#dari-objek-ke-sql)) | 0 (tipis), 3 |
 | Eksekusi | `Query\QueryExecutor` | Transaksi baca-saja, batas waktu, batas baris, pemetaan galat | 0, 3 |
 | Hasil | `Query\ResultSet`, `Query\ResultColumn`, `Query\LabelResolver`, `Query\GapFiller` | Kolom bertipe, label rujukan, deret waktu tanpa celah, total | 0 (tipis), 3 |
@@ -168,7 +169,7 @@ apps/core/app/Platform/Analytics/
 ├── Query/
 │   ├── AnalyticsQuery.php  Dimension.php  TimeRange.php  TimeGranularity.php       (0)
 │   ├── QueryParser.php  QueryValidator.php                                        (0)
-│   ├── QueryNormalizer.php  RelativeRange.php
+│   ├── QueryNormalizer.php  RelativeRange.php  FieldUseGate.php                   (2)
 │   ├── QueryCompiler.php  MeasureExpression.php  CompiledQuery.php                (0)
 │   ├── JoinPlanner.php  TimeBucketSql.php
 │   ├── QueryExecutor.php                                                          (0)
@@ -206,6 +207,7 @@ apps/core/app/Platform/Modules/Contracts/
     └── DashboardTemplate.php  DashboardTemplates.php                          (fase 2)
 
 apps/core/config/analytics.php                                                 (0)
+apps/core/resources/schemas/analytics-query.schema.json                        (2) sumber bentuk query
 apps/core/routes/analytics.php     (0) di-require dari routes/web.php, grup `auth` (bukan grup `api/v1`):
                                    halaman `/analytics/...` dan API `api/v1/analytics/...` di satu berkas
 apps/core/database/migrations/2026_10_xx_*_analytics_*.php
@@ -213,7 +215,7 @@ apps/core/resources/js/
 ├── pages/platform/analytics/  explore.tsx (0, sementara)  index.tsx  dashboard.tsx  publications.tsx
 ├── components/analytics/      widget-frame.tsx  kpi-tile.tsx  chart-widget.tsx  table-widget.tsx
 │                              widget-builder.tsx  filter-editor.tsx  dataset-picker.tsx …
-├── lib/analytics/             types.ts (0)  format.ts (0)  api.ts  query.ts
+├── lib/analytics/             types.ts (0)  format.ts (0)  query.ts (2)  api.ts
 └── embed/analytics.tsx                                                         (fase 2)
 
 modules/apperp/management-aset/src/Analytics/
@@ -242,6 +244,14 @@ method di bawah sudah dipakai kode area 0 dan tidak diganti tanpa memperbarui ha
 | `qualified($name)` | Kolom berkualifikasi untuk kunci field atau nama kolom tabel dasar yang lolos pemeriksaan pengenal |
 | `times()`, `defaultTime()` | Field waktu dan field waktu utama |
 
+**Yang dibaca `QueryValidator` (area 2)** dari tabel di atas: `hasField()`, `hasMeasure()`, `times()`, dan
+`defaultTime()`; ember waktu dan rentang waktu hanya sah pada kunci yang ada di `times()`. Tidak ada method
+baru yang diminta. Satu kebutuhan tersisa milik area 4: `FieldUseGate` perlu tahu kolom mana yang memuat
+data pribadi. Usulan, belum ada di kelas ini — `classification(string $key): DataClass`, yang melempar
+`LogicException` untuk kunci tak dikenal seperti `filterField()`, diisi registry dari
+`DataClassificationRegistry` sekali per kompilasi dataset. Area 1.4 atau area 4 menambahkannya, mana yang
+lebih dulu; yang kedua memakai yang sudah ada.
+
 Registry area 0 membaca **definisi** sekali per proses dan **field** dari database setiap kali dataset
 diminta (`TableFields` menyimpan tipe kolom per nama database), karena satu proses melayani beberapa
 database environment. Database yang belum punya tabel dataset menjawab dataset tidak tersedia
@@ -260,9 +270,10 @@ database environment. Database yang belum punya tabel dataset menjawab dataset t
 | `timeouts.job_ms` | 60000 | Untuk job (fase 3) |
 | `limits.rows_interactive` (0) | 5000 | Baris hasil kelompok dari layar; juga batas tertinggi `limit` |
 | `limits.rows_external_page` | 5000 | Baris per halaman luar |
-| `limits.dimensions` | 4 | Dimensi per query |
-| `limits.measures` | 12 | Measure per query |
-| `limits.filters` | 20 | Saringan per query |
+| `limits.dimensions` (2) | 4 | Dimensi per query |
+| `limits.measures` (2) | 12 | Measure per query |
+| `limits.filters` (2) | 20 | Saringan per query |
+| `limits.sort` (2) | 3 | Kunci urutan per query |
 | `limits.widgets_per_dashboard` | 24 | |
 | `limits.concurrent_per_tenant` | 4 | Query analitik bersamaan per tenant per instance |
 | `cache.default_ttl_seconds` | 300 | TTL widget bawaan |

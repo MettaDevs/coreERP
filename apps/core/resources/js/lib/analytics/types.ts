@@ -63,3 +63,10 @@ export type ResultSet = {
         query_hash: string;
     };
 };
+
+/** Satu pengelompok query: kunci field, atau field waktu beserta ukuran waktunya. */
+export type QueryDimension = NonNullable<AnalyticsQuery['dimensions']>[number];
+
+export type QuerySort = NonNullable<AnalyticsQuery['sort']>[number];
+
+export type QueryTimeRange = NonNullable<AnalyticsQuery['time_range']>;
