@@ -15,7 +15,20 @@ use App\Platform\Modules\Contracts\WorkflowDecisionTaken;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Apperp\ManagementAset\Analytics\AssetReceiptsDataset;
 use Modules\Apperp\ManagementAset\Analytics\AssetRegisterDataset;
+use Modules\Apperp\ManagementAset\Analytics\AssetSalesDataset;
+use Modules\Apperp\ManagementAset\Analytics\AssetScrapsDataset;
+use Modules\Apperp\ManagementAset\Analytics\BookValuesDataset;
+use Modules\Apperp\ManagementAset\Analytics\DepreciationEntriesDataset;
+use Modules\Apperp\ManagementAset\Analytics\DowntimeDataset;
+use Modules\Apperp\ManagementAset\Analytics\InsurancePoliciesDataset;
+use Modules\Apperp\ManagementAset\Analytics\MaintenanceRequestsDataset;
+use Modules\Apperp\ManagementAset\Analytics\PhysicalChecksDataset;
+use Modules\Apperp\ManagementAset\Analytics\ReclassificationsDataset;
+use Modules\Apperp\ManagementAset\Analytics\ValueAdjustmentsDataset;
+use Modules\Apperp\ManagementAset\Analytics\WarrantiesDataset;
+use Modules\Apperp\ManagementAset\Analytics\WorkOrdersDataset;
 use Modules\Apperp\ManagementAset\Console\Commands\BuildBuiltinLayouts;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
@@ -120,7 +133,25 @@ final class ModuleServiceProvider extends ServiceProvider
         // Dataset analitik: engine analitik Core membaca tabel module ini hanya lewat definisi di sini —
         // tabel, field, measure, dan kolom kebijakan data — dengan permission dan kebijakan yang sama
         // dengan layar daftarnya.
-        $this->app->make(Datasets::class)->register($this->app->make(AssetRegisterDataset::class));
+        $datasets = $this->app->make(Datasets::class);
+        foreach ([
+            AssetRegisterDataset::class,
+            AssetReceiptsDataset::class,
+            DepreciationEntriesDataset::class,
+            BookValuesDataset::class,
+            WorkOrdersDataset::class,
+            MaintenanceRequestsDataset::class,
+            DowntimeDataset::class,
+            AssetSalesDataset::class,
+            AssetScrapsDataset::class,
+            ValueAdjustmentsDataset::class,
+            ReclassificationsDataset::class,
+            InsurancePoliciesDataset::class,
+            WarrantiesDataset::class,
+            PhysicalChecksDataset::class,
+        ] as $dataset) {
+            $datasets->register($this->app->make($dataset));
+        }
 
         // Ekspor daftar di layar lewat antrean ekspor Core (K-27): register aset sebagai pilot. Core meminta
         // barisnya ke sini dengan hak dan kebijakan data yang sama dengan layar Inventarisasi aset.
