@@ -9,8 +9,8 @@ namespace App\Platform\Analytics\Query;
  * dari bentuk normalnya, jadi dua JSON yang berbeda urutan kuncinya menjadi satu entri cache.
  *
  * Bentuk konstruktor ini dibekukan area 0 dan dipakai bersama area 2, 3, 6, dan 9. Area 0 hanya mengisi
- * `dataset`, `dimensions` tanpa ember waktu, `measures`, `filters`, dan `limit`; sisanya bernilai bawaan
- * sampai area 2 membacanya dari JSON.
+ * `dataset`, `dimensions` tanpa ember waktu, `measures`, `filters`, dan `limit`; area 2 membaca sisanya
+ * dari JSON ({@see QueryParser}) dan menyatukan bentuknya ({@see QueryNormalizer}).
  */
 final readonly class AnalyticsQuery
 {
@@ -43,7 +43,7 @@ final readonly class AnalyticsQuery
         ksort($filters);
         foreach ($filters as &$value) {
             if (is_array($value)) {
-                sort($value);
+                sort($value, SORT_STRING);
             }
         }
         unset($value);

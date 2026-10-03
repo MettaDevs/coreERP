@@ -15,6 +15,7 @@ use App\Platform\Modules\Contracts\TenantProvisioned;
 use App\Platform\Modules\Contracts\TenantRunner;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
+use Carbon\CarbonImmutable;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -184,8 +185,8 @@ class WalkingSkeletonTest extends TestCase
             [['filters' => ['nama' => '*laptop*']], 'analytics.field_unknown', 'filters.nama'],
             [['dimensions' => ['lifecycle_state', 'kode']], 'analytics.field_unknown', 'dimensions.1'],
             [['measures' => ['count', 'nilai_buku']], 'analytics.field_unknown', 'measures.1'],
-            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0'],
-            [['time_range' => ['range' => '@this_month']], 'analytics.invalid_query', 'time_range'],
+            // Pengelompokan menurut waktu terbaca dan sah, tetapi baru dikompilasi area 3: ditolak, tidak diabaikan.
+            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity'],
             [['limit' => 5001], 'analytics.limit_exceeded', 'limit'],
         ];
         foreach ($cases as [$part, $code, $field]) {
@@ -248,6 +249,109 @@ class WalkingSkeletonTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/analytics/explore')->where('preview', null));
     }
 
+    /**
+     * Rentang waktu relatif (area 2): token diterjemahkan menurut zona pengguna, dan tanggal di kolom
+     * `date` dibandingkan apa adanya. Saat dibekukan, 31 Oktober 16.30 UTC adalah 1 November 00.30 WITA
+     * tetapi masih 31 Oktober 23.30 WIB: pembacaan zona yang salah (UTC) menjawab Oktober untuk keduanya.
+     */
+    public function test_time_range_follows_the_users_zone_and_narrows_rows(): void
+    {
+        $this->setAcquiredOn(['AST-A1' => '2026-09-01', 'AST-A2' => '2026-10-15', 'AST-A3' => '2026-12-31', 'AST-B1' => '2027-01-01', 'AST-B2' => '2026-10-01']);
+        $this->travelTo(CarbonImmutable::parse('2026-10-31 16:30:00', 'UTC'));
+
+        $count = fn (array $query): mixed => $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [
+            'dataset' => self::DATASET, 'measures' => ['count'], ...$query,
+        ])->assertOk()->json('rows.0.count');
+
+        // WITA: sudah November.
+        $this->assertSame(0, $count(['time_range' => ['range' => '@this_month']]));
+        $this->assertSame(2, $count(['time_range' => ['range' => '@last_month']]));
+        $this->assertSame(4, $count(['time_range' => ['range' => '@this_year']]));
+        $this->assertSame(0, $count(['time_range' => ['range' => '@last_year']]));
+        $this->assertSame(0, $count(['time_range' => ['range' => '@yesterday']]));
+        $this->assertSame(3, $count(['time_range' => ['field' => 'acquired_on', 'range' => '@year_to_date']]));
+
+        // Ekspresi tanggal biasa memakai sintaks yang sama dengan saringan, dan bertemu saringan lain dengan DAN.
+        $this->assertSame(2, $count(['time_range' => ['range' => '01/10/2026..31/10/2026']]));
+        $this->assertSame(1, $count(['time_range' => ['range' => '>=01/01/2027']]));
+        $this->assertSame(1, $count(['time_range' => ['range' => '@this_year'], 'filters' => ['lifecycle_state' => ['disposed']]]));
+
+        // Zona pengguna diganti ke WIB: pada saat yang sama masih Oktober.
+        DB::table('legal_entities')->where('organization_id', $this->legalEntity)->update(['timezone' => 'Asia/Jakarta']);
+        $this->assertSame(2, $count(['time_range' => ['range' => '@this_month']]));
+        $this->assertSame(1, $count(['time_range' => ['range' => '@last_month']]));
+    }
+
+    public function test_sort_orders_the_rows_and_a_top_n_cut_follows_that_order(): void
+    {
+        $status = fn (array $query): array => $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [
+            'dataset' => self::DATASET, 'dimensions' => ['lifecycle_state'], 'measures' => ['count', 'acquisition_value'], ...$query,
+        ])->assertOk()->json('rows.*.lifecycle_state');
+
+        // Tanpa urutan: jumlah terbanyak lebih dulu (lihat test pertama). Urutan pengguna menggantinya.
+        $this->assertSame(['received', 'decommissioned', 'disposed'], $status([]));
+        $this->assertSame(['received', 'disposed', 'decommissioned'], $status(['sort' => [['key' => 'acquisition_value', 'direction' => 'desc']]]));
+        $this->assertSame(['decommissioned', 'disposed', 'received'], $status(['sort' => [['key' => 'acquisition_value', 'direction' => 'asc']]]));
+        $this->assertSame(['decommissioned', 'disposed', 'received'], $status(['sort' => [['key' => 'lifecycle_state', 'direction' => 'asc']]]));
+        $this->assertSame(['received', 'disposed', 'decommissioned'], $status(['sort' => [['key' => 'lifecycle_state', 'direction' => 'desc']]]));
+        // Urutan kedua memutus seri urutan pertama: dua status sama-sama satu aset.
+        $this->assertSame(['disposed', 'decommissioned', 'received'], $status(['sort' => [['key' => 'count', 'direction' => 'asc'], ['key' => 'lifecycle_state', 'direction' => 'desc']]]));
+
+        // Potongan top-N diambil sesudah diurutkan, bukan sebelum.
+        $top = $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [
+            'dataset' => self::DATASET, 'dimensions' => ['lifecycle_state'], 'measures' => ['acquisition_value'], 'limit' => 1,
+            'sort' => [['key' => 'acquisition_value', 'direction' => 'asc']],
+        ])->assertOk();
+        $top->assertJsonPath('rows.0.lifecycle_state', 'decommissioned')->assertJsonPath('meta.truncated', true)->assertJsonPath('meta.row_limit', 1);
+        $this->assertCount(1, $top->json('rows'));
+    }
+
+    public function test_equivalent_queries_share_one_hash_and_different_ones_do_not(): void
+    {
+        $hash = fn (array $query): string => (string) $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', $query)->assertOk()->json('meta.query_hash');
+
+        $one = $hash([
+            'dataset' => self::DATASET, 'measures' => ['count'],
+            'filters' => ['lifecycle_state' => ['received', 'disposed'], 'currency_code' => ' IDR '],
+        ]);
+        // Urutan kunci dan pilihan berbeda, pilihan berulang, spasi di ujung isian, dan isian kosong pada
+        // kolom yang tidak ada (tidak menyaring apa pun, jadi dibuang sebelum diperiksa).
+        $same = $hash([
+            'filters' => ['currency_code' => 'IDR', 'lifecycle_state' => ['disposed', 'received', 'received'], 'kosong' => ''],
+            'measures' => ['count'], 'dataset' => self::DATASET, 'totals' => false,
+        ]);
+        $other = $hash(['dataset' => self::DATASET, 'measures' => ['count'], 'filters' => ['lifecycle_state' => ['received'], 'currency_code' => 'IDR']]);
+
+        $this->assertSame($one, $same);
+        $this->assertNotSame($one, $other);
+    }
+
+    public function test_query_shape_errors_name_the_part_that_is_wrong(): void
+    {
+        $cases = [
+            [['dimensions' => [['field' => 'lifecycle_state', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity', 'bukan kolom tanggal'],
+            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'hour']]], 'analytics.invalid_query', 'dimensions.0.granularity', 'day, week, month, quarter, year'],
+            [['dimensions' => ['lifecycle_state', 'group_aset_id', 'currency_code', 'acquired_on', 'responsible_org_unit_id']], 'analytics.limit_exceeded', 'dimensions', 'Maksimal 4'],
+            [['time_range' => ['range' => '@next_month']], 'analytics.invalid_query', 'time_range.range', '@this_month'],
+            [['time_range' => ['field' => 'lifecycle_state', 'range' => '@today']], 'analytics.invalid_query', 'time_range.field', 'bukan kolom tanggal'],
+            [['time_range' => ['field' => 'nama', 'range' => '@today']], 'analytics.field_unknown', 'time_range.field', 'tidak dikenal'],
+            [['time_range' => ['range' => 'bukan tanggal']], 'analytics.invalid_filter', 'time_range.range', 'bukan tanggal'],
+            [['time_range' => ['range' => '']], 'analytics.invalid_query', 'time_range.range', 'Isi rentang waktu'],
+            [['filters' => ['acquired_on' => 'bukan tanggal']], 'analytics.invalid_filter', 'filters.acquired_on', 'bukan tanggal'],
+            [['sort' => [['key' => 'lifecycle_state', 'direction' => 'asc']]], 'analytics.invalid_query', 'sort.0.key', 'tidak ada di pilihan'],
+            [['sort' => [['key' => 'count', 'direction' => 'naik']]], 'analytics.invalid_query', 'sort.0.direction', 'asc atau desc'],
+            [['totals' => true], 'analytics.invalid_query', 'totals', 'belum tersedia'],
+            [['compare' => 'previous_period'], 'analytics.invalid_query', 'compare', 'belum tersedia'],
+            [['dimensions' => [['field' => 'acquired_on', 'granularity' => 'month']]], 'analytics.invalid_query', 'dimensions.0.granularity', 'belum tersedia'],
+        ];
+
+        foreach ($cases as [$part, $code, $field, $message]) {
+            $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [...['dataset' => self::DATASET, 'measures' => ['count']], ...$part])
+                ->assertStatus(422)->assertJsonPath('error.code', $code)->assertJsonPath('error.field', $field)
+                ->assertJsonPath('error.message', fn (string $text): bool => str_contains($text, $message));
+        }
+    }
+
     private function business(string $name, string $email): User
     {
         return app(RegisterBusiness::class)->handle([
@@ -280,6 +384,14 @@ class WalkingSkeletonTest extends TestCase
         }
 
         return $user;
+    }
+
+    /** @param array<string, string> $dates kode aset => tanggal perolehan */
+    private function setAcquiredOn(array $dates): void
+    {
+        foreach ($dates as $code => $date) {
+            DB::table('aset_tr_aset')->where('kode', $code)->update(['acquired_on' => $date]);
+        }
     }
 
     private function organization(string $tenantId, string $classification, string $name): string

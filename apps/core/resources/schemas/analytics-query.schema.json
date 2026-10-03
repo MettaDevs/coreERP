@@ -1,0 +1,106 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "AnalyticsQuery",
+    "description": "Satu query analitik atas satu dataset. Sumber bentuk query untuk kontrak, tipe TypeScript layar (resources/js/lib/analytics/types.ts), dan pembaca query (QueryParser); satu test menjaga ketiganya memakai kunci yang sama. Batas jumlah (kolom pengelompokan, nilai, saringan, urutan, baris) diatur config/analytics.php, bukan skema ini. Bentuknya dijelaskan di docs/todo/analitik/mesin-query.md.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["dataset", "measures"],
+    "properties": {
+        "dataset": {
+            "description": "Kode dataset, berawalan id module.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+        },
+        "dimensions": {
+            "description": "Pengelompok hasil: kunci field, atau field waktu beserta ukuran waktunya. Kunci tidak boleh ganda.",
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    { "$ref": "#/$defs/key" },
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["field"],
+                        "properties": {
+                            "field": { "$ref": "#/$defs/key" },
+                            "granularity": { "$ref": "#/$defs/granularity" }
+                        }
+                    }
+                ]
+            }
+        },
+        "measures": {
+            "description": "Kunci measure dataset yang dihitung. Sedikitnya satu.",
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/key" }
+        },
+        "filters": {
+            "description": "Kunci field mengarah ke saringan. Teks, angka, dan tanggal memakai ekspresi sintaks Business Central (K-30); pilihan, ya/tidak, dan rujukan memakai daftar nilai. Isian kosong berarti tanpa saringan.",
+            "type": "object",
+            "additionalProperties": {
+                "oneOf": [
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "string" } }
+                ]
+            }
+        },
+        "time_range": {
+            "description": "Rentang waktu atas satu field waktu dataset.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["range"],
+            "properties": {
+                "field": {
+                    "description": "Kunci field waktu. Bawaannya field waktu utama dataset.",
+                    "$ref": "#/$defs/key"
+                },
+                "range": {
+                    "description": "Token relatif (@today, @yesterday, @this_week, @last_week, @this_month, @last_month, @this_quarter, @last_quarter, @this_year, @last_year, @last_7_days, @last_30_days, @last_90_days, @last_12_months, @year_to_date, @month_to_date) atau ekspresi tanggal sintaks Business Central, misalnya 01/01/2026..31/03/2026.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 250
+                }
+            }
+        },
+        "sort": {
+            "description": "Urutan hasil. Kunci harus salah satu pengelompok atau measure yang dipilih; urutan pertama yang utama. Tanpa ini, measure pertama diurutkan turun.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "direction"],
+                "properties": {
+                    "key": { "$ref": "#/$defs/key" },
+                    "direction": { "enum": ["asc", "desc"] }
+                }
+            }
+        },
+        "limit": {
+            "description": "Top-N: jumlah baris paling banyak. Tidak boleh melebihi batas baris principal.",
+            "type": "integer",
+            "minimum": 1
+        },
+        "totals": {
+            "description": "Minta total keseluruhan, satu baris per mata uang dan satuan.",
+            "type": "boolean"
+        },
+        "fill_gaps": {
+            "description": "Isi celah deret waktu. Bawaannya true bila ada pengelompokan menurut waktu.",
+            "type": "boolean"
+        }
+    },
+    "$defs": {
+        "key": {
+            "description": "Kunci field atau measure dataset.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+        },
+        "granularity": {
+            "description": "Ukuran ember waktu. Minggu mulai Senin.",
+            "enum": ["day", "week", "month", "quarter", "year"]
+        }
+    }
+}

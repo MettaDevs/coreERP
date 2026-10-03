@@ -144,7 +144,7 @@ tanpa menjatuhkan aplikasi.
 
 ---
 
-### 2. [ ] Model query lengkap
+### 2. [x] Model query lengkap
 
 **Tempat:** `app/Platform/Analytics/Query/{AnalyticsQuery, Dimension, TimeRange, TimeGranularity,
 QueryParser, QueryNormalizer, QueryValidator, RelativeRange}.php`,
@@ -154,20 +154,57 @@ QueryParser, QueryNormalizer, QueryValidator, RelativeRange}.php`,
 dinormalkan, dan divalidasi dengan galat berpath; token relatif benar di batas hari, minggu, tahun,
 dan tahun kabisat untuk tiga zona Indonesia.
 
-- [ ] 2.1 Skema JSON (draft 2020-12) sebagai sumber bentuk untuk kontrak dan tipe TypeScript. Tidak
+Selesai 3 Oktober 2026, di atas cabang area 0 (PR #274). Yang dikirim berbeda dari rencana di beberapa
+butir; bedanya dicatat di butir masing-masing (*Dikirim:*), dan halaman rancangan yang bersangkutan ikut
+diperbarui.
+
+- [x] 2.1 Skema JSON (draft 2020-12) sebagai sumber bentuk untuk kontrak dan tipe TypeScript. Tidak
   menambah pustaka validasi skema: parser memvalidasi dengan aturan sendiri, dan satu test memastikan
-  kunci di skema sama dengan kunci yang dikenal parser.
-- [ ] 2.2 `QueryParser`: galat 422 dengan path (`dimensions.1.granularity`) dan pesan bahasa Indonesia.
-- [ ] 2.3 `QueryNormalizer`: urutan kunci dan nilai daftar tetap; dua JSON setara menghasilkan bentuk
-  normal yang sama.
-- [ ] 2.4 `QueryValidator` terhadap `CompiledDataset` dan principal: kunci dikenal, batas
+  kunci di skema sama dengan kunci yang dikenal parser. *Dikirim:* `QueryShapeSyncTest` membandingkan
+  lebih dari yang dijanjikan — kunci di setiap tingkat (dimensi, `time_range`, `sort`), ukuran waktu dan
+  arah urutan, kunci tipe `AnalyticsQuery` di `types.ts`, dan daftar token periode serta ukuran waktu di
+  `query.ts` terhadap `RelativeRange::TOKENS` dan `TimeGranularity`. Kunci fase 2 (`compare`, `formulas`)
+  belum ada di skema: skema menggambarkan yang berlaku.
+- [x] 2.2 `QueryParser`: galat 422 dengan path (`dimensions.1.granularity`) dan pesan bahasa Indonesia.
+  *Dikirim:* semua kunci bentuk query dibaca, termasuk objek dimensi, `time_range`, `sort`, `totals`, dan
+  `fill_gaps` (bawaannya mengikuti ada tidaknya dimensi waktu). `compare` dan `formulas` ditolak "belum
+  tersedia". Isian saringan `null` dibaca sebagai kosong, karena `ConvertEmptyStringsToNull` mengubah
+  teks kosong di badan JSON menjadi `null` sebelum sampai ke parser; tanpa itu isian yang dikosongkan di
+  layar ditolak 422.
+- [x] 2.3 `QueryNormalizer`: urutan kunci dan nilai daftar tetap; dua JSON setara menghasilkan bentuk
+  normal yang sama. *Dikirim:* ia mengembalikan `AnalyticsQuery` yang sudah satu bentuk (bukan larik), dan
+  `RunQuery` memanggilnya sebelum apa pun, jadi hash dan kunci cache sama untuk setiap jalur masuk.
+  Saringan kosong dibuang, `fill_gaps` tanpa dimensi waktu dimatikan; urutan dimensi, measure, dan `sort`
+  dipertahankan karena mengubah hasil. `AnalyticsQuery::normalized()` sekarang mengurutkan pilihan sebagai
+  teks (`SORT_STRING`), supaya hasilnya tidak bergantung pada perbandingan angka-sebagai-teks PHP.
+- [x] 2.4 `QueryValidator` terhadap `CompiledDataset` dan principal: kunci dikenal, batas
   (`config/analytics.php`), granularitas hanya pada field waktu, urutan hanya pada kunci terpilih,
   `limit` dalam batas. Gerbang data pribadi dipanggil di sini, implementasinya milik area 4.
-- [ ] 2.5 `RelativeRange` dengan token di [rentang relatif](/todo/analitik/mesin-query#rentang-waktu-relatif);
-  menghasilkan ekspresi `Y-m-d..Y-m-d` untuk `FieldFilterExpression`.
-- [ ] 2.6 `types.ts` dan pembantu `query.ts` (penyusun query, pembaca kolom hasil) untuk layar.
-- [ ] 2.7 Test unit tanpa database: bentuk sah dan tidak sah, normalisasi, token di
+  *Dikirim:* kunci config baru `limits.dimensions`, `limits.measures`, `limits.filters`, `limits.sort`;
+  `time_range` memakai kolom waktu dataset dan token yang dikenal. Titik panggil gerbang data pribadi
+  adalah antarmuka `Query\FieldUseGate`, dipanggil terakhir dengan peta path → kolom yang dipakai query.
+  Parameternya opsional dan tidak ada implementasinya: **sampai area 4 mengikatnya, tidak ada pemeriksaan
+  data pribadi di jalur ini**, sama dengan keadaan area 0 (dataset yang ada tidak menawarkan kolom data
+  pribadi). Area 4 menjadikannya wajib. Tidak ada method baru yang diminta dari `CompiledDataset` untuk
+  validator; kebutuhan area 4 (klasifikasi per field) dicatat di [arsitektur](/todo/analitik/arsitektur#compileddataset).
+- [x] 2.5 `RelativeRange` dengan token di [rentang relatif](/todo/analitik/mesin-query#rentang-waktu-relatif);
+  menghasilkan ekspresi `Y-m-d..Y-m-d` untuk `FieldFilterExpression`. *Dikirim:* fungsi statis
+  (`expression()` dan `bounds()` untuk `GapFiller` area 3), bukan kelas yang disuntikkan seperti di sketsa
+  compiler. Karena parser kini membaca `time_range` dan `sort`, `QueryCompiler` ikut mengompilasinya
+  (sebagian kecil area 3.5) supaya tidak ada kunci yang dibaca lalu diabaikan; ember waktu dan `totals`
+  ditolak 422 "belum tersedia" sampai area 3.
+- [x] 2.6 `types.ts` dan pembantu `query.ts` (penyusun query, pembaca kolom hasil) untuk layar.
+  *Dikirim:* `types.ts` hanya bertambah alias bernama di akhir (`QueryDimension`, `QuerySort`,
+  `QueryTimeRange`); `query.ts` memuat `buildQuery()`, `dimension()`, `RELATIVE_RANGES` dan
+  `TIME_GRANULARITIES` dengan nama tampil bahasa sehari-hari, pembaca kolom hasil, dan
+  `groupRowsByImplicit()` (pengelompokan per mata uang yang kini ditulis tangan di `explore.tsx`, yang
+  tidak diubah karena area 8 menggantinya).
+- [x] 2.7 Test unit tanpa database: bentuk sah dan tidak sah, normalisasi, token di
   `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura` pada 31 Desember 23.30 dan 29 Februari 2028.
+  *Dikirim:* `tests/Unit/Platform/Analytics/` — `RelativeRangeTest`, `QueryParserTest`,
+  `QueryNormalizerTest`, `QueryValidatorTest`, `QueryShapeSyncTest` — ditambah test endpoint di
+  `WalkingSkeletonTest` (rentang waktu mengikuti zona pengguna, urutan dan top-N, hash sama untuk query
+  setara, galat berpath). Cara setiap penjaga dibuat merah dicatat di pull request area 2.
 
 ---
 
@@ -220,7 +257,11 @@ disetujui).
 - [ ] 4.3 `DataPolicyScope`: hibah kebijakan dataset → `DataPolicyFilter`; `lockedFilters()` dipasang
   sebagai saringan yang tidak dapat dilepas.
 - [ ] 4.4 `PersonalDataGate`: katalog, dimensi, saringan, urutan, kolom drill; label nama orang untuk
-  field `EndUserPseudonymousIdentifiers` hanya bagi yang berhak.
+  field `EndUserPseudonymousIdentifiers` hanya bagi yang berhak. Untuk query, ia mengimplementasikan
+  `Query\FieldUseGate` yang sudah dipanggil `QueryValidator` (area 2.4), mengikatnya di container, dan
+  menjadikan parameter validator tidak lagi opsional. Test yang dibutuhkan: query yang memakai kolom
+  tertutup sebagai pengelompok, saringan, dan rentang waktu ditolak 403 `analytics.field_personal_data`
+  berpath; `AnalyticsQueryException` belum punya pabrik untuk kode itu, jadi tambahkan.
 - [ ] 4.5 `ScopeFingerprint`: hash hibah terurut + hak data pribadi + saringan terkunci.
 - [ ] 4.6 **Setelah KA-14 disetujui**: migration katalog keamanan
   ([contoh](/todo/analitik/keamanan#rantai-izin-yang-diusulkan)), konstanta `CoreSecurityCatalog`,
