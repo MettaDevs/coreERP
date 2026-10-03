@@ -1,0 +1,575 @@
+# Mesin query
+
+Bagian dari [engine analitik](/todo/analitik/). Halaman ini menetapkan bentuk query JSON, cara
+query itu menjadi SQL, cara SQL-nya dijalankan, bentuk hasilnya, dan galatnya. Dataset yang menjadi
+bahannya dijelaskan di [model semantik](/todo/analitik/model-semantik).
+
+## Bentuk query
+
+Satu query membaca satu dataset. Bentuknya meniru query Cube (KA-07) karena bentuk itu sudah teruji
+dan langsung terpetakan ke `SELECT … GROUP BY`.
+
+```json
+{
+  "dataset": "management-aset.asset-register",
+  "dimensions": [
+    "group_aset_id",
+    { "field": "acquired_on", "granularity": "month" }
+  ],
+  "measures": ["count", "acquisition_value"],
+  "filters": {
+    "lifecycle_state": ["received", "decommissioned"],
+    "nama": "@*laptop*",
+    "acquisition_value": ">=5.000.000"
+  },
+  "time_range": { "field": "acquired_on", "range": "@last_12_months" },
+  "sort": [{ "key": "acquisition_value", "direction": "desc" }],
+  "limit": 10,
+  "totals": true,
+  "fill_gaps": true
+}
+```
+
+| Kunci | Wajib | Isi | Batas bawaan |
+| --- | --- | --- | --- |
+| `dataset` | ya | Kode dataset | — |
+| `dimensions` | tidak | Kunci field, atau `{field, granularity}` untuk field waktu | 4 |
+| `measures` | ya | Kunci measure dataset; fase 2 juga kunci rumus | 12 |
+| `filters` | tidak | Kunci field → ekspresi sintaks BC (teks, angka, tanggal) atau daftar nilai (pilihan, ya/tidak, rujukan) | 20 field, aturan K-30 per nilai |
+| `time_range` | tidak | `field` (bawaan field waktu utama dataset) dan `range`: token relatif atau ekspresi tanggal | — |
+| `sort` | tidak | Kunci dimensi atau measure, `asc`/`desc` | 3 |
+| `limit` | tidak | Top-N | ≤ `limits.rows_interactive` |
+| `totals` | tidak | Hitung total keseluruhan | — |
+| `fill_gaps` | tidak | Isi celah deret waktu; bawaan `true` bila ada dimensi waktu | 1000 titik |
+| `compare` | tidak, fase 2 | `previous_period` atau `previous_year` | — |
+| `formulas` | tidak, fase 2 | Rumus, lihat [bahasa rumus](#bahasa-rumus) | 5 |
+
+Skema JSON lengkapnya ditulis area 2 di `apps/core/resources/schemas/analytics-query.schema.json`
+dan dipakai tiga tempat sekaligus: validasi permintaan, tipe TypeScript layar, dan kontrak
+`integrasi-analitik.yaml`. Satu skema untuk ketiganya, supaya ketiganya tidak menyimpang.
+
+### Saringan
+
+Nilai saringan memakai bentuk yang sama dengan filter tambahan laporan (K-30), dan dijalankan oleh
+`FieldFilterExpression::apply()` yang sama — bukan salinan:
+
+| Tipe field | Bentuk nilai | Contoh |
+| --- | --- | --- |
+| Teks | Ekspresi | `Asus|Lenovo`, `*laptop*`, `@asus*`, `<>Rusak`, `''` |
+| Angka | Ekspresi, angka gaya Indonesia | `>=1.000.000`, `100..500`, `<>0` |
+| Tanggal, tanggal-jam | Ekspresi | `01/09/2026..30/09/2026`, `>=01/01/2026`, `t` |
+| Pilihan, ya/tidak, rujukan | Daftar nilai | `["received"]`, `["1"]`, `["01J…", "01J…"]` |
+
+Saringan pada field yang tidak dikenal dataset ditolak, bukan diabaikan: saringan yang diabaikan
+diam-diam memulangkan angka yang lebih besar dari yang diminta pengguna.
+
+### Rentang waktu relatif
+
+`time_range.range` menerima ekspresi tanggal biasa atau token. Token diterjemahkan `RelativeRange`
+menjadi ekspresi `Y-m-d..Y-m-d` **menurut zona waktu pengguna**, lalu dijalankan
+`FieldFilterExpression` yang sudah tahu cara mengubah hari penuh di zona pengguna menjadi rentang UTC.
+
+| Token | Arti, untuk "sekarang" = Kamis 15 Oktober 2026 |
+| --- | --- |
+| `@today` / `@yesterday` | 15 Okt / 14 Okt |
+| `@this_week` / `@last_week` | 12–18 Okt / 5–11 Okt (minggu mulai Senin) |
+| `@this_month` / `@last_month` | 1–31 Okt / 1–30 Sep |
+| `@this_quarter` / `@last_quarter` | 1 Okt–31 Des / 1 Jul–30 Sep |
+| `@this_year` / `@last_year` | 1 Jan–31 Des 2026 / 2025 |
+| `@last_7_days` / `@last_30_days` / `@last_90_days` | Termasuk hari ini |
+| `@last_12_months` | 1 Nov 2025–31 Okt 2026, bulan penuh |
+| `@year_to_date` / `@month_to_date` | 1 Jan–15 Okt / 1–15 Okt |
+
+`RelativeRange` terpisah dari `RelativeDates` milik preset laporan K-25. Token preset tersimpan di
+preset tenant dan menjadi tanggal tunggal; token analitik menjadi rentang. Menggabungkan keduanya
+mengubah arti token yang sudah tersimpan. Tahun fiskal (`@this_fiscal_year`) menyusul di fase 2
+lewat `FiscalCalendarDirectory`, karena butuh legal entity.
+
+## Dari JSON ke objek
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Platform\Analytics\Query;
+
+/**
+ * Query analitik yang sudah dibaca dan dinormalkan. Tidak berubah setelah dibuat: kunci cache dihitung
+ * dari bentuk normalnya, jadi dua JSON yang berbeda urutan kuncinya menjadi satu entri cache.
+ */
+final readonly class AnalyticsQuery
+{
+    /**
+     * @param  list<Dimension>  $dimensions
+     * @param  list<string>  $measures
+     * @param  array<string, string|list<string>>  $filters
+     * @param  list<array{key: string, direction: 'asc'|'desc'}>  $sort
+     */
+    public function __construct(
+        public string $dataset,
+        public array $dimensions,
+        public array $measures,
+        public array $filters,
+        public ?TimeRange $timeRange,
+        public array $sort,
+        public ?int $limit,
+        public bool $totals,
+        public bool $fillGaps,
+    ) {}
+
+    /** Bentuk normal untuk kunci cache dan log: kunci urut, nilai daftar urut, tanpa nilai bawaan. */
+    public function normalized(): array
+    {
+        $filters = $this->filters;
+        ksort($filters);
+        foreach ($filters as &$value) {
+            if (is_array($value)) {
+                sort($value);
+            }
+        }
+
+        return [
+            'dataset' => $this->dataset,
+            'dimensions' => array_map(fn (Dimension $d): array => $d->toArray(), $this->dimensions),
+            'measures' => $this->measures,
+            'filters' => $filters,
+            'time_range' => $this->timeRange?->toArray(),
+            'sort' => $this->sort,
+            'limit' => $this->limit,
+            'totals' => $this->totals,
+            'fill_gaps' => $this->fillGaps,
+        ];
+    }
+}
+```
+
+`QueryParser` membaca JSON menjadi objek ini dan menolak bentuk yang salah dengan galat berpath
+(`dimensions.1.granularity`). `QueryValidator` lalu memeriksa query terhadap dataset dan principal:
+setiap kunci dikenal, field data pribadi hanya bila principal berhak, batas jumlah, `limit` dalam
+batas, dimensi waktu hanya pada field waktu, `sort` hanya pada kunci yang dipilih.
+
+## Dari objek ke SQL
+
+Urutan di bawah bukan selera; setiap langkah bergantung pada langkah sebelumnya.
+
+1. **Query dasar dari dataset.** `Model::query()` untuk dataset bermodel — `TenantScope` dan
+   `SoftDeletes` ikut dari model — atau `fromSub(sumber, 'base')` ditambah `where base.tenant_id = ?`
+   untuk dataset bersumber query. Tabel dasar tidak pernah diberi alias.
+2. **Join yang dibutuhkan saja.** `JoinPlanner` mengumpulkan alias yang disebut dimensi, measure,
+   saringan, dan kolom kebijakan, lalu memasang join itu saja. Setiap join membawa
+   `alias.tenant_id = <tabel dasar>.tenant_id`, dan `alias.deleted_at IS NULL` kecuali join label.
+3. **Kebijakan data**, sebelum saringan pengguna, lewat `DataPolicyFilter::apply()` pada kolom yang
+   dinyatakan. Saringan pengguna hanya dapat menyempitkan, tidak pernah melebarkan.
+4. **Saringan pengguna dan rentang waktu** lewat `FieldFilterExpression::apply()`.
+5. **Dimensi** dengan alias posisi `d0`, `d1`, …, dan pengelompokan menurut alias itu.
+6. **Dimensi tersirat**: kolom mata uang dan satuan dari measure uang dan kuantitas (KA-22).
+7. **Measure** dengan alias `m0`, `m1`, ….
+8. **Urutan dan batas**: `ORDER BY` pada alias, `LIMIT n + 1`.
+9. **Total**: query kedua dengan langkah 1–4 dan 6 yang sama, tanpa dimensi lain.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Platform\Analytics\Query;
+
+use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\DataPolicyScope;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+
+/**
+ * Menyusun query builder Laravel dari query analitik. Tidak menjalankan apa pun; eksekusinya milik
+ * {@see QueryExecutor}, supaya `analytics:explain` dan test dapat memeriksa SQL tanpa membaca data.
+ */
+final class QueryCompiler
+{
+    public function __construct(
+        private readonly JoinPlanner $joins,
+        private readonly DataPolicyScope $policy,
+        private readonly MeasureSql $measures,
+        private readonly TimeBucketSql $time,
+        private readonly RelativeRange $ranges,
+    ) {}
+
+    public function compile(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
+    {
+        $builder = $dataset->baseQuery();
+        $grammar = $builder->getQuery()->getGrammar();
+
+        $this->joins->apply($builder, $dataset, $query);
+        $this->policy->apply($builder, $dataset, $principal);
+
+        foreach ($query->filters as $key => $value) {
+            FieldFilterExpression::apply($builder, $dataset->filterField($key), $value, $principal->timezone());
+        }
+        if ($query->timeRange !== null) {
+            $field = $dataset->filterField($query->timeRange->field ?? $dataset->defaultTime());
+            FieldFilterExpression::apply($builder, $field, $this->ranges->expression($query->timeRange->range, $principal->now()), $principal->timezone());
+        }
+
+        $totals = $query->totals ? clone $builder : null;
+        $columns = [];
+
+        foreach ($query->dimensions as $i => $dimension) {
+            $alias = "d{$i}";
+            $sql = $dimension->granularity === null
+                ? $grammar->wrap($dataset->qualified($dimension->field))
+                : $this->time->bucket($dataset, $dimension->field, $dimension->granularity, $principal->timezone());
+            // Kelompokkan menurut alias, bukan menurut ekspresi: ekspresi yang membawa parameter muncul dua
+            // kali sebagai `$1` dan `$5`, dan PostgreSQL tidak tahu keduanya sama.
+            $builder->selectRaw("{$sql} as {$alias}")->groupBy($alias);
+            $columns[] = ResultColumn::dimension($alias, $dimension, $dataset);
+            foreach ($dataset->labelColumnsFor($dimension->field) as $labelAlias => $labelSql) {
+                $builder->selectRaw("{$labelSql} as {$alias}_{$labelAlias}")->groupBy("{$alias}_{$labelAlias}");
+            }
+        }
+
+        foreach ($this->implicitDimensions($dataset, $query) as $j => $field) {
+            $alias = "c{$j}";
+            $builder->selectRaw($grammar->wrap($dataset->qualified($field))." as {$alias}")->groupBy($alias);
+            $totals?->selectRaw($grammar->wrap($dataset->qualified($field))." as {$alias}")->groupBy($alias);
+            $columns[] = ResultColumn::implicit($alias, $field, $dataset);
+        }
+
+        foreach ($query->measures as $i => $key) {
+            [$sql, $bindings] = $this->measures->sql($dataset, $dataset->measure($key));
+            $builder->selectRaw("{$sql} as m{$i}", $bindings);
+            $totals?->selectRaw("{$sql} as m{$i}", $bindings);
+            $columns[] = ResultColumn::measure("m{$i}", $key, $dataset);
+        }
+
+        foreach ($this->orderOf($query, $columns) as [$alias, $direction]) {
+            $builder->orderByRaw("{$alias} {$direction} nulls last");
+        }
+        $limit = $query->limit ?? $principal->rowLimit();
+        $builder->limit($limit + 1);
+
+        return new CompiledQuery($builder, $totals, $columns, $limit);
+    }
+}
+```
+
+`$dataset->qualified()` hanya memulangkan nama yang sudah lolos `DatasetValidator` (huruf kecil,
+angka, garis bawah), dan `wrap()` menambahkan tanda kutip identifier. Tidak satu pun nilai dari
+pemanggil masuk ke SQL selain lewat binding.
+
+### Measure
+
+```php
+/** @return array{0: string, 1: list<mixed>} */
+public function sql(CompiledDataset $dataset, CompiledMeasure $measure): array
+{
+    $column = $measure->field === null ? '*' : $this->grammar->wrap($dataset->qualified($measure->field));
+    $expression = match ($measure->aggregate) {
+        Aggregate::Count => "count({$column})",
+        Aggregate::CountDistinct => "count(distinct {$column})",
+        Aggregate::Sum => "coalesce(sum({$column}), 0)",
+        Aggregate::Average => "avg({$column})",
+        Aggregate::Minimum => "min({$column})",
+        Aggregate::Maximum => "max({$column})",
+    };
+
+    if ($measure->where === []) {
+        return [$expression, []];
+    }
+
+    // Saringan tetap measure: hanya kesamaan dan daftar nilai, sudah divalidasi saat dataset didaftarkan.
+    $conditions = [];
+    $bindings = [];
+    foreach ($measure->where as $field => $values) {
+        $wrapped = $this->grammar->wrap($dataset->qualified($field));
+        $values = (array) $values;
+        if ($values === [null]) {
+            $conditions[] = "{$wrapped} is null";
+            continue;
+        }
+        $conditions[] = $wrapped.' in ('.implode(', ', array_fill(0, count($values), '?')).')';
+        array_push($bindings, ...$values);
+    }
+
+    return ["{$expression} filter (where ".implode(' and ', $conditions).')', $bindings];
+}
+```
+
+Dua hal yang disengaja:
+
+- `sum` dibungkus `coalesce(…, 0)`: kelompok tanpa baris yang memenuhi saringan measure bernilai nol,
+  bukan kosong. `avg`, `min`, dan `max` tetap boleh kosong, karena rata-rata dari nol baris bukan nol.
+- Measure uang **tidak pernah** dijumlah tanpa kolom mata uangnya ikut dikelompokkan (langkah 6).
+  Kalau pengguna tidak memilih mata uang sebagai dimensi, compiler menambahkannya sebagai dimensi
+  tersirat; layar menampilkan satu nilai per mata uang ("Rp 1,2 M · USD 12.000"), tidak satu jumlah
+  campuran.
+
+### Waktu dan zona
+
+Kolom waktu di repo ini ada tiga jenis, dan masing-masing butuh SQL berbeda. Zona aplikasi
+(`config('app.timezone')`) adalah UTC, dan `$table->timestamps()` membuat `timestamp` **tanpa** zona
+yang berisi waktu UTC.
+
+| Tipe kolom | Ekspresi bucket bulan untuk pengguna `Asia/Makassar` |
+| --- | --- |
+| `date` | `date_trunc('month', "t"."acquired_on")::date` |
+| `timestamp` (tanpa zona, berisi UTC) | `date_trunc('month', ("t"."created_at" at time zone 'UTC') at time zone 'Asia/Makassar')::date` |
+| `timestamptz` | `date_trunc('month', "t"."posted_at" at time zone 'Asia/Makassar')::date` |
+
+- **Kolom `date` tidak dikonversi.** Tanggal perolehan adalah tanggal kalender, bukan saat.
+- **Zona ditulis sebagai literal, bukan binding**, setelah dicocokkan dengan
+  `DateTimeZone::listIdentifiers()`. Binding di `SELECT` dan `GROUP BY` menjadi dua parameter
+  berbeda bagi PostgreSQL, dan pengelompokan ditolak.
+- **Jangan memakai `to_char()` pada `timestamptz`.** Ia memakai zona sesi (UTC): awal Oktober di
+  Makassar adalah 30 September pukul 16.00 UTC, dan `to_char` menulisnya sebagai September.
+- **Minggu mulai Senin** (`date_trunc('week', …)` di PostgreSQL memang ISO).
+- **Celah deret waktu diisi di PHP** (`GapFiller`) dari rentang yang diminta: bulan tanpa transaksi
+  tetap muncul dengan nol untuk `count`/`sum` dan kosong untuk `avg`/`min`/`max`. Batasnya 1000 titik.
+
+Test yang wajib: transaksi pada 30 September 2026 pukul 16.30 UTC masuk bucket **Oktober** bagi
+pengguna WITA dan bucket September bagi pengguna UTC.
+
+### Label
+
+| Jenis field | Sumber label | Waktu |
+| --- | --- | --- |
+| Pilihan (`FIELD_OPTIONS`) | Peta nilai → label dari dataset | Setelah query, di PHP |
+| Rujukan module (`reference()`) | Join label ke tabel master yang sama module, termasuk baris terarsip | Di query, ikut dikelompokkan |
+| Dimensi bersama (`shared()`) | Resolver dimensi bersama di Core, sekali per himpunan id | Setelah query |
+| Ya/tidak | "Ya" / "Tidak" | Setelah query |
+
+Label dikirim di kolom pendamping `<kunci>__label`. Nilai mentah tetap dikirim, karena drill dan
+slicer butuh id, bukan nama.
+
+## Eksekusi baca-saja
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Platform\Analytics\Query;
+
+use Illuminate\Database\QueryException;
+
+final class QueryExecutor
+{
+    /**
+     * @return array{rows: list<object>, totals: list<object>}
+     */
+    public function run(CompiledQuery $compiled, int $timeoutMs): array
+    {
+        $connection = $compiled->builder->getConnection();
+        $connection->beginTransaction();
+
+        try {
+            // Baca-saja di level database: compiler yang salah pun tidak dapat menulis.
+            $connection->statement('set transaction read only');
+            // SET tidak menerima binding; nilainya integer dari config, bukan dari pemanggil.
+            $connection->statement(sprintf('set local statement_timeout = %d', $timeoutMs));
+
+            return [
+                'rows' => $compiled->builder->toBase()->get()->all(),
+                'totals' => $compiled->totals?->toBase()->get()->all() ?? [],
+            ];
+        } catch (QueryException $e) {
+            throw AnalyticsQueryException::fromDatabase($e);
+        } finally {
+            // ROLLBACK, bukan COMMIT. Query baca tidak butuh commit, dan bila engine dipanggil di dalam
+            // transaksi lain (test, job), rollback ke savepoint juga membatalkan SET LOCAL dan READ ONLY
+            // di atas. Commit ke savepoint membiarkan keduanya berlaku sampai transaksi luar selesai, dan
+            // INSERT berikutnya di transaksi itu gagal dengan "cannot execute INSERT in a read-only transaction".
+            $connection->rollBack();
+        }
+    }
+}
+```
+
+| Kode SQLSTATE | Arti | Jawaban |
+| --- | --- | --- |
+| `57014` | `statement_timeout` tercapai | 422 `analytics.query_timeout` |
+| `25006` | Percobaan menulis di transaksi baca-saja | 500 dan laporan galat: cacat compiler, bukan kesalahan pengguna |
+| `22P02`, `22007`, `22008` | Nilai tidak dapat dibaca sebagai angka atau tanggal | 422 `analytics.invalid_filter` |
+| `42xxx` | SQL tidak sah | 500 dan laporan galat; cacat compiler atau dataset |
+
+`InvalidFilterExpression` dari `FieldFilterExpression` diterjemahkan ke 422 `analytics.invalid_filter`
+dengan path field-nya, sebelum query sampai ke database.
+
+Test yang wajib untuk eksekutor:
+
+- Dipanggil di dalam transaksi test, lalu `INSERT` di transaksi yang sama **berhasil** — bukti
+  rollback ke savepoint membatalkan baca-saja dan batas waktu.
+- Query yang sengaja lambat (`pg_sleep`) pada dataset fixture berhenti di batas waktu dan menjadi 422.
+- Compiler yang dipaksa menulis (fixture test) gagal dengan `25006` di database, bukan lolos.
+
+## Bentuk hasil
+
+```json
+{
+  "columns": [
+    { "key": "group_aset_id", "kind": "dimension", "caption": "Group aset", "type": "reference", "label_key": "group_aset_id__label" },
+    { "key": "acquired_on", "kind": "dimension", "caption": "Tanggal perolehan", "type": "period", "granularity": "month" },
+    { "key": "currency_code", "kind": "dimension", "caption": "Mata uang", "type": "text", "implicit": true },
+    { "key": "count", "kind": "measure", "caption": "Jumlah aset", "type": "number", "format": "number" },
+    { "key": "acquisition_value", "kind": "measure", "caption": "Nilai perolehan", "type": "number", "format": "money", "currency_key": "currency_code" }
+  ],
+  "rows": [
+    { "group_aset_id": "01J9Z…", "group_aset_id__label": "Kendaraan", "acquired_on": "2026-09-01", "currency_code": "IDR", "count": 4, "acquisition_value": "1250000000.00" }
+  ],
+  "totals": [
+    { "currency_code": "IDR", "count": 140, "acquisition_value": "9870000000.00" }
+  ],
+  "meta": {
+    "dataset": "management-aset.asset-register",
+    "dataset_version": 1,
+    "generated_at": "2026-10-15T09:12:03+08:00",
+    "timezone": "Asia/Makassar",
+    "truncated": false,
+    "row_limit": 5000,
+    "cached": true,
+    "duration_ms": 41,
+    "query_hash": "sha256:…"
+  }
+}
+```
+
+- Alias SQL (`d0`, `m1`, `c0`) dipetakan kembali ke kunci dataset sebelum dikirim; alias tidak
+  pernah keluar dari server.
+- **Uang dan desimal dikirim sebagai string.** `numeric` PostgreSQL lebih presisi daripada float
+  JavaScript; layar memformatnya, bukan menghitungnya.
+- `totals` berupa daftar, satu baris per mata uang dan satuan.
+- Periode dikirim sebagai tanggal awal bucket (`2026-09-01`) beserta `granularity`; layar yang
+  menulis "Sep 2026".
+
+Tipe TypeScript-nya ditulis sekali di `resources/js/lib/analytics/types.ts`:
+
+```ts
+export type TimeGranularity = 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type MeasureFormat = 'number' | 'money' | 'percent' | 'quantity' | 'hours';
+
+export type AnalyticsQuery = {
+    dataset: string;
+    dimensions?: Array<string | { field: string; granularity?: TimeGranularity }>;
+    measures: string[];
+    filters?: Record<string, string | string[]>;
+    time_range?: { field?: string; range: string };
+    sort?: Array<{ key: string; direction: 'asc' | 'desc' }>;
+    limit?: number;
+    totals?: boolean;
+    fill_gaps?: boolean;
+};
+
+export type ResultColumn = {
+    key: string;
+    kind: 'dimension' | 'measure';
+    caption: string;
+    type: 'text' | 'number' | 'date' | 'datetime' | 'boolean' | 'option' | 'reference' | 'period';
+    format?: MeasureFormat;
+    granularity?: TimeGranularity;
+    label_key?: string;
+    currency_key?: string;
+    unit_key?: string;
+    implicit?: boolean;
+};
+
+export type ResultValue = string | number | boolean | null;
+
+export type ResultSet = {
+    columns: ResultColumn[];
+    rows: Array<Record<string, ResultValue>>;
+    totals: Array<Record<string, ResultValue>>;
+    meta: {
+        dataset: string;
+        dataset_version: number;
+        generated_at: string;
+        timezone: string;
+        truncated: boolean;
+        row_limit: number;
+        cached: boolean;
+        duration_ms: number;
+        query_hash: string;
+    };
+};
+```
+
+## Galat
+
+Bentuknya `{"error": {"code": "...", "message": "...", "field": "..."}}`, bentuk yang sudah dibaca
+`CoreApiError` di `resources/js/lib/core-api.ts`. Pesannya bahasa sehari-hari yang menyebut apa yang
+dapat dilakukan pengguna.
+
+| Kode | HTTP | Pesan untuk pengguna |
+| --- | --- | --- |
+| `analytics.dataset_unknown` | 404 | Data ini tidak tersedia. Module-nya mungkin tidak terpasang. |
+| `analytics.dataset_forbidden` | 403 | Anda tidak punya akses ke data ini. |
+| `analytics.field_unknown` | 422 | Kolom "…" tidak dikenal. Pilih kolom dari daftar. |
+| `analytics.field_personal_data` | 403 | Kolom "…" memuat data pribadi dan tidak dapat dipakai di analitik dengan hak Anda. |
+| `analytics.invalid_filter` | 422 | Saringan "…" tidak dapat dibaca. Contoh yang sah: … |
+| `analytics.limit_exceeded` | 422 | Terlalu banyak kolom pengelompokan. Maksimal 4. |
+| `analytics.query_timeout` | 422 | Perhitungan ini terlalu berat. Persempit periode atau saringan. |
+| `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. |
+
+## Bahasa rumus
+
+Fase 2 (area 13). Rumus menghitung nilai baru dari measure lain di baris yang sama: rasio, selisih,
+persen, kondisi sederhana. Dikompilasi ke SQL di atas ekspresi agregat, jadi urutan dan top-N dapat
+memakai hasilnya.
+
+```text
+ekspresi  := suku (('+' | '-') suku)*
+suku      := faktor (('*' | '/') faktor)*
+faktor    := angka | measure | fungsi | '(' ekspresi ')' | '-' faktor
+measure   := '[' kunci_measure ']'                  contoh: [acquisition_value]
+fungsi    := NAMA '(' argumen (';' argumen)* ')'    pemisah ';' karena koma adalah desimal
+kondisi   := ekspresi ('=' | '<>' | '<' | '<=' | '>' | '>=') ekspresi
+```
+
+| Fungsi | Arti | SQL |
+| --- | --- | --- |
+| `BAGI(a; b)` | `a / b`, nol bila `b` nol | `coalesce(a / nullif(b, 0), 0)` |
+| `BAGI(a; b; c)` | `a / b`, `c` bila `b` nol | `coalesce(a / nullif(b, 0), c)` |
+| `JIKA(kondisi; a; b)` | `a` bila kondisi benar | `case when … then a else b end` |
+| `ABS(a)`, `BULAT(a; n)` | Nilai mutlak, pembulatan | `abs(a)`, `round(a, n)` |
+| `MIN(a; b)`, `MAKS(a; b)` | Terkecil, terbesar | `least(a, b)`, `greatest(a, b)` |
+
+Contoh: persentase aset dilepas `BAGI([disposed]; [count]) * 100`.
+
+Aturan yang dijaga:
+
+- **Daftar fungsi tertutup.** Nama di luar tabel ditolak saat dibaca, sebelum ada SQL apa pun.
+- **Angka menjadi binding**, measure menjadi ekspresi agregat yang sudah divalidasi. Tidak ada teks
+  pengguna yang masuk ke SQL.
+- **Batas**: 500 karakter, kedalaman 20, 5 rumus per query, rumus tidak boleh memakai rumus lain di
+  fase 2.
+- **Uang**: rumus atas measure uang mewarisi pengelompokan mata uangnya; rumus yang mencampur measure
+  dengan kolom mata uang berbeda ditolak.
+- **Galat menunjuk posisi**: "Rumus tidak dapat dibaca di karakter 14: `]` tanpa pasangan".
+
+Test parser wajib mencakup percobaan menyisipkan SQL (`[count]); drop table x; --`), nama fungsi
+yang tidak dikenal, pembagian dengan nol, dan angka gaya Indonesia (`1.000,5`).
+
+## Perbandingan periode
+
+Fase 2 (area 13). `compare: "previous_period"` menjalankan query yang sama dengan rentang waktu
+digeser sepanjang rentang itu sendiri; `previous_year` menggeser satu tahun. Hasil kedua digabung ke
+hasil pertama menurut dimensi selain dimensi waktu, dan setiap measure mendapat tiga kolom tambahan:
+`<kunci>__previous`, `<kunci>__change`, `<kunci>__change_pct`. Persen perubahan dari nol ditulis kosong,
+bukan tak hingga.
+
+Perbandingan butuh `time_range`; query tanpa rentang waktu ditolak dengan pesan yang memintanya.
+
+## Baris di balik angka
+
+Fase 2 (area 12). Drill-through memakai query terpisah yang memilih baris, bukan kelompok:
+
+- Saringannya saringan widget **ditambah** nilai dimensi yang diklik sebagai kesamaan.
+- Kolomnya field yang dipilih penyusun widget, atau field bawaan dataset.
+- Kebijakan data dan gerbang data pribadi sama dengan query kelompok.
+- Halaman memakai kursor pada `id` tabel dasar, 100 baris per halaman, paling banyak 1.000 baris di
+  layar; lebih dari itu lewat antrean ekspor (`report_exports.kind = analytics`).
+
+## Alat operator
+
+- `php artisan analytics:datasets` — daftar dataset per module, versi, jumlah field dan measure, dan
+  hasil validasi.
+- `php artisan analytics:explain {widget|--query=…} --tenant=…` — SQL hasil compile beserta
+  `EXPLAIN (FORMAT TEXT)` di tenant itu, tanpa `ANALYZE`, untuk melihat indeks yang dipakai.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP Analytics"
+  short_description: "Datasets, query compiler, dashboards, and publications"
+  default_prompt: "Use $coreerp-analytics to declare datasets and change the CoreERP analytics engine without breaking tenant, data policy, or personal data boundaries."
