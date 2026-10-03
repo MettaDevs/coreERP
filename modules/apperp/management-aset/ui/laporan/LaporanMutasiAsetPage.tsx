@@ -11,20 +11,26 @@ import {
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
+/** Satu baris dataset `daftar-mutasi-aset`: satu aset pada satu dokumen mutasi yang selesai. */
 export type MutationReportRow = {
-    nomor?: number;
-    tanggal_mutasi?: string;
-    no_bukti?: string;
-    asset_kode?: string;
-    asset_nama?: string;
-    spesifikasi?: string;
-    lokasi_asal?: string;
-    lokasi_tujuan?: string;
-    penanggung_jawab?: string;
-    pic_penerima?: string;
-    kondisi_aset?: string;
-    keterangan?: string;
+    tanggal?: string | null;
+    kode?: string | null;
+    aset_kode?: string | null;
+    aset_nama?: string | null;
+    serial_number?: string | null;
+    asal_lokasi?: string | null;
+    tujuan_lokasi?: string | null;
+    asal_unit_kerja?: string | null;
+    tujuan_unit_kerja?: string | null;
+    diserahkan_oleh?: string | null;
+    diterima_oleh?: string | null;
+    kondisi?: string | null;
+    alasan?: string | null;
+    keterangan?: string | null;
 } & Record<string, unknown>;
+
+const teks = (value: unknown) =>
+    value === null || value === undefined || value === '' ? '—' : String(value);
 
 export default function LaporanMutasiAsetPage() {
     const {
@@ -38,79 +44,89 @@ export default function LaporanMutasiAsetPage() {
         loading,
         error,
         refetch,
-    } = useReportData<MutationReportRow>('laporan-mutasi-aset');
+    } = useReportData<MutationReportRow>('daftar-mutasi-aset');
 
     const columns: DataTableColumn<MutationReportRow>[] = useMemo(
         () => [
             {
-                id: 'tanggal_mutasi',
+                id: 'tanggal',
                 header: 'Tgl mutasi',
-                cell: (row) => String(row.tanggal_mutasi ?? '-'),
+                cell: (row) => teks(row.tanggal),
             },
             {
-                id: 'no_bukti',
+                id: 'kode',
                 header: 'No. bukti mutasi',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
-                        {String(row.no_bukti ?? '-')}
+                        {teks(row.kode)}
                     </span>
                 ),
             },
             {
-                id: 'asset_kode',
+                id: 'aset_kode',
                 header: 'Kode aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {teks(row.aset_kode)}
                     </span>
                 ),
             },
             {
-                id: 'asset_nama',
+                id: 'aset_nama',
                 header: 'Nama aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                cell: (row) => teks(row.aset_nama),
             },
             {
-                id: 'spesifikasi',
-                header: 'Spesifikasi',
-                cell: (row) => String(row.spesifikasi ?? '-'),
+                id: 'serial_number',
+                header: 'Nomor seri',
+                cell: (row) => teks(row.serial_number),
             },
             {
-                id: 'lokasi_asal',
+                id: 'asal_lokasi',
                 header: 'Lokasi asal',
-                cell: (row) => String(row.lokasi_asal ?? '-'),
+                cell: (row) => teks(row.asal_lokasi),
             },
             {
-                id: 'lokasi_tujuan',
+                id: 'tujuan_lokasi',
                 header: 'Lokasi tujuan',
-                cell: (row) => String(row.lokasi_tujuan ?? '-'),
+                cell: (row) => teks(row.tujuan_lokasi),
             },
             {
-                id: 'penanggung_jawab',
-                header: 'Penanggung jawab',
-                cell: (row) => String(row.penanggung_jawab ?? '-'),
+                id: 'asal_unit_kerja',
+                header: 'Unit asal',
+                cell: (row) => teks(row.asal_unit_kerja),
             },
             {
-                id: 'pic_penerima',
+                id: 'tujuan_unit_kerja',
+                header: 'Unit tujuan',
+                cell: (row) => teks(row.tujuan_unit_kerja),
+            },
+            {
+                id: 'diserahkan_oleh',
+                header: 'Diserahkan oleh',
+                cell: (row) => teks(row.diserahkan_oleh),
+            },
+            {
+                id: 'diterima_oleh',
                 header: 'PIC penerima',
-                cell: (row) => String(row.pic_penerima ?? '-'),
+                cell: (row) => teks(row.diterima_oleh),
             },
             {
-                id: 'kondisi_aset',
+                id: 'kondisi',
                 header: 'Kondisi aset',
-                cell: (row) => (
-                    <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(row.kondisi_aset ?? '-')}
-                    </span>
-                ),
-                align: 'center',
+                cell: (row) => teks(row.kondisi),
+            },
+            {
+                id: 'alasan',
+                header: 'Alasan mutasi',
+                cell: (row) => teks(row.alasan),
             },
             {
                 id: 'keterangan',
                 header: 'Keterangan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
-                        {String(row.keterangan ?? '-')}
+                        {teks(row.keterangan)}
                     </span>
                 ),
             },
@@ -121,8 +137,8 @@ export default function LaporanMutasiAsetPage() {
     return (
         <ReportPageLayout<MutationReportRow>
             title="Laporan mutasi aset"
-            description="Histori perpindahan lokasi, penanggung jawab, dan serah terima aset antar unit organisasi."
-            reportCode="laporan-mutasi-aset"
+            description="Perpindahan aset yang sudah selesai, satu baris per aset: dari mana ke mana, siapa yang menyerahkan dan menerima, dan kondisinya."
+            reportCode="daftar-mutasi-aset"
             filters={filters}
             filterBar={
                 <ReportFilterBar

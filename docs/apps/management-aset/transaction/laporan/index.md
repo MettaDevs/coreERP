@@ -19,15 +19,35 @@ kosong pada worker, persis kegagalan yang paling sulit ditemukan.
 
 ## Laporan yang ada
 
-Daftar lengkapnya didaftarkan di `src/ModuleServiceProvider.php` pada `ReportRegistry`. Katalog cetak Core dibaca dari definisi yang sama lewat `PenyediaLaporan::catalog()` saat `app:register-manifest`, jadi tidak ada daftar kedua yang harus disejalankan.
+Sumber daftarnya satu: pendaftaran `ReportRegistry` di `src/ModuleServiceProvider.php`. Katalog cetak Core dibaca dari definisi yang sama lewat `PenyediaLaporan::catalog()` saat `app:register-manifest`, jadi tidak ada daftar kedua yang harus disejalankan. Tabel di bawah hanya peta untuk pembaca; bila ia berbeda dengan pendaftaran itu, pendaftaran yang benar.
 
 | Kode manifest | Kelas | Parameter | Layout bawaan | Hak data |
 | --- | --- | --- | --- | --- |
-| `management-aset.work-order` | `src/Reporting/Definitions/WorkOrderDocument.php` | `id` work order | Word: header, tabel `baris`, tabel `checklist` | `pemeliharaan-aset.read` |
-| `management-aset.daftar-work-order` | `src/Reporting/Definitions/WorkOrderList.php` | `status`, `dari`, `sampai` | Excel: satu lembar, satu baris per work order | `pemeliharaan-aset.read` |
-| `management-aset.laporan-monitoring-aset` | `src/Reporting/Definitions/AssetMonitoringReport.php` | periode, filter aset, kondisi, lokasi, penanggung jawab, unit | Excel: satu baris per aset pada monitoring yang sudah selesai | `monitoring-aset.read` |
+| `management-aset.work-order` | `WorkOrderDocument` | `id` work order | Word: header, tabel `baris`, tabel `checklist` | `pemeliharaan-aset.read` |
+| `management-aset.daftar-work-order` | `WorkOrderList` | `status`, `dari`, `sampai` | Excel: satu baris per work order | `pemeliharaan-aset.read` |
+| `management-aset.laporan-pemeliharaan-aset` | `AssetMaintenanceReport` | `dari`, `sampai`, filter aset bersama tanpa kondisi, lokasi pekerjaan, status, tingkat layanan, teknisi, unit | Excel: satu baris per aset yang dikerjakan pada satu work order | `pemeliharaan-aset.read` |
+| `management-aset.berita-acara-serah-terima` | `BeritaAcaraSerahTerima` | `id` mutasi | Word: berita acara satu dokumen mutasi yang selesai | `mutasi-aset.read` |
+| `management-aset.daftar-mutasi-aset` | `DaftarMutasiAset` | group, kelompok harta fiskal, jenis, aset, `status`, `dari`, `sampai` | Excel: satu baris per aset yang berpindah | `mutasi-aset.read` |
+| `management-aset.laporan-penyusutan-aset` | `AssetDepreciationReport` | `periode`, filter aset bersama, buku | Excel: satu baris per buku aset | `penyusutan.read` |
+| `management-aset.laporan-pemusnahan-aset` | `AssetDisposalScrapReport` | `dari`, `sampai`, filter aset bersama, buku | Excel: satu baris per aset yang dimusnahkan | `pemusnahan-aset.read` |
+| `management-aset.laporan-penjualan-aset` | `AssetDisposalSaleReport` | `dari`, `sampai`, filter aset bersama, buku | Excel: satu baris per aset yang dijual | `penjualan-aset.read` |
+| `management-aset.laporan-monitoring-aset` | `AssetMonitoringReport` | periode, filter aset, kondisi, lokasi, penanggung jawab, unit | Excel: satu baris per aset pada monitoring yang sudah selesai | `monitoring-aset.read` |
 
-Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `daftar-work-order`).
+Kelasnya di `src/Reporting/Definitions/`. Kode di sisi modul adalah kode manifest tanpa awalan ID modul (`work-order`, `daftar-work-order`).
+
+**Kode yang dipakai layar wajib kode yang terdaftar.** Halaman di `ui/laporan/` memanggil pratinjau lewat `useReportData('<kode>')` dan tombol Cetak lewat `reportCode`, dan tombol cetak di layar transaksi lewat `requestPrint({ report })`. Kode yang tidak terdaftar tidak gagal saat build: pratinjaunya menjawab "laporan tidak dikenal" dan dialog cetaknya 404. Menu dan nama halaman boleh berbeda dari kode laporannya — menu **Laporan mutasi aset** membuka halaman yang membaca `daftar-mutasi-aset`, laporan yang sama dengan tombol ekspor di daftar mutasi. `tests/Feature/ReportScreenCodeTest.php` membaca kode-kode itu dari berkas layar dan menolak yang tidak terdaftar.
+
+### Laporan pemeliharaan aset
+
+Satu baris per baris pekerjaan work order, yaitu satu aset yang dirawat atau diperbaiki. Kolomnya mengikuti spesifikasi QA (halaman LAPORAN pada `docs/diagrams/drawio/DOKUMENTASI APLIKASI ASSET MANAGEMENT.drawio`): No. bukti, tanggal work order, kode aset, item aset, spesifikasi, satuan, jumlah, item checklist, analisa perbaikan, jenis pemeliharaan, unit organisasi, dan PIC. Ditambah jenis pekerjaan, lokasi, tingkat layanan, status, dan catatan, karena kolom-kolom itu juga dipakai sebagai filter.
+
+- **Tanggal work order** adalah tanggal dibuat menurut zona pengguna, sama dengan `daftar-work-order`, dan filter periode memakai batas hari yang sama. Jadwal tidak dipakai: tersimpan tanpa zona dan boleh kosong.
+- **Jenis pemeliharaan** adalah tipe work order (misalnya Rutin atau Korektif); **jenis pekerjaan** adalah master jenis pekerjaan di baris.
+- **Item checklist** menggabungkan butir checklist baris itu menurut nomor urutnya, beserta nilai dan satuannya, atau "tidak berlaku". **Analisa perbaikan** menggabungkan sebab kerusakan dan tindakan perbaikan beserta keterangannya.
+- **Lokasi** adalah lokasi yang disalin ke baris saat dibuat, yaitu tempat pekerjaan dikerjakan, bukan lokasi aset hari ini; filter lokasinya membaca kolom yang sama. **PIC** adalah teknisi yang ditugaskan pada baris, dan filter teknisi membaca kolom itu.
+- **Satuan dan jumlah** selalu "Unit" dan 1: satu baris pekerjaan menangani satu aset utuh, dan aset tidak punya satuan ukur sendiri.
+- Work order yang diarsipkan tidak ikut; semua status lainnya ikut kecuali disaring.
+- **Tidak ada kolom biaya.** Padanan Business Central, report 5634 "Maintenance - Details", menampilkan nominal tiap entri pemeliharaan, tetapi work order di modul ini belum mencatat biaya bahan, jasa, maupun tagihan vendor, dan spesifikasi QA juga tidak memintanya. Kolomnya ditambahkan setelah sumber datanya ada.
 
 ## Laporan keuangan aset
 
@@ -119,6 +139,7 @@ Pemeriksaan ganda itu tetap disengaja walau pemanggilnya berpindah dari jaringan
 | `laporan-nilai-buku-aset`, `laporan-proyeksi-penyusutan-aset` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`); Buku aset (`aset_tr_buku_aset`, `buku`) | buku aset yang dibaca |
 | `laporan-perolehan-aset` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang dibaca |
 | `laporan-rekonsiliasi-aset-buku-besar` | Aset (`aset_tr_aset`, `aset_tr_aset`, `kode`) | aset yang mutasinya dihitung; menurut keadaan aset sekarang |
+| `laporan-pemeliharaan-aset` | Work order (`aset_tr_pemeliharaan_aset`, `wo`, `kode`); Baris pekerjaan (`aset_tr_pemeliharaan_aset_details`, tanpa alias) | hanya baris yang cocok tercetak |
 
 Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`, `FIELD_LOOKUPS`, `FIELD_HIDDEN`), dan `tests/Feature/ReportFieldCatalogTest.php` menolak kolom yang belum diberi nama atau alasan disembunyikan. Jadwal work order (`diharapkan_*`, `dijadwalkan_*`) sengaja tidak ditawarkan: tersimpan tanpa zona, sedangkan filter tanggal-jam membacanya sebagai UTC. `berita-acara-serah-terima` dan `work-order` dicetak per satu dokumen yang dipilih, jadi tidak punya data item.
 
@@ -155,6 +176,7 @@ Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`
 | `resources/laporan/` | Layout bawaan per kode laporan |
 | `tests/Feature/PenyediaLaporanTest.php` | Definisi, layout bawaan, dataset dengan permission dan scope, filter daftar |
 | `tests/Feature/AssetFinancialReportsTest.php` | Laporan keuangan aset: mutasi nilai buku, rekonsiliasi, proyeksi, daftar perolehan |
+| `tests/Feature/ReportScreenCodeTest.php` | Kode laporan yang dipakai layar terdaftar di `ReportRegistry` |
 | `src/Reporting/AssetReportFilters.php` | Filter aset bersama: aturan, penerapan pada query, dan nama di kepala laporan |
 | `src/Reporting/Lists/AssetRegisterList.php` | Register aset sebagai daftar yang dapat diekspor Core |
 | `tests/Feature/AssetRegisterListTest.php` | Baris ekspor register aset mengikuti hak, cakupan unit kerja, dan pencarian |

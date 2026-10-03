@@ -4,6 +4,8 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Platform\Modules\Contracts\ReportFormatter;
 use App\Platform\Modules\Contracts\TenantRunner;
+use App\Platform\Reporting\Support\Rendering\XlsxTemplateRenderer;
+use App\Platform\Reporting\Support\ReportData as CoreReportData;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -15,6 +17,7 @@ use Modules\Apperp\ManagementAset\Reporting\ReportData;
 use Modules\Apperp\ManagementAset\Reporting\ReportDefinition;
 use Modules\Apperp\ManagementAset\Reporting\ReportRegistry;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 /**
@@ -337,6 +340,136 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame('Gudang Cakung', $baris['asal_lokasi']);
         $this->assertSame('Ruang Implementor', $baris['tujuan_lokasi']);
         $this->assertSame('17/09/2026', $baris['tanggal']);
+
+        // Filter aset bersama yang dipakai layar Laporan mutasi aset: group, kelompok harta fiskal, jenis, dan aset.
+        $group = (string) DB::table('aset_m_group_aset')->where('kode', 'GRPA-M1')->value('id');
+        $sesuai = $this->penyedia()->dataset('daftar-mutasi-aset', $konteks, ['group_aset_id' => [$group]]);
+        $this->assertSame(1, $sesuai['fields']['jumlah_baris']);
+        $this->assertSame('Elektronik', $sesuai['fields']['filter_group']);
+        $this->assertSame(0, $this->penyedia()->dataset('daftar-mutasi-aset', $konteks, ['group_aset_id' => [(string) Str::ulid()]])['fields']['jumlah_baris']);
+        $this->assertSame('Semua', $data['fields']['filter_jenis']);
+    }
+
+    public function test_maintenance_report_lists_one_row_per_asset_worked_on_with_checklist_and_analysis(): void
+    {
+        $data = $this->maintenanceWorkOrders();
+        $konteks = $this->konteks(['management-aset.pemeliharaan-aset.read']);
+        $run = fn (array $parameters = [], ?array $context = null): array => $this->penyedia()->dataset('laporan-pemeliharaan-aset', $context ?? $konteks, $parameters);
+        $bukti = fn (array $report): array => array_column($report['tables']['baris'], 'no_bukti');
+
+        $definisi = $this->penyedia()->definition('laporan-pemeliharaan-aset', $konteks);
+        $this->assertSame(['work_order', 'baris'], array_column($definisi['data_items'], 'key'));
+        foreach (['dari', 'sampai', 'group_aset_id', 'lokasi_aset_id', 'status', 'tingkat_layanan_id', 'teknisi_user_id', 'org_unit_id', 'filters'] as $parameter) {
+            $this->assertContains($parameter, $definisi['parameters']);
+        }
+        $this->assertContains(['key' => 'baris.analisa_perbaikan', 'label' => 'Analisa perbaikan', 'table' => 'baris'], $definisi['fields']);
+
+        // Hak membaca work order dituntut; hak membaca aset saja tidak cukup.
+        $this->assertGagalDengan('Anda tidak berhak membaca data laporan ini.', fn () => $run([], $this->konteks(['management-aset.aset.read'])));
+
+        // Urut tanggal work order; yang diarsipkan tidak ikut.
+        $semua = $run();
+        $this->assertSame(['PMHA-LAMA', 'PMHA-000001'], $bukti($semua));
+        $this->assertSame(2, $semua['fields']['jumlah_work_order']);
+        $this->assertSame(2, $semua['fields']['jumlah_pekerjaan']);
+        $baris = $semua['tables']['baris'][1];
+        $this->assertRowKeysDeclared('laporan-pemeliharaan-aset', $baris);
+        $this->assertSame([
+            'nomor' => 2,
+            'asset_kode' => 'AST-WO-1',
+            'asset_nama' => 'Forklift 1',
+            'spesifikasi' => 'SN: FL-77',
+            'satuan' => 'Unit',
+            'jumlah' => 1,
+            'checklist' => 'Tekanan ban: 32 psi; Lampu depan: tidak berlaku',
+            'analisa_perbaikan' => 'Sebab: Aus — Telapak ban gundul; Tindakan: Ganti komponen',
+            'jenis_pemeliharaan' => 'Korektif',
+            'jenis_pekerjaan' => 'Ganti ban',
+            'lokasi' => 'Gudang Cakung',
+            'pic' => 'montir-1',
+            'tingkat_layanan' => 'Mendesak',
+            'status' => 'Draf',
+            'catatan' => 'Ban cadangan habis',
+        ], array_intersect_key($baris, array_flip(['nomor', 'asset_kode', 'asset_nama', 'spesifikasi', 'satuan', 'jumlah', 'checklist', 'analisa_perbaikan', 'jenis_pemeliharaan', 'jenis_pekerjaan', 'lokasi', 'pic', 'tingkat_layanan', 'status', 'catatan'])));
+        $this->assertSame('2026-07-09', $semua['tables']['baris'][0]['tanggal']);
+        $this->assertSame('—', $semua['tables']['baris'][0]['checklist']);
+        $this->assertSame('—', $semua['tables']['baris'][0]['analisa_perbaikan']);
+
+        // Tanggal work order dan batas filter periode mengikuti zona pengguna: dibuat 18.00 UTC tanggal 9 berarti
+        // tanggal 10 di Jakarta.
+        $jakarta = $this->konteks(['management-aset.pemeliharaan-aset.read'], zona: 'Asia/Jakarta');
+        $this->assertSame('2026-07-10', $run([], $jakarta)['tables']['baris'][0]['tanggal']);
+        $this->assertSame(['PMHA-LAMA'], $bukti($run(['sampai' => '2026-07-09'])));
+        $this->assertSame([], $bukti($run(['sampai' => '2026-07-09'], $jakarta)));
+        $this->assertSame(['PMHA-000001'], $bukti($run(['dari' => '2026-08-01'])));
+
+        // Filter laporan: status, tingkat layanan, teknisi, lokasi pekerjaan, unit, dan filter aset bersama.
+        $selesai = $run(['status' => ['selesai']]);
+        $this->assertSame(['PMHA-LAMA'], $bukti($selesai));
+        $this->assertSame('Selesai', $selesai['fields']['filter_status']);
+        $this->assertSame(['PMHA-LAMA', 'PMHA-000001'], $bukti($run(['status' => ['selesai', 'draft']])));
+        $layanan = $run(['tingkat_layanan_id' => [$data['layanan']]]);
+        $this->assertSame(['PMHA-000001'], $bukti($layanan));
+        $this->assertSame('Mendesak', $layanan['fields']['filter_tingkat_layanan']);
+        $this->assertSame(['PMHA-LAMA'], $bukti($run(['teknisi_user_id' => ['montir-2']])));
+        $this->assertSame(['PMHA-000001'], $bukti($run(['lokasi_aset_id' => [$data['lokasi']]])));
+        $this->assertSame(['PMHA-LAMA'], $bukti($run(['org_unit_id' => [$data['unitLain']]])));
+        $this->assertSame(['PMHA-LAMA', 'PMHA-000001'], $bukti($run(['group_aset_id' => [$data['group']]])));
+        $this->assertSame([], $bukti($run(['jenis_aset_id' => [(string) Str::ulid()]])));
+        $this->assertGagalDengan('Parameter laporan tidak diterima', fn () => $run(['status' => ['hilang']]));
+
+        // Filter tambahan (K-30) pada work order dan baris pekerjaannya.
+        $trade = (string) DB::table('aset_m_trade')->where('kode', 'TRDE-1')->value('id');
+        $keahlian = $run(['filters' => ['baris' => ['trade_id' => [$trade]]]]);
+        $this->assertSame(['PMHA-000001'], $bukti($keahlian));
+        $this->assertSame('Baris pekerjaan — Bidang keahlian: Mekanik', $keahlian['fields']['filter_tambahan']);
+        $this->assertSame(['PMHA-LAMA'], $bukti($run(['filters' => ['work_order' => ['kode' => 'PMHA-L*']]])));
+
+        // Lingkup data organisasi `management-aset.asset-responsibility`: hanya unit yang diberikan.
+        $unitSaja = [...$konteks, 'data_policies' => ['management-aset.asset-responsibility' => ['all' => false, 'scope_grants' => [[
+            'legal_entity_id' => $this->legalEntityId,
+            'operating_unit_ids' => [$this->orgUnitId],
+        ]]]]];
+        $this->assertSame(['PMHA-000001'], $bukti($run([], $unitSaja)));
+        $this->assertSame([], $bukti($run([], $this->konteks(['management-aset.pemeliharaan-aset.read'], lingkupLain: true))));
+
+        // Layar membaca dataset yang sama lewat pratinjau.
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-pemeliharaan-aset?status[]=selesai')
+            ->assertOk()
+            ->assertJsonPath('data.tables.baris.0.no_bukti', 'PMHA-LAMA')
+            ->assertJsonCount(1, 'data.tables.baris');
+    }
+
+    public function test_maintenance_report_builtin_layout_renders_an_excel_file_that_opens(): void
+    {
+        $this->maintenanceWorkOrders();
+        $konteks = $this->konteks(['management-aset.pemeliharaan-aset.read']);
+        $dataset = $this->penyedia()->dataset('laporan-pemeliharaan-aset', $konteks, ['status' => ['draft', 'selesai']]);
+
+        $template = tempnam(sys_get_temp_dir(), 'tpl-pemeliharaan-').'.xlsx';
+        file_put_contents($template, $this->penyedia()->defaultLayout('laporan-pemeliharaan-aset', 'standar', $konteks));
+        try {
+            $file = (new XlsxTemplateRenderer)->render($template, CoreReportData::fromArray($dataset));
+        } finally {
+            @unlink($template);
+        }
+        $sheet = IOFactory::load($file->localPath)->getActiveSheet();
+        // Contoh hasil disimpan di folder sementara supaya dapat dibuka dan diperiksa mata.
+        @copy($file->localPath, sys_get_temp_dir().'/laporan-pemeliharaan-aset-contoh.xlsx');
+        $file->cleanup();
+
+        $this->assertSame('Pemeliharaan aset', $sheet->getTitle());
+        $this->assertSame(
+            ['No.', 'No. bukti', 'Tanggal work order', 'Kode aset', 'Item aset', 'Spesifikasi', 'Satuan', 'Jumlah', 'Item checklist', 'Analisa perbaikan', 'Jenis pemeliharaan'],
+            array_slice($sheet->rangeToArray('A12:R12')[0], 0, 11),
+        );
+        $this->assertSame('PMHA-LAMA', (string) $sheet->getCell('B13')->getValue());
+        $this->assertSame('PMHA-000001', (string) $sheet->getCell('B14')->getValue());
+        $this->assertSame('Tekanan ban: 32 psi; Lampu depan: tidak berlaku', (string) $sheet->getCell('I14')->getValue());
+        $this->assertSame('Draf, Selesai', (string) $sheet->getCell('F8')->getValue());
+        $this->assertSame('2 / 2', (string) $sheet->getCell('B10')->getValue());
+        $this->assertStringNotContainsString('${', (string) $sheet->getCell('R14')->getValue());
     }
 
     public function test_depreciation_report_reads_amounts_from_the_asset_book_records(): void
@@ -1187,6 +1320,64 @@ class PenyediaLaporanTest extends TestCase
             ])
             ->assertCreated()
             ->json('data.id');
+    }
+
+    /**
+     * Data laporan pemeliharaan: work order draf dari {@see workOrder()} yang barisnya sudah dianalisa dan
+     * berchecklist, satu work order selesai di unit lain bulan Juli tanpa tingkat layanan, dan satu work order
+     * yang diarsipkan.
+     *
+     * @return array{layanan: string, lokasi: string, group: string, unitLain: string}
+     */
+    private function maintenanceWorkOrders(): array
+    {
+        $workOrder = $this->workOrder();
+        $line = DB::table('aset_tr_pemeliharaan_aset_details')->where('pemeliharaan_aset_id', $workOrder)->first();
+        $this->assertNotNull($line);
+        $asetId = (string) $line->aset_id;
+        DB::table('aset_tr_aset')->where('id', $asetId)->update(['serial_number' => 'FL-77']);
+        DB::table('aset_tr_pemeliharaan_aset_details')->where('id', $line->id)->update([
+            'sebab_kerusakan_id' => $this->master('aset_m_sebab_kerusakan', 'Aus', 'SBK-1'),
+            'sebab_kerusakan_keterangan' => 'Telapak ban gundul',
+            'tindakan_perbaikan_id' => $this->master('aset_m_tindakan_perbaikan', 'Ganti komponen', 'TDP-1'),
+            'catatan' => 'Ban cadangan habis',
+        ]);
+        foreach ([['2', 'Lampu depan', null, null, true], ['1', 'Tekanan ban', '32', 'psi', false]] as [$nomor, $nama, $nilai, $satuan, $tidakBerlaku]) {
+            DB::table('aset_tr_pemeliharaan_aset_checklist')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'pemeliharaan_aset_detail_id' => $line->id,
+                'line_number' => $nomor, 'nama' => $nama, 'tipe' => $nilai === null ? 'text' : 'measurement',
+                'satuan' => $satuan, 'nilai' => $nilai, 'tidak_berlaku' => $tidakBerlaku,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $header = DB::table('aset_tr_pemeliharaan_aset')->where('id', $workOrder)->first();
+        $this->assertNotNull($header);
+        $unitLain = (string) Str::ulid();
+        foreach ([
+            ['PMHA-LAMA', 'selesai', '2026-07-09 18:00:00', $unitLain, 'montir-2', null],
+            ['PMHA-ARSIP', 'draft', '2026-08-20 03:00:00', $this->orgUnitId, 'montir-1', now()],
+        ] as [$kode, $status, $dibuat, $unit, $teknisi, $diarsipkan]) {
+            $id = (string) Str::ulid();
+            DB::table('aset_tr_pemeliharaan_aset')->insert([
+                'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
+                'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $unit,
+                'tipe_work_order_id' => $header->tipe_work_order_id, 'status' => $status, 'version' => 1,
+                'created_at' => $dibuat, 'updated_at' => $dibuat, 'deleted_at' => $diarsipkan,
+            ]);
+            DB::table('aset_tr_pemeliharaan_aset_details')->insert([
+                'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'pemeliharaan_aset_id' => $id, 'line_number' => 1,
+                'aset_id' => $asetId, 'maintenance_job_type_id' => $line->maintenance_job_type_id,
+                'ditugaskan_ke_user_id' => $teknisi, 'created_at' => $dibuat, 'updated_at' => $dibuat,
+            ]);
+        }
+
+        return [
+            'layanan' => (string) $header->tingkat_layanan_id,
+            'lokasi' => (string) $line->lokasi_aset_id,
+            'group' => (string) DB::table('aset_tr_aset')->where('id', $asetId)->value('group_aset_id'),
+            'unitLain' => $unitLain,
+        ];
     }
 
     /** @param array<string, mixed> $extra */

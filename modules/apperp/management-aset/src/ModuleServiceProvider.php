@@ -24,6 +24,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDepreciationReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalSaleReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetDisposalScrapReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetLedgerReconciliationReport;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMaintenanceReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMonitoringReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
@@ -86,6 +87,7 @@ final class ModuleServiceProvider extends ServiceProvider
             $registry->register(new AssetDepreciationProjectionReport);
             $registry->register(new AssetAcquisitionListReport);
             $registry->register(new AssetLedgerReconciliationReport);
+            $registry->register(new AssetMaintenanceReport);
 
             return $registry;
         });

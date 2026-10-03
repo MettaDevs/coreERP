@@ -5,6 +5,7 @@ namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\MutasiAset\MutasiAsetDetail;
 use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
+use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -23,6 +24,10 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * bentuk itu memang yang benar: pertanyaan yang dijawab laporan mutasi adalah "barang ini
  * pindah ke mana", dan barang adalah barisnya. Berita acara yang memuat sepuluh aset
  * muncul sebagai sepuluh baris, masing-masing dengan nomor bukti yang sama.
+ *
+ * Filter aset bersama (group, kelompok harta fiskal, jenis, dan aset) sama dengan laporan aset lain,
+ * sesuai spesifikasi QA. Lokasi dan kondisi tidak ditawarkan di sana: mutasi punya lokasi asal dan tujuan,
+ * dan satu filter "lokasi" tidak menyebut yang mana; keduanya tetap dapat disaring lewat filter tambahan.
  *
  * Hanya dokumen selesai yang ikut secara bawaan. Draf belum memindahkan apa pun; memasukkan
  * mereka membuat total laporan tidak cocok dengan keadaan aset yang sebenarnya.
@@ -59,6 +64,7 @@ final class DaftarMutasiAset implements ReportDefinition
     public function parameterRules(): array
     {
         return [
+            ...self::assetFilterRules(),
             'status' => ['nullable', 'string', 'in:'.implode(',', MutasiStatus::semua())],
             'dari' => ['nullable', 'date_format:Y-m-d'],
             'sampai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:dari'],
@@ -106,6 +112,7 @@ final class DaftarMutasiAset implements ReportDefinition
         ];
 
         return [
+            ...array_values(array_filter(AssetReportFilters::fields(), static fn (array $field): bool => in_array($field['key'], self::ASSET_FILTER_FIELDS, true))),
             ...array_map(
                 static fn (string $key, string $label): array => ['key' => $key, 'label' => $label, 'table' => null]
                     + ($key === 'dicetak_pada' ? ['type' => 'datetime'] : []),
@@ -148,6 +155,7 @@ final class DaftarMutasiAset implements ReportDefinition
         app(OrganizationScope::class)->query($query, $context->request(), 'mutasi.legal_entity_id', 'mutasi.responsible_org_unit_id');
 
         $query->where('mutasi.status', $parameters['status'] ?? MutasiStatus::SELESAI);
+        AssetReportFilters::apply($query, array_intersect_key($parameters, self::assetFilterRules()), 'aset');
         foreach ($this->dataItems() as $item) {
             AdditionalFilters::apply($query, $item, $parameters, $context);
         }
@@ -175,6 +183,7 @@ final class DaftarMutasiAset implements ReportDefinition
 
         return new ReportData(
             fields: [
+                ...array_intersect_key(AssetReportFilters::names($parameters), array_flip(self::ASSET_FILTER_FIELDS)),
                 'filter_status' => $parameters['status'] ?? MutasiStatus::SELESAI,
                 'filter_dari' => $parameters['dari'] ?? '',
                 'filter_sampai' => $parameters['sampai'] ?? '',
@@ -204,6 +213,21 @@ final class DaftarMutasiAset implements ReportDefinition
             ],
             fileName: 'daftar-mutasi-aset-'.$context->now()->format('Ymd-Hi'),
         );
+    }
+
+    /** Kepala laporan untuk filter aset bersama yang ditawarkan laporan ini. */
+    private const ASSET_FILTER_FIELDS = ['filter_group', 'filter_golongan', 'filter_jenis', 'filter_aset'];
+
+    /**
+     * Aturan filter aset bersama yang ditawarkan laporan ini; lihat docblock kelas.
+     *
+     * @return array<string, list<string>>
+     */
+    private static function assetFilterRules(): array
+    {
+        return array_diff_key(AssetReportFilters::rules(), array_flip([
+            'lokasi_aset_id', 'lokasi_aset_id.*', 'kondisi_aset_id', 'kondisi_aset_id.*', 'buku_id',
+        ]));
     }
 
     private function tanggal(?string $value): ?string
