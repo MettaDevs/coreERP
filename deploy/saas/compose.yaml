@@ -122,6 +122,14 @@ x-app-environment: &app-environment
   OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
   OTEL_PHP_DISABLED_INSTRUMENTATIONS: ${OTEL_PHP_DISABLED_INSTRUMENTATIONS:-psr3}
 
+  # Laporan kesalahan dan jejak ke Sentry swakelola, menggantikan SigNoz sejak 3 Oktober 2026. DSN dan
+  # alamat publiknya hanya ada di berkas env server, sama seperti alamat kolektor di atas: kosong berarti
+  # tidak ada yang dikirim. Jejak performa diambil 10% secara bawaan; kesalahan selalu terkirim seluruhnya.
+  SENTRY_LARAVEL_DSN: ${SENTRY_CORE_DSN:-}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+  SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+  COREERP_SENTRY_URL: ${COREERP_SENTRY_URL:-}
+
 services:
   # ------------------------------------------------------------------ data
 
@@ -363,6 +371,10 @@ services:
       # Skema dan porta sengaja tidak diteruskan: bawaannya `https` tanpa porta, dan itu yang
       # berlaku di setiap server.
       COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
+      # Project Sentry konsol sendiri, terpisah dari Core supaya peringatan dan kuotanya tidak tercampur.
+      SENTRY_LARAVEL_DSN: ${SENTRY_KONSOL_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       # Klien SSO milik konsol sendiri ("CoreERP Admin"), terpisah dari klien Core. Kosong berarti
       # tanpa SSO: tombolnya tidak tampil dan konsol bekerja seperti sebelumnya.
       CONSOLE_SSO_ISSUER: ${CONSOLE_SSO_ISSUER:-}

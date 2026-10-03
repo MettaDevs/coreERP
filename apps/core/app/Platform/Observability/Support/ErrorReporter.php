@@ -7,11 +7,19 @@ namespace App\Platform\Observability\Support;
 use App\Platform\Observability\Http\Middleware\AttachTraceContext;
 use Illuminate\Http\Request;
 use OpenTelemetry\API\Globals;
+use Sentry\SentrySdk;
+use Sentry\State\Scope;
 use Throwable;
 
+use function Sentry\captureException;
+use function Sentry\withScope;
+
 /**
- * Menyusun laporan kesalahan lalu menaruhnya di tiga tempat: berkas log di mesin, SigNoz, dan
- * — kalau webhooknya diisi — satu channel Discord.
+ * Menyusun laporan kesalahan lalu menaruhnya di berkas log di mesin, Sentry (bila DSN diisi), SigNoz
+ * (bila OpenTelemetry dinyalakan), dan — kalau webhooknya diisi — satu channel Discord.
+ *
+ * Sejak 3 Oktober 2026 Sentry swakelola menggantikan SigNoz sebagai tempat laporan dicari; SigNoz
+ * dimatikan dan jalur OpenTelemetry-nya dibiarkan diam (mati secara bawaan) supaya dapat dinyalakan lagi.
  *
  * **Kenapa lebih dari satu.** Berkas selalu bisa ditulis: ia tidak butuh jaringan, tidak butuh
  * collector yang hidup, dan tidak butuh izin keluar dari mesin pelanggan. SigNoz yang membuat
@@ -57,8 +65,9 @@ final class ErrorReporter
             $report = ErrorReport::from($error, $request);
 
             self::toFile($report);
+            $sentryEventId = self::toSentry($report, $error);
             self::toSigNoz($report);
-            DiscordNotifier::send($report);
+            DiscordNotifier::send($report, $sentryEventId);
         } catch (Throwable) {
             // Sengaja dibiarkan. Lihat catatan kelas.
         } finally {
@@ -111,6 +120,71 @@ final class ErrorReporter
             ErrorReportFile::write($report->toText());
         } catch (Throwable) {
             // Collector yang mati tidak boleh ikut menghapus berkasnya, dan sebaliknya.
+        }
+    }
+
+    /**
+     * Kunci laporan yang menjadi tag Sentry: nilainya sedikit dan dipakai untuk menyaring — tenant,
+     * organisasi, module, rute, dan sumber kesalahan. Sisanya masuk konteks `coreerp`, yang terbaca
+     * pada halaman kejadian tetapi tidak dijadikan indeks.
+     */
+    private const SENTRY_TAGS = [
+        'coreerp.tenant_slug', 'coreerp.tenant_id', 'coreerp.legal_entity_id', 'coreerp.org_unit_id',
+        'coreerp.module_id', 'coreerp.app_id', 'coreerp.sumber_kesalahan', 'http.route',
+        'db.response.status_code',
+    ];
+
+    /**
+     * Data pribadi tidak dikirim ke Sentry, sejalan dengan `send_default_pii` yang mati: alamat klien
+     * dan peramban pengguna tetap tercatat di berkas laporan, yang tinggal di mesin itu sendiri.
+     */
+    private const SENTRY_EXCLUDED = ['client.address', 'user_agent.original', 'exception.stacktrace'];
+
+    /**
+     * Mengirim kesalahan yang sama ke Sentry, lengkap dengan tenant dan organisasi tempat ia terjadi.
+     *
+     * Hanya lewat sini: penangan bawaan Sentry (`Integration::handles`) sengaja tidak dipasang, supaya
+     * saringan {@see ErrorReport::isReportable()} berlaku sama untuk Sentry, berkas, dan Discord, dan
+     * satu kesalahan tidak tiba dua kali. Tanpa DSN klien Sentry tidak terpasang dan cabang ini diam.
+     *
+     * Tag dipasang di dalam `withScope`, bukan pada scope bersama: di worker Octane scope yang sama
+     * melayani permintaan berikutnya, dan tenant permintaan ini tidak boleh menempel di sana.
+     *
+     * Id kejadiannya dipulangkan untuk tautan di Discord. Bukan dibaca dari `lastEventId` hub: di worker
+     * yang hidup lama nilai itu bisa milik kesalahan permintaan lain bila kiriman ini gagal.
+     */
+    private static function toSentry(ErrorReport $report, Throwable $error): ?string
+    {
+        try {
+            if (SentrySdk::getCurrentHub()->getClient() === null) {
+                return null;
+            }
+
+            $attributes = array_diff_key(
+                array_filter($report->toAttributes(), static fn (mixed $value): bool => $value !== null && $value !== ''),
+                array_flip(self::SENTRY_EXCLUDED),
+            );
+
+            return withScope(static function (Scope $scope) use ($report, $error, $attributes): ?string {
+                foreach (self::SENTRY_TAGS as $key) {
+                    if (isset($attributes[$key])) {
+                        $scope->setTag($key, mb_substr((string) $attributes[$key], 0, 200));
+                    }
+                }
+                if (isset($attributes['coreerp.user_id'])) {
+                    $scope->setUser(['id' => (string) $attributes['coreerp.user_id']]);
+                }
+                // Baris kepala laporan memuat alamat klien; disamarkan di sini, bukan di laporannya,
+                // karena berkas laporan di mesin itu sendiri memang perlu menyimpannya.
+                $address = (string) ($report->toAttributes()['client.address'] ?? '');
+                $text = $address === '' ? $report->toText() : str_replace($address, '[alamat klien]', $report->toText());
+                $scope->setContext('coreerp', [...$attributes, 'laporan' => $text]);
+
+                return captureException($error)?->__toString();
+            });
+        } catch (Throwable) {
+            // Sentry yang tidak terjangkau tidak boleh menahan berkas dan Discord.
+            return null;
         }
     }
 

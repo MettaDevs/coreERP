@@ -1,8 +1,13 @@
 # Pelaporan kesalahan
 
 Ketika sesuatu gagal di CoreERP, dua hal terjadi tanpa perlu diminta: sebuah laporan lengkap
-ditulis ke berkas di mesin, dan laporan yang sama dikirim ke SigNoz sebagai catatan
-terstruktur. Halaman ini menjelaskan apa isinya, ke mana perginya, dan bagaimana mematikannya.
+ditulis ke berkas di mesin, dan kesalahan yang sama dikirim ke Sentry beserta tenant dan organisasi
+tempat ia terjadi. Halaman ini menjelaskan apa isinya, ke mana perginya, dan bagaimana mematikannya.
+
+Sejak 3 Oktober 2026 **Sentry swakelola menggantikan SigNoz** sebagai tempat laporan dicari. SigNoz
+dimatikan; jalur OpenTelemetry-nya dibiarkan di kode tetapi mati secara bawaan, supaya dapat dinyalakan
+lagi tanpa menulis ulang. Bagian tentang SigNoz dan OpenTelemetry di bawah berlaku hanya bila jalur itu
+dinyalakan kembali.
 
 ## Apa yang dilaporkan
 
@@ -83,12 +88,46 @@ belum sepadan.
 | Tujuan | Selalu ada? | Kegunaannya |
 |---|---|---|
 | `storage/logs/kesalahan-internal-<peran>-<tanggal>.log` | Ya | Tidak butuh jaringan, tidak butuh collector, tidak butuh izin keluar dari mesin pelanggan |
-| SigNoz, sebagai catatan OTLP | Hanya bila telemetri menyala | Bisa dicari, disaring per tenant, dan diklik menuju jejak permintaannya |
-| Satu channel Discord, lewat webhook | Hanya bila webhooknya diisi | Mendatangi orang alih-alih menunggu dibuka |
+| Sentry, satu project per aplikasi | Hanya bila `SENTRY_LARAVEL_DSN` diisi | Dikelompokkan per masalah, disaring per tenant, dan 10% permintaan membawa jejak performanya |
+| SigNoz, sebagai catatan OTLP | Hanya bila telemetri menyala (mati sejak 3 Oktober 2026) | Bisa dicari, disaring per tenant, dan diklik menuju jejak permintaannya |
+| Satu channel Discord, lewat webhook | Hanya bila webhooknya diisi | Mendatangi orang alih-alih menunggu dibuka; menaut ke kejadiannya di Sentry |
 
-Yang pertama menjamin laporan selalu ada, yang kedua membuatnya berguna, yang ketiga
-memberitahu. Ketiganya punya penjaga sendiri, jadi collector yang mati tidak ikut menghapus
-berkasnya dan Discord yang diblokir tidak ikut menghapus keduanya.
+Berkas menjamin laporan selalu ada, Sentry membuatnya berguna, Discord memberitahu. Masing-masing
+punya penjaga sendiri, jadi Sentry yang tidak terjangkau tidak ikut menghapus berkasnya dan Discord
+yang diblokir tidak ikut menghapus keduanya.
+
+### Sentry
+
+Sentry swakelola di server dev pertama, satu project per aplikasi: `coreerp-core` (web, worker antrean,
+dan penjadwal Core beserta seluruh module) dan `coreerp-konsol` (admin.erp). Project terpisah supaya
+peringatan dan kuotanya tidak tercampur.
+
+**Core mengirim lewat `ErrorReporter`, bukan lewat penangan bawaan Sentry.** Saringan
+`ErrorReport::isReportable()` jadi berlaku sama untuk berkas, Sentry, dan Discord, dan satu kesalahan
+tidak tiba dua kali. Konsol tidak punya pelapor sendiri, jadi ia memakai `Integration::handles()`.
+
+| Dikirim | Tidak dikirim |
+|---|---|
+| Tag tenant, entitas legal, unit, module, rute, sumber kesalahan, dan kode galat database | Alamat klien dan peramban pengguna — juga disamarkan di dalam teks laporan |
+| Pengguna sebagai id saja | Nama dan email pengguna (`send_default_pii` mati) |
+| Konteks `coreerp`: seluruh atribut laporan dan teks laporannya, termasuk SQL yang terbaca | — |
+
+**Tag dipasang di dalam `withScope`.** Di worker Octane hub dan scope Sentry melayani permintaan
+berikutnya; tag tenant yang dipasang pada scope bersama akan menandai kesalahan permintaan lain sebagai
+milik tenant ini. `SentryReportingTest` menjaganya, dan dibuktikan merah dengan `configureScope`.
+
+Tautan Discord menuju kejadiannya di Sentry: id kejadian dipulangkan `toSentry()` lalu diteruskan, bukan
+dibaca dari `lastEventId` hub — di worker yang hidup lama nilai itu bisa milik kesalahan permintaan lain.
+
+| Variabel | SaaS | On-prem | Arti |
+|---|---|---|---|
+| `SENTRY_LARAVEL_DSN` | DSN project, dari `SENTRY_CORE_DSN` / `SENTRY_KONSOL_DSN` di berkas env server | kosong | Kosong berarti tidak ada yang dikirim |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.1` | `0.1` | Bagian permintaan yang membawa jejak performa; kesalahan selalu terkirim seluruhnya |
+| `SENTRY_ENVIRONMENT` | dari berkas env server | `on-prem` | Penanda lingkungan di Sentry |
+| `COREERP_SENTRY_URL` | alamat publik organisasi Sentry | kosong | Untuk tautan di Discord; bukan DSN, karena DSN boleh menunjuk alamat internal |
+
+DSN tidak pernah ditulis di repo. Klien on-prem yang mau memakai Sentry mengisi DSN project miliknya
+sendiri.
 
 ### Discord
 

@@ -51,6 +51,12 @@ x-edition-environment: &edition-environment
   # Laporan kesalahan ke Discord. Kosong berarti mati, dan itu bawaan yang benar untuk
   # on-prem: channelnya milik pelanggan, bukan milik kita. Lihat .env.example.
   COREERP_SIGNOZ_URL: ${COREERP_SIGNOZ_URL:-}
+  # Sentry: mati secara bawaan karena DSN kosong. On-prem tidak membawa telemetry wajib; klien yang mau
+  # memakainya mengisi DSN project Sentry miliknya sendiri, bukan milik kita.
+  SENTRY_LARAVEL_DSN: ${SENTRY_LARAVEL_DSN:-}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-on-prem}
+  SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+  COREERP_SENTRY_URL: ${COREERP_SENTRY_URL:-}
   COREERP_DISCORD_WEBHOOK_URL: ${COREERP_DISCORD_WEBHOOK_URL:-}
   COREERP_DISCORD_MENTION: ${COREERP_DISCORD_MENTION:-}
   COREERP_DISCORD_JEDA_DETIK: ${COREERP_DISCORD_JEDA_DETIK:-60}

@@ -114,6 +114,13 @@ return [
     'signoz_url' => env('COREERP_SIGNOZ_URL'),
 
     /*
+     * Alamat publik organisasi Sentry, untuk tautan "Buka kejadiannya di Sentry" pada laporan Discord,
+     * misalnya `https://sentry.contoh.id/organizations/<org>`. Bukan DSN: DSN boleh menunjuk alamat
+     * internal yang tidak terbuka dari peramban. Kosong berarti laporan Discord tidak memuat tautan Sentry.
+     */
+    'sentry_url' => env('COREERP_SENTRY_URL'),
+
+    /*
      * Pengiriman laporan kesalahan ke Discord.
      *
      * Kosong berarti mati, dan itulah bawaannya — termasuk pada pemasangan on-prem, yang
