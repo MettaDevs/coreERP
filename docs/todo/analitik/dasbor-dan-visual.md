@@ -425,6 +425,32 @@ export function formatMeasureValue(column: ResultColumn, row: Record<string, Res
 `Intl` bahasa Indonesia menulis ringkasan sebagai "rb", "jt", "M", dan "T" — "Rp 1,3 M" untuk
 satu koma tiga miliar — sama dengan cara orang menyebutnya.
 
+### Yang dikirim area 7
+
+*4 Oktober 2026.* Bedanya dari sketsa di atas, dan alasannya:
+
+- **Desimal uang tidak mengikuti `Intl` saja.** Chrome menganggap rupiah tanpa desimal (Node menganggapnya
+  dua), jadi sketsa `maximumFractionDigits: 2` menulis `Rp 240.500.000,5` dan mengikuti `Intl` polos menulis
+  `Rp 240.500.001`. `format.ts` menulis nilai bulat tanpa desimal dan nilai berpecahan dengan desimal lengkap
+  — desimal mata uang menurut `Intl`, paling sedikit dua karena uang disimpan dua desimal: `Rp 240.500.000,50`,
+  `US$12.000`. Aturan yang sama dipakai tile, tabel, sumbu, tooltip, dan `aria-label`.
+- **"Dihitung pukul …" memakai `meta.timezone` dan menuliskan zonanya** ("Dihitung pukul 14.05 WITA", "UTC"
+  untuk pengguna tanpa zona dan tanpa entitas legal), bukan zona sesi Shell atau perangkat.
+- **Tinggi widget menjadi tinggi area gambar**, bukan `min-h` sel grid: `h-40`/`h-64`/`h-96` untuk grafik,
+  `max-h-48`/`max-h-80`/`max-h-[28rem]` untuk tabel (bergulir). Tile dan teks setinggi isinya (`self-start`),
+  tidak melar setinggi grafik di sebelahnya. Grid juga memakai peta `lg:col-start-*` dari `x`, supaya letak
+  bercelah tetap dihormati.
+- **Menu widget**: Lihat sebagai tabel/grafik, Muat ulang, Ganti judul (Ubah teks untuk widget teks), dan
+  **Arsipkan**, bukan Hapus — tidak ada baris yang dihapus fisik (`AGENTS.md`). Ubah (pembangun widget) dipasang
+  area 8 lewat prop `onEdit` `WidgetFrame`; tombol Ubah di keadaan galat ikut muncul saat itu.
+- **Grafik tanpa animasi**, dimuat malas (`React.lazy`) sehingga dasbor tanpa grafik tidak mengunduh Recharts.
+  Sumbu jumlah tidak memakai garis bantu pecahan. Batas titik: 366 untuk garis dan area, 60 kelompok untuk
+  batang dan kolom, 12 seri.
+- **Tabel memakai `DataTable` tanpa mengurutkan ulang**: urutan engine dipertahankan, baris total per mata
+  uang di bawah ("Total IDR"), dan tanpa kolom mata uang karena nilai uang sudah menuliskannya.
+- Komponen yang dipakai ulang area 8: `WidgetContent` (tile, grafik, atau tabel dari satu `ResultSet`, untuk
+  pratinjau), `ResultTable`, `KpiTile`, `WidgetFrame` (`onEdit`), dan `lib/analytics/api.ts`.
+
 ## Pembangun widget
 
 `Sheet` sisi kanan dengan isi bergulir dan tombol Simpan/Batal tetap, `portalContainer` diteruskan

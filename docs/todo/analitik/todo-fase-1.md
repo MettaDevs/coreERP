@@ -531,7 +531,7 @@ widget (area 12).
 
 ---
 
-### 7. [ ] Layar dasbor
+### 7. [x] Layar dasbor
 
 **Tempat:** `resources/js/pages/platform/analytics/{index, dashboard}.tsx`,
 `resources/js/components/analytics/*`, `resources/js/lib/analytics/{api, format}.ts`,
@@ -541,22 +541,43 @@ widget (area 12).
 keadaan galat tampil dengan alasannya, layar diperiksa di runtime yang dibangun ulang — terang, gelap,
 lebar ponsel, dan keyboard.
 
-- [ ] 7.1 Daftar dasbor: satu `Card`, `DataTable`, aksi Buat dasbor di `CardAction`.
-- [ ] 7.2 Halaman dasbor: grid 12 kolom dengan peta kelas lengkap (bukan string tersusun), mode ubah
-  dengan tombol geser dan pilihan lebar, simpan dengan versi.
-- [ ] 7.3 `WidgetFrame`: memuat saat terlihat, kerangka saat memuat, galat yang dapat ditindaklanjuti,
+Selesai 4 Oktober 2026, di atas area 6. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di
+butir masing-masing (*Dikirim:*) dan di [dasbor dan visual](/todo/analitik/dasbor-dan-visual#yang-dikirim-area-7).
+Layar dibuktikan dengan tipe, lint, build, test halaman Inertia (`DashboardApiTest::test_dashboard_pages_render_their_components`,
+yang merah bila berkas komponennya hilang), dan pemeriksaan runtime yang dicatat di pull request area 7.
+
+- [x] 7.1 Daftar dasbor: satu `Card`, `DataTable`, aksi Buat dasbor di `CardAction`. *Dikirim:* Buat dasbor
+  membuka `Sheet` (nama, keterangan, Bagikan bagi pemegang hak dasbor bersama) lalu membuka dasbor barunya.
+  Mengubah dan mengarsipkan ada di halaman dasbor, tempat `can_edit` tiap dasbor diketahui; daftar tidak punya
+  menu baris.
+- [x] 7.2 Halaman dasbor: grid 12 kolom dengan peta kelas lengkap (bukan string tersusun), mode ubah
+  dengan tombol geser dan pilihan lebar, simpan dengan versi. *Dikirim:* juga pilihan tinggi (grafik dan tabel),
+  peta `lg:col-start-*` dari `x`, dan aksi Ubah dasbor serta Arsipkan di `RecordActionBar`. Prop server tetap
+  sumber kebenaran: setiap simpan memuat ulang prop `dashboard`; yang dipegang layar hanya draf letak.
+- [x] 7.3 `WidgetFrame`: memuat saat terlihat, kerangka saat memuat, galat yang dapat ditindaklanjuti,
   kosong, tanpa akses, data pribadi, tanda terpotong, "Dihitung pukul …", Muat ulang, menu (Ubah,
-  Lihat sebagai tabel, Hapus).
-- [ ] 7.4 Tile angka dengan ambang ala Cue, uang ringkas ("Rp 1,3 M"), ikon dan teks untuk setiap gaya.
-- [ ] 7.5 Grafik kolom, batang, garis, area, donat, bertumpuk lewat `@apperp/ui/chart`; panel per mata
-  uang; batas titik.
-- [ ] 7.6 Tabel lewat `DataTable` dengan baris total; teks biasa.
-- [ ] 7.7 `format.ts` sebagai satu-satunya pemformat angka hasil analitik di layar.
-- [ ] 7.8 Entri sidebar dengan permission dasbor; breadcrumb lewat `Page.layout`; tanpa `AppLayout`
-  ganda.
-- [ ] 7.9 Aksesibilitas: `aria-label` ringkasan grafik, padanan tabel, fokus keyboard pada menu widget.
-- [ ] 7.10 Verifikasi runtime: `start.ps1 -Build`, buka lewat rail, tangkapan keadaan galat dengan data
-  uji (tidak di-commit; temuan ditulis sebagai teks di pull request).
+  Lihat sebagai tabel, Hapus). *Dikirim:* menu berisi Ganti judul (Ubah teks untuk widget teks) dan
+  **Arsipkan**, bukan Hapus, karena tidak ada baris yang dihapus fisik. Ubah (pembangun) dipasang area 8 lewat
+  prop `onEdit`. Keadaan `field_removed` dan `dataset_unavailable` dari dasbor ditampilkan tanpa meminta data.
+- [x] 7.4 Tile angka dengan ambang ala Cue, uang ringkas ("Rp 1,3 M"), ikon dan teks untuk setiap gaya.
+  *Dikirim:* rentang persis `CuesAndKPIsImpl` BC (di bawah ambang 1 rendah, di atas ambang 2 tinggi, selain itu
+  tengah); uang ringkas bawaannya, nilai lengkapnya di `title` dan untuk pembaca layar.
+- [x] 7.5 Grafik kolom, batang, garis, area, donat, bertumpuk lewat `@apperp/ui/chart`; panel per mata
+  uang; batas titik. *Dikirim:* juga bertumpuk persen, label nilai, dan donat dengan potongan "Lainnya" yang
+  dijumlah tanpa kehilangan presisi. Grafik dimuat malas dan tanpa animasi.
+- [x] 7.6 Tabel lewat `DataTable` dengan baris total; teks biasa.
+- [x] 7.7 `format.ts` sebagai satu-satunya pemformat angka hasil analitik di layar. *Dikirim:* temuan runtime
+  area 0 ditutup — desimal lengkap atau tidak sama sekali (`Rp 240.500.000,50`, `US$12.000`), dan "Dihitung
+  pukul …" dalam zona `meta` dengan zonanya tertulis. Halaman Analisis data sementara ikut memakainya, dan tile-nya
+  tidak lagi melar setinggi grafik.
+- [x] 7.8 Entri sidebar dengan permission dasbor; breadcrumb lewat `Page.layout`; tanpa `AppLayout`
+  ganda. *Dikirim:* entri "Dasbor" di grup Dashboard (`core.analytics.dashboard.read`).
+- [x] 7.9 Aksesibilitas: `aria-label` ringkasan grafik, padanan tabel, fokus keyboard pada menu widget.
+- [x] 7.10 Verifikasi runtime: `start.ps1 -Build`, buka lewat rail, tangkapan keadaan galat dengan data
+  uji (tidak di-commit; temuan ditulis sebagai teks di pull request). *Dikirim:* diperiksa di pratinjau tanpa
+  sandi atas database pratinjau (bukan erp-dev, yang dipakai sesi lain), dibuka lewat rail. Data pribadi dan
+  `analytics.busy` tidak dapat dihasilkan engine dengan dataset aset dan sebelum area 9, jadi keadaannya
+  diperiksa dengan jawaban tiruan di peramban.
 
 ---
 

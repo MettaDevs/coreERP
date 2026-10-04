@@ -16,6 +16,7 @@ import {
     FileText,
     KeyRound,
     LayoutDashboard,
+    LayoutGrid,
     ListChecks,
     Hash,
     History,
@@ -154,6 +155,17 @@ export function AppSidebar() {
                               label: 'Ekspor laporan',
                               icon: FileOutput,
                               href: '/reports/exports',
+                          },
+                      ]
+                    : []),
+                // Area 7: daftar dasbor analitik, untuk pemegang permission rutenya (`core.analytics.dashboard.read`).
+                // Hanya penyaring tampilan; rute dan API memeriksanya sendiri.
+                ...(isAllowed('core.analytics.dashboard.read')
+                    ? [
+                          {
+                              label: 'Dasbor',
+                              icon: LayoutGrid,
+                              href: '/analytics',
                           },
                       ]
                     : []),

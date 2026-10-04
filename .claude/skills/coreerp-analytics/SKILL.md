@@ -26,12 +26,16 @@ last, `LabelResolver`, `GapFiller`, and `php artisan analytics:explain`. Area 6 
 `Dashboards\DashboardAccess`, save-time checks in `Dashboards\StoredQuery` and `Dashboards\WidgetDefinition`,
 the per-principal catalog in `Datasets\DatasetCatalog`) and the screen API under `api/v1/analytics`
 (datasets, dashboards, widgets, widget data run as the viewer, saved queries), plus the page routes
-`/analytics` and `/analytics/dashboards/{id}` whose components area 7 builds. Area 9 (4 October 2026) added
+`/analytics` and `/analytics/dashboards/{id}`. Area 7 (4 October 2026) built those screens: the dashboard list,
+the 12-column grid with layout editing, and reusable widget components in `resources/js/components/analytics/`
+(`WidgetFrame`, `WidgetContent`, `KpiTile`, lazily loaded `ChartWidget`, `ResultTable`, `DashboardGrid`,
+`useWidgetData`) over `lib/analytics/api.ts`. Area 9 (4 October 2026) added
 the result cache in the tenant database (`Cache\QueryCache`), the per-tenant concurrency slots
 (`Support\QuerySlots`, 429 `analytics.busy`), the `analytics-interactive` rate limiter
 (`AnalyticsServiceProvider`), and the masked query log (`Support\QueryLog`, retention policy
 `analytics_query_log`); widget data passes the widget's `cache_ttl_seconds`, and Muat ulang passes
-`refresh: true`. Everything else is still a plan. The plan,
+`refresh: true`. Everything else is still a
+plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
 If code and this skill disagree, trust the code and fix the skill in the same pull request.
