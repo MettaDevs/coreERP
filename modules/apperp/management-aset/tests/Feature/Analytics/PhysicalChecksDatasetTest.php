@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class PhysicalChecksDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -75,6 +76,35 @@ class PhysicalChecksDatasetTest extends TestCase
         $this->check($tenant, $legalEntity, "{$tag}-MON3", null, $location, [[$n1, true, 'sesuai', '100000']]);
     }
 
+    protected function timeField(): string
+    {
+        return 'check_date';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $location = (string) DB::table('aset_m_lokasi_aset')->where('tenant_id', $this->tenantId)->value('id');
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA);
+        $this->check($this->tenantId, $this->legalEntity, 'BATAS', $this->unitA, $location, [[$asset, true, 'sesuai', '1000']], $value);
+
+        return ['document_number' => 'BATAS'];
+    }
+
+    public function test_findings_that_do_not_match_and_assets_not_found_are_counted_apart(): void
+    {
+        $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'mismatch', 'absent']])
+            ->assertOk()
+            ->assertJsonPath('rows.0.count', 4)
+            ->assertJsonPath('rows.0.mismatch', 1)
+            ->assertJsonPath('rows.0.absent', 1);
+    }
+
     public function test_mismatching_findings_can_be_told_apart_from_matching_ones(): void
     {
         $rows = $this->analyze($this->owner, [
@@ -90,12 +120,12 @@ class PhysicalChecksDatasetTest extends TestCase
     }
 
     /** @param list<array{0: string, 1: bool, 2: string, 3: string}> $lines aset, ada, hasil, nilai buku */
-    private function check(string $tenant, string $legalEntity, string $code, ?string $unit, string $locationId, array $lines): void
+    private function check(string $tenant, string $legalEntity, string $code, ?string $unit, string $locationId, array $lines, string $date = '2026-09-28'): void
     {
         $id = (string) Str::ulid();
         DB::table('aset_tr_monitoring_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $code, 'legal_entity_id' => $legalEntity,
-            'responsible_org_unit_id' => $unit, 'lokasi_aset_id' => $locationId, 'tanggal' => '2026-09-28', 'status' => 'selesai',
+            'responsible_org_unit_id' => $unit, 'lokasi_aset_id' => $locationId, 'tanggal' => $date, 'status' => 'selesai',
             'diselesaikan_pada' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         foreach ($lines as $i => [$assetId, $present, $result, $bookValue]) {

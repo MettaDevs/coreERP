@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class AssetReceiptsDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -65,7 +66,37 @@ class AssetReceiptsDatasetTest extends TestCase
     {
         $this->receipt($tenant, $legalEntity, "{$tag}-R1", $unitA, 'IDR', [[2, '5000000'], [1, '2000000']]);
         $this->receipt($tenant, $legalEntity, "{$tag}-R2", $unitA, 'USD', [[3, '100.50']]);
-        $this->receipt($tenant, $legalEntity, "{$tag}-R3", $unitB, 'IDR', [[1, '7000000']]);
+        $this->receipt($tenant, $legalEntity, "{$tag}-R3", $unitB, 'IDR', [[1, '7000000']], 'draft');
+    }
+
+    protected function timeField(): string
+    {
+        return 'received_on';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $this->receipt($this->tenantId, $this->legalEntity, 'BATAS', $this->unitA, 'IDR', [[1, '1000']], 'selesai', $value);
+
+        return ['receipt_number' => 'BATAS'];
+    }
+
+    public function test_only_completed_receipts_count_towards_the_completed_value(): void
+    {
+        // R3 masih draf: nilainya ikut nilai penerimaan, tetapi tidak ikut nilai yang sudah selesai.
+        $rows = $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['receipt_value', 'completed_value']])
+            ->assertOk()->json('rows');
+        $byCurrency = array_column($rows, null, 'currency_code');
+
+        $this->assertDecimal('19000000', $byCurrency['IDR']['receipt_value']);
+        $this->assertDecimal('12000000', $byCurrency['IDR']['completed_value']);
+        $this->assertDecimal('301.50', $byCurrency['USD']['completed_value']);
     }
 
     public function test_a_receipt_is_counted_once_and_its_value_is_quantity_times_unit_value(): void
@@ -89,13 +120,13 @@ class AssetReceiptsDatasetTest extends TestCase
     }
 
     /** @param list<array{0: int, 1: string}> $lines jumlah dan nilai per unit */
-    private function receipt(string $tenant, string $legalEntity, string $code, string $unit, string $currency, array $lines): void
+    private function receipt(string $tenant, string $legalEntity, string $code, string $unit, string $currency, array $lines, string $status = 'selesai', string $date = '2026-09-15'): void
     {
         $id = (string) Str::ulid();
         DB::table('aset_tr_penerimaan_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $code,
-            'legal_entity_id' => $legalEntity, 'responsible_org_unit_id' => $unit, 'tanggal' => '2026-09-15',
-            'currency_code' => $currency, 'status' => 'selesai', 'created_at' => now(), 'updated_at' => now(),
+            'legal_entity_id' => $legalEntity, 'responsible_org_unit_id' => $unit, 'tanggal' => $date,
+            'currency_code' => $currency, 'status' => $status, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $masters = $this->masters($tenant);
         foreach ($lines as $i => [$quantity, $unitValue]) {

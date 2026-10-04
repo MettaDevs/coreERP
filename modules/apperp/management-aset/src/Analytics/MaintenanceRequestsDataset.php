@@ -65,6 +65,9 @@ final class MaintenanceRequestsDataset implements Dataset
             ->measure('count', 'Jumlah permintaan', Aggregate::Count)
             ->measure('asset_count', 'Jumlah aset yang dilaporkan', Aggregate::CountDistinct, field: 'aset_id')
             ->recordRoute('/management-aset/permintaan-pemeliharaan/{id}')
+            ->measure('accepted', 'Permintaan diterima', Aggregate::Count,
+                where: ['status' => [MaintenanceRequestStatus::ACCEPTED, MaintenanceRequestStatus::WORK_ORDER_CREATED]])
+            ->measure('rejected', 'Permintaan ditolak', Aggregate::Count, where: ['status' => [MaintenanceRequestStatus::REJECTED]])
             ->version(1);
     }
 }

@@ -94,6 +94,8 @@ final class BookValuesDataset implements Dataset
                 field: 'accumulated_depreciation', format: MeasureFormat::Money, currency: 'currency_code')
             ->measure('net_book_value', 'Nilai buku', Aggregate::Sum,
                 field: 'net_book_value', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('active_net_book_value', 'Nilai buku (buku aktif)', Aggregate::Sum,
+                field: 'net_book_value', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => ['active']])
             ->version(1);
     }
 }

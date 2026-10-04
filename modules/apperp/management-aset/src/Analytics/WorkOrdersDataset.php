@@ -11,6 +11,7 @@ use App\Platform\Modules\Contracts\Analytics\SharedDimension;
 use Modules\Apperp\ManagementAset\Models\master\TingkatLayanan;
 use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
+use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
 
 /**
  * Work order pemeliharaan, satu baris per dokumen work order.
@@ -52,6 +53,8 @@ final class WorkOrdersDataset implements Dataset
             ->time('aktual_selesai')
             ->measure('count', 'Jumlah work order', Aggregate::Count)
             ->recordRoute('/management-aset/pemeliharaan-aset/{id}')
+            ->measure('completed', 'Work order selesai', Aggregate::Count, where: ['status' => [WorkOrderStatus::SELESAI, WorkOrderStatus::DITUTUP]])
+            ->measure('cancelled', 'Work order dibatalkan', Aggregate::Count, where: ['status' => [WorkOrderStatus::DIBATALKAN]])
             ->version(1);
     }
 }

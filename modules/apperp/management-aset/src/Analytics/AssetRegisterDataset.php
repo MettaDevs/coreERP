@@ -16,6 +16,7 @@ use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\PabrikanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Register aset sebagai dataset analitik: satu baris per aset tercatat, termasuk komponen.
@@ -66,6 +67,8 @@ final class AssetRegisterDataset implements Dataset
             ->measure('average_acquisition_value', 'Rata-rata nilai perolehan', Aggregate::Average,
                 field: 'acquisition_value', format: MeasureFormat::Money, currency: 'currency_code')
             ->recordRoute('/management-aset/inventarisasi-aset/{id}')
+            ->measure('disposed', 'Aset dilepas', Aggregate::Count, where: ['lifecycle_state' => [StatusAset::DILEPAS]])
+            ->measure('decommissioned', 'Aset didekomisioning', Aggregate::Count, where: ['lifecycle_state' => [StatusAset::DIHENTIKAN]])
             ->version(1);
     }
 }

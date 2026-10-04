@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class BookValuesDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -61,13 +62,58 @@ class BookValuesDatasetTest extends TestCase
         return ['all' => 3, 'unitA' => 1, 'unitB' => 2];
     }
 
+    /** @return array{all: int, unitA: int, unitB: int} */
+    protected function expectedKeys(): array
+    {
+        // Buku V3 ditutup: daftar di layar hanya menawarkan buku aktif, dan paritas dibandingkan atas buku aktif.
+        return ['all' => 2, 'unitA' => 1, 'unitB' => 1];
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function datasetFilters(): array
+    {
+        return ['status' => ['active']];
+    }
+
     protected function seedRows(string $tenant, string $legalEntity, string $unitA, string $unitB, string $tag): void
     {
         $profile = $this->master($tenant, 'aset_m_profil_penyusutan', 'PRF-ANL', ['method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'actual']);
 
         $this->book($tenant, $profile, $this->asset($tenant, $legalEntity, "{$tag}-V1", $unitA, 'IDR', '10000000'), '10000000', '9000000');
         $this->book($tenant, $profile, $this->asset($tenant, $legalEntity, "{$tag}-V2", $unitB, 'USD', '2500'), '2500', '2000');
-        $this->book($tenant, $profile, $this->asset($tenant, $legalEntity, "{$tag}-V3", $unitB, 'IDR', '2000000'), '2000000', '2000000');
+        // Buku aset V3 sudah ditutup: daftar di layar tidak menawarkannya, dan nilai buku aktif tidak menghitungnya.
+        $this->book($tenant, $profile, $this->asset($tenant, $legalEntity, "{$tag}-V3", $unitB, 'IDR', '2000000'), '2000000', '2000000', 'closed');
+    }
+
+    protected function timeField(): string
+    {
+        return 'depreciation_start_on';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $profile = (string) DB::table('aset_m_profil_penyusutan')->where('tenant_id', $this->tenantId)->value('id');
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA, 'IDR', '1000');
+        $this->book($this->tenantId, $profile, $asset, '1000', '1000', 'active', $value);
+
+        return ['asset_id' => [$asset]];
+    }
+
+    public function test_the_active_book_value_leaves_out_closed_books(): void
+    {
+        $rows = $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['net_book_value', 'active_net_book_value']])
+            ->assertOk()->json('rows');
+        $byCurrency = array_column($rows, null, 'currency_code');
+
+        $this->assertDecimal('11000000', $byCurrency['IDR']['net_book_value']);
+        $this->assertDecimal('9000000', $byCurrency['IDR']['active_net_book_value']);
+        $this->assertDecimal('2000', $byCurrency['USD']['active_net_book_value']);
     }
 
     public function test_the_book_carries_current_balances_and_the_assets_currency(): void
@@ -89,12 +135,13 @@ class BookValuesDatasetTest extends TestCase
         $this->assertDecimal('1000000', $v1['accumulated_depreciation']);
     }
 
-    private function book(string $tenant, string $profile, string $assetId, string $acquisition, string $netBookValue): void
+    private function book(string $tenant, string $profile, string $assetId, string $acquisition, string $netBookValue, string $status = 'active', ?string $startsOn = null): void
     {
         DB::table('aset_tr_buku_aset')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'aset_id' => $assetId, 'depreciation_profile_id' => $profile,
             'book_code' => 'KOM', 'acquisition_value' => $acquisition, 'net_book_value' => $netBookValue,
-            'accumulated_depreciation' => (string) BigDecimal::of($acquisition)->minus($netBookValue), 'status' => 'active',
+            'accumulated_depreciation' => (string) BigDecimal::of($acquisition)->minus($netBookValue), 'status' => $status,
+            'depreciation_start_on' => $startsOn,
             'created_at' => now(), 'updated_at' => now(),
         ]);
     }

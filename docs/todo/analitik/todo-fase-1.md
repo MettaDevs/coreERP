@@ -366,7 +366,7 @@ boleh di area 23 sebagai pekerjaan module; sampai itu, test paritas yang menjaga
 
 ---
 
-### 5. [~] Dataset module aset
+### 5. [x] Dataset module aset
 
 **Tempat:** `modules/apperp/management-aset/src/Analytics/*`, satu blok di `ModuleServiceProvider::boot()`,
 `modules/apperp/management-aset/tests/Feature/Analytics/*` · **Setelah:** 0, 1 · **Keputusan:** KA-15,
@@ -379,18 +379,18 @@ Untuk setiap dataset, **baca dulu controller daftar resource-nya**: permission y
 menentukan `permission()` dan `dataPolicy()`. Jangan menebak dari nama kolom. Nama kelas, tabel, dan
 kolom di bawah adalah arah; yang dipakai adalah yang ada di module.
 
-Dikerjakan 4 Oktober 2026, sebelum compiler area 3 digabung. Empat belas dataset sudah terdaftar, valid,
-dan diuji; yang menunggu area 3 hanya **measure bersaringan** (saringan tetap `where` belum dikompilasi,
-dan measure yang tidak dapat dijalankan tidak ditawarkan) dan **pengelompokan waktu berzona**, jadi area
-ini tetap `[~]`. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir masing-masing
-(*Dikirim:*).
+Selesai 4 Oktober 2026 dalam dua pull request: empat belas dataset beserta test kebijakan, tenant, dan
+uang lebih dulu, sebelum compiler area 3 digabung; measure bersaringan dan test waktu berzona menyusul
+setelah area 3 ada di main. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di butir
+masing-masing (*Dikirim:*).
 
-- [~] 5.1 `asset-register` — register aset (lengkap dari area 0). *Dikirim:* seluruh field katalog K-30
+- [x] 5.1 `asset-register` — register aset (lengkap dari area 0). *Dikirim:* seluruh field katalog K-30
   kecuali keterangan, nomor seri, dan nomor model; rujukan berlabel ke enam master (group, jenis, kondisi,
   lokasi, pabrikan, model); dimensi bersama entitas legal, unit penanggung jawab, dan unit dimensi keuangan;
   measure rata-rata nilai perolehan; rute record. `currency_code` tetap field teks, bukan dimensi bersama
   mata uang seperti di sketsa: labelnya kode itu sendiri sampai master mata uang ada (FIN-20), dan mengganti
-  tipe field yang sudah dipakai layar tidak mendatangkan apa pun. *Menunggu area 3:* measure `disposed`.
+  tipe field yang sudah dipakai layar tidak mendatangkan apa pun. Measure bersaringan `disposed` (aset
+  dilepas) dan `decommissioned` (aset didekomisioning) menyusul setelah area 3.
 - [x] 5.2 `asset-receipts` — penerimaan aset. *Dikirim:* satu baris per **baris** dokumen penerimaan,
   bersumber query: header penerimaan tidak punya total, dan baris menyimpan `jumlah` serta `nilai_per_unit`,
   jadi nilai penerimaan (`jumlah × nilai_per_unit`, belum termasuk PPN) hanya dapat dihitung di query sumber.
@@ -427,15 +427,26 @@ ini tetap `[~]`. Yang dikirim berbeda dari rencana di beberapa butir; bedanya di
 - [x] 5.7 `physical-checks` — pemeriksaan fisik aset (monitoring aset). *Dikirim:* satu baris per aset pada
   satu pemeriksaan, bersumber query; kebijakan pada header, yang unitnya boleh kosong — pemeriksaan tanpa
   unit hanya terlihat bagi yang menjangkau seluruh organisasi, sama dengan layar daftarnya.
-- [~] 5.8 Test per dataset: isolasi tenant, paritas kebijakan, uang per mata uang, measure bersaringan,
+- [x] 5.8 Test per dataset: isolasi tenant, paritas kebijakan, uang per mata uang, measure bersaringan,
   waktu berzona ([daftar](/todo/analitik/model-semantik#test-yang-wajib-menyertai-setiap-dataset)).
   *Dikirim:* isolasi tenant, paritas kebijakan terhadap endpoint daftar module (hibah unit A, unit B,
   seluruh organisasi, dan tanpa hibah), penolakan tanpa permission baca, dan uang per mata uang, di
   `tests/Feature/Analytics/<Nama>DatasetTest.php`. Pemeriksaan umumnya ada di trait `ProbesAssetDatasets`
   dan `ChecksMoneyPerCurrency` (dunia ujinya dua tenant sungguhan, rantai izin sungguhan, empat pengguna
   yang dibuat sekali per test); setiap test dataset mengisi data awal dan jumlah baris yang diharapkan.
-  Setiap test paritas dilihat merah dengan merusak kolom kebijakannya. *Menunggu area 3:* measure
-  bersaringan dan pengelompokan waktu berzona.
+  Setiap test paritas dilihat merah dengan merusak kolom kebijakannya. Setelah area 3: measure bersaringan
+  diuji per dataset dengan data awal yang sengaja beragam (status, jenis, ya/tidak), dan pengelompokan waktu
+  berzona diperiksa di setiap dataset lewat trait `ChecksTimeZoneBuckets`: satu baris di 30 September 16.30
+  UTC (atau tanggal 30 September untuk kolom `date`) dikelompokkan per bulan dan per hari menurut UTC, WIB,
+  WITA, dan WIT. Kolom `date` tidak pernah bergeser; kolom `timestamp` bergeser ke Oktober bagi WITA dan WIT.
+  Module aset tidak punya kolom `timestamptz`, jadi jenis itu hanya diuji di Core (fixture `contoh-a`).
+
+**Measure bersaringan.** `asset-register`: `disposed`, `decommissioned`. `asset-receipts`: `completed_value`.
+`depreciation-entries`: `final_amount`. `book-values`: `active_net_book_value`. `work-orders`: `completed`,
+`cancelled`. `maintenance-requests`: `accepted`, `rejected`. `downtime`: `open_count`, `kpi_duration_hours`.
+`asset-sales` dan `asset-scraps`: `posted` (dan `posted_proceeds` untuk penjualan). `value-adjustments`:
+`write_down_amount`, `appreciation_amount`, `posted_net_effect`. `reclassifications`: `split_count`.
+`insurance-policies`: `blocked`. `warranties`: `full_coverage`. `physical-checks`: `mismatch`, `absent`.
 
 Query sumber dataset-dataset ini disusun dari `SourceQuery::from(Model::class)`, bukan `Model::query()`:
 kontrak `fromQuery()` meminta `Builder<Model>`, dan analisa tipe menolak `Builder<ModelKonkret>` karena

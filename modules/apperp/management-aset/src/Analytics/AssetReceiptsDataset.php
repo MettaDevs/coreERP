@@ -16,6 +16,7 @@ use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAsetDetail;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
+use Modules\Apperp\ManagementAset\Support\PenerimaanStatus;
 
 /**
  * Penerimaan aset, satu baris per baris dokumen penerimaan: barang yang datang, vendornya, dan nilainya.
@@ -85,6 +86,8 @@ final class AssetReceiptsDataset implements Dataset
             ->measure('quantity', 'Jumlah unit diterima', Aggregate::Sum, field: 'quantity')
             ->measure('receipt_value', 'Nilai penerimaan (belum termasuk PPN)', Aggregate::Sum,
                 field: 'line_value', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('completed_value', 'Nilai penerimaan yang sudah selesai (belum termasuk PPN)', Aggregate::Sum,
+                field: 'line_value', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => [PenerimaanStatus::SELESAI]])
             ->version(1);
     }
 }

@@ -77,6 +77,7 @@ final class WarrantiesDataset implements Dataset
             ->time('valid_from')
             ->measure('count', 'Jumlah garansi', Aggregate::Count)
             ->measure('asset_count', 'Jumlah aset bergaransi', Aggregate::CountDistinct, field: 'asset_id')
+            ->measure('full_coverage', 'Garansi penuh', Aggregate::Count, where: ['warranty_type' => [AssetWarranty::FULL]])
             ->version(1);
     }
 }

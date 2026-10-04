@@ -86,6 +86,7 @@ final class ReclassificationsDataset implements Dataset
             ->measure('document_count', 'Jumlah dokumen', Aggregate::CountDistinct, field: 'document_number')
             ->measure('moved_value', 'Nilai perolehan yang dipindah', Aggregate::Sum,
                 field: 'moved_value', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('split_count', 'Baris pecah aset', Aggregate::Count, where: ['kind' => [AssetReclassification::SPLIT]])
             ->version(1);
     }
 }

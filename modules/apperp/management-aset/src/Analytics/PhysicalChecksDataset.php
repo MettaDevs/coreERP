@@ -99,6 +99,8 @@ final class PhysicalChecksDataset implements Dataset
                 field: 'accumulated_depreciation', format: MeasureFormat::Money, currency: 'currency_code')
             ->measure('book_value', 'Nilai buku', Aggregate::Sum,
                 field: 'book_value', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('mismatch', 'Temuan tidak sesuai', Aggregate::Count, where: ['result' => [AssetMonitoringStatus::MISMATCH]])
+            ->measure('absent', 'Aset tidak ditemukan di tempat', Aggregate::Count, where: ['is_present' => false])
             ->version(1);
     }
 }

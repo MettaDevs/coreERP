@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class ReclassificationsDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -72,6 +73,34 @@ class ReclassificationsDatasetTest extends TestCase
         ]);
     }
 
+    protected function timeField(): string
+    {
+        return 'document_date';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $this->reclassification($this->tenantId, $this->legalEntity, 'BATAS', $this->unitA, 'pindah_group', [
+            [$this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA), '1000'],
+        ], $value);
+
+        return ['document_number' => 'BATAS'];
+    }
+
+    public function test_split_rows_are_counted_apart_from_group_transfers(): void
+    {
+        $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'split_count']])
+            ->assertOk()
+            ->assertJsonPath('rows.0.count', 3)
+            ->assertJsonPath('rows.0.split_count', 2);
+    }
+
     public function test_a_split_counts_one_document_and_one_row_per_source_asset(): void
     {
         $rows = $this->analyze($this->owner, [
@@ -88,12 +117,12 @@ class ReclassificationsDatasetTest extends TestCase
     }
 
     /** @param list<array{0: string, 1: string}> $lines aset asal dan nilai perolehan yang dipindah */
-    private function reclassification(string $tenant, string $legalEntity, string $code, string $unit, string $kind, array $lines): void
+    private function reclassification(string $tenant, string $legalEntity, string $code, string $unit, string $kind, array $lines, string $date = '2026-09-25'): void
     {
         $id = (string) Str::ulid();
         DB::table('aset_tr_reklasifikasi_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $code, 'legal_entity_id' => $legalEntity,
-            'responsible_org_unit_id' => $unit, 'jenis' => $kind, 'tanggal' => '2026-09-25', 'keterangan' => 'Penataan group',
+            'responsible_org_unit_id' => $unit, 'jenis' => $kind, 'tanggal' => $date, 'keterangan' => 'Penataan group',
             'status' => 'posted', 'created_at' => now(), 'updated_at' => now(),
         ]);
         foreach ($lines as $i => [$assetId, $moved]) {

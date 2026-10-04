@@ -7,6 +7,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature\Analytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -16,7 +17,7 @@ use Tests\TestCase;
  */
 class WarrantiesDatasetTest extends TestCase
 {
-    use ProbesAssetDatasets, RefreshDatabase;
+    use ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -64,6 +65,31 @@ class WarrantiesDatasetTest extends TestCase
         $this->warranty($tenant, $assetOfA, 'penuh', '2026-01-01', '2026-12-31');
         $this->warranty($tenant, $assetOfA, 'sebagian', '2026-06-01', '2027-05-31');
         $this->warranty($tenant, $assetOfB, 'penuh', '2026-02-01', '2027-01-31');
+    }
+
+    protected function timeField(): string
+    {
+        return 'valid_until';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA);
+        $this->warranty($this->tenantId, $asset, 'penuh', '2026-01-01', $value);
+
+        return ['asset_id' => [$asset]];
+    }
+
+    public function test_full_coverage_warranties_are_counted_apart(): void
+    {
+        $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'full_coverage']])
+            ->assertOk()->assertJsonPath('rows.0.count', 3)->assertJsonPath('rows.0.full_coverage', 2);
     }
 
     public function test_one_asset_with_two_warranties_is_two_warranties_but_one_asset(): void
