@@ -79,6 +79,15 @@ final class CoreSecurityCatalog
     /** Memakai field data pribadi di analitik (KA-14, PQ-04): hanya role Owner yang memegangnya otomatis. */
     public const ANALYTICS_PERSONAL_DATA_READ = 'core.analytics.personal-data.read';
 
+    /** Melihat dasbor dan query tersimpan milik sendiri serta yang bersama, beserta katalog datanya (KA-14, area 6). */
+    public const ANALYTICS_DASHBOARD_READ = 'core.analytics.dashboard.read';
+
+    /** Membuat, mengubah, dan mengarsipkan dasbor, widget, dan query tersimpan pribadi (KA-14, area 6). */
+    public const ANALYTICS_DASHBOARD_CREATE = 'core.analytics.dashboard.create';
+
+    /** Mengelola dasbor dan query tersimpan bersama, siapa pun pembuatnya (KA-14, area 6). */
+    public const ANALYTICS_SHARED_DASHBOARD_UPDATE = 'core.analytics.shared-dashboard.update';
+
     /**
      * Middleware rute untuk satu permission layar Core, misalnya `->middleware(CoreSecurityCatalog::gate(...))`.
      *

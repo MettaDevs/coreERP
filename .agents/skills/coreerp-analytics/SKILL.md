@@ -21,7 +21,12 @@ dataset contract (`join()`, `reference()`, `shared()`, `fromQuery()`, `field()`,
 permission chain (KA-14) and added `DataPolicyScope`, locked filters, `ScopeFingerprint`, and
 `PersonalDataGate`. Area 3 (4 October 2026) completed the compiler and results: `JoinPlanner`, time
 buckets (`TimeBucketExpression`), measure filters, totals per currency, default order with empty values
-last, `LabelResolver`, `GapFiller`, and `php artisan analytics:explain`. Everything else is still a
+last, `LabelResolver`, `GapFiller`, and `php artisan analytics:explain`. Area 6 (4 October 2026) added dashboards, widgets, and saved queries
+(`analytics_dashboards`, `analytics_widgets`, `analytics_saved_queries`; sharing rules in
+`Dashboards\DashboardAccess`, save-time checks in `Dashboards\StoredQuery` and `Dashboards\WidgetDefinition`,
+the per-principal catalog in `Datasets\DatasetCatalog`) and the screen API under `api/v1/analytics`
+(datasets, dashboards, widgets, widget data run as the viewer, saved queries), plus the page routes
+`/analytics` and `/analytics/dashboards/{id}` whose components area 7 builds. Everything else is still a
 plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
@@ -75,7 +80,9 @@ If code and this skill disagree, trust the code and fix the skill in the same pu
   2026): `2026_10_03_120000_register_analytics_security_catalog`, exactly the codes in `keamanan.md`.
   Codes that reach tenant roles cannot be renamed silently. Every analytics route names its gate with
   `CoreSecurityCatalog::gate(...)` (the explore page and `POST query` use
-  `core.analytics.explore.invoke`); add a `CoreSecurityCatalog` constant only when code uses the code.
+  `core.analytics.explore.invoke`; dashboards, widgets, saved queries, and the dataset catalog use
+  `core.analytics.dashboard.read`, creating also `dashboard.create`); add a `CoreSecurityCatalog` constant only
+  when code uses the code.
   Only the Owner role holds the duties automatically, personal data included (PQ-04).
 
 ## Declaring a dataset

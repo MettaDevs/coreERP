@@ -169,6 +169,53 @@ Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): vo
 Route model binding untuk `{dashboard}` dan `{widget}` wajib menyaring tenant aktif (scope di model
 atau `resolveRouteBinding`), sehingga id tenant lain menjadi 404 sebelum controller berjalan.
 
+### Yang dikirim area 6
+
+*4 Oktober 2026.* Seluruh blok area 6 di `routes/analytics.php` dijaga `core.analytics.dashboard.read`;
+`POST dashboards` dan `POST saved-queries` juga `core.analytics.dashboard.create`. Mengubah dan
+mengarsipkan diputuskan `Dashboards\DashboardAccess` di controller. `{dashboard}`, `{widget}`, dan
+`{savedQuery}` dicari di tenant aktif saja (`Models\BindsWithinActiveTenant`).
+
+| Metode dan path | Jawaban | Galat khusus |
+| --- | --- | --- |
+| `GET datasets` | `{data: DatasetSummary[]}` — module terpasang dan permission baca dipegang | |
+| `GET datasets/{code}` | `{data: DatasetDescription}` — field dan measure data pribadi disaring | 404 `analytics.dataset_unknown`, 403 `analytics.dataset_forbidden` |
+| `GET dashboards` | `{data: DashboardSummary[]}` milik sendiri dan bersama, urut nama | |
+| `POST dashboards` | 201 `{data: DashboardDetail}`, `ETag` | 403 tanpa hak; 422 nama ganda |
+| `GET dashboards/{id}` | `{data: DashboardDetail}`, `ETag` | 404 pribadi orang lain |
+| `PATCH dashboards/{id}` | `name`, `description`, `shared`, `layout`; `If-Match` atau `version` | 428, 409, 403 dasbor bersama tanpa hak, 422 letak |
+| `DELETE dashboards/{id}` | 204; widget-nya ikut diarsipkan | 428, 409 |
+| `POST dashboards/{id}/widgets` | 201 `{data: DashboardWidget}`, `ETag` | `query.…` dari validator, `analytics.invalid_visual`, 422 `analytics.limit_exceeded` |
+| `PATCH widgets/{id}` / `DELETE widgets/{id}` | `title`, `type`, `query`, `visual`, `cache_ttl_seconds` / 204 | 428, 409 |
+| `GET widgets/{id}/data`, `POST widgets/{id}/refresh` | `ResultSet` seperti `POST query`, dihitung sebagai yang melihat | 422 `analytics.field_removed`, 403 `analytics.dataset_forbidden`, 404 |
+| `GET/POST saved-queries`, `GET/PATCH/DELETE saved-queries/{id}` | `{data: SavedQuery}`; `?dataset=` menyaring daftar | 422 kode ganda |
+
+Halaman: `GET /analytics` merender `platform/analytics/index` dengan prop `dashboards` dan `abilities`
+(`{create, share}`), `GET /analytics/dashboards/{id}` merender `platform/analytics/dashboard` dengan prop
+`dashboard` dan `abilities`. Komponennya milik area 7.
+
+Perilaku yang perlu diketahui layar:
+
+- **Versi naik dua kali** pada perubahan yang menulis kolom: klaim versi lalu penyimpanannya. Pakai `version`
+  atau `ETag` dari jawaban, jangan menghitung sendiri.
+- **Menambah widget tidak mengubah versi dasbor.** `layout` di jawaban adalah letak efektif: letak tersimpan
+  untuk widget yang masih ada, lalu widget tanpa letak di bawahnya, dua per baris, `w` 6 dan `h` 2. `PATCH
+  layout` hanya menerima widget dasbor itu, `x + w ≤ 12`, `w` 3/4/6/8/12, `h` 1–3.
+- **Query widget dikirim dalam bentuk ringkas** (tanpa nilai bawaan) dengan kunci yang sudah dipetakan lewat
+  `renamed`. `status` widget menyebut definisi yang tidak dapat dihitung tanpa menghitungnya: `ok`,
+  `field_removed` beserta `missing_fields`, atau `dataset_unavailable`. Izin membaca datanya baru diketahui
+  dari data widget.
+- **Galat simpan widget** berbentuk `{error: {code, message, field}}` dengan `field` berawalan `query.` atau
+  `visual.`; isian dasar (judul, jenis, masa simpan) memakai galat validasi Laravel `{message, errors}`. Keduanya
+  dibaca `CoreApiError`.
+- **Mengganti jenis widget tanpa mengirim `visual`** memakai tampilan bawaan jenis baru, bukan tampilan lama.
+- **Kode query tersimpan** dibuat dari nama bila tidak dikirim (`nilai-perolehan`, lalu `-2`), unik per tenant,
+  dan tidak dapat diganti.
+- Belum ada: slicer (fase 2, area 12), cache dan rate limit `analytics-interactive` (area 9; sampai itu
+  `refresh` sama dengan data), dan menyalin dasbor bersama menjadi pribadi. Kontrak API ini tidak ditulis
+  tangan karena pemakainya hanya layar Core; `contracts/openapi.json` hasil Scramble belum diperbarui sejak
+  lama dan tidak memuatnya.
+
 ## Widget
 
 | Jenis | `visual` | Kebutuhan query |
@@ -179,6 +226,10 @@ atau `resolveRouteBinding`), sehingga id tenant lain menjadi 404 sebelum control
 | `donut` | `{category, value, max_slices?: 8}` | Satu dimensi, satu measure |
 | `table` | `{columns: [kunci], show_totals?: bool}` | Apa pun dalam batas |
 | `text` | `{text}` | Tanpa query. Teks biasa dengan baris baru; bukan Markdown atau HTML |
+
+*Dikirim area 6:* aturan ini diperiksa `Dashboards\WidgetDefinition` saat widget disimpan. Tile fase 1 tidak
+menerima pengelompokan; pengelompok kedua grafik wajib menjadi `series`; `measure` tile serta `category` dan
+`value` donat boleh dihilangkan dan diisi dari query-nya; bagian `visual` yang tidak dikenal ditolak.
 
 Ambang tile mengikuti Cue Setup BC — dua ambang, tiga rentang, gaya bermakna — dan dipetakan ke
 token tema, bukan warna mentah:

@@ -348,6 +348,16 @@ Aturannya meniru preset laporan K-25 (`ReportOptions`), yang sudah teruji:
 - Widget dihitung sebagai **yang melihat** (prinsip 3). Penyusun dasbor bersama tidak dapat
   "meminjamkan" haknya lewat widget.
 
+*Dikirim area 6 (4 Oktober 2026):* `Dashboards\DashboardAccess` menerapkan tabel di atas untuk dasbor dan
+query tersimpan; konstanta baru `ANALYTICS_DASHBOARD_READ`, `ANALYTICS_DASHBOARD_CREATE`, dan
+`ANALYTICS_SHARED_DASHBOARD_UPDATE` di `CoreSecurityCatalog`. Satu beda dari preset laporan: dasbor bersama yang
+terlihat tetapi tidak boleh diubah dijawab 403 beserta alasannya, karena yang membukanya sudah tahu dasbor itu
+ada; dasbor pribadi orang lain dan id tenant lain tetap 404. Tenant id di URL disaring satu penangkal saja —
+route binding `Models\BindsWithinActiveTenant` — supaya `AnalyticsTenantIsolationTest` dapat membuktikannya.
+`WidgetDataController` membuat principal dari keanggotaan sesi yang meminta, dan
+`SharedDashboardRunsAsViewerTest` menjaganya. Widget juga diperiksa terhadap hak **penyimpannya** saat disimpan
+(dataset terpasang, permission baca, gerbang data pribadi), tetapi hak itu tidak ikut tersimpan.
+
 ## Log query
 
 Satu baris per query di `analytics_query_log`: tenant, principal (`describe()`), sumber (`widget`,

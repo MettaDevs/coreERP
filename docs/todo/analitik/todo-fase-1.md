@@ -467,7 +467,7 @@ sederhana. Bentuk "dataset terhitung" untuknya diputuskan di area 23.
 
 ---
 
-### 6. [ ] Penyimpanan dasbor dan API layar
+### 6. [x] Penyimpanan dasbor dan API layar
 
 **Tempat:** migration `analytics_dashboards`, `analytics_widgets`, `analytics_saved_queries`;
 `app/Platform/Analytics/{Models, Http}/*`; `routes/analytics.php` · **Setelah:** 0, 2, 4 ·
@@ -476,21 +476,58 @@ sederhana. Bentuk "dataset terhitung" untuknya diputuskan di area 23.
 [API untuk layar](/todo/analitik/dasbor-dan-visual#api-untuk-layar) bekerja dengan aturan berbagi,
 versi baris, dan isolasi tenant yang diuji, dan widget dihitung sebagai yang melihat.
 
-- [ ] 6.1 Migration sesuai [tabel](/todo/analitik/dasbor-dan-visual#tabel): kolom jejak, `version`, tiga
+Selesai 4 Oktober 2026, di atas area 4. Yang dikirim berbeda dari rencana di beberapa butir; bedanya
+dicatat di butir masing-masing (*Dikirim:*), dan [dasbor dan visual](/todo/analitik/dasbor-dan-visual#api-untuk-layar)
+serta [arsitektur](/todo/analitik/arsitektur) ikut diperbarui.
+
+- [x] 6.1 Migration sesuai [tabel](/todo/analitik/dasbor-dan-visual#tabel): kolom jejak, `version`, tiga
   trigger, indeks unik parsial; lolos `MigrasiKompatibelMundurTest`, `DataClassificationBoundaryTest`,
-  `AuditColumnsBoundaryTest`.
-- [ ] 6.2 Model dengan klasifikasi, dan route binding yang menyaring tenant aktif (id tenant lain → 404).
-- [ ] 6.3 Controller dan request: dataset (katalog per principal), dasbor, widget, data widget,
-  refresh, query tersimpan, query bebas.
-- [ ] 6.4 Widget divalidasi saat disimpan: query lewat parser dan validator terhadap dataset saat ini;
-  `visual` lewat aturan per jenis widget.
-- [ ] 6.5 Membaca widget lama: kunci dipetakan lewat `renamed`; field yang hilang menghasilkan status
-  widget `field_removed` dengan nama kolomnya, bukan galat 500.
-- [ ] 6.6 Aturan berbagi seperti `ReportOptions` K-25; `RowVersion::claim` pada setiap perubahan.
-- [ ] 6.7 Batas widget per dasbor.
-- [ ] 6.8 Rute halaman Inertia `/analytics`, `/analytics/dashboards/{id}`, `/analytics/explore`.
-- [ ] 6.9 Test: CRUD; aturan berbagi; IDOR 404; 428 tanpa versi, 409 versi basi;
-  `SharedDashboardRunsAsViewerTest`; `AnalyticsTenantIsolationTest` untuk setiap endpoint.
+  `AuditColumnsBoundaryTest`. *Dikirim:* `2026_10_04_120000_create_analytics_dashboard_tables`, persis
+  rancangan ditambah indeks `(tenant_id, user_id)` pada query tersimpan untuk daftar milik sendiri.
+- [x] 6.2 Model dengan klasifikasi, dan route binding yang menyaring tenant aktif (id tenant lain → 404).
+  *Dikirim:* `Models\{Dashboard, Widget, SavedQuery}` dan trait `Models\BindsWithinActiveTenant`
+  (`resolveRouteBinding` dengan tenant keanggotaan aktif). Itu satu-satunya penangkal lintas tenant untuk
+  id di URL: `DashboardAccess` sengaja tidak membandingkan tenant lagi, supaya
+  `AnalyticsTenantIsolationTest` dapat membuktikannya merah.
+- [x] 6.3 Controller dan request: dataset (katalog per principal), dasbor, widget, data widget,
+  refresh, query tersimpan, query bebas. *Dikirim:* `DatasetController`, `DashboardController`,
+  `WidgetController`, `WidgetDataController`, `SavedQueryController`, `DashboardPageController`, dengan
+  validasi di controller (bukan kelas `Request`) seperti preset laporan, dan bentuk jawaban satu tempat di
+  `Http\Presenters\DashboardPresenter`. Katalog per principal di `Datasets\DatasetCatalog`. Query bebas
+  tetap `QueryController` area 0.
+- [x] 6.4 Widget divalidasi saat disimpan: query lewat parser dan validator terhadap dataset saat ini;
+  `visual` lewat aturan per jenis widget. *Dikirim:* `Dashboards\StoredQuery::validate()` (parser,
+  normalisasi, dataset terpasang dan boleh dibaca **penyimpannya**, validator dengan gerbang data pribadi;
+  galat berpath `query.…`) dan `Dashboards\WidgetDefinition` (galat `analytics.invalid_visual` berpath
+  `visual.…` atau `query.…`). Query disimpan dalam bentuk ringkas yang sama dengan badan `POST query`.
+- [x] 6.5 Membaca widget lama: kunci dipetakan lewat `renamed`; field yang hilang menghasilkan status
+  widget `field_removed` dengan nama kolomnya, bukan galat 500. *Dikirim:* `StoredQuery::read()` memetakan
+  query dan `visual` bila versi tersimpan lebih lama dari dataset; dasbor menyebut `status` setiap widget
+  (`ok`, `field_removed` dengan `missing_fields`, `dataset_unavailable`), dan data widget menjawab 422
+  `analytics.field_removed` berpath. Widget rusak tetap dapat diganti judul dan diarsipkan.
+- [x] 6.6 Aturan berbagi seperti `ReportOptions` K-25; `RowVersion::claim` pada setiap perubahan.
+  *Dikirim:* `Dashboards\DashboardAccess`, juga untuk query tersimpan. Bedanya dari preset: dasbor bersama
+  yang terlihat tetapi tidak boleh diubah dijawab 403 dengan alasannya, bukan 404, karena keberadaannya sudah
+  diketahui yang membuka; dasbor pribadi orang lain tetap 404. `shared` dapat diganti lewat `PATCH`
+  (menjadikan bersama: pemiliknya yang juga memegang `shared-dashboard.update`; berhenti membagikan: pemegang
+  hak itu). Menyalin dasbor menjadi pribadi belum ada endpoint-nya.
+- [x] 6.7 Batas widget per dasbor. *Dikirim:* `analytics.limits.widgets_per_dashboard` (bawaan 24),
+  dihitung di bawah kunci baris dasbor; melewatinya 422 `analytics.limit_exceeded`.
+- [x] 6.8 Rute halaman Inertia `/analytics`, `/analytics/dashboards/{id}`, `/analytics/explore`.
+  *Dikirim:* rutenya terdaftar (`analytics.index`, `analytics.dashboards.show`; `analytics.explore` dari area
+  0) dengan prop dari presenter yang sama dengan API, dan diuji sebagai jawaban Inertia JSON. Komponen
+  `platform/analytics/index` dan `.../dashboard` milik area 7: **sampai area 7 digabung, membuka kedua halaman
+  itu sebagai halaman penuh menjawab 500** karena manifest Vite belum memuat komponennya. Belum ada menu yang
+  menautkannya.
+- [x] 6.9 Test: CRUD; aturan berbagi; IDOR 404; 428 tanpa versi, 409 versi basi;
+  `SharedDashboardRunsAsViewerTest`; `AnalyticsTenantIsolationTest` untuk setiap endpoint. *Dikirim:*
+  `DashboardApiTest`, `SharedDashboardRunsAsViewerTest`, `AnalyticsTenantIsolationTest` (daftar rute ber-id
+  dibaca dari router, jadi rute baru tanpa baris di test-nya gagal). Cara setiap penjaga dibuat merah dicatat
+  di pull request area 6.
+
+Yang sengaja ditinggalkan untuk area lain: rate limit `analytics-interactive` pada data widget (area 9.4,
+bersama limiternya), cache yang dilewati `refresh` (area 9; sampai itu `refresh` sama dengan data), dan
+slicer di `PATCH` dasbor serta query string data widget (area 12).
 
 ---
 
