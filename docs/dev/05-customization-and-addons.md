@@ -26,9 +26,9 @@ menunggu rilis.
 
 | Urutan | Dipakai bila | Bentuknya |
 | --- | --- | --- |
-| 1. Setelan | Perbedaannya dapat ditulis sebagai data | Setelan tenant oleh owner/admin, termasuk [workflow persetujuan](21-visual-workflow-engine.md) |
+| 1. Setelan | Perbedaannya dapat ditulis sebagai data | Setelan tenant oleh owner/admin, termasuk [workflow persetujuan](21-visual-workflow-engine.md) dan [dasbor yang disusun dari dataset module](35-analitik.md) |
 | 2. Fitur produk | Dibutuhkan lebih dari satu pelanggan, atau domainnya umum | Fitur module biasa, boleh dinyalakan per tenant |
-| 3. Integrasi di luar CoreERP | Kebutuhannya di luar inti ERP: dasbor khusus, form lapangan, notifikasi | Pelanggan atau partner membangunnya sendiri di atas API dan event, dengan alat apa pun |
+| 3. Integrasi di luar CoreERP | Kebutuhannya di luar inti ERP: dasbor yang butuh data dari luar CoreERP, form lapangan, notifikasi | Pelanggan atau partner membangunnya sendiri di atas API dan event, dengan alat apa pun |
 | 4. Module khusus | Hanya satu pelanggan, dan harus berjalan di dalam ERP | Module di `modules/` yang dilisensikan hanya ke tenant tertentu |
 | Tidak pernah | – | Salinan source atau branch per pelanggan |
 
@@ -38,8 +38,23 @@ semakin banyak yang harus ikut dirawat setiap kali Core berubah.
 ### 1. Setelan
 
 Yang sudah menjadi setelan tenant antara lain format nomor dokumen (lihat
-[number sequence](14-number-sequences.md)), akun posting, dan workflow persetujuan.
+[number sequence](14-number-sequences.md)), akun posting, workflow persetujuan, dan dasbor.
 Setelan bertahan melewati update tanpa pekerjaan tambahan, karena yang berubah hanya data.
+
+**Dasbor adalah setelan selama datanya sudah dinyatakan sebagai dataset.** Module menyatakan dataset
+(tabel mana yang boleh dianalisis, kolom mana yang boleh dikelompokkan, nilai mana yang sah dijumlah),
+dan admin atau konsultan pelanggan menyusun dasbornya dari dataset itu: dasbor, widget, dan query
+tersimpan adalah baris di tabel tenant, bukan kode, jadi menyusunnya tidak menunggu rilis dan dasbornya
+bertahan melewati update; kunci dataset yang diganti nama dipetakan lewat versi dataset. Hak melihat
+angkanya tetap hak baca resource module dan kebijakan datanya, sama dengan layar daftarnya; dasbor tidak
+membuka data yang tidak boleh dibuka layar module. Rinciannya di [engine analitik](35-analitik.md). Sampai pembangun widget di layar selesai, widget baru dibuat lewat
+API dan belum lewat layar.
+
+Batasnya: dasbor hanya dapat menampilkan **data CoreERP yang sudah dinyatakan sebagai dataset**. Bila
+isinya butuh dataset yang belum ada, jawabannya menambah dataset di module pemiliknya (urutan 2, fitur
+produk), bukan kode khusus pelanggan. Bila isinya butuh data dari luar CoreERP — sistem lain, spreadsheet,
+mesin di lapangan — ia tetap [integrasi di luar CoreERP](#3-integrasi-di-luar-coreerp): engine ini hanya
+membaca tabel CoreERP.
 
 Custom field (kolom tambahan yang dibuat pelanggan sendiri) **belum ada**. Permintaan yang
 membutuhkannya turun ke urutan berikutnya sampai mekanisme itu benar-benar dibangun.
@@ -137,5 +152,6 @@ buatan pelanggan di dalam runtime.
 - [Standar module](02-module-standard.md) — batas tabel, lifecycle, dan jenis module
 - [API dan integrasi](04-api-and-integration.md) — kontrak dan event yang boleh dipakai pihak luar
 - [Visual workflow engine](21-visual-workflow-engine.md) — alur persetujuan sebagai setelan
+- [Engine analitik](35-analitik.md) — dasbor sebagai setelan, dan cara module menyatakan dataset
 - [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — tempat keputusan dicatat
 - [API untuk integrator](/todo/api-untuk-integrator/) — rencana kredensial token untuk sistem pelanggan

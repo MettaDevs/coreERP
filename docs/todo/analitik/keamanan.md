@@ -126,16 +126,24 @@ hibah rusak — pada mode legal entity + unit dan legal entity saja.
 Analitik dan layar module sekarang menyaring dengan dua jalur kode. Test ini yang membuktikan
 keduanya memulangkan baris yang sama.
 
-- **Di mana:** satu test per dataset berkebijakan, di folder test module
-  (`tests/Feature/Analytics/<Dataset>PolicyParityTest.php`).
-- **Susunan:** satu tenant, dua legal entity, tiga unit (A, B, C di bawah A), aset di setiap unit.
-- **Pengguna:** hibah unit A tanpa turunan, unit A dengan turunan, unit B saja, semua, dan tanpa
-  hibah sama sekali — rantai izin sungguhan untuk masing-masing.
-- **Bukti:** untuk setiap pengguna, himpunan id dari endpoint daftar module (misalnya
-  `GET /api/modules/management-aset/v1/aset`) **sama dengan** himpunan id dari drill analitik dataset
-  yang sama tanpa saringan lain. Untuk fase 1 yang belum punya drill, pembandingnya `count` per unit.
+- **Di mana:** satu test per dataset berkebijakan, di folder test module. Dikirim sebagai
+  `tests/Feature/Analytics/<Nama>DatasetTest.php` yang memakai trait `ProbesAssetDatasets` dan
+  `ChecksMoneyPerCurrency` (`tests/Concerns/`); pemeriksaan paritasnya bernama
+  `test_data_policy_grants_narrow_rows_exactly_like_the_module_list`. Bukan `<Dataset>PolicyParityTest`
+  seperti rencana awal.
+- **Susunan (dikirim):** dua tenant sungguhan, satu legal entity dan dua unit (A dan B) per tenant, dan data
+  awal yang sengaja membuat kolom kebijakan yang salah terlihat sebagai baris yang salah (unit dimensi keuangan
+  berlawanan dengan unit penanggung jawab, periode berunit pengguna lain dari asetnya, pemeriksaan tanpa
+  unit). Rencana awal menyebut dua legal entity dan tiga unit dengan turunan; susunan dikirim lebih sederhana
+  dan belum menguji hibah unit dengan turunan.
+- **Pengguna (dikirim):** pemilik (seluruh organisasi), hibah unit A, hibah unit B, dan tanpa hibah — rantai
+  izin sungguhan untuk masing-masing.
+- **Bukti (dikirim):** untuk setiap pengguna, kombinasi pengelompok yang dikembalikan dataset **sama dengan**
+  nilai pembeda baris dari endpoint daftar module (misalnya `GET /api/modules/management-aset/v1/aset`),
+  dan jumlah barisnya sesuai harapan. Pembandingnya himpunan kunci baris, bukan drill (belum ada) dan
+  bukan `count` per unit.
 - **Yang membuatnya merah:** mengganti kolom kebijakan dataset menjadi `financial_dimension_org_unit_id`
-  harus menggagalkan test ini. Coba sekali sebelum mempercayainya.
+  menggagalkan test ini; dibuktikan merah untuk semua dataset aset di pull request area 5.
 
 ## Data pribadi
 

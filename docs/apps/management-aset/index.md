@@ -64,6 +64,7 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 | [Garansi dan kontrak servis](/apps/management-aset/transaction/garansi-kontrak-servis/) | Garansi per aset, kontrak servis vendor, yang akan berakhir, dan pemberitahuan di work order |
 | [Asuransi aset](/apps/management-aset/transaction/asuransi-aset/) | Polis, pertanggungan aset berperiode, dan aset yang belum atau kurang diasuransikan |
 | [Laporan dan ekspor](/apps/management-aset/transaction/laporan/) | Dataset dan layout bawaan yang diminta Core untuk dicetak |
+| [Dataset analitik](/apps/management-aset/transaction/analitik/) | Dataset yang dibaca engine analitik Core untuk dasbor: measure, permission, dan kolom kebijakan data |
 | [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
 | [Monitoring aset](/apps/management-aset/transaction/monitoring-aset/) | Pemeriksaan fisik aset di satu lokasi; mencatat temuan tanpa mengubah register |
 | [Layar setup yang belum berisi](/apps/management-aset/transaction/monitoring/) | Layar setup yang sengaja belum berisi |

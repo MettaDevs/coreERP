@@ -4,7 +4,9 @@ Rencana kerja engine analitik CoreERP — padanan Power BI yang dibangun di dala
 bukan desain kanonik. Ditulis 3 Oktober 2026, sesudah pemilik produk memutuskan membangunnya
 sendiri. Halaman-halaman di folder ini ditulis supaya beberapa agen dapat mengerjakannya bersamaan
 tanpa saling menunggu dan tanpa saling menimpa. Kerangka berjalan (area 0) sudah dikirim pada hari yang
-sama; begitu kode sebuah bagian ada di repo, kodenya yang menjadi rujukan.
+sama; begitu kode sebuah bagian ada di repo, kodenya yang menjadi rujukan, dan [halaman kanonik engine
+analitik](/dev/35-analitik) menjelaskan yang sudah dikirim. Halaman di folder ini tetap rencana, riset, dan
+keputusan; bila berbeda dengan kode, kodenya yang benar.
 
 **Kenapa dibangun.** Hampir setiap fasilitas kesehatan dari sekitar seratus pelanggan sistem lama
 meminta dasbor — persediaan, kasir, aset, dan lain-lain — dan keinginannya berbeda-beda. Dulu
@@ -21,6 +23,7 @@ tanpa rilis baru. Itu memindahkan permintaan dasbor dari urutan 3–4 ke urutan 
 
 | Halaman | Isi | Dibaca oleh |
 | --- | --- | --- |
+| [Engine analitik, halaman kanonik](/dev/35-analitik) | Yang **sudah dikirim**: aturan beserta alasannya, endpoint, hak akses, dan cara module menyatakan dataset | Semua, sebelum halaman rencana |
 | [PRD](/todo/analitik/prd) | Masalah, pengguna, cakupan, kebutuhan fungsional dan nonfungsional, rilis, risiko | Semua, pertama kali |
 | [Riset](/todo/analitik/riset) | BC, F&O, Power BI, semantic layer terbuka, REST vs OData vs GraphQL, embed aman, pengaman PostgreSQL | Yang meragukan sebuah keputusan |
 | [Arsitektur](/todo/analitik/arsitektur) | Letak di lapis Platform, komponen, alur data, tenant dan database sendiri, berkas per komponen | Semua agen backend |
@@ -100,7 +103,7 @@ Alasan setiap keputusan ada di PRD atau halaman yang disebut.
 | KA-22 | Uang tidak pernah dijumlah lintas mata uang; kuantitas tidak pernah dijumlah lintas satuan | Keputusan teknis, mengikat |
 | KA-23 | Tidak ada analitik lintas tenant. Konsolidasi terjadi di dalam satu tenant lewat legal entity | Mengikuti [standar module](/dev/02-module-standard#ownership-dan-data) |
 | KA-24 | Setiap query analitik berjalan di transaksi baca-saja dengan batas waktu dan batas baris | Keputusan teknis, mengikat |
-| KA-25 | Halaman kanonik `docs/dev/05` diperbarui saat fase 1 selesai: dasbor yang dapat disusun dari dataset pindah dari "integrasi di luar" ke "setelan" | Menyusul di area 11 |
+| KA-25 | Halaman kanonik `docs/dev/05` diperbarui saat fase 1 selesai: dasbor yang dapat disusun dari dataset pindah dari "integrasi di luar" ke "setelan" | Dikerjakan di area 11 (4 Okt 2026): `docs/dev/05` diperbarui dan halaman kanonik `docs/dev/35-analitik.md` terbit; sapuan akhir menunggu area 8 dan 10 |
 
 ## Fase dan lajur
 
