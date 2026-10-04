@@ -27,6 +27,7 @@ import {
     Ruler,
     Package,
     Palette,
+    Share2,
     ShieldCheck,
     Truck,
     UserRound,
@@ -177,6 +178,17 @@ export function AppSidebar() {
                               label: 'Analisis data',
                               icon: ChartColumn,
                               href: '/analytics/explore',
+                          },
+                      ]
+                    : []),
+                // Area 15: publikasi untuk sistem lain, untuk pemegang permission rutenya
+                // (`core.analytics.publication.read`). Hanya penyaring tampilan.
+                ...(isAllowed('core.analytics.publication.read')
+                    ? [
+                          {
+                              label: 'Publikasi data',
+                              icon: Share2,
+                              href: '/analytics/publications',
                           },
                       ]
                     : []),

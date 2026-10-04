@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Analytics;
 
 use App\Platform\Analytics\Models\Dashboard;
+use App\Platform\Analytics\Models\Publication;
 use App\Platform\Analytics\Models\SavedQuery;
 use App\Platform\Analytics\Models\Widget;
 use App\Platform\Identity\Models\User;
@@ -18,10 +19,10 @@ use Tests\TestCase;
  * Isolasi tenant untuk setiap endpoint analitik (`docs/todo/analitik/keamanan.md`, *Test penjaga keamanan*):
  * dua tenant, keduanya dengan module aset dan pemilik yang memegang setiap duty, nol kebocoran.
  *
- * - Setiap rute yang menerima id dasbor, widget, atau query tersimpan menjawab 404 kepada tenant lain —
- *   termasuk dasbor **bersama**, yang di dalam tenant-nya terlihat oleh semua — dan barisnya tidak berubah.
- *   Daftar rutenya dibaca dari router, jadi rute baru yang belum ada di tabel test ini menggagalkannya.
- * - Daftar, katalog dataset, dan data widget hanya memuat milik tenant pemanggil.
+ * - Setiap rute yang menerima id dasbor, widget, query tersimpan, atau publikasi menjawab 404 kepada tenant
+ *   lain — termasuk dasbor **bersama**, yang di dalam tenant-nya terlihat oleh semua — dan barisnya tidak
+ *   berubah. Daftar rutenya dibaca dari router, jadi rute baru yang belum ada di tabel test ini menggagalkannya.
+ * - Daftar, katalog dataset, data widget, dan daftar publikasi hanya memuat milik tenant pemanggil.
  *
  * Dilihat merah dengan membuang saringan tenant di `BindsWithinActiveTenant` (tenant B membuka, mengubah, dan
  * mengarsipkan dasbor bersama tenant A) dan dengan membuang saringan tenant di `DashboardAccess::visible()`
@@ -29,7 +30,7 @@ use Tests\TestCase;
  */
 class AnalyticsTenantIsolationTest extends TestCase
 {
-    use BuildsAssetTenants, RefreshDatabase;
+    use BuildsAssetTenants, PublishesAnalytics, RefreshDatabase;
 
     private User $ownerA;
 
@@ -40,6 +41,8 @@ class AnalyticsTenantIsolationTest extends TestCase
     private Widget $widgetA;
 
     private SavedQuery $savedA;
+
+    private Publication $publicationA;
 
     protected function setUp(): void
     {
@@ -68,6 +71,11 @@ class AnalyticsTenantIsolationTest extends TestCase
         $this->dashboardA = Dashboard::query()->findOrFail($dashboard);
         $this->widgetA = Widget::query()->findOrFail($widget);
         $this->savedA = SavedQuery::query()->findOrFail($saved);
+
+        // Area 15: publikasi tenant A dari query tersimpannya.
+        $client = $this->integrationClient($this->ownerA, 'Klien A');
+        $publication = $this->publish($this->ownerA, ['name' => 'Publikasi A', 'saved_query_id' => $saved, 'client_ids' => [$client['id']]])->assertCreated()->json('data.id');
+        $this->publicationA = Publication::query()->findOrFail($publication);
     }
 
     public function test_every_endpoint_with_an_id_answers_404_to_another_tenant(): void
@@ -75,6 +83,7 @@ class AnalyticsTenantIsolationTest extends TestCase
         $d = $this->dashboardA->id;
         $w = $this->widgetA->id;
         $s = $this->savedA->id;
+        $p = $this->publicationA->id;
         $version = self::ifMatch(1);
         $widgetBody = ['title' => 'Susupan', 'type' => 'kpi', 'query' => ['dataset' => self::ASSET_DATASET, 'measures' => ['count']]];
 
@@ -92,12 +101,18 @@ class AnalyticsTenantIsolationTest extends TestCase
             'api.analytics.saved-queries.show' => ['GET', "/api/v1/analytics/saved-queries/{$s}", []],
             'api.analytics.saved-queries.update' => ['PATCH', "/api/v1/analytics/saved-queries/{$s}", ['name' => 'Diambil alih']],
             'api.analytics.saved-queries.destroy' => ['DELETE', "/api/v1/analytics/saved-queries/{$s}", []],
+            'api.analytics.publications.update' => ['PATCH', "/api/v1/analytics/publications/{$p}", ['name' => 'Diambil alih']],
+            'api.analytics.publications.preview' => ['GET', "/api/v1/analytics/publications/{$p}/preview", []],
+            'api.analytics.publications.pause' => ['POST', "/api/v1/analytics/publications/{$p}/pause", ['version' => 1]],
+            'api.analytics.publications.resume' => ['POST', "/api/v1/analytics/publications/{$p}/resume", ['version' => 1]],
+            'api.analytics.publications.revoke' => ['POST', "/api/v1/analytics/publications/{$p}/revoke", ['version' => 1]],
+            'api.analytics.publications.take-over' => ['POST', "/api/v1/analytics/publications/{$p}/take-over", ['version' => 1]],
         ];
 
         // Setiap rute analitik yang menerima id ada di tabel di atas; rute baru tanpa baris di sini gagal.
         $withId = collect(Route::getRoutes()->getRoutes())
             ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'api.analytics.') || str_starts_with((string) $route->getName(), 'analytics.'))
-            ->filter(fn (RoutingRoute $route): bool => array_intersect($route->parameterNames(), ['dashboard', 'widget', 'savedQuery']) !== [])
+            ->filter(fn (RoutingRoute $route): bool => array_intersect($route->parameterNames(), ['dashboard', 'widget', 'savedQuery', 'publication']) !== [])
             ->map(fn (RoutingRoute $route): string => (string) $route->getName())
             ->sort()->values()->all();
         $this->assertSame(collect(array_keys($calls))->sort()->values()->all(), $withId);
@@ -111,7 +126,7 @@ class AnalyticsTenantIsolationTest extends TestCase
         $this->assertSame(array_fill_keys(array_keys($calls), 404), $statuses, 'Rute analitik menjawab selain 404 kepada tenant lain.');
 
         // Tidak ada yang berubah di tenant A, dan pemiliknya masih membuka semuanya.
-        foreach ([$this->dashboardA, $this->widgetA, $this->savedA] as $row) {
+        foreach ([$this->dashboardA, $this->widgetA, $this->savedA, $this->publicationA] as $row) {
             $fresh = $row->fresh();
             $this->assertNotNull($fresh, $row::class.' tenant A terarsip oleh tenant B.');
             $this->assertSame(1, $fresh->version, $row::class.' tenant A diubah oleh tenant B.');
@@ -125,6 +140,9 @@ class AnalyticsTenantIsolationTest extends TestCase
     {
         $this->actingAs($this->ownerB)->getJson('/api/v1/analytics/dashboards')->assertOk()->assertExactJson(['data' => []]);
         $this->actingAs($this->ownerB)->getJson('/api/v1/analytics/saved-queries')->assertOk()->assertExactJson(['data' => []]);
+        $this->withoutVite();
+        $this->actingAs($this->ownerB)->get('/analytics/publications')->assertOk()
+            ->assertInertia(fn ($page) => $page->where('publications', [])->where('savedQueries', []));
         $this->actingAs($this->ownerA)->getJson('/api/v1/analytics/dashboards')->assertOk()->assertJsonPath('data.0.id', $this->dashboardA->id);
 
         // Nama yang sama boleh di tenant lain: keunikan dasbor bersama per tenant.

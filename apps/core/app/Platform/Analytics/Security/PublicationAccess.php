@@ -20,11 +20,14 @@ use App\Platform\Tenant\Models\TenantMembership;
  *
  * Permission baca dataset pemilik diperiksa sesudahnya oleh `DatasetAccess` lewat principal yang dibuat di sini,
  * pada jalur yang sama dengan setiap query; pembaca publikasi menerjemahkan penolakannya menjadi tertahan juga.
- * Tidak ada yang di-cache antarpermintaan: `CorePermissions` mengingat permission hanya selama satu permintaan.
+ *
+ * Tidak ada yang diingat antarpermintaan. `CorePermissions` diambil dari container **pada setiap pemeriksaan**,
+ * bukan disuntikkan sekali: kelas ini disuntikkan ke controller, dan router menyimpan instance controller di
+ * rutenya, sehingga instance yang disuntikkan dapat hidup lebih lama daripada satu permintaan — bersama ingatan
+ * permission pemilik dari permintaan sebelumnya. Ikatan `scoped()` baru segar bila diminta ulang.
  */
 final class PublicationAccess
 {
-    public function __construct(private readonly CorePermissions $permissions) {}
 
     /**
      * Principal publikasi bila pemiliknya masih berhak. `$clientId` klien integrasi yang membaca, untuk log.
@@ -56,6 +59,6 @@ final class PublicationAccess
             ->where('status', 'active')
             ->first();
 
-        return $this->permissions->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE) ? $membership : null;
+        return app(CorePermissions::class)->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE) ? $membership : null;
     }
 }

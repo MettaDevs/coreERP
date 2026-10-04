@@ -6,7 +6,6 @@ namespace Tests\Feature\Platform\Analytics;
 
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\RoleAssignment;
-use App\Platform\Access\Support\CorePermissions;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,9 +21,12 @@ use Tests\TestCase;
  * Analis pemilik publikasi hanya memegang hibah unit A, jadi sistem luar melihat dua aset unit A, bukan lima
  * milik direktur: jangkauan publikasi tidak pernah lebih luas daripada pemiliknya.
  *
- * Dilihat merah dengan melewati pemeriksaan permission di `PublicationAccess` (pencabutan duty publikasi tetap
- * dijawab 200) dan dengan menerjemahkan penolakan dataset di `PublicationReader::prepare()` menjadi
- * `unavailable` (pencabutan permission aset dijawab 409, bukan 403 tertahan).
+ * Tidak ada ingatan permission yang dibuang tangan di sini: setiap permintaan test membaca hak pemilik dari
+ * awal, seperti permintaan sungguhan. Dilihat merah dengan melewati pemeriksaan permission di
+ * `PublicationAccess` (pencabutan duty publikasi tetap dijawab 200), dengan menyuntikkan `CorePermissions`
+ * sekali ke `PublicationAccess` (duty yang dipasang lagi tetap dijawab tertahan, karena controller yang disimpan
+ * router membawa ingatan permintaan sebelumnya), dan dengan menerjemahkan penolakan dataset di
+ * `PublicationReader::prepare()` menjadi `unavailable` (pencabutan permission aset dijawab 409, bukan 403).
  */
 class PublicationSuspendedWhenOwnerLosesAccessTest extends TestCase
 {
@@ -88,7 +90,6 @@ class PublicationSuspendedWhenOwnerLosesAccessTest extends TestCase
         $this->roleOf($this->analyst)->duties()->detach('management-aset.aset.manage');
         $this->assertSuspended();
         // Metadata ikut tertahan: kolomnya pun dibaca dengan hak pemilik.
-        $this->forgetPermissions();
         $this->feed($this->client['token'], '/jumlah-aset-unit')->assertForbidden()->assertJsonPath('error.code', 'analytics.publication_suspended');
     }
 
@@ -96,6 +97,7 @@ class PublicationSuspendedWhenOwnerLosesAccessTest extends TestCase
     {
         $this->membership($this->analyst)->forceFill(['status' => 'inactive'])->save();
         $this->assertSuspended();
+        $this->withoutVite();
 
         // Layar menandai publikasinya tertahan untuk pemegang hak publikasi lain.
         $this->actingAs($this->director)->get('/analytics/publications')->assertOk()
@@ -109,23 +111,15 @@ class PublicationSuspendedWhenOwnerLosesAccessTest extends TestCase
 
     private function assertRows(int $count): void
     {
-        $this->forgetPermissions();
         $this->feed($this->client['token'], '/jumlah-aset-unit/rows')->assertOk()->assertJsonPath('rows', [['count' => $count]]);
     }
 
     private function assertSuspended(): void
     {
-        $this->forgetPermissions();
         $this->feed($this->client['token'], '/jumlah-aset-unit/rows')->assertForbidden()->assertExactJson(['error' => [
             'code' => 'analytics.publication_suspended',
             'message' => 'Publikasi ini tertahan karena pemiliknya tidak lagi berhak membagikan datanya. Minta admin tenant mengambil alih publikasi ini.',
         ]]);
-    }
-
-    /** Setiap permintaan sungguhan membaca permission baru; di dalam satu test, ingatan per permintaan dibuang. */
-    private function forgetPermissions(): void
-    {
-        app(CorePermissions::class)->forget();
     }
 
     private function membership(User $user): TenantMembership
