@@ -102,8 +102,9 @@ berubah.
 
 ## Aturan pengerjaan untuk setiap agen
 
-1. **Baca dulu**: halaman peta, PRD bagian yang relevan, halaman rancangan yang disebut area, dan
-   skill `coreerp-analytics`. Jangan mulai dari ingatan tentang dokumen lain.
+1. **Baca dulu**: halaman peta, [halaman kanonik engine analitik](/dev/35-analitik) untuk yang sudah
+   dikirim, PRD bagian yang relevan, halaman rancangan yang disebut area, dan skill `coreerp-analytics`.
+   Jangan mulai dari ingatan tentang dokumen lain.
 2. **Area yang keputusannya belum ditutup tidak dimulai.** Keputusan yang menunggu tercantum di
    [peta](/todo/analitik/#keputusan); bila ragu, tanyakan pemilik produk, jangan menebak.
 3. **Satu area, satu cabang dari `origin/main`.** Checkout utama `D:\Kerja\CoreERP` dipakai sesi

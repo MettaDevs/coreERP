@@ -172,6 +172,13 @@ Batas module ke Core dijaga terpisah oleh `ModuleNamespaceBoundaryTest`.
 | --- | --- |
 | `app/Foundation/Workflow/Support/WorkflowRuntime.php`, `app/Foundation/Workflow/Http/Controllers/` | [Visual workflow engine](/dev/21-visual-workflow-engine), [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) |
 
+### Analitik
+
+| Kode | Dokumen |
+| --- | --- |
+| `app/Platform/Analytics/`, `app/Platform/Modules/Contracts/Analytics/`, `routes/analytics.php`, `config/analytics.php` | [Engine analitik](/dev/35-analitik) |
+| `modules/apperp/management-aset/src/Analytics/` | [Dataset analitik Management Aset](/apps/management-aset/transaction/analitik/) |
+
 ### Frontend
 
 | Kode | Dokumen |

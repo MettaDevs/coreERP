@@ -181,7 +181,8 @@ apps/core/app/Platform/Analytics/
 ├── Security/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
 │   ├── DataPolicyScope.php  ScopeFingerprint.php                                  (4)
-│   ├── PublicationPrincipal.php  PersonalDataGate.php
+│   ├── PersonalDataGate.php                                                   (4)
+│   ├── PublicationPrincipal.php                                               (fase 2)
 ├── Cache/QueryCache.php                (9) cache hasil di tabel database tenant
 ├── Support/QueryLog.php  QuerySlots.php (9) log query tersamar; jatah query bersamaan per tenant
 ├── Dashboards/
@@ -198,11 +199,12 @@ apps/core/app/Platform/Analytics/
 │   │                 WidgetController  WidgetDataController  SavedQueryController  (6)
 │   ├── Middleware/   (EnsureAnalyticsEnabled area 0 dibuang area 4 bersama saklarnya)
 │   ├── Requests/     (area 6 memvalidasi di controller, seperti preset laporan)
-│   └── Presenters/   DashboardPresenter (6)  ResultSetPresenter
+│   └── Presenters/   DashboardPresenter (6)   (ResultSetPresenter tidak dibuat: `ResultSet::toArray()`)
 ├── External/       PublicationController.php  OData/*                         (fase 2)
 ├── Embed/          EmbedTokenIssuer.php  AuthenticateEmbedToken.php  EmbedPageController.php
 ├── Templates/      TemplateInstaller.php                                      (fase 2)
-├── Console/        AnalyticsDatasetsCommand.php (1)  AnalyticsExplainCommand.php (3)  PurgeAnalyticsCache.php
+├── Console/        AnalyticsDatasetsCommand.php (1)  AnalyticsExplainCommand.php (3)
+│                   PurgeAnalyticsCache.php (belum dibuat: menunggu perintah terjadwal per environment)
 └── Rollups/        (fase 3)
 
 apps/core/app/Platform/Modules/Contracts/

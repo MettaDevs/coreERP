@@ -288,7 +288,9 @@ principal, batas bentuk query dibaca validator.
 - [x] 3.10 `ResultSet`: alias kembali ke kunci, desimal sebagai string, `meta` lengkap.
 - [x] 3.11 `analytics:explain` (SQL + `EXPLAIN` tanpa `ANALYZE`). *Dikirim:* `--query=<json> --tenant=<id>
   --user=<email>`; query disusun sebagai pengguna itu lewat langkah yang sama dengan `RunQuery`. Argumen
-  widget menyusul bersama area 6.
+  widget direncanakan menyusul bersama area 6, tetapi **tidak ikut dikirim area 6**: perintahnya hanya
+  menerima `--query`, dan tidak ada area yang memegang butir ini. Untuk menjelaskan query widget, salin isi
+  `query`-nya dari dasbor.
 - [x] 3.12 Test (`QueryCompilerTest`, `QueryExpressionsTest`, `GapFillerTest`,
   `AnalyticsQueryExceptionTest`, dua test baru di `WalkingSkeletonTest`):
   - SQL hasil compile tidak pernah memberi alias tabel dasar;
@@ -673,7 +675,7 @@ pernah terlihat merah.
 
 ---
 
-### 11. [ ] Dokumentasi dan skill
+### 11. [~] Dokumentasi dan skill
 
 **Tempat:** `docs/dev/35-analitik.md` (baru), `docs/dev/README.md`, `docs/dev/05-customization-and-addons.md`,
 `docs/apps/management-aset/…` (halaman dataset), `docs/.vitepress/config.ts`,
@@ -682,11 +684,38 @@ pernah terlihat merah.
 **sudah** dikirim kode (bukan rencana), terdaftar di sidebar, build docs bersih, dan skill memuat
 perintah serta jebakan yang benar-benar ditemui selama fase 1.
 
-- [ ] 11.1 `docs/dev/35-analitik.md` dengan pola dokumen repo: kalimat pembuka, konsep yang mudah
+Dikerjakan 4 Oktober 2026 untuk bagian yang sudah dikirim (area 0–7 dan 9). Area ini tetap `[~]`: pembangun
+widget dan penjelajah (area 8) dan uji beban (area 10) belum ada, jadi halaman kanonik menyebut keduanya
+sebagai "menyusul" dan dilengkapi ketika kodenya masuk. Butir yang menunggu ditandai di bawah.
+
+- [x] 11.1 `docs/dev/35-analitik.md` dengan pola dokumen repo: kalimat pembuka, konsep yang mudah
   tertukar (dataset vs laporan, dasbor bersama vs publikasi), aturan beserta alasannya, di mana kodenya.
-- [ ] 11.2 `docs/dev/05`: dasbor yang dapat disusun dari dataset pindah ke "setelan"; dasbor yang butuh
-  data di luar CoreERP tetap integrasi di luar.
-- [ ] 11.3 Halaman dataset module aset: daftar dataset, measure, kolom kebijakan, dan kenapa kolom itu.
-- [ ] 11.4 Skill `coreerp-analytics` diperbarui dari rencana menjadi keadaan sebenarnya; kedua salinan
-  sama (`check-skill-copies.py`).
-- [ ] 11.5 Folder TODO ini: status area, keputusan yang berubah, dan temuan yang terbukti salah.
+  *Dikirim:* ditulis dari kode di `app/Platform/Analytics`, bukan dari halaman rencana, dengan sumber luar
+  untuk konsepnya (query dan report object Business Central, aggregate measurement F&O, semantic model Power BI,
+  dokumentasi PostgreSQL). Konsep yang mudah tertukar: dataset vs laporan (`ModuleReportProvider`), dataset vs
+  tabel vs measure, dasbor pribadi vs bersama vs publikasi, permission dataset (KA-15) vs permission analitik
+  (KA-14). Bagian *Yang belum ada* di halaman itu mendaftar batas yang dikirim; **perbarui bagian itu dan
+  bagian *Endpoint* ketika area 8 dan 10 masuk.** Terdaftar di `docs/dev/README.md`, sidebar, dan
+  `docs/onboarding/peta-kode.md`.
+- [x] 11.2 `docs/dev/05`: dasbor yang dapat disusun dari dataset pindah ke "setelan"; dasbor yang butuh
+  data di luar CoreERP tetap integrasi di luar. *Dikirim:* tabel urutan, bagian *Setelan*, dan bagian
+  *Integrasi di luar CoreERP*. Kalimatnya jujur tentang keadaan: widget baru masih dibuat lewat API sampai
+  pembangun widget (area 8) selesai.
+- [x] 11.3 Halaman dataset module aset: daftar dataset, measure, kolom kebijakan, dan kenapa kolom itu.
+  *Dikirim:* `docs/apps/management-aset/transaction/analitik/index.md`, bersebelahan dengan *Laporan dan
+  ekspor*. Kolom kebijakan dipasangkan dengan controller daftar yang dibaca dan pemanggilan
+  `OrganizationScope`-nya, bukan disalin dari rencana.
+- [x] 11.4 Skill `coreerp-analytics` diperbarui dari rencana menjadi keadaan sebenarnya; kedua salinan
+  sama (`check-skill-copies.py`). *Dikirim:* ditulis ulang: yang dikirim, yang masih rencana (fase 2 diberi
+  tanda sendiri), langkah menyatakan dataset, aturan SQL, aturan penyimpanan dasbor, test yang ada, dan jebakan
+  yang ditemui di pull request area 0–9. Halaman rencana tidak lagi disebut sebagai tempat membaca bentuk
+  yang sudah dikirim.
+- [~] 11.5 Folder TODO ini: status area, keputusan yang berubah, dan temuan yang terbukti salah.
+  *Dikirim:* status area tidak diubah (milik agen areanya). Temuan yang terbukti salah dikoreksi di
+  tempatnya: argumen widget `analytics:explain` ternyata tidak dikirim area 6 (butir 3.11 dan
+  [mesin query](/todo/analitik/mesin-query#alat-operator)); tabel galat di mesin query kekurangan
+  `analytics.field_removed` dan `analytics.invalid_visual`; uraian test paritas di
+  [keamanan](/todo/analitik/keamanan#test-paritas-kebijakan-data) menyebut nama berkas dan pembanding yang
+  tidak jadi dipakai; beberapa penanda area di susunan berkas
+  [arsitektur](/todo/analitik/arsitektur#susunan-berkas) basi. KA-25 ditandai dikerjakan di
+  [peta](/todo/analitik/). **Menunggu area 8 dan 10:** sapuan terakhir folder ini setelah keduanya masuk.
