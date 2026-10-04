@@ -108,7 +108,6 @@ trait ProbesAssetDatasets
     protected function setUp(): void
     {
         parent::setUp();
-        config(['analytics.enabled' => true]);
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->assertSame(0, Artisan::call('app:register-manifest', ['module' => 'management-aset']));
         Event::fake([TenantProvisioned::class]);
@@ -230,7 +229,8 @@ trait ProbesAssetDatasets
         $membership = TenantMembership::query()->create([
             'tenant_id' => $this->tenantId, 'user_id' => $user->id, 'status' => 'active',
         ]);
-        $this->grantDuties($membership, [$this->dutyFor($permission)]);
+        // `core.analytics.analyze` membuka pintu analitik (area 4); permission baca resource tetap menjaga datasetnya.
+        $this->grantDuties($membership, ['core.analytics.analyze', $this->dutyFor($permission)]);
 
         $assignment = RoleAssignment::query()->where('membership_id', $membership->id)->firstOrFail();
         foreach ($grants as [$legalEntity, $unit]) {
