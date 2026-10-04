@@ -28,6 +28,11 @@ use LogicException;
  * tidak mengenalinya sebagai ekspresi yang dikelompokkan. Karena literal, zonanya wajib salah satu nama di
  * `DateTimeZone::listIdentifiers()` — bukan isian bebas.
  * `date_trunc('week', …)` PostgreSQL memakai minggu ISO, yang mulai Senin.
+ *
+ * `$shift` (area 13) menggeser saat itu maju sebelum diember, misalnya `12 months`, untuk query pembanding
+ * perbandingan periode: baris tahun lalu jatuh di ember tahun ini, sehingga dapat digabung menurut nilai ember
+ * yang sama. Pergeseran bulan yang jatuh di tanggal yang tidak ada berhenti di akhir bulan (aturan interval
+ * PostgreSQL). Seperti zona, ia literal yang bentuknya diperiksa, bukan binding.
  */
 final readonly class TimeBucketExpression implements Expression
 {
@@ -40,9 +45,13 @@ final readonly class TimeBucketExpression implements Expression
         private string $column,
         private string $type,
         private string $timezone,
+        private ?string $shift = null,
     ) {
         if (! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
             throw new LogicException("Zona waktu `{$timezone}` bukan nama zona yang dikenal.");
+        }
+        if ($shift !== null && preg_match('/^[1-9]\d{0,3} (months|days)$/', $shift) !== 1) {
+            throw new LogicException("Pergeseran `{$shift}` bukan jumlah bulan atau hari.");
         }
     }
 
@@ -56,6 +65,9 @@ final readonly class TimeBucketExpression implements Expression
             'timestamp' => "({$column} at time zone 'UTC') at time zone {$zone}",
             'timestamptz' => "{$column} at time zone {$zone}",
         };
+        if ($this->shift !== null) {
+            $moment = "({$moment} + interval '{$this->shift}')";
+        }
 
         return "date_trunc('{$this->granularity->value}', {$moment})::date";
     }

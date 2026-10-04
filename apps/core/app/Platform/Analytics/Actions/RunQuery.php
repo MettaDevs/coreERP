@@ -9,6 +9,7 @@ use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\FiscalYearRange;
 use App\Platform\Analytics\Query\LabelResolver;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
@@ -35,6 +36,9 @@ use Throwable;
  * 4. Compile dan eksekusi **di dalam `TenantRunner::runFor()`**. Model module menyaring lewat
  *    `TenantScope`, yang gagal tertutup bila tenant belum terikat, dan rute Core tidak melewati
  *    middleware konteks module yang biasanya mengikatnya.
+ *
+ * Token tahun fiskal (area 13) dihitung rentangnya di dalam `runFor()` juga, sebelum kunci cache dihitung
+ * ({@see FiscalYearRange}): kalender fiskal ada di database tenant, dan rentangnya ikut menentukan kunci cache.
  *
  * Hasilnya ({@see ResultSet}) sudah berlabel, celah deret waktunya terisi, dan totalnya terhitung — semua
  * di dalam `runFor()`, karena resolver label dimensi bersama juga membaca data tenant.
@@ -64,6 +68,7 @@ final class RunQuery
         private readonly QueryCache $cache,
         private readonly QuerySlots $slots,
         private readonly QueryLog $log,
+        private readonly FiscalYearRange $fiscalYears,
     ) {}
 
     /**
@@ -85,10 +90,14 @@ final class RunQuery
             $this->access->authorize($principal, $dataset);
             $this->validator->validate($dataset, $query, $principal);
 
-            $result = $this->tenants->runFor($principal->tenantId(), fn (): ResultSet => $this->cache->remember(
-                $dataset, $query, $principal, $this->cache->ttl($cacheTtl), $refresh,
-                fn (): ResultSet => $this->slots->run($principal->tenantId(), $principal->timeoutMs(), fn (): ResultSet => $this->compute($dataset, $query, $principal)),
-            ));
+            $result = $this->tenants->runFor($principal->tenantId(), function () use ($dataset, $query, $principal, $cacheTtl, $refresh): ResultSet {
+                $resolved = $this->fiscalYears->resolve($dataset, $query, $principal);
+
+                return $this->cache->remember(
+                    $dataset, $resolved, $principal, $this->cache->ttl($cacheTtl), $refresh,
+                    fn (): ResultSet => $this->slots->run($principal->tenantId(), $principal->timeoutMs(), fn (): ResultSet => $this->compute($dataset, $resolved, $principal)),
+                );
+            });
         } catch (Throwable $e) {
             $this->log->failed($principal, $source, $query, $dataset, $e, self::elapsedMs($started));
 

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Query;
 
+use App\Platform\Analytics\Query\Formula\Formula;
+use App\Platform\Analytics\Query\Formula\InvalidFormula;
+use App\Platform\Analytics\Query\Formula\Parser as FormulaParser;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 use App\Platform\Modules\Contracts\FieldFilterExpression;
 
 /**
@@ -16,16 +20,19 @@ use App\Platform\Modules\Contracts\FieldFilterExpression;
  * {@see QueryNormalizer}; parser membaca apa adanya.
  *
  * Kunci yang dikenal sama dengan `resources/schemas/analytics-query.schema.json`, dan satu test menjaganya.
- * `compare` dan `formulas` milik fase 2 dan ditolak sebagai belum tersedia: query yang diam-diam
- * mengabaikan perbandingan atau rumus memulangkan angka yang berbeda dari yang diminta.
+ *
+ * Kunci fase 2 (area 13): `formulas` dibaca teks rumusnya di sini lewat {@see FormulaParser} — fungsi di luar
+ * daftar tertutup, kurung tanpa pasangan, dan karakter asing ditolak sebelum ada SQL, dengan galat
+ * `analytics.invalid_formula` yang menyebut karakter tempatnya; `compare` dan `percent_of_total` dibaca bentuknya.
+ * Apakah measure yang dirujuk rumus dikenal dataset diperiksa {@see QueryValidator}.
  */
 final class QueryParser
 {
     /** @var list<string> */
-    public const KEYS = ['dataset', 'dimensions', 'measures', 'filters', 'time_range', 'sort', 'limit', 'totals', 'fill_gaps'];
+    public const KEYS = ['dataset', 'dimensions', 'measures', 'filters', 'time_range', 'sort', 'limit', 'totals', 'fill_gaps', 'compare', 'formulas', 'percent_of_total'];
 
-    /** Kunci fase 2 yang sudah ada di bentuk query tetapi belum dibaca engine. */
-    public const FUTURE_KEYS = ['compare', 'formulas'];
+    /** @var list<string> */
+    public const FORMULA_KEYS = ['key', 'caption', 'expression', 'format'];
 
     /** @var list<string> */
     public const DIMENSION_KEYS = ['field', 'granularity'];
@@ -39,17 +46,18 @@ final class QueryParser
     private const MAX_KEY_LENGTH = 120;
 
     /**
+     * Kunci rumus: bentuk kunci dataset (huruf kecil, angka, garis bawah, diawali huruf), tanpa `__` yang dipakai
+     * kolom pendamping (`__label`, `__previous`).
+     */
+    private const FORMULA_KEY = '/^[a-z](?!.*__)[a-z0-9_]{0,63}$/';
+
+    /**
      * @param  array<array-key, mixed>  $input
      *
      * @throws AnalyticsQueryException
      */
     public function parse(array $input): AnalyticsQuery
     {
-        foreach (self::FUTURE_KEYS as $key) {
-            if (array_key_exists($key, $input)) {
-                throw AnalyticsQueryException::invalidQuery($key, 'Bagian "'.$key.'" belum tersedia.');
-            }
-        }
         $this->assertKnownKeys($input, self::KEYS, '');
 
         $dimensions = $this->dimensions($input['dimensions'] ?? []);
@@ -66,6 +74,9 @@ final class QueryParser
             totals: $this->flag($input['totals'] ?? null, 'totals', 'Total harus berupa true atau false.') ?? false,
             // Bawaannya mengikuti ada tidaknya pengelompokan menurut waktu: celah hanya ada di deret waktu.
             fillGaps: $this->flag($input['fill_gaps'] ?? null, 'fill_gaps', 'Isian celah waktu harus berupa true atau false.') ?? $buckets,
+            formulas: $this->formulas($input['formulas'] ?? null),
+            compare: $this->compare($input['compare'] ?? null),
+            percentOfTotal: $this->percentOfTotal($input['percent_of_total'] ?? null),
         );
     }
 
@@ -225,6 +236,93 @@ final class QueryParser
                 'key' => $this->key($item['key'] ?? null, "{$path}.key", 'Urutan harus menyebut nama kolom atau nilai.'),
                 'direction' => $direction,
             ];
+        }
+
+        return $out;
+    }
+
+    /** @return list<Formula> */
+    private function formulas(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw AnalyticsQueryException::invalidQuery('formulas', 'Rumus harus berupa daftar.');
+        }
+
+        $out = [];
+        $keys = [];
+        foreach ($value as $i => $item) {
+            $path = "formulas.{$i}";
+            if (! is_array($item) || ! $this->isObject($item)) {
+                throw AnalyticsQueryException::invalidQuery($path, 'Rumus harus berisi "key" dan "expression".');
+            }
+            $this->assertKnownKeys($item, self::FORMULA_KEYS, $path);
+
+            $key = $item['key'] ?? null;
+            if (! is_string($key) || preg_match(self::FORMULA_KEY, $key) !== 1) {
+                throw AnalyticsQueryException::invalidQuery("{$path}.key", 'Nama rumus hanya boleh huruf kecil, angka, dan garis bawah (tidak dua berturut-turut), diawali huruf, misalnya persen_dilepas.');
+            }
+            if (isset($keys[$key])) {
+                throw AnalyticsQueryException::invalidQuery("{$path}.key", 'Nama rumus "'.$key.'" dipakai lebih dari sekali.');
+            }
+            $keys[$key] = true;
+
+            $caption = $item['caption'] ?? null;
+            if ($caption !== null && (! is_string($caption) || trim($caption) === '' || mb_strlen($caption) > self::MAX_KEY_LENGTH)) {
+                throw AnalyticsQueryException::invalidQuery("{$path}.caption", 'Nama tampilan rumus paling panjang '.self::MAX_KEY_LENGTH.' karakter.');
+            }
+
+            $format = $item['format'] ?? null;
+            if ($format !== null) {
+                $format = is_string($format) ? MeasureFormat::tryFrom($format) : null;
+                if ($format === null) {
+                    throw AnalyticsQueryException::invalidQuery("{$path}.format", 'Format rumus harus salah satu dari: '.implode(', ', array_map(static fn (MeasureFormat $case): string => $case->value, MeasureFormat::cases())).'.');
+                }
+            }
+
+            $expression = $item['expression'] ?? null;
+            if (! is_string($expression)) {
+                throw AnalyticsQueryException::invalidFormula("{$path}.expression", 'Isi rumusnya, misalnya BAGI([disposed]; [count]) * 100.', 1);
+            }
+            try {
+                $node = FormulaParser::parse($expression);
+            } catch (InvalidFormula $e) {
+                throw AnalyticsQueryException::invalidFormula("{$path}.expression", $e->getMessage(), $e->position, $e);
+            }
+
+            $out[] = new Formula($key, $expression, $node, $caption === null ? null : trim($caption), $format);
+        }
+
+        return $out;
+    }
+
+    private function compare(mixed $value): ?CompareMode
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return (is_string($value) ? CompareMode::tryFrom($value) : null) ?? throw AnalyticsQueryException::invalidQuery(
+            'compare',
+            'Perbandingan harus salah satu dari: '.implode(', ', array_map(static fn (CompareMode $case): string => $case->value, CompareMode::cases())).'.',
+        );
+    }
+
+    /** @return list<string> */
+    private function percentOfTotal(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw AnalyticsQueryException::invalidQuery('percent_of_total', 'Persen terhadap total harus berupa daftar nilai yang dihitung.');
+        }
+
+        $out = [];
+        foreach ($value as $i => $key) {
+            $out[] = $this->key($key, "percent_of_total.{$i}", 'Persen terhadap total harus menyebut nama nilai yang dihitung.');
         }
 
         return $out;

@@ -7,7 +7,6 @@ namespace App\Platform\Analytics\Query;
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\CompiledMeasure;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
-use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Grammar;
 
 /**
@@ -23,7 +22,7 @@ use Illuminate\Database\Grammar;
  * Nilainya placeholder `?`; pemanggil memasang {@see self::bindings()} pada bagian query tempat ekspresi
  * ini dipakai (`select`, atau `order` untuk kunci urutan), dalam urutan yang sama.
  */
-final readonly class MeasureExpression implements Expression
+final readonly class MeasureExpression implements BoundExpression
 {
     /**
      * @param  ?string  $column  berkualifikasi, atau null untuk menghitung baris
@@ -89,8 +88,6 @@ final readonly class MeasureExpression implements Expression
 
     /**
      * Nilai saringan tetap, dalam urutan placeholder di {@see self::getValue()}.
-     *
-     * @return list<string|int|bool>
      */
     public function bindings(): array
     {
