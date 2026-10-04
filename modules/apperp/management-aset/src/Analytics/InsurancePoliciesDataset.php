@@ -53,6 +53,7 @@ final class InsurancePoliciesDataset implements Dataset
             ->time('berlaku_sampai', default: true)
             ->time('berlaku_mulai')
             ->measure('count', 'Jumlah polis', Aggregate::Count)
+            ->measure('blocked', 'Polis diblokir', Aggregate::Count, where: ['diblokir' => true])
             ->version(1);
     }
 }

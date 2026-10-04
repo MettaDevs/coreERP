@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class AssetSalesDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -62,9 +63,43 @@ class AssetSalesDatasetTest extends TestCase
         $scrapped = $this->asset($tenant, $legalEntity, "{$tag}-S3", $unitA, 'IDR', '500000');
 
         $this->document($tenant, $legalEntity, 'penjualan-aset', "{$tag}-SALE1", $unitA, $sold, '8000000');
-        $this->document($tenant, $legalEntity, 'penjualan-aset', "{$tag}-SALE2", $unitB, $soldAbroad, '900');
+        $this->document($tenant, $legalEntity, 'penjualan-aset', "{$tag}-SALE2", $unitB, $soldAbroad, '900', 'draft');
         // Pemusnahan memakai tabel yang sama, tetapi bukan bagian dataset penjualan.
         $this->document($tenant, $legalEntity, 'pemusnahan-aset', "{$tag}-SCRAP1", $unitA, $scrapped, null);
+    }
+
+    protected function timeField(): string
+    {
+        return 'document_date';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA);
+        $this->document($this->tenantId, $this->legalEntity, 'penjualan-aset', 'BATAS', $this->unitA, $asset, '1000', 'posted', $value);
+
+        return ['document_number' => 'BATAS'];
+    }
+
+    public function test_proceeds_are_split_into_posted_and_not_yet_posted_sales(): void
+    {
+        // SALE2 masih draf: ikut hasil penjualan, tetapi bukan hasil yang sudah diposting.
+        $rows = $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'posted', 'proceeds', 'posted_proceeds']])
+            ->assertOk()->json('rows');
+        $byCurrency = array_column($rows, null, 'currency_code');
+
+        $this->assertSame(1, $byCurrency['IDR']['posted']);
+        $this->assertDecimal('8000000', $byCurrency['IDR']['posted_proceeds']);
+        $this->assertSame(1, $byCurrency['USD']['count']);
+        $this->assertSame(0, $byCurrency['USD']['posted']);
+        $this->assertDecimal('900', $byCurrency['USD']['proceeds']);
+        $this->assertDecimal('0', $byCurrency['USD']['posted_proceeds']);
     }
 
     public function test_a_user_who_may_read_sales_but_not_scraps_never_sees_scrap_documents(): void
@@ -75,12 +110,12 @@ class AssetSalesDatasetTest extends TestCase
         $this->analyze($salesOnly, ['dataset' => 'management-aset.asset-scraps', 'measures' => ['count']])->assertForbidden();
     }
 
-    private function document(string $tenant, string $legalEntity, string $type, string $code, string $unit, string $assetId, ?string $value): void
+    private function document(string $tenant, string $legalEntity, string $type, string $code, string $unit, string $assetId, ?string $value, string $status = 'posted', string $date = '2026-09-20'): void
     {
         DB::table('aset_tr_dokumen_siklus_aset')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'jenis_dokumen' => $type,
             'kode' => $code, 'legal_entity_id' => $legalEntity, 'responsible_org_unit_id' => $unit, 'aset_id' => $assetId,
-            'tanggal' => '2026-09-20', 'status' => 'posted', 'nilai' => $value, 'created_at' => now(), 'updated_at' => now(),
+            'tanggal' => $date, 'status' => $status, 'nilai' => $value, 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
 }

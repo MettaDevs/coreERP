@@ -92,6 +92,9 @@ final class DowntimeDataset implements Dataset
             ->measure('count', 'Jumlah kejadian downtime', Aggregate::Count)
             ->measure('asset_count', 'Jumlah aset yang berhenti', Aggregate::CountDistinct, field: 'asset_id')
             ->measure('duration_hours', 'Lama downtime (jam)', Aggregate::Sum, field: 'duration_hours', format: MeasureFormat::Hours)
+            ->measure('open_count', 'Downtime yang masih berjalan', Aggregate::Count, where: ['is_open' => true])
+            ->measure('kpi_duration_hours', 'Lama downtime yang masuk KPI (jam)', Aggregate::Sum,
+                field: 'duration_hours', format: MeasureFormat::Hours, where: ['counts_in_kpi' => true])
             ->version(1);
     }
 }

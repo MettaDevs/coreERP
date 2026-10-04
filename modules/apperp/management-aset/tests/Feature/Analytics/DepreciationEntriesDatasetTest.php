@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -19,7 +20,7 @@ use Tests\TestCase;
  */
 class DepreciationEntriesDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -71,9 +72,40 @@ class DepreciationEntriesDatasetTest extends TestCase
         $book2 = $this->book($tenant, $d2);
 
         $this->period($tenant, $legalEntity, $book1, $unitA, '2026-09-30', '1000000');
-        $this->period($tenant, $legalEntity, $book1, $unitB, '2026-10-31', '1000000');
+        // Periode kedua aset D1 masih usulan: ikut jumlah periode, tetapi tidak ikut nilai penyusutan final.
+        $this->period($tenant, $legalEntity, $book1, $unitB, '2026-10-31', '1000000', 'proposed');
         $this->period($tenant, $legalEntity, $book2, $unitB, '2026-09-30', '150');
         $this->period($tenant, $legalEntity, $book2, $unitA, '2026-10-31', '50');
+    }
+
+    protected function timeField(): string
+    {
+        return 'period_ends_on';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA, 'IDR');
+        $this->period($this->tenantId, $this->legalEntity, $this->book($this->tenantId, $asset), $this->unitA, $value, '100');
+
+        return ['asset_id' => [$asset]];
+    }
+
+    public function test_only_final_periods_count_towards_the_final_amount(): void
+    {
+        $rows = $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['amount', 'final_amount']])
+            ->assertOk()->json('rows');
+        $byCurrency = array_column($rows, null, 'currency_code');
+
+        $this->assertDecimal('2000000', $byCurrency['IDR']['amount']);
+        $this->assertDecimal('1000000', $byCurrency['IDR']['final_amount']);
+        $this->assertDecimal('200', $byCurrency['USD']['final_amount']);
     }
 
     public function test_a_reversal_row_nets_out_the_period_it_reverses(): void
@@ -115,12 +147,12 @@ class DepreciationEntriesDatasetTest extends TestCase
         return $id;
     }
 
-    private function period(string $tenant, string $legalEntity, string $bookId, string $usageUnit, string $endsOn, string $amount): void
+    private function period(string $tenant, string $legalEntity, string $bookId, string $usageUnit, string $endsOn, string $amount, string $status = 'final'): void
     {
         DB::table('aset_tr_penyusutan_aset')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $bookId, 'legal_entity_id' => $legalEntity,
             'usage_org_unit_id' => $usageUnit, 'period_starts_on' => substr($endsOn, 0, 8).'01', 'period_ends_on' => $endsOn,
-            'amount' => $amount, 'status' => 'final', 'created_at' => now(), 'updated_at' => now(),
+            'amount' => $amount, 'status' => $status, 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
 }

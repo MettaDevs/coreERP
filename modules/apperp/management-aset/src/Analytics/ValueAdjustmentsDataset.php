@@ -91,6 +91,12 @@ final class ValueAdjustmentsDataset implements Dataset
                 field: 'amount', format: MeasureFormat::Money, currency: 'currency_code')
             ->measure('net_effect', 'Dampak ke nilai buku', Aggregate::Sum,
                 field: 'net_effect', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('write_down_amount', 'Nilai penurunan', Aggregate::Sum,
+                field: 'amount', format: MeasureFormat::Money, currency: 'currency_code', where: ['kind' => [AssetValueAdjustment::WRITE_DOWN]])
+            ->measure('appreciation_amount', 'Nilai kenaikan', Aggregate::Sum,
+                field: 'amount', format: MeasureFormat::Money, currency: 'currency_code', where: ['kind' => [AssetValueAdjustment::APPRECIATION]])
+            ->measure('posted_net_effect', 'Dampak ke nilai buku (sudah diposting)', Aggregate::Sum,
+                field: 'net_effect', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => [AssetValueAdjustment::POSTED]])
             ->version(1);
     }
 }

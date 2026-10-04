@@ -100,11 +100,14 @@ abstract class DisposalDataset implements Dataset
             ->measure('count', 'Jumlah dokumen', Aggregate::Count)
             ->measure('asset_count', 'Jumlah aset', Aggregate::CountDistinct, field: 'asset_id')
             ->measure('acquisition_value', 'Nilai perolehan aset', Aggregate::Sum,
-                field: 'acquisition_value', format: MeasureFormat::Money, currency: 'currency_code');
+                field: 'acquisition_value', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('posted', 'Dokumen yang sudah diposting', Aggregate::Count, where: ['status' => ['posted']]);
 
         if ($this->hasProceeds()) {
             $definition->measure('proceeds', 'Hasil penjualan', Aggregate::Sum,
                 field: 'proceeds', format: MeasureFormat::Money, currency: 'currency_code');
+            $definition->measure('posted_proceeds', 'Hasil penjualan yang sudah diposting', Aggregate::Sum,
+                field: 'proceeds', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => ['posted']]);
         }
 
         return $definition->version(1);

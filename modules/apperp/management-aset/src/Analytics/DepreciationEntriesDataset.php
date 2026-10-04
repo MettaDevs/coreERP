@@ -97,6 +97,8 @@ final class DepreciationEntriesDataset implements Dataset
             ->measure('asset_count', 'Jumlah aset', Aggregate::CountDistinct, field: 'asset_id')
             ->measure('amount', 'Nilai penyusutan', Aggregate::Sum,
                 field: 'amount', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('final_amount', 'Nilai penyusutan final', Aggregate::Sum,
+                field: 'amount', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => ['final']])
             ->version(1);
     }
 }

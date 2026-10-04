@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksMoneyPerCurrency;
+use Modules\Apperp\ManagementAset\Tests\Concerns\ChecksTimeZoneBuckets;
 use Modules\Apperp\ManagementAset\Tests\Concerns\ProbesAssetDatasets;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class AssetScrapsDatasetTest extends TestCase
 {
-    use ChecksMoneyPerCurrency, ProbesAssetDatasets, RefreshDatabase;
+    use ChecksMoneyPerCurrency, ChecksTimeZoneBuckets, ProbesAssetDatasets, RefreshDatabase;
 
     protected function datasetCode(): string
     {
@@ -59,17 +60,44 @@ class AssetScrapsDatasetTest extends TestCase
     {
         $this->document($tenant, $legalEntity, 'pemusnahan-aset', "{$tag}-SCRAP1", $unitA, $this->asset($tenant, $legalEntity, "{$tag}-K1", $unitA, 'IDR', '1000000'));
         $this->document($tenant, $legalEntity, 'pemusnahan-aset', "{$tag}-SCRAP2", $unitB, $this->asset($tenant, $legalEntity, "{$tag}-K2", $unitB, 'IDR', '500000'));
-        $this->document($tenant, $legalEntity, 'pemusnahan-aset', "{$tag}-SCRAP3", $unitB, $this->asset($tenant, $legalEntity, "{$tag}-K3", $unitB, 'USD', '300'));
+        $this->document($tenant, $legalEntity, 'pemusnahan-aset', "{$tag}-SCRAP3", $unitB, $this->asset($tenant, $legalEntity, "{$tag}-K3", $unitB, 'USD', '300'), 'draft');
         // Penjualan memakai tabel yang sama, tetapi bukan bagian dataset pemusnahan.
         $this->document($tenant, $legalEntity, 'penjualan-aset', "{$tag}-SALE1", $unitA, $this->asset($tenant, $legalEntity, "{$tag}-K4", $unitA, 'IDR', '9000000'));
     }
 
-    private function document(string $tenant, string $legalEntity, string $type, string $code, string $unit, string $assetId): void
+    protected function timeField(): string
+    {
+        return 'document_date';
+    }
+
+    protected function timeKind(): string
+    {
+        return 'date';
+    }
+
+    /** @return array<string, string|list<string>> */
+    protected function insertBoundaryRow(string $value): array
+    {
+        $asset = $this->asset($this->tenantId, $this->legalEntity, 'A-BATAS', $this->unitA);
+        $this->document($this->tenantId, $this->legalEntity, 'pemusnahan-aset', 'BATAS', $this->unitA, $asset, 'posted', $value);
+
+        return ['document_number' => 'BATAS'];
+    }
+
+    public function test_scrap_documents_not_yet_posted_are_left_out_of_the_posted_count(): void
+    {
+        $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'posted']])
+            ->assertOk()
+            ->assertJsonPath('rows.0.count', 3)
+            ->assertJsonPath('rows.0.posted', 2);
+    }
+
+    private function document(string $tenant, string $legalEntity, string $type, string $code, string $unit, string $assetId, string $status = 'posted', string $date = '2026-09-20'): void
     {
         DB::table('aset_tr_dokumen_siklus_aset')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'jenis_dokumen' => $type,
             'kode' => $code, 'legal_entity_id' => $legalEntity, 'responsible_org_unit_id' => $unit, 'aset_id' => $assetId,
-            'tanggal' => '2026-09-20', 'status' => 'posted', 'created_at' => now(), 'updated_at' => now(),
+            'tanggal' => $date, 'status' => $status, 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
 }

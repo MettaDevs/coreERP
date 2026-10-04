@@ -96,6 +96,17 @@ trait ProbesAssetDatasets
     }
 
     /**
+     * Saringan yang dipasang pada dataset saat membandingkannya dengan daftar module, untuk daftar yang
+     * sendirinya hanya menampilkan sebagian baris (misalnya buku aktif saja). Bawaannya tanpa saringan.
+     *
+     * @return array<string, string|list<string>>
+     */
+    protected function datasetFilters(): array
+    {
+        return [];
+    }
+
+    /**
      * Nilai pembeda satu baris daftar module, sama bentuknya dengan nilai `dimensions()` dataset digabung `|`.
      *
      * @param  array<string, mixed>  $row
@@ -183,6 +194,7 @@ trait ProbesAssetDatasets
     {
         $rows = $this->analyze($user, [
             'dataset' => $this->datasetCode(), 'dimensions' => $this->dimensions(), 'measures' => ['count'],
+            'filters' => $this->datasetFilters(),
         ])->assertOk()->json('rows');
 
         return $this->sorted(array_values(array_map(
