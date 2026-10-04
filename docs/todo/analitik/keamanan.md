@@ -384,7 +384,8 @@ jumlah baris, terpotong atau tidak, dari cache atau tidak, status, dan kode gala
 Wajib ada sebelum area yang bersangkutan dinyatakan `[x]`:
 
 - `AnalyticsTenantIsolationTest` — setiap endpoint analitik, dua tenant, nol kebocoran (area 3, 6).
-- `<Dataset>PolicyParityTest` — per dataset berkebijakan (area 5).
+- Paritas kebijakan data per dataset berkebijakan (area 5): `test_data_policy_grants_narrow_rows_exactly_like_the_module_list`
+  di setiap `<Nama>DatasetTest` module, lewat trait `ProbesAssetDatasets`.
 - `PersonalDataGateTest` — katalog, dimensi, saringan, urutan, drill, publikasi (area 4).
 - `SharedDashboardRunsAsViewerTest` (area 6).
 - `AnalyticsCacheIsolationTest` — tenant dan sidik jari scope (area 9).
