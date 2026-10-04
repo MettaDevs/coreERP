@@ -16,9 +16,9 @@ use Illuminate\Http\Request;
 /**
  * `POST /api/v1/analytics/query`: query bebas dari layar Core, dijalankan sebagai pengguna yang meminta.
  *
- * Hak: keanggotaan tenant (403 tanpa keanggotaan) dan permission baca resource dataset, diperiksa
- * {@see RunQuery}. Permission analitik sendiri (KA-14) belum ada; sampai disetujui, rutenya di balik
- * saklar `analytics.enabled`. Bentuk query dan hasilnya di `docs/todo/analitik/mesin-query.md`.
+ * Hak: `core.analytics.explore.invoke` di gate rute (KA-14), lalu module dataset terpasang dan permission
+ * baca resource dataset, diperiksa {@see RunQuery}. Bentuk query dan hasilnya di
+ * `docs/todo/analitik/mesin-query.md`.
  */
 final class QueryController extends Controller
 {

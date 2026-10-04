@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Security;
 
+use App\Platform\Access\Support\CorePermissions;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\DataPolicyAccessResolver;
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
@@ -16,6 +19,10 @@ use Carbon\CarbonImmutable;
  * `LaunchableAppCatalog::permissionsFor()` (role → duty → privilege → permission) dan hibah kebijakan
  * data lewat `DataPolicyAccessResolver::resolve()`. Dasbor bersama kelak dihitung dengan principal
  * **yang melihat**, bukan pembuatnya, jadi principal ini selalu dibuat dari keanggotaan sesi.
+ *
+ * Hak data pribadi adalah permission Core `core.analytics.personal-data.read` (duty *Pakai data pribadi di
+ * analitik*), dibaca lewat `CorePermissions` yang sama dengan gate rute, sehingga tidak menambah query.
+ * Pengguna tidak pernah punya saringan terkunci; batas baris dan waktu dari `config/analytics.php`.
  */
 final class UserPrincipal implements AnalyticsPrincipal
 {
@@ -27,6 +34,7 @@ final class UserPrincipal implements AnalyticsPrincipal
         private readonly string $timezone,
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $policies,
+        private readonly CorePermissions $corePermissions,
     ) {}
 
     /**
@@ -35,7 +43,7 @@ final class UserPrincipal implements AnalyticsPrincipal
      */
     public static function fromMembership(TenantMembership $membership, string $timezone): self
     {
-        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class));
+        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class), app(CorePermissions::class));
     }
 
     public function tenantId(): string
@@ -53,6 +61,16 @@ final class UserPrincipal implements AnalyticsPrincipal
     public function policyScope(string $policyCode): array
     {
         return $this->policies->resolve($this->membership)[$policyCode] ?? ['all' => false, 'scope_grants' => []];
+    }
+
+    public function mayUsePersonalData(): bool
+    {
+        return $this->corePermissions->allows($this->membership, CoreSecurityCatalog::ANALYTICS_PERSONAL_DATA_READ);
+    }
+
+    public function lockedFilters(string $dataset): array
+    {
+        return [];
     }
 
     public function timezone(): string
@@ -73,6 +91,11 @@ final class UserPrincipal implements AnalyticsPrincipal
     public function timeoutMs(): int
     {
         return config()->integer('analytics.timeouts.interactive_ms', 8000);
+    }
+
+    public function fingerprint(CompiledDataset $dataset): string
+    {
+        return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
     }
 
     public function describe(): string

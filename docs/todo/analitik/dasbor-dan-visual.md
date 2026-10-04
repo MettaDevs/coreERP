@@ -123,8 +123,8 @@ pola yang sama. Tabel cache dan log ada di [kinerja](/todo/analitik/kinerja-dan-
 Di bawah `api/v1/analytics`, sesi dan CSRF seperti API Core lain, didaftarkan di
 `routes/analytics.php` yang di-require dari grup `auth` di `routes/web.php` — bukan dari grup
 `api/v1`, karena berkas yang sama memuat halaman `/analytics/...`. Hanya layar Core pemakainya, jadi
-kontraknya hasil Scramble, bukan tulisan tangan. Sampai KA-14 disetujui, seluruh isinya di balik
-middleware saklar `EnsureAnalyticsEnabled` (area 0).
+kontraknya hasil Scramble, bukan tulisan tangan. Setiap rute dijaga permission di kolom Hak lewat
+`CoreSecurityCatalog::gate(...)` (area 4); saklar sementara area 0 sudah dibuang.
 
 | Metode dan path | Hak | Gunanya |
 | --- | --- | --- |
@@ -211,7 +211,8 @@ Warna tidak pernah menjadi satu-satunya sinyal: setiap gaya membawa ikon dan tek
 | Publikasi | `/settings/analytics/publications` | Fase 2 |
 
 Aturan halaman Core berlaku: tanpa `AppLayout` ganda, breadcrumb lewat `Page.layout`, entri di
-`components/app-sidebar.tsx` dengan permission `core.analytics.dashboard.read`, dan diperiksa dengan
+`components/app-sidebar.tsx` dengan permission rutenya — Daftar dasbor `core.analytics.dashboard.read`,
+Analisis data `core.analytics.explore.invoke` (area 4 sudah memasangnya) — dan diperiksa dengan
 menelusuri rail, bukan mengetik URL (skill `coreerp-ui`, bagian *New pages inside Control Plane*).
 
 ### Grid

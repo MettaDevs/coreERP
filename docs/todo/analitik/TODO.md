@@ -156,7 +156,7 @@ baris di bagian yang disediakan.
 | `apps/core/app/Platform/Modules/Support/CoreServices.php` | — | 0 (`Datasets`), 1 (`SharedDimensions`), 18 (`DashboardTemplates`) | Satu baris di `SINGLETON_BINDINGS` |
 | `apps/core/app/Foundation/Vendor/VendorServiceProvider.php`, `apps/core/app/Foundation/Currency/CurrencyServiceProvider.php` | — | 1 (resolver label dimensi bersama) | Satu baris `SharedDimensions::register()` di `boot()` |
 | `apps/core/tests/Fixtures/modules/apperp/contoh-a/*` (dataset, model `Penjualan`, `manifest/`) | 1 | 3, 4 (bahan uji engine) | Kolom baru lewat migration baru; dataset dan manifest hanya ditambah |
-| `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 (butir 4.6; KA-14 disetujui 3 Okt 2026), 15 | Konstanta baru di akhir |
+| `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 (butir 4.6; KA-14 disetujui 3 Okt 2026; hanya kode yang dipakai kode aplikasi), 6, 15 | Konstanta baru di akhir |
 | `apps/core/app/Platform/Retention/Support/RetentionPolicies.php` | — | 9, 17 | Satu `RetentionPolicy` per tabel |
 | `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | — | 15 | Dua entri di `SCOPES` |
 | `apps/core/resources/js/components/app-sidebar.tsx` | — | 0 (entri sementara Analisis data), 7, 15 | Satu item per area |

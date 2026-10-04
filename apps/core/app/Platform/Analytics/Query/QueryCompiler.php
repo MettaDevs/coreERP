@@ -6,7 +6,7 @@ namespace App\Platform\Analytics\Query;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
-use App\Platform\Modules\Contracts\DataPolicyFilter;
+use App\Platform\Analytics\Security\DataPolicyScope;
 use App\Platform\Modules\Contracts\FieldFilterExpression;
 use App\Platform\Modules\Contracts\InvalidFilterExpression;
 use LogicException;
@@ -19,8 +19,9 @@ use LogicException;
  *
  * 1. Query dasar dari model dataset — `TenantScope` dan `SoftDeletes` ikut dari model. Tabel dasar tidak
  *    pernah diberi alias, karena scope tenant disisipkan dengan nama tabel sebenarnya.
- * 2. Kebijakan data lewat `DataPolicyFilter`, pada kolom yang dinyatakan dataset, **sebelum** saringan
- *    pengguna. Saringan pengguna hanya dapat menyempitkan.
+ * 2. Jangkauan principal lewat {@see DataPolicyScope} — kebijakan data pada kolom yang dinyatakan dataset,
+ *    lalu saringan terkunci principal — **sebelum** saringan pengguna. Saringan pengguna hanya dapat
+ *    menyempitkan.
  * 3. Saringan pengguna dan rentang waktu lewat `FieldFilterExpression` (sintaks BC filter tambahan K-30),
  *    nilai lewat binding. Token rentang relatif menjadi `Y-m-d..Y-m-d` menurut zona principal
  *    ({@see RelativeRange}).
@@ -36,26 +37,20 @@ use LogicException;
  * `orderBy()`, yang membungkusnya dengan grammar, dan measure lewat `selectExpression()`.
  *
  * Isi kerangka berjalan (area 0) ditambah rentang waktu dan urutan pilihan pengguna (area 2), supaya
- * kunci yang sudah dibaca parser tidak pernah diabaikan diam-diam. Yang belum dikompilasi — ember waktu
- * dan total — ditolak 422, bukan diabaikan. Area 3 menambah join, ember waktu, saringan tetap measure,
- * total, dan `NULLS LAST` untuk measure yang dapat kosong; area 4 menggantikan langkah 2 dengan
- * `DataPolicyScope` beserta saringan terkunci.
+ * kunci yang sudah dibaca parser tidak pernah diabaikan diam-diam, dan langkah 2 dari area 4. Yang belum
+ * dikompilasi — ember waktu dan total — ditolak 422, bukan diabaikan. Area 3 menambah join, ember waktu,
+ * saringan tetap measure, total, dan `NULLS LAST` untuk measure yang dapat kosong.
  */
 final class QueryCompiler
 {
+    public function __construct(private readonly DataPolicyScope $scope) {}
+
     /** @throws AnalyticsQueryException */
     public function compile(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
     {
         $builder = $dataset->baseQuery();
 
-        if ($dataset->policy !== null) {
-            DataPolicyFilter::apply(
-                $builder,
-                $principal->policyScope($dataset->policy['code']),
-                $dataset->qualified($dataset->policy['legal_entity']),
-                $dataset->policy['operating_unit'] === null ? null : $dataset->qualified($dataset->policy['operating_unit']),
-            );
-        }
+        $this->scope->apply($builder, $dataset, $principal);
 
         foreach ($query->filters as $key => $value) {
             try {

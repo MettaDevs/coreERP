@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Datasets;
 
-use App\Platform\License\Support\SiteLicense;
 use App\Platform\Modules\Contracts\Analytics\Dataset;
 use App\Platform\Modules\Contracts\Analytics\Datasets;
-use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Modules\Support\LaunchableAppCatalog;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -85,19 +84,15 @@ final class DatasetRegistry implements Datasets
      */
     public function forTenant(string $tenantId): array
     {
-        $installed = ModuleInstallation::query()
-            ->where('tenant_id', $tenantId)
-            ->where('status', ModuleInstallation::STATUS_INSTALLED)
-            ->pluck('module_id')
-            ->map(static fn (mixed $id): string => (string) $id)
-            ->all();
-        // Dibaca dari wadah setiap kali, bukan disuntikkan: lisensi diikat `scoped`, dan registry ini hidup
-        // sepanjang proses.
-        $license = app(SiteLicense::class);
+        // Kesiapan module dari penentu yang sama dengan peluncur dan `DatasetAccess`
+        // (`LaunchableAppCatalog::readyModules()`), supaya katalog dan izin baca tidak pernah berbeda
+        // pendapat. Dibaca dari wadah setiap kali, bukan disuntikkan: lisensi di dalamnya diikat `scoped`,
+        // dan registry ini hidup sepanjang proses.
+        $ready = app(LaunchableAppCatalog::class)->readyModules($tenantId);
 
         return $this->compiledAll(array_values(array_filter(
             $this->declared(),
-            static fn (DeclaredDataset $declared): bool => in_array($declared->moduleId, $installed, true) && $license->allowsApp($declared->moduleId),
+            static fn (DeclaredDataset $declared): bool => in_array($declared->moduleId, $ready, true),
         )));
     }
 

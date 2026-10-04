@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\CompiledMeasure;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
+use App\Platform\Analytics\Security\AnalyticsPrincipal;
 use App\Platform\Analytics\Security\DatasetAccess;
+use App\Platform\Analytics\Security\PersonalDataGate;
 use App\Platform\Analytics\Security\UserPrincipal;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
@@ -27,16 +29,19 @@ use Inertia\Response;
  * Query-nya disusun dari dataset pertama yang boleh dibaca pengguna, bukan ditulis mati: Core tidak
  * menyebut nama module mana pun. Tile memakai measure hitung pertama dataset, grafik memakai measure
  * uang pertama per field pilihan pertama; judul keduanya dari nama tampilan yang dinyatakan module.
+ * Field dan measure data pribadi tidak ditawarkan kepada pengguna tanpa hak itu ({@see PersonalDataGate}).
  */
 final class ExploreController extends Controller
 {
+    public function __construct(private readonly PersonalDataGate $personalData) {}
+
     public function __invoke(Request $request, DatasetRegistry $datasets, DatasetAccess $access, UserClock $clock): Response
     {
         $principal = UserPrincipal::fromMembership($this->currentMembership($request), $clock->timezone($request));
 
         $preview = null;
         foreach ($datasets->all() as $dataset) {
-            $preview = $access->allows($principal, $dataset) ? $this->preview($dataset) : null;
+            $preview = $access->allows($principal, $dataset) ? $this->preview($dataset, $principal) : null;
             if ($preview !== null) {
                 break;
             }
@@ -48,10 +53,10 @@ final class ExploreController extends Controller
     /**
      * @return array{dataset: array{code: string, caption: string}, tile: array{caption: string, query: array{dataset: string, measures: list<string>}}, chart: array{caption: string, query: array{dataset: string, dimensions: list<string>, measures: list<string>}}|null}|null
      */
-    private function preview(CompiledDataset $dataset): ?array
+    private function preview(CompiledDataset $dataset, AnalyticsPrincipal $principal): ?array
     {
         // Measure bersaringan tetap belum dikompilasi di kerangka ini (area 3), jadi tidak ditawarkan.
-        $measures = array_values(array_filter($dataset->measures(), static fn (CompiledMeasure $measure): bool => $measure->where === []));
+        $measures = array_values(array_filter($this->personalData->visibleMeasures($dataset, $principal), static fn (CompiledMeasure $measure): bool => $measure->where === []));
         if ($measures === []) {
             return null;
         }
@@ -59,7 +64,7 @@ final class ExploreController extends Controller
         $count = array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->aggregate === Aggregate::Count) ?? $measures[0];
         $value = array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->format === MeasureFormat::Money)
             ?? array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->aggregate === Aggregate::Sum);
-        $category = array_find($dataset->fields(), static fn (FilterField $field): bool => $field->type === FieldType::Option);
+        $category = array_find($this->personalData->visibleFields($dataset, $principal), static fn (FilterField $field): bool => $field->type === FieldType::Option);
 
         return [
             'dataset' => ['code' => $dataset->code, 'caption' => $dataset->caption],
