@@ -17,6 +17,8 @@ export class CoreApiError extends Error {
         public readonly status: number,
         public readonly errors: Record<string, string[]> = {},
         public readonly code: string | null = null,
+        /** Bagian permintaan yang salah menurut `{ error: { field } }`, misalnya `filters.nama`. */
+        public readonly field: string | null = null,
     ) {
         super(message);
         this.name = 'CoreApiError';
@@ -59,7 +61,7 @@ export async function apiRequest(
         const body = (await response.json().catch(() => null)) as {
             message?: unknown;
             errors?: Record<string, string[]>;
-            error?: { code?: unknown; message?: unknown };
+            error?: { code?: unknown; message?: unknown; field?: unknown };
         } | null;
         const firstError = body?.errors
             ? Object.values(body.errors)[0]?.[0]
@@ -76,6 +78,7 @@ export async function apiRequest(
             response.status,
             body?.errors ?? {},
             typeof body?.error?.code === 'string' ? body.error.code : null,
+            typeof body?.error?.field === 'string' ? body.error.field : null,
         );
     }
 

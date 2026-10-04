@@ -1,70 +1,132 @@
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import type { ChartConfig } from '@apperp/ui/chart';
-import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-} from '@apperp/ui/chart';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Skeleton } from '@apperp/ui/skeleton';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-import { Head } from '@inertiajs/react';
-import { RotateCw } from 'lucide-react';
+import { Field } from '@apperp/ui/field';
+import { Select } from '@apperp/ui/select';
+import { Head, router, usePage } from '@inertiajs/react';
+import { LayoutDashboard, Link2, Save, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import Heading from '@/components/heading';
+import { toast } from 'sonner';
+import { QueryEditor } from '@/components/analytics/query-editor';
+import { QueryResult } from '@/components/analytics/query-result';
+import { SavedQuerySheet } from '@/components/analytics/saved-query-sheet';
+import { useDatasetDescription } from '@/components/analytics/use-dataset-description';
 import {
-    formatComputedAt,
-    formatDimensionValue,
-    formatMeasureValue,
-} from '@/lib/analytics/format';
+    queryErrorPlacement,
+    useQueryPreview,
+} from '@/components/analytics/use-query-preview';
+import { VisualPicker } from '@/components/analytics/visual-picker';
+import { WidgetBuilder } from '@/components/analytics/widget-builder';
+import { fetchSavedQueries } from '@/lib/analytics/api';
+import {
+    buildQuery,
+    emptyQuery,
+    exploreUrl,
+    readExploreUrl,
+} from '@/lib/analytics/query';
 import type {
     AnalyticsQuery,
-    ResultColumn,
-    ResultSet,
-    ResultValue,
+    DashboardAbilities,
+    DatasetSummary,
+    SavedQuery,
 } from '@/lib/analytics/types';
-import { apiJson, errorText } from '@/lib/core-api';
+import type { DataWidgetType } from '@/lib/analytics/visual';
+import {
+    defaultVisual,
+    isDataWidgetType,
+    suggestedTitle,
+    visualUnavailableReason,
+} from '@/lib/analytics/visual';
+import { CoreApiError } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
-type PreviewQuery = { caption: string; query: AnalyticsQuery };
-
 type Props = {
-    preview: {
-        dataset: { code: string; caption: string };
-        tile: PreviewQuery;
-        chart: PreviewQuery | null;
-    } | null;
+    datasets: DatasetSummary[];
+    abilities: DashboardAbilities;
 };
 
-type Row = Record<string, ResultValue>;
-
 /**
- * Analisis data, halaman sementara kerangka berjalan engine analitik (area 0): satu tile dan satu
- * grafik kolom dari `POST /api/v1/analytics/query`. Query-nya disusun server dari dataset pertama yang
- * boleh dibaca pengguna ini, jadi layar ini tidak menyebut module mana pun. Area 8 menggantinya dengan
- * penjelajah sungguhan.
+ * Analisis data (`/analytics/explore`, area 8.5–8.6): penjelajah satu data, padanan *Data analysis mode* Business
+ * Central (KA-21). Pengguna memilih data, nilai, pengelompokan, saringan, dan periode; hasilnya tabel dengan total
+ * atau grafik, dan dapat disimpan ke dasbor atau sebagai analisis tersimpan.
+ *
+ * Query dan jenis tampilannya milik URL (`?q=…&view=…`): dibaca dari `usePage().url` setiap render dan ditulis lewat
+ * kunjungan sisi peramban (`router.replace`), tidak pernah disalin ke state. Karena itu tautan halaman ini membuka
+ * analisis yang sama, dan kembali/maju di peramban berjalan seperti biasa. Hasil dihitung server sebagai pengguna
+ * yang membuka, jadi tautan yang sama dapat memberi angka berbeda bagi orang dengan akses berbeda.
  */
-export default function AnalyticsExplore({ preview }: Props) {
+export default function AnalyticsExplore({ datasets, abilities }: Props) {
+    const { url } = usePage();
+    const state = readExploreUrl(url);
+    const query = state.query ?? emptyQuery();
+    const description = useDatasetDescription(
+        query.dataset === '' ? null : query.dataset,
+    );
+    const dataset = description.description;
+    const times = dataset?.times ?? [];
+    const view: DataWidgetType =
+        isDataWidgetType(state.view) &&
+        visualUnavailableReason(state.view, query, times) === null
+            ? state.view
+            : 'table';
+    // Tabel penjelajah selalu membawa total bila ada pengelompokan; query di URL tidak perlu menyebutnya.
+    const run = buildQuery({
+        ...query,
+        totals: (query.dimensions ?? []).length > 0 ? true : undefined,
+    });
+    const ready = dataset !== null && run.measures.length > 0;
+    const result = useQueryPreview(ready ? run : null);
+    const placement = queryErrorPlacement(result.error);
+    // Query yang ditolak server (saringan tidak terbaca, batas) tidak ditawarkan untuk disimpan.
+    const rejected =
+        result.error instanceof CoreApiError && result.error.status === 422;
+    const title = suggestedTitle(run, dataset);
+    const saved = useSavedQueries();
+    const [building, setBuilding] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const navigate = (next: AnalyticsQuery, nextView: string | null) =>
+        router.replace({
+            url: exploreUrl(next, nextView),
+            preserveScroll: true,
+            preserveState: true,
+        });
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            toast.success('Tautan analisis disalin.');
+        } catch {
+            toast.error(
+                'Tautan belum dapat disalin. Salin alamat dari bilah alamat peramban.',
+            );
+        }
+    };
+
     return (
         <>
             <Head title="Analisis data" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <Heading title="Analisis data" />
-                {preview === null ? (
+            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-4 p-6">
+                <h1 className="text-xl font-semibold tracking-tight">
+                    Analisis data
+                </h1>
+                {state.unreadable && (
+                    <Alert>
+                        <TriangleAlert />
+                        <AlertTitle>Tautan ini tidak dapat dibaca</AlertTitle>
+                        <AlertDescription>
+                            Isi analisisnya mungkin terpotong saat disalin.
+                            Mulailah dari pilihan data di bawah.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {datasets.length === 0 ? (
                     <Card>
                         <CardContent>
                             <Empty>
@@ -83,18 +145,171 @@ export default function AnalyticsExplore({ preview }: Props) {
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                        {/* Tile setinggi isinya, tidak melar setinggi grafik di sebelahnya. */}
-                        <div className="self-start lg:col-span-4">
-                            <TileCard {...preview.tile} />
-                        </div>
-                        {preview.chart && (
-                            <div className="lg:col-span-8">
-                                <ColumnChartCard {...preview.chart} />
-                            </div>
-                        )}
+                        <Card className="min-w-0 self-start lg:col-span-4">
+                            <CardHeader>
+                                <CardTitle>Susun analisis</CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-5">
+                                {saved.items.length > 0 && (
+                                    <Field>
+                                        <Select
+                                            label="Buka analisis tersimpan"
+                                            items={saved.items.map((item) => ({
+                                                value: item.id,
+                                                label: item.name,
+                                            }))}
+                                            value={null}
+                                            onValueChange={(id) => {
+                                                const picked = saved.items.find(
+                                                    (item) => item.id === id,
+                                                );
+
+                                                if (picked) {
+                                                    router.push({
+                                                        url: exploreUrl(
+                                                            picked.query,
+                                                            state.view,
+                                                        ),
+                                                        preserveState: true,
+                                                    });
+                                                }
+                                            }}
+                                            searchPlaceholder="Cari analisis"
+                                            emptyMessage="Analisis tidak ditemukan."
+                                        />
+                                    </Field>
+                                )}
+                                <QueryEditor
+                                    datasets={datasets}
+                                    value={query}
+                                    dataset={dataset}
+                                    datasetLoading={description.loading}
+                                    datasetFailure={description.failure}
+                                    errors={placement}
+                                    onChange={(next) =>
+                                        navigate(next, state.view)
+                                    }
+                                />
+                            </CardContent>
+                        </Card>
+                        <Card className="min-w-0 lg:col-span-8">
+                            <CardHeader>
+                                <CardTitle className="break-words">
+                                    {title === '' ? 'Hasil' : title}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-4">
+                                {dataset !== null && (
+                                    <div className="flex flex-col gap-3">
+                                        <VisualPicker
+                                            query={run}
+                                            times={times}
+                                            value={view}
+                                            onChange={(next) =>
+                                                navigate(query, next)
+                                            }
+                                        />
+                                        {ready && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {abilities.create &&
+                                                    !rejected && (
+                                                        <>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() =>
+                                                                    setBuilding(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <LayoutDashboard />
+                                                                Simpan ke dasbor
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() =>
+                                                                    setSaving(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Save />
+                                                                Simpan analisis
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        void copyLink()
+                                                    }
+                                                >
+                                                    <Link2 />
+                                                    Salin tautan
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <QueryResult
+                                    ready={ready}
+                                    loading={result.loading}
+                                    result={result.result}
+                                    previous={result.previous}
+                                    message={placement.message}
+                                    type={view}
+                                    visual={defaultVisual(view, run, times)}
+                                    title={title}
+                                    height={3}
+                                    onReload={result.reload}
+                                />
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
             </main>
+            {building && (
+                <WidgetBuilder
+                    dashboard={null}
+                    initial={{ query: run, type: view }}
+                    datasets={datasets}
+                    onClose={() => setBuilding(false)}
+                    onSaved={(widget) => {
+                        setBuilding(false);
+                        toast.success(
+                            `"${widget.title}" ditambahkan ke dasbor.`,
+                            {
+                                action: {
+                                    label: 'Buka dasbor',
+                                    onClick: () =>
+                                        router.visit(
+                                            `/analytics/dashboards/${widget.dashboard_id}`,
+                                        ),
+                                },
+                            },
+                        );
+                    }}
+                />
+            )}
+            {saving && (
+                <SavedQuerySheet
+                    query={run}
+                    suggestedName={title}
+                    abilities={abilities}
+                    onClose={() => setSaving(false)}
+                    onSaved={(item) => {
+                        setSaving(false);
+                        saved.reload();
+                        toast.success(`Analisis "${item.name}" disimpan.`);
+                    }}
+                />
+            )}
         </>
     );
 }
@@ -105,263 +320,23 @@ AnalyticsExplore.layout = {
     ] satisfies BreadcrumbItem[],
 };
 
-/**
- * Hasil satu query, dimuat ulang saat query berubah atau saat diminta. Hasil yang tersimpan diberi
- * kunci query-nya, sehingga hasil query sebelumnya tidak pernah tampil sebagai hasil query sekarang.
- */
-function useQueryResult(query: AnalyticsQuery) {
+/** Analisis tersimpan milik sendiri dan yang dibagikan, untuk dibuka ulang di penjelajah. */
+function useSavedQueries() {
+    const [items, setItems] = useState<SavedQuery[]>([]);
     const [attempt, setAttempt] = useState(0);
-    const [loaded, setLoaded] = useState<{
-        key: string;
-        result: ResultSet | null;
-        error: string | null;
-    } | null>(null);
-    const body = JSON.stringify(query);
-    const key = `${attempt}:${body}`;
 
     useEffect(() => {
-        const controller = new AbortController();
+        let cancelled = false;
 
-        apiJson<ResultSet>('/api/v1/analytics/query', {
-            method: 'POST',
-            body,
-            signal: controller.signal,
-        })
-            .then((result) => setLoaded({ key, result, error: null }))
-            .catch((caught: unknown) => {
-                if (!controller.signal.aborted) {
-                    setLoaded({
-                        key,
-                        result: null,
-                        error: errorText(caught, 'Data belum dapat dimuat.'),
-                    });
-                }
-            });
+        // Daftar ini pelengkap: bila gagal dimuat, penjelajah tetap dapat dipakai tanpa pilihan membuka.
+        fetchSavedQueries()
+            .then((next) => !cancelled && setItems(next))
+            .catch(() => undefined);
 
-        return () => controller.abort();
-    }, [body, key]);
+        return () => {
+            cancelled = true;
+        };
+    }, [attempt]);
 
-    const current = loaded !== null && loaded.key === key ? loaded : null;
-
-    return {
-        loading: current === null,
-        result: current?.result ?? null,
-        error: current?.error ?? null,
-        reload: () => setAttempt((value) => value + 1),
-    };
-}
-
-function TileCard({ caption, query }: PreviewQuery) {
-    const { loading, result, error, reload } = useQueryResult(query);
-    const measure = result?.columns.find((column) => column.kind === 'measure');
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{caption}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-                {loading && <Skeleton className="h-9 w-32" />}
-                {error !== null && (
-                    <QueryFailure message={error} onRetry={reload} />
-                )}
-                {result && measure && (
-                    <>
-                        {/* Uang per mata uang ditulis berdampingan, tidak pernah dijumlah. */}
-                        <p className="text-3xl font-semibold tabular-nums">
-                            {result.rows
-                                .map((row) => formatMeasureValue(measure, row))
-                                .join(' · ')}
-                        </p>
-                        <ComputedAt result={result} />
-                    </>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function ColumnChartCard({ caption, query }: PreviewQuery) {
-    const { loading, result, error, reload } = useQueryResult(query);
-    const dimension = result?.columns.find(
-        (column) => column.kind === 'dimension' && !column.implicit,
-    );
-    const measure = result?.columns.find((column) => column.kind === 'measure');
-    const currency = result?.columns.find((column) => column.implicit);
-
-    return (
-        <Card className="h-full">
-            <CardHeader>
-                <CardTitle>{caption}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {loading && <Skeleton className="h-64 w-full" />}
-                {error !== null && (
-                    <QueryFailure message={error} onRetry={reload} />
-                )}
-                {result &&
-                    dimension &&
-                    measure &&
-                    (result.rows.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            Belum ada data untuk digambar.
-                        </p>
-                    ) : (
-                        <>
-                            {/* Satu panel per mata uang: uang lintas mata uang tidak digambar sebagai satu seri. */}
-                            {groupRows(result.rows, currency).map(
-                                ([label, rows]) => (
-                                    <ColumnPanel
-                                        key={label}
-                                        title={currency ? label : null}
-                                        rows={rows}
-                                        dimension={dimension}
-                                        measure={measure}
-                                    />
-                                ),
-                            )}
-                            <ComputedAt result={result} />
-                        </>
-                    ))}
-            </CardContent>
-        </Card>
-    );
-}
-
-function ColumnPanel({
-    title,
-    rows,
-    dimension,
-    measure,
-}: {
-    title: string | null;
-    rows: Row[];
-    dimension: ResultColumn;
-    measure: ResultColumn;
-}) {
-    const config = {
-        value: { label: measure.caption, color: 'var(--chart-1)' },
-    } satisfies ChartConfig;
-    // Angka diubah ke Number hanya untuk menggambar; tooltip dan tabel memformat dari nilai aslinya.
-    const data = rows.map((row) => ({
-        label: formatDimensionValue(dimension, row),
-        value: Number(row[measure.key] ?? 0),
-        row,
-    }));
-    const summary = `${measure.caption} per ${dimension.caption.toLowerCase()}${title ? ` (${title})` : ''}: ${data
-        .map((item) => `${item.label} ${formatMeasureValue(measure, item.row)}`)
-        .join('; ')}`;
-
-    return (
-        <section className="space-y-2">
-            {title && <h3 className="text-sm font-medium">{title}</h3>}
-            <ChartContainer
-                config={config}
-                className="aspect-auto h-64 w-full"
-                role="figure"
-                aria-label={summary}
-            >
-                <BarChart data={data} accessibilityLayer>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                    <YAxis
-                        width={88}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value: number) =>
-                            formatMeasureValue(
-                                measure,
-                                { ...rows[0], [measure.key]: value },
-                                true,
-                            )
-                        }
-                    />
-                    <ChartTooltip
-                        content={
-                            <ChartTooltipContent
-                                formatter={(_value, _name, item) => (
-                                    <div className="flex w-full justify-between gap-4">
-                                        <span className="text-muted-foreground">
-                                            {measure.caption}
-                                        </span>
-                                        <span className="font-mono font-medium tabular-nums">
-                                            {formatMeasureValue(
-                                                measure,
-                                                (item.payload as { row: Row })
-                                                    .row,
-                                            )}
-                                        </span>
-                                    </div>
-                                )}
-                            />
-                        }
-                    />
-                    <Bar dataKey="value" fill="var(--color-value)" radius={4} />
-                </BarChart>
-            </ChartContainer>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>{dimension.caption}</TableHead>
-                        <TableHead className="text-right">
-                            {measure.caption}
-                        </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {data.map((item) => (
-                        <TableRow key={String(item.row[dimension.key] ?? '')}>
-                            <TableCell>{item.label}</TableCell>
-                            <TableCell className="text-right tabular-nums">
-                                {formatMeasureValue(measure, item.row)}
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </section>
-    );
-}
-
-function QueryFailure({
-    message,
-    onRetry,
-}: {
-    message: string;
-    onRetry: () => void;
-}) {
-    return (
-        <div className="space-y-2">
-            <p className="text-sm text-destructive">{message}</p>
-            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-                <RotateCw />
-                Muat ulang
-            </Button>
-        </div>
-    );
-}
-
-/** Kapan dihitung, dalam zona engine (`meta.timezone`) dengan zonanya tertulis. */
-function ComputedAt({ result }: { result: ResultSet }) {
-    return (
-        <p className="text-xs text-muted-foreground">
-            {formatComputedAt(result.meta)}
-            {result.meta.truncated && ' · hasil dipotong'}
-        </p>
-    );
-}
-
-/** Baris dikelompokkan per mata uang tersirat, urutan kemunculannya dipertahankan. */
-function groupRows(
-    rows: Row[],
-    currency: ResultColumn | undefined,
-): Array<[string, Row[]]> {
-    const groups = new Map<string, Row[]>();
-
-    for (const row of rows) {
-        const label = currency ? String(row[currency.key] ?? '') : '';
-        groups.set(label, [...(groups.get(label) ?? []), row]);
-    }
-
-    return [...groups.entries()];
+    return { items, reload: () => setAttempt((value) => value + 1) };
 }

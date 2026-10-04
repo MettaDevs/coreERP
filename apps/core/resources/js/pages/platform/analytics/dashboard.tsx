@@ -14,6 +14,7 @@ import { Button } from '@apperp/ui/button';
 import { Card, CardContent } from '@apperp/ui/card';
 import {
     Empty,
+    EmptyContent,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
@@ -28,6 +29,7 @@ import {
     DashboardGrid,
     sortLayout,
 } from '@/components/analytics/dashboard-grid';
+import { WidgetBuilder } from '@/components/analytics/widget-builder';
 import { WidgetFrame } from '@/components/analytics/widget-frame';
 import { WidgetTitleDialog } from '@/components/analytics/widget-title-dialog';
 import {
@@ -52,7 +54,8 @@ type Props = {
 /**
  * Satu dasbor (`/analytics/dashboards/{id}`, area 7.2): grid widget yang masing-masing memuat datanya sendiri
  * saat terlihat, dihitung sebagai yang melihat. Pemilik (atau pengelola dasbor bersama) dapat mengubah nama,
- * mengatur letak dengan tombol geser dan pilihan lebar, mengganti judul widget, dan mengarsipkan.
+ * mengatur letak dengan tombol geser dan pilihan lebar, mengganti judul widget, dan mengarsipkan; area 8 menambah
+ * Tambah bagian dan Ubah lewat pembangun widget.
  *
  * Prop dari server adalah sumber kebenarannya: setiap perubahan disimpan dengan versi yang dibuka lalu
  * halamannya dimuat ulang, tidak disalin ke state. Yang dipegang layar hanya draf letak selama mode ubah.
@@ -84,6 +87,10 @@ function DashboardScreen({ dashboard, abilities }: Props) {
     const [renaming, setRenaming] = useState<DashboardWidget | null>(null);
     const [archivingWidget, setArchivingWidget] =
         useState<DashboardWidget | null>(null);
+    // Pembangun bagian (area 8): `widget` kosong untuk bagian baru.
+    const [building, setBuilding] = useState<{
+        widget: DashboardWidget | null;
+    } | null>(null);
     const editing = draft !== null;
     const layout = draft ?? dashboard.layout;
     const canEdit = dashboard.can_edit;
@@ -165,6 +172,13 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                     ) : (
                         <>
                             <ActionButton
+                                action="create"
+                                size="sm"
+                                onClick={() => setBuilding({ widget: null })}
+                            >
+                                Tambah bagian
+                            </ActionButton>
+                            <ActionButton
                                 action="edit"
                                 size="sm"
                                 onClick={() => setEditingDashboard(true)}
@@ -231,6 +245,19 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                                             : 'Pemilik dasbor belum menambahkan isi.'}
                                     </EmptyDescription>
                                 </EmptyHeader>
+                                {canEdit && (
+                                    <EmptyContent>
+                                        <ActionButton
+                                            action="create"
+                                            size="sm"
+                                            onClick={() =>
+                                                setBuilding({ widget: null })
+                                            }
+                                        >
+                                            Tambah bagian
+                                        </ActionButton>
+                                    </EmptyContent>
+                                )}
                             </Empty>
                         </CardContent>
                     </Card>
@@ -249,6 +276,12 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                                     widget.type === 'text'
                                         ? undefined
                                         : 'flex-1'
+                                }
+                                onEdit={
+                                    canEdit && !editing
+                                        ? (item) =>
+                                              setBuilding({ widget: item })
+                                        : undefined
                                 }
                                 onRename={
                                     canEdit && !editing
@@ -273,6 +306,22 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                     onSaved={() => {
                         toast.success('Dasbor disimpan.');
                         setEditingDashboard(false);
+                        reloadDashboard();
+                    }}
+                />
+            )}
+            {building && (
+                <WidgetBuilder
+                    dashboard={dashboard}
+                    widget={building.widget}
+                    onClose={() => setBuilding(null)}
+                    onSaved={(widget) => {
+                        toast.success(
+                            building.widget === null
+                                ? `"${widget.title}" ditambahkan ke dasbor ini.`
+                                : 'Perubahan disimpan.',
+                        );
+                        setBuilding(null);
                         reloadDashboard();
                     }}
                 />

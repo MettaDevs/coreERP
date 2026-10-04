@@ -170,13 +170,13 @@ final class DashboardController extends Controller
         foreach ($layout as $i => $entry) {
             $id = $entry['widget_id'];
             if (! isset($widgets[$id])) {
-                throw ValidationException::withMessages(["layout.{$i}.widget_id" => ['Widget ini tidak ada di dasbor ini. Muat ulang dasbornya.']]);
+                throw ValidationException::withMessages(["layout.{$i}.widget_id" => ['Bagian ini tidak ada di dasbor ini. Muat ulang dasbornya.']]);
             }
             if (isset($seen[$id])) {
-                throw ValidationException::withMessages(["layout.{$i}.widget_id" => ['Setiap widget hanya boleh punya satu letak.']]);
+                throw ValidationException::withMessages(["layout.{$i}.widget_id" => ['Setiap bagian hanya boleh punya satu letak.']]);
             }
             if ($entry['x'] + $entry['w'] > 12) {
-                throw ValidationException::withMessages(["layout.{$i}.x" => ['Widget melewati lebar dasbor. Geser ke kiri atau perkecil lebarnya.']]);
+                throw ValidationException::withMessages(["layout.{$i}.x" => ['Bagian ini melewati lebar dasbor. Geser ke kiri atau perkecil lebarnya.']]);
             }
             $seen[$id] = true;
             $out[] = ['widget_id' => $id, 'x' => (int) $entry['x'], 'y' => (int) $entry['y'], 'w' => (int) $entry['w'], 'h' => (int) $entry['h']];

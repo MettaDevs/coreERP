@@ -1,8 +1,15 @@
 import type {
+    AnalyticsQuery,
     DashboardDetail,
     DashboardLayoutItem,
+    DashboardSummary,
     DashboardWidget,
+    DatasetDescription,
+    DatasetSummary,
     ResultSet,
+    SavedQuery,
+    WidgetType,
+    WidgetVisual,
 } from '@/lib/analytics/types';
 import { apiJson, apiRequest, CoreApiError } from '@/lib/core-api';
 
@@ -80,7 +87,9 @@ export async function archiveDashboard(
 
 export async function updateWidget(
     widget: Pick<DashboardWidget, 'id' | 'version'>,
-    changes: Partial<Pick<DashboardWidget, 'title' | 'type' | 'visual'>>,
+    changes: Partial<
+        Pick<DashboardWidget, 'title' | 'type' | 'query' | 'visual'>
+    >,
 ): Promise<DashboardWidget> {
     return (
         await apiJson<{ data: DashboardWidget }>(
@@ -195,4 +204,96 @@ export function widgetFailure(caught: unknown): WidgetFailure {
         kind: 'other',
         message: 'Data belum dapat dimuat. Coba muat ulang.',
     };
+}
+
+/*
+ * Area 8: pembangun bagian dasbor dan penjelajah data. Query bebas (`POST query`) dihitung sebagai pengguna yang
+ * meminta dan dijaga `core.analytics.explore.invoke`; katalog data dan simpanan dijaga hak dasbor.
+ */
+
+/** Data yang boleh dibaca pengguna ini, untuk pemilih data. */
+export async function fetchDatasets(
+    signal?: AbortSignal,
+): Promise<DatasetSummary[]> {
+    return (
+        await apiJson<{ data: DatasetSummary[] }>(`${BASE}/datasets`, {
+            signal,
+        })
+    ).data;
+}
+
+/** Kolom, nilai, dan kolom tanggal satu data; kolom data pribadi sudah disaring server. */
+export async function fetchDataset(
+    code: string,
+    signal?: AbortSignal,
+): Promise<DatasetDescription> {
+    return (
+        await apiJson<{ data: DatasetDescription }>(
+            `${BASE}/datasets/${encodeURIComponent(code)}`,
+            { signal },
+        )
+    ).data;
+}
+
+/** Menjalankan satu query; teks JSON yang sudah disusun boleh dikirim apa adanya. */
+export function runQuery(
+    query: AnalyticsQuery | string,
+    signal?: AbortSignal,
+): Promise<ResultSet> {
+    return apiJson<ResultSet>(`${BASE}/query`, {
+        method: 'POST',
+        body: typeof query === 'string' ? query : JSON.stringify(query),
+        signal,
+    });
+}
+
+/** Dasbor milik sendiri dan yang dibagikan, beserta hak mengubahnya. */
+export async function fetchDashboards(): Promise<DashboardSummary[]> {
+    return (await apiJson<{ data: DashboardSummary[] }>(`${BASE}/dashboards`))
+        .data;
+}
+
+export type WidgetInput = {
+    title: string;
+    type: WidgetType;
+    query: AnalyticsQuery | null;
+    visual: WidgetVisual;
+};
+
+/** Menambah bagian ke dasbor; query dan tampilannya diperiksa server saat disimpan. */
+export async function createWidget(
+    dashboardId: string,
+    input: WidgetInput,
+): Promise<DashboardWidget> {
+    return (
+        await apiJson<{ data: DashboardWidget }>(
+            `${BASE}/dashboards/${encodeURIComponent(dashboardId)}/widgets`,
+            { method: 'POST', body: JSON.stringify(input) },
+        )
+    ).data;
+}
+
+export type SavedQueryInput = {
+    name: string;
+    description: string | null;
+    shared: boolean;
+    query: AnalyticsQuery;
+};
+
+/** Analisis tersimpan milik sendiri dan yang dibagikan, urut nama. */
+export async function fetchSavedQueries(): Promise<SavedQuery[]> {
+    return (await apiJson<{ data: SavedQuery[] }>(`${BASE}/saved-queries`))
+        .data;
+}
+
+/** Menyimpan analisis; kodenya dibuat server dari nama. */
+export async function createSavedQuery(
+    input: SavedQueryInput,
+): Promise<SavedQuery> {
+    return (
+        await apiJson<{ data: SavedQuery }>(`${BASE}/saved-queries`, {
+            method: 'POST',
+            body: JSON.stringify(input),
+        })
+    ).data;
 }

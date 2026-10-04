@@ -68,7 +68,7 @@ final class WidgetController extends Controller
                 Dashboard::query()->whereKey($dashboard->id)->lockForUpdate()->first();
                 $limit = config()->integer('analytics.limits.widgets_per_dashboard', 24);
                 if ($dashboard->widgets()->count() >= $limit) {
-                    throw AnalyticsQueryException::limitExceeded('dashboard', "Dasbor ini sudah berisi {$limit} widget, batas terbanyaknya. Arsipkan widget yang tidak dipakai lebih dulu.");
+                    throw AnalyticsQueryException::limitExceeded('dashboard', "Dasbor ini sudah berisi {$limit} bagian, batas terbanyaknya. Arsipkan bagian yang tidak dipakai lebih dulu.");
                 }
 
                 return Widget::query()->create([

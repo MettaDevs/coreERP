@@ -338,7 +338,7 @@ class DashboardApiTest extends TestCase
             ->assertUnprocessable()
             ->assertExactJson(['error' => [
                 'code' => 'analytics.field_removed',
-                'message' => 'Kolom "group_aset_id" sudah tidak tersedia di data ini. Ubah widget untuk memilih kolom lain.',
+                'message' => 'Kolom "group_aset_id" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain.',
                 'field' => 'query.dimensions.0',
             ]]);
 

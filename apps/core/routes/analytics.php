@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Route;
  * gate-nya; permission per endpoint ada di docs/todo/analitik/dasbor-dan-visual.md bagian *API untuk layar*.
  */
 
-// Area 0: kerangka berjalan. Halaman sementara dengan satu tile dan satu grafik; area 8 menggantinya.
+// Area 0: kerangka berjalan; area 8 menjadikannya penjelajah data (Analisis data). Query-nya di query string.
 Route::get('analytics/explore', ExploreController::class)
     ->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_EXPLORE_INVOKE))
     ->name('analytics.explore');

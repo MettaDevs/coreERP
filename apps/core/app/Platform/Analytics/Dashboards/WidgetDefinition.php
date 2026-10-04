@@ -49,11 +49,11 @@ final class WidgetDefinition
      */
     public function validate(AnalyticsPrincipal $principal, string $type, mixed $query, mixed $visual): array
     {
-        $visual = $this->object($visual ?? [], 'visual', 'Tampilan widget harus berupa pasangan bagian dan isinya.');
+        $visual = $this->object($visual ?? [], 'visual', 'Tampilan harus berupa pasangan nama dan isinya.');
 
         if ($type === 'text') {
             if ($query !== null) {
-                throw self::invalid('query', 'Widget teks tidak memakai query.');
+                throw self::invalid('query', 'Bagian teks tidak menghitung data, jadi tidak memakai pilihan data.');
             }
 
             return ['dataset_code' => null, 'dataset_version' => null, 'query' => null, 'visual' => $this->text($visual)];
@@ -67,7 +67,7 @@ final class WidgetDefinition
             'line', 'area' => $this->cartesian($dataset, $parsed, $visual, timeAxis: true),
             'donut' => $this->donut($parsed, $visual),
             'table' => $this->table($parsed, $visual),
-            default => throw self::invalid('type', 'Jenis widget tidak dikenal.'),
+            default => throw self::invalid('type', 'Jenis tampilan tidak dikenal.'),
         };
 
         return ['dataset_code' => $dataset->code, 'dataset_version' => $dataset->version, 'query' => StoredQuery::compact($parsed), 'visual' => $visual];
@@ -111,7 +111,7 @@ final class WidgetDefinition
         $this->knownKeys($visual, ['text']);
         $text = $visual['text'] ?? null;
         if (! is_string($text) || trim($text) === '' || mb_strlen($text) > self::MAX_TEXT_LENGTH) {
-            throw self::invalid('visual.text', 'Isi teks widget, paling panjang '.self::MAX_TEXT_LENGTH.' karakter.');
+            throw self::invalid('visual.text', 'Isi teksnya, paling panjang '.self::MAX_TEXT_LENGTH.' karakter.');
         }
 
         return ['text' => $text];
@@ -125,15 +125,15 @@ final class WidgetDefinition
     {
         $this->knownKeys($visual, ['measure', 'thresholds', 'compact']);
         if (count($query->measures) !== 1) {
-            throw self::invalid('query.measures', 'Tile angka menghitung tepat satu nilai.');
+            throw self::invalid('query.measures', 'Tampilan angka menghitung tepat satu nilai.');
         }
         if ($query->dimensions !== []) {
-            throw self::invalid('query.dimensions', 'Tile angka tidak memakai pengelompokan.');
+            throw self::invalid('query.dimensions', 'Tampilan angka tidak memakai pengelompokan.');
         }
 
         $measure = $visual['measure'] ?? $query->measures[0];
         if ($measure !== $query->measures[0]) {
-            throw self::invalid('visual.measure', 'Nilai tile harus nilai yang dihitung query-nya.');
+            throw self::invalid('visual.measure', 'Angka yang ditampilkan harus salah satu nilai yang dihitung.');
         }
 
         $out = ['measure' => $measure];
@@ -150,7 +150,7 @@ final class WidgetDefinition
     /** @return array{threshold1: int|float, threshold2: int|float, low: string, middle: string, high: string} */
     private function thresholds(mixed $value): array
     {
-        $thresholds = $this->object($value, 'visual.thresholds', 'Ambang tile harus berisi dua batas dan gaya tiap rentang.');
+        $thresholds = $this->object($value, 'visual.thresholds', 'Ambang angka harus berisi dua batas dan gaya tiap rentang.');
         $this->knownKeys($thresholds, ['threshold1', 'threshold2', 'low', 'middle', 'high'], 'visual.thresholds');
 
         foreach (['threshold1', 'threshold2'] as $key) {
@@ -216,7 +216,7 @@ final class WidgetDefinition
             throw self::invalid('visual.series', 'Kolom pengelompokan kedua harus dipakai sebagai seri.');
         }
 
-        $out['y'] = $this->subset($visual['y'] ?? null, $query->measures, 'visual.y', 'Pilih nilai yang digambar dari nilai yang dihitung query.');
+        $out['y'] = $this->subset($visual['y'] ?? null, $query->measures, 'visual.y', 'Pilih nilai yang digambar dari nilai yang dihitung.');
 
         if (isset($visual['stacked'])) {
             if (! in_array($visual['stacked'], self::STACKING, true)) {
@@ -247,17 +247,17 @@ final class WidgetDefinition
 
         $category = $visual['category'] ?? $query->dimensions[0]->field;
         if ($category !== $query->dimensions[0]->field) {
-            throw self::invalid('visual.category', 'Bagian donat harus kolom pengelompokan query-nya.');
+            throw self::invalid('visual.category', 'Potongan donat harus menurut kolom pengelompokannya.');
         }
         $value = $visual['value'] ?? $query->measures[0];
         if ($value !== $query->measures[0]) {
-            throw self::invalid('visual.value', 'Besar bagian donat harus nilai yang dihitung query-nya.');
+            throw self::invalid('visual.value', 'Besar potongan donat harus nilai yang dihitung.');
         }
 
         $out = ['category' => $category, 'value' => $value];
         if (isset($visual['max_slices'])) {
             if (! is_int($visual['max_slices']) || $visual['max_slices'] < 2 || $visual['max_slices'] > 20) {
-                throw self::invalid('visual.max_slices', 'Jumlah bagian donat antara 2 dan 20.');
+                throw self::invalid('visual.max_slices', 'Jumlah potongan donat antara 2 dan 20.');
             }
             $out['max_slices'] = $visual['max_slices'];
         }
@@ -274,7 +274,7 @@ final class WidgetDefinition
         $this->knownKeys($visual, ['columns', 'show_totals']);
         $keys = [...array_map(static fn (Dimension $dimension): string => $dimension->field, $query->dimensions), ...$query->measures];
 
-        $out = ['columns' => $this->subset($visual['columns'] ?? null, $keys, 'visual.columns', 'Pilih kolom tabel dari kolom pengelompokan dan nilai yang dihitung query.')];
+        $out = ['columns' => $this->subset($visual['columns'] ?? null, $keys, 'visual.columns', 'Pilih kolom tabel dari kolom pengelompokan dan nilai yang dihitung.')];
         if (isset($visual['show_totals'])) {
             $out['show_totals'] = $this->flag($visual['show_totals'], 'visual.show_totals');
         }
@@ -330,7 +330,7 @@ final class WidgetDefinition
     {
         foreach (array_keys($visual) as $key) {
             if (! in_array($key, $known, true)) {
-                throw self::invalid($path.'.'.$key, 'Bagian "'.$key.'" tidak dikenal untuk jenis widget ini.');
+                throw self::invalid($path.'.'.$key, '"'.$key.'" tidak dikenal untuk jenis tampilan ini.');
             }
         }
     }

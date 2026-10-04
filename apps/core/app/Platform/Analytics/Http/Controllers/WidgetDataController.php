@@ -65,7 +65,7 @@ final class WidgetDataController extends Controller
 
         try {
             if ($widget->dataset_code === null || $widget->query === null) {
-                throw AnalyticsQueryException::invalidQuery('type', 'Widget teks tidak punya data untuk dihitung.');
+                throw AnalyticsQueryException::invalidQuery('type', 'Bagian teks tidak punya data untuk dihitung.');
             }
             $dataset = $this->datasets->find($widget->dataset_code) ?? throw AnalyticsQueryException::datasetUnknown();
             $this->access->authorize($principal, $dataset);
@@ -75,7 +75,7 @@ final class WidgetDataController extends Controller
             if ($path !== null) {
                 throw new AnalyticsQueryException(
                     'analytics.field_removed',
-                    'Kolom "'.$read['missing'][$path].'" sudah tidak tersedia di data ini. Ubah widget untuk memilih kolom lain.',
+                    'Kolom "'.$read['missing'][$path].'" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain.',
                     422,
                     'query.'.$path,
                 );

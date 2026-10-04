@@ -594,7 +594,7 @@ yang merah bila berkas komponennya hilang), dan pemeriksaan runtime yang dicatat
 
 ---
 
-### 8. [ ] Pembangun widget dan penjelajah
+### 8. [x] Pembangun widget dan penjelajah
 
 **Tempat:** `resources/js/components/analytics/{widget-builder, dataset-picker, measure-picker,
 dimension-picker, filter-editor, time-range-picker, visual-picker}.tsx`,
@@ -604,18 +604,48 @@ dimension-picker, filter-editor, time-range-picker, visual-picker}.tsx`,
 yang belum pernah melihat layarnya — dan penjelajah dapat menyimpan hasilnya sebagai widget atau
 query tersimpan.
 
-- [ ] 8.1 Alur `Sheet` tujuh langkah di [pembangun widget](/todo/analitik/dasbor-dan-visual#pembangun-widget),
-  `portalContainer` pada setiap `Select`.
-- [ ] 8.2 `filter-editor.tsx` versi Core dari pola `AdditionalFilters` K-30: field bawaan, "+ Tambah
+Selesai 4 Oktober 2026, di atas area 7. Yang dikirim berbeda dari rencana di beberapa butir; bedanya dicatat di
+butir masing-masing (*Dikirim:*) dan di [dasbor dan visual](/todo/analitik/dasbor-dan-visual#yang-dikirim-area-8).
+Layar dibuktikan dengan tipe, lint, build, test halaman Inertia (`WalkingSkeletonTest::test_page_offers_the_readable_datasets_and_ignores_the_query_string`,
+`AnalyticsPermissionTest`), dan pemeriksaan runtime yang dicatat di pull request area 8. Cerita US-02 disusun lewat
+pembangun di runtime pratinjau dengan lima pilihan (data, nilai, kelompok, periode, tampilan; judul terisi sendiri),
+8 detik dengan penggerak otomatis dari membuka dasbor sampai bagian tersimpan dan tergambar, dan angkanya sama dengan
+SQL langsung. Uji dengan orang yang belum pernah melihat layarnya belum dilakukan.
+
+- [x] 8.1 Alur `Sheet` tujuh langkah di [pembangun widget](/todo/analitik/dasbor-dan-visual#pembangun-widget),
+  `portalContainer` pada setiap `Select`. *Dikirim:* `widget-builder.tsx` dengan langkah Data, Nilai, Kelompokkan
+  menurut, Saring, Periode, Tampilan (beserta Judul yang disarankan dari isi query), Pratinjau. Lima langkah pertama
+  satu komponen `query-editor.tsx` yang dipakai juga penjelajah. Dibuka dari Tambah bagian dan Ubah (`onEdit`
+  `WidgetFrame`) di halaman dasbor, dan dari Simpan ke dasbor di penjelajah (dengan langkah Dasbor tujuan). Escape di
+  daftar pilihan yang terbuka hanya menutup daftarnya; tanpa penahan itu `Sheet` ikut tertutup beserta isiannya.
+  Bagian teks tidak dibuat lewat pembangun: ia tidak memakai data, dan isinya tetap diubah lewat Ubah teks area 7.
+- [x] 8.2 `filter-editor.tsx` versi Core dari pola `AdditionalFilters` K-30: field bawaan, "+ Tambah
   saringan", contoh sintaks per tipe, isian dipakai saat Enter atau meninggalkan isian. Pemilih
   rujukan memanggil endpoint lookup module dari metadata dataset; dimensi bersama memakai endpoint
-  Core. Layar laporan aset tidak diubah.
-- [ ] 8.3 Pemilih tampilan yang menonaktifkan jenis yang tidak cocok beserta alasannya.
-- [ ] 8.4 Pratinjau dengan jeda 500 ms dan pembatalan permintaan lama.
-- [ ] 8.5 Penjelajah: tabel hasil dengan total, berpindah ke grafik, simpan ke dasbor atau sebagai
-  query tersimpan.
-- [ ] 8.6 Query penjelajah tersimpan di query string, dibaca ulang setiap render, sehingga analisis
-  dapat dibagikan sebagai tautan.
+  Core. Layar laporan aset tidak diubah. *Dikirim:* data analitik tidak menyatakan kolom saringan bawaan, jadi yang
+  tampil adalah kolom yang sudah berisi lalu yang ditambahkan. Rujukan memakai `/api/modules/<module>/v1/<lookup>`
+  (bentuk pemanggilan K-30); entitas legal dan unit kerja dibaca dari `GET api/v1/organizations` menurut
+  klasifikasinya; dimensi bersama lain tanpa lookup memakai isian ekspresi. Galat sintaks dari server
+  (`analytics.invalid_filter` berpath `filters.<kolom>`, `time_range.range`) tampil di bawah isiannya; untuk itu
+  `CoreApiError` kini membawa `field`.
+- [x] 8.3 Pemilih tampilan yang menonaktifkan jenis yang tidak cocok beserta alasannya. *Dikirim:* `visual-picker.tsx`
+  dengan aturan `lib/analytics/visual.ts` yang sama dengan `WidgetDefinition`; alasan ditulis terlihat di bawah grup,
+  bukan hanya di tooltip. Pilihan yang tidak cocok lagi setelah query berubah diganti jenis yang disarankan.
+- [x] 8.4 Pratinjau dengan jeda 500 ms dan pembatalan permintaan lama. *Dikirim:* `use-query-preview.ts`; membuka layar
+  dan Muat ulang tidak menunggu jeda. Pratinjau pembangun dibatasi 50 baris. Query yang ditolak server (422) tidak
+  dapat disimpan dari layar, karena saringan yang tidak terbaca baru ketahuan saat dihitung, bukan saat disimpan.
+- [x] 8.5 Penjelajah: tabel hasil dengan total, berpindah ke grafik, simpan ke dasbor atau sebagai
+  query tersimpan. *Dikirim:* di layar namanya "Simpan analisis" dan "Buka analisis tersimpan". Tabel selalu meminta
+  total bila ada pengelompokan. Halaman tidak lagi menerima pratinjau dari server: prop-nya hanya katalog data dan hak.
+- [x] 8.6 Query penjelajah tersimpan di query string, dibaca ulang setiap render, sehingga analisis
+  dapat dibagikan sebagai tautan. *Dikirim:* `?q=<query JSON ringkas>&view=<jenis>`, ditulis lewat `router.replace`
+  (kunjungan sisi peramban tanpa memuat ulang prop); tautan yang terpotong dibuka sebagai analisis kosong dengan
+  pemberitahuan. Ada tombol Salin tautan.
+
+Juga di area ini: pesan galat server area 6 tidak lagi menyebut "widget", "query", atau "tile". Layar area 7 menyebut
+widget "bagian", jadi pesannya memakai kata yang sama (`DashboardController`, `WidgetController`,
+`WidgetDataController`, `WidgetDefinition`, `DashboardAccess`, `StoredQuery`, `SavedQueryController`); kode galat tidak
+berubah.
 
 ---
 

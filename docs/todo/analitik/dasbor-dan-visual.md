@@ -472,6 +472,31 @@ Komponen saringan K-30 hari ini tinggal di UI module aset (`ui/laporan/_shared/A
 Area 8 membuat versi Core di `resources/js/components/analytics/filter-editor.tsx` dari pola yang sama;
 layar laporan aset tidak diubah.
 
+### Yang dikirim area 8
+
+*4 Oktober 2026.* Bedanya dari rancangan di atas, dan alasannya:
+
+- **Lima langkah pertama satu komponen.** `query-editor.tsx` (Data, Nilai, Kelompokkan menurut, Saring, Periode)
+  dipakai pembangun dan penjelajah; pembangun menambah Tampilan dan Pratinjau. Isinya dikendalikan pemanggil:
+  pembangun memegang draf di state, penjelajah membacanya dari URL.
+- **Di layar, widget bernama "bagian"**, sama dengan area 7 ("12 bagian", "Arsipkan bagian ini"): Tambah bagian, Ubah
+  bagian, Bagian baru. Pesan galat server ikut memakai kata itu. Query tersimpan bernama "analisis tersimpan".
+- **Saringan tanpa kolom bawaan.** Data analitik tidak menyatakan kolom saringan bawaan seperti data item laporan K-30,
+  jadi yang tampil hanya kolom yang sudah berisi dan yang ditambahkan. Rujukan memakai lookup module
+  (`/api/modules/<module>/v1/<lookup>`); entitas legal dan unit kerja dibaca dari `GET api/v1/organizations`;
+  rujukan tanpa keduanya memakai isian ekspresi.
+- **Tampilan yang tidak cocok** dinonaktifkan dengan alasan terlihat di bawah grup, dari aturan `lib/analytics/visual.ts`
+  yang sama dengan `WidgetDefinition`. Grafik garis dan area memakai pengelompokan tanggal sebagai sumbu mendatar,
+  pengelompokan lain sebagai seri.
+- **Pratinjau** dijalankan langsung saat layar dibuka dan saat Muat ulang, lalu dengan jeda 500 ms setiap kali query
+  berubah; permintaan sebelumnya dibatalkan. Pratinjau pembangun dibatasi 50 baris. Query yang ditolak server (422)
+  tidak dapat disimpan dari layar: `StoredQuery::validate()` tidak menjalankan `FieldFilterExpression`, jadi saringan
+  yang tidak terbaca baru ditolak saat bagiannya dihitung.
+- **Penjelajah** menyimpan query di `?q=<query JSON ringkas>&view=<jenis>` dan menulisnya lewat `router.replace`, tanpa
+  memuat ulang prop. Prop halaman hanya katalog data dan hak (`{create, share}`). Tabel penjelajah selalu meminta total
+  bila ada pengelompokan; analisis yang disimpan membawa `totals`.
+- **Bagian teks** tidak dibuat lewat pembangun; isinya tetap diubah lewat Ubah teks area 7.
+
 ## Slicer, cross-filter, drill (fase 2)
 
 - **Slicer** tersimpan di `analytics_dashboards.slicers`: kunci, judul, sumber (dimensi bersama atau
