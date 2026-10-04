@@ -46,6 +46,11 @@ final class RetentionPolicies
                 'retention_policy_log', 'Catatan penerapan retensi', 'retention_policy_log_entries', 'created_at',
                 28, 'coreerp.retention_log_retention_days',
             ),
+            // Engine analitik (area 9, PQ-05): bawaan 90 hari, admin tenant boleh mengubahnya, minimum 7.
+            new RetentionPolicy(
+                'analytics_query_log', 'Catatan permintaan analisis data', 'analytics_query_log', 'created_at',
+                7, 'analytics.log.retention_days',
+            ),
         ];
     }
 

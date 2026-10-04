@@ -73,6 +73,50 @@ final readonly class ResultSet
     }
 
     /**
+     * Bentuk yang disimpan cache hasil area 9 (`Cache\QueryCache`): seperti {@see self::toArray()}, tetapi
+     * kolomnya lengkap ({@see ResultColumn::toCache()}), supaya hasil yang dibaca kembali sama dengan hasil
+     * yang dihitung. Bentuk ini ikut versi kunci cache; mengubahnya berarti menaikkan versi itu.
+     *
+     * @return array{columns: list<array<string, mixed>>, rows: list<array<string, scalar|null>>, totals: list<array<string, scalar|null>>, meta: array{dataset: string, dataset_version: int, generated_at: string, timezone: string, truncated: bool, row_limit: int, cached: bool, duration_ms: int, query_hash: string}}
+     */
+    public function toCache(): array
+    {
+        return [
+            'columns' => array_map(static fn (ResultColumn $column): array => $column->toCache(), $this->columns),
+            'rows' => $this->rows,
+            'totals' => $this->totals,
+            'meta' => $this->meta,
+        ];
+    }
+
+    /**
+     * Hasil yang dibaca kembali dari cache: isinya persis hasil yang dihitung, termasuk `generated_at` — layar
+     * menulis "Dihitung pukul …" dari situ — dengan `meta.cached` menyala. `$payload` adalah bentuk
+     * {@see self::toCache()} yang sudah didekode dari JSON.
+     *
+     * @param  array<array-key, mixed>  $payload
+     */
+    public static function fromCache(array $payload): self
+    {
+        /** @var list<array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string}> $columns */
+        $columns = $payload['columns'];
+        /** @var list<array<string, scalar|null>> $rows */
+        $rows = $payload['rows'];
+        /** @var list<array<string, scalar|null>> $totals */
+        $totals = $payload['totals'];
+        /** @var array{dataset: string, dataset_version: int, generated_at: string, timezone: string, truncated: bool, row_limit: int, cached: bool, duration_ms: int, query_hash: string} $meta */
+        $meta = $payload['meta'];
+        $meta['cached'] = true;
+
+        return new self(
+            columns: array_map(static fn (array $column): ResultColumn => ResultColumn::fromCache($column), $columns),
+            rows: $rows,
+            totals: $totals,
+            meta: $meta,
+        );
+    }
+
+    /**
      * @return array{columns: list<array<string, string|bool>>, rows: list<array<string, scalar|null>>, totals: list<array<string, scalar|null>>, meta: array{dataset: string, dataset_version: int, generated_at: string, timezone: string, truncated: bool, row_limit: int, cached: bool, duration_ms: int, query_hash: string}}
      */
     public function toArray(): array

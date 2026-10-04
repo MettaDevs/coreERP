@@ -158,6 +158,7 @@ baris di bagian yang disediakan.
 | `apps/core/tests/Fixtures/modules/apperp/contoh-a/*` (dataset, model `Penjualan`, `manifest/`) | 1 | 3, 4 (bahan uji engine) | Kolom baru lewat migration baru; dataset dan manifest hanya ditambah |
 | `apps/core/app/Platform/Access/Support/CoreSecurityCatalog.php` | — | 4 (butir 4.6; KA-14 disetujui 3 Okt 2026; hanya kode yang dipakai kode aplikasi), 6, 15 | Konstanta baru di akhir |
 | `apps/core/app/Platform/Retention/Support/RetentionPolicies.php` | — | 9, 17 | Satu `RetentionPolicy` per tabel |
+| `apps/core/app/Platform/Analytics/AnalyticsServiceProvider.php` | 9 | 17 | Satu blok per area di `boot()` |
 | `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | — | 15 | Dua entri di `SCOPES` |
 | `apps/core/resources/js/components/app-sidebar.tsx` | — | 0 (entri sementara Analisis data), 7, 15 | Satu item per area |
 | `apps/core/app/Http/Middleware/HandleInertiaRequests.php`, `apps/core/resources/js/types/global.d.ts` | — | 0 (prop `analyticsEnabled`), 4 (membuangnya bersama saklar) | Hanya prop itu |

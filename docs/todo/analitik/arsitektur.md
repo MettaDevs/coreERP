@@ -157,7 +157,7 @@ area pemiliknya.
 
 ```text
 apps/core/app/Platform/Analytics/
-├── AnalyticsServiceProvider.php        rute embed, rate limiter, jadwal pembersihan
+├── AnalyticsServiceProvider.php        (9) limiter `analytics-interactive`; rute embed (17)
 ├── Actions/
 │   └── RunQuery.php                    (0) satu query dari ujung ke ujung, untuk setiap jalur masuk
 ├── Datasets/
@@ -182,15 +182,15 @@ apps/core/app/Platform/Analytics/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
 │   ├── DataPolicyScope.php  ScopeFingerprint.php                                  (4)
 │   ├── PublicationPrincipal.php  PersonalDataGate.php
-├── Cache/QueryCache.php
-├── Support/QueryLog.php
+├── Cache/QueryCache.php                (9) cache hasil di tabel database tenant
+├── Support/QueryLog.php  QuerySlots.php (9) log query tersamar; jatah query bersamaan per tenant
 ├── Dashboards/
 │   ├── DashboardAccess.php             (6) aturan berbagi dasbor dan query tersimpan (K-25)
 │   ├── StoredQuery.php                 (6) query widget dan query tersimpan: periksa, ringkas, baca + `renamed`
 │   └── WidgetDefinition.php            (6) aturan `visual` per jenis widget
 ├── Models/
 │   ├── Dashboard.php  Widget.php  SavedQuery.php  BindsWithinActiveTenant.php     (6)
-│   ├── QueryLogEntry.php  QueryCacheEntry.php
+│   ├── QueryLogEntry.php  QueryCacheEntry.php                                     (9)
 │   ├── Publication.php  EmbedToken.php                                        (fase 2)
 ├── Http/
 │   ├── Controllers/  QueryController  ExploreController                           (0)
@@ -312,10 +312,11 @@ dipasang sesudahnya di proses yang sama langsung terbaca. `find()` dan `all()` t
 | `limits.filters` (2) | 20 | Saringan per query |
 | `limits.sort` (2) | 3 | Kunci urutan per query |
 | `limits.widgets_per_dashboard` | 24 | |
-| `limits.concurrent_per_tenant` | 4 | Query analitik bersamaan per tenant per instance |
-| `cache.default_ttl_seconds` | 300 | TTL widget bawaan |
-| `cache.max_payload_kb` | 512 | Hasil lebih besar tidak di-cache |
-| `rate_limits.interactive_per_minute` | 120 | Per pengguna |
+| `limits.concurrent_per_tenant` (9) | 4 | Query analitik yang dihitung bersamaan per tenant, untuk seluruh instance (store kunci bersama) |
+| `cache.default_ttl_seconds` (9) | 300 | TTL widget bawaan; di bawah 60 dinaikkan ke 60, `0` tanpa cache |
+| `cache.max_payload_kb` (9) | 512 | Hasil yang sesudah dikompres lebih besar tidak di-cache |
+| `rate_limits.interactive_per_minute` (9) | 120 | Limiter `analytics-interactive`, per pengguna |
+| `log.retention_days` (9) | 90 | Bawaan retensi `analytics_query_log` (PQ-05); admin tenant mengubahnya, minimum 7 |
 | `embed.token_ttl_seconds` | 600 | KA-10 |
 
 Nilai on-prem satu container sengaja rendah. Menaikkannya keputusan operator, bukan bawaan.

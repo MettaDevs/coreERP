@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Actions;
 
+use App\Platform\Analytics\Cache\QueryCache;
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
@@ -15,7 +17,10 @@ use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Query\ResultSet;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
 use App\Platform\Analytics\Security\DatasetAccess;
+use App\Platform\Analytics\Support\QueryLog;
+use App\Platform\Analytics\Support\QuerySlots;
 use App\Platform\Modules\Contracts\TenantRunner;
+use Throwable;
 
 /**
  * Satu query analitik dari ujung ke ujung, sama untuk setiap jalur masuk: layar, widget, publikasi, feed,
@@ -34,9 +39,16 @@ use App\Platform\Modules\Contracts\TenantRunner;
  * Hasilnya ({@see ResultSet}) sudah berlabel, celah deret waktunya terisi, dan totalnya terhitung — semua
  * di dalam `runFor()`, karena resolver label dimensi bersama juga membaca data tenant.
  *
- * Tempat area 9 memasang cache dan log query: di sekeliling isi closure `runFor()` (compile, eksekusi,
- * dan penyusunan hasil), sesudah langkah 1–3, sehingga hasil cache tidak pernah melewati pemeriksaan hak.
- * Area 6 memanggilnya dari data widget.
+ * Area 9 memasang tiga hal di sekeliling isi closure itu, sesudah langkah 1–3, sehingga hasil cache tidak
+ * pernah melewati pemeriksaan hak:
+ *
+ * - **Cache hasil** di database tenant ({@see QueryCache}). Pemanggil menentukan `$cacheTtl` (null = bawaan
+ *   config, `0` = tanpa cache) dan `$refresh` (tombol Muat ulang: hitung ulang dan timpa). Area 6 meneruskan
+ *   TTL widget dan permintaan Muat ulang dari endpoint data widget.
+ * - **Jatah query bersamaan per tenant** ({@see QuerySlots}) hanya untuk perhitungan sungguhan; hasil dari
+ *   cache tidak memakai jatah. Jatah habis menjadi 429 `analytics.busy`.
+ * - **Log query** ({@see QueryLog}): satu baris per query, berhasil maupun ditolak, dengan `$source` jalur
+ *   masuknya (`QueryLog::SOURCE_*`).
  */
 final class RunQuery
 {
@@ -49,22 +61,57 @@ final class RunQuery
         private readonly QueryExecutor $executor,
         private readonly TenantRunner $tenants,
         private readonly LabelResolver $labels,
+        private readonly QueryCache $cache,
+        private readonly QuerySlots $slots,
+        private readonly QueryLog $log,
     ) {}
 
-    /** @throws AnalyticsQueryException */
-    public function handle(AnalyticsPrincipal $principal, AnalyticsQuery $query): ResultSet
+    /**
+     * @param  ?int  $cacheTtl  TTL cache dalam detik; null memakai `analytics.cache.default_ttl_seconds`, `0` tanpa
+     *                          cache, dan nilai di bawah 60 dinaikkan ke 60 ({@see QueryCache::ttl()})
+     * @param  bool  $refresh  lewati cache dan hitung ulang (tombol Muat ulang); hasilnya menimpa cache
+     * @param  string  $source  jalur masuk untuk log, salah satu `QueryLog::SOURCE_*`
+     *
+     * @throws AnalyticsQueryException
+     */
+    public function handle(AnalyticsPrincipal $principal, AnalyticsQuery $query, ?int $cacheTtl = null, bool $refresh = false, string $source = QueryLog::SOURCE_EXPLORE): ResultSet
     {
+        $started = hrtime(true);
         $query = $this->normalizer->normalize($query);
-        $dataset = $this->datasets->find($query->dataset) ?? throw AnalyticsQueryException::datasetUnknown();
-        $this->access->authorize($principal, $dataset);
-        $this->validator->validate($dataset, $query, $principal);
+        $dataset = null;
 
-        return $this->tenants->runFor($principal->tenantId(), function () use ($dataset, $query, $principal): ResultSet {
-            $compiled = $this->compiler->compile($dataset, $query, $principal);
-            $started = hrtime(true);
-            $executed = $this->executor->run($compiled, $principal->timeoutMs());
+        try {
+            $dataset = $this->datasets->find($query->dataset) ?? throw AnalyticsQueryException::datasetUnknown();
+            $this->access->authorize($principal, $dataset);
+            $this->validator->validate($dataset, $query, $principal);
 
-            return ResultSet::from($dataset, $query, $compiled, $executed, $principal, intdiv(hrtime(true) - $started, 1_000_000), $this->labels);
-        });
+            $result = $this->tenants->runFor($principal->tenantId(), fn (): ResultSet => $this->cache->remember(
+                $dataset, $query, $principal, $this->cache->ttl($cacheTtl), $refresh,
+                fn (): ResultSet => $this->slots->run($principal->tenantId(), $principal->timeoutMs(), fn (): ResultSet => $this->compute($dataset, $query, $principal)),
+            ));
+        } catch (Throwable $e) {
+            $this->log->failed($principal, $source, $query, $dataset, $e, self::elapsedMs($started));
+
+            throw $e;
+        }
+
+        $this->log->succeeded($principal, $source, $query, $dataset, $result, self::elapsedMs($started));
+
+        return $result;
+    }
+
+    /** Compile, eksekusi, dan penyusunan hasil; dijalankan di dalam `runFor()` sambil memegang satu jatah tenant. */
+    private function compute(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): ResultSet
+    {
+        $compiled = $this->compiler->compile($dataset, $query, $principal);
+        $started = hrtime(true);
+        $executed = $this->executor->run($compiled, $principal->timeoutMs());
+
+        return ResultSet::from($dataset, $query, $compiled, $executed, $principal, self::elapsedMs($started), $this->labels);
+    }
+
+    private static function elapsedMs(int $started): int
+    {
+        return intdiv(hrtime(true) - $started, 1_000_000);
     }
 }

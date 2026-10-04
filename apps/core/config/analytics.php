@@ -34,5 +34,31 @@ return [
         // Widget per dasbor (area 6). Widget yang melewatinya ditolak 422 `analytics.limit_exceeded` saat
         // ditambahkan; dasbor penuh membuka terlalu banyak query sekaligus.
         'widgets_per_dashboard' => (int) env('COREERP_ANALYTICS_WIDGETS_PER_DASHBOARD', 24),
+
+        // Area 9: query analitik yang boleh dihitung bersamaan per tenant. Query berikutnya dijawab 429
+        // `analytics.busy` dengan `Retry-After`, supaya analitik tidak menahan semua proses PHP server
+        // on-prem dan layar transaksi tetap terlayani. Hasil dari cache tidak memakai jatah ini.
+        'concurrent_per_tenant' => (int) env('COREERP_ANALYTICS_CONCURRENT_PER_TENANT', 4),
+    ],
+
+    // Area 9: cache hasil di tabel `analytics_query_cache` database tenant, bukan cache store Laravel
+    // (KA-18). `default_ttl_seconds` dipakai widget yang tidak menyebut TTL sendiri; TTL di bawah 60 detik
+    // dinaikkan ke 60, dan 0 berarti tanpa cache. Hasil yang sesudah dikompres lebih besar dari
+    // `max_payload_kb` tidak disimpan.
+    'cache' => [
+        'default_ttl_seconds' => (int) env('COREERP_ANALYTICS_CACHE_TTL_SECONDS', 300),
+        'max_payload_kb' => (int) env('COREERP_ANALYTICS_CACHE_MAX_PAYLOAD_KB', 512),
+    ],
+
+    // Area 9: permintaan analisis dari layar per pengguna per menit (limiter `analytics-interactive`),
+    // termasuk tombol Muat ulang yang melewati cache.
+    'rate_limits' => [
+        'interactive_per_minute' => (int) env('COREERP_ANALYTICS_RATE_LIMIT_PER_MINUTE', 120),
+    ],
+
+    // Area 9: masa simpan bawaan catatan query (`analytics_query_log`, PQ-05). Admin tenant dapat
+    // mengubahnya di Pengaturan → Retensi data, tidak kurang dari 7 hari.
+    'log' => [
+        'retention_days' => (int) env('COREERP_ANALYTICS_LOG_RETENTION_DAYS', 90),
     ],
 ];

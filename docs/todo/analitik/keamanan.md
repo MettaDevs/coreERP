@@ -370,6 +370,20 @@ jumlah baris, terpotong atau tidak, dari cache atau tidak, status, dan kode gala
 - Log bukan jejak audit perubahan. Perubahan dasbor dan publikasi tercatat log perubahan BC-style
   yang sudah ada (trigger `log_change`), karena tabelnya tabel tenant biasa.
 
+*Dikirim area 9 (4 Oktober 2026):* `Support\QueryLog`, dipanggil `RunQuery` untuk setiap query yang
+sampai ke engine — termasuk yang **ditolak** (tanpa hak, kolom tidak dikenal, jatah habis), dengan kode
+galatnya, karena penolakan itulah yang dicari saat menelusuri akses. Cacat engine tercatat `internal`.
+
+- **Yang disamarkan**, apa pun hak orang yang menjalankan query: nilai saringan pada field yang
+  klasifikasinya bukan `CustomerContent`, `SystemMetadata`, atau `OrganizationIdentifiableInformation` —
+  jadi data pribadi, id orang, dan data akun —, nilai pada field yang tidak dikenal dataset, seluruh nilai
+  bila datasetnya tidak dikenal (tanpa klasifikasi, gagal tertutup), dan rentang waktu pada field data
+  pribadi seperti tanggal lahir.
+- **`query_hash` dihitung dari bentuk tersamar**, bukan dari `meta.query_hash` hasil: hash bentuk asli
+  dapat ditebak ulang dari bentuk tersamar dengan mencoba nama satu per satu.
+- Retensinya tampil di Pengaturan → Retensi data sebagai *Catatan permintaan analisis data*; admin tenant
+  memilih masa simpan, tidak kurang dari 7 hari.
+
 ## Ancaman dan penangkalnya
 
 | Ancaman | Contoh | Penangkal | Test |

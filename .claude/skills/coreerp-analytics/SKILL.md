@@ -26,8 +26,12 @@ last, `LabelResolver`, `GapFiller`, and `php artisan analytics:explain`. Area 6 
 `Dashboards\DashboardAccess`, save-time checks in `Dashboards\StoredQuery` and `Dashboards\WidgetDefinition`,
 the per-principal catalog in `Datasets\DatasetCatalog`) and the screen API under `api/v1/analytics`
 (datasets, dashboards, widgets, widget data run as the viewer, saved queries), plus the page routes
-`/analytics` and `/analytics/dashboards/{id}` whose components area 7 builds. Everything else is still a
-plan. The plan,
+`/analytics` and `/analytics/dashboards/{id}` whose components area 7 builds. Area 9 (4 October 2026) added
+the result cache in the tenant database (`Cache\QueryCache`), the per-tenant concurrency slots
+(`Support\QuerySlots`, 429 `analytics.busy`), the `analytics-interactive` rate limiter
+(`AnalyticsServiceProvider`), and the masked query log (`Support\QueryLog`, retention policy
+`analytics_query_log`); widget data passes the widget's `cache_ttl_seconds`, and Muat ulang passes
+`refresh: true`. Everything else is still a plan. The plan,
 its decisions (`KA-xx`), and the work areas live in `docs/todo/analitik/`. Once an area ships, its code
 and `docs/dev/35-analitik.md` are the authority, and area 11 rewrites this skill to describe what exists.
 If code and this skill disagree, trust the code and fix the skill in the same pull request.
@@ -72,7 +76,10 @@ If code and this skill disagree, trust the code and fix the skill in the same pu
   parameters locked into the token. An empty locked filter means zero rows, never "all".
 - **Cache lives in the tenant database** (`analytics_query_cache`), never in Laravel's cache store,
   which `EnvironmentConnection::pins()` points at the central database. The key includes tenant,
-  dataset definition hash, normalized query, scope fingerprint, time zone, and today's date.
+  dataset definition hash, normalized query, scope fingerprint, time zone, today's date, and row limit.
+  Every entry point calls `RunQuery::handle($principal, $query, cacheTtl:, refresh:, source:)`; the cache
+  key is computed after the access checks, and only real computations take a concurrency slot. Laravel's
+  lock store (central) is fine for slot and stampede locks: their names carry only the tenant id and a hash.
 - **Outside callers read publications only** (KA-11), via integration clients with scopes
   `analytics.read` / `analytics.embed`. Every outside surface is hand-written in
   `apps/core/contracts/internal/integrasi-analitik.yaml`.
@@ -209,3 +216,10 @@ From `apps/core` in your worktree:
 - Caching in Laravel's cache store, which copies tenant data into the central database.
 - Letting `count` stand for "distinct things": it counts rows; use `CountDistinct`.
 - Rendering widget text as HTML or Markdown.
+- Testing the cache with a PHPUnit stub principal: `fingerprint()` returns `''` for every stub, so
+  different reaches share entries and isolation tests pass for the wrong reason. Use a real principal
+  (`tests/Feature/Platform/Analytics/Support/TestPrincipal.php`).
+- Binding a gzip string to a `bytea` column: PostgreSQL rejects it as invalid UTF-8. Bind a stream
+  (`PARAM_LOB`), and read it back with `stream_get_contents()`.
+- Logging a filter value without masking it: `QueryLog::masked()` hides values on personal, person-id,
+  and unknown fields, and the log hash is taken from the masked form.

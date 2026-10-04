@@ -590,7 +590,8 @@ dapat dilakukan pengguna.
 | `analytics.invalid_filter` | 422 | Saringan "…" tidak dapat dibaca. Contoh yang sah: … |
 | `analytics.limit_exceeded` | 422 | Terlalu banyak kolom pengelompokan. Maksimal 4. |
 | `analytics.query_timeout` | 422 | Perhitungan ini terlalu berat. Persempit periode atau saringan. |
-| `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. |
+| `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. (dengan `Retry-After`) |
+| `analytics.rate_limited` | 429 | Terlalu banyak permintaan analisis dalam satu menit. Tunggu sebentar, lalu coba lagi. (limiter `analytics-interactive` per pengguna, dengan `Retry-After`) |
 
 ## Bahasa rumus
 

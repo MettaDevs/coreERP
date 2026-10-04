@@ -211,8 +211,10 @@ Perilaku yang perlu diketahui layar:
 - **Mengganti jenis widget tanpa mengirim `visual`** memakai tampilan bawaan jenis baru, bukan tampilan lama.
 - **Kode query tersimpan** dibuat dari nama bila tidak dikirim (`nilai-perolehan`, lalu `-2`), unik per tenant,
   dan tidak dapat diganti.
-- Belum ada: slicer (fase 2, area 12), cache dan rate limit `analytics-interactive` (area 9; sampai itu
-  `refresh` sama dengan data), dan menyalin dasbor bersama menjadi pribadi. Kontrak API ini tidak ditulis
+- Data widget di-cache selama `cache_ttl_seconds` widget (kosong = bawaan 300 detik, `0` = selalu
+  menghitung ulang); `refresh` menghitung ulang tanpa membaca cache lalu menimpa hasilnya. Keduanya dibatasi
+  limiter `analytics-interactive` per pengguna dan dicatat di log query sebagai jalur `widget` (area 9).
+- Belum ada: slicer (fase 2, area 12) dan menyalin dasbor bersama menjadi pribadi. Kontrak API ini tidak ditulis
   tangan karena pemakainya hanya layar Core; `contracts/openapi.json` hasil Scramble belum diperbarui sejak
   lama dan tidak memuatnya.
 
