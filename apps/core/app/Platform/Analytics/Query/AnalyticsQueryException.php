@@ -29,6 +29,7 @@ final class AnalyticsQueryException extends RuntimeException
         public readonly int $status,
         public readonly ?string $field = null,
         ?Throwable $previous = null,
+        public readonly ?int $retryAfter = null,
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -75,6 +76,15 @@ final class AnalyticsQueryException extends RuntimeException
     }
 
     /**
+     * Semua jatah query bersamaan tenant sedang terpakai (area 9, `Support\QuerySlots`). Jawabannya membawa
+     * `Retry-After`, supaya layar menunggu sebentar alih-alih langsung mengulang.
+     */
+    public static function busy(int $retryAfterSeconds): self
+    {
+        return new self('analytics.busy', 'Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar.', 429, retryAfter: $retryAfterSeconds);
+    }
+
+    /**
      * Galat database yang bermakna bagi pengguna, atau null untuk yang bukan: pemanggil melempar ulang
      * pengecualian aslinya, sehingga cacat engine tetap menjadi 500 yang dilaporkan.
      */
@@ -102,6 +112,8 @@ final class AnalyticsQueryException extends RuntimeException
 
     public function toResponse(): JsonResponse
     {
-        return response()->json($this->toArray(), $this->status);
+        $headers = $this->retryAfter === null ? [] : ['Retry-After' => (string) $this->retryAfter];
+
+        return response()->json($this->toArray(), $this->status, $headers);
     }
 }

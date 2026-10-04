@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  *
  * Widget teks tidak punya dataset maupun query. `dataset_version` adalah versi dataset saat query disimpan:
  * kunci yang sesudahnya diganti nama module dipetakan saat dibaca (`StoredQuery`), dan kunci yang hilang
- * membuat widget berstatus `field_removed`, bukan galat 500. `cache_ttl_seconds` dibaca cache area 9.
+ * membuat widget berstatus `field_removed`, bukan galat 500. `cache_ttl_seconds` diteruskan ke cache hasil area 9.
  *
  * @property string $id
  * @property string $tenant_id

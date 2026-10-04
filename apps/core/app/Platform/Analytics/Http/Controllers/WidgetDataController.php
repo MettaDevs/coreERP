@@ -14,6 +14,7 @@ use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Security\DatasetAccess;
 use App\Platform\Analytics\Security\UserPrincipal;
+use App\Platform\Analytics\Support\QueryLog;
 use App\Platform\Identity\Support\UserClock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,8 +31,9 @@ use Illuminate\Http\Request;
  * galat. Kunci yang diganti nama dipetakan; kunci yang hilang dijawab 422 `analytics.field_removed` dengan
  * path dan nama kolomnya, bukan 500. Sesudah itu jalurnya `RunQuery`, sama dengan query bebas.
  *
- * `refresh` melewati cache untuk widget ini. Cache belum ada sampai area 9, jadi keduanya sekarang sama-sama
- * menghitung ulang; slicer (fase 2) belum dibaca dari query string.
+ * Hasilnya di-cache selama `cache_ttl_seconds` widget (kosong = bawaan config, `0` = selalu menghitung ulang;
+ * area 9, `Cache\QueryCache`). `refresh` — tombol Muat ulang — melewati cache untuk widget ini lalu menimpa
+ * hasilnya; keduanya tunduk pada limiter `analytics-interactive`. Slicer (fase 2) belum dibaca dari query string.
  */
 final class WidgetDataController extends Controller
 {
@@ -45,6 +47,17 @@ final class WidgetDataController extends Controller
     ) {}
 
     public function show(Request $request, Widget $widget): JsonResponse
+    {
+        return $this->data($request, $widget, refresh: false);
+    }
+
+    /** Muat ulang: menghitung ulang tanpa membaca cache, lalu menimpa hasil cache widget ini (area 9). */
+    public function refresh(Request $request, Widget $widget): JsonResponse
+    {
+        return $this->data($request, $widget, refresh: true);
+    }
+
+    private function data(Request $request, Widget $widget, bool $refresh): JsonResponse
     {
         $membership = $this->currentMembership($request);
         $this->dashboards->authorizeView($membership, $widget->dashboard ?? abort(404));
@@ -68,17 +81,17 @@ final class WidgetDataController extends Controller
                 );
             }
 
-            $result = $this->run->handle($principal, $this->parser->parse($read['query']));
+            $result = $this->run->handle(
+                $principal,
+                $this->parser->parse($read['query']),
+                cacheTtl: $widget->cache_ttl_seconds,
+                refresh: $refresh,
+                source: QueryLog::SOURCE_WIDGET,
+            );
         } catch (AnalyticsQueryException $e) {
             return $e->toResponse();
         }
 
         return response()->json($result->toArray());
-    }
-
-    /** Melewati cache untuk widget ini (area 9); sampai cache ada, sama dengan {@see self::show()}. */
-    public function refresh(Request $request, Widget $widget): JsonResponse
-    {
-        return $this->show($request, $widget);
     }
 }

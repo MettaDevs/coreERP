@@ -1,6 +1,7 @@
 <?php
 
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Analytics\AnalyticsServiceProvider;
 use App\Platform\Analytics\Http\Controllers\DashboardController;
 use App\Platform\Analytics\Http\Controllers\DashboardPageController;
 use App\Platform\Analytics\Http\Controllers\DatasetController;
@@ -32,17 +33,18 @@ Route::get('analytics/explore', ExploreController::class)
     ->name('analytics.explore');
 
 Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): void {
-    // Area 0: query bebas atas satu dataset, dijalankan sebagai pengguna yang meminta.
+    // Area 0: query bebas atas satu dataset, dijalankan sebagai pengguna yang meminta. Area 9: limiter
+    // `analytics-interactive` per pengguna; rute API analitik lain yang menghitung query memakainya juga.
     Route::post('query', QueryController::class)
-        ->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_EXPLORE_INVOKE))
+        ->middleware([CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_EXPLORE_INVOKE), 'throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER])
         ->name('query');
 });
 
 // Area 6: penyimpanan dasbor dan API layar. Melihat dijaga `dashboard.read` untuk seluruh blok, membuat juga
 // `dashboard.create`; mengubah dan mengarsipkan diputuskan `DashboardAccess` di controller, karena dasbor pribadi
 // dan bersama butuh permission berbeda. Id dasbor, widget, dan query tersimpan dicari di tenant aktif saja
-// (`BindsWithinActiveTenant`), jadi id tenant lain 404 sebelum controller berjalan. Rate limit
-// `analytics-interactive` untuk data widget menyusul bersama limiternya di area 9.
+// (`BindsWithinActiveTenant`), jadi id tenant lain 404 sebelum controller berjalan. Data widget dan Muat ulang
+// menghitung query, jadi ikut limiter `analytics-interactive` per pengguna (area 9).
 Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHBOARD_READ))->group(function (): void {
     // Halaman Shell; komponennya dibuat area 7.
     Route::get('analytics', [DashboardPageController::class, 'index'])->name('analytics.index');
@@ -63,8 +65,12 @@ Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHB
         Route::post('dashboards/{dashboard}/widgets', [WidgetController::class, 'store'])->name('widgets.store');
         Route::patch('widgets/{widget}', [WidgetController::class, 'update'])->name('widgets.update');
         Route::delete('widgets/{widget}', [WidgetController::class, 'destroy'])->name('widgets.destroy');
-        Route::get('widgets/{widget}/data', [WidgetDataController::class, 'show'])->name('widgets.data');
-        Route::post('widgets/{widget}/refresh', [WidgetDataController::class, 'refresh'])->name('widgets.refresh');
+        Route::get('widgets/{widget}/data', [WidgetDataController::class, 'show'])
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('widgets.data');
+        Route::post('widgets/{widget}/refresh', [WidgetDataController::class, 'refresh'])
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('widgets.refresh');
 
         Route::get('saved-queries', [SavedQueryController::class, 'index'])->name('saved-queries.index');
         Route::post('saved-queries', [SavedQueryController::class, 'store'])

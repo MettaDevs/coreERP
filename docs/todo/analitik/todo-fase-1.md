@@ -525,9 +525,9 @@ serta [arsitektur](/todo/analitik/arsitektur) ikut diperbarui.
   dibaca dari router, jadi rute baru tanpa baris di test-nya gagal). Cara setiap penjaga dibuat merah dicatat
   di pull request area 6.
 
-Yang sengaja ditinggalkan untuk area lain: rate limit `analytics-interactive` pada data widget (area 9.4,
-bersama limiternya), cache yang dilewati `refresh` (area 9; sampai itu `refresh` sama dengan data), dan
-slicer di `PATCH` dasbor serta query string data widget (area 12).
+Yang sengaja ditinggalkan untuk area lain: rate limit `analytics-interactive` pada data widget dan cache
+yang dilewati `refresh` (keduanya dipasang area 9), dan slicer di `PATCH` dasbor serta query string data
+widget (area 12).
 
 ---
 
@@ -585,7 +585,7 @@ query tersimpan.
 
 ---
 
-### 9. [ ] Cache, batas beban, dan log
+### 9. [x] Cache, batas beban, dan log
 
 **Tempat:** `app/Platform/Analytics/{Cache, Support}/*`, migration `analytics_query_cache` dan
 `analytics_query_log`, `RetentionPolicies`, rate limiter di `AnalyticsServiceProvider` · **Setelah:** 3,
@@ -593,15 +593,44 @@ query tersimpan.
 perilaku di [cache](/todo/analitik/kinerja-dan-uji-beban#cache) dan [batas](/todo/analitik/kinerja-dan-uji-beban#batas)
 terbukti test, dan log query tercatat dengan nilai data pribadi disamarkan.
 
-- [ ] 9.1 Tabel cache dan log, dengan klasifikasi dan kolom jejak.
-- [ ] 9.2 `QueryCache`: kunci seperti di halaman kinerja, kompresi, batas ukuran, kunci serbuan, TTL per
-  widget, lewati cache saat Muat ulang, pembersihan saat baca dan tulis.
-- [ ] 9.3 Batas query bersamaan per tenant dengan kunci bernomor → 429 `analytics.busy` dengan
-  `Retry-After`.
-- [ ] 9.4 Rate limiter `analytics-interactive` per pengguna.
-- [ ] 9.5 `QueryLog` dan kebijakan retensi `analytics_query_log` (bawaan 90 hari, PQ-05).
-- [ ] 9.6 Test: `AnalyticsCacheIsolationTest` (tenant, sidik jari scope, zona waktu, tanggal); TTL;
-  slot habis → 429; nilai saringan field data pribadi tersamarkan di log; retensi terdaftar.
+Selesai 4 Oktober 2026, di atas cabang area 3 (PR #280). Yang dikirim berbeda dari rencana di beberapa
+butir; bedanya dicatat di butir masing-masing (*Dikirim:*), dan [kinerja](/todo/analitik/kinerja-dan-uji-beban),
+[keamanan](/todo/analitik/keamanan#log-query), [mesin query](/todo/analitik/mesin-query#galat), serta
+[arsitektur](/todo/analitik/arsitektur#konfigurasi) ikut diperbarui. Uji bebannya milik area 10.
+
+- [x] 9.1 Tabel cache dan log, dengan klasifikasi dan kolom jejak. *Dikirim:*
+  `2026_10_04_130000_create_analytics_query_cache_and_log_tables`, model `QueryCacheEntry` dan
+  `QueryLogEntry` sebagai pembawa klasifikasi. Kolom `payload` cache diklasifikasi data pribadi, karena
+  hasil principal yang berhak data pribadi dapat memuat nama orang; `principal` log diklasifikasi id
+  orang. Status log dibatasi CHECK `success`/`failed`; jalur masuk (`source`) sengaja tanpa CHECK, karena
+  area 15–20 menambah jalurnya.
+- [x] 9.2 `QueryCache`: kunci seperti di halaman kinerja, kompresi, batas ukuran, kunci serbuan, TTL per
+  widget, lewati cache saat Muat ulang, pembersihan saat baca dan tulis. *Dikirim:* kunci juga memuat
+  batas baris principal (hasil terpotong berbeda per batas). Pembaca tidak menerima hasil yang lebih tua
+  dari TTL-nya sendiri walau barisnya ditulis pemanggil ber-TTL lebih panjang. Penjelajah (`POST query`)
+  memakai TTL 60 detik. Pemanggil yang menunggu kunci serbuan membaca ulang cache tiap 200 ms dan berhenti
+  menunggu sesudah batas waktu principal. Parameter untuk area 6: `RunQuery::handle(…, cacheTtl:, refresh:,
+  source:)` — TTL widget (null bawaan, `0` tanpa cache), Muat ulang, dan `QueryLog::SOURCE_WIDGET`.
+  `WidgetDataController` sudah memakainya: data widget meneruskan `cache_ttl_seconds` widget, `refresh`
+  meneruskan `refresh: true`, dan kedua rutenya memasang limiter `analytics-interactive`.
+- [x] 9.3 Batas query bersamaan per tenant dengan kunci bernomor → 429 `analytics.busy` dengan
+  `Retry-After`. *Dikirim:* `Support\QuerySlots`, kunci `analytics:slot:{tenant}:{n}` di store kunci
+  Laravel, dilepas di `finally`. Masa berlaku kunci dua kali batas waktu ditambah lima detik, bukan satu
+  kali: satu query menjalankan dua pernyataan (hasil dan total) yang masing-masing dibatasi
+  `statement_timeout`. Hasil dari cache tidak memakai jatah. `Retry-After` 2 detik.
+- [x] 9.4 Rate limiter `analytics-interactive` per pengguna. *Dikirim:* di `AnalyticsServiceProvider`
+  (baru, didaftarkan di `bootstrap/providers.php`), dipasang di `POST query`. Jawaban 429-nya berbentuk
+  galat analitik `analytics.rate_limited` berbahasa Indonesia, bukan pesan bawaan Laravel.
+- [x] 9.5 `QueryLog` dan kebijakan retensi `analytics_query_log` (bawaan 90 hari, PQ-05). *Dikirim:*
+  query yang ditolak ikut tercatat dengan kodenya. Yang disamarkan: nilai saringan pada field selain isi
+  bisnis biasa (data pribadi, id orang, data akun), field yang tidak dikenal, seluruh nilai bila datasetnya
+  tidak dikenal, dan rentang waktu pada field data pribadi. `query_hash` log dihitung dari bentuk tersamar.
+  Kebijakan retensinya tampil di Pengaturan → Retensi data (minimum 7 hari).
+- [x] 9.6 Test: `AnalyticsCacheIsolationTest` (tenant, sidik jari scope, zona waktu, tanggal); TTL;
+  slot habis → 429; nilai saringan field data pribadi tersamarkan di log; retensi terdaftar. *Dikirim:*
+  juga `QueryCacheTest`, `QueryLimitsTest`, dan `QueryLogTest`, di atas dataset bahan uji
+  `contoh-a.penjualan` dengan principal sungguhan (`Support\TestPrincipal`; stub PHPUnit memulangkan
+  sidik jari kosong). Cara setiap penjaga dibuat merah dicatat di pull request area 9.
 
 ---
 

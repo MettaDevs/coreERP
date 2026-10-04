@@ -22,9 +22,16 @@ paling menentukan:
 - **`statement_timeout` per transaksi** (8 detik layar, 20 detik luar). Dipasang `SET LOCAL`, jadi
   berlaku hanya untuk query analitik itu dan tidak bocor ke koneksi persisten berikutnya.
 - **Batas baris** dengan `LIMIT n + 1` dan tanda `truncated`.
-- **Query bersamaan per tenant**, bawaan 4 per instance. Diterapkan dengan kunci bernomor di store
-  kunci Laravel (`analytics:slot:{tenant}:{0..3}`, umur kunci = batas waktu + 5 detik); tidak ada slot
-  kosong berarti 429 dengan `Retry-After`. Nama kunci hanya memuat id tenant, bukan data.
+- **Query bersamaan per tenant**, bawaan 4 (`limits.concurrent_per_tenant`). Diterapkan dengan kunci
+  bernomor di store kunci Laravel (`analytics:slot:{tenant}:{0..3}`); tidak ada slot kosong berarti 429
+  `analytics.busy` dengan `Retry-After: 2`. Nama kunci hanya memuat id tenant, bukan data. Kunci dilepas
+  di `finally`, dan umurnya **dua kali** batas waktu ditambah 5 detik — satu query menjalankan dua
+  pernyataan (hasil dan total) yang masing-masing dibatasi `statement_timeout` — supaya proses yang mati
+  keras tidak mengurangi jatah selamanya. Hasil dari cache tidak memakai jatah. Karena store kunci
+  bersama untuk semua instance, batasnya per tenant untuk seluruh instance, bukan per instance.
+- **Laju per pengguna**: limiter bernama `analytics-interactive`, bawaan 120 per menit
+  (`rate_limits.interactive_per_minute`), dipasang di setiap API analitik yang menghitung query; Muat
+  ulang ikut terhitung. Jawaban 429-nya `analytics.rate_limited`.
 
 Kenapa batas bersamaan perlu walau sudah ada batas waktu: server on-prem menjalankan `core-app` satu
 container dengan jumlah proses PHP terbatas. Dua puluh query analitik yang masing-masing sah delapan
@@ -43,6 +50,10 @@ disimpan di tabel tenant sendiri.
 
 ### Tabel
 
+Dikirim area 9 (4 Oktober 2026) sebagai `2026_10_04_130000_create_analytics_query_cache_and_log_tables`,
+dibaca dan ditulis hanya oleh `Cache\QueryCache`. `payload` dikirim ke PostgreSQL sebagai aliran
+(`PARAM_LOB`): binding teks biasa ditolak sebagai UTF-8 yang tidak sah.
+
 ```php
 Schema::create('analytics_query_cache', function (Blueprint $table): void {
     $table->ulid('id')->primary();
@@ -59,9 +70,10 @@ Schema::create('analytics_query_cache', function (Blueprint $table): void {
 });
 ```
 
-Klasifikasi tabelnya `CustomerContent`: isinya angka bisnis tenant. Baris yang kedaluwarsa bukan data
-bisnis dan dihapus fisik oleh pembersihan cache, bukan diarsipkan — sama halnya dengan log yang
-diretensi.
+Klasifikasi tabelnya `CustomerContent`: isinya angka bisnis tenant. Kolom `payload` diklasifikasi
+`EndUserIdentifiableInformation`, karena hasil principal yang berhak data pribadi dapat memuat nama orang.
+Baris yang kedaluwarsa bukan data bisnis dan dihapus fisik oleh pembersihan cache, bukan diarsipkan —
+sama halnya dengan log yang diretensi.
 
 ### Kunci
 
@@ -75,8 +87,13 @@ $key = hash('sha256', json_encode([
     'scope' => $principal->fingerprint($dataset),
     'timezone' => $principal->timezone(),
     'today' => $principal->now()->toDateString(),  // token relatif berubah arti setiap hari
+    'row_limit' => $principal->rowLimit(),         // hasil terpotong berbeda per batas baris
 ], JSON_THROW_ON_ERROR));
 ```
+
+`row_limit` ditambahkan area 9: dua principal berjangkauan sama tetapi berbatas baris berbeda (pengguna
+dan publikasi kelak) tidak boleh berbagi hasil yang terpotong. `AnalyticsCacheIsolationTest` membuktikan
+setiap komponen mengubah kunci sendirian.
 
 `ScopeFingerprint` menghitung hash dari yang menentukan baris mana yang terlihat: hibah kebijakan
 dataset (terurut), hak data pribadi, dan saringan terkunci principal. Dua pengguna dengan hibah sama
@@ -85,9 +102,13 @@ berbagi cache; pengguna dengan hibah berbeda tidak pernah.
 ### Perilaku
 
 - **TTL per widget**, bawaan 300 detik, minimum 60, `0` berarti tanpa cache. Penjelajah tidak
-  memakai cache untuk pratinjau, tetapi memakainya untuk hasil yang sama persis dalam satu menit.
+  memakai cache untuk pratinjau, tetapi memakainya untuk hasil yang sama persis dalam satu menit
+  (`POST query` memakai TTL 60). TTL adalah umur terlama yang diterima **pembaca**: hasil yang ditulis
+  widget ber-TTL sepuluh menit tidak dibaca penjelajah sesudah satu menit. Pemanggilnya
+  `RunQuery::handle(…, cacheTtl:, refresh:, source:)`; area 6 meneruskan TTL widget dan Muat ulang.
 - **Serbuan dicegah** dengan kunci `analytics:compute:{tenant}:{cache_key}` selama perhitungan; pemanggil
-  kedua menunggu sebentar lalu membaca hasil pemanggil pertama.
+  kedua membaca ulang cache setiap 200 ms lalu memakai hasil pemanggil pertama. Bila kunci lepas tanpa
+  hasil (terlalu besar, atau gagal), atau batas waktu principal habis, ia menghitung sendiri.
 - **Hasil besar tidak di-cache** (lebih dari `cache.max_payload_kb`).
 - **Tombol Muat ulang** melewati cache untuk satu widget, dan tetap tunduk pada rate limit.
 - **Pembersihan**: baris kedaluwarsa dihapus saat terbaca, dan setiap penulisan menghapus paling banyak

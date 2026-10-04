@@ -7,6 +7,7 @@ use App\Foundation\NumberSequence\NumberSequenceServiceProvider;
 use App\Foundation\UnitOfMeasure\UnitOfMeasureServiceProvider;
 use App\Foundation\Vendor\VendorServiceProvider;
 use App\Foundation\Workflow\WorkflowServiceProvider;
+use App\Platform\Analytics\AnalyticsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\ModuleServiceProvider;
@@ -14,6 +15,8 @@ use App\Providers\ModuleServiceProvider;
 return [
     AppServiceProvider::class,
     FortifyServiceProvider::class,
+    // Engine analitik: limiter API layarnya (area 9) dan, kelak, rute embed (area 17).
+    AnalyticsServiceProvider::class,
     // Fitur Foundation mendaftarkan ikatannya sendiri, sebelum penyedia layanan module dimuat,
     // supaya module yang memakai facade-nya saat register menemukan pelaksananya.
     CurrencyServiceProvider::class,
