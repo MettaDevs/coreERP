@@ -22,7 +22,11 @@ final class RowCursor
     /** Panjang tertinggi cursor yang diterima, sebelum dibaca. */
     public const MAX_LENGTH = 200;
 
-    /** Cakupan cursor: publikasi, versinya, dan bentuk normal query efektif. */
+    /**
+     * Cakupan cursor: publikasi, versinya, dan bentuk normal query efektif.
+     *
+     * @param  array<string, mixed>  $normalizedQuery
+     */
     public static function scope(string $publicationId, int $publicationVersion, array $normalizedQuery): string
     {
         return substr(hash('sha256', $publicationId.'|'.$publicationVersion.'|'.json_encode($normalizedQuery, JSON_THROW_ON_ERROR)), 0, 24);

@@ -42,7 +42,7 @@ final class PublicationPresenter
         $clientIds = $publications->flatMap(static fn (Publication $publication): array => $publication->client_ids)->unique()->values()->all();
         $clients = IntegrationClient::query()->where('tenant_id', $membership->tenant_id)->whereIn('id', $clientIds)->get()->keyBy('id');
 
-        return $publications->map(fn (Publication $publication): array => $this->one($publication, $membership, $canManage, $clients))->values()->all();
+        return array_values($publications->map(fn (Publication $publication): array => $this->one($publication, $membership, $canManage, $clients))->all());
     }
 
     /**

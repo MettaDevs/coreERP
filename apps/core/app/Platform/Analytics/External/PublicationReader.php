@@ -145,12 +145,13 @@ final class PublicationReader
             }
         }
 
-        $threshold = $publication->min_group_size;
-        $countKey = $threshold === null ? null : self::countMeasure($dataset);
-        if ($threshold !== null && $countKey === null) {
-            throw PublicationErrors::unavailable('datanya tidak lagi punya jumlah baris untuk menyembunyikan kelompok kecil.');
-        }
-        $hiddenCount = $countKey !== null && ! in_array($countKey, $parsed->measures, true) ? $countKey : null;
+        // Ambang kelompok kecil beserta measure jumlah baris yang menghitungnya, atau null bila mati.
+        $small = $publication->min_group_size === null ? null : [
+            'threshold' => $publication->min_group_size,
+            'count' => self::countMeasure($dataset)
+                ?? throw PublicationErrors::unavailable('datanya tidak lagi punya jumlah baris untuk menyembunyikan kelompok kecil.'),
+        ];
+        $hiddenCount = $small !== null && ! in_array($small['count'], $parsed->measures, true) ? $small['count'] : null;
 
         try {
             $query = $this->normalizer->normalize($this->parser->parse(self::effective($base, $filters, $hiddenCount)));
@@ -169,17 +170,17 @@ final class PublicationReader
 
         $rows = $result->rows;
         $hidden = 0;
-        if ($threshold !== null && $countKey !== null) {
+        if ($small !== null) {
             $kept = [];
             foreach ($rows as $row) {
-                $sources = (int) ($row[$countKey] ?? 0);
-                if ($sources > 0 && $sources < $threshold) {
+                $sources = (int) ($row[$small['count']] ?? 0);
+                if ($sources > 0 && $sources < $small['threshold']) {
                     $hidden++;
 
                     continue;
                 }
                 if ($hiddenCount !== null) {
-                    unset($row[$countKey]);
+                    unset($row[$hiddenCount]);
                 }
                 $kept[] = $row;
             }
