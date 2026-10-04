@@ -61,4 +61,14 @@ return [
     'log' => [
         'retention_days' => (int) env('COREERP_ANALYTICS_LOG_RETENTION_DAYS', 90),
     ],
+
+    // Area 15: publikasi yang dibaca sistem luar lewat klien integrasi. `rows_max` adalah batas baris hasil
+    // satu publikasi sebelum dibagi per halaman; hasil yang lebih panjang dipotong dan ditandai
+    // `meta.truncated`. `timeout_ms` adalah `statement_timeout` query publikasi, lebih longgar daripada layar
+    // karena pemanggilnya mesin yang menunggu, bukan orang. Rate limit-nya milik klien integrasi
+    // (`coreerp.integration_api_rate_limit`), bersama endpoint integrasi lain.
+    'publications' => [
+        'rows_max' => (int) env('COREERP_ANALYTICS_PUBLICATION_ROWS_MAX', 20000),
+        'timeout_ms' => (int) env('COREERP_ANALYTICS_PUBLICATION_TIMEOUT_MS', 15000),
+    ],
 ];

@@ -62,6 +62,10 @@ class IntegrationClient extends Model
         'finance-postings.ack' => 'Mengirim ack posting (dibukukan atau ditolak)',
         'vendors.read' => 'Membaca vendor',
         'operating-units.read' => 'Membaca operating unit dan nomornya',
+        // Area 15 analitik: membaca publikasi yang membuka klien ini. `analytics.embed` disiapkan untuk embed
+        // (area 17) dan belum membuka endpoint apa pun.
+        'analytics.read' => 'Membaca publikasi analitik',
+        'analytics.embed' => 'Mencetak token embed analitik',
     ];
 
     protected $fillable = [

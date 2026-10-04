@@ -6,6 +6,7 @@ use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceControl
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Foundation\Workflow\Http\Controllers\Internal\InternalWorkflowInstanceController;
+use App\Platform\Analytics\Http\Controllers\Internal\PublicationFeedController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
@@ -59,6 +60,18 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.ack'])->group(function (): void {
     Route::post('finance-postings/{posting_id}/ack', [FinancePostingFeedController::class, 'ack'])
         ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*');
+});
+
+/*
+ * Publikasi analitik untuk sistem di luar CoreERP (engine analitik area 15, KA-11): klien integrasi hanya
+ * membaca publikasi yang dibuat pengguna tenant dan yang menyebut klien itu, tidak pernah query bebas.
+ * Kontraknya `contracts/internal/integrasi-analitik.yaml`; rate limit-nya jatah klien integrasi yang sama
+ * dengan feed finance.
+ */
+Route::prefix('internal/v1/analytics')->middleware(['throttle:integration-client', 'integration-client:analytics.read'])->group(function (): void {
+    Route::get('publications', [PublicationFeedController::class, 'index']);
+    Route::get('publications/{code}', [PublicationFeedController::class, 'show'])->where('code', '[A-Za-z0-9][A-Za-z0-9_-]{0,79}');
+    Route::get('publications/{code}/rows', [PublicationFeedController::class, 'rows'])->where('code', '[A-Za-z0-9][A-Za-z0-9_-]{0,79}');
 });
 
 /*
