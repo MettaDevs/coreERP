@@ -9,8 +9,12 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Query yang sudah disusun tetapi belum dijalankan. `builder` sudah membawa `LIMIT limit + 1`, sehingga
- * baris ke-`limit + 1` hanya menandai hasil terpotong; `totals` query total (area 3), null bila tidak
- * diminta.
+ * baris ke-`limit + 1` hanya menandai hasil terpotong; `totals` query total — satu baris per mata uang dan
+ * satuan, tanpa batas baris — atau null bila tidak diminta. `columns` urutan kolom hasil beserta alias
+ * SQL-nya, yang dipetakan {@see ResultSet} kembali ke kunci dataset.
+ *
+ * Dipegang {@see QueryExecutor} untuk dijalankan atau di-`EXPLAIN`, dan oleh test yang memeriksa SQL-nya
+ * (`$compiled->builder->toBase()->toSql()`) tanpa membaca data.
  */
 final readonly class CompiledQuery
 {
