@@ -25,7 +25,7 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | --- | --- | --- | --- |
 | Satu query | `Actions\RunQuery` | Registry, akses, validasi, lalu compile dan eksekusi di dalam `TenantRunner::runFor()`; dipakai setiap jalur masuk, tempat cache dan log menumpang | 0, 9 |
 | Registry dataset | `Datasets\DatasetRegistry`, `Datasets\DatasetValidator` | Mengumpulkan dataset dari module, memvalidasi definisinya dua tahap, menyaring menurut module terpasang dan berlisensi | 0 (tipis), 1 |
-| Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 1, 4 |
+| Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 6 |
 | Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, vendor, mata uang: label (area 1); periode, pemilih, dan drill-across (area 14) | 1, 14 |
 | Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryNormalizer`, `Query\QueryValidator` | JSON → objek tak berubah → bentuk normal; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
@@ -40,7 +40,7 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | Sidik jari scope | `Security\ScopeFingerprint` | Kunci cache yang memisahkan pengguna dengan jangkauan berbeda | 4, 9 |
 | Cache | `Cache\QueryCache` | Hasil di tabel tenant, kunci terhadap serbuan, TTL | 9 |
 | Log | `Support\QueryLog` | Satu baris per query: sumber, durasi, baris, status | 9 |
-| Dasbor | `Models\Dashboard`, `Models\Widget`, `Models\SavedQuery`, `Http\Controllers\*` | Penyimpanan dan API layar | 6 |
+| Dasbor | `Models\Dashboard`, `Models\Widget`, `Models\SavedQuery`, `Dashboards\*`, `Http\Controllers\*`, `Http\Presenters\DashboardPresenter` | Penyimpanan, aturan berbagi, pemeriksaan widget, dan API layar | 6 |
 | Template | `Contracts\Analytics\DashboardTemplates` + `Templates\TemplateInstaller` | Template bawaan module → dasbor tenant | 18 |
 | Publikasi | `Models\Publication`, `External\PublicationController` | Query tersimpan atau dasbor yang dibuka ke luar | 15 |
 | Feed OData | `External\OData\*` | `$metadata`, entity set, `$filter` → query analitik | 16 |
@@ -165,7 +165,7 @@ apps/core/app/Platform/Analytics/
 │   ├── CompiledDataset.php  CompiledMeasure.php  InvalidDatasetDefinition.php      (0, 1)
 │   ├── DatasetValidator.php  DeclaredDataset.php                                   (1) aturan definisi
 │   ├── CompiledJoin.php  CompiledReference.php                                     (1)
-│   ├── DatasetCatalog.php              katalog per principal
+│   ├── DatasetCatalog.php              (6) katalog per principal
 │   ├── SharedDimensionRegistry.php     (1) implements Contracts\Analytics\SharedDimensions
 │   └── OrganizationLabels.php  MemberLabels.php                                    (1) resolver milik Platform
 ├── Query/
@@ -184,16 +184,21 @@ apps/core/app/Platform/Analytics/
 │   ├── PublicationPrincipal.php  PersonalDataGate.php
 ├── Cache/QueryCache.php
 ├── Support/QueryLog.php
+├── Dashboards/
+│   ├── DashboardAccess.php             (6) aturan berbagi dasbor dan query tersimpan (K-25)
+│   ├── StoredQuery.php                 (6) query widget dan query tersimpan: periksa, ringkas, baca + `renamed`
+│   └── WidgetDefinition.php            (6) aturan `visual` per jenis widget
 ├── Models/
-│   ├── Dashboard.php  Widget.php  SavedQuery.php  QueryLogEntry.php  QueryCacheEntry.php
+│   ├── Dashboard.php  Widget.php  SavedQuery.php  BindsWithinActiveTenant.php     (6)
+│   ├── QueryLogEntry.php  QueryCacheEntry.php
 │   ├── Publication.php  EmbedToken.php                                        (fase 2)
 ├── Http/
 │   ├── Controllers/  QueryController  ExploreController                           (0)
-│   │                 DatasetController  DashboardController
-│   │                 WidgetController  WidgetDataController  SavedQueryController
+│   │                 DatasetController  DashboardController  DashboardPageController
+│   │                 WidgetController  WidgetDataController  SavedQueryController  (6)
 │   ├── Middleware/   (EnsureAnalyticsEnabled area 0 dibuang area 4 bersama saklarnya)
-│   ├── Requests/     StoreDashboardRequest  UpdateWidgetRequest  RunQueryRequest …
-│   └── Presenters/   DashboardPresenter  ResultSetPresenter
+│   ├── Requests/     (area 6 memvalidasi di controller, seperti preset laporan)
+│   └── Presenters/   DashboardPresenter (6)  ResultSetPresenter
 ├── External/       PublicationController.php  OData/*                         (fase 2)
 ├── Embed/          EmbedTokenIssuer.php  AuthenticateEmbedToken.php  EmbedPageController.php
 ├── Templates/      TemplateInstaller.php                                      (fase 2)

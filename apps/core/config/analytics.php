@@ -30,5 +30,9 @@ return [
         'measures' => (int) env('COREERP_ANALYTICS_MAX_MEASURES', 12),
         'filters' => (int) env('COREERP_ANALYTICS_MAX_FILTERS', 20),
         'sort' => (int) env('COREERP_ANALYTICS_MAX_SORT', 3),
+
+        // Widget per dasbor (area 6). Widget yang melewatinya ditolak 422 `analytics.limit_exceeded` saat
+        // ditambahkan; dasbor penuh membuka terlalu banyak query sekaligus.
+        'widgets_per_dashboard' => (int) env('COREERP_ANALYTICS_WIDGETS_PER_DASHBOARD', 24),
     ],
 ];
