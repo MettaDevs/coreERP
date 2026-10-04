@@ -5,76 +5,44 @@ declare(strict_types=1);
 namespace App\Platform\Analytics\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Platform\Analytics\Dashboards\DashboardAccess;
 use App\Platform\Analytics\Datasets\CompiledDataset;
-use App\Platform\Analytics\Datasets\CompiledMeasure;
-use App\Platform\Analytics\Datasets\DatasetRegistry;
-use App\Platform\Analytics\Security\AnalyticsPrincipal;
-use App\Platform\Analytics\Security\DatasetAccess;
-use App\Platform\Analytics\Security\PersonalDataGate;
+use App\Platform\Analytics\Datasets\DatasetCatalog;
 use App\Platform\Analytics\Security\UserPrincipal;
 use App\Platform\Identity\Support\UserClock;
-use App\Platform\Modules\Contracts\Analytics\Aggregate;
-use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
-use App\Platform\Modules\Contracts\FieldType;
-use App\Platform\Modules\Contracts\FilterField;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Halaman Analisis data sementara (area 0, kerangka berjalan): satu tile dan satu grafik kolom dari
- * `POST /api/v1/analytics/query`, untuk membuktikan setiap lapis tersambung. Area 8 menggantinya dengan
- * penjelajah sungguhan.
+ * Halaman Analisis data (`/analytics/explore`, area 8): penjelajah satu dataset — padanan *Data analysis mode*
+ * Business Central (KA-21) — dijaga `core.analytics.explore.invoke` di gate rute.
  *
- * Query-nya disusun dari dataset pertama yang boleh dibaca pengguna, bukan ditulis mati: Core tidak
- * menyebut nama module mana pun. Tile memakai measure hitung pertama dataset, grafik memakai measure
- * uang pertama per field pilihan pertama; judul keduanya dari nama tampilan yang dinyatakan module.
- * Field dan measure data pribadi tidak ditawarkan kepada pengguna tanpa hak itu ({@see PersonalDataGate}).
+ * Prop-nya hanya daftar data yang boleh dibaca pengguna ini (katalog yang sama dengan
+ * `GET api/v1/analytics/datasets`) dan hak menyimpan. Query-nya tinggal di query string dan dibaca layar setiap
+ * render, jadi server tidak membacanya: mengubah query tidak memuat ulang halaman, dan tautan yang dibagikan
+ * membuka analisis yang sama. Isi dataset dan hasilnya diminta layar lewat API, dihitung sebagai pengguna yang
+ * membuka.
  */
 final class ExploreController extends Controller
 {
-    public function __construct(private readonly PersonalDataGate $personalData) {}
+    public function __construct(
+        private readonly DatasetCatalog $catalog,
+        private readonly DashboardAccess $access,
+        private readonly UserClock $clock,
+    ) {}
 
-    public function __invoke(Request $request, DatasetRegistry $datasets, DatasetAccess $access, UserClock $clock): Response
+    public function __invoke(Request $request): Response
     {
-        $principal = UserPrincipal::fromMembership($this->currentMembership($request), $clock->timezone($request));
+        $membership = $this->currentMembership($request);
+        $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request));
 
-        $preview = null;
-        foreach ($datasets->all() as $dataset) {
-            $preview = $access->allows($principal, $dataset) ? $this->preview($dataset, $principal) : null;
-            if ($preview !== null) {
-                break;
-            }
-        }
-
-        return Inertia::render('platform/analytics/explore', ['preview' => $preview]);
-    }
-
-    /**
-     * @return array{dataset: array{code: string, caption: string}, tile: array{caption: string, query: array{dataset: string, measures: list<string>}}, chart: array{caption: string, query: array{dataset: string, dimensions: list<string>, measures: list<string>}}|null}|null
-     */
-    private function preview(CompiledDataset $dataset, AnalyticsPrincipal $principal): ?array
-    {
-        $measures = array_values($this->personalData->visibleMeasures($dataset, $principal));
-        if ($measures === []) {
-            return null;
-        }
-
-        $count = array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->aggregate === Aggregate::Count) ?? $measures[0];
-        $value = array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->format === MeasureFormat::Money)
-            ?? array_find($measures, static fn (CompiledMeasure $measure): bool => $measure->aggregate === Aggregate::Sum);
-        $category = array_find($this->personalData->visibleFields($dataset, $principal), static fn (FilterField $field): bool => $field->type === FieldType::Option);
-
-        return [
-            'dataset' => ['code' => $dataset->code, 'caption' => $dataset->caption],
-            'tile' => [
-                'caption' => $count->caption,
-                'query' => ['dataset' => $dataset->code, 'measures' => [$count->key]],
-            ],
-            'chart' => $value === null || $category === null ? null : [
-                'caption' => $value->caption.' per '.mb_strtolower($category->caption),
-                'query' => ['dataset' => $dataset->code, 'dimensions' => [$category->key], 'measures' => [$value->key]],
-            ],
-        ];
+        return Inertia::render('platform/analytics/explore', [
+            'datasets' => array_map(
+                fn (CompiledDataset $dataset): array => $this->catalog->summary($dataset),
+                $this->catalog->forPrincipal($principal),
+            ),
+            'abilities' => ['create' => $this->access->mayCreate($membership), 'share' => $this->access->mayShare($membership)],
+        ]);
     }
 }

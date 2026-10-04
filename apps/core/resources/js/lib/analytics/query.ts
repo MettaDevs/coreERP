@@ -143,3 +143,91 @@ export function groupRowsByImplicit(
         rows: grouped,
     }));
 }
+
+/*
+ * Area 8: query penjelajah di query string (`/analytics/explore?q=…&view=…`), supaya analisis dapat dibagikan
+ * sebagai tautan. Layar membacanya dari URL setiap render dan menulisnya kembali lewat kunjungan sisi peramban;
+ * query tidak pernah disalin ke state.
+ */
+
+export const EXPLORE_PATH = '/analytics/explore';
+
+/** Query kosong untuk satu data: belum ada nilai, pengelompokan, saringan, atau periode. */
+export function emptyQuery(dataset = ''): AnalyticsQuery {
+    return { dataset, measures: [] };
+}
+
+/** Alamat penjelajah untuk query dan jenis tampilan ini; query tanpa data tidak ditulis. */
+export function exploreUrl(
+    query: AnalyticsQuery | null,
+    view: string | null,
+): string {
+    const params = new URLSearchParams();
+
+    if (query !== null && query.dataset !== '') {
+        params.set('q', JSON.stringify(buildQuery(query)));
+    }
+
+    if (view !== null) {
+        params.set('view', view);
+    }
+
+    const search = params.toString();
+
+    return search === '' ? EXPLORE_PATH : `${EXPLORE_PATH}?${search}`;
+}
+
+export type ExploreUrlState = {
+    query: AnalyticsQuery | null;
+    view: string | null;
+    /** `q` ada tetapi bukan query yang dapat dibaca, misalnya tautan yang terpotong. */
+    unreadable: boolean;
+};
+
+/**
+ * Query dan jenis tampilan dari alamat halaman (`usePage().url`, path beserta query string). Hanya bentuknya
+ * yang diperiksa di sini; isinya tetap divalidasi server saat dijalankan.
+ */
+export function readExploreUrl(url: string): ExploreUrlState {
+    const params = new URL(url, 'http://localhost').searchParams;
+    const view = params.get('view');
+    const raw = params.get('q');
+
+    if (raw === null) {
+        return { query: null, view, unreadable: false };
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(raw);
+
+        if (isQueryShape(parsed)) {
+            return { query: parsed, view, unreadable: false };
+        }
+    } catch {
+        // Ditangani di bawah: tautan yang tidak terbaca dibuka sebagai analisis kosong.
+    }
+
+    return { query: null, view, unreadable: true };
+}
+
+function isQueryShape(value: unknown): value is AnalyticsQuery {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+    }
+
+    const query = value as Record<string, unknown>;
+    const list = (item: unknown) => item === undefined || Array.isArray(item);
+    const record = (item: unknown) =>
+        item === undefined ||
+        (typeof item === 'object' && item !== null && !Array.isArray(item));
+
+    return (
+        typeof query.dataset === 'string' &&
+        Array.isArray(query.measures) &&
+        query.measures.every((item) => typeof item === 'string') &&
+        list(query.dimensions) &&
+        list(query.sort) &&
+        record(query.filters) &&
+        record(query.time_range)
+    );
+}

@@ -39,7 +39,7 @@ final class SavedQueryController extends Controller
 {
     private const CODE_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,79}$/';
 
-    private const DUPLICATE_CODE = 'Kode ini sudah dipakai query lain di tenant ini. Pilih kode lain.';
+    private const DUPLICATE_CODE = 'Kode ini sudah dipakai analisis tersimpan lain. Pilih kode lain.';
 
     public function __construct(
         private readonly DashboardAccess $access,

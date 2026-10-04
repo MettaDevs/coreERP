@@ -47,7 +47,7 @@ final class StoredQuery
     public function validate(AnalyticsPrincipal $principal, mixed $input, string $path = 'query'): array
     {
         if (! is_array($input)) {
-            throw AnalyticsQueryException::invalidQuery($path, 'Susun query lebih dulu: pilih data dan nilai yang dihitung.');
+            throw AnalyticsQueryException::invalidQuery($path, 'Susun analisisnya lebih dulu: pilih data dan nilai yang dihitung.');
         }
 
         try {

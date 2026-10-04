@@ -225,10 +225,10 @@ apps/core/routes/analytics.php     (0) di-require dari routes/web.php, grup `aut
                                    halaman `/analytics/...` dan API `api/v1/analytics/...` di satu berkas
 apps/core/database/migrations/2026_10_xx_*_analytics_*.php
 apps/core/resources/js/
-├── pages/platform/analytics/  explore.tsx (0, sementara)  index.tsx  dashboard.tsx  publications.tsx
+├── pages/platform/analytics/  explore.tsx (0, penjelajah sejak 8)  index.tsx  dashboard.tsx  publications.tsx
 ├── components/analytics/      widget-frame.tsx  kpi-tile.tsx  chart-widget.tsx  table-widget.tsx
-│                              widget-builder.tsx  filter-editor.tsx  dataset-picker.tsx …
-├── lib/analytics/             types.ts (0)  format.ts (0)  query.ts (2)  api.ts
+│                              widget-builder.tsx  query-editor.tsx  filter-editor.tsx  dataset-picker.tsx … (8)
+├── lib/analytics/             types.ts (0)  format.ts (0)  query.ts (2)  api.ts  visual.ts (8)
 └── embed/analytics.tsx                                                         (fase 2)
 
 modules/apperp/management-aset/src/Analytics/

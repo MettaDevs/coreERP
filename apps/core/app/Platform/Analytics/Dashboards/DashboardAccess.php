@@ -75,8 +75,8 @@ final class DashboardAccess
     {
         $this->authorizeView($membership, $item);
         abort_unless($this->canEdit($membership, $item), 403, $item->shared
-            ? 'Anda belum boleh mengubah dasbor dan query bersama.'
-            : 'Anda belum boleh mengubah dasbor dan query pribadi.');
+            ? 'Anda belum boleh mengubah dasbor dan analisis bersama.'
+            : 'Anda belum boleh mengubah dasbor dan analisis pribadi.');
     }
 
     /**
@@ -85,8 +85,8 @@ final class DashboardAccess
      */
     public function authorizeCreate(TenantMembership $membership, bool $shared): void
     {
-        abort_unless($this->mayCreate($membership), 403, 'Anda belum boleh membuat dasbor dan query.');
-        abort_if($shared && ! $this->mayShare($membership), 403, 'Anda belum boleh membagikan dasbor dan query ke semua pengguna.');
+        abort_unless($this->mayCreate($membership), 403, 'Anda belum boleh membuat dasbor dan analisis.');
+        abort_if($shared && ! $this->mayShare($membership), 403, 'Anda belum boleh membagikan dasbor dan analisis ke semua pengguna.');
     }
 
     /**
@@ -99,8 +99,8 @@ final class DashboardAccess
             return;
         }
 
-        abort_unless($this->mayShare($membership), 403, 'Anda belum boleh membagikan dasbor dan query ke semua pengguna.');
-        abort_if($shared && $item->user_id !== (int) $membership->user_id, 403, 'Hanya pemiliknya yang dapat membagikan dasbor atau query pribadi.');
+        abort_unless($this->mayShare($membership), 403, 'Anda belum boleh membagikan dasbor dan analisis ke semua pengguna.');
+        abort_if($shared && $item->user_id !== (int) $membership->user_id, 403, 'Hanya pemiliknya yang dapat membagikan dasbor atau analisis pribadi.');
     }
 
     /**

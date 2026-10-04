@@ -229,22 +229,33 @@ class WalkingSkeletonTest extends TestCase
         $this->organization((string) $this->membership->tenant_id, 'operating_unit', 'Unit sesudah analitik');
     }
 
-    public function test_page_offers_a_tile_and_a_chart_from_the_first_readable_dataset(): void
+    /**
+     * Penjelajah (area 8) hanya menerima daftar data yang boleh dibaca dan hak menyimpan; query-nya tinggal di
+     * query string dan dibaca layar, jadi halaman yang dibuka dengan query tetap memulangkan prop yang sama.
+     */
+    public function test_page_offers_the_readable_datasets_and_ignores_the_query_string(): void
     {
-        $this->actingAs($this->owner)->get('/analytics/explore')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('platform/analytics/explore')
-                // Pratinjau memakai dataset pertama yang boleh dibaca menurut kode; sejak module aset punya
-                // banyak dataset (area 5) itu bukan lagi register aset, jadi yang dipastikan hanya bentuknya.
-                ->where('preview.dataset.code', fn (string $code): bool => str_starts_with($code, 'management-aset.'))
-                ->where('preview.tile.query.measures', ['count'])
-                ->has('preview.chart.query.dimensions'));
+        $catalog = ['management-aset.asset-register', 'management-aset.book-values'];
+        $query = urlencode((string) json_encode(['dataset' => 'management-aset.asset-register', 'measures' => ['count']]));
+
+        foreach (['/analytics/explore', "/analytics/explore?q={$query}&view=column"] as $url) {
+            $this->actingAs($this->owner)->get($url)->assertOk()
+                ->assertInertia(fn (AssertableInertia $page) => $page
+                    ->component('platform/analytics/explore')
+                    ->where('datasets', fn ($datasets): bool => array_diff($catalog, collect($datasets)->pluck('code')->all()) === [])
+                    ->where('datasets.0', fn ($dataset): bool => collect($dataset)->keys()->all() === ['code', 'caption', 'description', 'module_id', 'version'])
+                    ->where('abilities', ['create' => true, 'share' => true])
+                    ->missing('preview'));
+        }
     }
 
     public function test_page_without_readable_dataset_offers_nothing(): void
     {
         $this->actingAs($this->member(['management-aset.group-aset.manage']))->get('/analytics/explore')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/analytics/explore')->where('preview', null));
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/analytics/explore')
+                ->where('datasets', [])
+                ->where('abilities', ['create' => true, 'share' => false]));
     }
 
     /**
