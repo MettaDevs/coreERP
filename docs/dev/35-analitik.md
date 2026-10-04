@@ -7,9 +7,9 @@ Satu baris di `analytics_dashboards` adalah satu dasbor milik satu pengguna, sat
 Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, aturan apa yang ditegakkan kode, dan kenapa. Ia menjelaskan yang **sudah dikirim**. Rencana, riset, dan keputusan `KA-xx` ada di [folder rencana engine analitik](../todo/analitik/README.md); bila rencana dan kode berbeda, kodenya yang benar.
 
 ::: info Yang sudah ada dan yang menyusul
-Sudah ada di Core: kontrak dataset dan registry, model query, compiler dan eksekusi baca-saja, keamanan baca beserta rantai permission, penyimpanan dasbor dan API layarnya, layar dasbor, serta cache, batas beban, dan log query. Module aset sudah menyatakan dataset ([daftarnya](/apps/management-aset/transaction/analitik/)).
+Sudah ada di Core: kontrak dataset dan registry, model query, compiler dan eksekusi baca-saja, keamanan baca beserta rantai permission, penyimpanan dasbor dan API layarnya, layar dasbor, cache, batas beban, dan log query, serta — dari fase 2 — rumus, perbandingan periode, persen terhadap total, dan token tahun fiskal di mesin query. Module aset sudah menyatakan dataset ([daftarnya](/apps/management-aset/transaction/analitik/)).
 
-Menyusul, dan tidak ditulis di sini sebelum kodenya ada: pembangun widget dan penjelajah ([area 8](../todo/analitik/todo-fase-1.md)), uji beban ([area 10](../todo/analitik/todo-fase-1.md)), dan seluruh [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, rumus, perbandingan periode, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
+Menyusul, dan tidak ditulis di sini sebelum kodenya ada: pembangun widget dan penjelajah ([area 8](../todo/analitik/todo-fase-1.md)), uji beban ([area 10](../todo/analitik/todo-fase-1.md)), editor rumus di pembangun, dan sisa [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
 :::
 
 ## Konsep yang mudah tertukar
@@ -188,7 +188,7 @@ Hanya role Owner memegang duty ini otomatis, termasuk data pribadi. Role lain me
 
 **Saringan terkunci yang kosong berarti nol baris.** `FieldFilterExpression` membaca nilai kosong sebagai "tanpa saringan", jadi daftar nilai `[]` yang tidak dijaga akan diam-diam melepas saringannya. Hal yang sama berlaku untuk saringan terkunci yang menyebut field yang tidak lagi dikenal dataset. Saringan terkunci belum dipakai pengguna biasa (principal pengguna selalu mengembalikan kosong); ia disiapkan untuk publikasi dan embed.
 
-**Saringan pada kolom yang tidak dikenal ditolak, bukan diabaikan.** Saringan yang diabaikan memulangkan angka yang lebih besar dari yang diminta, tanpa tanda apa pun. Prinsip yang sama berlaku untuk kunci query yang belum dibaca engine: `compare` dan `formulas` dijawab "belum tersedia", bukan dilewati.
+**Saringan pada kolom yang tidak dikenal ditolak, bukan diabaikan.** Saringan yang diabaikan memulangkan angka yang lebih besar dari yang diminta, tanpa tanda apa pun. Prinsip yang sama berlaku untuk bagian query yang tidak dikenal: ia ditolak dengan path-nya, bukan dilewati.
 
 **Hak membaca diperiksa sebelum query dicocokkan dengan dataset.** Pengguna tanpa hak tidak boleh belajar nama kolom dari pesan galat. Module yang tidak terpasang atau tidak berlisensi dijawab 404 seperti dataset yang tidak ada; tanpa permission baca dijawab 403. Pemasangan dibaca dari catatan `core_module_installations` lewat `LaunchableAppCatalog::readyModules()`, tidak dari entitlement.
 
@@ -219,6 +219,30 @@ Hanya role Owner memegang duty ini otomatis, termasuk data pribadi. Role lain me
 **Celah deret waktu diisi, kecuali mengisinya akan berbohong.** Bulan tanpa baris tetap tampil: nol untuk `count` dan `sum`, kosong untuk `avg`, `min`, dan `max` — rata-rata dari nol baris bukan nol. `GapFiller` tidak mengisi bila hasil terpotong (periode yang hilang mungkin terpotong, bukan kosong), bila urutan pertama bukan periodenya, atau bila isiannya melebihi batas titik atau baris.
 
 **Desimal keluar sebagai string.** Jumlah baris dikirim sebagai angka; uang dan desimal sebagai string, karena `numeric` PostgreSQL lebih presisi daripada angka JavaScript. Layar memformatnya lewat `resources/js/lib/analytics/format.ts`, bukan menghitungnya.
+
+### Rumus, perbandingan periode, dan persen terhadap total
+
+Tiga bagian query fase 2 (area 13). Bentuk JSON-nya di [mesin query](../todo/analitik/mesin-query.md#bahasa-rumus) dan di skema `resources/schemas/analytics-query.schema.json`.
+
+**Rumus adalah bahasa kecil sendiri yang dikompilasi ke SQL, bukan DAX dan bukan SQL dari pengguna (KA-19).** `Query\Formula\Parser` membaca teks rumus menjadi pohon simpul dengan daftar fungsi tertutup — `BAGI`, `JIKA`, `ABS`, `BULAT`, `MIN`, `MAKS` — dan menolak apa pun di luarnya **di karakter tempatnya**, sebelum ada SQL: fungsi asing, kurung tanpa pasangan, titik koma di luar fungsi, perbandingan di luar `JIKA`. `[count]); drop table x; --` berhenti di karakter 8. `FormulaExpression` menyusun SQL dari pohon itu saja: angka menjadi binding `cast(? as numeric)`, measure menjadi ekspresi agregatnya, dan tanda hitung dipetakan dari daftar tetap. Galatnya 422 `analytics.invalid_formula` dengan `field` (`formulas.0.expression`) dan `position`, supaya editor dapat menandai tempatnya.
+
+**Angka ditulis cara Indonesia, seperti filter tambahan K-30.** `1.000,5` adalah seribu koma lima; isian fungsi karena itu dipisah titik koma, `BAGI([a]; [b])`.
+
+**Bagi nol tidak pernah menjadi galat.** `a / b` kosong bila `b` nol, `BAGI(a; b)` nol, `BAGI(a; b; c)` bernilai `c`. Setiap measure di dalam rumus dibulatkan ke `numeric`, jadi `[a] / [count]` tidak menjadi pembagian bilangan bulat.
+
+**Rumus dihitung di atas agregat, di SQL yang sama.** Ia dipilih lewat `measures` seperti measure dataset, jadi `sort` dan `limit` dapat memakainya, dan total menghitung rumus atas total — rasio jumlah, bukan jumlah rasio. Rumus tidak boleh memakai rumus lain, dan hanya measure yang hasilnya angka boleh dirujuk: terkecil atau terbesar atas tanggal ditolak.
+
+**Rumus mewarisi mata uang measure di dalamnya (KA-22).** Kolom mata uang dan satuan measure yang dirujuk ikut dikelompokkan walau measure-nya sendiri tidak dipilih. Rumus yang mencampur dua kolom mata uang, atau dua kolom satuan, ditolak; uang dibagi hitungan boleh. Format `money` dan `quantity` butuh measure uang atau kuantitas di dalam rumusnya, dan kolom hasilnya membawa `currency_key` atau `unit_key` measure itu.
+
+**Perbandingan periode menjalankan langkah filter dan pengelompokan dua kali, lalu menggabungkan keduanya di SQL.** `Comparison` menghitung rentang pembanding menurut zona principal: `previous_year` mundur dua belas bulan; `previous_period` memakai langkah token — bulan ini dengan bulan lalu, awal bulan sampai hari ini dengan tanggal yang sama bulan lalu — dan untuk rentang tertulis, sebanyak bulan penuhnya atau harinya. Rentang bulan penuh tetap bulan penuh, jadi Februari kabisat terbaca sampai tanggal 29. Ember waktu query pembanding digeser maju sebanyak pergeserannya (`TimeBucketExpression`), sehingga Oktober tahun lalu jatuh di ember Oktober tahun ini. Kedua sisi disatukan dengan `UNION ALL` lalu `GROUP BY` semua dimensi — sama dengan gabungan luar penuh dengan kosong bertemu kosong; `FULL JOIN … IS NOT DISTINCT FROM` ditolak PostgreSQL. Kelompok yang hanya ada di periode lalu tetap muncul dengan nilai sekarang nol, dan bulan yang kosong di kedua periode diisi `GapFiller`.
+
+**Setiap measure mendapat tiga kolom turunan**: `<kunci>__previous`, `<kunci>__change`, dan `<kunci>__change_pct`, ditandai `derived_from` dan `derivation` di kolom hasil. Persen perubahan memakai nilai mutlak pembanding sebagai penyebut, dan kosong bila pembandingnya nol — bukan tak hingga. Perbandingan butuh rentang waktu yang jelas awal dan akhirnya, dan kolom tanggal yang dikelompokkan harus memakai ukuran waktu.
+
+**Persen terhadap total (`percent_of_total`) dihitung sebelum `LIMIT`, per mata uang.** `nilai / sum(nilai) over (partition by <mata uang>)`: top-10 tetap menunjukkan bagian dari seluruh kelompok, dan persen nilai rupiah tidak dicampur dengan dolar. Kolomnya `<kunci>__percent_of_total`.
+
+**Token tahun fiskal dihitung lewat `FiscalCalendarDirectory`, untuk tepat satu perusahaan.** `@this_fiscal_year` dan `@last_fiscal_year` memakai perusahaan dari saringan (tepat satu nilai pada field entitas legal, termasuk saringan terkunci), atau perusahaan workspace pengguna (`UserPrincipal::workspaceLegalEntity()`). Tanpa perusahaan, dengan dua perusahaan, dengan perusahaan tenant lain, atau dengan kalender yang belum mencakup hari ini, token ditolak dengan pesan — tidak diam-diam menjadi tahun kalender. `FiscalYearRange` berjalan di dalam `runFor()` sebelum kunci cache dihitung, dan rentang hasilnya ikut di bentuk normal query, sehingga dua perusahaan dengan tahun fiskal berbeda tidak berbagi hasil cache.
+
+**Kunci cache membedakan semuanya.** Rumus (kunci, nama, teks, format), perbandingan, dan persen terhadap total ikut di `AnalyticsQuery::normalized()` hanya bila diisi, jadi hash query lama tidak berubah. Urutan daftar rumus dan persen tidak mengubah kunci.
 
 ### Cache dan batas beban
 
@@ -325,7 +349,7 @@ Semua kunci ada di `apps/core/config/analytics.php`, dengan variabel env berawal
 | --- | --- |
 | `timeouts.*` | `statement_timeout` query dari layar |
 | `limits.rows_interactive` | Batas baris hasil, sekaligus batas tertinggi `limit` query |
-| `limits.dimensions`, `measures`, `filters`, `sort` | Batas bentuk query |
+| `limits.dimensions`, `measures`, `filters`, `sort`, `formulas` | Batas bentuk query; panjang (500 karakter) dan kedalaman (20 tingkat) satu rumus bagian dari bahasanya, bukan setelan |
 | `limits.widgets_per_dashboard` | Widget per dasbor |
 | `limits.concurrent_per_tenant` | Query yang dihitung bersamaan per tenant |
 | `cache.*` | TTL bawaan dan ukuran hasil terbesar yang disimpan |
@@ -343,6 +367,7 @@ Engine memakai ulang, dan tidak membuat ulang:
 | `LaunchableAppCatalog` | Module terpasang dan berlisensi, serta permission module |
 | `TenantRunner` | Mengikat tenant untuk model module |
 | `UserClock` | Zona waktu pengguna |
+| `FiscalCalendarDirectory`, `CurrentWorkspace` | Rentang token tahun fiskal dan perusahaan workspace |
 | `RowVersion` | Versi baris pada dasbor, widget, dan query tersimpan |
 | `RetentionPolicies` | Retensi log query |
 | `CoreSecurityCatalog` | Gate rute |
@@ -356,7 +381,8 @@ Engine memakai ulang, dan tidak membuat ulang:
 | `apps/core/app/Platform/Modules/Contracts/Analytics/` | Kontrak yang dipenuhi module: `Dataset`, `Datasets`, `DatasetDefinition`, `Aggregate`, `MeasureFormat`, `SharedDimension` dan resolvernya |
 | `apps/core/app/Platform/Modules/Contracts/DataPolicyFilter.php` | Aturan kebijakan data yang dipakai bersama module dan engine |
 | `app/Platform/Analytics/Datasets/` | `DatasetRegistry`, `DatasetValidator`, `CompiledDataset`, `DatasetCatalog`, `SharedDimensionRegistry` |
-| `app/Platform/Analytics/Query/` | Parser, normalizer, validator, `RelativeRange`, compiler, `JoinPlanner`, ekspresi SQL, `QueryExecutor`, `ResultSet`, `LabelResolver`, `GapFiller`, `AnalyticsQueryException` |
+| `app/Platform/Analytics/Query/` | Parser, normalizer, validator, `RelativeRange`, compiler, `JoinPlanner`, ekspresi SQL, `QueryExecutor`, `ResultSet`, `LabelResolver`, `GapFiller`, `AnalyticsQueryException`, `Comparison`, `FiscalYearRange` |
+| `app/Platform/Analytics/Query/Formula/` | Bahasa rumus: `Lexer`, `Parser`, simpul pohon (`Node/`), `Formula`, dan `FormulaExpression` yang menyusun SQL-nya |
 | `app/Platform/Analytics/Actions/RunQuery.php` | Satu query dari ujung ke ujung, tempat cache, jatah, dan log menumpang |
 | `app/Platform/Analytics/Security/` | `AnalyticsPrincipal`, `UserPrincipal`, `DatasetAccess`, `DataPolicyScope`, `PersonalDataGate`, `ScopeFingerprint` |
 | `app/Platform/Analytics/Cache/QueryCache.php`, `Support/QuerySlots.php`, `Support/QueryLog.php` | Cache hasil, jatah query bersamaan, log tersamar |
@@ -384,6 +410,10 @@ Engine memakai ulang, dan tidak membuat ulang:
 | `AnalyticsCacheIsolationTest`, `QueryCacheTest` | Kunci cache berubah oleh tiap komponennya; tenant dan jangkauan berbeda tidak berbagi hasil |
 | `QueryLimitsTest`, `QueryLogTest` | Jatah query dan rate limit; log mencatat penolakan dan menyamarkan nilai |
 | `DashboardApiTest` | Versi baris, aturan berbagi, validasi widget, kunci yang diganti nama, dan halaman Inertia yang merah bila berkas komponennya hilang |
+| `FormulaTest`, `FormulaValidationTest` | Rumus ditolak di posisinya (termasuk sisipan SQL), angka sebagai binding, mata uang tidak tercampur, measure bukan angka ditolak, kunci cache membedakan rumus, perbandingan, persen, dan tahun fiskal |
+| `ComparisonTest` | Rentang pembanding per token, batas tahun, tahun kabisat, rentang tertulis, zona principal |
+| `FormulaAndComparisonTest` | Angka rumus sampai database, bagi nol, top-N atas rumus, persen per mata uang, perbandingan dengan kelompok periode lalu, bulan kosong, total |
+| `FiscalYearAndStoredFormulaTest` | Tahun fiskal dari workspace atau saringan beserta cache per perusahaan, penolakannya, dan widget yang menyimpan rumus |
 | `<Nama>DatasetTest` di module aset | Isolasi tenant, paritas kebijakan data terhadap endpoint daftar, permission, dan uang per mata uang, untuk setiap dataset |
 
 Setiap penjaga di atas dilihat merah sekali dengan merusak penangkalnya sebelum dipercaya ([standar penjaga](25-standar-penjaga-dan-pengujian.md)).
@@ -394,7 +424,9 @@ Ini batas yang dikirim, supaya tidak dijanjikan lebih dari yang ada:
 
 - **Pembangun widget dan penjelajah** (area 8). Halaman `/analytics/explore` masih halaman sementara yang menyusun satu tile dan satu grafik dari dataset pertama yang boleh dibaca pengguna. Menu widget memang belum punya aksi Ubah; widget baru hanya dapat dibuat lewat API.
 - **Uji beban** (area 10). Menurut aturan repo, fitur ini belum dinyatakan selesai sebelum lulus gate beban.
-- **Slicer, cross-filter, drill, ekspor widget, rumus, perbandingan periode, dimensi bersama lintas module, publikasi, feed OData, embed, dan template** (fase 2). Query yang memuat `compare` atau `formulas` ditolak "belum tersedia".
+- **Slicer, cross-filter, drill, ekspor widget, dimensi bersama lintas module, publikasi, feed OData, embed, dan template** (fase 2).
+- **Editor rumus dan tampilan perbandingan di layar** (area 13.7). Mesinnya sudah menerima `formulas`, `compare`, dan `percent_of_total`, dan widget menyimpannya; pembangun belum menawarkannya, dan tile belum menggambar selisih dan persen perubahan.
+- **Tahun fiskal yang tidak dua belas bulan pada "periode sebelumnya"**: rentang tahun fiskal digeser sebanyak bulan penuhnya, bukan dicari ulang di kalender. Tahun fiskal lalu (`@last_fiscal_year`) sendiri dicari di kalender.
 - **Measure bersaringan dan uji waktu berzona pada dataset aset** (area 5): compiler sudah mengerjakan `FILTER (WHERE …)`; yang belum adalah measure yang memakainya di dataset aset.
 - **Menyalin dasbor bersama menjadi dasbor pribadi**, argumen widget di `analytics:explain`, dan pembersihan terjadwal `analytics_query_cache` (menunggu perintah terjadwal yang dapat berjalan per environment; sementara itu pembersihan terjadi saat baca dan tulis).
 

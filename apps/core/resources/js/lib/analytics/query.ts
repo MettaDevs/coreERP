@@ -42,6 +42,8 @@ export const RELATIVE_RANGES = [
     { token: '@last_quarter', caption: 'Kuartal lalu' },
     { token: '@this_year', caption: 'Tahun ini' },
     { token: '@last_year', caption: 'Tahun lalu' },
+    { token: '@this_fiscal_year', caption: 'Tahun fiskal ini' },
+    { token: '@last_fiscal_year', caption: 'Tahun fiskal lalu' },
     { token: '@last_7_days', caption: '7 hari terakhir' },
     { token: '@last_30_days', caption: '30 hari terakhir' },
     { token: '@last_90_days', caption: '90 hari terakhir' },
@@ -100,6 +102,11 @@ export function buildQuery(parts: AnalyticsQuery): AnalyticsQuery {
         ...(parts.fill_gaps === undefined
             ? {}
             : { fill_gaps: parts.fill_gaps }),
+        ...(parts.compare ? { compare: parts.compare } : {}),
+        ...(parts.formulas?.length ? { formulas: parts.formulas } : {}),
+        ...(parts.percent_of_total?.length
+            ? { percent_of_total: parts.percent_of_total }
+            : {}),
     };
 }
 

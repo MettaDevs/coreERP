@@ -116,6 +116,9 @@ final class Parser
                 $this->close($token);
 
                 return $node;
+            case Token::SEPARATOR:
+            case Token::CLOSE:
+                throw InvalidFormula::at($token->position, 'isian kosong sebelum `'.$token->text.'`');
             case Token::ARITHMETIC:
                 if ($token->value === '-') {
                     $this->enter();

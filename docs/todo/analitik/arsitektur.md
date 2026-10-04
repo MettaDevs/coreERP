@@ -177,7 +177,9 @@ apps/core/app/Platform/Analytics/
 │   ├── QueryExecutor.php                                                          (0, 3)
 │   ├── ResultSet.php  ResultColumn.php  AnalyticsQueryException.php               (0, 3)
 │   ├── LabelResolver.php  GapFiller.php                                           (3)
-│   └── Formula/            Lexer.php  Parser.php  Node/*  SqlEmitter.php      (fase 2)
+│   ├── Comparison.php  CompareMode.php  FiscalYearRange.php                   (13)
+│   ├── BoundExpression.php  SqlTemplate.php                                       (13)
+│   └── Formula/            Lexer.php  Token.php  Parser.php  Node/*  Formula.php  FormulaExpression.php  (13)
 ├── Security/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
 │   ├── DataPolicyScope.php  ScopeFingerprint.php                                  (4)

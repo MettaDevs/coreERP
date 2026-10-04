@@ -15,7 +15,6 @@ use App\Platform\Modules\Contracts\InvalidFilterExpression;
 use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\JoinClause;
 use LogicException;
 
 /**
@@ -57,7 +56,7 @@ use LogicException;
  *   mata uang dan satuan measure itu sendiri: persen nilai uang dihitung per mata uang.
  * - **Perbandingan periode** (`compare`): langkah 1–7 dua kali — rentang yang diminta (`cur`) dan rentang
  *   pembanding dari {@see Comparison} dengan ember waktu digeser maju sebanyak pergeserannya (`prev`) — lalu
- *   digabung `FULL JOIN` menurut semua dimensi (`is not distinct from`, supaya kosong bertemu kosong). Urutan,
+ *   digabung menurut semua dimensi lewat `UNION ALL` dan `GROUP BY`, supaya kosong bertemu kosong. Urutan,
  *   batas, dan persen terhadap total berlaku pada hasil gabungan. Kelompok yang hanya ada di periode lalu tetap
  *   muncul dengan nilai sekarang nol, dan periode yang tidak ada di keduanya diisi {@see GapFiller}. Selisih
  *   dan persen perubahan dihitung di SQL, dalam `numeric`; persen dari nol kosong.
@@ -72,6 +71,9 @@ final class QueryCompiler
     private const CURRENT = 'cur';
 
     private const PREVIOUS = 'prev';
+
+    /** Alias gabungan kedua periode pada perbandingan periode. */
+    private const PERIODS = 'periods';
 
     public function __construct(
         private readonly JoinPlanner $joins,
@@ -343,13 +345,17 @@ final class QueryCompiler
     }
 
     /**
-     * Perbandingan periode: query periode yang diminta (`cur`) dan query pembanding (`prev`) digabung `FULL JOIN`
-     * menurut semua kolom dimensi, lalu setiap measure mendapat nilai pembanding, selisih, dan persen perubahan.
-     * Tanpa dimensi sama sekali kedua sisi tepat satu baris, jadi digabung tanpa syarat.
+     * Perbandingan periode: baris query periode yang diminta (`cur`) dan query pembanding (`prev`) disatukan dengan
+     * `UNION ALL` — tiap sisi mengisi kolom measure-nya sendiri dan membiarkan kolom sisi lain kosong — lalu
+     * dikelompokkan menurut semua kolom dimensi. Hasilnya sama dengan gabungan luar penuh menurut dimensi, dengan
+     * kosong bertemu kosong seperti di `GROUP BY`; `FULL JOIN … IS NOT DISTINCT FROM` ditolak PostgreSQL karena
+     * syaratnya tidak dapat di-hash. Tiap sisi sudah berkelompok, jadi setiap kelompok paling banyak satu baris per
+     * sisi dan `max()` hanya memilih nilai sisi itu. Tanpa dimensi sama sekali, hasilnya tepat satu baris.
      *
-     * Jumlah dan hitungan yang kosong di satu sisi berarti nol — kelompok itu tidak punya baris di periode itu —
-     * sedangkan rata-rata, terkecil, terbesar, dan rumus tetap kosong. Persen perubahan memakai nilai mutlak
-     * pembanding sebagai penyebut, supaya naik dari minus tetap terbaca naik, dan kosong bila pembandingnya nol.
+     * Setiap measure lalu mendapat nilai pembanding, selisih, dan persen perubahan. Jumlah dan hitungan yang kosong
+     * di satu sisi berarti nol — kelompok itu tidak punya baris di periode itu — sedangkan rata-rata, terkecil,
+     * terbesar, dan rumus tetap kosong. Persen perubahan memakai nilai mutlak pembanding sebagai penyebut, supaya
+     * naik dari minus tetap terbaca naik, dan kosong bila pembandingnya nol.
      *
      * @param  list<ResultColumn>  $columns  kolom dimensi dan measure; aliasnya sama di kedua subquery
      * @param  Builder<Model>  $current
@@ -362,32 +368,39 @@ final class QueryCompiler
     {
         // Query luar tanpa scope model: scope tenant dan arsip sudah ada di dalam kedua subquery, dan nama tabel dasar
         // tidak ada di FROM query luar.
-        $outer = (new $dataset->model)->newQueryWithoutScopes()->fromSub($current, self::CURRENT);
+        $sides = [];
+        foreach ([self::CURRENT => $current, self::PREVIOUS => $previous] as $side => $grouped) {
+            $part = (new $dataset->model)->newQueryWithoutScopes()->fromSub($grouped, $side);
+            foreach ($columns as $column) {
+                if ($column->kind === ResultColumn::DIMENSION) {
+                    $part->addSelect($side.'.'.$column->alias.' as '.$column->alias);
+                    if ($column->labelAlias !== null) {
+                        $part->addSelect($side.'.'.$column->labelAlias.' as '.$column->labelAlias);
+                    }
 
-        $keys = [];
-        foreach ($columns as $column) {
-            if ($column->kind === ResultColumn::DIMENSION) {
-                $keys[] = $column->alias;
-            }
-        }
-        if ($keys === []) {
-            $outer->crossJoinSub($previous, self::PREVIOUS);
-        } else {
-            $outer->joinSub($previous, self::PREVIOUS, static function (JoinClause $join) use ($keys): void {
-                foreach ($keys as $key) {
-                    $join->on(self::CURRENT.'.'.$key, 'is not distinct from', self::PREVIOUS.'.'.$key);
+                    continue;
                 }
-            }, null, null, 'full');
+                foreach ([self::CURRENT, self::PREVIOUS] as $slot) {
+                    if ($slot === $side) {
+                        $part->addSelect($side.'.'.$column->alias.' as '.$column->alias.'_'.$slot);
+                    } else {
+                        $part->selectExpression(new SqlTemplate('null', []), $column->alias.'_'.$slot);
+                    }
+                }
+            }
+            $sides[] = $part;
         }
+        $outer = (new $dataset->model)->newQueryWithoutScopes()->fromSub($sides[0]->unionAll($sides[1]), self::PERIODS);
 
         $out = [];
         /** @var array<string, Expression|string> $subjects */
         $subjects = [];
         foreach ($columns as $column) {
             if ($column->kind === ResultColumn::DIMENSION) {
-                $subjects[$column->alias] = self::either($outer, $column->alias);
+                $outer->addSelect(self::PERIODS.'.'.$column->alias.' as '.$column->alias)->groupBy($column->alias);
+                $subjects[$column->alias] = self::PERIODS.'.'.$column->alias;
                 if ($column->labelAlias !== null) {
-                    self::either($outer, $column->labelAlias);
+                    $outer->addSelect(self::PERIODS.'.'.$column->labelAlias.' as '.$column->labelAlias)->groupBy($column->labelAlias);
                 }
                 $out[] = $column;
 
@@ -396,17 +409,17 @@ final class QueryCompiler
 
             $now = self::side($column, self::CURRENT);
             $before = self::side($column, self::PREVIOUS);
-            self::select($outer, $now, $column->alias);
+            $outer->selectExpression($now, $column->alias);
             $subjects[$column->alias] = $now;
             $out[] = $column;
 
-            self::select($outer, $before, $column->alias.'_previous');
+            $outer->selectExpression($before, $column->alias.'_previous');
             $out[] = ResultColumn::derived($column->alias.'_previous', $column, ResultColumn::PREVIOUS, $mode->caption());
 
-            self::select($outer, new SqlTemplate('({0} - {1})', [$now, $before]), $column->alias.'_change');
+            $outer->selectExpression(new SqlTemplate('({0} - {1})', [$now, $before]), $column->alias.'_change');
             $out[] = ResultColumn::derived($column->alias.'_change', $column, ResultColumn::CHANGE, $mode->caption());
 
-            self::select($outer, new SqlTemplate('cast(({0} - {1}) as numeric) / nullif(abs({1}), 0) * 100', [$now, $before]), $column->alias.'_change_pct');
+            $outer->selectExpression(new SqlTemplate('cast(({0} - {1}) as numeric) / nullif(abs({1}), 0) * 100', [$now, $before]), $column->alias.'_change_pct');
             $out[] = ResultColumn::derived($column->alias.'_change_pct', $column, ResultColumn::CHANGE_PERCENT, $mode->caption());
 
             if ($partitions !== null && in_array($column->key, $query->percentOfTotal, true)) {
@@ -417,37 +430,14 @@ final class QueryCompiler
         return [$outer, $out, $subjects];
     }
 
-    /**
-     * Kolom dimensi gabungan: nilainya dari sisi mana pun yang punya baris.
-     *
-     * @param  Builder<Model>  $outer
-     */
-    private static function either(Builder $outer, string $alias): SqlTemplate
+    /** Nilai satu measure dari satu periode di gabungan; jumlah dan hitungan yang kosong berarti nol. */
+    private static function side(ResultColumn $column, string $side): SqlTemplate
     {
-        $expression = new SqlTemplate('coalesce({0}, {1})', [self::CURRENT.'.'.$alias, self::PREVIOUS.'.'.$alias]);
-        $outer->selectExpression($expression, $alias);
-
-        return $expression;
-    }
-
-    /** Nilai satu measure dari satu sisi gabungan; jumlah dan hitungan yang kosong berarti nol. */
-    private static function side(ResultColumn $column, string $side): Expression|string
-    {
-        $value = $side.'.'.$column->alias;
+        $value = self::PERIODS.'.'.$column->alias.'_'.$side;
 
         return in_array($column->aggregate, [Aggregate::Count, Aggregate::CountDistinct, Aggregate::Sum], true)
-            ? new SqlTemplate('coalesce({0}, 0)', [$value])
-            : $value;
-    }
-
-    /** @param  Builder<Model>  $builder */
-    private static function select(Builder $builder, Expression|string $value, string $alias): void
-    {
-        if (is_string($value)) {
-            $builder->addSelect($value.' as '.$alias);
-        } else {
-            $builder->selectExpression($value, $alias);
-        }
+            ? new SqlTemplate('coalesce(max({0}), 0)', [$value])
+            : new SqlTemplate('max({0})', [$value]);
     }
 
     /**

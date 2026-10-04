@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Platform\Analytics\Query;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Datasets\DatasetValidator;
 use App\Platform\Analytics\Query\Formula\Formula;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 
 /**
@@ -96,6 +98,9 @@ final class QueryValidator
         foreach ($query->percentOfTotal as $i => $key) {
             if (! in_array($key, $query->measures, true)) {
                 throw AnalyticsQueryException::invalidQuery("percent_of_total.{$i}", 'Persen terhadap total hanya untuk nilai yang dihitung, dan "'.$key.'" tidak ada di pilihan.');
+            }
+            if (! isset($formulas[$key]) && ! $this->numeric($dataset, $key)) {
+                throw AnalyticsQueryException::invalidQuery("percent_of_total.{$i}", 'Nilai "'.$key.'" bukan angka, jadi tidak punya persen terhadap total.');
             }
         }
 
@@ -189,6 +194,9 @@ final class QueryValidator
             if (! $dataset->hasMeasure($key)) {
                 throw AnalyticsQueryException::formulaMeasureUnknown("{$path}.expression", $key, $position);
             }
+            if (! $this->numeric($dataset, $key)) {
+                throw AnalyticsQueryException::invalidFormula("{$path}.expression", 'Nilai ['.$key.'] bukan angka, jadi tidak dapat dihitung di rumus (karakter '.$position.').', $position);
+            }
 
             $measure = $dataset->measure($key);
             foreach (['mata uang' => $measure->currency, 'satuan' => $measure->unit] as $noun => $column) {
@@ -240,6 +248,28 @@ final class QueryValidator
                 throw AnalyticsQueryException::invalidQuery("dimensions.{$i}", 'Untuk membandingkan periode, kelompokkan kolom tanggal per hari, minggu, bulan, kuartal, atau tahun.');
             }
         }
+        foreach ($query->measures as $i => $key) {
+            if ($query->formula($key) === null && ! $this->numeric($dataset, $key)) {
+                throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai "'.$key.'" bukan angka, jadi selisihnya antarperiode tidak dapat dihitung. Lepas nilai ini untuk membandingkan periode.');
+            }
+        }
+    }
+
+    /**
+     * Measure yang hasilnya angka: hitungan, jumlah, dan rata-rata selalu (registry menolak jumlah dan rata-rata
+     * atas kolom bukan angka); terkecil dan terbesar hanya bila kolomnya angka — terkecil atas tanggal adalah tanggal,
+     * yang tidak dapat dikurangkan, dipersenkan, atau dihitung di rumus.
+     */
+    private function numeric(CompiledDataset $dataset, string $key): bool
+    {
+        $measure = $dataset->measure($key);
+        if (! in_array($measure->aggregate, [Aggregate::Minimum, Aggregate::Maximum], true)) {
+            return true;
+        }
+
+        return $measure->field !== null
+            && $dataset->hasField($measure->field)
+            && in_array($dataset->columnType($measure->field), DatasetValidator::NUMERIC, true);
     }
 
     /**

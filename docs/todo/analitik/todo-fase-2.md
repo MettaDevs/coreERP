@@ -34,7 +34,7 @@ dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringa
 
 ---
 
-### 13. [ ] Rumus dan perbandingan periode
+### 13. [~] Rumus dan perbandingan periode
 
 **Tempat:** `app/Platform/Analytics/Query/Formula/*`, `Query/Comparison.php`,
 `resources/js/components/analytics/formula-editor.tsx` · **Setelah:** 3 · **Keputusan:** KA-19 ·
@@ -42,16 +42,21 @@ dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringa
 [bahasa rumus](/todo/analitik/mesin-query#bahasa-rumus) terbaca dan terkompilasi dengan seluruh
 aturannya, US-11 lulus, dan percobaan injeksi ditolak oleh test.
 
-- [ ] 13.1 Lexer, parser, simpul pohon, dan pemancar SQL; galat berposisi.
-- [ ] 13.2 Validasi: fungsi tertutup, batas panjang dan kedalaman, warisan mata uang.
-- [ ] 13.3 Rumus di query (`formulas`) dan di widget; urutan dan top-N atas rumus.
-- [ ] 13.4 `compare: previous_period | previous_year` dengan kolom `__previous`, `__change`,
+- [x] 13.1 Lexer, parser, simpul pohon, dan pemancar SQL; galat berposisi.
+- [x] 13.2 Validasi: fungsi tertutup, batas panjang dan kedalaman, warisan mata uang.
+- [x] 13.3 Rumus di query (`formulas`) dan di widget; urutan dan top-N atas rumus.
+- [x] 13.4 `compare: previous_period | previous_year` dengan kolom `__previous`, `__change`,
   `__change_pct`; persen dari nol kosong.
-- [ ] 13.5 Persen terhadap total (`sum(x) over ()`) sebagai pilihan tampilan measure.
-- [ ] 13.6 Token tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`) lewat `FiscalCalendarDirectory`,
+- [x] 13.5 Persen terhadap total (`sum(x) over ()`) sebagai pilihan tampilan measure. Bentuknya
+  `percent_of_total: [kunci]`, kolom `<kunci>__percent_of_total`, dipartisi per mata uang.
+- [x] 13.6 Token tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`) lewat `FiscalCalendarDirectory`,
   dengan legal entity dari saringan atau workspace; tanpa legal entity, token ditolak dengan pesan.
-- [ ] 13.7 Editor rumus di pembangun: daftar measure, daftar fungsi, galat di posisinya.
-- [ ] 13.8 Test parser (termasuk `[count]); drop table x; --`, angka `1.000,5`, bagi nol) dan test
+- [ ] 13.7 Editor rumus di pembangun: daftar measure, daftar fungsi, galat di posisinya. **Tertunda**: pembangun
+  milik area 8 yang belum digabung. Backend sudah menyediakan yang dibutuhkan editor: galat
+  `analytics.invalid_formula` berpath `formulas.N.expression` dengan `position`, daftar fungsi
+  `Formula\Parser::FUNCTIONS`, katalog measure dari `GET datasets/{code}`, dan tipe `QueryFormula`,
+  `QueryCompare`, `ResultDerivation` di `types.ts`. Tampilan selisih dan persen perubahan di tile ikut di sini.
+- [x] 13.8 Test parser (termasuk `[count]); drop table x; --`, angka `1.000,5`, bagi nol) dan test
   perbandingan pada batas tahun.
 
 ---

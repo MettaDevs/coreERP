@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Platform\Analytics;
 
+use App\Platform\Analytics\Query\CompareMode;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\RelativeRange;
 use App\Platform\Analytics\Query\TimeGranularity;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -69,10 +71,6 @@ class QueryShapeSyncTest extends TestCase
         $schema = $this->schema();
 
         $this->assertEqualsCanonicalizing(QueryParser::KEYS, $this->keys($schema));
-        // Kunci fase 2 belum dibaca engine, jadi belum boleh ada di skema: skema menggambarkan yang berlaku.
-        foreach (QueryParser::FUTURE_KEYS as $key) {
-            $this->assertArrayNotHasKey($key, $schema['properties']);
-        }
     }
 
     public function test_the_nested_keys_of_the_schema_are_the_ones_the_parser_reads(): void
@@ -91,6 +89,11 @@ class QueryShapeSyncTest extends TestCase
         $this->assertEqualsCanonicalizing(QueryParser::SORT_KEYS, $this->keys($properties['sort']['items']));
         $this->assertEqualsCanonicalizing(QueryParser::SORT_KEYS, $properties['sort']['items']['required']);
         $this->assertFalse($properties['sort']['items']['additionalProperties']);
+
+        $formula = $properties['formulas']['items'];
+        $this->assertEqualsCanonicalizing(QueryParser::FORMULA_KEYS, $this->keys($formula));
+        $this->assertSame(['key', 'expression'], $formula['required']);
+        $this->assertFalse($formula['additionalProperties']);
     }
 
     public function test_the_schema_enums_are_the_ones_the_server_knows(): void
@@ -102,6 +105,8 @@ class QueryShapeSyncTest extends TestCase
             $schema['$defs']['granularity']['enum'],
         );
         $this->assertSame(['asc', 'desc'], $schema['properties']['sort']['items']['properties']['direction']['enum']);
+        $this->assertSame(array_map(static fn (CompareMode $case): string => $case->value, CompareMode::cases()), $schema['properties']['compare']['enum']);
+        $this->assertSame(array_map(static fn (MeasureFormat $case): string => $case->value, MeasureFormat::cases()), $schema['$defs']['format']['enum']);
 
         // Daftar token di deskripsi skema adalah yang dibaca orang yang menulis query dari luar.
         $description = $schema['properties']['time_range']['properties']['range']['description'];
