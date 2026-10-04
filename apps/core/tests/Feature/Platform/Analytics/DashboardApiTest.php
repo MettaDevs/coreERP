@@ -13,6 +13,7 @@ use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\Dataset;
 use App\Platform\Modules\Contracts\Analytics\DatasetDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Tests\TestCase;
 
@@ -433,31 +434,37 @@ class DashboardApiTest extends TestCase
         $this->actingAs($assetOnly)->getJson('/api/v1/analytics/saved-queries')->assertForbidden();
     }
 
-    public function test_dashboard_pages_answer_with_the_components_area_7_builds(): void
+    public function test_dashboard_pages_render_their_components(): void
     {
         $dashboard = $this->actingAs($this->owner)->postJson('/api/v1/analytics/dashboards', ['name' => 'Beranda'])->assertCreated()->json('data.id');
 
-        // Komponen `platform/analytics/index` dan `.../dashboard` dibuat area 7. Sampai berkasnya ada, halaman penuh
-        // tidak dapat dirender (manifest Vite tidak memuatnya), jadi yang diuji di sini jawaban Inertia sebagai JSON:
-        // rute, hak, nama komponen, dan prop-nya. Versi aset diambil dari jawaban 409 Inertia sendiri.
-        $page = function (User $user, string $uri) {
-            $version = (string) $this->actingAs($user)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => 'versi-yang-pasti-salah'])
-                ->get($uri)->headers->get('X-Inertia-Version');
+        // Halaman penuh, bukan jawaban Inertia JSON: `inertia.testing.ensure_pages_exist` memeriksa berkas komponennya
+        // (area 7) ada di `resources/js/pages`, jadi nama komponen yang salah ketik atau berkas yang hilang merah di sini.
+        $this->actingAs($this->owner)->get('/analytics')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/analytics/index')
+                ->where('dashboards.0.id', $dashboard)
+                ->where('abilities', ['create' => true, 'share' => true]));
+        $this->actingAs($this->owner)->get("/analytics/dashboards/{$dashboard}")->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/analytics/dashboard')
+                ->where('dashboard.id', $dashboard)
+                ->where('dashboard.widgets', [])
+                ->where('abilities', ['create' => true, 'share' => true]));
 
-            return $this->actingAs($user)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])->get($uri);
-        };
+        // Pemegang Lihat dasbor saja: daftar terbuka tanpa tombol membuat; dasbor pribadi orang lain tetap 404.
+        $viewer = $this->member($this->tenant, ['core.analytics.inquire']);
+        $this->actingAs($viewer)->get('/analytics')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/analytics/index')
+                ->where('dashboards', [])
+                ->where('abilities', ['create' => false, 'share' => false]));
+        $this->actingAs($viewer)->get("/analytics/dashboards/{$dashboard}")->assertNotFound();
 
-        $page($this->owner, '/analytics')->assertOk()
-            ->assertJsonPath('component', 'platform/analytics/index')
-            ->assertJsonPath('props.dashboards.0.id', $dashboard)
-            ->assertJsonPath('props.abilities', ['create' => true, 'share' => true]);
-        $page($this->owner, "/analytics/dashboards/{$dashboard}")->assertOk()
-            ->assertJsonPath('component', 'platform/analytics/dashboard')
-            ->assertJsonPath('props.dashboard.id', $dashboard)
-            ->assertJsonPath('props.dashboard.widgets', []);
-
-        $this->actingAs($this->analyst())->get("/analytics/dashboards/{$dashboard}")->assertNotFound();
-        $this->actingAs($this->member($this->tenant, ['management-aset.aset.manage']))->get('/analytics')->assertForbidden();
+        // Tanpa hak melihat dasbor: gate rute untuk kedua halaman.
+        $assetOnly = $this->member($this->tenant, ['management-aset.aset.manage']);
+        $this->actingAs($assetOnly)->get('/analytics')->assertForbidden();
+        $this->actingAs($assetOnly)->get("/analytics/dashboards/{$dashboard}")->assertForbidden();
     }
 
     /** Penyusun dasbor yang boleh membaca seluruh aset tenant ini. */

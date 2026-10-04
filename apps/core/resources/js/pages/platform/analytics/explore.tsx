@@ -26,8 +26,8 @@ import { RotateCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import Heading from '@/components/heading';
-import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
+    formatComputedAt,
     formatDimensionValue,
     formatMeasureValue,
 } from '@/lib/analytics/format';
@@ -83,7 +83,8 @@ export default function AnalyticsExplore({ preview }: Props) {
                     </Card>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                        <div className="lg:col-span-4">
+                        {/* Tile setinggi isinya, tidak melar setinggi grafik di sebelahnya. */}
+                        <div className="self-start lg:col-span-4">
                             <TileCard {...preview.tile} />
                         </div>
                         {preview.chart && (
@@ -155,7 +156,7 @@ function TileCard({ caption, query }: PreviewQuery) {
     const measure = result?.columns.find((column) => column.kind === 'measure');
 
     return (
-        <Card className="h-full">
+        <Card>
             <CardHeader>
                 <CardTitle>{caption}</CardTitle>
             </CardHeader>
@@ -340,12 +341,11 @@ function QueryFailure({
     );
 }
 
+/** Kapan dihitung, dalam zona engine (`meta.timezone`) dengan zonanya tertulis. */
 function ComputedAt({ result }: { result: ResultSet }) {
-    const formatTime = useDateTimeFormat();
-
     return (
         <p className="text-xs text-muted-foreground">
-            Dihitung {formatTime(result.meta.generated_at)}
+            {formatComputedAt(result.meta)}
             {result.meta.truncated && ' · hasil dipotong'}
         </p>
     );
