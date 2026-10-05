@@ -86,7 +86,11 @@ export function QueryEditor({
             compare: next.time_range === undefined ? undefined : next.compare,
         });
     };
-    const formulas = value.formulas ?? [];
+    // Server menormalkan rumus menurut kunci sebelum memberi path galat formulas.N.expression.
+    // Urutan layar harus sama, termasuk sebelum pengguna mengubah isian apa pun.
+    const formulas = [...(value.formulas ?? [])].sort((a, b) =>
+        a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+    );
     const ownKeys = formulaKeys(value);
     // Nilai data yang dipilih, lalu rumus: pemilih nilai hanya mengenal nilai data.
     const setMeasures = (measures: string[]) =>

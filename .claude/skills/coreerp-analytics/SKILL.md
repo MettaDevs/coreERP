@@ -16,9 +16,9 @@ code and fix the skill in the same pull request.
 
 | | State |
 | --- | --- |
-| Shipped | Dataset contract, registry, and validator; query model; compiler, read-only executor, and results; read security and the permission chain; dashboard storage and the screen API; dashboard screens; result cache, concurrency limits, and the masked query log; the management-aset datasets |
+| Shipped | Dataset contract, registry, and validator; query model; compiler, read-only executor, and results; read security and the permission chain; dashboard storage and the screen API; dashboard screens; result cache, concurrency limits, and the masked query log; the management-aset datasets; formulas, period comparisons, and their builder controls |
 | Open in phase 1 | Widget builder and explorer (the `/analytics/explore` page is still a temporary preview), load test, filtered measures on the asset datasets |
-| Plan only (phase 2–3) | Slicers, drill, formulas, period comparison, cross-module drill-across, publications, Query API, OData, embeds, templates, rollups, alerts |
+| Plan only (phase 2–3) | Slicers, drill, cross-module drill-across, publications, Query API, OData, embeds, templates, rollups, alerts |
 
 The live status of each area is in the area titles of `docs/todo/analitik/todo-fase-1.md`; decisions
 (`KA-xx`), the PRD, and phase 2–3 designs are in `docs/todo/analitik/`. Treat those pages as plans: they

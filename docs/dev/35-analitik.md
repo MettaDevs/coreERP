@@ -9,7 +9,7 @@ Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, atur
 ::: info Yang sudah ada dan yang menyusul
 Sudah ada di Core: kontrak dataset dan registry, model query, compiler dan eksekusi baca-saja, keamanan baca beserta rantai permission, penyimpanan dasbor dan API layarnya, layar dasbor, cache, batas beban, dan log query, serta — dari fase 2 — rumus, perbandingan periode, persen terhadap total, dan token tahun fiskal di mesin query. Module aset sudah menyatakan dataset ([daftarnya](/apps/management-aset/transaction/analitik/)).
 
-Menyusul, dan tidak ditulis di sini sebelum kodenya ada: pembangun widget dan penjelajah ([area 8](../todo/analitik/todo-fase-1.md)), uji beban ([area 10](../todo/analitik/todo-fase-1.md)), editor rumus di pembangun, dan sisa [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
+Menyusul, dan tidak ditulis di sini sebelum kodenya ada: pembangun widget dan penjelajah ([area 8](../todo/analitik/todo-fase-1.md)), uji beban ([area 10](../todo/analitik/todo-fase-1.md)), serta sisa [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
 :::
 
 ## Konsep yang mudah tertukar
@@ -244,6 +244,8 @@ Tiga bagian query fase 2 (area 13). Bentuk JSON-nya di [mesin query](../todo/ana
 
 **Kunci cache membedakan semuanya.** Rumus (kunci, nama, teks, format), perbandingan, dan persen terhadap total ikut di `AnalyticsQuery::normalized()` hanya bila diisi, jadi hash query lama tidak berubah. Urutan daftar rumus dan persen tidak mengubah kunci.
 
+**Pembangun menyediakan editor rumus dan pembanding periode.** Editor menawarkan nilai dari dataset dan fungsi yang diterima `Parser::FUNCTIONS`; galat `analytics.invalid_formula` membawa `position`, yang dipakai untuk menandai karakter dan mengarahkan kursor. Daftar rumus di layar mengikuti urutan kunci yang dipakai normalisasi server, jadi nomor rumus pada path galat tetap cocok. Pilihan pembanding muncul bila dataset punya kolom waktu. Tile menampilkan arah perubahan, persen bila pembandingnya bukan nol, dan nilai sebelumnya; tabel menampilkan kolom turunan di samping nilai asal.
+
 ### Cache dan batas beban
 
 **Cache tinggal di tabel database tenant, bukan di cache store Laravel.** `EnvironmentConnection::pins()` mengarahkan cache store ke database pusat, dan angka tenant yang punya database sendiri tidak boleh tersalin ke sana (KA-18). Kunci stampede dan jatah query boleh di store kunci pusat karena namanya hanya memuat id tenant dan hash, tidak pernah data.
@@ -425,7 +427,6 @@ Ini batas yang dikirim, supaya tidak dijanjikan lebih dari yang ada:
 - **Pembangun widget dan penjelajah** (area 8). Halaman `/analytics/explore` masih halaman sementara yang menyusun satu tile dan satu grafik dari dataset pertama yang boleh dibaca pengguna. Menu widget memang belum punya aksi Ubah; widget baru hanya dapat dibuat lewat API.
 - **Uji beban** (area 10). Menurut aturan repo, fitur ini belum dinyatakan selesai sebelum lulus gate beban.
 - **Slicer, cross-filter, drill, ekspor widget, dimensi bersama lintas module, publikasi, feed OData, embed, dan template** (fase 2).
-- **Editor rumus dan tampilan perbandingan di layar** (area 13.7). Mesinnya sudah menerima `formulas`, `compare`, dan `percent_of_total`, dan widget menyimpannya; pembangun belum menawarkannya, dan tile belum menggambar selisih dan persen perubahan.
 - **Tahun fiskal yang tidak dua belas bulan pada "periode sebelumnya"**: rentang tahun fiskal digeser sebanyak bulan penuhnya, bukan dicari ulang di kalender. Tahun fiskal lalu (`@last_fiscal_year`) sendiri dicari di kalender.
 - **Measure bersaringan dan uji waktu berzona pada dataset aset** (area 5): compiler sudah mengerjakan `FILTER (WHERE …)`; yang belum adalah measure yang memakainya di dataset aset.
 - **Menyalin dasbor bersama menjadi dasbor pribadi**, argumen widget di `analytics:explain`, dan pembersihan terjadwal `analytics_query_cache` (menunggu perintah terjadwal yang dapat berjalan per environment; sementara itu pembersihan terjadi saat baca dan tulis).

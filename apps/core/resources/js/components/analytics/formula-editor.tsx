@@ -163,7 +163,13 @@ function FormulaRow({
         }
 
         element.focus();
-        element.setSelectionRange(position - 1, position);
+        const characters = Array.from(element.value);
+        const index = Math.min(Math.max(position - 1, 0), characters.length);
+        const start = characters.slice(0, index).join('').length;
+        element.setSelectionRange(
+            start,
+            start + (characters[index]?.length ?? 0),
+        );
     }, [position]);
 
     // Sisipan menggantikan pilihan di isian, atau masuk di posisi kursor; isian tetap fokus.
@@ -363,19 +369,20 @@ function InsertButtons({
 
 /** Teks rumus dengan karakter yang ditunjuk galat ditandai; posisi sesudah akhir teks ditandai kotak kosong. */
 function Marked({ text, position }: { text: string; position: number }) {
-    const index = Math.min(Math.max(position - 1, 0), text.length);
-    const marked = text.slice(index, index + 1);
+    const characters = Array.from(text);
+    const index = Math.min(Math.max(position - 1, 0), characters.length);
+    const marked = characters[index] ?? '';
 
     return (
         <p
             className="font-mono text-xs break-all text-muted-foreground"
             aria-hidden
         >
-            {text.slice(0, index)}
+            {characters.slice(0, index).join('')}
             <mark className="rounded-sm bg-destructive/20 px-0.5 text-foreground">
                 {marked === '' || marked === ' ' ? ' ' : marked}
             </mark>
-            {text.slice(index + 1)}
+            {characters.slice(index + 1).join('')}
         </p>
     );
 }

@@ -51,11 +51,8 @@ aturannya, US-11 lulus, dan percobaan injeksi ditolak oleh test.
   `percent_of_total: [kunci]`, kolom `<kunci>__percent_of_total`, dipartisi per mata uang.
 - [x] 13.6 Token tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`) lewat `FiscalCalendarDirectory`,
   dengan legal entity dari saringan atau workspace; tanpa legal entity, token ditolak dengan pesan.
-- [ ] 13.7 Editor rumus di pembangun: daftar measure, daftar fungsi, galat di posisinya. **Tertunda**: pembangun
-  milik area 8 yang belum digabung. Backend sudah menyediakan yang dibutuhkan editor: galat
-  `analytics.invalid_formula` berpath `formulas.N.expression` dengan `position`, daftar fungsi
-  `Formula\Parser::FUNCTIONS`, katalog measure dari `GET datasets/{code}`, dan tipe `QueryFormula`,
-  `QueryCompare`, `ResultDerivation` di `types.ts`. Tampilan selisih dan persen perubahan di tile ikut di sini.
+- [x] 13.7 Editor rumus di pembangun: daftar nilai dan fungsi, galat ditandai pada karakter yang ditunjuk server;
+  pilihan pembanding periode, kolom perubahan pada tabel, dan arah, persen, serta nilai sebelumnya pada tile.
 - [x] 13.8 Test parser (termasuk `[count]); drop table x; --`, angka `1.000,5`, bagi nol) dan test
   perbandingan pada batas tahun.
 

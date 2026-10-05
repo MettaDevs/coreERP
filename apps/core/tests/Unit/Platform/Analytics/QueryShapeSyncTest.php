@@ -28,6 +28,12 @@ class QueryShapeSyncTest extends TestCase
 
     private const QUERY = 'resources/js/lib/analytics/query.ts';
 
+    private const QUERY_EDITOR = 'resources/js/components/analytics/query-editor.tsx';
+
+    private const KPI_TILE = 'resources/js/components/analytics/kpi-tile.tsx';
+
+    private const RESULT_TABLE = 'resources/js/components/analytics/result-table.tsx';
+
     /** @return array<string, mixed> */
     private function schema(): array
     {
@@ -147,6 +153,28 @@ class QueryShapeSyncTest extends TestCase
         $this->assertSame(1, preg_match('/TIME_GRANULARITIES = \[(.*?)\] as const/s', $query, $block));
         preg_match_all("/value: '(\w+)'/", $block[1], $granularities);
         $this->assertSame(array_map(static fn (TimeGranularity $case): string => $case->value, TimeGranularity::cases()), $granularities[1]);
+    }
+
+    public function test_the_builder_wires_formula_errors_and_comparison_modes_to_the_query(): void
+    {
+        $editor = $this->read(self::QUERY_EDITOR);
+
+        $this->assertStringContainsString('<FormulaEditor', $editor);
+        $this->assertStringContainsString('measures={dataset.measures}', $editor);
+        $this->assertStringContainsString('formulas={formulas}', $editor);
+        $this->assertStringContainsString('error={errors.formula ?? null}', $editor);
+        $this->assertStringContainsString('COMPARE_MODES.map((mode)', $editor);
+        $this->assertStringContainsString('compare:', $editor);
+    }
+
+    public function test_period_comparison_is_visible_in_tiles_and_tables(): void
+    {
+        $tile = $this->read(self::KPI_TILE);
+        $table = $this->read(self::RESULT_TABLE);
+
+        $this->assertStringContainsString('derivedColumns(result, measure.key)', $tile);
+        $this->assertStringContainsString('formatMeasureValue(previous, row, compact)', $tile);
+        $this->assertStringContainsString('column.derived_from === key', $table);
     }
 
     /**
