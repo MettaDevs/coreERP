@@ -4,6 +4,13 @@ Model kanonik CoreERP mengikuti pemisahan Microsoft Dynamics 365 antara tenant, 
 
 ## Batas yang tidak boleh dicampur
 
+Shell membuka Entitas legal, Operating unit, dan Hierarki organisasi lewat menu terpisah, masing-masing
+di `/settings/legal-entities`, `/settings/operating-units`, dan `/settings/organization-hierarchies`.
+Ketiganya tetap memakai permission organisasi yang sama. Halaman directory mengirim field sesuai
+klasifikasi: kode perusahaan, negara, dan zona waktu hanya untuk entitas legal; tipe dan nomor unit
+hanya untuk operating unit. Backend tetap menolak zona waktu yang dikirim ke operating unit.
+Hierarchy tetap menyimpan hubungan dalam versi berdasarkan purpose, bukan pada identitas organisasi.
+
 - `tenant_id` adalah batas kontrak, isolasi data, metering, dan placement SaaS.
 - organization adalah identitas bisnis stabil di dalam tenant.
 - legal entity dan operating unit adalah klasifikasi organization yang saling eksklusif dan mempunyai konsekuensi berbeda.

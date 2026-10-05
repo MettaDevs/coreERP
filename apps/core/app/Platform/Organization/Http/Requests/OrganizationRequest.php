@@ -70,14 +70,16 @@ class OrganizationRequest extends FormRequest
     /** @return array{classification:string,name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number:?string} */
     public function payload(): array
     {
+        $legalEntity = $this->validated('classification') === 'legal_entity';
+
         return [
             'classification' => $this->string('classification')->toString(),
             'name' => $this->string('name')->toString(),
-            'company_code' => strtoupper($this->string('company_code')->toString()) ?: null,
-            'country_code' => $this->string('country_code')->toString() ?: null,
-            'timezone' => $this->string('timezone')->toString() ?: null,
-            'operating_unit_type' => $this->string('operating_unit_type')->toString() ?: null,
-            'operating_unit_number' => $this->string('operating_unit_number')->toString() ?: null,
+            'company_code' => $legalEntity ? (strtoupper($this->string('company_code')->toString()) ?: null) : null,
+            'country_code' => $legalEntity ? ($this->string('country_code')->toString() ?: null) : null,
+            'timezone' => $legalEntity ? ($this->string('timezone')->toString() ?: null) : null,
+            'operating_unit_type' => $legalEntity ? null : ($this->string('operating_unit_type')->toString() ?: null),
+            'operating_unit_number' => $legalEntity ? null : ($this->string('operating_unit_number')->toString() ?: null),
         ];
     }
 }
