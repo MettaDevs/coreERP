@@ -45,11 +45,11 @@ export function AppSidebarHeader({
     return (
         <header
             className={cn(
-                'sticky top-0 z-20 h-16 shrink-0 border-b bg-background transition-[border-radius,box-shadow] duration-200',
+                'sticky top-0 z-20 min-h-16 shrink-0 border-b bg-background transition-[border-radius,box-shadow] duration-200',
                 isScrolled ? 'rounded-none shadow-sm' : 'rounded-t-2xl',
             )}
         >
-            <div className="flex h-full items-center gap-4 px-5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-3 sm:gap-4 sm:px-5">
                 <SidebarTrigger className="shrink-0" />
                 <div className="hidden h-6 w-px bg-border sm:block" />
                 <WorkspaceSwitcher />
@@ -57,7 +57,7 @@ export function AppSidebarHeader({
                 <div className="hidden h-6 w-px bg-border lg:block" />
                 <Button
                     variant="outline"
-                    className="hidden h-10 w-full max-w-sm justify-start px-3 font-normal text-muted-foreground shadow-xs lg:flex"
+                    className="hidden h-10 max-w-sm min-w-32 flex-1 justify-start px-3 font-normal text-muted-foreground shadow-xs lg:flex"
                     onClick={() => setCommandOpen(true)}
                 >
                     <Search data-icon="inline-start" />
