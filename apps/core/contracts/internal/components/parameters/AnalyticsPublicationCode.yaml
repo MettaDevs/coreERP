@@ -1,0 +1,10 @@
+name: code
+in: path
+required: true
+description: |
+  Kode publikasi, misalnya `aset-per-unit`. Kode dibuat admin tenant dan tidak pernah berubah; huruf
+  besar dan kecil dianggap sama.
+schema:
+  type: string
+  maxLength: 80
+  pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$'

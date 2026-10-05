@@ -1,0 +1,11 @@
+description: |
+  Publikasi berkode ini tidak ada, sudah dicabut, atau tidak menyebut klien Anda. Ketiganya dijawab
+  sama dan sengaja tidak dibedakan, supaya keberadaan publikasi tenant tidak bocor ke klien lain.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/AnalyticsError' }
+    example:
+      error:
+        code: analytics.publication_unknown
+        message: Publikasi ini tidak ada atau tidak dibuka untuk klien integrasi ini.
+        field: code

@@ -6,6 +6,12 @@
     "berkas": "integrasi-finance.yaml"
   },
   {
+    "id": "integrasi-analitik",
+    "judul": "Integrasi · Analitik",
+    "publik": true,
+    "berkas": "integrasi-analitik.yaml"
+  },
+  {
     "id": "app",
     "judul": "App module (internal)",
     "publik": false,

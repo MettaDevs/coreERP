@@ -1,0 +1,55 @@
+parameters:
+  - $ref: '#/components/parameters/AnalyticsPublicationCode'
+get:
+  tags: [Publikasi]
+  operationId: internal.analytics.publications.show
+  summary: Metadata satu publikasi — kolom, format, dan kolom yang boleh disaring
+  security:
+    - integrationClient: []
+  description: |
+    Kolom yang akan dikirim `GET /analytics/publications/{code}/rows`, tanpa menghitung barisnya.
+    Hak pemilik publikasi diperiksa ulang di sini juga: pemilik yang tidak lagi berhak membuat metadata
+    pun tertahan (`403 analytics.publication_suspended`).
+
+    Kolom data pribadi tidak pernah ada di publikasi, di metadata maupun di baris.
+  responses:
+    '200':
+      description: Metadata publikasi.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/AnalyticsPublication' }
+          example:
+            data:
+              code: aset-per-unit
+              name: Aset per unit
+              description: Jumlah aset per unit penanggung jawab.
+              status: active
+              formats: [json, csv]
+              updated_at: '2026-10-04T09:00:00+00:00'
+              timezone: Asia/Jakarta
+              small_group_threshold: null
+              columns:
+                - key: responsible_org_unit_id
+                  kind: dimension
+                  caption: Unit penanggung jawab
+                  type: reference
+                  label_key: responsible_org_unit_id__label
+                - key: count
+                  kind: measure
+                  caption: Jumlah aset
+                  type: number
+                  format: number
+              filterable:
+                - key: responsible_org_unit_id
+                  caption: Unit penanggung jawab
+                  type: reference
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/AnalyticsForbidden' }
+    '404': { $ref: '#/components/responses/AnalyticsNotFound' }
+    '409': { $ref: '#/components/responses/AnalyticsUnavailable' }
+    '429': { $ref: '#/components/responses/AnalyticsRateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

@@ -1,0 +1,11 @@
+description: |
+  Publikasi tidak dapat dihitung sekarang: datanya tidak tersedia lagi (aplikasinya dicabut dari
+  tenant), kolom yang dipublikasikan sudah tidak ada, atau isinya tidak lagi cocok dengan datanya.
+  Admin tenant yang memperbaikinya di CoreERP; mengulang permintaan tidak mengubah jawabannya.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/AnalyticsError' }
+    example:
+      error:
+        code: analytics.publication_unavailable
+        message: 'Publikasi ini tidak dapat dibaca sekarang: kolom "Unit penanggung jawab" sudah tidak tersedia di datanya. Minta admin tenant memperbaikinya.'

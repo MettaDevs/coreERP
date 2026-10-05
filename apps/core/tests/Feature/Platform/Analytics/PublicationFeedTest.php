@@ -9,6 +9,7 @@ use App\Platform\Analytics\Models\Publication;
 use App\Platform\Analytics\Models\QueryLogEntry;
 use App\Platform\Identity\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CocokDenganKontrak;
 use Tests\TestCase;
 
 /**
@@ -22,7 +23,7 @@ use Tests\TestCase;
  */
 class PublicationFeedTest extends TestCase
 {
-    use BuildsAssetTenants, PublishesAnalytics, RefreshDatabase;
+    use BuildsAssetTenants, CocokDenganKontrak, PublishesAnalytics, RefreshDatabase;
 
     private User $director;
 
@@ -100,6 +101,13 @@ class PublicationFeedTest extends TestCase
         $this->assertStringStartsWith('text/csv', (string) $csv->headers->get('Content-Type'));
         $this->assertSame($cursor, $csv->headers->get('X-Next-Cursor'));
         $this->assertSame("responsible_org_unit_id,responsible_org_unit_id__label,count\n{$this->unitB},\"Unit B\",3\n", $csv->getContent());
+
+        // Jawaban sungguhan cocok dengan skema kontrak yang terbit untuk developer luar.
+        $contract = 'contracts/terbit/integrasi-analitik.yaml';
+        $this->assertCocokSkema($this->feed($client['token'])->json('data.0'), 'AnalyticsPublicationSummary', $contract);
+        $this->assertCocokSkema($this->feed($client['token'], '/aset-per-unit')->json('data'), 'AnalyticsPublication', $contract);
+        $this->assertCocokSkema($first->json(), 'AnalyticsRowsPage', $contract);
+        $this->assertCocokSkema($this->feed($client['token'], '/tidak-ada')->assertNotFound()->json(), 'AnalyticsError', $contract);
 
         // Log query: sumber api, publikasi dan klien tercatat di principal.
         $log = QueryLogEntry::query()->where('tenant_id', $this->tenant)->where('source', 'api')->latest('id')->firstOrFail();

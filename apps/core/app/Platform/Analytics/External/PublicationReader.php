@@ -99,8 +99,8 @@ final class PublicationReader
             $this->validator->validate($dataset, $parsed, $principal);
         } catch (AnalyticsQueryException $e) {
             throw PublicationErrors::unavailable($e->errorCode === 'analytics.field_personal_data'
-                ? 'query-nya memakai kolom data pribadi, yang tidak pernah dibuka ke luar.'
-                : 'query-nya tidak lagi cocok dengan datanya.');
+                ? 'analisisnya memakai kolom data pribadi, yang tidak pernah dibuka ke luar.'
+                : 'analisisnya tidak lagi cocok dengan datanya.');
         }
 
         return ['dataset' => $dataset, 'query' => $read['query'], 'parsed' => $parsed];

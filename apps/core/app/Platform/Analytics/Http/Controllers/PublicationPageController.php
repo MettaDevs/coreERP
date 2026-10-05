@@ -37,7 +37,6 @@ final class PublicationPageController extends Controller
 {
     public function __construct(
         private readonly PublicationPresenter $presenter,
-        private readonly CorePermissions $permissions,
         private readonly DashboardAccess $dashboards,
         private readonly DatasetRegistry $datasets,
         private readonly DatasetAccess $access,
@@ -48,7 +47,7 @@ final class PublicationPageController extends Controller
     public function index(Request $request): Response
     {
         $membership = $this->currentMembership($request);
-        $canManage = $this->permissions->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE);
+        $canManage = app(CorePermissions::class)->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE);
 
         $publications = Publication::query()
             ->where('tenant_id', $membership->tenant_id)

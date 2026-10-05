@@ -104,6 +104,24 @@ masih memegang hak publikasi, masih memegang permission dataset. Pembuat yang ke
 haknya membuat publikasinya menjawab 403 `analytics.publication_suspended` sampai admin memindahkan
 kepemilikannya. Hak publikasi tidak boleh hidup lebih lama daripada pembuatnya.
 
+*Dikirim area 15 (4 Oktober 2026):* `Security\PublicationPrincipal` (permission module dan hibah kebijakan dari
+keanggotaan pemilik, `mayUsePersonalData()` selalu `false`, saringan terkunci `locked_filters[dataset]`, zona
+waktu publikasi) dan `Security\PublicationAccess`, yang memeriksa pada setiap permintaan: keanggotaan pemilik
+aktif di tenant publikasi dan masih memegang `core.analytics.publication.update`. Permission baca dataset
+pemilik diperiksa `DatasetAccess` di jalur query biasa, dan penolakannya diterjemahkan menjadi tertahan.
+
+- **`CorePermissions` diminta dari container pada setiap pemeriksaan, tidak disuntikkan sekali.** Router
+  menyimpan instance controller di rutenya, jadi layanan yang disuntikkan ke controller dapat hidup lebih lama
+  daripada satu permintaan — bersama ingatan permission permintaan sebelumnya. `PublicationSuspendedWhenOwnerLosesAccessTest`
+  merah persis di situ (duty yang dipasang lagi tetap tertahan) sebelum diperbaiki. `DashboardAccess` dan
+  layanan lain yang menyuntikkan `CorePermissions` ke controller membawa pola yang sama; dampaknya di sana
+  sebatas tampilan, karena gate rute membaca ulang.
+- **Hanya pemilik yang mengubah isi publikasi** (salinan query, saringan terkunci, klien, format, ambang
+  kelompok kecil) dan melihat pratinjaunya. Pemegang hak publikasi lain boleh menghentikan sementara,
+  melanjutkan, mencabut, dan **mengambil alih** — menjadikan dirinya pemilik, sehingga sejak itu jangkauannya
+  yang dipakai. "Memindahkan pemilik" ke orang ketiga sengaja tidak ada: publikasi tidak pernah berjalan atas
+  jangkauan orang yang tidak menyusunnya.
+
 ## Kebijakan data
 
 `DataPolicyScope` mengambil hibah principal untuk kode kebijakan dataset dan menerapkannya lewat
@@ -169,7 +187,8 @@ Tiga perilaku yang mudah terlewat:
 - **Kelompok kecil pada publikasi.** Publikasi boleh menyembunyikan baris yang dihitung dari kurang
   dari *k* baris sumber (PQ-07), karena angka "1 pasien penyakit X di unit Y" dapat menunjuk orang.
   Penyembunyian dikerjakan pada hasil, dengan `count` baris sumber yang ditambahkan diam-diam ke query
-  publikasi.
+  publikasi. *Dikirim area 15:* ambang per publikasi, bawaan mati; bawaan untuk dataset pasien menunggu
+  keputusan PQ-07 (gap di [akses luar](/todo/analitik/akses-luar#endpoint)).
 
 *Dikirim area 4 (4 Oktober 2026):* `Security\PersonalDataGate` membaca `CompiledDataset::classification()`
 dan hak principal (`mayUsePersonalData()`).
@@ -421,7 +440,8 @@ Wajib ada sebelum area yang bersangkutan dinyatakan `[x]`:
 - `PersonalDataGateTest` — katalog, dimensi, saringan, urutan, drill, publikasi (area 4).
 - `SharedDashboardRunsAsViewerTest` (area 6).
 - `AnalyticsCacheIsolationTest` — tenant dan sidik jari scope (area 9).
-- `PublicationSuspendedWhenOwnerLosesAccessTest`, `LockedFilterEmptyMeansNothingTest` (area 15).
+- `PublicationSuspendedWhenOwnerLosesAccessTest`, `LockedFilterEmptyMeansNothingTest`, `PublicationPersonalDataTest`
+  (area 15).
 - `EmbedTokenTest` — kedaluwarsa, dicabut, asal salah, dipakai untuk dasbor lain (area 17).
 - `AnalyticsBoundaryTest` dan `AnalyticsDatasetsBoundaryTest` (area 1, lihat
   [arsitektur](/todo/analitik/arsitektur#penjaga-batas-yang-baru)).

@@ -1,0 +1,22 @@
+type: object
+required: [code, name, description, status, formats, updated_at]
+properties:
+  code:
+    type: string
+    examples: [aset-per-unit]
+  name:
+    type: string
+    examples: [Aset per unit]
+  description:
+    type: [string, 'null']
+  status:
+    type: string
+    description: '`active`, atau `paused` bila admin tenant menghentikannya sementara. Publikasi yang dicabut tidak tampil.'
+    examples: [active, paused]
+  formats:
+    type: array
+    items: { $ref: '#/components/schemas/AnalyticsFormat' }
+  updated_at:
+    type: [string, 'null']
+    format: date-time
+    description: Terakhir diubah admin tenant.

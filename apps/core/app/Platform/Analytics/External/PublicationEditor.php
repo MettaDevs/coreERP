@@ -75,17 +75,17 @@ final class PublicationEditor
     public function snapshot(TenantMembership $owner, Publication $publication, ?SavedQuery $saved): array
     {
         if ($saved === null || $saved->tenant_id !== $owner->tenant_id || ! $this->dashboards->canView($owner, $saved)) {
-            throw self::fail('saved_query_id', 'Pilih query tersimpan yang dapat Anda buka.');
+            throw self::fail('saved_query_id', 'Pilih analisis tersimpan yang dapat Anda buka.');
         }
 
         $dataset = $this->datasets->find($saved->dataset_code)
-            ?? throw self::fail('saved_query_id', 'Data query ini tidak tersedia lagi. Aplikasinya mungkin belum terpasang.');
+            ?? throw self::fail('saved_query_id', 'Data analisis ini tidak tersedia lagi. Aplikasinya mungkin belum terpasang.');
         $principal = PublicationPrincipal::make($publication, $owner);
 
         $read = StoredQuery::read($dataset, $saved->query, $saved->dataset_version);
         $missing = array_key_first($read['missing']);
         if ($missing !== null) {
-            throw self::fail('saved_query_id', 'Kolom "'.$read['missing'][$missing].'" di query ini sudah tidak tersedia. Ubah query-nya lebih dulu.');
+            throw self::fail('saved_query_id', 'Kolom "'.$read['missing'][$missing].'" di analisis ini sudah tidak tersedia. Ubah analisisnya lebih dulu.');
         }
 
         try {
@@ -94,9 +94,9 @@ final class PublicationEditor
             $this->validator->validate($dataset, $parsed, $principal);
         } catch (AnalyticsQueryException $e) {
             throw self::fail('saved_query_id', match ($e->errorCode) {
-                'analytics.field_personal_data' => 'Query ini memakai kolom data pribadi, yang tidak pernah dibuka ke sistem lain. Pilih query tanpa kolom itu.',
-                'analytics.dataset_forbidden' => 'Anda tidak punya akses ke data query ini.',
-                'analytics.dataset_unknown' => 'Data query ini tidak tersedia lagi. Aplikasinya mungkin belum terpasang.',
+                'analytics.field_personal_data' => 'Analisis ini memakai kolom data pribadi, yang tidak pernah dibuka ke sistem lain. Pilih analisis tanpa kolom itu.',
+                'analytics.dataset_forbidden' => 'Anda tidak punya akses ke data analisis ini.',
+                'analytics.dataset_unknown' => 'Data analisis ini tidak tersedia lagi. Aplikasinya mungkin belum terpasang.',
                 default => $e->getMessage(),
             });
         }
@@ -124,14 +124,14 @@ final class PublicationEditor
     {
         $dataset = $publication->dataset_code === null ? null : $this->datasets->find($publication->dataset_code);
         if ($dataset === null || $publication->query === null) {
-            throw self::fail('saved_query_id', 'Data publikasi ini tidak tersedia lagi. Pilih query tersimpan lain.');
+            throw self::fail('saved_query_id', 'Data publikasi ini tidak tersedia lagi. Pilih analisis tersimpan lain.');
         }
 
         $read = StoredQuery::read($dataset, $publication->query, $publication->dataset_version);
         try {
             $parsed = $this->normalizer->normalize($this->parser->parse($read['query']));
         } catch (AnalyticsQueryException) {
-            throw self::fail('saved_query_id', 'Query publikasi ini tidak lagi cocok dengan datanya. Pilih query tersimpan lagi.');
+            throw self::fail('saved_query_id', 'Analisis publikasi ini tidak lagi cocok dengan datanya. Pilih analisis tersimpan lagi.');
         }
 
         return ['dataset' => $dataset, 'parsed' => $parsed];
@@ -263,7 +263,7 @@ final class PublicationEditor
         $count = PublicationReader::countMeasure($dataset)
             ?? throw self::fail('min_group_size', 'Data ini tidak punya nilai jumlah baris, jadi kelompok kecil tidak dapat disembunyikan.');
         if (! in_array($count, $parsed->measures, true) && count($parsed->measures) >= config()->integer('analytics.limits.measures', 12)) {
-            throw self::fail('min_group_size', 'Kurangi satu nilai di query ini supaya jumlah baris dapat ikut dihitung untuk menyembunyikan kelompok kecil.');
+            throw self::fail('min_group_size', 'Kurangi satu nilai di analisis ini supaya jumlah baris dapat ikut dihitung untuk menyembunyikan kelompok kecil.');
         }
 
         return $size;

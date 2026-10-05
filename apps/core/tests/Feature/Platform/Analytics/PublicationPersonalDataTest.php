@@ -100,7 +100,7 @@ class PublicationPersonalDataTest extends TestCase
 
         $this->publish($this->owner, ['name' => 'Per pembeli', 'saved_query_id' => $saved, 'client_ids' => [$this->client['id']]])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['saved_query_id' => 'Query ini memakai kolom data pribadi, yang tidak pernah dibuka ke sistem lain. Pilih query tanpa kolom itu.']);
+            ->assertJsonValidationErrors(['saved_query_id' => 'Analisis ini memakai kolom data pribadi, yang tidak pernah dibuka ke sistem lain. Pilih analisis tanpa kolom itu.']);
         $this->assertSame(0, Publication::query()->count());
     }
 

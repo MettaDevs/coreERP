@@ -3,6 +3,7 @@
 namespace Tests\Feature\Platform\Docs;
 
 use App\Foundation\Currency\Support\MoneyPrecision;
+use App\Platform\Analytics\Models\Publication;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\ProviderAccess;
 use Database\Seeders\AppCatalogSeeder;
@@ -91,6 +92,49 @@ class DocsPortalTest extends TestCase
         }
     }
 
+    public function test_tamu_dapat_mengunduh_kontrak_analitik_yang_hanya_memuat_endpoint_publikasi(): void
+    {
+        $this->get('/docs')->assertOk()->assertSee('Integrasi · Analitik', false);
+        $this->get('/docs?spec=integrasi-analitik')->assertOk()->assertSee(route('docs.kontrak', 'integrasi-analitik'), false);
+
+        $spesifikasi = Yaml::parse((string) $this->get('/docs/kontrak/integrasi-analitik.yaml')->assertOk()->getContent());
+        $this->assertSame(
+            ['/analytics/publications', '/analytics/publications/{code}', '/analytics/publications/{code}/rows'],
+            collect(array_keys($spesifikasi['paths']))->sort()->values()->all(),
+        );
+        $this->assertSame(['integrationClient'], array_keys($spesifikasi['components']['securitySchemes']));
+        foreach (['Memulai', 'Langkah 1', 'Halaman dan cursor', 'CSV', 'Google Sheets lewat Apps Script', 'n8n, Make, dan Zapier', 'Kode galat'] as $bagian) {
+            $this->assertStringContainsString('## '.$bagian, $spesifikasi['info']['description']);
+        }
+    }
+
+    public function test_daftar_format_dan_kode_galat_analitik_punya_bagian_sendiri_dan_sama_di_setiap_tempat(): void
+    {
+        // Pembaca mencari "format" dan "kode galat" di docs: judul bagian di panduan dan model sendiri harus
+        // memuat daftar yang sama, dan daftar itu harus sama dengan yang dikirim kode.
+        $spesifikasi = Yaml::parseFile(base_path('contracts/terbit/integrasi-analitik.yaml'));
+        $panduan = $spesifikasi['info']['description'];
+
+        $format = $this->nilaiDiTabel($this->bagianPanduan($panduan, 'Format baris'), '[a-z]+');
+        $this->assertSame(Publication::FORMATS, $format);
+        $this->assertSame($format, $spesifikasi['components']['schemas']['AnalyticsFormat']['examples']);
+        $this->assertSame($format, $this->nilaiDiTabel($spesifikasi['components']['schemas']['AnalyticsFormat']['description'], '[a-z]+'));
+        $parameter = collect($spesifikasi['paths']['/analytics/publications/{code}/rows']['get']['parameters'])->firstWhere('name', 'format');
+        $this->assertSame('#/components/schemas/AnalyticsFormat', $parameter['schema']['$ref']);
+
+        $kode = $this->nilaiDiTabel($this->bagianPanduan($panduan, 'Kode galat'), 'analytics\.[a-z_]+');
+        $this->assertNotEmpty($kode);
+        $model = $spesifikasi['components']['schemas']['AnalyticsErrorCode'];
+        $this->assertSame($kode, $model['examples']);
+        $this->assertSame($kode, $this->nilaiDiTabel($model['description'], 'analytics\.[a-z_]+'));
+
+        // Setiap kode yang dapat dikirim galat publikasi ada di daftar.
+        preg_match_all("/'(analytics\.[a-z_]+)'/", (string) file_get_contents(app_path('Platform/Analytics/External/PublicationErrors.php')), $dikirim);
+        foreach (array_unique($dikirim[1]) as $satu) {
+            $this->assertContains($satu, $kode, "Kode {$satu} dikirim kode tetapi tidak ada di daftar Kode galat.");
+        }
+    }
+
     public function test_judul_panduan_tanpa_kode_supaya_hasil_pencarian_menuju_judulnya(): void
     {
         // Scalar membuat alamat hasil pencarian dari seluruh teks judul, tetapi membuang bagian
@@ -173,6 +217,18 @@ class DocsPortalTest extends TestCase
     private function jenisDiTabel(string $markdown): array
     {
         preg_match_all('/^\| `([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)` \|/m', $markdown, $cocok);
+
+        return $cocok[1];
+    }
+
+    /**
+     * Nilai berbentuk `$pola` di kolom pertama tabel markdown, sesuai urutannya.
+     *
+     * @return list<string>
+     */
+    private function nilaiDiTabel(string $markdown, string $pola): array
+    {
+        preg_match_all('/^\| `('.$pola.')` \|/m', $markdown, $cocok);
 
         return $cocok[1];
     }

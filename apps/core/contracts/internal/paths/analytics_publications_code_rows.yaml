@@ -1,0 +1,103 @@
+parameters:
+  - $ref: '#/components/parameters/AnalyticsPublicationCode'
+get:
+  tags: [Publikasi]
+  operationId: internal.analytics.publications.rows
+  summary: Baris satu publikasi, per halaman, sebagai JSON atau CSV
+  security:
+    - integrationClient: []
+  description: |
+    Angka dihitung saat diminta dengan hak pemilik publikasi hari ini, dipersempit saringan terkunci
+    publikasi dan saringan tambahan Anda. Hasil yang sama dapat diambil dari cache sampai lima menit
+    (`meta.generated_at` menyebut saat dihitung).
+
+    **Halaman.** Kirim `meta.next_cursor` (JSON) atau header `X-Next-Cursor` (CSV) sebagai `cursor`,
+    dengan `filter` yang sama, sampai cursor habis. Cursor terikat ke publikasi, versinya, dan
+    saringannya: cursor yang dipakai dengan saringan lain, atau sesudah admin mengubah publikasinya,
+    dijawab `422 analytics.cursor_invalid` — mulai lagi dari halaman pertama.
+
+    **Saringan tambahan** hanya menyempitkan, dan hanya pada kolom di `filterable` metadata. Ia dipasang
+    bersama saringan publikasi, tidak pernah menggantikannya.
+  parameters:
+    - name: format
+      in: query
+      required: false
+      description: Salah satu nilai di `formats` metadata; lihat bagian **Format baris** di panduan.
+      schema:
+        $ref: '#/components/schemas/AnalyticsFormat'
+        default: json
+    - name: limit
+      in: query
+      required: false
+      description: Baris per halaman.
+      schema: { type: integer, minimum: 1, maximum: 5000, default: 1000 }
+    - name: cursor
+      in: query
+      required: false
+      description: '`meta.next_cursor` atau header `X-Next-Cursor` dari halaman sebelumnya.'
+      schema: { type: string, maxLength: 200 }
+    - name: filter
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      description: |
+        Saringan tambahan per kolom di `filterable`. Kolom teks, angka, dan tanggal memakai ekspresi:
+        `filter[acquired_on]=01/01/2026..31/12/2026`, `filter[kode]=RS*|Klinik*`. Kolom pilihan, ya/tidak,
+        dan rujukan memakai daftar nilai: `filter[responsible_org_unit_id][]=01J9…&filter[responsible_org_unit_id][]=01JA…`.
+        Isian kosong berarti tanpa saringan tambahan pada kolom itu. Paling banyak 20 saringan termasuk
+        saringan publikasi.
+      schema:
+        type: object
+        additionalProperties:
+          oneOf:
+            - type: string
+              maxLength: 250
+            - type: array
+              maxItems: 100
+              items: { type: string }
+  responses:
+    '200':
+      description: Satu halaman baris.
+      headers:
+        X-Next-Cursor:
+          description: Hanya pada CSV, bila masih ada halaman berikutnya.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AnalyticsRowsPage' }
+          example:
+            columns:
+              - key: responsible_org_unit_id
+                kind: dimension
+                caption: Unit penanggung jawab
+                type: reference
+                label_key: responsible_org_unit_id__label
+              - key: count
+                kind: measure
+                caption: Jumlah aset
+                type: number
+                format: number
+            rows:
+              - responsible_org_unit_id: 01J9Z3K4M5N6P7Q8R9S0T1V2W3
+                responsible_org_unit_id__label: Instalasi Farmasi
+                count: 42
+            meta:
+              publication: aset-per-unit
+              generated_at: '2026-10-15T09:00:00+07:00'
+              timezone: Asia/Jakarta
+              truncated: false
+              small_groups_hidden: 0
+              next_cursor: null
+        text/csv:
+          schema: { type: string }
+          example: |
+            responsible_org_unit_id,responsible_org_unit_id__label,count
+            01J9Z3K4M5N6P7Q8R9S0T1V2W3,"Instalasi Farmasi",42
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/AnalyticsForbidden' }
+    '404': { $ref: '#/components/responses/AnalyticsNotFound' }
+    '409': { $ref: '#/components/responses/AnalyticsUnavailable' }
+    '422': { $ref: '#/components/responses/AnalyticsInvalid' }
+    '429': { $ref: '#/components/responses/AnalyticsRateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

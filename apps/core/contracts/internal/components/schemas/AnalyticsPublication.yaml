@@ -1,0 +1,37 @@
+type: object
+description: Metadata satu publikasi — isi `AnalyticsPublicationSummary` ditambah kolom dan saringannya.
+required: [code, name, description, status, formats, updated_at, timezone, small_group_threshold, columns, filterable]
+properties:
+  code:
+    type: string
+    examples: [aset-per-unit]
+  name:
+    type: string
+    examples: [Aset per unit]
+  description:
+    type: [string, 'null']
+  status:
+    type: string
+    description: '`active`, atau `paused` bila admin tenant menghentikannya sementara.'
+    examples: [active, paused]
+  formats:
+    type: array
+    items: { $ref: '#/components/schemas/AnalyticsFormat' }
+  updated_at:
+    type: [string, 'null']
+    format: date-time
+  timezone:
+    type: string
+    description: Zona waktu periode dan rentang tanggal relatif ("bulan ini") publikasi ini.
+    examples: [Asia/Jakarta]
+  small_group_threshold:
+    type: [integer, 'null']
+    description: |
+      Baris yang dihitung dari 1 sampai kurang dari angka ini tidak dikirim. `null` berarti semua
+      kelompok dikirim.
+  columns:
+    type: array
+    items: { $ref: '#/components/schemas/AnalyticsColumn' }
+  filterable:
+    type: array
+    items: { $ref: '#/components/schemas/AnalyticsFilterableField' }

@@ -72,6 +72,23 @@ Schema::create('analytics_embed_tokens', function (Blueprint $table): void {
 Token kedaluwarsa dihapus `RetentionService` (`analytics_embed_tokens`, satu hari setelah
 kedaluwarsa); tabel itu tabel teknis, bukan data bisnis.
 
+*Dikirim area 15 (4 Oktober 2026):* migration `2026_10_04_150000_create_analytics_publications_table` dengan
+bentuk di atas ditambah empat kolom, dan model `Models\Publication`.
+
+- **`dataset_code`, `dataset_version`, `query`: salinan query tersimpan saat dipublikasikan.** Yang dibaca
+  sistem luar adalah salinan yang sudah ditinjau pemiliknya, bukan query tersimpan yang hidup. Query
+  tersimpan bersama dapat diubah pemegang `shared-dashboard.update` lain; tanpa salinan, perubahan itu
+  langsung keluar dengan jangkauan pemilik publikasi, tanpa persetujuannya. Layar menandai query tersimpan
+  yang sudah berubah, dan pemilik menerapkannya dengan mengirim `saved_query_id` lagi. Query tersimpan
+  yang diarsipkan tidak menghentikan publikasi.
+- **`timezone`**: zona pembuatnya saat dibuat (`UserClock`), supaya periode dan "bulan ini" tidak ikut zona
+  server (`app.timezone` UTC) bila pemiliknya belum memilih zona di My Profile.
+- `embed_origins` dan `embed_parameters` sudah ada sesuai bentuk di atas, belum diisi: milik area 17.
+- `last_used_at` kolom aktivitas mesin: tidak menaikkan versi baris dan tidak mengubah `updated_at`.
+- **Publikasi berjenis dasbor belum dapat dibuat.** REST JSON/CSV dan feed OData hanya membaca publikasi
+  berjenis query; dasbor hanya berguna bagi embed, jadi pembuatannya pindah ke butir 17.1 bersama asal situs
+  dan parameter embed-nya.
+
 ## Scope klien integrasi
 
 Dua scope baru di `IntegrationClient::SCOPES`, dipilih admin saat menerbitkan klien:
@@ -83,6 +100,10 @@ Dua scope baru di `IntegrationClient::SCOPES`, dipilih admin saat menerbitkan kl
 
 Keduanya tetap dipersempit daftar `client_ids` setiap publikasi: scope membuka pintu, publikasi
 menentukan ruangan mana.
+
+*Dikirim area 15:* keduanya di `IntegrationClient::SCOPES`, jadi tampil di layar Klien integrasi.
+`analytics.embed` belum membuka endpoint apa pun sampai area 17; kontraknya menyebut itu sebagai yang belum
+tersedia.
 
 ## Endpoint
 
@@ -124,6 +145,47 @@ Apps Script. Tautan CSV dengan kunci di URL tidak disediakan di v1, karena kunci
 setiap log yang dilewatinya.
 
 **n8n, Make, Zapier**: node HTTP dengan header `Authorization: Bearer <client_id>.<secret>`.
+
+*Dikirim area 15 (4 Oktober 2026):* tiga endpoint pertama di `routes/api.php` (`internal/v1/analytics`, di
+balik `integration-client:analytics.read` dan rate limit klien integrasi yang sudah ada), controller
+`Http\Controllers\Internal\PublicationFeedController`, pembacanya `External\PublicationReader`. Kontraknya
+`contracts/internal/integrasi-analitik.yaml`. Yang ditetapkan saat membangunnya:
+
+- **Urutan penolakan.** Publikasi dicari di tenant klien menurut kode (tanpa membedakan huruf besar); yang
+  tidak ada, dicabut, berjenis dasbor, atau tidak menyebut klien itu dijawab sama — 404
+  `analytics.publication_unknown`. Lalu dihentikan sementara (403 `analytics.publication_paused`), lalu
+  pemilik diperiksa ulang (403 `analytics.publication_suspended`), lalu salinan query dibaca terhadap dataset
+  saat ini: dataset dicabut, kolom hilang, atau kolom yang kini berkelas data pribadi menjadi 409
+  `analytics.publication_unavailable`. Daftar lengkap kodenya di bagian *Kode galat* kontrak.
+- **Metadata** (`GET …/{code}`) memuat `columns` (bentuk kolom hasil), `filterable`, `formats`, `timezone`,
+  dan `small_group_threshold`, tanpa menjalankan query: compiler hanya menyusun SQL.
+- **Saringan tambahan** hanya diterima pada kolom pengelompok publikasi (untuk periode, kolom tanggalnya)
+  yang **belum** disaring query publikasi. Satu kolom memegang satu saringan; menerima saringan pemanggil di
+  kolom yang sudah disaring berarti menggantikannya, dan itu dapat melebarkan. Isian kosong berarti tanpa
+  saringan tambahan.
+- **Cursor posisi, bukan keyset.** Hasil analitik adalah kelompok tanpa kunci baris; compiler selalu
+  mengurutkan dengan setiap pengelompok sebagai pemutus seri, jadi posisi stabil selama data tidak berubah.
+  Cursor terikat ke id dan versi publikasi serta bentuk normal query efektif (termasuk saringan pemanggil);
+  yang tidak cocok dijawab 422 `analytics.cursor_invalid`. Query dihitung utuh lalu dipotong per halaman,
+  dengan cache hasil area 9 menanggung halaman berikutnya. Batas baris satu publikasi
+  `analytics.publications.rows_max` (bawaan 20.000), batas waktu `analytics.publications.timeout_ms` (15 detik).
+- **Bentuk baris** sama dengan contoh di atas, dengan `meta` berisi `publication`, `generated_at`,
+  `timezone`, `truncated`, `small_groups_hidden`, dan `next_cursor`. **Total tidak dikirim**: di samping
+  kelompok yang disembunyikan, total membuka selisihnya.
+- **CSV** ditulis `External\CsvRows`, bukan penulis ekspor daftar: penulis itu menulis ke berkas dan mengubah
+  uang menjadi float. Aturan sel sama — angka mentah, tanggal ISO, teks berawalan `=+-@` diberi petik.
+  Baris judul berisi kunci kolom (termasuk `<kunci>__label`), cursor halaman berikutnya di header
+  `X-Next-Cursor`.
+- **Log**: `RunQuery` dengan sumber `api`; principal tercatat `publication:<id>;client:<id>`.
+
+*Gap PQ-07 (belum diputuskan pemilik produk):* ambang kelompok kecil hidup per publikasi
+(`min_group_size`, 2 sampai 1.000) dan bawaannya **mati** untuk setiap publikasi. Semua dataset hari ini
+dataset aset, yang tidak menyentuh pasien, jadi usulan PRD (mati untuk yang tidak menyentuh pasien) terpenuhi.
+Bawaan 5 untuk dataset pasien **belum** dibangun dan tidak ditulis mati di kode: saat dataset pasien pertama
+lahir, pemilik produk memutuskan PQ-07 dan bawaannya dibaca dari setelan, bukan dari angka di kode.
+Penyembunyian membuang kelompok berhitungan 1 sampai ambang−1 baris sumber, memakai measure jumlah baris tanpa
+saringan tetap milik dataset (dataset tanpa measure seperti itu tidak dapat memakai ambang). Penyembunyian
+tidak menangkal serangan selisih lewat saringan tambahan yang berbeda; itu batas yang diketahui.
 
 ## Feed OData v4
 

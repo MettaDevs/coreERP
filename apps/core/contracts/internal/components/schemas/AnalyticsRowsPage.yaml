@@ -1,0 +1,39 @@
+type: object
+required: [columns, rows, meta]
+properties:
+  columns:
+    type: array
+    items: { $ref: '#/components/schemas/AnalyticsColumn' }
+  rows:
+    type: array
+    description: |
+      Satu objek per baris, berkunci `key` kolom (ditambah `label_key` bila ada). Jumlah baris dikirim
+      sebagai bilangan bulat; nilai lain — uang, rata-rata — sebagai teks desimal persis dengan titik,
+      supaya tidak kehilangan presisi. Tanggal ISO (`2026-09-01`).
+    items:
+      type: object
+      additionalProperties:
+        type: [string, number, boolean, 'null']
+  meta:
+    type: object
+    required: [publication, generated_at, timezone, truncated, small_groups_hidden, next_cursor]
+    properties:
+      publication:
+        type: string
+        examples: [aset-per-unit]
+      generated_at:
+        type: string
+        format: date-time
+        description: Saat angkanya dihitung. Hasil yang sama dapat diambil dari cache sampai lima menit.
+      timezone:
+        type: string
+        examples: [Asia/Jakarta]
+      truncated:
+        type: boolean
+        description: '`true` bila hasil publikasi melewati batas baris server (bawaan 20.000) dan dipotong.'
+      small_groups_hidden:
+        type: integer
+        description: Jumlah kelompok yang tidak dikirim karena terlalu kecil. `0` bila tidak ada atau ambangnya mati.
+      next_cursor:
+        type: [string, 'null']
+        description: Kirim sebagai `cursor` untuk halaman berikutnya. `null` berarti halaman terakhir.

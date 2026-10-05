@@ -1,0 +1,1026 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
+openapi: 3.1.0
+info:
+  title: CoreERP — Publikasi analitik
+  version: 1.0.0
+  description: |
+    Panduan untuk developer yang membaca angka CoreERP dari sistem lain — n8n, Make, Zapier, Google
+    Sheets, gudang data, atau aplikasi buatan sendiri. Yang dapat dibaca hanyalah **publikasi** yang
+    dibuat pengguna tenant Anda: analisis tersimpan yang sengaja dibuka, dengan saringan yang sudah
+    dikunci. Tidak ada query bebas dari luar.
+
+    ## Memulai
+
+    ```text
+    Pengguna tenant di CoreERP                        Sistem Anda
+    ──────────────────────────                        ───────────
+    Analisis tersimpan  ──▶  Publikasi  ──────────▶   GET /analytics/publications/{code}/rows
+                             · saringan terkunci       Authorization: Bearer <client_id>.<secret>
+                             · klien yang boleh
+                             · format JSON / CSV
+    ```
+
+    - Satu publikasi = satu tabel kelompok: kolom pengelompok (misalnya unit kerja, bulan) dan nilai
+      yang dihitung (misalnya jumlah aset, nilai perolehan).
+    - Angkanya dihitung **dengan hak pemilik publikasi hari ini**. Bila pemiliknya kehilangan hak atau
+      keluar dari tenant, publikasi berhenti menjawab (`403 analytics.publication_suspended`) sampai
+      admin tenant mengambil alihnya. Anda tidak pernah menerima data di luar hak pemiliknya.
+    - Kolom data pribadi — nama pasien, NIK, nomor telepon — tidak pernah ikut publikasi. Id pengguna
+      boleh ikut sebagai pengelompok, tanpa nama orangnya.
+
+    ## Langkah 1 — Minta klien integrasi dan publikasi
+
+    Admin tenant CoreERP menyiapkan dua hal, lalu menyerahkan token dan kode publikasinya kepada Anda:
+
+    | Di CoreERP | Isi |
+    | --- | --- |
+    | **Identity & access › Klien integrasi** | Klien baru mode **Pull** dengan scope `analytics.read`. Token `<client_id>.<secret>` tampil sekali saat dibuat |
+    | **Dashboard › Publikasi data** | Publikasi dari analisis tersimpan, dengan klien Anda dicentang di **Klien yang boleh membaca** dan format yang Anda butuhkan |
+
+    Satu klien dapat membaca banyak publikasi, dan satu publikasi dapat dibuka untuk banyak klien. Scope
+    membuka pintu; publikasi menentukan ruangan mana.
+
+    ## Langkah 2 — Alamat dan autentikasi
+
+    Semua endpoint berada di bawah `https://<alamat>/api/internal/v1`, dengan `<alamat>` sama dengan
+    alamat yang dipakai pengguna tenant itu untuk masuk ke CoreERP. Kirim token di setiap permintaan:
+
+    ```http
+    GET /api/internal/v1/analytics/publications
+    Authorization: Bearer <client_id>.<secret>
+    Accept: application/json
+    ```
+
+    Token menentukan tenant. Jangan mengirim id tenant sendiri; kalau dikirim, diabaikan. Token tidak
+    pernah diterima di URL. Salinan **sandbox** tenant menjawab `503` untuk seluruh endpoint di halaman
+    ini.
+
+    ## Langkah 3 — Temukan publikasi dan kolomnya
+
+    1. `GET /analytics/publications` — publikasi yang membuka klien Anda, beserta `formats`-nya.
+    2. `GET /analytics/publications/{code}` — kolom yang akan dikirim (`columns`), kolom yang boleh
+       disaring (`filterable`), zona waktu periode, dan ambang kelompok kecil.
+
+    Publikasi yang tidak membuka klien Anda dijawab `404`, sama dengan kode yang tidak ada.
+
+    ## Langkah 4 — Baca baris
+
+    ```bash
+    curl -sS -H "Authorization: Bearer $COREERP_TOKEN" \
+      "https://alamat-tenant.contoh/api/internal/v1/analytics/publications/aset-per-unit/rows?limit=1000"
+    ```
+
+    ```json
+    {
+      "columns": [
+        { "key": "responsible_org_unit_id", "kind": "dimension", "caption": "Unit penanggung jawab", "type": "reference", "label_key": "responsible_org_unit_id__label" },
+        { "key": "count", "kind": "measure", "caption": "Jumlah aset", "type": "number", "format": "number" }
+      ],
+      "rows": [
+        { "responsible_org_unit_id": "01J9Z3K4M5N6P7Q8R9S0T1V2W3", "responsible_org_unit_id__label": "Instalasi Farmasi", "count": 42 }
+      ],
+      "meta": { "publication": "aset-per-unit", "generated_at": "2026-10-15T09:00:00+07:00", "timezone": "Asia/Jakarta", "truncated": false, "small_groups_hidden": 0, "next_cursor": null }
+    }
+    ```
+
+    - Kolom berlabel membawa nilai mentah (`responsible_org_unit_id`) **dan** namanya
+      (`responsible_org_unit_id__label`). Simpan nilai mentahnya untuk penggabungan dan saringan.
+    - Jumlah baris dikirim sebagai bilangan bulat. Uang dan rata-rata dikirim sebagai **teks desimal**
+      dengan titik, misalnya `"150000000.00"`; jangan membacanya sebagai float bila presisi penting.
+      Measure uang selalu didampingi kolom mata uangnya (`currency_key`) — uang tidak pernah dijumlah
+      lintas mata uang.
+    - Periode dikirim sebagai tanggal awalnya, misalnya `2026-09-01` untuk September 2026, dihitung
+      menurut `timezone` publikasi.
+    - Hasil yang sama dapat diambil dari cache sampai lima menit; `meta.generated_at` menyebut saat
+      angkanya dihitung. Untuk tarikan harian atau per jam, ini tidak berpengaruh.
+
+    ## Halaman dan cursor
+
+    Setiap halaman paling banyak `limit` baris (bawaan 1.000, paling banyak 5.000). Bila
+    `meta.next_cursor` tidak `null`, ulangi permintaan dengan `cursor=<nilai itu>` dan parameter lain
+    yang sama, sampai `next_cursor` bernilai `null`.
+
+    - Urutan baris pasti: menurut urutan analisisnya, lalu menurut setiap kolom pengelompok.
+    - Cursor terikat ke publikasi dan saringan permintaannya. Cursor yang dipakai dengan saringan lain,
+      atau sesudah admin tenant mengubah publikasinya, dijawab `422 analytics.cursor_invalid`: mulai
+      lagi dari halaman pertama.
+    - Baca seluruh halaman dalam satu putaran. Bila data berubah di antara dua halaman, kelompok baru
+      dapat menggeser posisi baris.
+    - Satu publikasi paling banyak menghasilkan 20.000 baris sebelum dibagi per halaman; selebihnya
+      dipotong dan `meta.truncated` bernilai `true`. Minta admin tenant mempersempit analisisnya.
+
+    ## Saringan tambahan
+
+    Persempit hasil dengan `filter[<kolom>]`, hanya untuk kolom yang tercantum di `filterable`
+    metadata:
+
+    | Tipe kolom | Bentuk | Contoh |
+    | --- | --- | --- |
+    | `reference`, `option`, `boolean` | Daftar nilai | `filter[responsible_org_unit_id][]=01J9…&filter[responsible_org_unit_id][]=01JA…` |
+    | `date`, `datetime` | Ekspresi | `filter[acquired_on]=01/01/2026..31/12/2026` |
+    | `text` | Ekspresi | `filter[kode]=RS*\|Klinik*` |
+    | `number` | Ekspresi | `filter[nilai]=>=1.000.000` |
+
+    Ekspresi memakai sintaks saringan CoreERP: `|` atau, `&` dan, `..` rentang inklusif, `<>` bukan,
+    `*` sembarang huruf; angka ditulis cara Indonesia (`1.000.000,50`), tanggal `31/12/2026` atau
+    `2026-12-31`. Encode nilainya di URL.
+
+    Saringan tambahan **hanya menyempitkan**: ia dipasang bersama saringan terkunci publikasi dan hak
+    pemiliknya, tidak pernah menggantikannya. Kolom yang sudah disaring analisis publikasi tidak ada di
+    `filterable`, dan saringan pada kolom lain ditolak `422 analytics.invalid_filter`.
+
+    ## CSV
+
+    Tambahkan `format=csv` (bila `csv` ada di `formats` publikasi). Baris pertama berisi kunci kolom,
+    termasuk kolom label; judul tampilan ada di metadata.
+
+    ```text
+    responsible_org_unit_id,responsible_org_unit_id__label,count
+    01J9Z3K4M5N6P7Q8R9S0T1V2W3,"Instalasi Farmasi",42
+    ```
+
+    - Pemisah koma, baris diakhiri `\n`, UTF-8 tanpa BOM.
+    - Angka mentah dengan titik desimal, tanggal ISO.
+    - Teks yang diawali `=`, `+`, `-`, atau `@` diberi awalan petik (`'`) supaya spreadsheet tidak
+      menjalankannya sebagai rumus. Angka negatif tetap angka.
+    - Cursor halaman berikutnya ada di header `X-Next-Cursor`; tanpa header itu, halaman ini yang
+      terakhir.
+
+    ## Google Sheets lewat Apps Script
+
+    `IMPORTDATA` tidak dapat mengirim header `Authorization`, dan tautan dengan token di URL tidak
+    disediakan karena token di URL tercatat di setiap log yang dilewatinya. Pakai Apps Script dan
+    simpan token di **Project Settings › Script properties**:
+
+    ```javascript
+    const COREERP = 'https://alamat-tenant.contoh/api/internal/v1';
+
+    function tarikAsetPerUnit() {
+      const token = PropertiesService.getScriptProperties().getProperty('COREERP_TOKEN');
+      const values = [];
+      let cursor = null;
+      do {
+        const url = COREERP + '/analytics/publications/aset-per-unit/rows?format=csv&limit=5000'
+          + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+        const response = UrlFetchApp.fetch(url, {
+          headers: { Authorization: 'Bearer ' + token },
+          muteHttpExceptions: true,
+        });
+        if (response.getResponseCode() !== 200) {
+          throw new Error(response.getContentText());
+        }
+        const page = Utilities.parseCsv(response.getContentText());
+        values.push(...(values.length ? page.slice(1) : page));
+        cursor = response.getHeaders()['X-Next-Cursor'] || null;
+      } while (cursor);
+
+      const sheet = SpreadsheetApp.getActive().getSheetByName('Aset per unit');
+      sheet.clearContents();
+      sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+    }
+    ```
+
+    Jadwalkan lewat **Triggers › Add Trigger** (time-driven), misalnya setiap hari pukul 06.00.
+
+    ## n8n, Make, dan Zapier
+
+    Pakai node atau modul HTTP biasa:
+
+    | Setelan | Isi |
+    | --- | --- |
+    | Method | `GET` |
+    | URL | `https://<alamat>/api/internal/v1/analytics/publications/<code>/rows` |
+    | Header | `Authorization: Bearer <client_id>.<secret>` (di n8n: credential **Header Auth**) |
+    | Query | `limit=5000`, ditambah `filter[...]` bila perlu |
+
+    Di node **HTTP Request** n8n, nyalakan **Pagination** dengan mode *Update a Parameter in Each
+    Request*: parameter query `cursor` bernilai `{{ $response.body.meta.next_cursor }}`, dan
+    *Pagination Complete When* = *Other* dengan `{{ !$response.body.meta.next_cursor }}`. Baris ada di
+    `rows` setiap halaman.
+
+    ## Kelompok kecil
+
+    Admin tenant dapat menetapkan ambang per publikasi (`small_group_threshold` di metadata). Baris yang
+    dihitung dari 1 sampai kurang dari ambang itu tidak dikirim, supaya angka kecil — "1 pasien di unit
+    X" — tidak dapat menunjuk orang tertentu. `meta.small_groups_hidden` menyebut berapa kelompok yang
+    tidak dikirim. Kelompok bernilai nol tetap dikirim. Total tidak pernah dikirim, supaya selisihnya
+    tidak membuka kelompok yang disembunyikan.
+
+    ## Format baris
+
+    | Nilai | Isi |
+    | --- | --- |
+    | `json` | Baris sebagai objek JSON, bersama kolom dan meta halaman |
+    | `csv` | Baris sebagai CSV berjudul kunci kolom, cursor di header `X-Next-Cursor` |
+
+    Format yang boleh diminta untuk satu publikasi ada di `formats`-nya; format lain dijawab
+    `422 analytics.format_unavailable`. Daftar ini terbuka: format baru dapat ditambahkan tanpa versi
+    kontrak baru.
+
+    ## Kode galat
+
+    Galat publikasi berbentuk `{"error": {"code", "message", "field"}}`. Penolakan token, allowlist IP,
+    scope, rate limit klien, dan salinan sandbox berbentuk `{"message"}` saja, sama dengan integrasi
+    CoreERP lain.
+
+    | Kode | Status | Arti |
+    | --- | --- | --- |
+    | `analytics.publication_unknown` | 404 | Publikasi tidak ada, sudah dicabut, atau tidak membuka klien Anda |
+    | `analytics.publication_paused` | 403 | Publikasi dihentikan sementara oleh admin tenant |
+    | `analytics.publication_suspended` | 403 | Pemilik publikasi tidak lagi berhak membagikan datanya |
+    | `analytics.publication_unavailable` | 409 | Data atau kolom publikasi tidak dapat dihitung lagi |
+    | `analytics.format_unavailable` | 422 | Format yang diminta tidak dibuka untuk publikasi ini |
+    | `analytics.cursor_invalid` | 422 | Cursor tidak dikenal atau dipakai dengan saringan lain |
+    | `analytics.invalid_parameter` | 422 | Parameter `format`, `limit`, atau `filter` tidak terbaca |
+    | `analytics.invalid_filter` | 422 | Kolom tidak dapat disaring, atau isian saringan tidak terbaca |
+    | `analytics.limit_exceeded` | 422 | Terlalu banyak saringan dalam satu permintaan |
+    | `analytics.query_timeout` | 422 | Perhitungan terlalu berat; persempit saringan |
+    | `analytics.busy` | 429 | Terlalu banyak perhitungan bersamaan di tenant; tunggu `Retry-After` |
+
+    | Status tanpa kode | Arti |
+    | --- | --- |
+    | `401` | Token salah, belum dikirim, atau kliennya dicabut |
+    | `403` | Alamat asal di luar allowlist klien, atau klien tanpa scope `analytics.read` |
+    | `429` | Rate limit klien: 120 permintaan per menit per `client_id`, bersama endpoint integrasi lain; tunggu `Retry-After` |
+    | `503` | Salinan sandbox, yang tidak menyajikan data ke sistem luar |
+
+    Kode tetap, teks `message` dapat berubah. Daftar ini terbuka: kode baru dapat ditambahkan tanpa
+    versi kontrak baru — perlakukan kode yang belum Anda kenal menurut status HTTP-nya. `409` dan
+    `403 analytics.publication_suspended` tidak sembuh dengan diulang; hubungi admin tenant.
+
+    ## Yang belum tersedia
+
+    - **Feed OData** untuk Excel dan Power BI belum tersedia; halaman ini akan memuatnya saat terbit.
+    - **Embed** dasbor di situs Anda belum tersedia. Scope `analytics.embed` sudah dapat dipilih di
+      Klien integrasi, tetapi belum membuka endpoint apa pun.
+
+    ## Versi kontrak
+
+    Bentuk versi 1 tidak berubah. Kolom baru di objek jawaban dapat ditambahkan tanpa versi baru; baca
+    menurut nama kunci. Perubahan yang memengaruhi pembaca terbit sebagai versi baru dan diumumkan lebih
+    dulu.
+servers:
+- url: https://{alamat}/api/internal/v1
+  description: Alamat tenant CoreERP di layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+  variables:
+    alamat:
+      default: alamat-tenant.contoh
+      description: Host yang dipakai pengguna tenant itu untuk masuk ke CoreERP.
+security:
+- integrationClient: []
+tags:
+- name: Publikasi
+  description: Publikasi analitik yang dibuka pengguna tenant untuk klien Anda — daftar, metadata, dan
+    baris.
+paths:
+  /analytics/publications:
+    get:
+      tags:
+      - Publikasi
+      operationId: internal.analytics.publications.index
+      summary: Publikasi yang boleh dibaca klien ini
+      security:
+      - integrationClient: []
+      description: |
+        Hanya klien integrasi dengan scope `analytics.read`. Memuat publikasi tenant klien yang menyebut
+        klien ini, berstatus `active` atau `paused`; publikasi yang dicabut atau tidak menyebut klien ini
+        tidak tampil. Tanpa halaman: jumlah publikasi satu tenant kecil.
+      responses:
+        '200':
+          description: Daftar publikasi, urut kode.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnalyticsPublicationSummary'
+              example:
+                data:
+                - code: aset-per-unit
+                  name: Aset per unit
+                  description: Jumlah aset per unit penanggung jawab.
+                  status: active
+                  formats:
+                  - json
+                  - csv
+                  updated_at: '2026-10-04T09:00:00+00:00'
+        '401':
+          $ref: '#/components/responses/IntegrationUnauthenticated'
+        '403':
+          $ref: '#/components/responses/AnalyticsForbidden'
+        '429':
+          $ref: '#/components/responses/AnalyticsRateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /analytics/publications/{code}:
+    parameters:
+    - $ref: '#/components/parameters/AnalyticsPublicationCode'
+    get:
+      tags:
+      - Publikasi
+      operationId: internal.analytics.publications.show
+      summary: Metadata satu publikasi — kolom, format, dan kolom yang boleh disaring
+      security:
+      - integrationClient: []
+      description: |
+        Kolom yang akan dikirim `GET /analytics/publications/{code}/rows`, tanpa menghitung barisnya.
+        Hak pemilik publikasi diperiksa ulang di sini juga: pemilik yang tidak lagi berhak membuat metadata
+        pun tertahan (`403 analytics.publication_suspended`).
+
+        Kolom data pribadi tidak pernah ada di publikasi, di metadata maupun di baris.
+      responses:
+        '200':
+          description: Metadata publikasi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AnalyticsPublication'
+              example:
+                data:
+                  code: aset-per-unit
+                  name: Aset per unit
+                  description: Jumlah aset per unit penanggung jawab.
+                  status: active
+                  formats:
+                  - json
+                  - csv
+                  updated_at: '2026-10-04T09:00:00+00:00'
+                  timezone: Asia/Jakarta
+                  small_group_threshold: null
+                  columns:
+                  - key: responsible_org_unit_id
+                    kind: dimension
+                    caption: Unit penanggung jawab
+                    type: reference
+                    label_key: responsible_org_unit_id__label
+                  - key: count
+                    kind: measure
+                    caption: Jumlah aset
+                    type: number
+                    format: number
+                  filterable:
+                  - key: responsible_org_unit_id
+                    caption: Unit penanggung jawab
+                    type: reference
+        '401':
+          $ref: '#/components/responses/IntegrationUnauthenticated'
+        '403':
+          $ref: '#/components/responses/AnalyticsForbidden'
+        '404':
+          $ref: '#/components/responses/AnalyticsNotFound'
+        '409':
+          $ref: '#/components/responses/AnalyticsUnavailable'
+        '429':
+          $ref: '#/components/responses/AnalyticsRateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /analytics/publications/{code}/rows:
+    parameters:
+    - $ref: '#/components/parameters/AnalyticsPublicationCode'
+    get:
+      tags:
+      - Publikasi
+      operationId: internal.analytics.publications.rows
+      summary: Baris satu publikasi, per halaman, sebagai JSON atau CSV
+      security:
+      - integrationClient: []
+      description: |
+        Angka dihitung saat diminta dengan hak pemilik publikasi hari ini, dipersempit saringan terkunci
+        publikasi dan saringan tambahan Anda. Hasil yang sama dapat diambil dari cache sampai lima menit
+        (`meta.generated_at` menyebut saat dihitung).
+
+        **Halaman.** Kirim `meta.next_cursor` (JSON) atau header `X-Next-Cursor` (CSV) sebagai `cursor`,
+        dengan `filter` yang sama, sampai cursor habis. Cursor terikat ke publikasi, versinya, dan
+        saringannya: cursor yang dipakai dengan saringan lain, atau sesudah admin mengubah publikasinya,
+        dijawab `422 analytics.cursor_invalid` — mulai lagi dari halaman pertama.
+
+        **Saringan tambahan** hanya menyempitkan, dan hanya pada kolom di `filterable` metadata. Ia dipasang
+        bersama saringan publikasi, tidak pernah menggantikannya.
+      parameters:
+      - name: format
+        in: query
+        required: false
+        description: Salah satu nilai di `formats` metadata; lihat bagian **Format baris** di panduan.
+        schema:
+          $ref: '#/components/schemas/AnalyticsFormat'
+          default: json
+      - name: limit
+        in: query
+        required: false
+        description: Baris per halaman.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5000
+          default: 1000
+      - name: cursor
+        in: query
+        required: false
+        description: '`meta.next_cursor` atau header `X-Next-Cursor` dari halaman sebelumnya.'
+        schema:
+          type: string
+          maxLength: 200
+      - name: filter
+        in: query
+        required: false
+        style: deepObject
+        explode: true
+        description: |
+          Saringan tambahan per kolom di `filterable`. Kolom teks, angka, dan tanggal memakai ekspresi:
+          `filter[acquired_on]=01/01/2026..31/12/2026`, `filter[kode]=RS*|Klinik*`. Kolom pilihan, ya/tidak,
+          dan rujukan memakai daftar nilai: `filter[responsible_org_unit_id][]=01J9…&filter[responsible_org_unit_id][]=01JA…`.
+          Isian kosong berarti tanpa saringan tambahan pada kolom itu. Paling banyak 20 saringan termasuk
+          saringan publikasi.
+        schema:
+          type: object
+          additionalProperties:
+            oneOf:
+            - type: string
+              maxLength: 250
+            - type: array
+              maxItems: 100
+              items:
+                type: string
+      responses:
+        '200':
+          description: Satu halaman baris.
+          headers:
+            X-Next-Cursor:
+              description: Hanya pada CSV, bila masih ada halaman berikutnya.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsRowsPage'
+              example:
+                columns:
+                - key: responsible_org_unit_id
+                  kind: dimension
+                  caption: Unit penanggung jawab
+                  type: reference
+                  label_key: responsible_org_unit_id__label
+                - key: count
+                  kind: measure
+                  caption: Jumlah aset
+                  type: number
+                  format: number
+                rows:
+                - responsible_org_unit_id: 01J9Z3K4M5N6P7Q8R9S0T1V2W3
+                  responsible_org_unit_id__label: Instalasi Farmasi
+                  count: 42
+                meta:
+                  publication: aset-per-unit
+                  generated_at: '2026-10-15T09:00:00+07:00'
+                  timezone: Asia/Jakarta
+                  truncated: false
+                  small_groups_hidden: 0
+                  next_cursor: null
+            text/csv:
+              schema:
+                type: string
+              example: |
+                responsible_org_unit_id,responsible_org_unit_id__label,count
+                01J9Z3K4M5N6P7Q8R9S0T1V2W3,"Instalasi Farmasi",42
+        '401':
+          $ref: '#/components/responses/IntegrationUnauthenticated'
+        '403':
+          $ref: '#/components/responses/AnalyticsForbidden'
+        '404':
+          $ref: '#/components/responses/AnalyticsNotFound'
+        '409':
+          $ref: '#/components/responses/AnalyticsUnavailable'
+        '422':
+          $ref: '#/components/responses/AnalyticsInvalid'
+        '429':
+          $ref: '#/components/responses/AnalyticsRateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+components:
+  securitySchemes:
+    integrationClient:
+      type: http
+      scheme: bearer
+      description: |
+        Token klien integrasi berbentuk `<client_id>.<secret>`, diterbitkan admin tenant di
+        Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
+        header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
+        allowlist, atau scope yang kurang ditolak. Rate limit per klien
+        (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
+  parameters:
+    AnalyticsPublicationCode:
+      name: code
+      in: path
+      required: true
+      description: |
+        Kode publikasi, misalnya `aset-per-unit`. Kode dibuat admin tenant dan tidak pernah berubah; huruf
+        besar dan kecil dianggap sama.
+      schema:
+        type: string
+        maxLength: 80
+        pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$
+  responses:
+    AnalyticsForbidden:
+      description: |
+        Permintaan ditolak. Pemeriksaannya berurutan, dan yang pertama gagal yang menjawab:
+
+        1. Alamat asal di luar allowlist IP klien — bentuk `Error`.
+        2. Klien tidak punya scope `analytics.read` — bentuk `Error`.
+        3. Publikasi dihentikan sementara (`analytics.publication_paused`) — bentuk `AnalyticsError`.
+        4. Pemilik publikasi tidak lagi berhak membagikan datanya (`analytics.publication_suspended`) —
+           bentuk `AnalyticsError`. Publikasi terbaca lagi setelah admin tenant mengambil alihnya.
+
+        Publikasi yang tidak membuka klien Anda tidak pernah dijawab `403`, melainkan `404`.
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - $ref: '#/components/schemas/Error'
+            - $ref: '#/components/schemas/AnalyticsError'
+          examples:
+            scope:
+              summary: Scope kurang
+              value:
+                message: Klien integrasi ini tidak punya izin analytics.read.
+            paused:
+              summary: Dihentikan sementara
+              value:
+                error:
+                  code: analytics.publication_paused
+                  message: Publikasi ini sedang dihentikan sementara oleh admin tenant. Coba lagi setelah
+                    dilanjutkan.
+            suspended:
+              summary: Pemilik kehilangan hak
+              value:
+                error:
+                  code: analytics.publication_suspended
+                  message: Publikasi ini tertahan karena pemiliknya tidak lagi berhak membagikan datanya.
+                    Minta admin tenant mengambil alih publikasi ini.
+    AnalyticsInvalid:
+      description: |
+        Parameter tidak dapat dipakai. `error.field` menunjuk parameternya; `error.code` salah satu dari
+        `analytics.format_unavailable`, `analytics.cursor_invalid`, `analytics.invalid_parameter`,
+        `analytics.invalid_filter`, `analytics.limit_exceeded`, atau `analytics.query_timeout`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnalyticsError'
+          examples:
+            filter:
+              summary: Kolom yang tidak boleh disaring
+              value:
+                error:
+                  code: analytics.invalid_filter
+                  message: Kolom "acquisition_value" tidak dapat disaring di publikasi ini. Lihat daftar
+                    filterable di metadata publikasi.
+                  field: filter.acquisition_value
+            cursor:
+              summary: Cursor dipakai dengan saringan lain
+              value:
+                error:
+                  code: analytics.cursor_invalid
+                  message: Cursor tidak dikenal atau tidak cocok dengan saringan permintaan ini. Mulai
+                    lagi dari halaman pertama.
+                  field: cursor
+            timeout:
+              summary: Perhitungan terlalu berat
+              value:
+                error:
+                  code: analytics.query_timeout
+                  message: Perhitungan ini terlalu berat. Persempit periode atau saringan.
+    AnalyticsNotFound:
+      description: |
+        Publikasi berkode ini tidak ada, sudah dicabut, atau tidak menyebut klien Anda. Ketiganya dijawab
+        sama dan sengaja tidak dibedakan, supaya keberadaan publikasi tenant tidak bocor ke klien lain.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnalyticsError'
+          example:
+            error:
+              code: analytics.publication_unknown
+              message: Publikasi ini tidak ada atau tidak dibuka untuk klien integrasi ini.
+              field: code
+    AnalyticsRateLimited:
+      description: |
+        Dua sebab, dibedakan dari bentuknya:
+
+        - **Rate limit klien** (bentuk `Error`): 120 permintaan per menit per klien integrasi, dihitung dari
+          `client_id`, dipakai bersama semua endpoint integrasi yang dipanggil klien itu. Rate limit diperiksa
+          sebelum token, jadi jawaban ini bisa datang lebih dulu dari `401`.
+        - **Tenant sedang sibuk menghitung** (`analytics.busy`, bentuk `AnalyticsError`): terlalu banyak
+          perhitungan analitik bersamaan di tenant ini. Hasil yang sudah ada di cache tidak terkena.
+
+        Keduanya membawa `Retry-After` dalam detik; tunggu selama itu sebelum mengulang.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - $ref: '#/components/schemas/Error'
+            - $ref: '#/components/schemas/AnalyticsError'
+          examples:
+            rateLimit:
+              summary: Rate limit klien
+              value:
+                message: Too Many Attempts.
+            busy:
+              summary: Tenant sedang sibuk
+              value:
+                error:
+                  code: analytics.busy
+                  message: Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar.
+    AnalyticsUnavailable:
+      description: |
+        Publikasi tidak dapat dihitung sekarang: datanya tidak tersedia lagi (aplikasinya dicabut dari
+        tenant), kolom yang dipublikasikan sudah tidak ada, atau isinya tidak lagi cocok dengan datanya.
+        Admin tenant yang memperbaikinya di CoreERP; mengulang permintaan tidak mengubah jawabannya.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AnalyticsError'
+          example:
+            error:
+              code: analytics.publication_unavailable
+              message: 'Publikasi ini tidak dapat dibaca sekarang: kolom "Unit penanggung jawab" sudah
+                tidak tersedia di datanya. Minta admin tenant memperbaikinya.'
+    IntegrationUnauthenticated:
+      description: |
+        Token klien integrasi tidak dikirim, tidak berbentuk `<client_id>.<secret>`, secret-nya salah,
+        atau kliennya sudah dicabut. Keempatnya dijawab dengan pesan yang sama dan sengaja tidak
+        dibedakan.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Token klien integrasi tidak sah atau sudah dicabut.
+    OutboundRefused:
+      description: |
+        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    AnalyticsColumn:
+      type: object
+      required:
+      - key
+      - kind
+      - caption
+      - type
+      description: |
+        Satu kolom baris publikasi. `key` adalah nama kunci di setiap baris dan judul kolom CSV; `caption`
+        judul tampilan yang dapat diganti modul.
+      properties:
+        key:
+          type: string
+          examples:
+          - responsible_org_unit_id
+        kind:
+          type: string
+          description: '`dimension` untuk kolom pengelompok, `measure` untuk nilai yang dihitung.'
+          examples:
+          - dimension
+          - measure
+        caption:
+          type: string
+          examples:
+          - Unit penanggung jawab
+        type:
+          type: string
+          description: |
+            Tipe nilainya: `text`, `number`, `date`, `datetime`, `option`, `boolean`, `reference`, atau
+            `period` (awal periode, misalnya `2026-09-01`, untuk pengelompokan menurut waktu).
+          examples:
+          - reference
+          - number
+          - period
+        format:
+          type: string
+          description: Untuk measure, cara angkanya dibaca, misalnya `number` atau `money`.
+          examples:
+          - number
+          - money
+        granularity:
+          type: string
+          description: Untuk kolom `period`, panjang periodenya.
+          examples:
+          - month
+        label_key:
+          type: string
+          description: |
+            Kunci kolom pendamping yang berisi nama untuk nilai ini (misalnya nama unit di samping id-nya).
+            Nilai mentahnya tetap dikirim, dan dipakai untuk saringan tambahan.
+          examples:
+          - responsible_org_unit_id__label
+        currency_key:
+          type: string
+          description: Untuk measure uang, kunci kolom mata uangnya. Uang tidak pernah dijumlah lintas
+            mata uang.
+          examples:
+          - currency_code
+        unit_key:
+          type: string
+          description: Untuk measure kuantitas, kunci kolom satuannya.
+        implicit:
+          type: boolean
+          description: '`true` untuk kolom mata uang atau satuan yang ikut dikelompokkan walau tidak dipilih.'
+    AnalyticsError:
+      type: object
+      required:
+      - error
+      description: Galat publikasi analitik. Penolakan token, allowlist, scope, rate limit, dan salinan
+        sandbox memakai bentuk `Error` (`message` saja).
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              $ref: '#/components/schemas/AnalyticsErrorCode'
+            message:
+              type: string
+              description: Penjelasan untuk developer, bahasa Indonesia. Teksnya tidak dijamin tetap.
+            field:
+              type: string
+              description: Parameter yang salah bila ada, misalnya `cursor`, `limit`, atau `filter.responsible_org_unit_id`.
+    AnalyticsErrorCode:
+      type: string
+      description: |
+        Kode galat publikasi analitik di `error.code`. Kode tetap; teks `message` dapat berubah.
+
+        | Kode | Status | Arti |
+        | --- | --- | --- |
+        | `analytics.publication_unknown` | 404 | Publikasi tidak ada, sudah dicabut, atau tidak membuka klien Anda |
+        | `analytics.publication_paused` | 403 | Publikasi dihentikan sementara oleh admin tenant |
+        | `analytics.publication_suspended` | 403 | Pemilik publikasi tidak lagi berhak membagikan datanya |
+        | `analytics.publication_unavailable` | 409 | Data atau kolom publikasi tidak dapat dihitung lagi |
+        | `analytics.format_unavailable` | 422 | Format yang diminta tidak dibuka untuk publikasi ini |
+        | `analytics.cursor_invalid` | 422 | Cursor tidak dikenal atau dipakai dengan saringan lain |
+        | `analytics.invalid_parameter` | 422 | Parameter `format`, `limit`, atau `filter` tidak terbaca |
+        | `analytics.invalid_filter` | 422 | Kolom tidak dapat disaring, atau isian saringan tidak terbaca |
+        | `analytics.limit_exceeded` | 422 | Terlalu banyak saringan dalam satu permintaan |
+        | `analytics.query_timeout` | 422 | Perhitungan terlalu berat; persempit saringan |
+        | `analytics.busy` | 429 | Terlalu banyak perhitungan bersamaan di tenant; tunggu `Retry-After` |
+
+        Daftar ini terbuka: kode baru dapat ditambahkan tanpa versi kontrak baru. Perlakukan kode yang
+        belum Anda kenal menurut status HTTP-nya.
+      examples:
+      - analytics.publication_unknown
+      - analytics.publication_paused
+      - analytics.publication_suspended
+      - analytics.publication_unavailable
+      - analytics.format_unavailable
+      - analytics.cursor_invalid
+      - analytics.invalid_parameter
+      - analytics.invalid_filter
+      - analytics.limit_exceeded
+      - analytics.query_timeout
+      - analytics.busy
+    AnalyticsFilterableField:
+      type: object
+      required:
+      - key
+      - caption
+      - type
+      description: Kolom yang boleh disaring lewat `filter[<key>]` di `GET /analytics/publications/{code}/rows`.
+      properties:
+        key:
+          type: string
+          examples:
+          - responsible_org_unit_id
+        caption:
+          type: string
+          examples:
+          - Unit penanggung jawab
+        type:
+          type: string
+          description: |
+            `text`, `number`, `date`, dan `datetime` disaring dengan ekspresi (`filter[kolom]=ekspresi`);
+            `option`, `boolean`, dan `reference` dengan daftar nilai (`filter[kolom][]=nilai`).
+          examples:
+          - reference
+          - date
+          - option
+        options:
+          type: array
+          description: Untuk `option`, nilai yang dikenal beserta namanya.
+          items:
+            type: object
+            required:
+            - value
+            - label
+            properties:
+              value:
+                type: string
+              label:
+                type: string
+    AnalyticsFormat:
+      type: string
+      description: |
+        Format baris publikasi. Admin tenant memilih format yang dibuka untuk setiap publikasi; daftar
+        `formats` di metadata menyebut yang boleh diminta.
+
+        | Nilai | Isi |
+        | --- | --- |
+        | `json` | Baris sebagai objek JSON, bersama kolom dan meta halaman |
+        | `csv` | Baris sebagai CSV berjudul kunci kolom, cursor di header `X-Next-Cursor` |
+
+        Daftar ini terbuka: format baru dapat ditambahkan tanpa versi kontrak baru.
+      examples:
+      - json
+      - csv
+    AnalyticsPublication:
+      type: object
+      description: Metadata satu publikasi — isi `AnalyticsPublicationSummary` ditambah kolom dan saringannya.
+      required:
+      - code
+      - name
+      - description
+      - status
+      - formats
+      - updated_at
+      - timezone
+      - small_group_threshold
+      - columns
+      - filterable
+      properties:
+        code:
+          type: string
+          examples:
+          - aset-per-unit
+        name:
+          type: string
+          examples:
+          - Aset per unit
+        description:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          description: '`active`, atau `paused` bila admin tenant menghentikannya sementara.'
+          examples:
+          - active
+          - paused
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsFormat'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        timezone:
+          type: string
+          description: Zona waktu periode dan rentang tanggal relatif ("bulan ini") publikasi ini.
+          examples:
+          - Asia/Jakarta
+        small_group_threshold:
+          type:
+          - integer
+          - 'null'
+          description: |
+            Baris yang dihitung dari 1 sampai kurang dari angka ini tidak dikirim. `null` berarti semua
+            kelompok dikirim.
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsColumn'
+        filterable:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsFilterableField'
+    AnalyticsPublicationSummary:
+      type: object
+      required:
+      - code
+      - name
+      - description
+      - status
+      - formats
+      - updated_at
+      properties:
+        code:
+          type: string
+          examples:
+          - aset-per-unit
+        name:
+          type: string
+          examples:
+          - Aset per unit
+        description:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          description: '`active`, atau `paused` bila admin tenant menghentikannya sementara. Publikasi
+            yang dicabut tidak tampil.'
+          examples:
+          - active
+          - paused
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsFormat'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Terakhir diubah admin tenant.
+    AnalyticsRowsPage:
+      type: object
+      required:
+      - columns
+      - rows
+      - meta
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsColumn'
+        rows:
+          type: array
+          description: |
+            Satu objek per baris, berkunci `key` kolom (ditambah `label_key` bila ada). Jumlah baris dikirim
+            sebagai bilangan bulat; nilai lain — uang, rata-rata — sebagai teks desimal persis dengan titik,
+            supaya tidak kehilangan presisi. Tanggal ISO (`2026-09-01`).
+          items:
+            type: object
+            additionalProperties:
+              type:
+              - string
+              - number
+              - boolean
+              - 'null'
+        meta:
+          type: object
+          required:
+          - publication
+          - generated_at
+          - timezone
+          - truncated
+          - small_groups_hidden
+          - next_cursor
+          properties:
+            publication:
+              type: string
+              examples:
+              - aset-per-unit
+            generated_at:
+              type: string
+              format: date-time
+              description: Saat angkanya dihitung. Hasil yang sama dapat diambil dari cache sampai lima
+                menit.
+            timezone:
+              type: string
+              examples:
+              - Asia/Jakarta
+            truncated:
+              type: boolean
+              description: '`true` bila hasil publikasi melewati batas baris server (bawaan 20.000) dan
+                dipotong.'
+            small_groups_hidden:
+              type: integer
+              description: Jumlah kelompok yang tidak dikirim karena terlalu kecil. `0` bila tidak ada
+                atau ambangnya mati.
+            next_cursor:
+              type:
+              - string
+              - 'null'
+              description: Kirim sebagai `cursor` untuk halaman berikutnya. `null` berarti halaman terakhir.
+    Error:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
+  headers:
+    RetryAfter:
+      description: Detik sampai jatah pulih. Tunggu selama itu sebelum mengirim permintaan berikutnya.
+      schema:
+        type: integer
+        example: 60

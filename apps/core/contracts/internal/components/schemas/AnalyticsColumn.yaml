@@ -1,0 +1,46 @@
+type: object
+required: [key, kind, caption, type]
+description: |
+  Satu kolom baris publikasi. `key` adalah nama kunci di setiap baris dan judul kolom CSV; `caption`
+  judul tampilan yang dapat diganti modul.
+properties:
+  key:
+    type: string
+    examples: [responsible_org_unit_id]
+  kind:
+    type: string
+    description: '`dimension` untuk kolom pengelompok, `measure` untuk nilai yang dihitung.'
+    examples: [dimension, measure]
+  caption:
+    type: string
+    examples: [Unit penanggung jawab]
+  type:
+    type: string
+    description: |
+      Tipe nilainya: `text`, `number`, `date`, `datetime`, `option`, `boolean`, `reference`, atau
+      `period` (awal periode, misalnya `2026-09-01`, untuk pengelompokan menurut waktu).
+    examples: [reference, number, period]
+  format:
+    type: string
+    description: Untuk measure, cara angkanya dibaca, misalnya `number` atau `money`.
+    examples: [number, money]
+  granularity:
+    type: string
+    description: Untuk kolom `period`, panjang periodenya.
+    examples: [month]
+  label_key:
+    type: string
+    description: |
+      Kunci kolom pendamping yang berisi nama untuk nilai ini (misalnya nama unit di samping id-nya).
+      Nilai mentahnya tetap dikirim, dan dipakai untuk saringan tambahan.
+    examples: [responsible_org_unit_id__label]
+  currency_key:
+    type: string
+    description: Untuk measure uang, kunci kolom mata uangnya. Uang tidak pernah dijumlah lintas mata uang.
+    examples: [currency_code]
+  unit_key:
+    type: string
+    description: Untuk measure kuantitas, kunci kolom satuannya.
+  implicit:
+    type: boolean
+    description: '`true` untuk kolom mata uang atau satuan yang ikut dikelompokkan walau tidak dipilih.'

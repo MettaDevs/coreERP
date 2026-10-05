@@ -222,16 +222,16 @@ final class PublicationFeedController extends Controller
             if (preg_match('/^[a-z][a-z0-9_]{0,63}$/', $key) !== 1) {
                 throw PublicationErrors::filterNotAllowed(mb_substr($key, 0, 64));
             }
-            if (is_string($value)) {
-                $filters[$key] = $value;
+            // Isian kosong tiba sebagai null (`ConvertEmptyStringsToNull`), dan berarti tanpa saringan tambahan.
+            if ($value === null || is_string($value)) {
+                $filters[$key] = $value ?? '';
 
                 continue;
             }
-            if (! is_array($value) || ! array_is_list($value) || array_filter($value, static fn (mixed $item): bool => ! is_string($item)) !== []) {
+            if (! is_array($value) || ! array_is_list($value) || array_filter($value, static fn (mixed $item): bool => $item !== null && ! is_string($item)) !== []) {
                 throw PublicationErrors::invalidParameter('filter.'.$key, 'Tulis daftar pilihan sebagai filter['.$key.'][]=nilai.');
             }
-            /** @var list<string> $value */
-            $filters[$key] = $value;
+            $filters[$key] = array_map(static fn (?string $item): string => $item ?? '', $value);
         }
 
         return $filters;

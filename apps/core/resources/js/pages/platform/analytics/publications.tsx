@@ -570,7 +570,7 @@ function PublicationSheet({
                         </Field>
                         <Field data-invalid={Boolean(error('saved_query_id'))}>
                             <NativeSelect
-                                label="Query tersimpan"
+                                label="Analisis tersimpan"
                                 required
                                 value={form.saved_query_id}
                                 onChange={(event) =>
@@ -583,7 +583,7 @@ function PublicationSheet({
                                 }
                             >
                                 <NativeSelectOption value="">
-                                    Pilih query tersimpan
+                                    Pilih analisis tersimpan
                                 </NativeSelectOption>
                                 {publication?.saved_query &&
                                     !savedQueries.some(
@@ -610,8 +610,8 @@ function PublicationSheet({
                                 ))}
                             </NativeSelect>
                             <FieldDescription>
-                                Yang dibaca sistem lain adalah isi query saat
-                                dipublikasikan. Perubahan query tersimpan baru
+                                Yang dibaca sistem lain adalah isi analisis saat
+                                dipublikasikan. Perubahan analisis tersimpan baru
                                 ikut setelah Anda menerapkannya di sini.
                             </FieldDescription>
                             <FieldError>{error('saved_query_id')}</FieldError>
@@ -629,7 +629,7 @@ function PublicationSheet({
                                     htmlFor="apply-latest"
                                     className="font-normal"
                                 >
-                                    Query tersimpan ini sudah berubah. Terapkan
+                                    Analisis tersimpan ini sudah berubah. Terapkan
                                     isi terbarunya saat disimpan.
                                 </FieldLabel>
                             </Field>
@@ -978,7 +978,7 @@ function HealthNote({ publication }: { publication: Publication }) {
     if (publication.saved_query?.changed && publication.status !== 'revoked') {
         return (
             <span className="block text-xs text-muted-foreground">
-                Query tersimpannya sudah berubah; sistem lain masih membaca isi
+                Analisis tersimpannya sudah berubah; sistem lain masih membaca isi
                 lama sampai pemiliknya menerapkannya.
             </span>
         );
@@ -1063,7 +1063,7 @@ export default function AnalyticsPublications({
                                 <EmptyHeader>
                                     <EmptyTitle>Belum ada publikasi</EmptyTitle>
                                     <EmptyDescription>
-                                        Publikasikan query tersimpan supaya
+                                        Publikasikan analisis tersimpan supaya
                                         sistem lain dapat membaca angkanya tanpa
                                         membuka CoreERP.
                                     </EmptyDescription>

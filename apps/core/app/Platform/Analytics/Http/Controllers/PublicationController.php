@@ -59,7 +59,6 @@ final class PublicationController extends Controller
         private readonly PublicationPresenter $presenter,
         private readonly PublicationAccess $access,
         private readonly PublicationReader $reader,
-        private readonly CorePermissions $permissions,
         private readonly UserClock $clock,
     ) {}
 
@@ -131,7 +130,7 @@ final class PublicationController extends Controller
         if (array_key_exists('saved_query_id', $data)) {
             $snapshot = $this->editor->snapshot($membership, $publication, $this->savedQuery($membership, $data['saved_query_id']));
             if ($snapshot['dataset']->code !== $publication->dataset_code && ! array_key_exists('locked_filters', $data) && $publication->locked_filters !== []) {
-                throw ValidationException::withMessages(['locked_filters' => ['Query ini memakai data lain. Atur ulang saringan terkunci untuk data yang baru.']]);
+                throw ValidationException::withMessages(['locked_filters' => ['Analisis ini memakai data lain. Atur ulang saringan terkunci untuk data yang baru.']]);
             }
             ['dataset' => $dataset, 'parsed' => $parsed] = $snapshot;
             $values = $snapshot['values'];
@@ -343,7 +342,7 @@ final class PublicationController extends Controller
 
     private function respond(Publication $publication, TenantMembership $membership, int $status = 200): JsonResponse
     {
-        $canManage = $this->permissions->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE);
+        $canManage = app(CorePermissions::class)->allows($membership, CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE);
 
         return response()->json(['data' => $this->presenter->one($publication, $membership, $canManage)], $status, ['ETag' => RowVersion::etag($publication->version)]);
     }

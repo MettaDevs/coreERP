@@ -1,0 +1,34 @@
+get:
+  tags: [Publikasi]
+  operationId: internal.analytics.publications.index
+  summary: Publikasi yang boleh dibaca klien ini
+  security:
+    - integrationClient: []
+  description: |
+    Hanya klien integrasi dengan scope `analytics.read`. Memuat publikasi tenant klien yang menyebut
+    klien ini, berstatus `active` atau `paused`; publikasi yang dicabut atau tidak menyebut klien ini
+    tidak tampil. Tanpa halaman: jumlah publikasi satu tenant kecil.
+  responses:
+    '200':
+      description: Daftar publikasi, urut kode.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/AnalyticsPublicationSummary' }
+          example:
+            data:
+              - code: aset-per-unit
+                name: Aset per unit
+                description: Jumlah aset per unit penanggung jawab.
+                status: active
+                formats: [json, csv]
+                updated_at: '2026-10-04T09:00:00+00:00'
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/AnalyticsForbidden' }
+    '429': { $ref: '#/components/responses/AnalyticsRateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

@@ -1,0 +1,297 @@
+# Akar domain analitik untuk sistem di luar CoreERP (token klien integrasi). Dirakit ke
+# `contracts/terbit/integrasi-analitik.yaml` oleh `contracts/bundle.py`, dan terbit tanpa login di portal
+# `/docs`. Rancangannya di docs/todo/analitik/akses-luar.md (area 15; OData area 16 dan embed area 17
+# menambah path di bawah `paths:`).
+#
+# Panduan di `info.description` ditulis untuk orang luar: tanpa riwayat keputusan internal dan tanpa
+# jalur kode. Daftar nilai yang dipilih pembaca — format baris dan kode galat — punya judul bagian
+# sendiri dan model sendiri (`AnalyticsFormat`, `AnalyticsErrorCode`), ditulis dengan `examples`,
+# bukan `enum`. `DocsPortalTest` memeriksa keduanya.
+x-portal:
+  judul: Integrasi · Analitik
+  publik: true
+  urutan: 20
+openapi: 3.1.0
+info:
+  title: CoreERP — Publikasi analitik
+  version: 1.0.0
+  description: |
+    Panduan untuk developer yang membaca angka CoreERP dari sistem lain — n8n, Make, Zapier, Google
+    Sheets, gudang data, atau aplikasi buatan sendiri. Yang dapat dibaca hanyalah **publikasi** yang
+    dibuat pengguna tenant Anda: analisis tersimpan yang sengaja dibuka, dengan saringan yang sudah
+    dikunci. Tidak ada query bebas dari luar.
+
+    ## Memulai
+
+    ```text
+    Pengguna tenant di CoreERP                        Sistem Anda
+    ──────────────────────────                        ───────────
+    Analisis tersimpan  ──▶  Publikasi  ──────────▶   GET /analytics/publications/{code}/rows
+                             · saringan terkunci       Authorization: Bearer <client_id>.<secret>
+                             · klien yang boleh
+                             · format JSON / CSV
+    ```
+
+    - Satu publikasi = satu tabel kelompok: kolom pengelompok (misalnya unit kerja, bulan) dan nilai
+      yang dihitung (misalnya jumlah aset, nilai perolehan).
+    - Angkanya dihitung **dengan hak pemilik publikasi hari ini**. Bila pemiliknya kehilangan hak atau
+      keluar dari tenant, publikasi berhenti menjawab (`403 analytics.publication_suspended`) sampai
+      admin tenant mengambil alihnya. Anda tidak pernah menerima data di luar hak pemiliknya.
+    - Kolom data pribadi — nama pasien, NIK, nomor telepon — tidak pernah ikut publikasi. Id pengguna
+      boleh ikut sebagai pengelompok, tanpa nama orangnya.
+
+    ## Langkah 1 — Minta klien integrasi dan publikasi
+
+    Admin tenant CoreERP menyiapkan dua hal, lalu menyerahkan token dan kode publikasinya kepada Anda:
+
+    | Di CoreERP | Isi |
+    | --- | --- |
+    | **Identity & access › Klien integrasi** | Klien baru mode **Pull** dengan scope `analytics.read`. Token `<client_id>.<secret>` tampil sekali saat dibuat |
+    | **Dashboard › Publikasi data** | Publikasi dari analisis tersimpan, dengan klien Anda dicentang di **Klien yang boleh membaca** dan format yang Anda butuhkan |
+
+    Satu klien dapat membaca banyak publikasi, dan satu publikasi dapat dibuka untuk banyak klien. Scope
+    membuka pintu; publikasi menentukan ruangan mana.
+
+    ## Langkah 2 — Alamat dan autentikasi
+
+    Semua endpoint berada di bawah `https://<alamat>/api/internal/v1`, dengan `<alamat>` sama dengan
+    alamat yang dipakai pengguna tenant itu untuk masuk ke CoreERP. Kirim token di setiap permintaan:
+
+    ```http
+    GET /api/internal/v1/analytics/publications
+    Authorization: Bearer <client_id>.<secret>
+    Accept: application/json
+    ```
+
+    Token menentukan tenant. Jangan mengirim id tenant sendiri; kalau dikirim, diabaikan. Token tidak
+    pernah diterima di URL. Salinan **sandbox** tenant menjawab `503` untuk seluruh endpoint di halaman
+    ini.
+
+    ## Langkah 3 — Temukan publikasi dan kolomnya
+
+    1. `GET /analytics/publications` — publikasi yang membuka klien Anda, beserta `formats`-nya.
+    2. `GET /analytics/publications/{code}` — kolom yang akan dikirim (`columns`), kolom yang boleh
+       disaring (`filterable`), zona waktu periode, dan ambang kelompok kecil.
+
+    Publikasi yang tidak membuka klien Anda dijawab `404`, sama dengan kode yang tidak ada.
+
+    ## Langkah 4 — Baca baris
+
+    ```bash
+    curl -sS -H "Authorization: Bearer $COREERP_TOKEN" \
+      "https://alamat-tenant.contoh/api/internal/v1/analytics/publications/aset-per-unit/rows?limit=1000"
+    ```
+
+    ```json
+    {
+      "columns": [
+        { "key": "responsible_org_unit_id", "kind": "dimension", "caption": "Unit penanggung jawab", "type": "reference", "label_key": "responsible_org_unit_id__label" },
+        { "key": "count", "kind": "measure", "caption": "Jumlah aset", "type": "number", "format": "number" }
+      ],
+      "rows": [
+        { "responsible_org_unit_id": "01J9Z3K4M5N6P7Q8R9S0T1V2W3", "responsible_org_unit_id__label": "Instalasi Farmasi", "count": 42 }
+      ],
+      "meta": { "publication": "aset-per-unit", "generated_at": "2026-10-15T09:00:00+07:00", "timezone": "Asia/Jakarta", "truncated": false, "small_groups_hidden": 0, "next_cursor": null }
+    }
+    ```
+
+    - Kolom berlabel membawa nilai mentah (`responsible_org_unit_id`) **dan** namanya
+      (`responsible_org_unit_id__label`). Simpan nilai mentahnya untuk penggabungan dan saringan.
+    - Jumlah baris dikirim sebagai bilangan bulat. Uang dan rata-rata dikirim sebagai **teks desimal**
+      dengan titik, misalnya `"150000000.00"`; jangan membacanya sebagai float bila presisi penting.
+      Measure uang selalu didampingi kolom mata uangnya (`currency_key`) — uang tidak pernah dijumlah
+      lintas mata uang.
+    - Periode dikirim sebagai tanggal awalnya, misalnya `2026-09-01` untuk September 2026, dihitung
+      menurut `timezone` publikasi.
+    - Hasil yang sama dapat diambil dari cache sampai lima menit; `meta.generated_at` menyebut saat
+      angkanya dihitung. Untuk tarikan harian atau per jam, ini tidak berpengaruh.
+
+    ## Halaman dan cursor
+
+    Setiap halaman paling banyak `limit` baris (bawaan 1.000, paling banyak 5.000). Bila
+    `meta.next_cursor` tidak `null`, ulangi permintaan dengan `cursor=<nilai itu>` dan parameter lain
+    yang sama, sampai `next_cursor` bernilai `null`.
+
+    - Urutan baris pasti: menurut urutan analisisnya, lalu menurut setiap kolom pengelompok.
+    - Cursor terikat ke publikasi dan saringan permintaannya. Cursor yang dipakai dengan saringan lain,
+      atau sesudah admin tenant mengubah publikasinya, dijawab `422 analytics.cursor_invalid`: mulai
+      lagi dari halaman pertama.
+    - Baca seluruh halaman dalam satu putaran. Bila data berubah di antara dua halaman, kelompok baru
+      dapat menggeser posisi baris.
+    - Satu publikasi paling banyak menghasilkan 20.000 baris sebelum dibagi per halaman; selebihnya
+      dipotong dan `meta.truncated` bernilai `true`. Minta admin tenant mempersempit analisisnya.
+
+    ## Saringan tambahan
+
+    Persempit hasil dengan `filter[<kolom>]`, hanya untuk kolom yang tercantum di `filterable`
+    metadata:
+
+    | Tipe kolom | Bentuk | Contoh |
+    | --- | --- | --- |
+    | `reference`, `option`, `boolean` | Daftar nilai | `filter[responsible_org_unit_id][]=01J9…&filter[responsible_org_unit_id][]=01JA…` |
+    | `date`, `datetime` | Ekspresi | `filter[acquired_on]=01/01/2026..31/12/2026` |
+    | `text` | Ekspresi | `filter[kode]=RS*\|Klinik*` |
+    | `number` | Ekspresi | `filter[nilai]=>=1.000.000` |
+
+    Ekspresi memakai sintaks saringan CoreERP: `|` atau, `&` dan, `..` rentang inklusif, `<>` bukan,
+    `*` sembarang huruf; angka ditulis cara Indonesia (`1.000.000,50`), tanggal `31/12/2026` atau
+    `2026-12-31`. Encode nilainya di URL.
+
+    Saringan tambahan **hanya menyempitkan**: ia dipasang bersama saringan terkunci publikasi dan hak
+    pemiliknya, tidak pernah menggantikannya. Kolom yang sudah disaring analisis publikasi tidak ada di
+    `filterable`, dan saringan pada kolom lain ditolak `422 analytics.invalid_filter`.
+
+    ## CSV
+
+    Tambahkan `format=csv` (bila `csv` ada di `formats` publikasi). Baris pertama berisi kunci kolom,
+    termasuk kolom label; judul tampilan ada di metadata.
+
+    ```text
+    responsible_org_unit_id,responsible_org_unit_id__label,count
+    01J9Z3K4M5N6P7Q8R9S0T1V2W3,"Instalasi Farmasi",42
+    ```
+
+    - Pemisah koma, baris diakhiri `\n`, UTF-8 tanpa BOM.
+    - Angka mentah dengan titik desimal, tanggal ISO.
+    - Teks yang diawali `=`, `+`, `-`, atau `@` diberi awalan petik (`'`) supaya spreadsheet tidak
+      menjalankannya sebagai rumus. Angka negatif tetap angka.
+    - Cursor halaman berikutnya ada di header `X-Next-Cursor`; tanpa header itu, halaman ini yang
+      terakhir.
+
+    ## Google Sheets lewat Apps Script
+
+    `IMPORTDATA` tidak dapat mengirim header `Authorization`, dan tautan dengan token di URL tidak
+    disediakan karena token di URL tercatat di setiap log yang dilewatinya. Pakai Apps Script dan
+    simpan token di **Project Settings › Script properties**:
+
+    ```javascript
+    const COREERP = 'https://alamat-tenant.contoh/api/internal/v1';
+
+    function tarikAsetPerUnit() {
+      const token = PropertiesService.getScriptProperties().getProperty('COREERP_TOKEN');
+      const values = [];
+      let cursor = null;
+      do {
+        const url = COREERP + '/analytics/publications/aset-per-unit/rows?format=csv&limit=5000'
+          + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+        const response = UrlFetchApp.fetch(url, {
+          headers: { Authorization: 'Bearer ' + token },
+          muteHttpExceptions: true,
+        });
+        if (response.getResponseCode() !== 200) {
+          throw new Error(response.getContentText());
+        }
+        const page = Utilities.parseCsv(response.getContentText());
+        values.push(...(values.length ? page.slice(1) : page));
+        cursor = response.getHeaders()['X-Next-Cursor'] || null;
+      } while (cursor);
+
+      const sheet = SpreadsheetApp.getActive().getSheetByName('Aset per unit');
+      sheet.clearContents();
+      sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+    }
+    ```
+
+    Jadwalkan lewat **Triggers › Add Trigger** (time-driven), misalnya setiap hari pukul 06.00.
+
+    ## n8n, Make, dan Zapier
+
+    Pakai node atau modul HTTP biasa:
+
+    | Setelan | Isi |
+    | --- | --- |
+    | Method | `GET` |
+    | URL | `https://<alamat>/api/internal/v1/analytics/publications/<code>/rows` |
+    | Header | `Authorization: Bearer <client_id>.<secret>` (di n8n: credential **Header Auth**) |
+    | Query | `limit=5000`, ditambah `filter[...]` bila perlu |
+
+    Di node **HTTP Request** n8n, nyalakan **Pagination** dengan mode *Update a Parameter in Each
+    Request*: parameter query `cursor` bernilai `{{ $response.body.meta.next_cursor }}`, dan
+    *Pagination Complete When* = *Other* dengan `{{ !$response.body.meta.next_cursor }}`. Baris ada di
+    `rows` setiap halaman.
+
+    ## Kelompok kecil
+
+    Admin tenant dapat menetapkan ambang per publikasi (`small_group_threshold` di metadata). Baris yang
+    dihitung dari 1 sampai kurang dari ambang itu tidak dikirim, supaya angka kecil — "1 pasien di unit
+    X" — tidak dapat menunjuk orang tertentu. `meta.small_groups_hidden` menyebut berapa kelompok yang
+    tidak dikirim. Kelompok bernilai nol tetap dikirim. Total tidak pernah dikirim, supaya selisihnya
+    tidak membuka kelompok yang disembunyikan.
+
+    ## Format baris
+
+    | Nilai | Isi |
+    | --- | --- |
+    | `json` | Baris sebagai objek JSON, bersama kolom dan meta halaman |
+    | `csv` | Baris sebagai CSV berjudul kunci kolom, cursor di header `X-Next-Cursor` |
+
+    Format yang boleh diminta untuk satu publikasi ada di `formats`-nya; format lain dijawab
+    `422 analytics.format_unavailable`. Daftar ini terbuka: format baru dapat ditambahkan tanpa versi
+    kontrak baru.
+
+    ## Kode galat
+
+    Galat publikasi berbentuk `{"error": {"code", "message", "field"}}`. Penolakan token, allowlist IP,
+    scope, rate limit klien, dan salinan sandbox berbentuk `{"message"}` saja, sama dengan integrasi
+    CoreERP lain.
+
+    | Kode | Status | Arti |
+    | --- | --- | --- |
+    | `analytics.publication_unknown` | 404 | Publikasi tidak ada, sudah dicabut, atau tidak membuka klien Anda |
+    | `analytics.publication_paused` | 403 | Publikasi dihentikan sementara oleh admin tenant |
+    | `analytics.publication_suspended` | 403 | Pemilik publikasi tidak lagi berhak membagikan datanya |
+    | `analytics.publication_unavailable` | 409 | Data atau kolom publikasi tidak dapat dihitung lagi |
+    | `analytics.format_unavailable` | 422 | Format yang diminta tidak dibuka untuk publikasi ini |
+    | `analytics.cursor_invalid` | 422 | Cursor tidak dikenal atau dipakai dengan saringan lain |
+    | `analytics.invalid_parameter` | 422 | Parameter `format`, `limit`, atau `filter` tidak terbaca |
+    | `analytics.invalid_filter` | 422 | Kolom tidak dapat disaring, atau isian saringan tidak terbaca |
+    | `analytics.limit_exceeded` | 422 | Terlalu banyak saringan dalam satu permintaan |
+    | `analytics.query_timeout` | 422 | Perhitungan terlalu berat; persempit saringan |
+    | `analytics.busy` | 429 | Terlalu banyak perhitungan bersamaan di tenant; tunggu `Retry-After` |
+
+    | Status tanpa kode | Arti |
+    | --- | --- |
+    | `401` | Token salah, belum dikirim, atau kliennya dicabut |
+    | `403` | Alamat asal di luar allowlist klien, atau klien tanpa scope `analytics.read` |
+    | `429` | Rate limit klien: 120 permintaan per menit per `client_id`, bersama endpoint integrasi lain; tunggu `Retry-After` |
+    | `503` | Salinan sandbox, yang tidak menyajikan data ke sistem luar |
+
+    Kode tetap, teks `message` dapat berubah. Daftar ini terbuka: kode baru dapat ditambahkan tanpa
+    versi kontrak baru — perlakukan kode yang belum Anda kenal menurut status HTTP-nya. `409` dan
+    `403 analytics.publication_suspended` tidak sembuh dengan diulang; hubungi admin tenant.
+
+    ## Yang belum tersedia
+
+    - **Feed OData** untuk Excel dan Power BI belum tersedia; halaman ini akan memuatnya saat terbit.
+    - **Embed** dasbor di situs Anda belum tersedia. Scope `analytics.embed` sudah dapat dipilih di
+      Klien integrasi, tetapi belum membuka endpoint apa pun.
+
+    ## Versi kontrak
+
+    Bentuk versi 1 tidak berubah. Kolom baru di objek jawaban dapat ditambahkan tanpa versi baru; baca
+    menurut nama kunci. Perubahan yang memengaruhi pembaca terbit sebagai versi baru dan diumumkan lebih
+    dulu.
+
+servers:
+  - url: https://{alamat}/api/internal/v1
+    description: Alamat tenant CoreERP di layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+    variables:
+      alamat:
+        default: alamat-tenant.contoh
+        description: Host yang dipakai pengguna tenant itu untuk masuk ke CoreERP.
+
+security:
+  - integrationClient: []
+
+tags:
+  - name: Publikasi
+    description: Publikasi analitik yang dibuka pengguna tenant untuk klien Anda — daftar, metadata, dan baris.
+
+paths:
+  /analytics/publications: { $ref: 'paths/analytics_publications.yaml' }
+  /analytics/publications/{code}: { $ref: 'paths/analytics_publications_code.yaml' }
+  /analytics/publications/{code}/rows: { $ref: 'paths/analytics_publications_code_rows.yaml' }
+
+components:
+  securitySchemes:
+    integrationClient: { $ref: 'components/securitySchemes/integrationClient.yaml' }
