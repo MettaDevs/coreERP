@@ -271,6 +271,21 @@ token, scope, dan IP yang diizinkan, signature push, dan aturan URL tujuan. Data
 fiturnya masing-masing; feed posting finance milik `App\Foundation\FinancePosting`, dan aplikasi
 finance pelanggan hanyalah satu klien integrasi.
 
+Pengelolaan koneksi memakai duty `core.integration-clients.inquire` dan
+`core.integration-clients.manage`, terpisah dari setup finance. Duty Kelola boleh memberikan scope
+yang terdaftar kepada koneksi; ini kewenangan pengelola integrasi, bukan turunan hak baca data
+finance atau HR pengguna tersebut. Token sistem luar tetap dibatasi scope yang diberikan.
+
+Katalog scope tersimpan di `integration_scopes`, dibaca melalui `IntegrationScope`. Nama dan kode
+scope baru didaftarkan lewat migration oleh fitur pemilik API; controller klien tidak menyimpan
+daftar domain. Scope tidak terdaftar atau terarsip ditolak saat menyimpan koneksi. Pengarsipan
+katalog tidak mencabut scope pada token yang sudah diterbitkan; untuk mencabut akses, ubah scope
+koneksi atau cabut klien. Form koneksi baru tidak memilih scope atau prefix posting otomatis.
+
+Mendaftarkan scope tidak membuat API atau mesin pengiriman baru. Fitur pemilik data tetap
+mengimplementasikan endpoint, pemeriksaan scope token, pembatasan tenant/organisasi yang berlaku,
+dan kontraknya. Hak untuk memanggil resource tidak berasal dari permission pengelolaan koneksi.
+
 Hari ini mesin pengirimnya baru mengenal satu jenis data, yaitu jurnal posting. Rencana menjadikannya
 umum — padanan Business events di Dynamics 365 F&O dan webhook subscription di Business Central —
 ada di [master bersama](../todo/master-bersama/README.md#saluran-integrasi-ke-sistem-luar). Syarat

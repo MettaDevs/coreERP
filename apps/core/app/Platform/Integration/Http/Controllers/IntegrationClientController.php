@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Models\IntegrationScope;
 use App\Platform\Integration\Support\IntegrationClientAccounts;
 use App\Platform\Integration\Support\PushDestination;
 use App\Platform\Integration\Support\SignedPush;
@@ -27,8 +28,8 @@ use Symfony\Component\HttpFoundation\IpUtils;
 /**
  * Klien integrasi tenant (TODO 4.4): terbitkan token, atur scope dan mode pengiriman, cabut.
  *
- * Hanya owner dan admin, termasuk untuk melihat daftarnya: yang tampil di sini adalah siapa yang
- * boleh membaca jurnal keuangan tenant dari luar CoreERP.
+ * Hak melihat dan mengelola mengikuti role tenant. Daftar ini menunjukkan sistem luar yang
+ * boleh memakai API tenant, dengan scope yang diberikan secara eksplisit.
  *
  * Token dan signing secret ditampilkan **sekali**, di jawaban yang menerbitkannya. Yang disimpan
  * hanya digest token; signing secret disimpan terenkripsi karena CoreERP sendiri yang memakainya
@@ -38,7 +39,7 @@ final class IntegrationClientController extends Controller
 {
     public function index(Request $request): Response
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_READ);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_READ);
 
         return Inertia::render('platform/integration/integration-clients', [
             'clients' => IntegrationClient::query()
@@ -48,14 +49,15 @@ final class IntegrationClientController extends Controller
                 ->get()
                 ->map(fn (IntegrationClient $client): array => $this->present($client))
                 ->values(),
-            'scopes' => IntegrationClient::SCOPES,
+            'scopes' => IntegrationScope::options(),
             'endpoint' => url('/api/internal/v1'),
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE),
         ]);
     }
 
     public function store(Request $request, PushDestination $destination, IntegrationClientAccounts $accounts): JsonResponse
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE);
         $data = $this->validated($request, $membership->tenant_id, $destination);
         $secret = Str::random(48);
         $marker = $data['delivery_mode'] === IntegrationClient::PUSH ? Str::random(48) : null;
@@ -84,7 +86,7 @@ final class IntegrationClientController extends Controller
 
     public function update(Request $request, IntegrationClient $integrationClient, PushDestination $destination, IntegrationClientAccounts $accounts): JsonResponse
     {
-        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE);
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE);
         $client = $this->ownedClient($membership, $integrationClient, active: true);
         $data = $this->validated($request, $membership->tenant_id, $destination, $client);
 
@@ -117,7 +119,7 @@ final class IntegrationClientController extends Controller
     /** Mencabut berlaku pada permintaan berikutnya. Klien yang dicabut tidak dapat dihidupkan lagi. */
     public function revoke(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE), $integrationClient, active: true);
         DB::transaction(function () use ($request, $client): void {
             RowVersion::claim($client, RowVersion::expected($request));
             $client->fill(['status' => IntegrationClient::REVOKED, 'revoked_at' => now()])->save();
@@ -128,7 +130,7 @@ final class IntegrationClientController extends Controller
 
     public function rotateToken(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE), $integrationClient, active: true);
         $secret = Str::random(48);
         $client->fill(['token_digest' => IntegrationClient::digest($secret)])->save();
 
@@ -137,7 +139,7 @@ final class IntegrationClientController extends Controller
 
     public function rotateSigningSecret(Request $request, IntegrationClient $integrationClient): JsonResponse
     {
-        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE), $integrationClient, active: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Signing secret hanya dipakai klien mode push.']);
         }
@@ -153,7 +155,7 @@ final class IntegrationClientController extends Controller
      */
     public function testPush(Request $request, IntegrationClient $integrationClient, SignedPush $push, ActiveEnvironment $environment): JsonResponse
     {
-        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::FINANCE_SETUP_UPDATE), $integrationClient, active: true);
+        $client = $this->ownedClient($this->authorizedMembership($request, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE), $integrationClient, active: true);
         if ($client->delivery_mode !== IntegrationClient::PUSH) {
             throw ValidationException::withMessages(['delivery_mode' => 'Kirim uji hanya untuk klien mode push.']);
         }
@@ -217,7 +219,7 @@ final class IntegrationClientController extends Controller
             'delivery_mode' => ['required', Rule::in([IntegrationClient::PULL, IntegrationClient::PUSH])],
             'push_url' => ['nullable', 'required_if:delivery_mode,push', 'string', 'max:500', 'url:https'],
             'scopes' => ['required', 'array', 'min:1'],
-            'scopes.*' => ['string', Rule::in(array_keys(IntegrationClient::SCOPES))],
+            'scopes.*' => ['string', Rule::in(array_keys(IntegrationScope::options()))],
             'posting_type_prefixes' => ['nullable', 'array', 'max:20'],
             'posting_type_prefixes.*' => ['string', 'max:60', 'regex:/^[a-z0-9_-]+(\.[a-z0-9_-]+)*\.?\*?$/'],
             'allowed_ips' => ['nullable', 'array', 'max:50'],
