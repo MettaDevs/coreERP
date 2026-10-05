@@ -70,6 +70,18 @@ sisa="$(di_image 'ls -d /repo/apps/core/tests /repo/modules/*/*/tests /repo/apps
 [ -z "$sisa" ] || gagal 'Suite test atau resep pembangunan ikut ke image:' "$sisa"
 lulus 'hanya apps/core, tanpa suite test dan Dockerfile'
 
+# Pola `**/vendor` pernah membuang halaman Vendor beserta entri Vite-nya, sementara
+# controller tetap dikirim. /login tetap hijau tetapi /settings/vendors menjawab 500.
+di_image 'php -r '\''
+    $page = "resources/js/pages/foundation/vendor/vendors.tsx";
+    $manifest = json_decode(file_get_contents("public/build/manifest.json"), true, 512, JSON_THROW_ON_ERROR);
+    if (!is_file($page) || !isset($manifest[$page]) || !is_file("public/build/".$manifest[$page]["file"])) {
+        fwrite(STDERR, "Halaman Vendor atau aset Vite-nya tidak ada di image.\n");
+        exit(1);
+    }
+'\''' || gagal 'Halaman Vendor tidak dapat dimuat dari image rilis.'
+lulus 'halaman Vendor, entri manifest Vite, dan aset hasil build ada'
+
 akhiran="uji-image-$$"
 jaringan="$akhiran"
 bereskan() {
