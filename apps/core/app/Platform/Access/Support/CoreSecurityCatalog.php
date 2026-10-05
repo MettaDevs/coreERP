@@ -47,6 +47,10 @@ final class CoreSecurityCatalog
 
     public const FINANCE_SETUP_UPDATE = 'core.finance-setup.update';
 
+    public const INTEGRATION_CLIENT_READ = 'core.integration-clients.read';
+
+    public const INTEGRATION_CLIENT_UPDATE = 'core.integration-clients.update';
+
     public const VENDOR_READ = 'core.vendor.read';
 
     public const VENDOR_UPDATE = 'core.vendor.update';

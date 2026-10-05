@@ -6,6 +6,7 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Integration\Models\IntegrationScope;
 use App\Platform\Integration\Support\PushDestination;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 
 /**
@@ -25,6 +27,7 @@ use Tests\TestCase;
  */
 class IntegrationClientTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $owner;
@@ -34,6 +37,7 @@ class IntegrationClientTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutVite();
         $this->seed(AppCatalogSeeder::class);
         [$this->owner, $this->membership] = $this->tenantBaru('owner@metta.test', 'PT Metta');
         $this->unit($this->membership->tenant_id, 'Klinik A', 'KLN-A');
@@ -41,6 +45,66 @@ class IntegrationClientTest extends TestCase
         // Mode on-prem kecuali test yang sengaja menguji SaaS: `.env` pengembang boleh menyetel
         // domain dasar, dan hasil test tidak boleh bergantung pada berkas itu.
         config(['coreerp.base_domain' => null]);
+    }
+
+    public function test_finance_setup_does_not_grant_integration_access(): void
+    {
+        $clientId = (string) $this->buat()->json('data.id');
+        $member = $this->integrationMember(['core.finance-setup.manage']);
+
+        $this->actingAs($member->user)->get('/settings/integration-clients')->assertForbidden();
+        $this->postJson('/api/v1/integration-clients', $this->bentuk())->assertForbidden();
+        $this->assertIntegrationChangesForbidden($clientId);
+    }
+
+    public function test_integration_inquire_is_read_only_and_manage_is_independent_of_finance(): void
+    {
+        $clientId = (string) $this->buat()->json('data.id');
+        $reader = $this->integrationMember(['core.integration-clients.inquire']);
+        $this->actingAs($reader->user)->get('/settings/integration-clients')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', false));
+        $this->postJson('/api/v1/integration-clients', $this->bentuk())->assertForbidden();
+        $this->assertIntegrationChangesForbidden($clientId);
+
+        $manager = $this->integrationMember(['core.integration-clients.manage']);
+        $this->assertFalse($manager->hasCorePermission('core.finance-setup.update'));
+        $this->actingAs($manager->user)->get('/settings/integration-clients')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', true));
+        $this->postJson('/api/v1/integration-clients', $this->bentuk(['name' => 'External system']))->assertCreated();
+        $this->postJson("/api/v1/integration-clients/{$clientId}/rotate-token")->assertOk();
+    }
+
+    public function test_registered_non_finance_scope_is_available_and_unknown_or_archived_scope_is_refused(): void
+    {
+        $scope = IntegrationScope::query()->create(['code' => 'test-documents.read', 'name' => 'Membaca dokumen uji']);
+        $this->actingAs($this->owner)->get('/settings/integration-clients')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('scopes', fn ($scopes): bool => ($scopes['test-documents.read'] ?? null) === 'Membaca dokumen uji'));
+        $token = (string) $this->buat(['scopes' => ['test-documents.read']])->assertCreated()->json('token');
+        $this->unitsDengan($token)->assertForbidden();
+        $this->getJson('/api/internal/v1/finance-postings')->assertForbidden();
+        $this->buat(['name' => 'Unknown', 'scopes' => ['unknown.read']])->assertUnprocessable()
+            ->assertJsonValidationErrors('scopes.0');
+        $scope->delete();
+        $this->buat(['name' => 'Archived', 'scopes' => ['test-documents.read']])->assertUnprocessable()
+            ->assertJsonValidationErrors('scopes.0');
+    }
+
+    private function assertIntegrationChangesForbidden(string $clientId): void
+    {
+        $this->patchJson("/api/v1/integration-clients/{$clientId}", $this->bentuk())->assertForbidden();
+        foreach (['rotate-token', 'rotate-signing-secret', 'test-push', 'revoke'] as $action) {
+            $this->postJson("/api/v1/integration-clients/{$clientId}/{$action}")->assertForbidden();
+        }
+    }
+
+    /** @param list<string> $duties */
+    private function integrationMember(array $duties): TenantMembership
+    {
+        return $this->grantDuties(TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id,
+            'user_id' => User::factory()->create()->id,
+            'status' => 'active',
+        ]), $duties);
     }
 
     public function test_klien_pull_menerima_token_sekali_dan_hanya_digest_yang_disimpan(): void
