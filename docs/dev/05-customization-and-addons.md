@@ -47,8 +47,8 @@ dan admin atau konsultan pelanggan menyusun dasbornya dari dataset itu: dasbor, 
 tersimpan adalah baris di tabel tenant, bukan kode, jadi menyusunnya tidak menunggu rilis dan dasbornya
 bertahan melewati update; kunci dataset yang diganti nama dipetakan lewat versi dataset. Hak melihat
 angkanya tetap hak baca resource module dan kebijakan datanya, sama dengan layar daftarnya; dasbor tidak
-membuka data yang tidak boleh dibuka layar module. Rinciannya di [engine analitik](35-analitik.md). Sampai pembangun widget di layar selesai, widget baru dibuat lewat
-API dan belum lewat layar.
+membuka data yang tidak boleh dibuka layar module. Rinciannya di [engine analitik](35-analitik.md).
+Penyusunnya memakai pembangun bagian dan penjelajah data di layar Dasbor dan Analisis data.
 
 Batasnya: dasbor hanya dapat menampilkan **data CoreERP yang sudah dinyatakan sebagai dataset**. Bila
 isinya butuh dataset yang belum ada, jawabannya menambah dataset di module pemiliknya (urutan 2, fitur

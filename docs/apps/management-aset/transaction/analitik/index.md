@@ -24,27 +24,28 @@ Sumber daftar yang berlaku ada di `ModuleServiceProvider::boot()` pada blok pend
 
 | Kode | Satu baris mewakili | Permission | Measure |
 | --- | --- | --- | --- |
-| `asset-register` | Satu aset tercatat, termasuk komponen | `aset.read` | `count`; `acquisition_value` dan `average_acquisition_value` (uang) |
-| `asset-receipts` | Satu **baris** dokumen penerimaan | `penerimaan-aset.read` | `count`, `receipt_count` (dokumen), `quantity`; `receipt_value` (uang, belum termasuk PPN) |
-| `depreciation-entries` | Satu periode penyusutan sebuah buku aset, termasuk pembaliknya | `penyusutan.read` | `count`, `asset_count`; `amount` (uang) |
-| `book-values` | Satu pasangan aset dan buku penyusutan | `penyusutan.read` | `count`, `asset_count`; `acquisition_value`, `accumulated_depreciation`, `net_book_value` (uang) |
-| `work-orders` | Satu work order | `pemeliharaan-aset.read` | `count` |
-| `maintenance-requests` | Satu permintaan pemeliharaan | `permintaan-pemeliharaan.read` | `count`, `asset_count` |
-| `downtime` | Satu periode aset berhenti dipakai | `downtime-aset.read` | `count`, `asset_count`; `duration_hours` (jam) |
-| `asset-sales` | Satu dokumen penjualan aset | `penjualan-aset.read` | `count`, `asset_count`; `acquisition_value`, `proceeds` (uang) |
-| `asset-scraps` | Satu dokumen pemusnahan aset | `pemusnahan-aset.read` | `count`, `asset_count`; `acquisition_value` (uang) |
-| `value-adjustments` | Satu aset pada satu dokumen penyesuaian nilai | `penyesuaian-nilai-aset.read` | `count`, `document_count`; `amount` dan `net_effect` (uang) |
-| `reclassifications` | Satu aset asal pada satu dokumen reklasifikasi | `reklasifikasi-aset.read` | `count`, `document_count`; `moved_value` (uang) |
-| `insurance-policies` | Satu polis asuransi | `polis-asuransi.read` | `count` |
-| `warranties` | Satu garansi aset | `garansi-aset.read` | `count`, `asset_count` |
-| `physical-checks` | Satu aset pada satu pemeriksaan fisik (monitoring) | `monitoring-aset.read` | `count`, `document_count`, `asset_count`; `acquisition_value`, `accumulated_depreciation`, `book_value` (uang) |
+| `asset-register` | Satu aset tercatat, termasuk komponen | `aset.read` | `count`, `disposed`, `decommissioned`; `acquisition_value` dan `average_acquisition_value` (uang) |
+| `asset-receipts` | Satu **baris** dokumen penerimaan | `penerimaan-aset.read` | `count`, `receipt_count` (dokumen), `quantity`; `receipt_value` dan `completed_value` (uang, belum termasuk PPN) |
+| `depreciation-entries` | Satu periode penyusutan sebuah buku aset, termasuk pembaliknya | `penyusutan.read` | `count`, `asset_count`; `amount` dan `final_amount` (uang) |
+| `book-values` | Satu pasangan aset dan buku penyusutan | `penyusutan.read` | `count`, `asset_count`; `acquisition_value`, `accumulated_depreciation`, `net_book_value`, `active_net_book_value` (uang) |
+| `work-orders` | Satu work order | `pemeliharaan-aset.read` | `count`, `completed`, `cancelled` |
+| `maintenance-requests` | Satu permintaan pemeliharaan | `permintaan-pemeliharaan.read` | `count`, `asset_count`, `accepted`, `rejected` |
+| `downtime` | Satu periode aset berhenti dipakai | `downtime-aset.read` | `count`, `asset_count`, `open_count`; `duration_hours` dan `kpi_duration_hours` (jam) |
+| `asset-sales` | Satu dokumen penjualan aset | `penjualan-aset.read` | `count`, `asset_count`, `posted`; `acquisition_value`, `proceeds`, `posted_proceeds` (uang) |
+| `asset-scraps` | Satu dokumen pemusnahan aset | `pemusnahan-aset.read` | `count`, `asset_count`, `posted`; `acquisition_value` (uang) |
+| `value-adjustments` | Satu aset pada satu dokumen penyesuaian nilai | `penyesuaian-nilai-aset.read` | `count`, `document_count`; `amount`, `net_effect`, `write_down_amount`, `appreciation_amount`, `posted_net_effect` (uang) |
+| `reclassifications` | Satu aset asal pada satu dokumen reklasifikasi | `reklasifikasi-aset.read` | `count`, `document_count`, `split_count`; `moved_value` (uang) |
+| `insurance-policies` | Satu polis asuransi | `polis-asuransi.read` | `count`, `blocked` |
+| `warranties` | Satu garansi aset | `garansi-aset.read` | `count`, `asset_count`, `full_coverage` |
+| `physical-checks` | Satu aset pada satu pemeriksaan fisik (monitoring) | `monitoring-aset.read` | `count`, `document_count`, `asset_count`, `mismatch`, `absent`; `acquisition_value`, `accumulated_depreciation`, `book_value` (uang) |
 
 Kelas dataset ada di `modules/apperp/management-aset/src/Analytics/`, satu berkas per dataset; dataset penjualan dan pemusnahan berbagi kelas dasar `DisposalDataset`. Field datang dari dua jalur: `fieldsFromModel()` mengambil katalog filter tambahan K-30 model (register aset dan work order), dan `field()` menyatakannya satu per satu untuk dataset yang bersumber query.
 
 Beberapa kebiasaan yang berlaku di semua dataset ini:
 
+- **Measure bersaringan menjawab "berapa yang sudah …" tanpa dataset tambahan.** Measure berikut membawa saringan tetap pada satu field (`where` pada `measure()`), jadi hitungan atau jumlahnya hanya memuat baris yang cocok, dengan pengelompokan yang sama dengan measure biasanya: `disposed` dan `decommissioned` (status aset), `completed_value` (penerimaan berstatus selesai), `final_amount` (periode penyusutan final), `active_net_book_value` (buku aktif), `completed` dan `cancelled` (work order), `accepted` dan `rejected` (permintaan pemeliharaan), `open_count` dan `kpi_duration_hours` (downtime yang masih berjalan dan yang masuk KPI), `posted` dan `posted_proceeds` (dokumen pelepasan yang sudah diposting), `write_down_amount`, `appreciation_amount`, dan `posted_net_effect` (penyesuaian nilai), `split_count` (baris pecah aset), `blocked` (polis diblokir), `full_coverage` (garansi penuh), serta `mismatch` dan `absent` (temuan pemeriksaan fisik). Saringannya memakai konstanta status milik module (misalnya `StatusAset::DILEPAS`), bukan teks yang diketik ulang.
 - **Uang selalu bersama mata uangnya.** Setiap measure uang menyebut kolom `currency_code`, dan engine tidak pernah menjumlahkan lintas mata uang: aset IDR dan USD tampil sebagai dua baris. Mata uang di tabel yang tidak menyimpannya (periode penyusutan, dokumen pelepasan, baris penyesuaian) diambil dari asetnya, dan itu salah satu alasan dataset-nya bersumber query.
-- **Dokumen yang masih draf ikut terhitung** kecuali disaring menurut status. Nilai yang baru dibekukan saat dokumen diselesaikan (nilai buku di pemeriksaan fisik, nilai yang dipindah di reklasifikasi) kosong selama draf, sehingga ukuran uangnya hanya bermakna untuk dokumen yang sudah selesai atau diposting.
+- **Dokumen yang masih draf ikut terhitung** kecuali disaring menurut status, atau memakai measure bersaringan seperti `completed_value`, `final_amount`, dan `posted`. Nilai yang baru dibekukan saat dokumen diselesaikan (nilai buku di pemeriksaan fisik, nilai yang dipindah di reklasifikasi) kosong selama draf, sehingga ukuran uangnya hanya bermakna untuk dokumen yang sudah selesai atau diposting.
 - **Aset yang diarsipkan tetap punya riwayat.** Dataset yang bergabung dengan aset menyaring arsip pada tabel dasar dan header dokumennya, tidak pada asetnya: aset yang sudah dilepas berakhir diarsipkan, dan dokumen pelepasannya tidak boleh ikut hilang.
 
 ## Kolom kebijakan, dan kenapa kolom itu
@@ -93,7 +94,6 @@ Field yang memuat data pribadi tidak tersedia bagi pengguna tanpa hak data priba
 
 ## Yang belum ada
 
-- **Measure bersaringan di register aset**, misalnya jumlah aset yang sudah dilepas, dan test waktu berzona untuk dataset aset. Compiler engine sudah mengerjakan saringan tetap measure; yang belum ada adalah measure yang memakainya (area 5 di [TODO fase 1](/todo/analitik/todo-fase-1)).
 - **Laba atau rugi pelepasan.** Tidak tersimpan di tabel mana pun: ia dihitung saat pratinjau dan saat posting, lalu hanya ikut ke jurnal. Dataset penjualan hanya punya hasil penjualan dan nilai perolehan aset yang dilepas.
 - **Measure uang untuk polis asuransi.** Tabel polis tidak menyimpan mata uang, dan uang tanpa mata uang tidak boleh dijumlah. Premi dan nilai pertanggungan menunggu kolom mata uang pada polis.
 - **KPI pemeliharaan** (availability, MTBF, MTTR). Dihitung `MaintenanceKpi` dari beberapa tabel dengan logika jam yang tidak dapat dinyatakan sebagai agregat sederhana; bentuk dataset terhitung untuknya belum diputuskan.
@@ -105,7 +105,7 @@ Field yang memuat data pribadi tidak tersedia bagi pengguna tanpa hak data priba
 
 1. Baca controller daftar resource-nya, lalu tentukan permission dan kolom kebijakannya dari situ — jangan dari nama kolom.
 2. Tulis kelasnya di `src/Analytics/`, daftarkan di `ModuleServiceProvider::boot()`, dan tulis `<Nama>DatasetTest` dengan trait `ProbesAssetDatasets` dan `ChecksMoneyPerCurrency`. Trait itu ada di `tests/Concerns/`.
-3. Susun data awal test supaya kolom kebijakan yang salah terlihat sebagai baris yang salah, lalu rusak kolom kebijakannya sekali dan pastikan test paritas merah.
+3. Susun data awal test supaya kolom kebijakan yang salah terlihat sebagai baris yang salah, lalu rusak kolom kebijakannya sekali dan pastikan test paritas merah. Untuk dataset yang punya field waktu, pakai `ChecksTimeZoneBuckets` (satu baris di batas bulan harus jatuh di bulan yang benar bagi UTC, WIB, WITA, dan WIT; kolom `date` tidak pernah bergeser, kolom `timestamp` berisi UTC), dan beri setiap measure bersaringan data awal yang beragam supaya saringannya terbukti memilih baris yang benar.
 4. Jalankan `php artisan analytics:datasets` dan `tests/Feature/Boundary` dari `apps/core`.
 5. Mengganti atau menghapus kunci field atau measure butuh `version(n+1)`; widget tenant menyimpan kuncinya. Aturannya di [engine analitik](/dev/35-analitik#menyatakan-dataset-di-module).
 
@@ -116,7 +116,7 @@ Field yang memuat data pribadi tidak tersedia bagi pengguna tanpa hak data priba
 | `modules/apperp/management-aset/src/Analytics/*Dataset.php` | Satu kelas per dataset, dan `SourceQuery` untuk query sumber |
 | `modules/apperp/management-aset/src/ModuleServiceProvider.php` | Pendaftaran dataset di `boot()` |
 | `modules/apperp/management-aset/tests/Feature/Analytics/` | Satu test per dataset |
-| `modules/apperp/management-aset/tests/Concerns/ProbesAssetDatasets.php`, `ChecksMoneyPerCurrency.php` | Isolasi tenant, paritas kebijakan data, penolakan tanpa permission, dan uang per mata uang |
+| `modules/apperp/management-aset/tests/Concerns/ProbesAssetDatasets.php`, `ChecksMoneyPerCurrency.php`, `ChecksTimeZoneBuckets.php` | Isolasi tenant, paritas kebijakan data, penolakan tanpa permission, uang per mata uang, dan pengelompokan waktu menurut zona |
 | `modules/apperp/management-aset/src/Support/OrganizationScope.php` | Aturan lingkup yang ditiru kebijakan data dataset |
 
 ## Halaman terkait

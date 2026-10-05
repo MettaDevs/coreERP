@@ -592,7 +592,7 @@ dapat dilakukan pengguna.
 | `analytics.query_timeout` | 422 | Perhitungan ini terlalu berat. Persempit periode atau saringan. |
 | `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. (dengan `Retry-After`) |
 | `analytics.rate_limited` | 429 | Terlalu banyak permintaan analisis dalam satu menit. Tunggu sebentar, lalu coba lagi. (limiter `analytics-interactive` per pengguna, dengan `Retry-After`) |
-| `analytics.field_removed` | 422 | Kolom "…" sudah tidak tersedia di data ini. Ubah widget untuk memilih kolom lain. (data widget yang query tersimpannya memuat kunci yang sudah tidak ada di dataset; `field` berpath `query.…`) |
+| `analytics.field_removed` | 422 | Kolom "…" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain. (data widget yang query tersimpannya memuat kunci yang sudah tidak ada di dataset; `field` berpath `query.…`) |
 | `analytics.invalid_visual` | 422 | Bagian tampilan widget tidak cocok dengan jenis atau query-nya, misalnya "Pilih sumbu mendatar dari kolom pengelompokan." (saat widget disimpan; `field` berpath `visual.…` atau `query.…`) |
 
 ## Bahasa rumus
