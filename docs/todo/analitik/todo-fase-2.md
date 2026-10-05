@@ -10,7 +10,7 @@ dibaca Excel/Power BI dan sistem pelanggan, dan dasbor dapat dipasang di situs p
 
 ---
 
-### 12. [ ] Slicer, cross-filter, drill, dan ekspor widget
+### 12. [x] Slicer, cross-filter, drill, dan ekspor widget
 
 **Tempat:** `resources/js/components/analytics/{slicer-bar, drill-sheet, cross-filter-chips}.tsx`,
 `app/Platform/Analytics/Http/Controllers/DrillController.php`, perluasan `ExportQueue` (`kind = analytics`)
@@ -18,18 +18,18 @@ dibaca Excel/Power BI dan sistem pelanggan, dan dasbor dapat dipasang di situs p
 **Selesai bila:** cerita US-05, US-06, dan US-13 lulus, slicer tersimpan sebagai tautan yang dapat
 dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringan yang sama.
 
-- [ ] 12.1 Slicer di `analytics_dashboards.slicers`: sumber dimensi bersama atau field satu dataset,
+- [x] 12.1 Slicer di `analytics_dashboards.slicers`: sumber dimensi bersama atau field satu dataset,
   kontrol pilih banyak / rentang tanggal / ekspresi, nilai bawaan.
-- [ ] 12.2 Pemetaan slicer ke widget dan penanda "tidak berlaku di sini"; nilai slicer di query string,
+- [x] 12.2 Pemetaan slicer ke widget dan penanda "tidak berlaku di sini"; nilai slicer di query string,
   dibaca ulang setiap render.
-- [ ] 12.3 Cross-filter: klik nilai menambah chip saringan sementara ke widget lain.
-- [ ] 12.4 Drill-down hierarki waktu, dan hierarki yang dinyatakan dataset (`hierarchy()` ditambahkan
+- [x] 12.3 Cross-filter: klik nilai menambah chip saringan sementara ke widget lain.
+- [x] 12.4 Drill-down hierarki waktu, dan hierarki yang dinyatakan dataset (`hierarchy()` ditambahkan
   ke `DatasetDefinition` bila dibutuhkan; perubahan aditif).
-- [ ] 12.5 Drill-through: `POST api/v1/analytics/drill` — baris, kursor pada `id`, 100 per halaman,
+- [x] 12.5 Drill-through: `POST api/v1/analytics/drill` — baris, kursor pada `id`, 100 per halaman,
   1.000 di layar; kolom data pribadi mengikuti gerbang; baris membuka `recordRoute`.
-- [ ] 12.6 Ekspor widget dan daftar drill ke Excel lewat antrean ekspor yang ada, jenis baru
+- [x] 12.6 Ekspor widget dan daftar drill ke Excel lewat antrean ekspor yang ada, jenis baru
   `analytics`, kolom bertipe seperti ekspor daftar.
-- [ ] 12.7 Test paritas drill terhadap endpoint daftar module (memakai ulang test paritas area 5);
+- [x] 12.7 Test paritas drill terhadap endpoint daftar module (memakai ulang test paritas area 5);
   ekspor memulangkan baris yang sama dengan layar.
 
 ---

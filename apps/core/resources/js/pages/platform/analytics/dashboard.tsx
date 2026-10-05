@@ -20,7 +20,7 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { LayoutGrid } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +29,7 @@ import {
     DashboardGrid,
     sortLayout,
 } from '@/components/analytics/dashboard-grid';
+import { CrossFilterChips, SlicerBar } from '@/components/analytics/slicer-bar';
 import { WidgetBuilder } from '@/components/analytics/widget-builder';
 import { WidgetFrame } from '@/components/analytics/widget-frame';
 import { WidgetTitleDialog } from '@/components/analytics/widget-title-dialog';
@@ -37,7 +38,13 @@ import {
     archiveWidget,
     updateDashboard,
 } from '@/lib/analytics/api';
+import {
+    fieldsForWidget,
+    readSlicerUrl,
+    slicerUrl,
+} from '@/lib/analytics/slicer';
 import type {
+    CrossFilter,
     DashboardAbilities,
     DashboardDetail,
     DashboardLayoutItem,
@@ -80,6 +87,7 @@ function reloadDashboard(onFinish?: () => void) {
 }
 
 function DashboardScreen({ dashboard, abilities }: Props) {
+    const { url } = usePage();
     const [draft, setDraft] = useState<DashboardLayoutItem[] | null>(null);
     const [savingLayout, setSavingLayout] = useState(false);
     const [editingDashboard, setEditingDashboard] = useState(false);
@@ -91,6 +99,28 @@ function DashboardScreen({ dashboard, abilities }: Props) {
     const [building, setBuilding] = useState<{
         widget: DashboardWidget | null;
     } | null>(null);
+    const [crossFilterState, setCrossFilterState] = useState({
+        dashboardId: dashboard.id,
+        values: [] as CrossFilter[],
+    });
+    const crossFilters =
+        crossFilterState.dashboardId === dashboard.id
+            ? crossFilterState.values
+            : [];
+    const setCrossFilters = (
+        update: CrossFilter[] | ((current: CrossFilter[]) => CrossFilter[]),
+    ) => {
+        setCrossFilterState((current) => {
+            const values =
+                current.dashboardId === dashboard.id ? current.values : [];
+
+            return {
+                dashboardId: dashboard.id,
+                values: typeof update === 'function' ? update(values) : update,
+            };
+        });
+    };
+    const slicerValues = readSlicerUrl(url, dashboard.slicers);
     const editing = draft !== null;
     const layout = draft ?? dashboard.layout;
     const canEdit = dashboard.can_edit;
@@ -133,6 +163,31 @@ function DashboardScreen({ dashboard, abilities }: Props) {
         } finally {
             setArchivingWidget(null);
         }
+    };
+
+    const saveSlicers = async (slicers: DashboardDetail['slicers']) => {
+        await updateDashboard(dashboard, { slicers });
+        const kept = Object.fromEntries(
+            Object.entries(slicerValues).filter(([key]) =>
+                slicers.some((slicer) => slicer.key === key),
+            ),
+        );
+        router.replace({
+            url: slicerUrl(url, slicers, kept),
+            preserveState: true,
+            preserveScroll: true,
+        });
+        setCrossFilters([]);
+        toast.success('Saringan dasbor disimpan.');
+        reloadDashboard();
+    };
+
+    const toggleCrossFilter = (filter: CrossFilter) => {
+        setCrossFilters((current) =>
+            current.some((item) => item.id === filter.id)
+                ? current.filter((item) => item.id !== filter.id)
+                : [...current, filter],
+        );
     };
 
     return (
@@ -231,6 +286,29 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                         </p>
                     )}
                 </div>
+                <SlicerBar
+                    dashboard={dashboard}
+                    values={slicerValues}
+                    canEdit={canEdit}
+                    onValuesChange={(values) => {
+                        router.replace({
+                            url: slicerUrl(url, dashboard.slicers, values),
+                            preserveState: true,
+                            preserveScroll: true,
+                        });
+                        setCrossFilters([]);
+                    }}
+                    onSave={saveSlicers}
+                />
+                <CrossFilterChips
+                    filters={crossFilters}
+                    onRemove={(id) =>
+                        setCrossFilters((current) =>
+                            current.filter((item) => item.id !== id),
+                        )
+                    }
+                    onClear={() => setCrossFilters([])}
+                />
                 {dashboard.widgets.length === 0 ? (
                     <Card>
                         <CardContent>
@@ -270,6 +348,21 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                         renderWidget={(widget, place) => (
                             <WidgetFrame
                                 widget={widget}
+                                fields={fieldsForWidget(
+                                    widget,
+                                    dashboard.dataset_fields,
+                                )}
+                                hierarchies={
+                                    widget.dataset_code === null
+                                        ? {}
+                                        : (dashboard.dataset_fields[
+                                              widget.dataset_code
+                                          ]?.hierarchies ?? {})
+                                }
+                                slicers={dashboard.slicers}
+                                slicerValues={slicerValues}
+                                crossFilters={crossFilters}
+                                onCrossFilter={toggleCrossFilter}
                                 height={place.h}
                                 className={
                                     widget.type === 'kpi' ||
