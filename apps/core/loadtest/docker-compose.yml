@@ -83,6 +83,7 @@ services:
     restart: unless-stopped
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./results:/results:ro
     environment:
       POSTGRES_DB: core_erp
       POSTGRES_USER: core_erp
@@ -141,8 +142,21 @@ services:
     entrypoint: ["sh", "/loadtest/prepare.sh"]
     volumes:
       - ./prepare.sh:/loadtest/prepare.sh:ro
+      - ./analytics-fixture.php:/loadtest/analytics-fixture.php:ro
+      - ./results:/results
     environment:
       <<: *api-environment
+      LOADTEST_MODULES: ${LOADTEST_MODULES:-management-aset human-resources}
+      LOADTEST_ANALYTICS: ${LOADTEST_ANALYTICS:-0}
+      LOADTEST_PASSWORD: ${LOADTEST_PASSWORD:-Loadtest-Owner-2026!}
+      ANALYTICS_FIXTURE_ID: ${ANALYTICS_FIXTURE_ID:-a10}
+      ANALYTICS_DATASET: ${ANALYTICS_DATASET:-management-aset.asset-register}
+      ANALYTICS_POLICY_CODE: ${ANALYTICS_POLICY_CODE:-management-aset.asset-responsibility}
+      ANALYTICS_TENANTS: ${ANALYTICS_TENANTS:-128}
+      ANALYTICS_ASSETS_MIN: ${ANALYTICS_ASSETS_MIN:-5000}
+      ANALYTICS_ASSETS_MAX: ${ANALYTICS_ASSETS_MAX:-20000}
+      ANALYTICS_POLICY_RED: ${ANALYTICS_POLICY_RED:-0}
+      ANALYTICS_FIXTURE_OUTPUT: /results/analytics-fixture.json
       # `migrate:fresh` menolak berjalan pada APP_ENV=production, dan penolakan itu benar.
       # Yang dijalankan di sini adalah penyiapan database sekali pakai, bukan instance yang
       # melayani beban; instance yang melayani beban tetap production.
@@ -187,6 +201,9 @@ services:
       LATENCY_VUS: ${LATENCY_VUS:-1}
       DURATION: ${DURATION:-90s}
       RUN_ID: ${RUN_ID:-local}
+      ANALYTICS_FIXTURE_ID: ${ANALYTICS_FIXTURE_ID:-a10}
+      ANALYTICS_DATASET: ${ANALYTICS_DATASET:-management-aset.asset-register}
+      LOADTEST_PASSWORD: ${LOADTEST_PASSWORD:-Loadtest-Owner-2026!}
 
 volumes:
   db-data:

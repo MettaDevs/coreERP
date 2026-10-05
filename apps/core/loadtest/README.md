@@ -1000,3 +1000,61 @@ trigger `bump_row_version` menyala dan dimatikan:
 menyala dan mati sekitar 3–5%, sebesar selisih dua run dengan keadaan yang sama. Seperti biaya log, biaya
 versi tidak terukur di atas selisih antar-run pada mesin ini; itu bukan berarti nol.
 
+## Engine analitik — area 10
+
+Fixture analitik adalah pilihan terpisah karena isinya jauh lebih besar dari skenario lain: sedikitnya 100
+tenant, masing-masing dua legal entity, delapan unit, tiga akun, dan jumlah aset acak 5.000–20.000. Database
+`core-loadtest` tetap satu PostgreSQL bersama empat instance API di belakang nginx. Jalankan fixture ini hanya
+di stack uji yang boleh dihapus.
+
+```powershell
+docker compose up -d --wait db pgbouncer
+docker compose run --rm --no-deps -e LOADTEST_ANALYTICS=1 init
+docker compose up -d api1 api2 api3 api4 lb
+```
+
+`ANALYTICS_FIXTURE_ID` mengikat tenant, akun, dan hasil SQL. Gunakan nilai yang sama saat menyiapkan fixture
+dan saat menjalankan `verify.sql`. `ANALYTICS_DATASET` serta `ANALYTICS_POLICY_CODE` dapat diganti lewat
+environment Compose. Fixture membuat akun Owner, akun dengan scope dua unit, dan akun tanpa grant. Sebagian
+aset menaruh `financial_dimension_org_unit_id` pada unit yang berbeda dari `responsible_org_unit_id`, sehingga
+oracle menangkap pemakaian kolom policy yang keliru.
+
+Skenario pertama query analitik yang dibaca pengguna. Profil `saturation` menahan 1.000 VU selama 90 detik;
+profil `latency` mengukur satu tingkat concurrency selama 90 detik. Ulangi profil latensi dengan kenaikan VU
+sampai p95 atau p99 melewati SLO, lalu catat tingkat tertinggi yang masih lulus.
+
+```powershell
+$core = "$PWD\k6"
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
+  -e RUN_ID=analytics-sat-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
+  grafana/k6:0.55.0 run --out json=/results/analytics-sat-a10.ndjson /scripts/analytics-explore.js
+
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=latency -e TENANTS=128 -e LATENCY_VUS=8 -e DURATION=90s `
+  -e RUN_ID=analytics-lat-8-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
+  grafana/k6:0.55.0 run --out json=/results/analytics-lat-8-a10.ndjson /scripts/analytics-explore.js
+
+python .\k6\analytics-observations.py .\results\analytics-*.ndjson `
+  --output .\results\analytics-observed.csv
+docker compose exec -T db psql -U core_erp -d core_erp -v run_id=a10 -v analytics=true -f - < verify.sql
+```
+
+`analytics-observations.py` mengambil sample metric per baris dari output JSON k6; `verify.sql` memuatnya ke
+tabel sementara lalu membandingkan langsung dengan `aset_tr_aset`. Ia memeriksa tenant, scope dua unit menurut
+`responsible_org_unit_id`, pengguna tanpa grant, dan jumlah uang terpisah per mata uang. Profil latensi
+menerapkan p95 < 200 ms dan p99 < 500 ms. Profil penjenuhan menjaga 0 error 5xx aplikasi; 502/504, timeout,
+dan 429 `analytics.busy` dicatat terpisah sebagai tanda kapasitas.
+
+Untuk melihat oracle scope memerah, siapkan **stack uji terpisah** dengan `ANALYTICS_POLICY_RED=1`. Itu memberi
+akun dua-unit grant seluruh organisasi, sementara tabel oracle tetap menyimpan scope yang seharusnya. Jalankan
+skenario sedikitnya 384 VU agar semua akun dua-unit mendapat query, konversi observasi, lalu jalankan `verify.sql`;
+hasil yang diharapkan adalah exit code 3 pada pemeriksaan policy. Buang stack negative-control sesudahnya dan
+siapkan ulang fixture normal sebelum mencatat hasil gate.
+
+Jangan menyatakan area ini lulus sebelum laporan memuat concurrency tertinggi yang memenuhi SLO, perangkat
+keras, durasi beban penuh, jumlah tenant, serta container atau resource yang jenuh lebih dulu. `docker stats
+--no-stream` dan jumlah backend dari `pg_stat_activity` memberi bukti untuk bottleneck.
+
