@@ -18,7 +18,7 @@ const sidebarNavItems: NavItem[] = [
     },
     {
         title: 'Organization',
-        href: '/settings/organization',
+        href: '/settings/legal-entities',
         icon: null,
     },
     {
@@ -69,6 +69,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const isWidePage =
         url.startsWith('/settings/access') ||
         url.startsWith('/settings/organization') ||
+        url.startsWith('/settings/legal-entities') ||
+        url.startsWith('/settings/operating-units') ||
         url.startsWith('/settings/address-setup');
 
     return (

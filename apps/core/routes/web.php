@@ -183,7 +183,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/privileges/{privilege}/duplicate', [SecurityConfigurationController::class, 'duplicatePrivilege'])->name('security-configuration.privileges.duplicate');
     Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
     Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
-    Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/organization', [OrganizationController::class, 'directory'])->name('organization.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/legal-entities', [OrganizationController::class, 'index'])->defaults('section', 'legal-entities')->name('organization.legal-entities')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/operating-units', [OrganizationController::class, 'index'])->defaults('section', 'operating-units')->name('organization.operating-units')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
+    Route::get('settings/organization-hierarchies', [OrganizationController::class, 'index'])->defaults('section', 'hierarchies')->name('organization.hierarchies')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
     Route::inertia('settings/global-address-book', 'platform/address-book/index')->name('global-address-book.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::NUMBER_SEQUENCE_READ));
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');

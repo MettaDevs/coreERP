@@ -29,7 +29,7 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                 className="h-svh min-w-0 overflow-hidden bg-muted/30 py-2 pr-2 pl-0"
             >
                 <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-                    <div className="flex min-h-[calc(100svh-1rem)] w-full min-w-[80rem] flex-col rounded-2xl border bg-background shadow-sm xl:min-w-0">
+                    <div className="flex min-h-[calc(100svh-1rem)] w-full min-w-0 flex-col rounded-2xl border bg-background shadow-sm">
                         <AppSidebarHeader isScrolled={isScrolled} />
                         {/*
                             Di bawah header, di atas isi halaman — dan tidak dapat ditutup.
