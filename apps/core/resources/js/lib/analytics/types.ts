@@ -22,6 +22,9 @@ export type AnalyticsQuery = {
     limit?: number;
     totals?: boolean;
     fill_gaps?: boolean;
+    compare?: QueryCompare;
+    formulas?: QueryFormula[];
+    percent_of_total?: string[];
 };
 
 export type ResultColumn = {
@@ -43,6 +46,9 @@ export type ResultColumn = {
     currency_key?: string;
     unit_key?: string;
     implicit?: boolean;
+    /** Kolom turunan (area 13): kunci measure atau rumus asalnya. */
+    derived_from?: string;
+    derivation?: ResultDerivation;
 };
 
 export type ResultValue = string | number | boolean | null;
@@ -233,3 +239,26 @@ export type SavedQuery = {
 
 /** Hak membuat dasbor pribadi dan mengelola dasbor bersama, untuk tombol di layar. */
 export type DashboardAbilities = { create: boolean; share: boolean };
+
+/*
+ * Area 13: rumus, perbandingan periode, dan persen terhadap total (`docs/todo/analitik/mesin-query.md`, bagian
+ * *Bahasa rumus* dan *Perbandingan periode*).
+ */
+
+/** Periode pembanding: rentang yang sama digeser sepanjang dirinya, atau satu tahun. */
+export type QueryCompare = 'previous_period' | 'previous_year';
+
+/** Satu rumus; kuncinya dipilih lewat `measures`. Teksnya disimpan apa adanya. */
+export type QueryFormula = {
+    key: string;
+    expression: string;
+    caption?: string;
+    format?: MeasureFormat;
+};
+
+/**
+ * Jenis kolom turunan: nilai periode pembanding (`<kunci>__previous`), selisih (`__change`), persen perubahan
+ * (`__change_pct`, kosong bila pembandingnya nol), dan persen terhadap total (`__percent_of_total`).
+ */
+export type ResultDerivation =
+    'previous' | 'change' | 'change_pct' | 'percent_of_total';

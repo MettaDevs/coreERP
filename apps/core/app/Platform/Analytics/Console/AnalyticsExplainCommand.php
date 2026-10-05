@@ -6,6 +6,7 @@ namespace App\Platform\Analytics\Console;
 
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\FiscalYearRange;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
 use App\Platform\Analytics\Query\QueryNormalizer;
@@ -48,6 +49,7 @@ final class AnalyticsExplainCommand extends Command
         QueryExecutor $executor,
         TenantRunner $tenants,
         UserClock $clock,
+        FiscalYearRange $fiscalYears,
     ): int {
         $json = $this->option('query');
         $tenant = $this->option('tenant');
@@ -82,8 +84,8 @@ final class AnalyticsExplainCommand extends Command
             $access->authorize($principal, $dataset);
             $validator->validate($dataset, $query, $principal);
 
-            [$sql, $plan] = $tenants->runFor($principal->tenantId(), static function () use ($compiler, $executor, $dataset, $query, $principal): array {
-                $compiled = $compiler->compile($dataset, $query, $principal);
+            [$sql, $plan] = $tenants->runFor($principal->tenantId(), static function () use ($compiler, $executor, $fiscalYears, $dataset, $query, $principal): array {
+                $compiled = $compiler->compile($dataset, $fiscalYears->resolve($dataset, $query, $principal), $principal);
 
                 return [
                     ['rows' => $compiled->builder->toBase()->toRawSql(), 'totals' => $compiled->totals?->toBase()->toRawSql()],

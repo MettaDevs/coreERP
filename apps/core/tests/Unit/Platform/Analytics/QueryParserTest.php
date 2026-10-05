@@ -6,10 +6,12 @@ namespace Tests\Unit\Platform\Analytics;
 
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\CompareMode;
 use App\Platform\Analytics\Query\Dimension;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\TimeGranularity;
 use App\Platform\Analytics\Query\TimeRange;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -157,8 +159,18 @@ class QueryParserTest extends TestCase
         $base = ['dataset' => 'modul.dataset-contoh', 'measures' => ['count']];
 
         yield 'kunci tingkat atas tidak dikenal' => [[...$base, 'foo' => 1], 'foo'];
-        yield 'compare belum tersedia' => [[...$base, 'compare' => 'previous_period'], 'compare'];
-        yield 'formulas belum tersedia' => [[...$base, 'formulas' => []], 'formulas'];
+        yield 'compare tidak dikenal' => [[...$base, 'compare' => 'last_month'], 'compare'];
+        yield 'compare bukan teks' => [[...$base, 'compare' => true], 'compare'];
+        yield 'formulas bukan daftar' => [[...$base, 'formulas' => ['rasio' => '[count]']], 'formulas'];
+        yield 'rumus bukan objek' => [[...$base, 'formulas' => ['[count] * 2']], 'formulas.0'];
+        yield 'rumus berbagian asing' => [[...$base, 'formulas' => [['key' => 'r', 'expression' => '[count]', 'sql' => 'x']]], 'formulas.0.sql'];
+        yield 'kunci rumus berhuruf besar' => [[...$base, 'formulas' => [['key' => 'Rasio', 'expression' => '[count]']]], 'formulas.0.key'];
+        yield 'kunci rumus bergaris bawah ganda' => [[...$base, 'formulas' => [['key' => 'count__previous', 'expression' => '[count]']]], 'formulas.0.key'];
+        yield 'kunci rumus ganda' => [[...$base, 'formulas' => [['key' => 'r', 'expression' => '[count]'], ['key' => 'r', 'expression' => '1']]], 'formulas.1.key'];
+        yield 'format rumus tidak dikenal' => [[...$base, 'formulas' => [['key' => 'r', 'expression' => '[count]', 'format' => 'rupiah']]], 'formulas.0.format'];
+        yield 'nama tampilan rumus kosong' => [[...$base, 'formulas' => [['key' => 'r', 'expression' => '[count]', 'caption' => ' ']]], 'formulas.0.caption'];
+        yield 'percent_of_total bukan daftar' => [[...$base, 'percent_of_total' => 'count'], 'percent_of_total'];
+        yield 'percent_of_total berisi angka' => [[...$base, 'percent_of_total' => [1]], 'percent_of_total.0'];
         yield 'badan berupa daftar' => [['count'], '0'];
 
         yield 'dataset hilang' => [['measures' => ['count']], 'dataset'];
@@ -239,15 +251,34 @@ class QueryParserTest extends TestCase
         }
     }
 
-    public function test_the_phase_two_keys_say_they_are_not_available_yet_rather_than_unknown(): void
+    /** Kunci area 13 dibaca, bukan ditolak: rumus beserta pohonnya, perbandingan, dan persen terhadap total. */
+    public function test_the_phase_two_keys_are_read(): void
     {
-        foreach (['compare', 'formulas'] as $key) {
-            try {
-                (new QueryParser)->parse(['dataset' => 'modul.dataset-contoh', 'measures' => ['count'], $key => 1]);
-                $this->fail("Bagian {$key} seharusnya ditolak.");
-            } catch (AnalyticsQueryException $e) {
-                $this->assertStringContainsString('belum tersedia', $e->getMessage());
-            }
+        $query = (new QueryParser)->parse([
+            'dataset' => 'modul.dataset-contoh',
+            'measures' => ['count', 'rasio'],
+            'formulas' => [['key' => 'rasio', 'caption' => ' Rasio ', 'expression' => 'BAGI([total]; [count])', 'format' => 'money']],
+            'compare' => 'previous_year',
+            'percent_of_total' => ['count'],
+        ]);
+
+        $this->assertSame(CompareMode::PreviousYear, $query->compare);
+        $this->assertSame(['count'], $query->percentOfTotal);
+        $this->assertCount(1, $query->formulas);
+        $this->assertSame('rasio', $query->formulas[0]->key);
+        $this->assertSame('Rasio', $query->formulas[0]->caption);
+        $this->assertSame(MeasureFormat::Money, $query->formulas[0]->format);
+        $this->assertSame(['total', 'count'], $query->formulas[0]->measures());
+        $this->assertSame($query->formulas[0], $query->formula('rasio'));
+        $this->assertNull($query->formula('count'));
+
+        try {
+            (new QueryParser)->parse(['dataset' => 'modul.dataset-contoh', 'measures' => ['r'], 'formulas' => [['key' => 'r', 'expression' => '[count] +']]]);
+            $this->fail('Rumus yang terpotong seharusnya ditolak.');
+        } catch (AnalyticsQueryException $e) {
+            $this->assertSame('analytics.invalid_formula', $e->errorCode);
+            $this->assertSame(10, $e->position);
+            $this->assertSame(['error' => ['code' => 'analytics.invalid_formula', 'message' => $e->getMessage(), 'field' => 'formulas.0.expression', 'position' => 10]], $e->toArray());
         }
 
         try {

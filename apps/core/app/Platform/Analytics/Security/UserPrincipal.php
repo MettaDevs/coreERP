@@ -8,6 +8,7 @@ use App\Platform\Access\Support\CorePermissions;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
@@ -23,11 +24,18 @@ use Carbon\CarbonImmutable;
  * Hak data pribadi adalah permission Core `core.analytics.personal-data.read` (duty *Pakai data pribadi di
  * analitik*), dibaca lewat `CorePermissions` yang sama dengan gate rute, sehingga tidak menambah query.
  * Pengguna tidak pernah punya saringan terkunci; batas baris dan waktu dari `config/analytics.php`.
+ *
+ * Perusahaan workspace sesi ({@see self::workspaceLegalEntity()}) dibaca hanya bila dibutuhkan — token tahun fiskal
+ * tanpa saringan perusahaan (area 13) — dan hanya dari permintaan yang punya sesi; perintah artisan dan job tidak
+ * punya workspace.
  */
 final class UserPrincipal implements AnalyticsPrincipal
 {
     /** @var array<string, list<string>> permission per module, dibaca sekali per principal */
     private array $permissions = [];
+
+    /** Perusahaan workspace, dibaca sekali saat pertama dibutuhkan; `false` berarti belum dibaca. */
+    private string|false|null $workspaceLegalEntity = false;
 
     public function __construct(
         private readonly TenantMembership $membership,
@@ -101,5 +109,22 @@ final class UserPrincipal implements AnalyticsPrincipal
     public function describe(): string
     {
         return 'membership:'.$this->membership->id;
+    }
+
+    /**
+     * Id perusahaan (entitas legal) yang dipilih pengguna di workspace sesi ini, atau null tanpa sesi (perintah
+     * artisan, job) atau tanpa perusahaan yang dapat dipilih. Pilihan workspace dibaca lewat `CurrentWorkspace`,
+     * yang sama dengan layar module dan zona waktu pengguna.
+     */
+    public function workspaceLegalEntity(): ?string
+    {
+        if ($this->workspaceLegalEntity === false) {
+            $request = app('request');
+            $this->workspaceLegalEntity = $request->hasSession()
+                ? app(CurrentWorkspace::class)->legalEntity($request, $this->membership)?->id
+                : null;
+        }
+
+        return $this->workspaceLegalEntity;
     }
 }

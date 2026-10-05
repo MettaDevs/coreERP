@@ -31,6 +31,10 @@ return [
         'filters' => (int) env('COREERP_ANALYTICS_MAX_FILTERS', 20),
         'sort' => (int) env('COREERP_ANALYTICS_MAX_SORT', 3),
 
+        // Area 13: rumus per query. Kuncinya ikut dihitung di `measures` karena rumus dipilih lewat sana;
+        // panjang (500 karakter) dan kedalaman (20 tingkat) satu rumus adalah bagian bahasanya, bukan setelan.
+        'formulas' => (int) env('COREERP_ANALYTICS_MAX_FORMULAS', 5),
+
         // Widget per dasbor (area 6). Widget yang melewatinya ditolak 422 `analytics.limit_exceeded` saat
         // ditambahkan; dasbor penuh membuka terlalu banyak query sekaligus.
         'widgets_per_dashboard' => (int) env('COREERP_ANALYTICS_WIDGETS_PER_DASHBOARD', 24),

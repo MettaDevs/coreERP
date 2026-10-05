@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Platform\Analytics\Query;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Query\Formula\Formula;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 use App\Platform\Modules\Contracts\FieldType;
 
 /**
@@ -16,12 +18,27 @@ use App\Platform\Modules\Contracts\FieldType;
  * Dimensi yang berlabel membawa `labelKey` (`<kunci>__label`): pilihan, ya/tidak, rujukan module, dan
  * dimensi bersama. Label rujukan module ikut dipilih di SQL lewat join label (`labelAlias`, `d0_label`);
  * yang lain diterjemahkan {@see LabelResolver} sesudah query. Periode dan kolom tersirat tidak berlabel.
+ *
+ * Area 13 menambah dua jenis kolom nilai. **Rumus** berjenis `measure` dengan kuncinya sendiri dan tanpa agregat,
+ * jadi dikirim sebagai teks desimal dan kosong di baris isian celah. **Kolom turunan** (`derived_from` dan
+ * `derivation`) mengikuti satu measure atau rumus: nilai periode pembanding (`<kunci>__previous`), selisihnya
+ * (`__change`), persen perubahannya (`__change_pct`), dan persen terhadap total (`__percent_of_total`). Nilai
+ * pembanding dan selisih membawa agregat, format, dan mata uang measure asalnya; kedua persen berformat
+ * `percent` tanpa mata uang.
  */
 final readonly class ResultColumn
 {
     public const DIMENSION = 'dimension';
 
     public const MEASURE = 'measure';
+
+    public const PREVIOUS = 'previous';
+
+    public const CHANGE = 'change';
+
+    public const CHANGE_PERCENT = 'change_pct';
+
+    public const PERCENT_OF_TOTAL = 'percent_of_total';
 
     /**
      * @param  'dimension'|'measure'  $kind
@@ -40,6 +57,8 @@ final readonly class ResultColumn
         public bool $implicit = false,
         public ?Aggregate $aggregate = null,
         public ?string $labelAlias = null,
+        public ?string $derivedFrom = null,
+        public ?string $derivation = null,
     ) {}
 
     public static function dimension(string $alias, Dimension $dimension, CompiledDataset $dataset): self
@@ -96,6 +115,57 @@ final readonly class ResultColumn
         );
     }
 
+    /**
+     * Kolom satu rumus. Mata uang dan satuannya diwarisi dari measure yang dirujuk (dimensi tersirat yang sama),
+     * tetapi hanya ditulis bila formatnya uang atau kuantitas: rasio dua nilai uang adalah angka biasa.
+     */
+    public static function formula(string $alias, Formula $formula, ?string $currencyKey, ?string $unitKey): self
+    {
+        $format = $formula->format();
+
+        return new self(
+            alias: $alias,
+            key: $formula->key,
+            kind: self::MEASURE,
+            caption: $formula->caption(),
+            type: 'number',
+            format: $format->value,
+            currencyKey: $format === MeasureFormat::Money ? $currencyKey : null,
+            unitKey: $format === MeasureFormat::Quantity ? $unitKey : null,
+        );
+    }
+
+    /**
+     * Kolom turunan satu measure atau rumus: periode pembanding, selisih, persen perubahan, atau persen terhadap
+     * total. `$period` nama periode pembanding untuk judul kolom ("tahun lalu").
+     *
+     * @param  'previous'|'change'|'change_pct'|'percent_of_total'  $derivation
+     */
+    public static function derived(string $alias, self $base, string $derivation, string $period = ''): self
+    {
+        $percent = $derivation === self::CHANGE_PERCENT || $derivation === self::PERCENT_OF_TOTAL;
+
+        return new self(
+            alias: $alias,
+            key: $base->key.'__'.$derivation,
+            kind: self::MEASURE,
+            caption: $base->caption.' ('.match ($derivation) {
+                self::PREVIOUS => $period,
+                self::CHANGE => 'selisih dengan '.$period,
+                self::CHANGE_PERCENT => 'perubahan % dari '.$period,
+                self::PERCENT_OF_TOTAL => '% dari total',
+            }.')',
+            type: 'number',
+            format: $percent ? MeasureFormat::Percent->value : $base->format,
+            currencyKey: $percent ? null : $base->currencyKey,
+            unitKey: $percent ? null : $base->unitKey,
+            // Selisih jumlah baris tetap bilangan bulat; persen selalu teks desimal dan kosong di baris isian celah.
+            aggregate: $percent ? null : $base->aggregate,
+            derivedFrom: $base->key,
+            derivation: $derivation,
+        );
+    }
+
     /** Measure jumlah baris, yang dikirim sebagai bilangan bulat; measure lain dikirim sebagai teks desimal. */
     public function counts(): bool
     {
@@ -106,7 +176,7 @@ final readonly class ResultColumn
      * Semua isian kolom, termasuk yang tidak pernah keluar dari server (`alias`, `labelAlias`, agregat), untuk
      * cache hasil area 9: kolom yang dibaca kembali dari cache sama persis dengan yang dibuat compiler.
      *
-     * @return array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string}
+     * @return array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string, derived_from: ?string, derivation: ?string}
      */
     public function toCache(): array
     {
@@ -124,13 +194,15 @@ final readonly class ResultColumn
             'implicit' => $this->implicit,
             'aggregate' => $this->aggregate?->value,
             'label_alias' => $this->labelAlias,
+            'derived_from' => $this->derivedFrom,
+            'derivation' => $this->derivation,
         ];
     }
 
     /**
      * Kebalikan {@see self::toCache()}.
      *
-     * @param  array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string}  $data
+     * @param  array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string, derived_from: ?string, derivation: ?string}  $data
      */
     public static function fromCache(array $data): self
     {
@@ -148,6 +220,8 @@ final readonly class ResultColumn
             implicit: $data['implicit'],
             aggregate: $data['aggregate'] === null ? null : Aggregate::from($data['aggregate']),
             labelAlias: $data['label_alias'],
+            derivedFrom: $data['derived_from'],
+            derivation: $data['derivation'],
         );
     }
 
@@ -165,6 +239,8 @@ final readonly class ResultColumn
             'currency_key' => $this->currencyKey,
             'unit_key' => $this->unitKey,
             'implicit' => $this->implicit,
+            'derived_from' => $this->derivedFrom,
+            'derivation' => $this->derivation,
         ], static fn (string|bool|null $value): bool => $value !== null && $value !== false);
     }
 }

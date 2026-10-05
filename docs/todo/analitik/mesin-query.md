@@ -41,13 +41,15 @@ dan langsung terpetakan ke `SELECT … GROUP BY`.
 | `limit` | tidak | Top-N | ≤ `limits.rows_interactive` |
 | `totals` | tidak | Hitung total keseluruhan | — |
 | `fill_gaps` | tidak | Isi celah deret waktu; bawaan `true` bila ada dimensi waktu, dan tanpa dimensi waktu isian ini tidak berarti apa-apa | 1000 titik |
-| `compare` | tidak, fase 2 | `previous_period` atau `previous_year` | — |
-| `formulas` | tidak, fase 2 | Rumus, lihat [bahasa rumus](#bahasa-rumus) | 5 |
+| `compare` | tidak, fase 2 | `previous_period` atau `previous_year`, lihat [perbandingan periode](#perbandingan-periode) | — |
+| `formulas` | tidak, fase 2 | Daftar `{key, expression, caption?, format?}`, lihat [bahasa rumus](#bahasa-rumus); kuncinya dipilih lewat `measures` | 5 (`limits.formulas`) |
+| `percent_of_total` | tidak, fase 2 | Kunci di `measures` yang juga ditampilkan sebagai persen terhadap total, lihat [persen terhadap total](#persen-terhadap-total) | — |
 
 Batas jumlah di kolom kanan dibaca dari `config/analytics.php` (`limits.dimensions`, `limits.measures`,
-`limits.filters`, `limits.sort`) dan dijawab 422 `analytics.limit_exceeded`. `compare` dan `formulas`
-belum dibaca engine dan ditolak sebagai "belum tersedia", bukan diabaikan: query yang diam-diam
-mengabaikan perbandingan atau rumus memulangkan angka yang berbeda dari yang diminta.
+`limits.filters`, `limits.sort`, `limits.formulas`) dan dijawab 422 `analytics.limit_exceeded`. Sejak area 13
+`compare`, `formulas`, dan `percent_of_total` dibaca engine; sebelumnya keduanya yang pertama ditolak sebagai
+"belum tersedia", bukan diabaikan, karena query yang diam-diam mengabaikan perbandingan atau rumus memulangkan
+angka yang berbeda dari yang diminta.
 
 Skema JSON-nya ditulis area 2 di `apps/core/resources/schemas/analytics-query.schema.json` (draft 2020-12)
 sebagai sumber bentuk untuk tiga tempat: pembaca query di server, tipe TypeScript layar, dan kontrak
@@ -101,8 +103,21 @@ field waktu utama menolak rentang waktu dengan meminta kolomnya disebut.
 
 `RelativeRange` terpisah dari `RelativeDates` milik preset laporan K-25. Token preset tersimpan di
 preset tenant dan menjadi tanggal tunggal; token analitik menjadi rentang. Menggabungkan keduanya
-mengubah arti token yang sudah tersimpan. Tahun fiskal (`@this_fiscal_year`) menyusul di fase 2
-lewat `FiscalCalendarDirectory`, karena butuh legal entity.
+mengubah arti token yang sudah tersimpan.
+
+Tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`, area 13) butuh perusahaan, jadi rentangnya tidak dihitung
+`RelativeRange` dari tanggal saja. `FiscalYearRange` menghitungnya lewat `FiscalCalendarDirectory` di dalam
+`runFor()`, sebelum kunci cache, dan menyimpannya di `TimeRange::$bounds`:
+
+- Perusahaannya dari saringan — tepat satu nilai pada field berdimensi bersama entitas legal, termasuk saringan
+  terkunci principal — atau, tanpa saringan itu, dari workspace pengguna (`UserPrincipal::workspaceLegalEntity()`,
+  dibaca dari sesi). Publikasi, embed, dan job tidak punya workspace.
+- Ditolak 422 di `time_range.range` (atau di saringannya) dengan pesan: tanpa perusahaan, dengan lebih dari satu,
+  dengan perusahaan tenant lain, atau dengan kalender yang belum mencakup hari ini. Tidak pernah diganti tahun
+  kalender diam-diam.
+- `@last_fiscal_year` adalah tahun fiskal yang memuat hari sebelum awal tahun fiskal ini.
+- Rentangnya ikut di `normalized()` (`time_range.bounds`), sehingga dua perusahaan dengan tahun fiskal berbeda
+  tidak berbagi hasil cache.
 
 `RelativeRange` berisi fungsi statis, seperti `RelativeDates` dan `FieldFilterExpression`, dan tidak
 membaca jam sendiri: pemanggil memberinya `AnalyticsPrincipal::now()` yang sudah berzona.
@@ -539,6 +554,9 @@ export type AnalyticsQuery = {
     limit?: number;
     totals?: boolean;
     fill_gaps?: boolean;
+    compare?: 'previous_period' | 'previous_year'; // area 13
+    formulas?: Array<{ key: string; expression: string; caption?: string; format?: MeasureFormat }>;
+    percent_of_total?: string[];
 };
 
 export type ResultColumn = {
@@ -552,6 +570,8 @@ export type ResultColumn = {
     currency_key?: string;
     unit_key?: string;
     implicit?: boolean;
+    derived_from?: string; // area 13: kolom perbandingan atau persen terhadap total
+    derivation?: 'previous' | 'change' | 'change_pct' | 'percent_of_total';
 };
 
 export type ResultValue = string | number | boolean | null;
@@ -592,14 +612,34 @@ dapat dilakukan pengguna.
 | `analytics.query_timeout` | 422 | Perhitungan ini terlalu berat. Persempit periode atau saringan. |
 | `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. (dengan `Retry-After`) |
 | `analytics.rate_limited` | 429 | Terlalu banyak permintaan analisis dalam satu menit. Tunggu sebentar, lalu coba lagi. (limiter `analytics-interactive` per pengguna, dengan `Retry-After`) |
+| `analytics.invalid_formula` | 422 | Rumus tidak dapat dibaca di karakter 14: `)` tanpa pasangan. Juga rumus yang memakai rumus lain, nilai bukan angka, atau dua mata uang. Membawa `position` (karakter, mulai 1) di samping `field` (`formulas.0.expression`). Measure yang tidak dikenal di dalam rumus memakai `analytics.field_unknown` dengan `position` yang sama. |
 | `analytics.field_removed` | 422 | Kolom "…" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain. (data widget yang query tersimpannya memuat kunci yang sudah tidak ada di dataset; `field` berpath `query.…`) |
 | `analytics.invalid_visual` | 422 | Bagian tampilan widget tidak cocok dengan jenis atau query-nya, misalnya "Pilih sumbu mendatar dari kolom pengelompokan." (saat widget disimpan; `field` berpath `visual.…` atau `query.…`) |
 
 ## Bahasa rumus
 
-Fase 2 (area 13). Rumus menghitung nilai baru dari measure lain di baris yang sama: rasio, selisih,
+Fase 2 (area 13, dikirim). Rumus menghitung nilai baru dari measure lain di baris yang sama: rasio, selisih,
 persen, kondisi sederhana. Dikompilasi ke SQL di atas ekspresi agregat, jadi urutan dan top-N dapat
-memakai hasilnya.
+memakai hasilnya. Kodenya di `app/Platform/Analytics/Query/Formula/` (`Lexer`, `Parser`, `Node/*`, `Formula`,
+`FormulaExpression`).
+
+```json
+{
+  "dataset": "management-aset.asset-register",
+  "dimensions": ["group_aset_id"],
+  "measures": ["count", "persen_dilepas"],
+  "formulas": [
+    { "key": "persen_dilepas", "caption": "Persen dilepas", "expression": "BAGI([disposed]; [count]) * 100", "format": "percent" }
+  ],
+  "sort": [{ "key": "persen_dilepas", "direction": "desc" }],
+  "limit": 10
+}
+```
+
+Kunci rumus berbentuk kunci dataset tanpa `__`, tidak boleh sama dengan kunci field atau measure dataset, dan
+wajib dipilih di `measures` — di sanalah urutan kolomnya. `caption` bawaannya kunci; `format` bawaannya `number`.
+Kolom hasilnya berjenis `measure` tanpa agregat: dikirim sebagai teks desimal dan kosong di baris isian celah.
+Widget menyimpan teks rumus apa adanya; nama measure yang diganti module (`renamed`) ikut diganti di dalam teks.
 
 ```text
 ekspresi  := suku (('+' | '-') suku)*
@@ -612,6 +652,7 @@ kondisi   := ekspresi ('=' | '<>' | '<' | '<=' | '>' | '>=') ekspresi
 
 | Fungsi | Arti | SQL |
 | --- | --- | --- |
+| `a / b` | Bagi; kosong bila `b` nol | `a / nullif(b, 0)` |
 | `BAGI(a; b)` | `a / b`, nol bila `b` nol | `coalesce(a / nullif(b, 0), 0)` |
 | `BAGI(a; b; c)` | `a / b`, `c` bila `b` nol | `coalesce(a / nullif(b, 0), c)` |
 | `JIKA(kondisi; a; b)` | `a` bila kondisi benar | `case when … then a else b end` |
@@ -622,27 +663,79 @@ Contoh: persentase aset dilepas `BAGI([disposed]; [count]) * 100`.
 
 Aturan yang dijaga:
 
-- **Daftar fungsi tertutup.** Nama di luar tabel ditolak saat dibaca, sebelum ada SQL apa pun.
-- **Angka menjadi binding**, measure menjadi ekspresi agregat yang sudah divalidasi. Tidak ada teks
-  pengguna yang masuk ke SQL.
-- **Batas**: 500 karakter, kedalaman 20, 5 rumus per query, rumus tidak boleh memakai rumus lain di
-  fase 2.
-- **Uang**: rumus atas measure uang mewarisi pengelompokan mata uangnya; rumus yang mencampur measure
-  dengan kolom mata uang berbeda ditolak.
-- **Galat menunjuk posisi**: "Rumus tidak dapat dibaca di karakter 14: `]` tanpa pasangan".
+- **Daftar fungsi tertutup.** Nama di luar tabel ditolak saat dibaca, sebelum ada SQL apa pun. Nama fungsi
+  tidak peka huruf besar.
+- **Angka menjadi binding** `cast(? as numeric)`, measure menjadi ekspresi agregat yang sudah divalidasi dan
+  dibulatkan ke `numeric` (`count / count` bukan pembagian bilangan bulat). Tanda hitung dan perbandingan
+  dipetakan dari daftar tetap. Tidak ada teks pengguna yang masuk ke SQL.
+- **Angka cara Indonesia**, sama dengan filter K-30: `1.000,5`; titik yang bukan kelompok ribuan dibaca desimal
+  (`1.5`). Isian fungsi dipisah titik koma; koma di luar angka ditolak dengan petunjuknya.
+- **Batas**: 500 karakter, kedalaman 20, 5 rumus per query (`limits.formulas`), rumus tidak boleh memakai rumus
+  lain di fase 2.
+- **Hanya nilai angka**: measure terkecil atau terbesar atas kolom bukan angka (tanggal) tidak dapat dirujuk.
+- **Uang**: rumus atas measure uang mewarisi pengelompokan mata uangnya, walau measure itu sendiri tidak dipilih;
+  rumus yang mencampur measure dengan kolom mata uang berbeda — atau kolom satuan berbeda — ditolak. Format
+  `money` dan `quantity` butuh measure uang atau kuantitas di dalamnya, dan kolom hasilnya membawa `currency_key`
+  atau `unit_key`-nya.
+- **Galat menunjuk posisi**: "Rumus tidak dapat dibaca di karakter 14: `)` tanpa pasangan", kode
+  `analytics.invalid_formula`, dengan `position`.
 
 Test parser wajib mencakup percobaan menyisipkan SQL (`[count]); drop table x; --`), nama fungsi
-yang tidak dikenal, pembagian dengan nol, dan angka gaya Indonesia (`1.000,5`).
+yang tidak dikenal, pembagian dengan nol, dan angka gaya Indonesia (`1.000,5`). Ada di `FormulaTest`,
+`FormulaValidationTest`, dan `FormulaAndComparisonTest`.
 
 ## Perbandingan periode
 
-Fase 2 (area 13). `compare: "previous_period"` menjalankan query yang sama dengan rentang waktu
-digeser sepanjang rentang itu sendiri; `previous_year` menggeser satu tahun. Hasil kedua digabung ke
-hasil pertama menurut dimensi selain dimensi waktu, dan setiap measure mendapat tiga kolom tambahan:
-`<kunci>__previous`, `<kunci>__change`, `<kunci>__change_pct`. Persen perubahan dari nol ditulis kosong,
-bukan tak hingga.
+Fase 2 (area 13, dikirim). `compare: "previous_period"` menjalankan query yang sama dengan rentang waktu
+digeser sepanjang rentang itu sendiri; `previous_year` menggeser satu tahun. Setiap measure dan rumus mendapat
+tiga kolom tambahan: `<kunci>__previous`, `<kunci>__change`, `<kunci>__change_pct`. Persen perubahan dari nol
+ditulis kosong, bukan tak hingga, dan penyebutnya nilai mutlak pembanding.
 
-Perbandingan butuh `time_range`; query tanpa rentang waktu ditolak dengan pesan yang memintanya.
+Rentang pembanding (`Query\Comparison`, menurut zona principal):
+
+| Rentang | `previous_period` | `previous_year` |
+| --- | --- | --- |
+| Token hari, minggu, 7/30/90 hari | Mundur 1/7/7/30/90 hari | Mundur 12 bulan |
+| Token bulan, kuartal, tahun, 12 bulan | Mundur 1/3/12/12 bulan | Mundur 12 bulan |
+| `@month_to_date`, `@year_to_date` | Tanggal yang sama bulan lalu / tahun lalu | Mundur 12 bulan |
+| Rentang tertulis bulan penuh, tahun fiskal | Mundur sebanyak bulannya | Mundur 12 bulan |
+| Rentang tertulis lain | Mundur sebanyak harinya | Mundur 12 bulan |
+
+Rentang bulan penuh tetap bulan penuh sesudah digeser (Februari kabisat sampai tanggal 29), dan pergeseran bulan
+yang jatuh di tanggal yang tidak ada berhenti di akhir bulan. Rentang tahun fiskal digeser sebanyak bulannya, bukan
+dicari ulang di kalender; tahun fiskal yang tidak dua belas bulan karena itu belum tepat pada perbandingan.
+
+Penggabungannya di SQL, satu pernyataan:
+
+1. Langkah 1–7 compiler untuk rentang yang diminta (`cur`) dan untuk rentang pembanding (`prev`). Ember waktu
+   query pembanding digeser maju sebanyak pergeserannya (`TimeBucketExpression` dengan `interval '12 months'`),
+   jadi baris Oktober tahun lalu berlabel Oktober tahun ini.
+2. Kedua sisi disatukan `UNION ALL` — tiap sisi mengisi kolom measure-nya sendiri — lalu `GROUP BY` semua kolom
+   dimensi (termasuk mata uang tersirat). Itu gabungan luar penuh dengan kosong bertemu kosong;
+   `FULL JOIN … IS NOT DISTINCT FROM` ditolak PostgreSQL karena syaratnya tidak dapat di-hash.
+3. Kelompok yang hanya ada di periode lalu tetap muncul, dengan hitungan dan jumlah sekarang nol; rata-rata,
+   terkecil, terbesar, dan rumus kosong. Urutan, `LIMIT`, dan persen terhadap total berlaku pada hasil gabungan.
+4. `GapFiller` mengisi periode yang kosong di kedua sisi: nol untuk nilai dan selisih hitungan dan jumlah, kosong
+   untuk persen.
+5. Total dihitung sama, per mata uang, beserta selisih dan persennya.
+
+Perbandingan butuh `time_range` yang jelas awal dan akhirnya — token, `a..b`, atau satu tanggal; query tanpa
+rentang waktu ditolak dengan pesan yang memintanya, dan rentang terbuka (`>=01/01/2026`) atau pilihan ditolak.
+Kolom tanggal yang dikelompokkan harus memakai ukuran waktu, dan measure terkecil atau terbesar atas kolom bukan
+angka tidak dapat dibandingkan.
+
+## Persen terhadap total
+
+Fase 2 (area 13, dikirim), pilihan tampilan measure: `"percent_of_total": ["acquisition_value"]` menambah kolom
+`acquisition_value__percent_of_total`, yaitu `nilai / sum(nilai) over (partition by <mata uang dan satuan measure
+itu>) * 100`. Fungsi jendela berjalan sebelum `LIMIT`, jadi top-10 tetap menunjukkan bagian dari seluruh kelompok;
+partisinya menjaga persen rupiah tidak tercampur dengan dolar (KA-22). Total nol menjadi kosong. Baris total tidak
+membawa kolom ini, karena nilainya selalu 100.
+
+Kolom turunan — perbandingan dan persen terhadap total — membawa `derived_from` (kunci asalnya) dan `derivation`
+(`previous`, `change`, `change_pct`, `percent_of_total`) di `columns`. Nilai pembanding dan selisih mewarisi format
+dan mata uang measure asalnya; kedua persen berformat `percent` tanpa mata uang. Kolom turunan tidak dapat dipakai
+di `sort` atau `visual` widget; layar menampilkannya di samping measure asalnya.
 
 ## Baris di balik angka
 

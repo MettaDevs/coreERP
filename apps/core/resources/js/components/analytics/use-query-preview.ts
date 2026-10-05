@@ -71,17 +71,26 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
     };
 }
 
+/** Galat satu rumus: rumus ke berapa, pesannya, dan karakter tempatnya bila server menyebutnya. */
+export type FormulaError = {
+    index: number;
+    message: string;
+    position: number | null;
+};
+
 /**
- * Letak galat query di layar: galat saringan (`filters.<kolom>`) dan periode (`time_range.range`) ditampilkan di
- * isiannya, sisanya di area hasil. Pesannya dari server, kecuali kegagalan yang punya kalimat sendiri.
+ * Letak galat query di layar: galat saringan (`filters.<kolom>`), periode (`time_range.range`), dan rumus
+ * (`formulas.<n>.…`, area 13) ditampilkan di isiannya, sisanya di area hasil. Pesannya dari server, kecuali
+ * kegagalan yang punya kalimat sendiri.
  */
 export function queryErrorPlacement(error: unknown): {
     filters: Record<string, string>;
     timeRange: string | null;
+    formula: FormulaError | null;
     message: string | null;
 } {
     if (error === null || error === undefined) {
-        return { filters: {}, timeRange: null, message: null };
+        return { filters: {}, timeRange: null, formula: null, message: null };
     }
 
     const message = widgetFailure(error).message;
@@ -91,6 +100,7 @@ export function queryErrorPlacement(error: unknown): {
         return {
             filters: { [field.slice('filters.'.length)]: message },
             timeRange: null,
+            formula: null,
             message: 'Periksa saringan yang ditandai.',
         };
     }
@@ -99,9 +109,25 @@ export function queryErrorPlacement(error: unknown): {
         return {
             filters: {},
             timeRange: message,
+            formula: null,
             message: 'Periksa periode yang ditandai.',
         };
     }
 
-    return { filters: {}, timeRange: null, message };
+    const formula = /^formulas\.(\d+)(\.|$)/.exec(field);
+
+    if (formula !== null && error instanceof CoreApiError) {
+        return {
+            filters: {},
+            timeRange: null,
+            formula: {
+                index: Number(formula[1]),
+                message,
+                position: error.position,
+            },
+            message: 'Periksa rumus yang ditandai.',
+        };
+    }
+
+    return { filters: {}, timeRange: null, formula: null, message };
 }
