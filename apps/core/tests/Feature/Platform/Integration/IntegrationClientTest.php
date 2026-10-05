@@ -89,6 +89,17 @@ class IntegrationClientTest extends TestCase
             ->assertJsonValidationErrors('scopes.0');
     }
 
+    public function test_scope_catalog_is_restored_after_test_database_truncation(): void
+    {
+        DB::statement('TRUNCATE integration_scopes');
+        $this->assertSame([], IntegrationScope::options());
+
+        self::reinstallCoreSecurityCatalog();
+
+        $this->assertArrayHasKey('vendors.read', IntegrationScope::options());
+        $this->buat(['scopes' => ['vendors.read']])->assertCreated();
+    }
+
     private function assertIntegrationChangesForbidden(string $clientId): void
     {
         $this->patchJson("/api/v1/integration-clients/{$clientId}", $this->bentuk())->assertForbidden();
