@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Platform\Analytics;
 
 use App\Platform\Analytics\Query\CompareMode;
+use App\Platform\Analytics\Query\Formula\Parser;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\RelativeRange;
 use App\Platform\Analytics\Query\TimeGranularity;
@@ -146,5 +147,26 @@ class QueryShapeSyncTest extends TestCase
         $this->assertSame(1, preg_match('/TIME_GRANULARITIES = \[(.*?)\] as const/s', $query, $block));
         preg_match_all("/value: '(\w+)'/", $block[1], $granularities);
         $this->assertSame(array_map(static fn (TimeGranularity $case): string => $case->value, TimeGranularity::cases()), $granularities[1]);
+    }
+
+    /**
+     * Editor rumus (area 13.7) menawarkan fungsi dan pembanding dari daftarnya sendiri; daftar itu harus sama dengan
+     * daftar tertutup pembaca rumus dan pilihan perbandingan di server, supaya layar tidak menawarkan yang ditolak.
+     */
+    public function test_the_formula_editor_offers_exactly_the_server_functions_formats_and_comparisons(): void
+    {
+        $query = $this->read(self::QUERY);
+
+        $this->assertSame(1, preg_match('/FORMULA_FUNCTIONS = \[(.*?)\] as const/s', $query, $functions));
+        preg_match_all("/name: '(\w+)'/", $functions[1], $names);
+        $this->assertSame(array_keys(Parser::FUNCTIONS), $names[1]);
+
+        $this->assertSame(1, preg_match('/FORMULA_FORMATS = \[(.*?)\] as const/s', $query, $formats));
+        preg_match_all("/value: '(\w+)'/", $formats[1], $values);
+        $this->assertSame(array_map(static fn (MeasureFormat $case): string => $case->value, MeasureFormat::cases()), $values[1]);
+
+        $this->assertSame(1, preg_match('/COMPARE_MODES = \[(.*?)\] as const/s', $query, $modes));
+        preg_match_all("/value: '(\w+)'/", $modes[1], $values);
+        $this->assertSame(array_map(static fn (CompareMode $case): string => $case->value, CompareMode::cases()), $values[1]);
     }
 }

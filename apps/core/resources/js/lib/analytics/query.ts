@@ -1,7 +1,10 @@
 import type {
     AnalyticsQuery,
+    MeasureFormat,
+    QueryCompare,
     QueryDimension,
     ResultColumn,
+    ResultDerivation,
     ResultSet,
     ResultValue,
     TimeGranularity,
@@ -237,4 +240,87 @@ function isQueryShape(value: unknown): value is AnalyticsQuery {
         record(query.filters) &&
         record(query.time_range)
     );
+}
+
+/*
+ * Area 13: rumus, perbandingan periode, dan persen terhadap total di layar. Daftar fungsi dan pilihan perbandingan
+ * harus sama dengan `Formula\Parser::FUNCTIONS` dan `CompareMode` di server; satu test PHP menjaganya.
+ */
+
+/** Fungsi bahasa rumus, dengan contoh tulisan dan artinya untuk bantuan di editor rumus. */
+export const FORMULA_FUNCTIONS = [
+    {
+        name: 'BAGI',
+        syntax: 'BAGI(a; b)',
+        caption:
+            'a dibagi b; nol bila b nol. BAGI(a; b; c) memberi c bila b nol.',
+    },
+    {
+        name: 'JIKA',
+        syntax: 'JIKA(a > b; x; y)',
+        caption: 'x bila syaratnya benar, selain itu y.',
+    },
+    { name: 'ABS', syntax: 'ABS(a)', caption: 'Nilai tanpa tanda minus.' },
+    {
+        name: 'BULAT',
+        syntax: 'BULAT(a; 2)',
+        caption: 'Dibulatkan ke sekian angka di belakang koma.',
+    },
+    { name: 'MIN', syntax: 'MIN(a; b)', caption: 'Yang terkecil.' },
+    { name: 'MAKS', syntax: 'MAKS(a; b)', caption: 'Yang terbesar.' },
+] as const;
+
+/** Format angka hasil rumus. */
+export const FORMULA_FORMATS = [
+    { value: 'number', caption: 'Angka' },
+    { value: 'money', caption: 'Uang' },
+    { value: 'percent', caption: 'Persen' },
+    { value: 'quantity', caption: 'Kuantitas' },
+    { value: 'hours', caption: 'Jam' },
+] as const satisfies ReadonlyArray<{ value: MeasureFormat; caption: string }>;
+
+/** Periode pembanding, dengan "tanpa pembanding" sebagai pilihan kosong di layar. */
+export const COMPARE_MODES = [
+    { value: 'previous_period', caption: 'Periode sebelumnya' },
+    { value: 'previous_year', caption: 'Periode yang sama tahun lalu' },
+] as const satisfies ReadonlyArray<{ value: QueryCompare; caption: string }>;
+
+/** Kunci rumus di query; kunci itu juga ada di `measures`, tempat urutan kolomnya. */
+export function formulaKeys(query: AnalyticsQuery): string[] {
+    return (query.formulas ?? []).map((formula) => formula.key);
+}
+
+/**
+ * Kunci rumus baru yang belum dipakai query maupun data: `rumus_1`, `rumus_2`, …. Pengguna tidak mengetik kunci;
+ * yang ia lihat adalah nama rumusnya.
+ */
+export function newFormulaKey(
+    query: AnalyticsQuery,
+    taken: Iterable<string>,
+): string {
+    const used = new Set([...taken, ...formulaKeys(query), ...query.measures]);
+
+    for (let index = 1; ; index++) {
+        const key = `rumus_${index}`;
+
+        if (!used.has(key)) {
+            return key;
+        }
+    }
+}
+
+/** Kolom turunan satu nilai di hasil: pembanding, selisih, persen perubahan, dan persen terhadap total. */
+export function derivedColumns(
+    result: ResultSet,
+    key: string,
+): Partial<Record<ResultDerivation, ResultColumn>> {
+    const out: Partial<Record<ResultDerivation, ResultColumn>> = {};
+
+    for (const column of result.columns) {
+        if (column.derived_from === key && column.derivation !== undefined) {
+            out[column.derivation] = column;
+        }
+    }
+
+    return out;
 }
