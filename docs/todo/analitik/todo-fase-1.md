@@ -725,9 +725,10 @@ pernah terlihat merah.
 **sudah** dikirim kode (bukan rencana), terdaftar di sidebar, build docs bersih, dan skill memuat
 perintah serta jebakan yang benar-benar ditemui selama fase 1.
 
-Dikerjakan 4 Oktober 2026 untuk bagian yang sudah dikirim (area 0–7 dan 9). Area ini tetap `[~]`: pembangun
-widget dan penjelajah (area 8) dan uji beban (area 10) belum ada, jadi halaman kanonik menyebut keduanya
-sebagai "menyusul" dan dilengkapi ketika kodenya masuk. Butir yang menunggu ditandai di bawah.
+Dikerjakan 4 Oktober 2026 untuk bagian yang sudah dikirim, dalam dua tahap: area 0–7 dan 9 lebih dulu, lalu
+area 5 (measure bersaringan dan test waktu berzona) dan area 8 (pembangun bagian dan penjelajah) setelah masuk ke
+main. Area ini tetap `[~]` hanya karena uji beban (area 10) belum ada: halaman kanonik menyebutnya "menyusul"
+dan dilengkapi ketika kodenya masuk. Butir yang menunggu ditandai di bawah.
 
 - [x] 11.1 `docs/dev/35-analitik.md` dengan pola dokumen repo: kalimat pembuka, konsep yang mudah
   tertukar (dataset vs laporan, dasbor bersama vs publikasi), aturan beserta alasannya, di mana kodenya.
@@ -735,22 +736,31 @@ sebagai "menyusul" dan dilengkapi ketika kodenya masuk. Butir yang menunggu dita
   untuk konsepnya (query dan report object Business Central, aggregate measurement F&O, semantic model Power BI,
   dokumentasi PostgreSQL). Konsep yang mudah tertukar: dataset vs laporan (`ModuleReportProvider`), dataset vs
   tabel vs measure, dasbor pribadi vs bersama vs publikasi, permission dataset (KA-15) vs permission analitik
-  (KA-14). Bagian *Yang belum ada* di halaman itu mendaftar batas yang dikirim; **perbarui bagian itu dan
-  bagian *Endpoint* ketika area 8 dan 10 masuk.** Terdaftar di `docs/dev/README.md`, sidebar, dan
-  `docs/onboarding/peta-kode.md`.
+  (KA-14). Bagian *Yang belum ada* di halaman itu mendaftar batas yang dikirim. *Tahap 2 (area 8):* bagian
+  *Layar* baru (isian query satu komponen untuk pembangun dan penjelajah, state penjelajah di URL, pratinjau
+  500 ms dengan pembatalan, aturan tampilan yang mencerminkan `WidgetDefinition`, Escape di `Sheet`), tabel
+  istilah layar ("bagian", "analisis tersimpan"), baris *Endpoint* penjelajah, dan celah
+  `StoredQuery::validate()` yang tidak menjalankan `FieldFilterExpression`. **Menunggu area 10:** hapus
+  bullet uji beban di *Yang belum ada* dan kotak info di awal halaman ketika uji bebannya lulus. Terdaftar di
+  `docs/dev/README.md`, sidebar, dan `docs/onboarding/peta-kode.md`.
 - [x] 11.2 `docs/dev/05`: dasbor yang dapat disusun dari dataset pindah ke "setelan"; dasbor yang butuh
   data di luar CoreERP tetap integrasi di luar. *Dikirim:* tabel urutan, bagian *Setelan*, dan bagian
-  *Integrasi di luar CoreERP*. Kalimatnya jujur tentang keadaan: widget baru masih dibuat lewat API sampai
-  pembangun widget (area 8) selesai.
+  *Integrasi di luar CoreERP*. Tahap 1 menulis jujur bahwa widget baru masih lewat API; tahap 2 (area 8)
+  menggantinya dengan pembangun bagian dan penjelajah di layar.
 - [x] 11.3 Halaman dataset module aset: daftar dataset, measure, kolom kebijakan, dan kenapa kolom itu.
   *Dikirim:* `docs/apps/management-aset/transaction/analitik/index.md`, bersebelahan dengan *Laporan dan
   ekspor*. Kolom kebijakan dipasangkan dengan controller daftar yang dibaca dan pemanggilan
-  `OrganizationScope`-nya, bukan disalin dari rencana.
+  `OrganizationScope`-nya, bukan disalin dari rencana. *Tahap 2 (area 5):* tabel dataset memuat measure
+  bersaringan setiap dataset, kebiasaan measure bersaringan dan draf, dan `ChecksTimeZoneBuckets`; butir
+  "yang belum ada" tentang measure bersaringan dihapus.
 - [x] 11.4 Skill `coreerp-analytics` diperbarui dari rencana menjadi keadaan sebenarnya; kedua salinan
   sama (`check-skill-copies.py`). *Dikirim:* ditulis ulang: yang dikirim, yang masih rencana (fase 2 diberi
   tanda sendiri), langkah menyatakan dataset, aturan SQL, aturan penyimpanan dasbor, test yang ada, dan jebakan
   yang ditemui di pull request area 0–9. Halaman rencana tidak lagi disebut sebagai tempat membaca bentuk
-  yang sudah dikirim.
+  yang sudah dikirim. *Tahap 2 (area 5 dan 8):* status (hanya uji beban yang terbuka), komponen layar yang
+  dipakai ulang, state penjelajah di URL, pratinjau dan pembatalan, istilah layar, measure bersaringan dan test
+  zona di langkah menyatakan dataset, dan jebakan baru (Escape di dalam `Sheet`, salinan state ke `useState`,
+  celah validasi saringan saat menyimpan, kata "widget" dan "query" di pesan server yang dibaca pengguna).
 - [~] 11.5 Folder TODO ini: status area, keputusan yang berubah, dan temuan yang terbukti salah.
   *Dikirim:* status area tidak diubah (milik agen areanya). Temuan yang terbukti salah dikoreksi di
   tempatnya: argumen widget `analytics:explain` ternyata tidak dikirim area 6 (butir 3.11 dan
@@ -759,4 +769,6 @@ sebagai "menyusul" dan dilengkapi ketika kodenya masuk. Butir yang menunggu dita
   [keamanan](/todo/analitik/keamanan#test-paritas-kebijakan-data) menyebut nama berkas dan pembanding yang
   tidak jadi dipakai; beberapa penanda area di susunan berkas
   [arsitektur](/todo/analitik/arsitektur#susunan-berkas) basi. KA-25 ditandai dikerjakan di
-  [peta](/todo/analitik/). **Menunggu area 8 dan 10:** sapuan terakhir folder ini setelah keduanya masuk.
+  [peta](/todo/analitik/). *Tahap 2:* pesan `analytics.field_removed` di tabel galat mengikuti kata layar
+  ("Ubah bagian ini …"), dan area 5 serta 8 sudah `[x]` oleh agen areanya. **Menunggu area 10:** sapuan terakhir
+  folder ini setelah uji beban masuk.

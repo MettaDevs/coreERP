@@ -342,7 +342,7 @@ export function AppSidebar() {
                         label: 'Klien integrasi',
                         icon: Plug,
                         href: '/settings/integration-clients',
-                        permission: 'core.finance-setup.read',
+                        permission: 'core.integration-clients.read',
                     },
                 ],
             },

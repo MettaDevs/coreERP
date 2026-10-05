@@ -104,6 +104,7 @@ type Props = {
     clients: Client[];
     scopes: Record<string, string>;
     endpoint: string;
+    canManage: boolean;
 };
 type Secrets = {
     title: string;
@@ -129,15 +130,8 @@ function toForm(client: Client | null): Form {
         name: client?.name ?? '',
         delivery_mode: client?.delivery_mode ?? 'pull',
         push_url: client?.push_url ?? '',
-        scopes: client?.scopes ?? [
-            'finance-postings.read',
-            'finance-postings.ack',
-            'vendors.read',
-            'operating-units.read',
-        ],
-        posting_type_prefixes: (
-            client?.posting_type_prefixes ?? ['asset.']
-        ).join(', '),
+        scopes: client?.scopes ?? [],
+        posting_type_prefixes: (client?.posting_type_prefixes ?? []).join(', '),
         allowed_ips: (client?.allowed_ips ?? []).join('\n'),
     };
 }
@@ -245,7 +239,7 @@ function ClientSheet({
                                 label="Nama"
                                 required
                                 maxLength={120}
-                                placeholder="Contoh: Old-finance"
+                                placeholder="Nama sistem luar"
                                 value={form.name}
                                 onChange={(event) =>
                                     set('name', event.target.value)
@@ -272,10 +266,11 @@ function ClientSheet({
                                 </NativeSelectOption>
                             </NativeSelect>
                             <FieldDescription>
-                                Pull: aplikasi finance memanggil API CoreERP
-                                untuk mengambil posting, lalu mengirim ack.
-                                Push: CoreERP mengirim setiap posting ke URL
-                                aplikasi finance, dengan signature HMAC.
+                                Pull: sistem luar memanggil API CoreERP sesuai
+                                scope yang diberikan. Push: CoreERP mengirim
+                                setiap posting ke URL sistem luar, dengan
+                                signature HMAC. Pengiriman push saat ini
+                                tersedia untuk posting finance.
                             </FieldDescription>
                         </Field>
                         {form.delivery_mode === 'push' && (
@@ -284,7 +279,7 @@ function ClientSheet({
                                     label="URL tujuan"
                                     required
                                     type="url"
-                                    placeholder="https://finance.contoh.co.id/coreerp/postings"
+                                    placeholder="https://sistem.contoh.co.id/coreerp/postings"
                                     value={form.push_url}
                                     onChange={(event) =>
                                         set('push_url', event.target.value)
@@ -416,7 +411,7 @@ function SecretsDialog({
                 <DialogHeader>
                     <DialogTitle>{secrets.title}</DialogTitle>
                     <DialogDescription>
-                        Salin sekarang dan simpan di aplikasi finance. Nilai ini
+                        Salin sekarang dan simpan di sistem luar. Nilai ini
                         tidak akan ditampilkan lagi; bila hilang, terbitkan yang
                         baru.
                     </DialogDescription>
@@ -443,7 +438,7 @@ function SecretsDialog({
                                 value={secrets.signing_secret}
                             />
                             <p className="text-sm text-muted-foreground">
-                                Dipakai aplikasi finance untuk memeriksa header{' '}
+                                Dipakai sistem luar untuk memeriksa header{' '}
                                 <span className="font-mono">
                                     X-CoreERP-Event-Signature
                                 </span>
@@ -470,6 +465,7 @@ export default function IntegrationClients({
     clients,
     scopes,
     endpoint,
+    canManage,
 }: Props) {
     const formatDateTime = useDateTimeFormat();
     const [editing, setEditing] = useState<Client | 'new' | null>(null);
@@ -532,7 +528,7 @@ export default function IntegrationClients({
             <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
                 <Heading
                     title="Klien integrasi"
-                    description="Sistem di luar CoreERP yang membaca posting finance, vendor, dan operating unit milik tenant ini."
+                    description="Atur koneksi dan izin akses untuk sistem di luar CoreERP."
                 />
                 <Card>
                     <CardHeader>
@@ -542,15 +538,17 @@ export default function IntegrationClients({
                             sempit. Mencabut klien berlaku pada permintaan
                             berikutnya.
                         </CardDescription>
-                        <CardAction>
-                            <ActionButton
-                                action="create"
-                                size="sm"
-                                onClick={() => setEditing('new')}
-                            >
-                                Tambah klien
-                            </ActionButton>
-                        </CardAction>
+                        {canManage && (
+                            <CardAction>
+                                <ActionButton
+                                    action="create"
+                                    size="sm"
+                                    onClick={() => setEditing('new')}
+                                >
+                                    Tambah klien
+                                </ActionButton>
+                            </CardAction>
+                        )}
                     </CardHeader>
                     <CardContent>
                         {clients.length === 0 ? (
@@ -558,8 +556,8 @@ export default function IntegrationClients({
                                 <EmptyHeader>
                                     <EmptyTitle>Belum ada klien</EmptyTitle>
                                     <EmptyDescription>
-                                        Tambahkan klien untuk aplikasi finance
-                                        yang akan membaca posting dari CoreERP.
+                                        Tambahkan klien untuk sistem luar yang
+                                        akan memakai API CoreERP.
                                     </EmptyDescription>
                                 </EmptyHeader>
                             </Empty>
@@ -636,86 +634,88 @@ export default function IntegrationClients({
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {client.status ===
-                                                        'active' && (
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    aria-label={`Aksi untuk ${client.name}`}
+                                                    {canManage &&
+                                                        client.status ===
+                                                            'active' && (
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger
+                                                                    asChild
                                                                 >
-                                                                    <MoreHorizontal />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem
-                                                                    onSelect={() =>
-                                                                        setEditing(
-                                                                            client,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Ubah
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem
-                                                                    onSelect={() =>
-                                                                        action(
-                                                                            client,
-                                                                            'rotate-token',
-                                                                            `Token baru untuk ${client.name}`,
-                                                                            'Token diterbitkan ulang.',
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Terbitkan
-                                                                    ulang token
-                                                                </DropdownMenuItem>
-                                                                {client.delivery_mode ===
-                                                                    'push' && (
-                                                                    <>
-                                                                        <DropdownMenuItem
-                                                                            onSelect={() =>
-                                                                                action(
-                                                                                    client,
-                                                                                    'rotate-signing-secret',
-                                                                                    `Signing secret baru untuk ${client.name}`,
-                                                                                    'Signing secret diganti.',
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Ganti
-                                                                            signing
-                                                                            secret
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuItem
-                                                                            onSelect={() =>
-                                                                                testPush(
-                                                                                    client,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Kirim
-                                                                            uji
-                                                                        </DropdownMenuItem>
-                                                                    </>
-                                                                )}
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem
-                                                                    variant="destructive"
-                                                                    onSelect={() =>
-                                                                        setRevoking(
-                                                                            client,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Cabut
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    )}
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        aria-label={`Aksi untuk ${client.name}`}
+                                                                    >
+                                                                        <MoreHorizontal />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem
+                                                                        onSelect={() =>
+                                                                            setEditing(
+                                                                                client,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Ubah
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        onSelect={() =>
+                                                                            action(
+                                                                                client,
+                                                                                'rotate-token',
+                                                                                `Token baru untuk ${client.name}`,
+                                                                                'Token diterbitkan ulang.',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Terbitkan
+                                                                        ulang
+                                                                        token
+                                                                    </DropdownMenuItem>
+                                                                    {client.delivery_mode ===
+                                                                        'push' && (
+                                                                        <>
+                                                                            <DropdownMenuItem
+                                                                                onSelect={() =>
+                                                                                    action(
+                                                                                        client,
+                                                                                        'rotate-signing-secret',
+                                                                                        `Signing secret baru untuk ${client.name}`,
+                                                                                        'Signing secret diganti.',
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Ganti
+                                                                                signing
+                                                                                secret
+                                                                            </DropdownMenuItem>
+                                                                            <DropdownMenuItem
+                                                                                onSelect={() =>
+                                                                                    testPush(
+                                                                                        client,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Kirim
+                                                                                uji
+                                                                            </DropdownMenuItem>
+                                                                        </>
+                                                                    )}
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        variant="destructive"
+                                                                        onSelect={() =>
+                                                                            setRevoking(
+                                                                                client,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Cabut
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -754,8 +754,8 @@ export default function IntegrationClients({
                         <AlertDialogDescription>
                             Token klien ini langsung tidak berlaku, dan klien
                             yang sudah dicabut tidak dapat dihidupkan lagi.
-                            Aplikasi finance yang memakainya berhenti menerima
-                            posting sampai diberi klien baru.
+                            Sistem luar yang memakainya berhenti menerima akses
+                            API sampai diberi klien baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
