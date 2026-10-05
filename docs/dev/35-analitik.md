@@ -7,9 +7,9 @@ Satu baris di `analytics_dashboards` adalah satu dasbor milik satu pengguna, sat
 Halaman ini untuk developer yang akan menyentuh kodenya: apa yang disimpan, aturan apa yang ditegakkan kode, dan kenapa. Ia menjelaskan yang **sudah dikirim**. Rencana, riset, dan keputusan `KA-xx` ada di [folder rencana engine analitik](../todo/analitik/README.md); bila rencana dan kode berbeda, kodenya yang benar.
 
 ::: info Yang sudah ada dan yang menyusul
-Sudah ada di Core: kontrak dataset dan registry, model query, compiler dan eksekusi baca-saja, keamanan baca beserta rantai permission, penyimpanan dasbor dan API layarnya, layar dasbor, cache, batas beban, dan log query, serta — dari fase 2 — rumus, perbandingan periode, persen terhadap total, dan token tahun fiskal di mesin query. Module aset sudah menyatakan dataset ([daftarnya](/apps/management-aset/transaction/analitik/)).
+Sudah ada di Core: kontrak dataset dan registry, model query, compiler dan eksekusi baca-saja, keamanan baca beserta rantai permission, penyimpanan dasbor dan API layarnya, layar dasbor, pembangun bagian dan penjelajah data, cache, batas beban, dan log query, serta rumus, perbandingan periode, persen terhadap total, dan token tahun fiskal. Module aset sudah menyatakan dataset ([daftarnya](/apps/management-aset/transaction/analitik/)).
 
-Menyusul, dan tidak ditulis di sini sebelum kodenya ada: pembangun widget dan penjelajah ([area 8](../todo/analitik/todo-fase-1.md)), uji beban ([area 10](../todo/analitik/todo-fase-1.md)), serta sisa [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
+Menyusul, dan tidak ditulis di sini sebelum kodenya ada: uji beban ([area 10](../todo/analitik/todo-fase-1.md)) dan sisa [fase 2](../todo/analitik/todo-fase-2.md) — slicer, drill, dimensi bersama lintas module, publikasi, feed OData, embed, dan template. Bagian [Yang belum ada](#yang-belum-ada) merinci batasnya.
 :::
 
 ## Konsep yang mudah tertukar
@@ -39,6 +39,21 @@ Pemisahan yang sama ada di Business Central: *report object* terdiri dari datase
 **`count` dan `count_distinct`.** `Count` menghitung baris (dengan field: baris yang field-nya terisi). Work order per aset dihitung `CountDistinct` pada id asetnya, bukan `Count`.
 
 **Rujukan, dimensi bersama, dan join.** Rujukan (`reference()`) menunjuk master milik module yang sama dan labelnya datang dari join di SQL. Dimensi bersama (`shared()`) menunjuk benda milik Core atau Foundation — entitas legal, unit kerja, pengguna, vendor, mata uang — dan labelnya diterjemahkan Core sesudah agregasi. Join (`join()`) memasukkan kolom tabel lain milik module yang sama sebagai field.
+
+**Measure bersaringan.** Satu measure dapat membawa saringan tetap (`where` pada `measure()`), misalnya hitungan aset yang statusnya dilepas. Saringan ini hanya kesamaan atau daftar nilai pada field pilihan, ya/tidak, atau rujukan, dan dikompilasi menjadi `FILTER (WHERE …)` pada panggilan agregatnya. Ia menggantikan dataset tambahan per status: satu dataset menjawab "berapa seluruhnya" dan "berapa yang sudah selesai" dalam satu query, dengan pengelompokan yang sama.
+
+**Nama di layar bukan nama di kode.** Layar tidak menampilkan istilah arsitektur:
+
+| Di kode dan di halaman ini | Di layar |
+| --- | --- |
+| widget | bagian |
+| query tersimpan | analisis tersimpan |
+| dataset | data |
+| measure | nilai |
+| dimensi, pengelompok | kelompokkan menurut, kolom |
+| filter | saring |
+
+Pesan galat dari server ikut memakai kata layar ("Dasbor ini sudah berisi … bagian"), karena layar menampilkannya apa adanya. Kode galat `analytics.*` tidak berubah.
 
 ### Dasbor pribadi, dasbor bersama, dan publikasi
 
@@ -137,7 +152,7 @@ API ini hanya dipanggil layar Core sendiri, jadi ia bukan permukaan app-ke-Core 
 | Rute | Hak | Gunanya |
 | --- | --- | --- |
 | `GET /analytics`, `GET /analytics/dashboards/{id}` | `dashboard.read` | Halaman Dasbor |
-| `GET /analytics/explore` | `explore.invoke` | Halaman Analisis data sementara, sampai penjelajah selesai |
+| `GET /analytics/explore` | `explore.invoke` | Halaman Analisis data (penjelajah). Propnya hanya katalog data dan hak `{create, share}`; querynya tinggal di query string (`?q=…&view=…`) dan tidak dibaca server |
 | `POST /api/v1/analytics/query` | `explore.invoke` | Query bebas, dijalankan sebagai pengguna yang meminta |
 | `GET datasets`, `GET datasets/{code}` | `dashboard.read` | Katalog dataset, field, dan measure yang boleh dipakai pengguna ini |
 | `GET/POST dashboards`, `GET/PATCH/DELETE dashboards/{id}` | `dashboard.read`; membuat juga `dashboard.create` | Dasbor; aturan berbagi diputuskan `DashboardAccess` |
@@ -151,6 +166,7 @@ Perilaku yang perlu diketahui pemanggil:
 - **Galat simpan widget** berbentuk `{error: {code, message, field}}` dengan `field` berawalan `query.` atau `visual.`; isian dasar memakai galat validasi Laravel biasa. Kode galat engine yang lain ada di `AnalyticsQueryException` dan di `Dashboards\WidgetDefinition` (`analytics.invalid_visual`).
 - **Dasbor bersama yang terlihat tetapi tidak boleh diubah dijawab 403** dengan alasannya, karena yang membukanya sudah tahu dasbor itu ada. Dasbor pribadi orang lain dan id milik tenant lain dijawab 404.
 - **Rate limit** `analytics-interactive` per pengguna berlaku untuk query bebas, data widget, dan Muat ulang. Jawabannya galat analitik `analytics.rate_limited`, bukan pesan bawaan Laravel.
+- **Penjelajah menyimpan analisisnya di URL.** `?q=` berisi query JSON ringkas (bentuk yang sama dengan badan `POST query`) dan `?view=` jenis tampilannya. Tautan yang dibagikan membuka analisis yang sama, dihitung dengan hak yang membukanya; tautan yang terpotong dibuka sebagai analisis kosong dengan pemberitahuan.
 
 ## Hak akses
 
@@ -270,7 +286,7 @@ Retensi lewat kebijakan `analytics_query_log` di `RetentionPolicies`, bawaannya 
 
 **Id di URL hanya dicari di tenant aktif, lewat satu penangkal: route binding.** `BindsWithinActiveTenant` membuat id dasbor, widget, atau query tersimpan milik tenant lain menjadi 404 sebelum controller berjalan, sehingga keberadaannya tidak bocor lewat 403. `DashboardAccess` sengaja tidak membandingkan tenant lagi, supaya penangkalnya tinggal satu dan `AnalyticsTenantIsolationTest` dapat membuktikannya merah bila dilepas. Test itu membaca daftar rute ber-id dari router, jadi rute baru tanpa baris di test-nya gagal.
 
-**Widget diperiksa saat disimpan, terhadap dataset saat ini dan hak penyimpannya.** Query lewat parser, normalisasi, dataset terpasang dan boleh dibaca penyimpan, lalu validator dengan gate data pribadinya; `visual` lewat aturan per jenis widget (`Dashboards\WidgetDefinition`). Bagian `visual` yang tidak dikenal ditolak, bukan diabaikan. Hak penyimpan **tidak ikut tersimpan**: saat widget dibuka, hak yang melihatlah yang berlaku. Mengganti judul atau masa simpan tidak memeriksa ulang query, supaya widget lama yang kolomnya sudah hilang tetap dapat diganti nama atau diarsipkan.
+**Widget diperiksa saat disimpan, terhadap dataset saat ini dan hak penyimpannya.** Query lewat parser, normalisasi, dataset terpasang dan boleh dibaca penyimpan, lalu validator dengan gate data pribadinya; `visual` lewat aturan per jenis widget (`Dashboards\WidgetDefinition`). Bagian `visual` yang tidak dikenal ditolak, bukan diabaikan. Hak penyimpan **tidak ikut tersimpan**: saat widget dibuka, hak yang melihatlah yang berlaku. Mengganti judul atau masa simpan tidak memeriksa ulang query, supaya widget lama yang kolomnya sudah hilang tetap dapat diganti nama atau diarsipkan. **Celah yang tercatat:** `StoredQuery::validate()` tidak menjalankan `FieldFilterExpression`, jadi saringan yang tidak terbaca (angka yang bukan angka, tanggal yang tidak ada) lolos saat disimpan lewat API dan baru ditolak saat bagiannya dihitung. Layar menahannya dengan tidak menyimpan query yang ditolak server; API-nya belum.
 
 **Widget yang kolomnya hilang rusak terang, tidak salah diam-diam.** `StoredQuery::read()` memetakan kunci yang diganti nama lewat `renamed()` dataset; kunci yang sudah tidak ada menjadikan status widget `field_removed` beserta nama kolomnya, dan data widget dijawab 422 `analytics.field_removed`, bukan 500. Kolom tidak pernah dibuang diam-diam dari query lama, karena angka tanpa satu saringan lebih besar dari yang diminta penyusunnya. Dasbor juga menyebut `dataset_unavailable` untuk dataset yang tidak terdaftar atau module-nya tidak terpasang.
 
@@ -280,6 +296,24 @@ Retensi lewat kebijakan `analytics_query_log` di `RetentionPolicies`, bawaannya 
 
 **Letak widget dibatasi.** `layout` hanya menerima widget milik dasbor itu, masing-masing sekali, dan tidak melewati grid 12 kolom (`DashboardController::WIDTHS` dan `MAX_HEIGHT`). Kelas Tailwind lebar dipetakan dari tabel lengkap, tidak disusun dari string (`col-span-${w}`), karena Tailwind tidak melihat kelas yang disusun saat jalan.
 
+### Layar
+
+Komponen ada di `apps/core/resources/js/components/analytics/`, halaman di `resources/js/pages/platform/analytics/`. Pembangun bagian dibuka dari **Tambah bagian** dan **Ubah** di halaman dasbor, dan dari **Simpan ke dasbor** di penjelajah (dengan langkah Dasbor tujuan, hanya dasbor yang boleh diubah pengguna itu). Penjelajah juga menyimpan hasilnya sebagai analisis tersimpan (**Simpan analisis**), membuka analisis tersimpan, dan menyalin tautannya.
+
+**Isian query adalah satu komponen, dipakai dua layar.** `query-editor.tsx` memuat lima langkah pertama — Data, Nilai, Kelompokkan menurut, Saring, Periode — dari `dataset-picker`, `measure-picker`, `dimension-picker`, `filter-editor`, dan `time-range-picker`. Pembangun bagian dan penjelajah memakainya, jadi menambah jenis saringan atau periode cukup di satu tempat. Yang berbeda hanya siapa yang memegang isinya: pembangun menyimpan draf di state, penjelajah membacanya dari URL.
+
+**State penjelajah tinggal di URL dan dibaca ulang setiap render, tidak disalin ke `useState`.** Salinan itu akan menyimpang dari tautan yang dibuka orang lain, dan analisis tidak dapat dibagikan. `readExploreUrl()` membacanya dari `usePage().url`, dan `exploreUrl()` menuliskannya lewat `router.replace`, yaitu kunjungan sisi peramban yang tidak memuat ulang prop. Server tidak membaca query-nya sama sekali.
+
+**Pratinjau menunggu isian berhenti berubah, dan permintaan lama dibatalkan.** `use-query-preview.ts` menjalankan query setelah `PREVIEW_DELAY_MS` (500 ms) sejak perubahan terakhir, lalu membatalkan permintaan sebelumnya dengan `AbortController`. Tanpa jeda, memilih dua nilai berturut-turut menembakkan dua perhitungan; tanpa pembatalan, jawaban yang lambat dari query lama dapat menimpa yang baru. Membuka layar dan Muat ulang tidak menunggu jeda. Pratinjau pembangun dibatasi baris, dan hasil sebelumnya diredupkan selama perhitungan berikutnya berjalan.
+
+**Tampilan yang tidak cocok dinonaktifkan dengan alasannya, memakai aturan yang sama dengan server.** `lib/analytics/visual.ts` mencerminkan `Dashboards\WidgetDefinition`: grafik butuh satu atau dua pengelompok, garis dan area butuh pengelompokan tanggal pada sumbu mendatar, donat satu pengelompok dan satu nilai. Alasannya ditulis terlihat di bawah grup pilihan, bukan hanya di tooltip. **Dua salinan aturan ini harus bergerak bersama**: server tetap yang memutuskan (`analytics.invalid_visual`), layar hanya menghindarkan pengguna dari menyusun yang pasti ditolak.
+
+**Pilihan saringan datang dari sumber yang sama dengan layar module.** Rujukan memakai lookup module (`/api/modules/<module>/v1/<lookup>`, bentuk pemanggilan filter tambahan K-30); entitas legal dan unit kerja dibaca dari `GET api/v1/organizations`; dimensi bersama lain tanpa lookup (vendor, pengguna, mata uang) memakai isian ekspresi, karena Core belum punya endpoint daftar untuk ketiganya. Galat sintaks dari server (`filters.<kolom>`, `time_range.range`) tampil di bawah isian yang salah; untuk itu `CoreApiError` membawa `field`. Data analitik tidak menyatakan kolom saringan bawaan seperti data item laporan K-30, jadi yang tampil hanya kolom yang sudah berisi dan yang ditambahkan.
+
+**Escape di daftar pilihan dalam `Sheet` menutup seluruh `Sheet`.** Combobox SDK di dalam Dialog Radix meneruskan Escape ke dialognya, dan isian yang sedang disusun hilang. Pembangun menahannya lewat `onEscapeKeyDown` yang memeriksa `[data-slot=combobox-content]`; `Sheet` lain yang memuat daftar pilihan masih berperilaku begitu. Setiap `Select` di dalam `Sheet` juga wajib menerima `portalContainer`, kalau tidak daftarnya terbuka di bawah `Sheet` dan tidak dapat dipilih.
+
+**Bagian teks tidak dibuat lewat pembangun.** Ia tidak memakai data, dan isinya tetap diubah lewat Ubah teks di menu bagian. Teksnya teks biasa, bukan HTML atau Markdown.
+
 ## Menyatakan dataset di module
 
 Contoh yang berjalan ada di `modules/apperp/management-aset/src/Analytics/AssetRegisterDataset.php`; yang bersumber query ada di `DepreciationEntriesDataset.php`.
@@ -287,7 +321,7 @@ Contoh yang berjalan ada di `modules/apperp/management-aset/src/Analytics/AssetR
 1. **Baca controller daftar resource-nya dulu.** Permission yang dicek dan cara ia memanggil `OrganizationScope` (`asetQuery`, `query` dengan kolom tertentu, atau `legalEntityQuery`) menentukan `permission()` dan `dataPolicy()`. Jangan menebak kolom kebijakan dari namanya.
 2. **Tulis satu kelas** di `modules/<penerbit>/<module>/src/Analytics/` yang mengimplementasikan `Contracts\Analytics\Dataset`: `moduleId()` dan `definition()`. Definisinya hanya mengumpulkan pernyataan lewat `DatasetDefinition`; ia tidak boleh membaca database, sesi, atau konteks permintaan, karena definisi sama untuk setiap tenant dan pengguna.
 3. **Daftarkan di `ModuleServiceProvider::boot()`**, di samping pendaftaran laporan: `Datasets::register()`. `Datasets` diikat singleton di `CoreServices::SINGLETON_BINDINGS`; diikat biasa, setiap pendaftaran masuk ke salinan yang langsung dibuang dan Core melihat daftar kosong tanpa satu pun galat.
-4. **Tulis test** di `tests/Feature/Analytics/<Nama>DatasetTest.php` dengan trait `ProbesAssetDatasets` dan `ChecksMoneyPerCurrency` sebagai contoh: isolasi tenant, paritas kebijakan data terhadap endpoint daftar module, penolakan tanpa permission baca, dan uang per mata uang. Lihat setiap test merah sekali dengan merusak penangkalnya, terutama paritas: ganti kolom kebijakan dataset dengan kolom yang mirip dan test harus gagal.
+4. **Tulis test** di `tests/Feature/Analytics/<Nama>DatasetTest.php` dengan trait `ProbesAssetDatasets`, `ChecksMoneyPerCurrency`, dan `ChecksTimeZoneBuckets` sebagai contoh: isolasi tenant, paritas kebijakan data terhadap endpoint daftar module, penolakan tanpa permission baca, uang per mata uang, setiap measure bersaringan dengan data awal yang beragam (status, jenis, ya/tidak), dan pengelompokan waktu menurut zona (satu baris di batas bulan jatuh di bulan berbeda bagi UTC, WIB, WITA, dan WIT). Lihat setiap test merah sekali dengan merusak penangkalnya, terutama paritas: ganti kolom kebijakan dataset dengan kolom yang mirip dan test harus gagal.
 5. **Jalankan** `php artisan analytics:datasets` dan `tests/Feature/Boundary`. Tidak ada perubahan manifest, katalog, atau migration yang dibutuhkan: hak baca memakai permission resource yang sudah ada (KA-15), dan validator membaca permission dan kebijakan data dari manifest gabungan module, bukan dari database.
 
 Bagian utama `DatasetDefinition` (daftar lengkapnya di `apps/core/app/Platform/Modules/Contracts/Analytics/DatasetDefinition.php`):
@@ -393,7 +427,9 @@ Engine memakai ulang, dan tidak membuat ulang:
 | `app/Platform/Analytics/Console/` | `analytics:datasets`, `analytics:explain` |
 | `apps/core/routes/analytics.php`, `config/analytics.php` | Rute dan konfigurasi |
 | `apps/core/resources/schemas/analytics-query.schema.json` | Bentuk query sebagai skema JSON; satu test menjaganya sama dengan parser |
-| `apps/core/resources/js/pages/platform/analytics/`, `components/analytics/`, `lib/analytics/` | Layar dasbor, komponen widget, dan pembantu |
+| `apps/core/resources/js/pages/platform/analytics/` | Halaman Dasbor (daftar dan satu dasbor) dan Analisis data (penjelajah) |
+| `apps/core/resources/js/components/analytics/` | Komponen bagian (`widget-frame`, `widget-content`, `kpi-tile`, `chart-widget`, `result-table`, `dashboard-grid`), pembangun (`widget-builder`, `query-editor` dan pemilihnya, `filter-editor`, `visual-picker`), hasil penjelajah (`query-result`, `saved-query-sheet`), dan hook (`use-widget-data`, `use-query-preview`, `use-dataset-description`) |
+| `apps/core/resources/js/lib/analytics/` | `api.ts` (pemanggilan API), `query.ts` (penyusun query dan URL penjelajah), `visual.ts` (aturan tampilan), `format.ts` (satu-satunya pemformat angka), `types.ts` |
 | `modules/apperp/management-aset/src/Analytics/` | Dataset module aset |
 | `apps/core/tests/Fixtures/modules/apperp/contoh-a/` | Dataset bahan uji engine, supaya test engine tidak bergantung pada module produk |
 
@@ -412,11 +448,12 @@ Engine memakai ulang, dan tidak membuat ulang:
 | `AnalyticsCacheIsolationTest`, `QueryCacheTest` | Kunci cache berubah oleh tiap komponennya; tenant dan jangkauan berbeda tidak berbagi hasil |
 | `QueryLimitsTest`, `QueryLogTest` | Jatah query dan rate limit; log mencatat penolakan dan menyamarkan nilai |
 | `DashboardApiTest` | Versi baris, aturan berbagi, validasi widget, kunci yang diganti nama, dan halaman Inertia yang merah bila berkas komponennya hilang |
+| `<Nama>DatasetTest` di module aset | Isolasi tenant, paritas kebijakan data terhadap endpoint daftar, permission, uang per mata uang, measure bersaringan, dan pengelompokan waktu menurut zona (`ChecksTimeZoneBuckets`), untuk setiap dataset |
+| `WalkingSkeletonTest` (halaman penjelajah) | Halaman hanya menawarkan data yang boleh dibaca pengguna dan mengabaikan query string di server |
 | `FormulaTest`, `FormulaValidationTest` | Rumus ditolak di posisinya (termasuk sisipan SQL), angka sebagai binding, mata uang tidak tercampur, measure bukan angka ditolak, kunci cache membedakan rumus, perbandingan, persen, dan tahun fiskal |
 | `ComparisonTest` | Rentang pembanding per token, batas tahun, tahun kabisat, rentang tertulis, zona principal |
 | `FormulaAndComparisonTest` | Angka rumus sampai database, bagi nol, top-N atas rumus, persen per mata uang, perbandingan dengan kelompok periode lalu, bulan kosong, total |
-| `FiscalYearAndStoredFormulaTest` | Tahun fiskal dari workspace atau saringan beserta cache per perusahaan, penolakannya, dan widget yang menyimpan rumus |
-| `<Nama>DatasetTest` di module aset | Isolasi tenant, paritas kebijakan data terhadap endpoint daftar, permission, dan uang per mata uang, untuk setiap dataset |
+| `FiscalYearAndStoredFormulaTest` | Tahun fiskal dari workspace atau saringan beserta cache per entitas legal, penolakannya, dan widget yang menyimpan rumus |
 
 Setiap penjaga di atas dilihat merah sekali dengan merusak penangkalnya sebelum dipercaya ([standar penjaga](25-standar-penjaga-dan-pengujian.md)).
 
@@ -424,11 +461,11 @@ Setiap penjaga di atas dilihat merah sekali dengan merusak penangkalnya sebelum 
 
 Ini batas yang dikirim, supaya tidak dijanjikan lebih dari yang ada:
 
-- **Pembangun widget dan penjelajah** (area 8). Halaman `/analytics/explore` masih halaman sementara yang menyusun satu tile dan satu grafik dari dataset pertama yang boleh dibaca pengguna. Menu widget memang belum punya aksi Ubah; widget baru hanya dapat dibuat lewat API.
 - **Uji beban** (area 10). Menurut aturan repo, fitur ini belum dinyatakan selesai sebelum lulus gate beban.
 - **Slicer, cross-filter, drill, ekspor widget, dimensi bersama lintas module, publikasi, feed OData, embed, dan template** (fase 2).
 - **Tahun fiskal yang tidak dua belas bulan pada "periode sebelumnya"**: rentang tahun fiskal digeser sebanyak bulan penuhnya, bukan dicari ulang di kalender. Tahun fiskal lalu (`@last_fiscal_year`) sendiri dicari di kalender.
-- **Measure bersaringan dan uji waktu berzona pada dataset aset** (area 5): compiler sudah mengerjakan `FILTER (WHERE …)`; yang belum adalah measure yang memakainya di dataset aset.
+- **Uji pembangun dengan orang yang belum pernah melihat layarnya.** Cerita US-02 diperiksa dengan penggerak otomatis (lima pilihan, angka sama dengan SQL langsung), tetapi belum dengan orang sungguhan.
+- **Pemeriksaan sintaks saringan saat menyimpan lewat API** (lihat [celah yang tercatat](#dasbor-dan-widget)), dan daftar pilihan untuk vendor, pengguna, dan mata uang di editor saringan.
 - **Menyalin dasbor bersama menjadi dasbor pribadi**, argumen widget di `analytics:explain`, dan pembersihan terjadwal `analytics_query_cache` (menunggu perintah terjadwal yang dapat berjalan per environment; sementara itu pembersihan terjadi saat baca dan tulis).
 
 Rinciannya, beserta butir kerja dan keputusan yang menunggu, ada di [TODO fase 1](../todo/analitik/todo-fase-1.md).

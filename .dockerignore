@@ -5,6 +5,9 @@ docs
 artifacts
 **/node_modules
 **/vendor
+# Folder halaman Vendor adalah source UI, bukan dependency Composer.
+!apps/core/resources/js/pages/foundation/vendor
+!apps/core/resources/js/pages/foundation/vendor/**
 # Keluaran build `@apperp/ui`. Image membangunnya sendiri; menyalin milik mesin
 # pengembang hanya menaruh versi basi di lapisan yang lebih awal.
 packages/ui/dist

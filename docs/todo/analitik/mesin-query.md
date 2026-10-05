@@ -613,7 +613,7 @@ dapat dilakukan pengguna.
 | `analytics.busy` | 429 | Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar. (dengan `Retry-After`) |
 | `analytics.rate_limited` | 429 | Terlalu banyak permintaan analisis dalam satu menit. Tunggu sebentar, lalu coba lagi. (limiter `analytics-interactive` per pengguna, dengan `Retry-After`) |
 | `analytics.invalid_formula` | 422 | Rumus tidak dapat dibaca di karakter 14: `)` tanpa pasangan. Juga rumus yang memakai rumus lain, nilai bukan angka, atau dua mata uang. Membawa `position` (karakter, mulai 1) di samping `field` (`formulas.0.expression`). Measure yang tidak dikenal di dalam rumus memakai `analytics.field_unknown` dengan `position` yang sama. |
-| `analytics.field_removed` | 422 | Kolom "…" sudah tidak tersedia di data ini. Ubah widget untuk memilih kolom lain. (data widget yang query tersimpannya memuat kunci yang sudah tidak ada di dataset; `field` berpath `query.…`) |
+| `analytics.field_removed` | 422 | Kolom "…" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain. (data widget yang query tersimpannya memuat kunci yang sudah tidak ada di dataset; `field` berpath `query.…`) |
 | `analytics.invalid_visual` | 422 | Bagian tampilan widget tidak cocok dengan jenis atau query-nya, misalnya "Pilih sumbu mendatar dari kolom pengelompokan." (saat widget disimpan; `field` berpath `visual.…` atau `query.…`) |
 
 ## Bahasa rumus

@@ -34,7 +34,7 @@ dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringa
 
 ---
 
-### 13. [~] Rumus dan perbandingan periode
+### 13. [x] Rumus dan perbandingan periode
 
 **Tempat:** `app/Platform/Analytics/Query/Formula/*`, `Query/Comparison.php`,
 `resources/js/components/analytics/formula-editor.tsx` · **Setelah:** 3 · **Keputusan:** KA-19 ·

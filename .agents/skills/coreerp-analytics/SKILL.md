@@ -16,8 +16,8 @@ code and fix the skill in the same pull request.
 
 | | State |
 | --- | --- |
-| Shipped | Dataset contract, registry, and validator; query model; compiler, read-only executor, and results; read security and the permission chain; dashboard storage and the screen API; dashboard screens; result cache, concurrency limits, and the masked query log; the management-aset datasets; formulas, period comparisons, and their builder controls |
-| Open in phase 1 | Widget builder and explorer (the `/analytics/explore` page is still a temporary preview), load test, filtered measures on the asset datasets |
+| Shipped | Dataset contract, registry, and validator; query model; compiler, read-only executor, and results; read security and the permission chain; dashboard storage and the screen API; dashboard screens; widget builder and data explorer; result cache, concurrency limits, and masked query log; management-aset datasets with filtered measures and time-zone tests; formulas, period comparisons, and their builder controls |
+| Open in phase 1 | Load test (area 10) |
 | Plan only (phase 2–3) | Slicers, drill, cross-module drill-across, publications, Query API, OData, embeds, templates, rollups, alerts |
 
 The live status of each area is in the area titles of `docs/todo/analitik/todo-fase-1.md`; decisions
@@ -32,7 +32,7 @@ describe what is intended, and a plan sentence is never evidence that code exist
 | Declaring a dataset in a module | `docs/dev/35-analitik.md` (section *Menyatakan dataset di module*), `docs/apps/management-aset/transaction/analitik/index.md`, and a finished example in `modules/apperp/management-aset/src/Analytics/` |
 | Compiler, executor, results | `docs/todo/analitik/mesin-query.md` (query shape and SQL rules), then the code docblocks in `Query/` |
 | Permissions, data policy, personal data | `docs/dev/35-analitik.md`, `docs/todo/analitik/keamanan.md`, and the data policy gate in `coreerp-architecture` |
-| Dashboards, widgets, screens | `docs/todo/analitik/dasbor-dan-visual.md`, then `coreerp-ui` and `coreerp-page-standard` |
+| Dashboards, widgets, screens | `docs/dev/35-analitik.md` (section *Layar*), `docs/todo/analitik/dasbor-dan-visual.md`, then `coreerp-ui` and `coreerp-page-standard` |
 | Formulas, slicers, publications, OData, embeds (phase 2) | `docs/todo/analitik/akses-luar.md` and the phase 2 TODO, then the contract decision gate in `coreerp-architecture` |
 | Cache, limits, load test | `docs/todo/analitik/kinerja-dan-uji-beban.md` |
 
@@ -124,11 +124,14 @@ describe what is intended, and a plan sentence is never evidence that code exist
    `$this->app->make(Datasets::class)->register($this->app->make(AssetRegisterDataset::class));`
    `Datasets` is a singleton in `CoreServices::SINGLETON_BINDINGS`; bound plain, every registration lands in
    a throwaway copy and Core sees an empty list without any error.
-4. Add `tests/Feature/Analytics/<Name>DatasetTest.php` with the `ProbesAssetDatasets` and
-   `ChecksMoneyPerCurrency` traits (`tests/Concerns/`): tenant isolation, policy parity against the module's
-   list endpoint for four users (whole organization, unit A, unit B, no grant), 403 without the read
-   permission, and money per currency. Seed so a wrong policy column shows up as wrong rows (the opposite
-   unit on the financial-dimension column), then break the policy column once and watch parity go red.
+4. Add `tests/Feature/Analytics/<Name>DatasetTest.php` with the `ProbesAssetDatasets`,
+   `ChecksMoneyPerCurrency`, and `ChecksTimeZoneBuckets` traits (`tests/Concerns/`): tenant isolation, policy
+   parity against the module's list endpoint for four users (whole organization, unit A, unit B, no grant), 403
+   without the read permission, money per currency, every filtered measure over seed data that mixes the
+   filtered values, and month/day buckets for one row at a month boundary under UTC, WIB, WITA, and WIT (a
+   `date` column never shifts; a `timestamp` column holds UTC). Seed so a wrong policy column shows up as wrong
+   rows (the opposite unit on the financial-dimension column), then break the policy column once and watch
+   parity go red.
 5. Run `php artisan analytics:datasets` (it prints why a dataset is rejected and exits non-zero) and the
    Boundary suite (`AnalyticsDatasetsBoundaryTest`). No manifest, catalog, or migration change is needed;
    the validator reads permissions and data policies from the module's merged manifest, not the database.
@@ -142,7 +145,9 @@ classification. One dataset has one permission: split resources guarded by diffe
 they share a table (`asset-sales` and `asset-scraps`).
 
 Free text, names, and pseudonymous ids are excluded with `except` (high cardinality, often personal data);
-a numeric column is a measure only if declared; `Count` counts rows, `CountDistinct` counts things.
+a numeric column is a measure only if declared; `Count` counts rows, `CountDistinct` counts things. A
+"how many are already X" question is a **filtered measure** (`where: ['status' => [Status::DONE]]`, field
+choice/boolean/reference only, using the module's status constants), not a second dataset.
 
 Changing a dataset: adding is free; renaming a key needs `version(n+1, renamed: [...])`; removing a
 key needs `version(n+1)` and leaves affected widgets reading "column no longer available"
@@ -213,6 +218,7 @@ screen, so ship it with the parity test.
 
 - Core pages under `resources/js/pages/platform/analytics/`; no `AppLayout` wrapper, breadcrumbs via
   `Page.layout`, a sidebar entry guarded by the dashboard permission, verified by walking the rail.
+  Dashboard and explorer pages are `index`, `dashboard`, and `explore`.
   `DashboardApiTest::test_dashboard_pages_render_their_components` goes red when a page component is missing
   from the Vite manifest (a missing component answers 500 as a full page).
 - Charts use `@apperp/ui/chart` (Recharts, already installed) with `--chart-1…5` colours, loaded lazily. Every
@@ -227,10 +233,36 @@ screen, so ship it with the parity test.
   was computed. Widget menus say Arsipkan, not Hapus.
 - Overlays pass `portalContainer` to every `Select`; URL-owned state (explorer query, slicers) is
   derived from the URL each render, never copied into `useState`.
+- **The five query steps are one component.** `query-editor.tsx` (Data, Nilai, Kelompokkan menurut, Saring,
+  Periode, built from `dataset-picker`, `measure-picker`, `dimension-picker`, `filter-editor`,
+  `time-range-picker`) serves both the widget builder and the explorer; the builder adds Tampilan
+  (`visual-picker`) and Pratinjau. Reuse it; the caller owns the state (builder: draft in state, explorer: URL).
+  Other reusable pieces: `WidgetContent`, `ResultTable`, `KpiTile`, `WidgetFrame` (`onEdit`), `query-result`,
+  `saved-query-sheet`, `use-query-preview`, `use-dataset-description`, and `lib/analytics/{api, query, visual,
+  format}.ts`.
+- **Explorer state is the URL**: `?q=<compact query JSON>&view=<type>`, read by `readExploreUrl()` from
+  `usePage().url` on every render and written with `router.replace` (a client-side visit, no prop reload).
+  The server never reads it (`ExploreController` sends only the dataset catalog and `{create, share}`), and a
+  truncated link opens an empty analysis with a notice.
+- **Preview**: `use-query-preview.ts` waits `PREVIEW_DELAY_MS` (500 ms) after the last change and aborts the
+  previous request with `AbortController`; opening the screen and Muat ulang do not wait. Dim the previous
+  result while the next one computes. A query the server rejects (422) cannot be saved from the screen.
+- **`lib/analytics/visual.ts` mirrors `Dashboards\WidgetDefinition`** (which view types fit which query,
+  with a visible reason when disabled). Change both together: the server decides (`analytics.invalid_visual`),
+  the screen only keeps users from building what will be refused.
+- **Screen words**: widget = "bagian", saved query = "analisis tersimpan", dataset = "data", measure =
+  "nilai". Server messages that reach the screen use the same words (no "widget", "query", or "tile" in text a
+  user reads); the `analytics.*` codes do not change.
+- Filter choices: module references use the module lookup (`/api/modules/<module>/v1/<lookup>`), legal entity
+  and operating unit use `GET api/v1/organizations`, other shared dimensions fall back to an expression field;
+  server syntax errors (`filters.<column>`, `time_range.range`) show under the field, which is why
+  `CoreApiError` carries `field`.
 - Widget text is plain text: never render it as HTML or Markdown.
 - The repo has no JavaScript unit-test runner. Prove screens with types, lint, build, and the rebuilt
   runtime (`D:\Kerja\erp-dev\start.ps1 -Build`); a preview with a throwaway database is acceptable when the
-  shared runtime belongs to another session.
+  shared runtime belongs to another session. The browser pane may not paint reliably: a headless Chrome over
+  CDP was used for interaction and screenshots, and the server page test
+  (`WalkingSkeletonTest::test_page_offers_the_readable_datasets_and_ignores_the_query_string`) covers the props.
 
 ## Outside CoreERP (phase 2, plan only — no code yet)
 
@@ -254,10 +286,11 @@ screen, so ship it with the parity test.
 
 `AnalyticsBoundaryTest`, `AnalyticsDatasetsBoundaryTest`, `DatasetValidatorTest`, `DatasetRegistryTest`,
 `QueryShapeSyncTest` (schema, parser, TypeScript, and token lists agree), `WalkingSkeletonTest` (tenant,
-permission, policy parity, money per currency, rollback to savepoint, zones), `PersonalDataGateTest`,
+permission, policy parity, money per currency, rollback to savepoint, zones, explorer page props), `PersonalDataGateTest`,
 `DataPolicyFilterTest` (parity with the module's `OrganizationScope`), `AnalyticsTenantIsolationTest`,
 `SharedDashboardRunsAsViewerTest`, `DashboardApiTest`, `AnalyticsCacheIsolationTest`, `QueryCacheTest`,
-`QueryLimitsTest`, `QueryLogTest`, `ScopeFingerprintTest`, and per-dataset `<Name>DatasetTest` in the module.
+`QueryLimitsTest`, `QueryLogTest`, `ScopeFingerprintTest`, and per-dataset `<Name>DatasetTest` in the module
+(tenant, parity, money, filtered measures, time-zone buckets).
 From phase 2 add: publication suspension, empty locked filter at publication level, `$filter` injection, key
 scrubbing, and embed token tests. Each one is seen red once before it is trusted
 (`docs/dev/25-standar-penjaga-dan-pengujian.md`); record how you broke the guard in the pull request.
@@ -317,5 +350,19 @@ Each of these cost time while building the engine.
   field. A `min`/`max` over a column excluded from the field list has no classification and is not checked
   (no dataset does this today); keep it that way until the validator closes the gap.
 - Expecting Intl to format rupiah the same in every runtime. Always use `lib/analytics/format.ts`.
+- **Escape inside a `Sheet` closes the whole `Sheet`.** The SDK combobox inside a Radix dialog forwards
+  Escape to the dialog and the half-built query is lost. The builder stops it with `onEscapeKeyDown` that checks
+  `event.target.closest('[data-slot="combobox-content"]')`. Other sheets holding a list (for example
+  `DashboardFormSheet`) still behave the old way. Every `Select` in a `Sheet` also needs `portalContainer`, or
+  the list opens under the sheet and cannot be picked.
+- Copying the explorer query into `useState`: the link and the screen drift apart, and the analysis cannot be
+  shared. Derive it from the URL each render.
+- Running a preview per keystroke, or letting a slow old answer overwrite a new one: debounce 500 ms and abort
+  the previous request.
+- `StoredQuery::validate()` does not run `FieldFilterExpression`, so an unreadable filter (a non-number in a
+  number field, a date that is not on the calendar) can be saved through the API and only fails when the part
+  is computed. The screens guard it; the API does not yet.
+- Writing "widget", "query", or "tile" in a server message a user will read. The screens say "bagian",
+  "analisis", and "tampilan angka".
 - Running two PHPUnit runs at once on the shared PostgreSQL: `out of shared memory` and missing relations are
   contention, not a code defect. Drop the per-process test databases and rerun one at a time.
