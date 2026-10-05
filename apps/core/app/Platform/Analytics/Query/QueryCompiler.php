@@ -361,7 +361,7 @@ final class QueryCompiler
      * @param  Builder<Model>  $current
      * @param  Builder<Model>  $previous
      * @param  array<string, list<string>>|null  $partitions  alias kolom mata uang tiap measure untuk persen terhadap
-     *                                                         total, atau null tanpa persen terhadap total (baris total)
+     *                                                        total, atau null tanpa persen terhadap total (baris total)
      * @return array{0: Builder<Model>, 1: list<ResultColumn>, 2: array<string, Expression|string>}
      */
     private function merged(CompiledDataset $dataset, AnalyticsQuery $query, array $columns, Builder $current, Builder $previous, ?array $partitions, CompareMode $mode): array
