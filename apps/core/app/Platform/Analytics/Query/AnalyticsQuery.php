@@ -84,7 +84,7 @@ final readonly class AnalyticsQuery
         unset($value);
 
         $timeRange = $this->timeRange?->toArray();
-        if ($timeRange !== null && $this->timeRange?->bounds !== null) {
+        if ($this->timeRange !== null && $this->timeRange->bounds !== null) {
             $timeRange['bounds'] = $this->timeRange->bounds;
         }
 

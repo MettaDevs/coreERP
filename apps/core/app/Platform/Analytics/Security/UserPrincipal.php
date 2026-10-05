@@ -12,7 +12,6 @@ use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
-use Illuminate\Http\Request;
 
 /**
  * Pengguna tenant yang menjalankan query dari layar, atas keanggotaannya sendiri.
@@ -121,7 +120,7 @@ final class UserPrincipal implements AnalyticsPrincipal
     {
         if ($this->workspaceLegalEntity === false) {
             $request = app('request');
-            $this->workspaceLegalEntity = $request instanceof Request && $request->hasSession()
+            $this->workspaceLegalEntity = $request->hasSession()
                 ? app(CurrentWorkspace::class)->legalEntity($request, $this->membership)?->id
                 : null;
         }
