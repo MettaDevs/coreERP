@@ -288,9 +288,9 @@ function FormulaRow({
                                     tanda hitung + - * /. Pisahkan isian fungsi
                                     dengan titik koma; desimal memakai koma,
                                     misalnya 1.000,5. Tanda / menghasilkan
-                                    kosong bila pembaginya nol. BAGI menghasilkan
-                                    0, atau memakai cadangan yang ditulis, bila
-                                    pembagi tepat nol.
+                                    kosong bila pembaginya nol. BAGI
+                                    menghasilkan 0, atau memakai cadangan yang
+                                    ditulis, bila pembagi tepat nol.
                                 </span>
                                 {FORMULA_FUNCTIONS.map((item) => (
                                     <span key={item.name}>

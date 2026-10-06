@@ -12,7 +12,7 @@ import type {
     ResultColumn,
     ResultValue,
 } from '@/lib/analytics/types';
-import type { DatasetField } from '@/lib/analytics/types';
+import type { WidgetDatasetField } from '@/lib/analytics/slicer';
 import { cn } from '@/lib/utils';
 
 type Line = {
@@ -45,7 +45,7 @@ export function ResultTable({
     showTotals?: boolean;
     /** Pembungkus bergulir, misalnya batas tinggi widget. */
     className?: string;
-    fields?: DatasetField[];
+    fields?: WidgetDatasetField[];
     onDimensionSelect?: (
         field: ResultColumn,
         row: Record<string, ResultValue>,

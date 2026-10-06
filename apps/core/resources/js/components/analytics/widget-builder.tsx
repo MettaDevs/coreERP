@@ -26,7 +26,12 @@ import {
     fetchDatasets,
     updateWidget,
 } from '@/lib/analytics/api';
-import { buildQuery, dimensionField, emptyQuery } from '@/lib/analytics/query';
+import {
+    buildQuery,
+    dimensionField,
+    emptyQuery,
+    formulaKeys,
+} from '@/lib/analytics/query';
 import type {
     AnalyticsQuery,
     BlendQuery,
@@ -295,9 +300,18 @@ export function WidgetBuilder({
                 dataset,
             ),
         );
+        const dimensions = shared === undefined ? [] : [shared];
+        const formulas = new Set(formulaKeys(query));
+        const measures = query.measures.filter((key) => !formulas.has(key));
+        const keys = [...dimensions.map(dimensionField), ...measures];
         const first = buildQuery({
             ...query,
-            dimensions: shared === undefined ? [] : [shared],
+            dimensions,
+            measures,
+            formulas: undefined,
+            compare: undefined,
+            percent_of_total: undefined,
+            sort: query.sort?.filter((sort) => keys.includes(sort.key)),
         });
 
         setBlendQueries([first, emptyQuery()]);
@@ -452,6 +466,10 @@ export function WidgetBuilder({
                             />
                         ) : (
                             <div className="flex flex-col gap-5">
+                                <p className="text-sm text-muted-foreground" role="status">
+                                    Gabungan saat ini hanya mendukung nilai langsung; rumus, persen dari total,
+                                    dan pembanding periode belum tersedia.
+                                </p>
                                 <section className="flex min-w-0 flex-col gap-3">
                                     <h3 className="text-sm font-medium">
                                         Data pertama
@@ -481,6 +499,7 @@ export function WidgetBuilder({
                                         maxDimensions={1}
                                         dimensionEmptyMessage="Data ini belum menyediakan kolom bersama."
                                         allowTimeGranularity={false}
+                                        allowFormulaFeatures={false}
                                     />
                                 </section>
                                 {sharedDimension === null ? (
@@ -526,6 +545,7 @@ export function WidgetBuilder({
                                             maxDimensions={1}
                                             dimensionEmptyMessage="Data ini belum memiliki kolom untuk gabungan yang dipilih."
                                             allowTimeGranularity={false}
+                                            allowFormulaFeatures={false}
                                         />
                                     </section>
                                 )}

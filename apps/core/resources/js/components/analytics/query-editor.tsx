@@ -54,6 +54,7 @@ export function QueryEditor({
     maxDimensions,
     dimensionEmptyMessage,
     allowTimeGranularity = true,
+    allowFormulaFeatures = true,
 }: {
     datasets: DatasetSummary[];
     value: AnalyticsQuery;
@@ -75,6 +76,8 @@ export function QueryEditor({
     maxDimensions?: number;
     dimensionEmptyMessage?: string;
     allowTimeGranularity?: boolean;
+    /** Rumus, persen terhadap total, dan perbandingan periode hanya tersedia untuk widget satu data. */
+    allowFormulaFeatures?: boolean;
 }) {
     const title = (step: number, text: string) =>
         numbered ? `${step}. ${text}` : text;
@@ -146,72 +149,91 @@ export function QueryEditor({
                         <Step title={title(2, 'Nilai')}>
                             <MeasurePicker
                                 measures={dataset.measures}
-                                value={value.measures.filter(
-                                    (key) => !ownKeys.includes(key),
-                                )}
-                                onChange={setMeasures}
-                                portalContainer={portalContainer}
-                            />
-                            <FormulaEditor
-                                measures={dataset.measures}
-                                formulas={formulas}
-                                maxFormulas={dataset.limits.formulas}
-                                error={errors.formula ?? null}
-                                limitError={errors.formulaLimit}
-                                onChange={(key, changed) =>
-                                    setFormulas(
-                                        formulas.map((formula) =>
-                                            formula.key === key
-                                                ? { key, ...changed }
-                                                : formula,
-                                        ),
-                                        value.measures,
-                                    )
+                                value={
+                                    allowFormulaFeatures
+                                        ? value.measures.filter(
+                                              (key) => !ownKeys.includes(key),
+                                          )
+                                        : value.measures
                                 }
-                                onAdd={(added) => {
-                                    const key = newFormulaKey(value, [
-                                        ...dataset.measures.map(
-                                            (measure) => measure.key,
-                                        ),
-                                        ...dataset.fields.map(
-                                            (field) => field.key,
-                                        ),
-                                    ]);
-
-                                    setFormulas(
-                                        [...formulas, { key, ...added }],
-                                        [...value.measures, key],
-                                    );
-                                }}
-                                onRemove={(key) =>
-                                    setFormulas(
-                                        formulas.filter(
-                                            (formula) => formula.key !== key,
-                                        ),
-                                        value.measures.filter(
-                                            (measure) => measure !== key,
-                                        ),
-                                    )
+                                onChange={
+                                    allowFormulaFeatures
+                                        ? setMeasures
+                                        : (measures) => set({ measures })
                                 }
                                 portalContainer={portalContainer}
                             />
-                            {value.measures.length > 0 && (
-                                <Field>
-                                    <MultiSelect
-                                        label="Tampilkan juga sebagai persen dari total"
-                                        items={value.measures.map((key) => ({
-                                            value: key,
-                                            label: captionOf(key),
-                                        }))}
-                                        value={value.percent_of_total ?? []}
-                                        onValueChange={(keys) =>
-                                            set({ percent_of_total: keys })
+                            {allowFormulaFeatures && (
+                                <>
+                                    <FormulaEditor
+                                        measures={dataset.measures}
+                                        formulas={formulas}
+                                        maxFormulas={dataset.limits.formulas}
+                                        error={errors.formula ?? null}
+                                        limitError={errors.formulaLimit}
+                                        onChange={(key, changed) =>
+                                            setFormulas(
+                                                formulas.map((formula) =>
+                                                    formula.key === key
+                                                        ? { key, ...changed }
+                                                        : formula,
+                                                ),
+                                                value.measures,
+                                            )
                                         }
-                                        searchPlaceholder="Cari nilai"
-                                        emptyMessage="Nilai tidak ditemukan."
+                                        onAdd={(added) => {
+                                            const key = newFormulaKey(value, [
+                                                ...dataset.measures.map(
+                                                    (measure) => measure.key,
+                                                ),
+                                                ...dataset.fields.map(
+                                                    (field) => field.key,
+                                                ),
+                                            ]);
+
+                                            setFormulas(
+                                                [...formulas, { key, ...added }],
+                                                [...value.measures, key],
+                                            );
+                                        }}
+                                        onRemove={(key) =>
+                                            setFormulas(
+                                                formulas.filter(
+                                                    (formula) =>
+                                                        formula.key !== key,
+                                                ),
+                                                value.measures.filter(
+                                                    (measure) => measure !== key,
+                                                ),
+                                            )
+                                        }
                                         portalContainer={portalContainer}
                                     />
-                                </Field>
+                                    {value.measures.length > 0 && (
+                                        <Field>
+                                            <MultiSelect
+                                                label="Tampilkan juga sebagai persen dari total"
+                                                items={value.measures.map(
+                                                    (key) => ({
+                                                        value: key,
+                                                        label: captionOf(key),
+                                                    }),
+                                                )}
+                                                value={
+                                                    value.percent_of_total ?? []
+                                                }
+                                                onValueChange={(keys) =>
+                                                    set({
+                                                        percent_of_total: keys,
+                                                    })
+                                                }
+                                                searchPlaceholder="Cari nilai"
+                                                emptyMessage="Nilai tidak ditemukan."
+                                                portalContainer={portalContainer}
+                                            />
+                                        </Field>
+                                    )}
+                                </>
                             )}
                         </Step>
                         <Step title={title(3, 'Kelompokkan menurut')}>
@@ -249,7 +271,7 @@ export function QueryEditor({
                                 onChange={(time_range) => set({ time_range })}
                                 portalContainer={portalContainer}
                             />
-                            {dataset.times.length > 0 && (
+                            {allowFormulaFeatures && dataset.times.length > 0 && (
                                 <Field>
                                     <Select
                                         label="Bandingkan dengan"

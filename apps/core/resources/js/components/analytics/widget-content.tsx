@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import type { ChartWidgetType } from '@/components/analytics/chart-widget';
 import { KpiTile } from '@/components/analytics/kpi-tile';
 import { ResultTable } from '@/components/analytics/result-table';
+import type { WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
     CartesianVisual,
     DonutVisual,
@@ -13,7 +14,6 @@ import type {
     TableVisual,
     WidgetType,
     WidgetVisual,
-    DatasetField,
     ResultColumn,
     ResultValue,
 } from '@/lib/analytics/types';
@@ -77,7 +77,7 @@ export function WidgetContent({
     /** Tinggi di grid, 1–3. */
     height?: number;
     asTable?: boolean;
-    fields?: DatasetField[];
+    fields?: WidgetDatasetField[];
     onDimensionSelect?: (
         field: ResultColumn,
         row: Record<string, ResultValue>,
@@ -99,6 +99,8 @@ export function WidgetContent({
                 columns={table.columns}
                 showTotals={table.show_totals !== false}
                 className={tableHeight}
+                fields={fields}
+                onDimensionSelect={onDimensionSelect}
             />
         );
     }

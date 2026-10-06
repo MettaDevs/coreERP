@@ -412,8 +412,8 @@ class DashboardApiTest extends TestCase
         // Dataset module dapat bertambah field waktu (area 5); yang dijaga, field waktu ditandai di kedua tempat.
         $this->assertContains('acquired_on', $described->json('data.times'));
         $measures = collect($described->json('data.measures'))->keyBy('key');
-        $this->assertSame(['key' => 'count', 'caption' => 'Jumlah aset', 'aggregate' => 'count', 'format' => 'number'], $measures['count']);
-        $this->assertSame(['key' => 'acquisition_value', 'caption' => 'Nilai perolehan', 'aggregate' => 'sum', 'format' => 'money', 'currency_key' => 'currency_code'], $measures['acquisition_value']);
+        $this->assertSame(['key' => 'count', 'caption' => 'Jumlah aset', 'aggregate' => 'count', 'format' => 'number', 'numeric' => true], $measures['count']);
+        $this->assertSame(['key' => 'acquisition_value', 'caption' => 'Nilai perolehan', 'aggregate' => 'sum', 'format' => 'money', 'currency_key' => 'currency_code', 'numeric' => true], $measures['acquisition_value']);
         $fields = collect($described->json('data.fields'))->keyBy('key');
         $this->assertSame(['date', true], [$fields['acquired_on']['type'], $fields['acquired_on']['time']]);
         $this->assertSame(['option', false], [$fields['lifecycle_state']['type'], $fields['lifecycle_state']['time']]);

@@ -54,6 +54,16 @@ final class Blend
         foreach ($inputs as $index => $queryInput) {
             [$dataset, $query] = $this->queries->validate($principal, $queryInput, "queries.{$index}");
 
+            if ($query->formulas !== []) {
+                throw AnalyticsQueryException::invalidQuery("queries.{$index}.formulas", 'Rumus belum tersedia pada gabungan data. Pilih nilai dari masing-masing data.');
+            }
+            if ($query->compare !== null) {
+                throw AnalyticsQueryException::invalidQuery("queries.{$index}.compare", 'Pembanding periode belum tersedia pada gabungan data.');
+            }
+            if ($query->percentOfTotal !== []) {
+                throw AnalyticsQueryException::invalidQuery("queries.{$index}.percent_of_total", 'Persen dari total belum tersedia pada gabungan data.');
+            }
+
             if (isset($seenDatasets[$dataset->code])) {
                 throw AnalyticsQueryException::invalidQuery("queries.{$index}.dataset", 'Pilih dua data yang berbeda untuk digabungkan.');
             }

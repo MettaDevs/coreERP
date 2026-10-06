@@ -2,12 +2,16 @@ import type {
     CrossFilter,
     DashboardSlicer,
     DashboardWidget,
+    AnalyticsQuery,
     DatasetDescription,
     DatasetField,
     ResultValue,
 } from '@/lib/analytics/types';
 
 export type SlicerValues = Record<string, string | string[]>;
+
+/** Field yang dikaitkan ke dataset asalnya, supaya blend tetap dapat memetakan slicer per sumber. */
+export type WidgetDatasetField = DatasetField & { source_dataset: string };
 
 /** Nilai slicer dimuat dari alamat pada setiap render; alamat tetap satu-satunya sumber kebenaran. */
 export function readSlicerUrl(
@@ -72,43 +76,79 @@ export function slicerUrl(
 export function fieldsForWidget(
     widget: DashboardWidget,
     datasets: Record<string, DatasetDescription>,
-): DatasetField[] {
-    return widget.dataset_code === null
-        ? []
-        : (datasets[widget.dataset_code]?.fields ?? []);
+): WidgetDatasetField[] {
+    return querySources(widget).flatMap(({ dataset }) =>
+        (datasets[dataset]?.fields ?? []).map((field) => ({
+            ...field,
+            source_dataset: dataset,
+        })),
+    );
 }
 
 export function slicerField(
     slicer: DashboardSlicer,
     widget: DashboardWidget,
-    fields: DatasetField[],
-): DatasetField | null {
+    fields: WidgetDatasetField[],
+): WidgetDatasetField | null {
+    return slicerFieldsForWidget(slicer, widget, fields)[0] ?? null;
+}
+
+function slicerFieldsForWidget(
+    slicer: DashboardSlicer,
+    widget: DashboardWidget,
+    fields: WidgetDatasetField[],
+): WidgetDatasetField[] {
     const source = slicer.source;
+    const queries = querySources(widget);
 
     if (source.type === 'field') {
-        return source.dataset === widget.dataset_code
-            ? (fields.find((field) => field.key === source.field) ?? null)
-            : null;
+        if (!queries.some((query) => query.dataset === source.dataset)) {
+            return [];
+        }
+
+        const field = fields.find(
+            (item) =>
+                item.source_dataset === source.dataset &&
+                item.key === source.field,
+        );
+
+        return field === undefined ? [] : [field];
     }
 
-    const matches = fields.filter(
-        (field) => field.shared_dimension === source.dimension,
+    const matches = fields.filter((field) =>
+        field.shared_dimension === source.dimension,
     );
 
-    if (matches.length <= 1) {
-        return matches[0] ?? null;
+    if (widget.type === 'blend') {
+        const selected = queries.map(({ dataset, query }) => {
+            const candidates = matches.filter(
+                (field) =>
+                    field.source_dataset === dataset &&
+                    queryFields(query).has(field.key),
+            );
+
+            return candidates.length === 1 ? candidates[0] : null;
+        });
+
+        return selected.every((field) => field !== null)
+            ? selected.filter((field): field is WidgetDatasetField => field !== null)
+            : [];
     }
 
-    const used = queryFields(widget);
+    if (matches.length <= 1) {
+        return matches;
+    }
+
+    const used = queryFields(queries[0]?.query);
     const selected = matches.filter((field) => used.has(field.key));
 
-    return selected.length === 1 ? selected[0] : null;
+    return selected.length === 1 ? selected : [];
 }
 
 export function notApplicableSlicers(
     slicers: DashboardSlicer[],
     widget: DashboardWidget,
-    fields: DatasetField[],
+    fields: WidgetDatasetField[],
 ): string[] {
     return slicers
         .filter((slicer) => slicerField(slicer, widget, fields) === null)
@@ -117,7 +157,7 @@ export function notApplicableSlicers(
 
 export function crossFilterValues(
     widget: DashboardWidget,
-    fields: DatasetField[],
+    fields: WidgetDatasetField[],
     slicers: DashboardSlicer[],
     values: SlicerValues,
     crossFilters: CrossFilter[],
@@ -126,11 +166,16 @@ export function crossFilterValues(
     const slicerFields = new Set<string>();
 
     for (const slicer of slicers) {
-        const field = slicerField(slicer, widget, fields);
         const value = values[slicer.key];
 
-        if (field !== null && value !== undefined && !empty(value)) {
-            slicerFields.add(field.key);
+        if (
+            value !== undefined &&
+            !empty(value) &&
+            (widget.type !== 'blend' || slicer.source.type === 'shared')
+        ) {
+            for (const field of slicerFieldsForWidget(slicer, widget, fields)) {
+                slicerFields.add(fieldIdentity(field));
+            }
         }
     }
 
@@ -139,23 +184,46 @@ export function crossFilterValues(
             continue;
         }
 
-        const matched = item.source.shared_dimension
-            ? fields.filter(
-                  (field) =>
-                      field.shared_dimension === item.source.shared_dimension,
-              )
-            : fields.filter(
-                  (field) =>
-                      widget.dataset_code === item.source.dataset &&
-                      field.key === item.source.field,
-              );
-        const candidates =
-            matched.length > 1
-                ? matched.filter((field) => queryFields(widget).has(field.key))
-                : matched;
-        const field = candidates.length === 1 ? candidates[0] : null;
+        if (widget.type === 'blend' && item.source.shared_dimension === undefined) {
+            continue;
+        }
 
-        if (field === null || slicerFields.has(field.key)) {
+        let field: WidgetDatasetField | null = null;
+        if (widget.type === 'blend') {
+            const first = querySources(widget)[0];
+            if (first !== undefined && item.source.shared_dimension !== undefined) {
+                const candidates = fields.filter(
+                    (candidate) =>
+                        candidate.source_dataset === first.dataset &&
+                        candidate.shared_dimension === item.source.shared_dimension &&
+                        queryFields(first.query).has(candidate.key),
+                );
+                field = candidates.length === 1 ? candidates[0] : null;
+            }
+        } else {
+            const matched = item.source.shared_dimension
+                ? fields.filter(
+                      (candidate) =>
+                          candidate.shared_dimension ===
+                          item.source.shared_dimension,
+                  )
+                : fields.filter(
+                      (candidate) =>
+                          candidate.source_dataset === item.source.dataset &&
+                          candidate.key === item.source.field,
+                  );
+            const candidates =
+                matched.length > 1
+                    ? matched.filter((candidate) =>
+                          queryFields(querySources(widget)[0]?.query).has(
+                              candidate.key,
+                          ),
+                      )
+                    : matched;
+            field = candidates.length === 1 ? candidates[0] : null;
+        }
+
+        if (field === null || slicerFields.has(fieldIdentity(field))) {
             continue;
         }
 
@@ -169,22 +237,6 @@ export function crossFilterValues(
     }
 
     return filters;
-}
-
-function queryFields(widget: DashboardWidget): Set<string> {
-    const fields = new Set<string>();
-
-    for (const dimension of widget.query?.dimensions ?? []) {
-        fields.add(typeof dimension === 'string' ? dimension : dimension.field);
-    }
-
-    Object.keys(widget.query?.filters ?? {}).forEach((key) => fields.add(key));
-
-    if (widget.query?.time_range?.field) {
-        fields.add(widget.query.time_range.field);
-    }
-
-    return fields;
 }
 
 function filterValue(
@@ -257,12 +309,19 @@ function empty(value: string | string[]): boolean {
 
 export function crossFilterFromRow(
     widget: DashboardWidget,
-    field: DatasetField,
+    field: WidgetDatasetField,
     value: ResultValue,
     label: string,
     granularity?: CrossFilter['source']['granularity'],
 ): CrossFilter | null {
-    if (value === null || value === undefined || widget.dataset_code === null) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    if (widget.dataset_code === null && widget.type !== 'blend') {
+        return null;
+    }
+    if (widget.type === 'blend' && field.shared_dimension === undefined) {
         return null;
     }
 
@@ -271,7 +330,7 @@ export function crossFilterFromRow(
         origin_widget_id: widget.id,
         title: field.caption,
         source: {
-            dataset: widget.dataset_code,
+            dataset: field.source_dataset,
             field: field.key,
             type: field.type,
             shared_dimension: field.shared_dimension,
@@ -281,4 +340,34 @@ export function crossFilterFromRow(
         value: String(value),
         label,
     };
+}
+
+function querySources(
+    widget: DashboardWidget,
+): Array<{ dataset: string; query: AnalyticsQuery }> {
+    if (widget.query === null) {
+        return [];
+    }
+
+    return 'queries' in widget.query ? widget.query.queries : [widget.query];
+}
+
+function queryFields(query: AnalyticsQuery | undefined): Set<string> {
+    const fields = new Set<string>();
+    if (query === undefined) {
+        return fields;
+    }
+    for (const dimension of query.dimensions ?? []) {
+        fields.add(typeof dimension === 'string' ? dimension : dimension.field);
+    }
+    Object.keys(query.filters ?? {}).forEach((key) => fields.add(key));
+    if (query.time_range?.field) {
+        fields.add(query.time_range.field);
+    }
+
+    return fields;
+}
+
+function fieldIdentity(field: WidgetDatasetField): string {
+    return `${field.source_dataset}:${field.key}`;
 }

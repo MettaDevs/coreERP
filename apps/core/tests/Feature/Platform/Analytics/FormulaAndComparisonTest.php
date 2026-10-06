@@ -299,12 +299,12 @@ class FormulaAndComparisonTest extends TestCase
         $result = $this->analyse([
             'dimensions' => [['field' => 'tanggal', 'granularity' => 'year']],
             'measures' => ['count'],
-            'time_range' => ['range' => '01/01/2000..31/12/2030'],
+            'time_range' => ['range' => '02/01/2000..30/12/2030'],
             'compare' => 'previous_period',
         ]);
 
         $this->assertFalse($result->meta['truncated']);
-        $this->assertCount(31, $result->rows);
+        $this->assertCount(2, $result->rows);
 
         $expression = new TimeBucketExpression(
             TimeGranularity::Year,
