@@ -25,6 +25,7 @@ export type Context = {
 };
 
 export type Aset = {
+    legal_entity_id: string;
     id: string;
     kode: string;
     nama: string;

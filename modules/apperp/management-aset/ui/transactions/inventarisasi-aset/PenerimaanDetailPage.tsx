@@ -1,8 +1,11 @@
+import { usePage } from '@inertiajs/react';
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
+import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -102,6 +105,7 @@ export default function PenerimaanDetailPage({
     mode: Mode;
 }) {
     const can = izin(permissions);
+    const { workspace } = usePage<{ workspace: Workspace }>().props;
     const canRegister = bolehMendaftarkan(permissions);
     // Nomor seri mengubah aset, bukan dokumen, jadi izinnya izin koreksi aset. Dokumen
     // yang sudah selesai memang tidak dapat disunting — dan ini bukan pengecualiannya,
@@ -117,6 +121,7 @@ export default function PenerimaanDetailPage({
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
     // Pratinjau disimpan bersama versi dokumen yang melahirkannya: pratinjau versi lama tidak
@@ -318,6 +323,8 @@ export default function PenerimaanDetailPage({
     const penghalang = pratinjauSekarang?.blockers ?? [];
 
     async function simpan() {
+        setSaveError(null);
+
         if (!context.legal_entity_id) {
             toast.error(
                 'Pilih entitas legal aktif terlebih dahulu pada header CoreERP.',
@@ -424,6 +431,12 @@ export default function PenerimaanDetailPage({
                 setGalat(caught.validationErrors);
             }
 
+            setSaveError(
+                caught instanceof ApiError && caught.status >= 500
+                    ? 'Penerimaan belum tersimpan karena terjadi kesalahan sistem. Isian Anda tetap tersedia. Tim pengelola dapat memeriksa laporan kesalahannya.'
+                    : errorMessage(caught, 'Penerimaan belum dapat disimpan.'),
+            );
+            panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             toastSaveError(caught, 'Penerimaan belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
@@ -433,6 +446,7 @@ export default function PenerimaanDetailPage({
     async function selesaikan() {
         setKonfirmasiSelesai(false);
         setMenyimpan(true);
+        setSaveError(null);
 
         try {
             const hasil = await api<{ data: Penerimaan }>(
@@ -452,6 +466,15 @@ export default function PenerimaanDetailPage({
                 setGalat(caught.validationErrors);
             }
 
+            setSaveError(
+                caught instanceof ApiError && caught.status >= 500
+                    ? 'Penerimaan belum selesai karena terjadi kesalahan sistem. Dokumen tetap tersedia. Tim pengelola dapat memeriksa laporan kesalahannya.'
+                    : errorMessage(
+                          caught,
+                          'Penerimaan belum dapat diselesaikan.',
+                      ),
+            );
+            panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             toastSaveError(caught, 'Penerimaan belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
@@ -520,10 +543,17 @@ export default function PenerimaanDetailPage({
         );
     }
 
+    const legalEntityName = workspace.legal_entities.find(
+        (entity) =>
+            entity.id ===
+            (tersimpan?.legal_entity_id ?? context.legal_entity_id),
+    )?.name;
     const judul =
         mode === 'create'
             ? 'Penerimaan aset baru'
-            : (tersimpan?.kode ?? 'Penerimaan aset');
+            : [legalEntityName, tersimpan?.kode ?? 'Penerimaan aset']
+                  .filter(Boolean)
+                  .join(' · ');
 
     /** Satu Select penunjuk master, dipakai berkali-kali pada kepala dan baris. */
     const pilihan = (
@@ -618,6 +648,13 @@ export default function PenerimaanDetailPage({
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">
+                    {saveError && (
+                        <Alert variant="destructive" role="alert">
+                            <TriangleAlert />
+                            <AlertTitle>Proses belum berhasil</AlertTitle>
+                            <AlertDescription>{saveError}</AlertDescription>
+                        </Alert>
+                    )}
                     <p className="text-muted-foreground text-sm">
                         Entitas legal mengikuti konteks aktif Anda. Satu dokumen
                         adalah satu kedatangan: tiap unit yang datang menjadi
