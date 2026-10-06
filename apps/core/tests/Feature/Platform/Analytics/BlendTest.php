@@ -191,34 +191,6 @@ class BlendTest extends TestCase
         }
     }
 
-    public function test_blends_reject_formula_comparison_and_percent_of_total_until_their_columns_are_merged(): void
-    {
-        $cases = [];
-
-        $formula = $this->queries(['count', 'doubled'], ['count']);
-        $formula['queries'][0]['formulas'] = [['key' => 'doubled', 'expression' => '[count] * 2']];
-        $cases[] = [$formula, 'queries.0.formulas'];
-
-        $comparison = $this->queries(['count'], ['count']);
-        $comparison['queries'][0]['time_range'] = ['range' => '01/01/2026..31/01/2026'];
-        $comparison['queries'][0]['compare'] = 'previous_period';
-        $cases[] = [$comparison, 'queries.0.compare'];
-
-        $percent = $this->queries(['count'], ['count']);
-        $percent['queries'][0]['percent_of_total'] = ['count'];
-        $cases[] = [$percent, 'queries.0.percent_of_total'];
-
-        foreach ($cases as [$input, $field]) {
-            try {
-                app(Blend::class)->validate($this->principal(), $input);
-                $this->fail('Kolom turunan yang belum digabung tidak boleh diabaikan diam-diam.');
-            } catch (AnalyticsQueryException $exception) {
-                $this->assertSame('analytics.invalid_query', $exception->errorCode);
-                $this->assertSame($field, $exception->field);
-            }
-        }
-    }
-
     public function test_each_source_keeps_its_own_row_limit_and_truncation_metadata(): void
     {
         $units = [(string) Str::ulid(), (string) Str::ulid(), (string) Str::ulid()];

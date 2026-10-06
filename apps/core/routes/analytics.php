@@ -3,9 +3,9 @@
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Analytics\AnalyticsServiceProvider;
 use App\Platform\Analytics\Http\Controllers\AnalyticsExportController;
+use App\Platform\Analytics\Http\Controllers\BlendController;
 use App\Platform\Analytics\Http\Controllers\DashboardController;
 use App\Platform\Analytics\Http\Controllers\DashboardPageController;
-use App\Platform\Analytics\Http\Controllers\BlendController;
 use App\Platform\Analytics\Http\Controllers\DatasetController;
 use App\Platform\Analytics\Http\Controllers\DrillController;
 use App\Platform\Analytics\Http\Controllers\ExploreController;
