@@ -436,6 +436,7 @@ export default function PenerimaanDetailPage({
                     ? 'Penerimaan belum tersimpan karena terjadi kesalahan sistem. Isian Anda tetap tersedia. Tim pengelola dapat memeriksa laporan kesalahannya.'
                     : errorMessage(caught, 'Penerimaan belum dapat disimpan.'),
             );
+            panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             toastSaveError(caught, 'Penerimaan belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
@@ -473,6 +474,7 @@ export default function PenerimaanDetailPage({
                           'Penerimaan belum dapat diselesaikan.',
                       ),
             );
+            panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
             toastSaveError(caught, 'Penerimaan belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
