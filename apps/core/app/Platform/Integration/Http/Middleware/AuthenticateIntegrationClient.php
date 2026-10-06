@@ -10,7 +10,9 @@ use App\Platform\Integration\Support\IntegrationClientAccounts;
 use App\Platform\Modules\Http\Middleware\AuthenticateAppService;
 use App\Platform\Modules\Support\TenantScope;
 use Closure;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -82,7 +84,27 @@ final class AuthenticateIntegrationClient
                 $client->forceFill(['last_used_at' => now()])->saveQuietly();
             }
 
-            return $next($request);
+            // Jatah per klien baru dipakai sesudah id token diverifikasi; batas IP ada di middleware rute sebelumnya.
+            $limit = (int) config('coreerp.integration_api_rate_limit', 120);
+            $key = 'integration-client:'.$client->id;
+            if (RateLimiter::tooManyAttempts($key, $limit)) {
+                $retryAfter = RateLimiter::availableIn($key);
+                throw new ThrottleRequestsException('Too Many Attempts.', null, [
+                    'Retry-After' => $retryAfter,
+                    'X-RateLimit-Limit' => $limit,
+                    'X-RateLimit-Remaining' => 0,
+                    'X-RateLimit-Reset' => now()->addSeconds($retryAfter)->timestamp,
+                ]);
+            }
+            RateLimiter::hit($key, 60);
+
+            $response = $next($request);
+            $response->headers->add([
+                'X-RateLimit-Limit' => $limit,
+                'X-RateLimit-Remaining' => RateLimiter::retriesLeft($key, $limit),
+            ]);
+
+            return $response;
         } finally {
             // Pelaku milik permintaan ini saja; koneksi yang dipakai ulang tidak boleh membawanya.
             AuditActor::clear();

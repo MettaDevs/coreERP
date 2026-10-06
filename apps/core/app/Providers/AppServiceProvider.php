@@ -12,7 +12,6 @@ use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
-use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
 use App\Platform\License\Support\SiteLicense;
 use App\Platform\Observability\Support\ErrorReporter;
 use Carbon\CarbonImmutable;
@@ -188,17 +187,13 @@ class AppServiceProvider extends ServiceProvider
             (int) config('coreerp.integration_api_ip_rate_limit', 600)
         )->by('ip:'.$request->ip()));
 
-        RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
-            (int) config('coreerp.integration_api_rate_limit', 120)
-        )->by(self::integrationClientKey($request)));
-
         // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
         RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
             ? Limit::perMinute((int) config('coreerp.internal_api_rate_limit', 600))->by(implode(':', [
                 $request->header('X-CoreERP-App-Id', 'unknown'),
                 $request->header('X-CoreERP-Tenant-Id', 'unknown'),
             ]))
-            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::integrationClientKey($request)));
+            : Limit::perMinute((int) config('coreerp.integration_api_ip_rate_limit', 600))->by('ip:'.$request->ip()));
     }
 
     /**
@@ -257,13 +252,5 @@ class AppServiceProvider extends ServiceProvider
         // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
         // menjadi pelepasan yang lebih tepat sasaran.
         Event::forget(MessageLogged::class);
-    }
-
-    /** Id klien yang sudah diautentikasi, atau alamat IP sebelum autentikasi. */
-    private static function integrationClientKey(Request $request): string
-    {
-        $id = $request->attributes->get(AuthenticateIntegrationClient::ATTRIBUTE);
-
-        return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
     }
 }
