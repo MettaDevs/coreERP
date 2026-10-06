@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Datasets;
 
+use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\SharedDimension;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\FilterField;
@@ -199,6 +200,19 @@ final readonly class CompiledDataset
     public function measure(string $key): CompiledMeasure
     {
         return $this->measures[$key] ?? throw new LogicException("Measure `{$key}` tidak ada di dataset `{$this->code}`.");
+    }
+
+    /** Apakah hasil measure berupa angka, bukan tanggal minimum atau maksimum. */
+    public function isNumericMeasure(string $key): bool
+    {
+        $measure = $this->measure($key);
+        if (! in_array($measure->aggregate, [Aggregate::Minimum, Aggregate::Maximum], true)) {
+            return true;
+        }
+
+        return $measure->field !== null
+            && $this->hasField($measure->field)
+            && in_array($this->columnType($measure->field), DatasetValidator::NUMERIC, true);
     }
 
     /**

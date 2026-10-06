@@ -68,7 +68,8 @@ final class DatasetCatalog
                 'format' => $measure->format->value,
                 'currency_key' => $measure->currency,
                 'unit_key' => $measure->unit,
-            ], static fn (?string $value): bool => $value !== null);
+                'numeric' => $dataset->isNumericMeasure($measure->key),
+            ], static fn (mixed $value): bool => $value !== null);
         }
 
         $visible = array_column($fields, 'key');
@@ -77,6 +78,7 @@ final class DatasetCatalog
             ...$this->summary($dataset),
             'fields' => $fields,
             'measures' => $measures,
+            'limits' => ['formulas' => config()->integer('analytics.limits.formulas', 5)],
             'times' => array_values(array_intersect($dataset->times(), $visible)),
             'default_time' => in_array($dataset->defaultTime(), $visible, true) ? $dataset->defaultTime() : null,
         ];

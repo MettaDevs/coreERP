@@ -20,7 +20,13 @@ use Carbon\CarbonInterface;
  *
  * Kelas ini sengaja terpisah dari `RelativeDates` milik preset laporan (K-25): token preset tersimpan di
  * preset tenant dan menjadi **satu tanggal**, token analitik menjadi **rentang**. Menggabungkan keduanya
- * mengubah arti token yang sudah tersimpan. Tahun fiskal menyusul di fase 2, karena butuh legal entity.
+ * mengubah arti token yang sudah tersimpan.
+ *
+ * **Tahun fiskal** (`@this_fiscal_year`, `@last_fiscal_year`, area 13) bergantung pada kalender fiskal
+ * perusahaan, jadi rentangnya tidak dapat dihitung dari tanggal saja. {@see FiscalYearRange} menghitungnya lewat
+ * `FiscalCalendarDirectory` sebelum query dikompilasi dan menyimpannya di `TimeRange::$bounds`;
+ * {@see self::boundsOf()} dan {@see self::expressionOf()} membaca rentang itu. Token tahun fiskal yang belum
+ * dihitung ditolak dengan pesan yang meminta perusahaannya, tidak diam-diam menjadi tahun kalender.
  */
 final class RelativeRange
 {
@@ -41,12 +47,43 @@ final class RelativeRange
         '@last_quarter',
         '@this_year',
         '@last_year',
+        '@this_fiscal_year',
+        '@last_fiscal_year',
         '@last_7_days',
         '@last_30_days',
         '@last_90_days',
         '@last_12_months',
         '@year_to_date',
         '@month_to_date',
+    ];
+
+    /** Token yang rentangnya bergantung pada kalender fiskal perusahaan, bukan pada tanggal saja. */
+    public const FISCAL_TOKENS = ['@this_fiscal_year', '@last_fiscal_year'];
+
+    /**
+     * Langkah "periode sebelumnya" tiap token kalender untuk perbandingan periode ({@see Comparison}):
+     * `[bulan, hari]`, salah satunya nol. Bulan ini dibandingkan dengan bulan lalu, bukan dengan 31 hari
+     * sebelumnya, dan awal bulan sampai hari ini dengan tanggal yang sama bulan lalu.
+     *
+     * @var array<string, array{0: int, 1: int}>
+     */
+    public const STEPS = [
+        '@today' => [0, 1],
+        '@yesterday' => [0, 1],
+        '@this_week' => [0, 7],
+        '@last_week' => [0, 7],
+        '@this_month' => [1, 0],
+        '@last_month' => [1, 0],
+        '@this_quarter' => [3, 0],
+        '@last_quarter' => [3, 0],
+        '@this_year' => [12, 0],
+        '@last_year' => [12, 0],
+        '@last_7_days' => [0, 7],
+        '@last_30_days' => [0, 30],
+        '@last_90_days' => [0, 90],
+        '@last_12_months' => [12, 0],
+        '@year_to_date' => [12, 0],
+        '@month_to_date' => [1, 0],
     ];
 
     /** Nilai `time_range.range` yang berawalan `@` adalah token, bukan ekspresi tanggal. */
@@ -58,6 +95,46 @@ final class RelativeRange
     public static function known(string $token): bool
     {
         return in_array($token, self::TOKENS, true);
+    }
+
+    public static function isFiscal(string $range): bool
+    {
+        return in_array($range, self::FISCAL_TOKENS, true);
+    }
+
+    /**
+     * Ekspresi untuk `FieldFilterExpression` dari rentang waktu query: rentang tahun fiskal yang sudah dihitung,
+     * token kalender, atau ekspresi tanggal biasa apa adanya.
+     *
+     * @throws AnalyticsQueryException token yang tidak dikenal, atau token tahun fiskal yang belum dihitung
+     */
+    public static function expressionOf(TimeRange $range, CarbonImmutable $now): string
+    {
+        if ($range->bounds !== null) {
+            return $range->bounds[0].'..'.$range->bounds[1];
+        }
+
+        return self::expression($range->range, $now);
+    }
+
+    /**
+     * Hari pertama dan terakhir rentang waktu query bila berupa token (termasuk tahun fiskal yang sudah dihitung),
+     * atau null untuk ekspresi tanggal biasa.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     *
+     * @throws AnalyticsQueryException
+     */
+    public static function boundsOf(TimeRange $range, CarbonImmutable $now): ?array
+    {
+        if ($range->bounds !== null) {
+            return [
+                CarbonImmutable::parse($range->bounds[0], $now->getTimezone())->startOfDay(),
+                CarbonImmutable::parse($range->bounds[1], $now->getTimezone())->startOfDay(),
+            ];
+        }
+
+        return self::isToken($range->range) ? self::bounds($range->range, $now) : null;
     }
 
     /**
@@ -108,6 +185,7 @@ final class RelativeRange
             '@last_12_months' => [$today->startOfMonth()->subMonthsNoOverflow(11), $today->endOfMonth()->startOfDay()],
             '@year_to_date' => [$today->startOfYear(), $today],
             '@month_to_date' => [$today->startOfMonth(), $today],
+            '@this_fiscal_year', '@last_fiscal_year' => throw self::fiscalUnresolved(),
             default => throw self::unknown($token),
         };
     }
@@ -116,6 +194,15 @@ final class RelativeRange
     public static function unknown(string $token): AnalyticsQueryException
     {
         return AnalyticsQueryException::invalidQuery('time_range.range', 'Periode "'.$token.'" tidak dikenal. Pilih salah satu dari: '.implode(', ', self::TOKENS).'.');
+    }
+
+    /**
+     * Galat untuk token tahun fiskal yang rentangnya belum dihitung: tanpa perusahaan, tahun fiskal tidak punya
+     * arti, dan menggantinya diam-diam dengan tahun kalender memulangkan angka periode lain.
+     */
+    public static function fiscalUnresolved(): AnalyticsQueryException
+    {
+        return AnalyticsQueryException::invalidQuery('time_range.range', 'Periode tahun fiskal butuh satu perusahaan. Saring data menurut satu perusahaan, atau pilih perusahaan di workspace.');
     }
 
     /**

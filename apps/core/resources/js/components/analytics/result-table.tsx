@@ -39,11 +39,16 @@ export function ResultTable({
     /** Pembungkus bergulir, misalnya batas tinggi widget. */
     className?: string;
 }) {
+    // Kolom turunan (perbandingan periode, persen terhadap total; area 13) ikut di samping nilai asalnya walau
+    // daftar kolom tabel hanya menyebut nilainya.
     const chosen: ResultColumn[] = (
         columns && columns.length > 0
-            ? columns.map((key) =>
+            ? columns.flatMap((key) => [
                   result.columns.find((column) => column.key === key),
-              )
+                  ...result.columns.filter(
+                      (column) => column.derived_from === key,
+                  ),
+              ])
             : [...dimensionColumns(result), ...measureColumns(result)]
     ).filter(
         (column): column is ResultColumn =>

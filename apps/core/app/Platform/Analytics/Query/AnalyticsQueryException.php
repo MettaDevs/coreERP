@@ -15,7 +15,8 @@ use Throwable;
  *
  * Bentuk jawabannya `{"error": {"code", "message", "field"}}`, yang sudah dibaca `CoreApiError` di layar.
  * Pesannya bahasa sehari-hari yang menyebut apa yang dapat dilakukan pengguna; `field` menunjuk bagian
- * query yang salah (`filters.nama`, `dimensions.1`) bila ada.
+ * query yang salah (`filters.nama`, `dimensions.1`) bila ada. Galat di dalam teks rumus (area 13) juga membawa
+ * `position`, karakter tempat masalahnya (mulai 1), supaya editor rumus dapat menandainya.
  *
  * Cacat engine — compiler yang menulis, SQL yang tidak sah — sengaja **tidak** menjadi pengecualian ini:
  * ia dibiarkan menjadi 500 dan dilaporkan, karena bukan kesalahan pengguna. Daftar kodenya ada di
@@ -30,6 +31,7 @@ final class AnalyticsQueryException extends RuntimeException
         public readonly ?string $field = null,
         ?Throwable $previous = null,
         public readonly ?int $retryAfter = null,
+        public readonly ?int $position = null,
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -37,6 +39,18 @@ final class AnalyticsQueryException extends RuntimeException
     public static function invalidQuery(string $field, string $message): self
     {
         return new self('analytics.invalid_query', $message, 422, $field);
+    }
+
+    /** Teks rumus tidak dapat dibaca, atau memakai fungsi, rumus, atau mata uang yang tidak boleh (area 13). */
+    public static function invalidFormula(string $field, string $message, int $position, ?Throwable $previous = null): self
+    {
+        return new self('analytics.invalid_formula', $message, 422, $field, $previous, position: $position);
+    }
+
+    /** Rumus merujuk measure yang tidak dikenal dataset; kodenya sama dengan nilai tidak dikenal lainnya. */
+    public static function formulaMeasureUnknown(string $field, string $key, int $position): self
+    {
+        return new self('analytics.field_unknown', 'Rumus memakai nilai ['.$key.'] yang tidak dikenal, di karakter '.$position.'. Pilih nilai dari daftar.', 422, $field, position: $position);
     }
 
     public static function datasetUnknown(): self
@@ -99,12 +113,15 @@ final class AnalyticsQueryException extends RuntimeException
         };
     }
 
-    /** @return array{error: array{code: string, message: string, field?: string}} */
+    /** @return array{error: array{code: string, message: string, field?: string, position?: int}} */
     public function toArray(): array
     {
         $error = ['code' => $this->errorCode, 'message' => $this->getMessage()];
         if ($this->field !== null) {
             $error['field'] = $this->field;
+        }
+        if ($this->position !== null) {
+            $error['position'] = $this->position;
         }
 
         return ['error' => $error];

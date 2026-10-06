@@ -179,7 +179,7 @@ mengarsipkan diputuskan `Dashboards\DashboardAccess` di controller. `{dashboard}
 | Metode dan path | Jawaban | Galat khusus |
 | --- | --- | --- |
 | `GET datasets` | `{data: DatasetSummary[]}` — module terpasang dan permission baca dipegang | |
-| `GET datasets/{code}` | `{data: DatasetDescription}` — field dan measure data pribadi disaring | 404 `analytics.dataset_unknown`, 403 `analytics.dataset_forbidden` |
+| `GET datasets/{code}` | `{data: DatasetDescription}` — field dan measure data pribadi disaring; setiap measure menyatakan apakah hasilnya angka, dan `limits.formulas` mengikuti config | 404 `analytics.dataset_unknown`, 403 `analytics.dataset_forbidden` |
 | `GET dashboards` | `{data: DashboardSummary[]}` milik sendiri dan bersama, urut nama | |
 | `POST dashboards` | 201 `{data: DashboardDetail}`, `ETag` | 403 tanpa hak; 422 nama ganda |
 | `GET dashboards/{id}` | `{data: DashboardDetail}`, `ETag` | 404 pribadi orang lain |

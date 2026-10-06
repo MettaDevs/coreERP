@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Platform\Analytics;
 
+use App\Platform\Analytics\Query\CompareMode;
+use App\Platform\Analytics\Query\Formula\Parser;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\RelativeRange;
 use App\Platform\Analytics\Query\TimeGranularity;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +27,12 @@ class QueryShapeSyncTest extends TestCase
     private const TYPES = 'resources/js/lib/analytics/types.ts';
 
     private const QUERY = 'resources/js/lib/analytics/query.ts';
+
+    private const QUERY_EDITOR = 'resources/js/components/analytics/query-editor.tsx';
+
+    private const KPI_TILE = 'resources/js/components/analytics/kpi-tile.tsx';
+
+    private const RESULT_TABLE = 'resources/js/components/analytics/result-table.tsx';
 
     /** @return array<string, mixed> */
     private function schema(): array
@@ -69,10 +78,6 @@ class QueryShapeSyncTest extends TestCase
         $schema = $this->schema();
 
         $this->assertEqualsCanonicalizing(QueryParser::KEYS, $this->keys($schema));
-        // Kunci fase 2 belum dibaca engine, jadi belum boleh ada di skema: skema menggambarkan yang berlaku.
-        foreach (QueryParser::FUTURE_KEYS as $key) {
-            $this->assertArrayNotHasKey($key, $schema['properties']);
-        }
     }
 
     public function test_the_nested_keys_of_the_schema_are_the_ones_the_parser_reads(): void
@@ -91,6 +96,11 @@ class QueryShapeSyncTest extends TestCase
         $this->assertEqualsCanonicalizing(QueryParser::SORT_KEYS, $this->keys($properties['sort']['items']));
         $this->assertEqualsCanonicalizing(QueryParser::SORT_KEYS, $properties['sort']['items']['required']);
         $this->assertFalse($properties['sort']['items']['additionalProperties']);
+
+        $formula = $properties['formulas']['items'];
+        $this->assertEqualsCanonicalizing(QueryParser::FORMULA_KEYS, $this->keys($formula));
+        $this->assertSame(['key', 'expression'], $formula['required']);
+        $this->assertFalse($formula['additionalProperties']);
     }
 
     public function test_the_schema_enums_are_the_ones_the_server_knows(): void
@@ -102,6 +112,8 @@ class QueryShapeSyncTest extends TestCase
             $schema['$defs']['granularity']['enum'],
         );
         $this->assertSame(['asc', 'desc'], $schema['properties']['sort']['items']['properties']['direction']['enum']);
+        $this->assertSame(array_map(static fn (CompareMode $case): string => $case->value, CompareMode::cases()), $schema['properties']['compare']['enum']);
+        $this->assertSame(array_map(static fn (MeasureFormat $case): string => $case->value, MeasureFormat::cases()), $schema['$defs']['format']['enum']);
 
         // Daftar token di deskripsi skema adalah yang dibaca orang yang menulis query dari luar.
         $description = $schema['properties']['time_range']['properties']['range']['description'];
@@ -141,5 +153,48 @@ class QueryShapeSyncTest extends TestCase
         $this->assertSame(1, preg_match('/TIME_GRANULARITIES = \[(.*?)\] as const/s', $query, $block));
         preg_match_all("/value: '(\w+)'/", $block[1], $granularities);
         $this->assertSame(array_map(static fn (TimeGranularity $case): string => $case->value, TimeGranularity::cases()), $granularities[1]);
+    }
+
+    public function test_the_builder_wires_formula_errors_and_comparison_modes_to_the_query(): void
+    {
+        $editor = $this->read(self::QUERY_EDITOR);
+
+        $this->assertStringContainsString('<FormulaEditor', $editor);
+        $this->assertStringContainsString('measures={dataset.measures}', $editor);
+        $this->assertStringContainsString('formulas={formulas}', $editor);
+        $this->assertStringContainsString('error={errors.formula ?? null}', $editor);
+        $this->assertStringContainsString('COMPARE_MODES.map((mode)', $editor);
+        $this->assertStringContainsString('compare:', $editor);
+    }
+
+    public function test_period_comparison_is_visible_in_tiles_and_tables(): void
+    {
+        $tile = $this->read(self::KPI_TILE);
+        $table = $this->read(self::RESULT_TABLE);
+
+        $this->assertStringContainsString('derivedColumns(result, measure.key)', $tile);
+        $this->assertStringContainsString('formatMeasureValue(previous, row, compact)', $tile);
+        $this->assertStringContainsString('column.derived_from === key', $table);
+    }
+
+    /**
+     * Editor rumus (area 13.7) menawarkan fungsi dan pembanding dari daftarnya sendiri; daftar itu harus sama dengan
+     * daftar tertutup pembaca rumus dan pilihan perbandingan di server, supaya layar tidak menawarkan yang ditolak.
+     */
+    public function test_the_formula_editor_offers_exactly_the_server_functions_formats_and_comparisons(): void
+    {
+        $query = $this->read(self::QUERY);
+
+        $this->assertSame(1, preg_match('/FORMULA_FUNCTIONS = \[(.*?)\] as const/s', $query, $functions));
+        preg_match_all("/name: '(\w+)'/", $functions[1], $names);
+        $this->assertSame(array_keys(Parser::FUNCTIONS), $names[1]);
+
+        $this->assertSame(1, preg_match('/FORMULA_FORMATS = \[(.*?)\] as const/s', $query, $formats));
+        preg_match_all("/value: '(\w+)'/", $formats[1], $values);
+        $this->assertSame(array_map(static fn (MeasureFormat $case): string => $case->value, MeasureFormat::cases()), $values[1]);
+
+        $this->assertSame(1, preg_match('/COMPARE_MODES = \[(.*?)\] as const/s', $query, $modes));
+        preg_match_all("/value: '(\w+)'/", $modes[1], $values);
+        $this->assertSame(array_map(static fn (CompareMode $case): string => $case->value, CompareMode::cases()), $values[1]);
     }
 }

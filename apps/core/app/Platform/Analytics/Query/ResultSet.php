@@ -98,7 +98,7 @@ final readonly class ResultSet
      */
     public static function fromCache(array $payload): self
     {
-        /** @var list<array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string}> $columns */
+        /** @var list<array{alias: string, key: string, kind: 'dimension'|'measure', caption: string, type: string, format: ?string, granularity: ?string, label_key: ?string, currency_key: ?string, unit_key: ?string, implicit: bool, aggregate: ?string, label_alias: ?string, derived_from: ?string, derivation: ?string}> $columns */
         $columns = $payload['columns'];
         /** @var list<array<string, scalar|null>> $rows */
         $rows = $payload['rows'];
