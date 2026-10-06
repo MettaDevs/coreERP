@@ -7,12 +7,12 @@ import {
     formatMeasureValue,
 } from '@/lib/analytics/format';
 import { dimensionColumns, measureColumns } from '@/lib/analytics/query';
+import type { WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
     AnalyticsResult,
     ResultColumn,
     ResultValue,
 } from '@/lib/analytics/types';
-import type { WidgetDatasetField } from '@/lib/analytics/slicer';
 import { cn } from '@/lib/utils';
 
 type Line = {

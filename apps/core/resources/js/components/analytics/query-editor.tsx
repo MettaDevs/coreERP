@@ -192,7 +192,10 @@ export function QueryEditor({
                                             ]);
 
                                             setFormulas(
-                                                [...formulas, { key, ...added }],
+                                                [
+                                                    ...formulas,
+                                                    { key, ...added },
+                                                ],
                                                 [...value.measures, key],
                                             );
                                         }}
@@ -203,7 +206,8 @@ export function QueryEditor({
                                                         formula.key !== key,
                                                 ),
                                                 value.measures.filter(
-                                                    (measure) => measure !== key,
+                                                    (measure) =>
+                                                        measure !== key,
                                                 ),
                                             )
                                         }
@@ -229,7 +233,9 @@ export function QueryEditor({
                                                 }
                                                 searchPlaceholder="Cari nilai"
                                                 emptyMessage="Nilai tidak ditemukan."
-                                                portalContainer={portalContainer}
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                             />
                                         </Field>
                                     )}
@@ -271,45 +277,49 @@ export function QueryEditor({
                                 onChange={(time_range) => set({ time_range })}
                                 portalContainer={portalContainer}
                             />
-                            {allowFormulaFeatures && dataset.times.length > 0 && (
-                                <Field>
-                                    <Select
-                                        label="Bandingkan dengan"
-                                        items={[
-                                            {
-                                                value: NO_COMPARE,
-                                                label: 'Tanpa pembanding',
-                                            },
-                                            ...COMPARE_MODES.map((mode) => ({
-                                                value: mode.value,
-                                                label: mode.caption,
-                                            })),
-                                        ]}
-                                        value={
-                                            value.time_range === undefined
-                                                ? NO_COMPARE
-                                                : (value.compare ?? NO_COMPARE)
-                                        }
-                                        onValueChange={(mode) =>
-                                            set({
-                                                compare:
-                                                    mode === null ||
-                                                    mode === NO_COMPARE
-                                                        ? undefined
-                                                        : (mode as QueryCompare),
-                                            })
-                                        }
-                                        searchPlaceholder="Cari pembanding"
-                                        emptyMessage="Pembanding tidak ditemukan."
-                                        portalContainer={portalContainer}
-                                    />
-                                    <FieldDescription>
-                                        {value.time_range === undefined
-                                            ? 'Pilih periode lebih dulu untuk membandingkannya.'
-                                            : 'Setiap nilai mendapat angka pembanding, selisih, dan persen perubahannya.'}
-                                    </FieldDescription>
-                                </Field>
-                            )}
+                            {allowFormulaFeatures &&
+                                dataset.times.length > 0 && (
+                                    <Field>
+                                        <Select
+                                            label="Bandingkan dengan"
+                                            items={[
+                                                {
+                                                    value: NO_COMPARE,
+                                                    label: 'Tanpa pembanding',
+                                                },
+                                                ...COMPARE_MODES.map(
+                                                    (mode) => ({
+                                                        value: mode.value,
+                                                        label: mode.caption,
+                                                    }),
+                                                ),
+                                            ]}
+                                            value={
+                                                value.time_range === undefined
+                                                    ? NO_COMPARE
+                                                    : (value.compare ??
+                                                      NO_COMPARE)
+                                            }
+                                            onValueChange={(mode) =>
+                                                set({
+                                                    compare:
+                                                        mode === null ||
+                                                        mode === NO_COMPARE
+                                                            ? undefined
+                                                            : (mode as QueryCompare),
+                                                })
+                                            }
+                                            searchPlaceholder="Cari pembanding"
+                                            emptyMessage="Pembanding tidak ditemukan."
+                                            portalContainer={portalContainer}
+                                        />
+                                        <FieldDescription>
+                                            {value.time_range === undefined
+                                                ? 'Pilih periode lebih dulu untuk membandingkannya.'
+                                                : 'Setiap nilai mendapat angka pembanding, selisih, dan persen perubahannya.'}
+                                        </FieldDescription>
+                                    </Field>
+                                )}
                         </Step>
                     </>
                 ))}

@@ -349,18 +349,18 @@ export function WidgetFrame({
             {drilling !== null &&
                 widget.query !== null &&
                 !('queries' in widget.query) && (
-                <DrillSheet
-                    key={`${widget.id}:${JSON.stringify(drilling)}`}
-                    widget={widget}
-                    values={drilling}
-                    query={widget.query}
-                    fields={fields}
-                    hierarchies={hierarchies}
-                    slicers={slicerValues}
-                    crossFilters={targetFilters}
-                    onClose={() => setDrilling(null)}
-                />
-            )}
+                    <DrillSheet
+                        key={`${widget.id}:${JSON.stringify(drilling)}`}
+                        widget={widget}
+                        values={drilling}
+                        query={widget.query}
+                        fields={fields}
+                        hierarchies={hierarchies}
+                        slicers={slicerValues}
+                        crossFilters={targetFilters}
+                        onClose={() => setDrilling(null)}
+                    />
+                )}
         </Card>
     );
 }

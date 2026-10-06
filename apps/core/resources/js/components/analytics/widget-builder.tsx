@@ -466,9 +466,13 @@ export function WidgetBuilder({
                             />
                         ) : (
                             <div className="flex flex-col gap-5">
-                                <p className="text-sm text-muted-foreground" role="status">
-                                    Gabungan saat ini hanya mendukung nilai langsung; rumus, persen dari total,
-                                    dan pembanding periode belum tersedia.
+                                <p
+                                    className="text-sm text-muted-foreground"
+                                    role="status"
+                                >
+                                    Gabungan saat ini hanya mendukung nilai
+                                    langsung; rumus, persen dari total, dan
+                                    pembanding periode belum tersedia.
                                 </p>
                                 <section className="flex min-w-0 flex-col gap-3">
                                     <h3 className="text-sm font-medium">

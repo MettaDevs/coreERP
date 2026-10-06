@@ -115,8 +115,8 @@ function slicerFieldsForWidget(
         return field === undefined ? [] : [field];
     }
 
-    const matches = fields.filter((field) =>
-        field.shared_dimension === source.dimension,
+    const matches = fields.filter(
+        (field) => field.shared_dimension === source.dimension,
     );
 
     if (widget.type === 'blend') {
@@ -131,7 +131,9 @@ function slicerFieldsForWidget(
         });
 
         return selected.every((field) => field !== null)
-            ? selected.filter((field): field is WidgetDatasetField => field !== null)
+            ? selected.filter(
+                  (field): field is WidgetDatasetField => field !== null,
+              )
             : [];
     }
 
@@ -184,18 +186,27 @@ export function crossFilterValues(
             continue;
         }
 
-        if (widget.type === 'blend' && item.source.shared_dimension === undefined) {
+        if (
+            widget.type === 'blend' &&
+            item.source.shared_dimension === undefined
+        ) {
             continue;
         }
 
         let field: WidgetDatasetField | null = null;
+
         if (widget.type === 'blend') {
             const first = querySources(widget)[0];
-            if (first !== undefined && item.source.shared_dimension !== undefined) {
+
+            if (
+                first !== undefined &&
+                item.source.shared_dimension !== undefined
+            ) {
                 const candidates = fields.filter(
                     (candidate) =>
                         candidate.source_dataset === first.dataset &&
-                        candidate.shared_dimension === item.source.shared_dimension &&
+                        candidate.shared_dimension ===
+                            item.source.shared_dimension &&
                         queryFields(first.query).has(candidate.key),
                 );
                 field = candidates.length === 1 ? candidates[0] : null;
@@ -321,6 +332,7 @@ export function crossFilterFromRow(
     if (widget.dataset_code === null && widget.type !== 'blend') {
         return null;
     }
+
     if (widget.type === 'blend' && field.shared_dimension === undefined) {
         return null;
     }
@@ -349,18 +361,27 @@ function querySources(
         return [];
     }
 
-    return 'queries' in widget.query ? widget.query.queries : [widget.query];
+    return 'queries' in widget.query
+        ? widget.query.queries.map((query) => ({
+              dataset: query.dataset,
+              query,
+          }))
+        : [{ dataset: widget.query.dataset, query: widget.query }];
 }
 
 function queryFields(query: AnalyticsQuery | undefined): Set<string> {
     const fields = new Set<string>();
+
     if (query === undefined) {
         return fields;
     }
+
     for (const dimension of query.dimensions ?? []) {
         fields.add(typeof dimension === 'string' ? dimension : dimension.field);
     }
+
     Object.keys(query.filters ?? {}).forEach((key) => fields.add(key));
+
     if (query.time_range?.field) {
         fields.add(query.time_range.field);
     }

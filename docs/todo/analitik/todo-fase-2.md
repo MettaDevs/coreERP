@@ -62,13 +62,18 @@ aturannya, US-11 lulus, dan percobaan injeksi ditolak oleh test.
 
 ---
 
-### 14. [ ] Dimensi bersama dan gabungan lintas module
+### 14. [~] Dimensi bersama dan gabungan lintas module
 
 **Tempat:** `app/Platform/Analytics/Datasets/SharedDimensionRegistry.php` (perluasan),
 `Query/Blend.php`, jenis widget `blend`, fixture dua module · **Setelah:** 3 · **Keputusan:** KA-03 ·
 **Skill:** `coreerp-analytics`, `coreerp-architecture` · **Selesai bila:** satu widget menampilkan
 angka dua dataset dari dua module menurut dimensi bersama yang sama, hanya ketika keduanya terpasang,
 tanpa join baris lintas module.
+
+> Draft area 14 sudah menyimpan dan menghitung dua query secara terpisah, menampilkan gabungan luar penuh di tabel,
+> dan menerapkan kebijakan data, slicer, serta cross-filter per sumber. Pilihan sumber nilai untuk pemilih dimensi bersama masih menunggu keputusan
+> pemilik produk. Rumus, pembanding periode, persen terhadap total, dan ekspor Excel widget blend belum didukung.
+> PostgreSQL feature tests, CI gabungan, dan verifikasi layar runtime juga masih menunggu.
 
 - [ ] 14.1 Registry dimensi bersama lengkap: resolver label, pemilih nilai untuk slicer, dan
   pendaftaran dari Foundation (vendor, mata uang) lewat penyedia layanan fiturnya.
