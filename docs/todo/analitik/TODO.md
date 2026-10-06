@@ -148,12 +148,16 @@ baris di bagian yang disediakan.
 
 | Berkas | Dibuat oleh | Ditambah oleh | Cara menambah |
 | --- | --- | --- | --- |
-| `apps/core/routes/analytics.php` | 0 | 6, 8, 12, 13, 15, 16, 17, 18 | Satu blok per area, berkomentar nomor area; halaman `/analytics/...` di luar blok `api/v1/analytics` |
+| `apps/core/routes/analytics.php` | 0 | 6, 8, 12, 13, 14, 15, 16, 17, 18 | Satu blok per area, berkomentar nomor area; halaman `/analytics/...` di luar blok `api/v1/analytics` |
 | `apps/core/routes/web.php` | — | 0 (satu baris `require` di grup `auth`), 17 (rute embed di luar grup `web`) | Hanya baris itu |
 | `apps/core/config/analytics.php` | 0 | 2 (`limits.*` bentuk query), 3, 9, 15, 16, 17 | Kunci baru di bagian area |
 | `apps/core/app/Platform/Analytics/Actions/RunQuery.php` | 0 | 2 (menyatukan bentuk query lebih dulu), 4, 9 | Langkah baru di tempatnya; urutan otorisasi yang ada tidak dipindah |
 | `apps/core/app/Platform/Analytics/Query/QueryCompiler.php` | 0 | 2 (rentang waktu dan urutan pengguna), 3, 4 | Langkah di tempatnya; kunci query yang sudah dibaca parser tidak boleh diabaikan, hanya dikompilasi atau ditolak |
 | `apps/core/app/Platform/Analytics/Datasets/CompiledDataset.php` | 0 | 1, 3, 4 | Method baru; nama method yang ada dicatat di [arsitektur](/todo/analitik/arsitektur#compileddataset) |
+| `apps/core/app/Platform/Analytics/Datasets/SharedDimensionRegistry.php`, `DatasetCatalog.php` | 1, 8 | 14 | Registry hanya menawarkan dimensi yang resolvernya tersedia; katalog hanya menampilkan dimensi pada field yang boleh dilihat principal |
+| `apps/core/app/Platform/Analytics/Query/Blend.php`, `BlendQuery.php`, `BlendResultSet.php` | 14 | — | Dua query mandiri dijalankan lewat `RunQuery`, lalu hasil agregat digabung menurut dimensi bersama |
+| `apps/core/app/Platform/Analytics/Http/Controllers/BlendController.php` | 14 | — | Endpoint pratinjau gabungan untuk layar Core; limiter dan gate sama dengan query interaktif |
+| `apps/core/app/Platform/Analytics/Dashboards/WidgetDefinition.php`, `apps/core/app/Platform/Analytics/Models/Widget.php`, `apps/core/app/Platform/Analytics/Http/Controllers/WidgetDataController.php`, `apps/core/app/Platform/Analytics/Http/Presenters/DashboardPresenter.php` | 6 | 14 | Widget `blend` menyimpan query dan versi dataset per sumber; baca data memeriksa akses setiap sumber |
 | `apps/core/app/Platform/Modules/Support/CoreServices.php` | — | 0 (`Datasets`), 1 (`SharedDimensions`), 18 (`DashboardTemplates`) | Satu baris di `SINGLETON_BINDINGS` |
 | `apps/core/app/Foundation/Vendor/VendorServiceProvider.php`, `apps/core/app/Foundation/Currency/CurrencyServiceProvider.php` | — | 1 (resolver label dimensi bersama) | Satu baris `SharedDimensions::register()` di `boot()` |
 | `apps/core/tests/Fixtures/modules/apperp/contoh-a/*` (dataset, model `Penjualan`, `manifest/`) | 1 | 3, 4 (bahan uji engine) | Kolom baru lewat migration baru; dataset dan manifest hanya ditambah |
@@ -163,7 +167,9 @@ baris di bagian yang disediakan.
 | `apps/core/app/Platform/Integration/Models/IntegrationClient.php` | — | 15 | Dua entri di `SCOPES` |
 | `apps/core/resources/js/components/app-sidebar.tsx` | — | 0 (entri sementara Analisis data), 7, 15 | Satu item per area |
 | `apps/core/app/Http/Middleware/HandleInertiaRequests.php`, `apps/core/resources/js/types/global.d.ts` | — | 0 (prop `analyticsEnabled`), 4 (membuangnya bersama saklar) | Hanya prop itu |
-| `apps/core/resources/js/lib/analytics/types.ts` | 0 | 2, 6, 12, 13 | Tipe baru di akhir; tipe yang ada hanya diperluas |
+| `apps/core/resources/js/lib/analytics/types.ts`, `api.ts` | 0, 6 | 12, 13, 14 | Tipe baru di akhir; bentuk query dan hasil blend ditambahkan tanpa mengubah query satu dataset |
+| `apps/core/resources/js/components/analytics/` (widget builder dan tabel hasil) | 7, 8 | 12, 14 | Builder hanya menawarkan dataset kedua yang berbagi dimensi; menu di dalam `Sheet` memakai `portalContainer` |
+| `apps/core/tests/Fixtures/modules/apperp/contoh-b/*` (dataset, model, manifest) | 14 | — | Fixture module kedua untuk menguji gabungan lintas module dan pencabutan pemasangan |
 | `apps/core/vite.config.ts` | — | 17 (entri embed) | Satu entri |
 | `modules/apperp/management-aset/src/ModuleServiceProvider.php` | — | 0, 5, 18 | Satu daftar dataset dan satu daftar template |
 | `apps/core/contracts/internal/integrasi-analitik.yaml` | 15 | 16, 17 | Path baru di bawah `paths:` |

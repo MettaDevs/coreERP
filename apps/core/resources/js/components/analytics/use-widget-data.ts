@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { WidgetFailure } from '@/lib/analytics/api';
 import { fetchWidgetData, widgetFailure } from '@/lib/analytics/api';
 import type { SlicerValues } from '@/lib/analytics/slicer';
-import type { ResultSet } from '@/lib/analytics/types';
+import type { AnalyticsResult } from '@/lib/analytics/types';
 
 type Loaded = {
     key: string;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
 };
 
@@ -32,7 +32,7 @@ export function useWidgetData(
     const [visible, setVisible] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
-    const [previous, setPrevious] = useState<ResultSet | null>(null);
+    const [previous, setPrevious] = useState<AnalyticsResult | null>(null);
     const filtersKey = JSON.stringify([slicers, crossFilters]);
     const key = `${widgetId}:${attempt}:${filtersKey}`;
 

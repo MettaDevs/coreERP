@@ -243,7 +243,8 @@ class WalkingSkeletonTest extends TestCase
                 ->assertInertia(fn (AssertableInertia $page) => $page
                     ->component('platform/analytics/explore')
                     ->where('datasets', fn ($datasets): bool => array_diff($catalog, collect($datasets)->pluck('code')->all()) === [])
-                    ->where('datasets.0', fn ($dataset): bool => collect($dataset)->keys()->all() === ['code', 'caption', 'description', 'module_id', 'version'])
+                    ->where('datasets.0', fn ($dataset): bool => collect($dataset)->keys()->all() === ['code', 'caption', 'description', 'module_id', 'version', 'shared_dimensions'])
+                    ->where('datasets.0.shared_dimensions', fn ($dimensions): bool => collect($dimensions)->contains('core.legal-entity'))
                     ->where('abilities', ['create' => true, 'share' => true])
                     ->missing('preview'));
         }

@@ -23,6 +23,8 @@ final readonly class TestPrincipal implements AnalyticsPrincipal
     /**
      * @param  array{all: bool, scope_grants: list<array{legal_entity_id: ?string, operating_unit_ids: list<string>}>}  $scope
      * @param  array<string, string|list<string>>  $locked
+     * @param  array<string, bool>  $permissions
+     * @param  array<string, array{all: bool, scope_grants: list<array{legal_entity_id: ?string, operating_unit_ids: list<string>}>}>  $policyScopes
      */
     public function __construct(
         private string $tenant,
@@ -35,6 +37,8 @@ final readonly class TestPrincipal implements AnalyticsPrincipal
         private bool $permitted = true,
         private string $name = 'uji',
         private ?string $fixedFingerprint = null,
+        private array $permissions = [],
+        private array $policyScopes = [],
     ) {}
 
     public function tenantId(): string
@@ -44,12 +48,12 @@ final readonly class TestPrincipal implements AnalyticsPrincipal
 
     public function holdsPermission(string $moduleId, string $permission): bool
     {
-        return $this->permitted;
+        return $this->permissions[$moduleId.'.'.$permission] ?? $this->permitted;
     }
 
     public function policyScope(string $policyCode): array
     {
-        return $this->scope;
+        return $this->policyScopes[$policyCode] ?? $this->scope;
     }
 
     public function mayUsePersonalData(): bool

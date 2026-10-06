@@ -303,7 +303,9 @@ function zoneLabel(date: Date, timeZone: string): string {
  * "Dihitung pukul 14.05 WITA", atau dengan tanggal bila bukan hari ini menurut zona itu. Zona perangkat
  * tidak pernah dipakai diam-diam: pengguna tanpa zona dan tanpa entitas legal melihat "UTC" tertulis.
  */
-export function formatComputedAt(meta: ResultSet['meta']): string {
+export function formatComputedAt(
+    meta: Pick<ResultSet['meta'], 'generated_at' | 'timezone'>,
+): string {
     const date = new Date(meta.generated_at);
 
     if (Number.isNaN(date.getTime())) {

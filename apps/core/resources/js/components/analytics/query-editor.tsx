@@ -20,6 +20,7 @@ import {
 import type {
     AnalyticsQuery,
     DatasetDescription,
+    DatasetField,
     DatasetSummary,
     QueryCompare,
     QueryFormula,
@@ -49,6 +50,11 @@ export function QueryEditor({
     onChange,
     numbered = false,
     portalContainer,
+    dimensionFilter,
+    maxDimensions,
+    dimensionEmptyMessage,
+    allowTimeGranularity = true,
+    allowFormulaFeatures = true,
 }: {
     datasets: DatasetSummary[];
     value: AnalyticsQuery;
@@ -66,6 +72,12 @@ export function QueryEditor({
     /** Menomori langkah, untuk alur pembangun. */
     numbered?: boolean;
     portalContainer?: RefObject<HTMLElement | null>;
+    dimensionFilter?: (field: DatasetField) => boolean;
+    maxDimensions?: number;
+    dimensionEmptyMessage?: string;
+    allowTimeGranularity?: boolean;
+    /** Rumus, persen terhadap total, dan perbandingan periode hanya tersedia untuk widget satu data. */
+    allowFormulaFeatures?: boolean;
 }) {
     const title = (step: number, text: string) =>
         numbered ? `${step}. ${text}` : text;
@@ -137,80 +149,112 @@ export function QueryEditor({
                         <Step title={title(2, 'Nilai')}>
                             <MeasurePicker
                                 measures={dataset.measures}
-                                value={value.measures.filter(
-                                    (key) => !ownKeys.includes(key),
-                                )}
-                                onChange={setMeasures}
-                                portalContainer={portalContainer}
-                            />
-                            <FormulaEditor
-                                measures={dataset.measures}
-                                formulas={formulas}
-                                maxFormulas={dataset.limits.formulas}
-                                error={errors.formula ?? null}
-                                limitError={errors.formulaLimit}
-                                onChange={(key, changed) =>
-                                    setFormulas(
-                                        formulas.map((formula) =>
-                                            formula.key === key
-                                                ? { key, ...changed }
-                                                : formula,
-                                        ),
-                                        value.measures,
-                                    )
+                                value={
+                                    allowFormulaFeatures
+                                        ? value.measures.filter(
+                                              (key) => !ownKeys.includes(key),
+                                          )
+                                        : value.measures
                                 }
-                                onAdd={(added) => {
-                                    const key = newFormulaKey(value, [
-                                        ...dataset.measures.map(
-                                            (measure) => measure.key,
-                                        ),
-                                        ...dataset.fields.map(
-                                            (field) => field.key,
-                                        ),
-                                    ]);
-
-                                    setFormulas(
-                                        [...formulas, { key, ...added }],
-                                        [...value.measures, key],
-                                    );
-                                }}
-                                onRemove={(key) =>
-                                    setFormulas(
-                                        formulas.filter(
-                                            (formula) => formula.key !== key,
-                                        ),
-                                        value.measures.filter(
-                                            (measure) => measure !== key,
-                                        ),
-                                    )
+                                onChange={
+                                    allowFormulaFeatures
+                                        ? setMeasures
+                                        : (measures) => set({ measures })
                                 }
                                 portalContainer={portalContainer}
                             />
-                            {value.measures.length > 0 && (
-                                <Field>
-                                    <MultiSelect
-                                        label="Tampilkan juga sebagai persen dari total"
-                                        items={value.measures.map((key) => ({
-                                            value: key,
-                                            label: captionOf(key),
-                                        }))}
-                                        value={value.percent_of_total ?? []}
-                                        onValueChange={(keys) =>
-                                            set({ percent_of_total: keys })
+                            {allowFormulaFeatures && (
+                                <>
+                                    <FormulaEditor
+                                        measures={dataset.measures}
+                                        formulas={formulas}
+                                        maxFormulas={dataset.limits.formulas}
+                                        error={errors.formula ?? null}
+                                        limitError={errors.formulaLimit}
+                                        onChange={(key, changed) =>
+                                            setFormulas(
+                                                formulas.map((formula) =>
+                                                    formula.key === key
+                                                        ? { key, ...changed }
+                                                        : formula,
+                                                ),
+                                                value.measures,
+                                            )
                                         }
-                                        searchPlaceholder="Cari nilai"
-                                        emptyMessage="Nilai tidak ditemukan."
+                                        onAdd={(added) => {
+                                            const key = newFormulaKey(value, [
+                                                ...dataset.measures.map(
+                                                    (measure) => measure.key,
+                                                ),
+                                                ...dataset.fields.map(
+                                                    (field) => field.key,
+                                                ),
+                                            ]);
+
+                                            setFormulas(
+                                                [
+                                                    ...formulas,
+                                                    { key, ...added },
+                                                ],
+                                                [...value.measures, key],
+                                            );
+                                        }}
+                                        onRemove={(key) =>
+                                            setFormulas(
+                                                formulas.filter(
+                                                    (formula) =>
+                                                        formula.key !== key,
+                                                ),
+                                                value.measures.filter(
+                                                    (measure) =>
+                                                        measure !== key,
+                                                ),
+                                            )
+                                        }
                                         portalContainer={portalContainer}
                                     />
-                                </Field>
+                                    {value.measures.length > 0 && (
+                                        <Field>
+                                            <MultiSelect
+                                                label="Tampilkan juga sebagai persen dari total"
+                                                items={value.measures.map(
+                                                    (key) => ({
+                                                        value: key,
+                                                        label: captionOf(key),
+                                                    }),
+                                                )}
+                                                value={
+                                                    value.percent_of_total ?? []
+                                                }
+                                                onValueChange={(keys) =>
+                                                    set({
+                                                        percent_of_total: keys,
+                                                    })
+                                                }
+                                                searchPlaceholder="Cari nilai"
+                                                emptyMessage="Nilai tidak ditemukan."
+                                                portalContainer={
+                                                    portalContainer
+                                                }
+                                            />
+                                        </Field>
+                                    )}
+                                </>
                             )}
                         </Step>
                         <Step title={title(3, 'Kelompokkan menurut')}>
                             <DimensionPicker
-                                fields={dataset.fields}
+                                fields={
+                                    dimensionFilter
+                                        ? dataset.fields.filter(dimensionFilter)
+                                        : dataset.fields
+                                }
                                 value={value.dimensions ?? []}
                                 onChange={(dimensions) => set({ dimensions })}
                                 portalContainer={portalContainer}
+                                maxDimensions={maxDimensions}
+                                emptyMessage={dimensionEmptyMessage}
+                                allowTimeGranularity={allowTimeGranularity}
                             />
                         </Step>
                         <Step title={title(4, 'Saring')}>
@@ -233,45 +277,49 @@ export function QueryEditor({
                                 onChange={(time_range) => set({ time_range })}
                                 portalContainer={portalContainer}
                             />
-                            {dataset.times.length > 0 && (
-                                <Field>
-                                    <Select
-                                        label="Bandingkan dengan"
-                                        items={[
-                                            {
-                                                value: NO_COMPARE,
-                                                label: 'Tanpa pembanding',
-                                            },
-                                            ...COMPARE_MODES.map((mode) => ({
-                                                value: mode.value,
-                                                label: mode.caption,
-                                            })),
-                                        ]}
-                                        value={
-                                            value.time_range === undefined
-                                                ? NO_COMPARE
-                                                : (value.compare ?? NO_COMPARE)
-                                        }
-                                        onValueChange={(mode) =>
-                                            set({
-                                                compare:
-                                                    mode === null ||
-                                                    mode === NO_COMPARE
-                                                        ? undefined
-                                                        : (mode as QueryCompare),
-                                            })
-                                        }
-                                        searchPlaceholder="Cari pembanding"
-                                        emptyMessage="Pembanding tidak ditemukan."
-                                        portalContainer={portalContainer}
-                                    />
-                                    <FieldDescription>
-                                        {value.time_range === undefined
-                                            ? 'Pilih periode lebih dulu untuk membandingkannya.'
-                                            : 'Setiap nilai mendapat angka pembanding, selisih, dan persen perubahannya.'}
-                                    </FieldDescription>
-                                </Field>
-                            )}
+                            {allowFormulaFeatures &&
+                                dataset.times.length > 0 && (
+                                    <Field>
+                                        <Select
+                                            label="Bandingkan dengan"
+                                            items={[
+                                                {
+                                                    value: NO_COMPARE,
+                                                    label: 'Tanpa pembanding',
+                                                },
+                                                ...COMPARE_MODES.map(
+                                                    (mode) => ({
+                                                        value: mode.value,
+                                                        label: mode.caption,
+                                                    }),
+                                                ),
+                                            ]}
+                                            value={
+                                                value.time_range === undefined
+                                                    ? NO_COMPARE
+                                                    : (value.compare ??
+                                                      NO_COMPARE)
+                                            }
+                                            onValueChange={(mode) =>
+                                                set({
+                                                    compare:
+                                                        mode === null ||
+                                                        mode === NO_COMPARE
+                                                            ? undefined
+                                                            : (mode as QueryCompare),
+                                                })
+                                            }
+                                            searchPlaceholder="Cari pembanding"
+                                            emptyMessage="Pembanding tidak ditemukan."
+                                            portalContainer={portalContainer}
+                                        />
+                                        <FieldDescription>
+                                            {value.time_range === undefined
+                                                ? 'Pilih periode lebih dulu untuk membandingkannya.'
+                                                : 'Setiap nilai mendapat angka pembanding, selisih, dan persen perubahannya.'}
+                                        </FieldDescription>
+                                    </Field>
+                                )}
                         </Step>
                     </>
                 ))}

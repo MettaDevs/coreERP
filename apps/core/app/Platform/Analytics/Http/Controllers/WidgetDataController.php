@@ -9,9 +9,11 @@ use App\Platform\Analytics\Actions\RunQuery;
 use App\Platform\Analytics\Dashboards\DashboardAccess;
 use App\Platform\Analytics\Dashboards\SlicerDefinitions;
 use App\Platform\Analytics\Dashboards\StoredQuery;
+use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Widget;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\Blend;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Security\DatasetAccess;
 use App\Platform\Analytics\Security\UserPrincipal;
@@ -45,6 +47,7 @@ final class WidgetDataController extends Controller
         private readonly DatasetAccess $access,
         private readonly QueryParser $parser,
         private readonly RunQuery $run,
+        private readonly Blend $blend,
         private readonly UserClock $clock,
         private readonly SlicerDefinitions $slicers,
     ) {}
@@ -67,6 +70,56 @@ final class WidgetDataController extends Controller
         $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request));
 
         try {
+            if ($widget->type === 'blend') {
+                if ($widget->query === null) {
+                    throw AnalyticsQueryException::invalidQuery('query', 'Bagian gabungan ini tidak dapat dibaca. Ubah lalu simpan lagi.');
+                }
+                $read = $this->blend->readStorage($widget->query);
+                $sourceDatasets = [];
+                foreach ($read['datasets'] as $dataset) {
+                    if ($dataset === null) {
+                        throw AnalyticsQueryException::datasetUnknown();
+                    }
+                    $this->access->authorize($principal, $dataset);
+                    $sourceDatasets[] = $dataset;
+                }
+                if ($read['missing'] !== []) {
+                    $missing = $read['missing'][0];
+                    throw new AnalyticsQueryException(
+                        'analytics.field_removed',
+                        'Kolom "'.$missing['field'].'" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain.',
+                        422,
+                        "query.queries.{$missing['source']}.{$missing['path']}",
+                    );
+                }
+                $crossFilters = $this->crossFiltersForBlend(
+                    $request->query('c'),
+                    $sourceDatasets,
+                    $read['query']['queries'],
+                );
+                $locked = [];
+                foreach ($sourceDatasets as $index => $dataset) {
+                    $locked[$dataset->code] = $this->slicers->filtersForWidget(
+                        $widget->dashboard->slicers ?? [],
+                        $request->query('s'),
+                        $crossFilters[$index],
+                        $dataset,
+                        $read['query']['queries'][$index],
+                        $principal,
+                    );
+                }
+                $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request), $locked);
+                $result = $this->blend->handle(
+                    $principal,
+                    $read['query'],
+                    cacheTtl: $widget->cache_ttl_seconds,
+                    refresh: $refresh,
+                    source: QueryLog::SOURCE_WIDGET,
+                );
+
+                return response()->json($result->toArray());
+            }
+
             if ($widget->dataset_code === null || $widget->query === null) {
                 throw AnalyticsQueryException::invalidQuery('type', 'Bagian teks tidak punya data untuk dihitung.');
             }
@@ -107,5 +160,79 @@ final class WidgetDataController extends Controller
         }
 
         return response()->json($result->toArray());
+    }
+
+    /**
+     * Cross-filter yang berasal dari field salah satu sumber gabungan dipetakan ke field terpilih dengan dimensi
+     * bersama yang sama pada kedua sumber. Filter field biasa hanya diterapkan pada sumber yang memilikinya.
+     * Kunci asing tetap diteruskan ke validator agar dijawab sebagai 422, bukan diabaikan.
+     *
+     * @param  list<CompiledDataset>  $datasets
+     * @param  list<array<string, mixed>>  $queries
+     * @return array{0: mixed, 1: mixed}
+     */
+    private function crossFiltersForBlend(mixed $input, array $datasets, array $queries): array
+    {
+        if (! is_array($input)) {
+            return [$input, []];
+        }
+
+        $selectedFields = [];
+        $sharedDimensions = [];
+        foreach ($queries as $index => $query) {
+            $raw = is_array($query['dimensions'] ?? null) ? ($query['dimensions'][0] ?? null) : null;
+            $field = is_array($raw) ? ($raw['field'] ?? null) : $raw;
+            $selectedFields[] = is_string($field) ? $field : null;
+            $sharedDimensions[] = is_string($field) && $datasets[$index]->hasField($field)
+                ? $datasets[$index]->sharedDimension($field)
+                : null;
+        }
+
+        $filters = [[], []];
+        foreach ($input as $field => $value) {
+            if (! is_string($field)) {
+                $filters[0][$field] = $value;
+
+                continue;
+            }
+
+            $matched = false;
+            $matchesSharedDimension = $sharedDimensions[0] !== null
+                && array_any($datasets, fn (CompiledDataset $dataset): bool => $dataset->hasField($field)
+                    && $dataset->sharedDimension($field) === $sharedDimensions[0]);
+            if ($matchesSharedDimension) {
+                foreach ($datasets as $index => $dataset) {
+                    $target = $selectedFields[$index] ?? null;
+                    if ($dataset->sharedDimension($target ?? '') === $sharedDimensions[$index] && is_string($target)) {
+                        $filters[$index][$target] = $value;
+                    }
+                }
+                $matched = true;
+            }
+
+            foreach ($datasets as $index => $dataset) {
+                if ($matchesSharedDimension) {
+                    break;
+                }
+                if (! $dataset->hasField($field)) {
+                    continue;
+                }
+
+                $dimension = $dataset->sharedDimension($field);
+                if ($dimension !== null && $dimension === $sharedDimensions[0] && $dimension === $sharedDimensions[$index]) {
+                    $target = $selectedFields[$index] ?? $field;
+                    $filters[$index][$target] = $value;
+                } else {
+                    $filters[$index][$field] = $value;
+                }
+                $matched = true;
+            }
+
+            if (! $matched) {
+                $filters[0][$field] = $value;
+            }
+        }
+
+        return [$filters[0], $filters[1]];
     }
 }

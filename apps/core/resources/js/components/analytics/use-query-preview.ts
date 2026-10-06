@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { runQuery, widgetFailure } from '@/lib/analytics/api';
-import type { AnalyticsQuery, ResultSet } from '@/lib/analytics/types';
+import { runBlend, runQuery, widgetFailure } from '@/lib/analytics/api';
+import type {
+    AnalyticsQuery,
+    AnalyticsResult,
+    BlendQuery,
+    BlendResultSet,
+    ResultSet,
+} from '@/lib/analytics/types';
 import { CoreApiError } from '@/lib/core-api';
 
 /** Jeda sejak isian terakhir berubah sebelum query dijalankan. */
@@ -8,8 +14,16 @@ export const PREVIEW_DELAY_MS = 500;
 
 type Loaded = {
     key: string;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     error: unknown;
+};
+
+type PreviewState<T> = {
+    loading: boolean;
+    result: T | null;
+    error: unknown;
+    previous: T | null;
+    reload: () => void;
 };
 
 /**
@@ -21,11 +35,23 @@ type Loaded = {
  * berhasil, untuk ditampilkan redup selama perhitungan berikutnya berjalan. Membuka layar dan Muat ulang tidak
  * menunggu jeda. `null` berarti query belum lengkap; tidak ada yang dikirim.
  */
-export function useQueryPreview(query: AnalyticsQuery | null) {
+export function useQueryPreview(
+    query: AnalyticsQuery | null,
+): PreviewState<ResultSet>;
+export function useQueryPreview(
+    query: BlendQuery | null,
+): PreviewState<BlendResultSet>;
+export function useQueryPreview(
+    query: AnalyticsQuery | BlendQuery | null,
+): PreviewState<AnalyticsResult>;
+export function useQueryPreview(
+    query: AnalyticsQuery | BlendQuery | null,
+): PreviewState<AnalyticsResult> {
     const body = query === null ? null : JSON.stringify(query);
+    const blend = query !== null && 'queries' in query;
     const [attempt, setAttempt] = useState(0);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
-    const [previous, setPrevious] = useState<ResultSet | null>(null);
+    const [previous, setPrevious] = useState<AnalyticsResult | null>(null);
     const lastBody = useRef<string | null | undefined>(undefined);
     const key = body === null ? null : `${attempt}:${body}`;
 
@@ -42,7 +68,10 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
         lastBody.current = body;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            runQuery(body, controller.signal)
+            (blend
+                ? runBlend(body, controller.signal)
+                : runQuery(body, controller.signal)
+            )
                 .then((result) => {
                     setLoaded({ key, result, error: null });
                     setPrevious(result);
@@ -58,7 +87,7 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [body, key]);
+    }, [body, blend, key]);
 
     const current = key !== null && loaded?.key === key ? loaded : null;
 

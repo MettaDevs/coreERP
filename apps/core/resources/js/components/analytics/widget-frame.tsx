@@ -46,14 +46,13 @@ import {
     crossFilterValues,
     notApplicableSlicers,
 } from '@/lib/analytics/slicer';
-import type { SlicerValues } from '@/lib/analytics/slicer';
+import type { SlicerValues, WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
+    AnalyticsResult,
     CrossFilter,
     DashboardSlicer,
     DashboardWidget,
-    DatasetField,
     ResultColumn,
-    ResultSet,
     ResultValue,
     TextVisual,
     DrillValue,
@@ -71,7 +70,7 @@ type WidgetFrameProps = {
     onRename?: (widget: DashboardWidget) => void;
     onArchive?: (widget: DashboardWidget) => void;
     className?: string;
-    fields?: DatasetField[];
+    fields?: WidgetDatasetField[];
     hierarchies?: Record<string, string[]>;
     slicers?: DashboardSlicer[];
     slicerValues?: SlicerValues;
@@ -149,7 +148,11 @@ export function WidgetFrame({
     };
 
     const selectPoint = (row: Record<string, ResultValue>) => {
-        if (shown === null || widget.query === null) {
+        if (
+            shown === null ||
+            widget.query === null ||
+            'queries' in widget.query
+        ) {
             return;
         }
 
@@ -175,6 +178,7 @@ export function WidgetFrame({
               icon?: LucideIcon;
               onSelect: () => void;
               destructive?: boolean;
+              disabled?: boolean;
           }
         | 'separator'
     > = [
@@ -191,29 +195,36 @@ export function WidgetFrame({
             : []),
         ...(hasData
             ? [
-                  {
-                      label: 'Ekspor ke Excel',
-                      icon: Download,
-                      onSelect: () => {
-                          void enqueueAnalyticsExport({
-                              widget_id: widget.id,
-                              kind: 'widget',
-                              slicers: slicerValues,
-                              cross_filters: targetFilters,
-                          })
-                              .then(() =>
-                                  toast.success(
-                                      'Ekspor bagian masuk ke antrean. Buka menu Ekspor untuk melihat hasilnya.',
-                                  ),
-                              )
-                              .catch((caught: unknown) =>
-                                  toastSaveError(
-                                      caught,
-                                      'Ekspor belum diminta.',
-                                  ),
-                              );
-                      },
-                  },
+                  widget.type === 'blend'
+                      ? {
+                            label: 'Ekspor gabungan belum tersedia',
+                            icon: Download,
+                            disabled: true,
+                            onSelect: () => {},
+                        }
+                      : {
+                            label: 'Ekspor ke Excel',
+                            icon: Download,
+                            onSelect: () => {
+                                void enqueueAnalyticsExport({
+                                    widget_id: widget.id,
+                                    kind: 'widget',
+                                    slicers: slicerValues,
+                                    cross_filters: targetFilters,
+                                })
+                                    .then(() =>
+                                        toast.success(
+                                            'Ekspor bagian masuk ke antrean. Buka menu Ekspor untuk melihat hasilnya.',
+                                        ),
+                                    )
+                                    .catch((caught: unknown) =>
+                                        toastSaveError(
+                                            caught,
+                                            'Ekspor belum diminta.',
+                                        ),
+                                    );
+                            },
+                        },
                   {
                       label: 'Muat ulang',
                       icon: RotateCw,
@@ -283,6 +294,7 @@ export function WidgetFrame({
                                                     ? 'destructive'
                                                     : 'default'
                                             }
+                                            disabled={item.disabled}
                                             onSelect={item.onSelect}
                                         >
                                             {item.icon && <item.icon />}
@@ -334,19 +346,21 @@ export function WidgetFrame({
                     </Button>
                 </CardFooter>
             )}
-            {drilling !== null && widget.query !== null && (
-                <DrillSheet
-                    key={`${widget.id}:${JSON.stringify(drilling)}`}
-                    widget={widget}
-                    values={drilling}
-                    query={widget.query}
-                    fields={fields}
-                    hierarchies={hierarchies}
-                    slicers={slicerValues}
-                    crossFilters={targetFilters}
-                    onClose={() => setDrilling(null)}
-                />
-            )}
+            {drilling !== null &&
+                widget.query !== null &&
+                !('queries' in widget.query) && (
+                    <DrillSheet
+                        key={`${widget.id}:${JSON.stringify(drilling)}`}
+                        widget={widget}
+                        values={drilling}
+                        query={widget.query}
+                        fields={fields}
+                        hierarchies={hierarchies}
+                        slicers={slicerValues}
+                        crossFilters={targetFilters}
+                        onClose={() => setDrilling(null)}
+                    />
+                )}
         </Card>
     );
 }
@@ -369,12 +383,12 @@ function FrameBody({
     height: number;
     hasData: boolean;
     loading: boolean;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
     asTable: boolean;
     onReload: () => void;
     onEdit?: (widget: DashboardWidget) => void;
-    fields: DatasetField[];
+    fields: WidgetDatasetField[];
     onDimensionSelect: (
         column: ResultColumn,
         row: Record<string, ResultValue>,

@@ -23,6 +23,7 @@ final class DatasetCatalog
     public function __construct(
         private readonly DatasetRegistry $datasets,
         private readonly PersonalDataGate $personalData,
+        private readonly SharedDimensionRegistry $sharedDimensions,
     ) {}
 
     /** @return list<CompiledDataset> */
@@ -34,15 +35,24 @@ final class DatasetCatalog
         ));
     }
 
-    /** @return array{code: string, caption: string, description: ?string, module_id: string, version: int} */
-    public function summary(CompiledDataset $dataset): array
+    /** @return array{code: string, caption: string, description: ?string, module_id: string, version: int, shared_dimensions: list<string>} */
+    public function summary(CompiledDataset $dataset, AnalyticsPrincipal $principal): array
     {
+        $shared = [];
+        foreach ($this->personalData->visibleFields($dataset, $principal) as $field) {
+            $dimension = $dataset->sharedDimension($field->key);
+            if ($dimension !== null && $this->sharedDimensions->supports($dimension)) {
+                $shared[] = $dimension->value;
+            }
+        }
+
         return [
             'code' => $dataset->code,
             'caption' => $dataset->caption,
             'description' => $dataset->description,
             'module_id' => $dataset->moduleId,
             'version' => $dataset->version,
+            'shared_dimensions' => array_values(array_unique($shared)),
         ];
     }
 
@@ -82,7 +92,7 @@ final class DatasetCatalog
         }
 
         return [
-            ...$this->summary($dataset),
+            ...$this->summary($dataset, $principal),
             'fields' => $fields,
             'measures' => $measures,
             'limits' => ['formulas' => config()->integer('analytics.limits.formulas', 5)],

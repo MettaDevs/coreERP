@@ -12,6 +12,7 @@ use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Dashboard;
 use App\Platform\Analytics\Models\SavedQuery;
 use App\Platform\Analytics\Models\Widget;
+use App\Platform\Analytics\Query\Blend;
 use App\Platform\Analytics\Security\UserPrincipal;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
@@ -41,6 +42,7 @@ final class DashboardPresenter
         private readonly DatasetRegistry $datasets,
         private readonly DatasetCatalog $catalog,
         private readonly LaunchableAppCatalog $apps,
+        private readonly Blend $blend,
         private readonly UserClock $clock,
     ) {}
 
@@ -86,7 +88,18 @@ final class DashboardPresenter
         $ready = $this->apps->readyModules((string) $membership->tenant_id);
         $dashboard->setAttribute('widgets_count', $widgets->count());
         $principal = UserPrincipal::fromMembership($membership, $this->clock->timezoneFor($membership->user, null));
-        $widgetDatasets = array_fill_keys(array_filter($widgets->pluck('dataset_code')->all()), true);
+        $widgetDatasets = [];
+        foreach ($widgets as $widget) {
+            if ($widget->dataset_code !== null) {
+                $widgetDatasets[$widget->dataset_code] = true;
+            } elseif ($widget->type === 'blend' && $widget->query !== null) {
+                foreach ($this->blend->readStorage($widget->query)['query']['queries'] as $query) {
+                    if (is_string($query['dataset'] ?? null)) {
+                        $widgetDatasets[$query['dataset']] = true;
+                    }
+                }
+            }
+        }
         $datasetFields = [];
         foreach ($this->catalog->forPrincipal($principal) as $dataset) {
             if (isset($widgetDatasets[$dataset->code])) {
@@ -122,6 +135,25 @@ final class DashboardPresenter
             'missing_fields' => [],
             'version' => $widget->version,
         ];
+        if ($widget->type === 'blend' && $widget->query !== null) {
+            $ready ??= $this->apps->readyModules($widget->tenant_id);
+            $read = $this->blend->readStorage($widget->query);
+            $available = true;
+            foreach ($read['datasets'] as $dataset) {
+                if ($dataset === null || ! in_array($dataset->moduleId, $ready, true)) {
+                    $available = false;
+                    break;
+                }
+            }
+
+            return [
+                ...$out,
+                'query' => $read['query'],
+                'visual' => $this->blend->renameVisual($widget->visual, $read['maps'], $read['query']),
+                'status' => ! $available ? 'dataset_unavailable' : ($read['missing'] === [] ? 'ok' : 'field_removed'),
+                'missing_fields' => array_values(array_unique(array_column($read['missing'], 'field'))),
+            ];
+        }
         if ($widget->dataset_code === null || $widget->query === null) {
             return $out;
         }
