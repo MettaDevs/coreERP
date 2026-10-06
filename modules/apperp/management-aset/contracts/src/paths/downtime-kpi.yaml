@@ -10,7 +10,7 @@
     operationId: createDowntimeReason
     parameters: [$ref: '#/components/parameters/IdempotencyKey']
     requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/MasterCreate'}, {type: object, properties: {masuk_kpi: {type: boolean, default: true}}}]}}}}
-    responses: {'201': {description: Alasan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+    responses: {'201': {description: Alasan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}, '422': {$ref: '#/components/responses/ValidationError'}, '500': {$ref: '#/components/responses/InternalError'}}
 /api/v1/alasan-downtime/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Downtime dan KPI], operationId: getDowntimeReason, responses: {'200': {description: Alasan downtime, headers: {ETag: {$ref: '#/components/headers/ETag'}}, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonResponse'}}}}}}

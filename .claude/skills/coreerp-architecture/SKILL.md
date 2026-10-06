@@ -149,6 +149,11 @@ Before adding or changing a Number Sequence reference, manifest, setting, or API
 
 ### Data policy decision gate
 
+For numbered records, apply the persistence gate in `number-sequence-design`: document unique indexes
+and lookup namespaces must match reference scope. An issuer-only test is insufficient. Fixtures must
+honor manifest scope, including cross-company persistence when numbering is per legal entity. See
+`docs/dev/14-number-sequences.md`, "Scope nomor harus sama dengan indeks dokumen".
+
 Before creating or changing an app resource that stores or exposes operational
 records:
 

@@ -338,6 +338,7 @@ class RegisterAsetTest extends TestCase
         $this->configureReadyBook($classification['group_aset_id']);
 
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
 
         return $this->terimaAset($this->tenantId, [
             'legal_entity_id' => $this->legalEntityId, 'nama' => 'Aset uji', ...$classification,

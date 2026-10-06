@@ -29,6 +29,7 @@ class PerencanaanAsetTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         $this->unitId = $this->buatSatuanUji($this->tenantId);
         Http::fake(function ($request) {
@@ -38,6 +39,17 @@ class PerencanaanAsetTest extends TestCase
 
             return Http::response(['data' => ['number' => 'PLNA-000001']], 200);
         });
+    }
+
+    public function test_planning_numbers_can_repeat_in_another_legal_entity(): void
+    {
+        $typeId = $this->jenis($this->tenantId);
+        $first = $this->create($typeId)->assertCreated()->json('data');
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $second = $this->create($typeId)->assertCreated()->json('data');
+        $this->assertSame($first['kode'], $second['kode']);
+        $this->assertNotSame($first['id'], $second['id']);
     }
 
     public function test_planning_uses_aset_type_lookup_and_saves_specification_on_transaction_detail(): void

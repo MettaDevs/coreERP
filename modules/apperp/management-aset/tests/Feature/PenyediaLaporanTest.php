@@ -46,6 +46,10 @@ class PenyediaLaporanTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        // Preview dibandingkan dengan formatter cetak yang memakai UTC di skenario ini.
+        // Entitas legal sungguhan tidak boleh diam-diam mewarisi default WIB pada fixture.
+        DB::table('legal_entities')->where('organization_id', $this->legalEntityId)->update(['timezone' => 'UTC']);
         $this->orgUnitId = (string) Str::ulid();
     }
 

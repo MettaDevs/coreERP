@@ -28,6 +28,7 @@ class AssetRegisterListTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
     }
 
     public function test_rows_follow_the_granted_operating_units_and_the_search_like_the_screen(): void
