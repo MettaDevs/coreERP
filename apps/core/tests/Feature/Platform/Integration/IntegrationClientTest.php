@@ -97,7 +97,61 @@ class IntegrationClientTest extends TestCase
         self::reinstallCoreSecurityCatalog();
 
         $this->assertArrayHasKey('vendors.read', IntegrationScope::options());
+        $this->assertArrayHasKey('legal-entities.read', IntegrationScope::options());
         $this->buat(['scopes' => ['vendors.read']])->assertCreated();
+    }
+
+    public function test_legal_entity_directory_requires_its_own_scope(): void
+    {
+        $this->getJson('/api/internal/v1/legal-entities')->assertUnauthorized();
+        $token = (string) $this->buat()->assertCreated()->json('token');
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/internal/v1/legal-entities')->assertForbidden();
+
+        $this->assertNotContains('legal-entities.read', IntegrationClient::query()->firstOrFail()->scopes);
+        $token = (string) $this->buat(['name' => 'Directory reader', 'scopes' => ['legal-entities.read']])
+            ->assertCreated()->json('token');
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/internal/v1/legal-entities')->assertExactJson(['data' => []]);
+        $this->getJson('/api/internal/v1/finance-postings')->assertForbidden();
+    }
+
+    public function test_legal_entity_directory_lists_only_active_entities_of_the_token_tenant(): void
+    {
+        $token = (string) $this->buat(['scopes' => ['legal-entities.read']])->assertCreated()->json('token');
+        $lastId = $this->directoryEntity($this->membership->tenant_id, 'Zulu', 'ZULU');
+        $firstId = $this->directoryEntity($this->membership->tenant_id, 'Alpha', 'ALPHA');
+        $this->directoryEntity($this->membership->tenant_id, 'Inactive', 'INACTIVE', 'inactive');
+        [, $otherMembership] = $this->tenantBaru('directory@other.test', 'Other tenant');
+        $this->directoryEntity($otherMembership->tenant_id, 'Other', 'OTHER');
+
+        // tenant_id dan legal_entity dari query tidak boleh memperluas atau mengganti tenant token.
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/internal/v1/legal-entities?tenant_id='.$otherMembership->tenant_id.'&legal_entity=OTHER')
+            ->assertExactJson(['data' => [
+                ['id' => $firstId, 'code' => 'ALPHA', 'name' => 'Alpha', 'status' => 'active'],
+                ['id' => $lastId, 'code' => 'ZULU', 'name' => 'Zulu', 'status' => 'active'],
+            ]]);
+
+        $newId = $this->directoryEntity($this->membership->tenant_id, 'New', 'NEW');
+        $this->getJson('/api/internal/v1/legal-entities')->assertOk()->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.1.id', $newId);
+        $this->assertDatabaseMissing('finance_posting_settings', ['legal_entity_id' => $newId]);
+    }
+
+    private function directoryEntity(string $tenantId, string $name, string $code, string $status = 'active'): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('organizations')->insert([
+            'id' => $id, 'tenant_id' => $tenantId, 'name' => $name, 'classification' => 'legal_entity',
+            'status' => $status, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('legal_entities')->insert([
+            'organization_id' => $id, 'tenant_id' => $tenantId, 'company_code' => $code, 'country_code' => 'ID',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
     }
 
     private function assertIntegrationChangesForbidden(string $clientId): void

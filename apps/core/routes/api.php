@@ -49,6 +49,10 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
     Route::get('vendors', [VendorDirectoryController::class, 'index']);
 });
 
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:legal-entities.read'])->group(function (): void {
+    Route::get('legal-entities', [OrganizationDirectoryController::class, 'legalEntities']);
+});
+
 /*
  * Feed posting finance untuk pembaca mode `pull`. Membaca dan mengirim ack adalah dua scope berbeda:
  * pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.

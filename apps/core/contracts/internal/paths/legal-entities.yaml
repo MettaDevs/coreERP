@@ -1,0 +1,33 @@
+get:
+  tags: [Directory]
+  operationId: internal.legal-entities.index
+  summary: Daftar entitas legal aktif untuk pilihan perusahaan
+  security:
+    - integrationClient: []
+  description: |
+    Memerlukan scope `legal-entities.read`, diberikan secara eksplisit oleh admin tenant.
+    Seluruh entitas legal aktif milik tenant token dikembalikan, urut nama lalu id,
+    tanpa pagination atau parameter filter. Operating unit dan entitas tidak aktif tidak disajikan.
+
+    Entitas baru langsung tersedia, walaupun feed posting-nya belum diaktifkan.
+    Endpoint ini tidak mengubah setelan feed atau hak token. Simpan `id` untuk identitas
+    perusahaan dan gunakan sebagai parameter `legal_entity` pada vendor atau posting.
+    `code` berasal dari `company_code`, sama dengan `legal_entity.code` pada payload posting.
+    Pemetaan perusahaan ke database finance tetap menjadi tanggung jawab pembaca.
+  responses:
+    '200':
+      description: Daftar lengkap entitas legal aktif, atau daftar kosong.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/LegalEntity' }
+    '401': { $ref: '#/components/responses/IntegrationUnauthenticated' }
+    '403': { $ref: '#/components/responses/IntegrationForbidden' }
+    '429': { $ref: '#/components/responses/IntegrationRateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

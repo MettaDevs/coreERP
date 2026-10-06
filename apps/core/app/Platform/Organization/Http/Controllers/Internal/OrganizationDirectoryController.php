@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\DB;
 
 final class OrganizationDirectoryController extends Controller
 {
+    /** Daftar entitas legal aktif untuk pilihan perusahaan pada sistem luar. */
+    public function legalEntities(Request $request): JsonResponse
+    {
+        $entities = DB::table('organizations')
+            ->join('legal_entities as entity', 'entity.organization_id', '=', 'organizations.id')
+            ->where('organizations.tenant_id', $request->attributes->get('coreerp.tenant_id'))
+            ->where('entity.tenant_id', $request->attributes->get('coreerp.tenant_id'))
+            ->where('organizations.classification', 'legal_entity')
+            ->where('organizations.status', 'active')
+            ->orderBy('organizations.name')
+            ->orderBy('organizations.id')
+            ->get(['organizations.id', 'entity.company_code as code', 'organizations.name', 'organizations.status']);
+
+        return response()->json(['data' => $entities]);
+    }
+
     /**
      * Operating unit tenant, beserta nomor dan tipenya.
      *
