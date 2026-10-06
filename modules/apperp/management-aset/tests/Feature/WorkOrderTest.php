@@ -28,8 +28,21 @@ class WorkOrderTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         Http::fake(fn () => Http::response(['data' => ['number' => 'PMHA-000001']], 200));
+    }
+
+    public function test_work_order_numbers_can_repeat_in_another_legal_entity(): void
+    {
+        $seed = $this->seedMasters();
+        $first = $this->create($seed)->assertCreated()->json('data');
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $seed['aset'] = $this->aset($this->tenantId, $seed, 'AST-WO-SECOND');
+        $second = $this->create($seed)->assertCreated()->json('data');
+        $this->assertSame($first['kode'], $second['kode']);
+        $this->assertNotSame($first['id'], $second['id']);
     }
 
     public function test_work_order_disimpan_dengan_baris_pekerjaan_dan_nomor_dari_core(): void

@@ -127,7 +127,11 @@ trait BerinteraksiDenganKonteksCore
                 'tenant_id' => $tenantId,
                 'reference_id' => $referensiId,
                 'profile_code' => 'non-continuous-default',
-                'scope_type' => 'tenant',
+                // Sama seperti EnsureNumberSequenceDrafts: pilih scope paling luas yang diizinkan
+                // manifest. Memaksa tenant di sini menyembunyikan bentrokan nomor antar-PT.
+                'scope_type' => collect(['tenant', 'legal_entity', 'operating_unit'])
+                    ->first(fn (string $scope): bool => in_array($scope, $baris['allowed_scopes'] ?? [], true))
+                    ?? throw new \LogicException('Reference nomor tidak memiliki scope yang valid: '.$kode),
                 'status' => 'active',
                 'is_continuous' => false,
                 'allow_manual' => false,
@@ -495,7 +499,7 @@ trait BerinteraksiDenganKonteksCore
         ]);
 
         // Tiap tenant, termasuk tenant kedua yang dibuat test isolasi, mendapat urutan nomornya
-        // sendiri. Nomor urut bersifat per tenant di Core; tenant tanpa urutan tidak bisa
+        // sendiri. Konfigurasi milik tenant, tetapi counter mengikuti scope reference; tenant tanpa urutan tidak bisa
         // menerbitkan apa pun, dan test lintas tenant akan gagal dengan 422 yang tidak
         // menyebut sebabnya.
         $this->pastikanNomorUrutSiap($tenantId);

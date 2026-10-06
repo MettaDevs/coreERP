@@ -176,11 +176,26 @@ export function errorMessage(caught: unknown, fallback: string): string {
     return caught instanceof Error ? caught.message : fallback;
 }
 
+export function saveErrorMessage(caught: unknown, fallback: string): string {
+    return caught instanceof ApiError && caught.status >= 500
+        ? `${fallback} Terjadi kesalahan sistem. Hubungi pengelola aplikasi agar dapat diperiksa.`
+        : errorMessage(caught, fallback);
+}
+
 /**
  * Toast untuk kegagalan menyimpan. Versi basi mendapat tombol muat ulang penuh: isian form
  * harus kembali ke data terbaru supaya pengguna melihat perubahan orang lain lebih dulu.
  */
 export function toastSaveError(caught: unknown, fallback: string): void {
+    if (caught instanceof ApiError && caught.status >= 500) {
+        toast.error(saveErrorMessage(caught, fallback), {
+            duration: Infinity,
+            closeButton: true,
+        });
+
+        return;
+    }
+
     if (caught instanceof ApiError && caught.code === 'stale_version') {
         toast.error(caught.message, {
             duration: Infinity,

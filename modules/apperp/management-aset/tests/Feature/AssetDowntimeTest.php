@@ -51,6 +51,7 @@ class AssetDowntimeTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unitId = (string) Str::ulid();
         $this->jenisAset = $this->seedMaster('aset_m_jenis_aset', 'Mesin produksi');
     }

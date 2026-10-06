@@ -39,6 +39,7 @@ class WorkOrderExecutionTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         // Nomor harus berurut: satu test dapat membuat lebih dari satu work order, dan dua
         // nomor yang sama akan ditolak unique (tenant_id, kode) persis seperti di produksi.

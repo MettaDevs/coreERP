@@ -367,6 +367,45 @@ Dua aturan tambahan **hanya** untuk pemanggil di luar runtime ini:
 6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database miliknya; worker mengirimnya sampai sukses.
 7. Set timeout eksplisit pada HTTP client ke Core.
 
+## Scope nomor harus sama dengan indeks dokumen
+
+Keberhasilan `issue()` belum membuktikan dokumen bisa disimpan. Telusuri setiap reference dari manifest,
+scope konfigurasi tenant, context pemanggil, kolom dokumen, indeks unik, sampai cara record dicari.
+Counter `legal_entity` berjalan sendiri untuk tiap PT walaupun kode PT tidak dicetak dalam format.
+Indeks dokumennya menjaga `(tenant_id, legal_entity_id, kode)`, bukan hanya `(tenant_id, kode)`.
+Prefix tetap mengikuti konfigurasi; jangan mengatasi bentrokan dengan menaikkan counter PT lain,
+mencari `MAX(kode)`, atau mengubah format yang sudah dipakai.
+
+Jika beberapa reference berbagi satu tabel, discriminator jenis dokumen ikut menjadi namespace indeks.
+Penjualan, pemusnahan, dan dekomisioning aset berbagi `aset_tr_dokumen_siklus_aset`, sehingga indeksnya
+menjaga `(tenant_id, legal_entity_id, jenis_dokumen, kode)`. Penghapusan lunak memerlukan indeks nomor
+aktif dengan `WHERE deleted_at IS NULL`. Indeks parsial bukan perintah untuk menerbitkan ulang nomor
+yang sudah pernah terbit; idempotensi penerbit tetap menjaga riwayat penerbitannya.
+
+Relasi dan URL memakai `id`; pencarian nomor lintas-PT membawa atau menampilkan perusahaan. Integrasi
+finance memakai `legal_entity` untuk menentukan pembukuan tujuan dan `posting_id` untuk mencegah
+pembukuan ganda, bukan nomor dokumen saja.
+
+### Gate regresi
+
+- Fixture mengikuti manifest dan aturan default scope produksi. Reference yang hanya mengizinkan
+  `legal_entity` tidak boleh dipaksa menjadi `tenant`. Buat organisasi sungguhan beserta baris klasifikasinya.
+- Buat dua PT dalam satu tenant, minta nomor reference yang sama dengan format yang sama, lalu simpan
+  dokumennya. Nomor boleh sama, id record harus berbeda. Jika dokumen melahirkan record bernomor lain,
+  periksa sampai record tersebut tersimpan.
+- Tolak duplikat aktif dalam PT dan namespace yang sama. Periksa replay idempotensi dan nomor berikutnya
+  di PT asal; test satu PT atau satu panggilan penerbit belum menutup gate.
+- Bandingkan seluruh reference scoped dari manifest dengan indeks tabel pemiliknya. Reference baru wajib
+  ikut coverage. `modules/apperp/management-aset/tests/Feature/NumberSequenceScopeTest.php` memeriksa
+  matriks itu dan sengaja mengganti satu indeks menjadi se-tenant untuk membuktikan guard menolaknya.
+- Setelah migration, baca definisi indeks dari database runtime yang dipakai UI. Metadata skema host atau
+  keberhasilan migration di database test tidak membuktikan runtime sudah diperbarui.
+
+Kegagalan pada 6 Oktober 2026 berasal dari manifest aset yang memakai counter per PT sementara beberapa
+indeks lama masih se-tenant. Helper test memaksa semuanya ke scope `tenant`, sehingga keadaan runtime
+tidak direproduksi. Perbaikannya mencakup indeks dan fixture; menambah test tanpa membetulkan fixture
+akan mempertahankan titik buta yang sama.
+
 ## Lihat juga
 
 - [Kalender fiskal](15-fiscal-calendars.md) — periode reset yang dipakai penerbitan nomor

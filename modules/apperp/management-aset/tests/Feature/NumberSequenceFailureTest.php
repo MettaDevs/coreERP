@@ -2,12 +2,15 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -55,6 +58,30 @@ class NumberSequenceFailureTest extends TestCase
 
         $this->assertSame(0, DB::table('aset_m_kondisi_aset')->count(), 'Master tersimpan padahal nomornya gagal terbit.');
         $this->assertSame(0, $this->jumlahNomorTerbit());
+    }
+
+    public function test_unexpected_issuer_failure_is_a_reported_500_not_validation(): void
+    {
+        $failure = new RuntimeException('Kegagalan internal penerbit nomor untuk test.');
+        $this->mock(NumberSequenceIssuer::class)->shouldReceive('issue')->once()->andThrow($failure);
+        $reported = [];
+        app(ExceptionHandler::class)->reportable(function (RuntimeException $error) use (&$reported): void {
+            $reported[] = $error;
+        });
+
+        $this->buatMaster()->assertStatus(500);
+        $this->assertContains($failure, $reported);
+        $this->assertDatabaseCount('aset_m_kondisi_aset', 0);
+        $this->assertSame(0, $this->jumlahNomorTerbit());
+    }
+
+    public function test_empty_generated_number_is_an_internal_error(): void
+    {
+        $this->mock(NumberSequenceIssuer::class)->shouldReceive('issue')->once()
+            ->andReturn(['id' => (string) Str::ulid(), 'number' => '', 'status' => 'issued']);
+
+        $this->buatMaster()->assertStatus(500);
+        $this->assertDatabaseCount('aset_m_kondisi_aset', 0);
     }
 
     /**

@@ -4,7 +4,9 @@ namespace Modules\Apperp\ManagementAset\Services;
 
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
+use UnexpectedValueException;
 
 /**
  * Penerbitan nomor lewat kontrak Core, bukan lewat HTTP.
@@ -43,7 +45,7 @@ class AssetNumberSequenceIssuer
                 $reference,
                 $idempotencyKey,
             );
-        } catch (Throwable $failure) {
+        } catch (ValidationException $failure) {
             throw $this->fail('number_sequence_failed', $failure->getMessage(), $reference, $tenantId, $failure);
         }
 
@@ -53,7 +55,7 @@ class AssetNumberSequenceIssuer
         $number = $result['number'];
 
         if ($number === '') {
-            throw $this->fail('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $tenantId);
+            throw new UnexpectedValueException('Penerbit nomor mengembalikan nomor kosong untuk reference '.$reference.'.');
         }
 
         return $number;

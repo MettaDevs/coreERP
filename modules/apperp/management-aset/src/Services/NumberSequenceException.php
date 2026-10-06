@@ -22,10 +22,10 @@ use Throwable;
  * ditolak. Ketiganya berasal dari jaringan, dan jaringan itu sudah tidak ada — nomor
  * diterbitkan lewat kontrak di dalam proses yang sama, pada koneksi database yang sama.
  *
- * Yang tersisa hanya satu jenis kegagalan: permintaannya sendiri tidak bisa dipenuhi,
- * misalnya reference yang belum terdaftar untuk tenant ini. Itu 422, dan hanya 422. Status
- * per kejadian dibuang bersama sebab-sebab yang tidak mungkin lagi terjadi, sehingga 503
- * tidak sekadar berhenti dipakai — ia menjadi tidak bisa ditulis.
+ * Kelas ini hanya mewakili penolakan validasi, misalnya reference yang belum terdaftar atau
+ * urutan nomor yang belum aktif. Itu 422. Kegagalan database dan bug internal tetap mungkin
+ * walaupun tidak ada jaringan; keduanya tidak dibungkus kelas ini dan diteruskan ke handler
+ * Laravel sebagai 500 agar laporan exception aslinya sampai ke Sentry.
  */
 class NumberSequenceException extends RuntimeException
 {
