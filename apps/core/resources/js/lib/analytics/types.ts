@@ -64,6 +64,31 @@ export type ResultSet = {
     };
 };
 
+/** Hasil gabungan dua query analitik yang masing-masing memakai scope-nya sendiri. */
+export type BlendResultSet = Omit<ResultSet, 'meta'> & {
+    meta: {
+        type: 'blend';
+        dimension: string;
+        generated_at: string;
+        timezone: string;
+        truncated: boolean;
+        cached: boolean;
+        duration_ms: number;
+        query_hash: string;
+        sources: Array<{
+            dataset: string;
+            dataset_version: number;
+            row_limit: number;
+            truncated: boolean;
+            cached: boolean;
+            duration_ms: number;
+            query_hash: string;
+        }>;
+    };
+};
+
+export type AnalyticsResult = ResultSet | BlendResultSet;
+
 /** Satu pengelompok query: kunci field, atau field waktu beserta ukuran waktunya. */
 export type QueryDimension = NonNullable<AnalyticsQuery['dimensions']>[number];
 
@@ -84,6 +109,7 @@ export type DatasetSummary = {
     description: string | null;
     module_id: string;
     version: number;
+    shared_dimensions: string[];
 };
 
 export type DatasetField = {
@@ -123,7 +149,17 @@ export type DatasetDescription = DatasetSummary & {
 };
 
 export type WidgetType =
-    'kpi' | 'bar' | 'column' | 'line' | 'area' | 'donut' | 'table' | 'text';
+    | 'kpi'
+    | 'bar'
+    | 'column'
+    | 'line'
+    | 'area'
+    | 'donut'
+    | 'table'
+    | 'blend'
+    | 'text';
+
+export type BlendQuery = { queries: [AnalyticsQuery, AnalyticsQuery] };
 
 /** Gaya rentang ambang tile, mengikuti Cue Setup Business Central. */
 export type ThresholdStyle =
@@ -178,7 +214,7 @@ export type DashboardWidget = {
     type: WidgetType;
     dataset_code: string | null;
     /** Kosong untuk widget teks. Kunci yang diganti nama dataset sudah dipetakan server. */
-    query: AnalyticsQuery | null;
+    query: AnalyticsQuery | BlendQuery | null;
     visual: WidgetVisual;
     cache_ttl_seconds: number | null;
     status: WidgetStatus;

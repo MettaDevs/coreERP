@@ -11,6 +11,7 @@ use App\Platform\Analytics\Dashboards\StoredQuery;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Widget;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\Blend;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Security\DatasetAccess;
 use App\Platform\Analytics\Security\UserPrincipal;
@@ -43,6 +44,7 @@ final class WidgetDataController extends Controller
         private readonly DatasetAccess $access,
         private readonly QueryParser $parser,
         private readonly RunQuery $run,
+        private readonly Blend $blend,
         private readonly UserClock $clock,
     ) {}
 
@@ -64,6 +66,37 @@ final class WidgetDataController extends Controller
         $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request));
 
         try {
+            if ($widget->type === 'blend') {
+                if ($widget->query === null) {
+                    throw AnalyticsQueryException::invalidQuery('query', 'Bagian gabungan ini tidak dapat dibaca. Ubah lalu simpan lagi.');
+                }
+                $read = $this->blend->readStorage($widget->query);
+                foreach ($read['datasets'] as $dataset) {
+                    if ($dataset === null) {
+                        throw AnalyticsQueryException::datasetUnknown();
+                    }
+                    $this->access->authorize($principal, $dataset);
+                }
+                if ($read['missing'] !== []) {
+                    $missing = $read['missing'][0];
+                    throw new AnalyticsQueryException(
+                        'analytics.field_removed',
+                        'Kolom "'.$missing['field'].'" sudah tidak tersedia di data ini. Ubah bagian ini untuk memilih kolom lain.',
+                        422,
+                        "query.queries.{$missing['source']}.{$missing['path']}",
+                    );
+                }
+                $result = $this->blend->handle(
+                    $principal,
+                    $read['query'],
+                    cacheTtl: $widget->cache_ttl_seconds,
+                    refresh: $refresh,
+                    source: QueryLog::SOURCE_WIDGET,
+                );
+
+                return response()->json($result->toArray());
+            }
+
             if ($widget->dataset_code === null || $widget->query === null) {
                 throw AnalyticsQueryException::invalidQuery('type', 'Bagian teks tidak punya data untuk dihitung.');
             }

@@ -37,8 +37,8 @@ import {
 import type { WidgetFailure } from '@/lib/analytics/api';
 import { formatComputedAt } from '@/lib/analytics/format';
 import type {
+    AnalyticsResult,
     DashboardWidget,
-    ResultSet,
     TextVisual,
 } from '@/lib/analytics/types';
 import { cn } from '@/lib/utils';
@@ -241,7 +241,7 @@ function FrameBody({
     height: number;
     hasData: boolean;
     loading: boolean;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
     asTable: boolean;
     onReload: () => void;

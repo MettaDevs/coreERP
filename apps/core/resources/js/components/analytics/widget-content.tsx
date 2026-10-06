@@ -6,6 +6,8 @@ import { ResultTable } from '@/components/analytics/result-table';
 import type {
     CartesianVisual,
     DonutVisual,
+    AnalyticsResult,
+    BlendResultSet,
     KpiVisual,
     ResultSet,
     TableVisual,
@@ -42,6 +44,10 @@ export function isChartType(type: WidgetType): type is ChartWidgetType {
     return CHART_TYPES.includes(type);
 }
 
+function isBlendResult(result: AnalyticsResult): result is BlendResultSet {
+    return 'type' in result.meta && result.meta.type === 'blend';
+}
+
 /**
  * Isi satu widget dari hasil query yang sudah ada: tile, grafik, atau tabel menurut jenisnya. Tidak
  * memuat data dan tidak tahu dasbor, jadi pembangun widget dan penjelajah (area 8) memakainya untuk
@@ -58,7 +64,7 @@ export function WidgetContent({
 }: {
     type: WidgetType;
     visual: WidgetVisual;
-    result: ResultSet;
+    result: AnalyticsResult;
     title: string;
     /** Tinggi di grid, 1–3. */
     height?: number;
@@ -66,6 +72,19 @@ export function WidgetContent({
 }) {
     const chartHeight = CHART_HEIGHT[height] ?? CHART_HEIGHT[2];
     const tableHeight = TABLE_HEIGHT[height] ?? TABLE_HEIGHT[2];
+
+    if (type === 'blend' || isBlendResult(result)) {
+        const table = visual as TableVisual;
+
+        return (
+            <ResultTable
+                result={result}
+                columns={table.columns}
+                showTotals={table.show_totals !== false}
+                className={tableHeight}
+            />
+        );
+    }
 
     if (asTable || type === 'table') {
         const table = type === 'table' ? (visual as TableVisual) : null;
@@ -80,8 +99,10 @@ export function WidgetContent({
         );
     }
 
+    const queryResult: ResultSet = result;
+
     if (type === 'kpi') {
-        return <KpiTile result={result} visual={visual as KpiVisual} />;
+        return <KpiTile result={queryResult} visual={visual as KpiVisual} />;
     }
 
     if (isChartType(type)) {
@@ -92,7 +113,7 @@ export function WidgetContent({
                 <ChartWidget
                     type={type}
                     visual={visual as CartesianVisual | DonutVisual}
-                    result={result}
+                    result={queryResult}
                     title={title}
                     heightClass={chartHeight}
                 />

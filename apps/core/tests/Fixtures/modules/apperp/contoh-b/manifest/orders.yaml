@@ -1,0 +1,28 @@
+security:
+  data_policies:
+    - code: contoh-b.orders-scope
+      name: Pesanan menurut unit kerja
+      protected_permissions:
+        - contoh-b.orders.read
+      requires_legal_entity: true
+      requires_operating_unit: true
+      allows_descendants: true
+  entry_points:
+    - code: contoh-b.orders.form
+      name: Layar pesanan
+      type: form
+  permissions:
+    - code: contoh-b.orders.read
+      name: Lihat pesanan
+      entry_point: contoh-b.orders.form
+      access: read
+  privileges:
+    - code: contoh-b.orders.view
+      name: Lihat pesanan
+      permissions:
+        - contoh-b.orders.read
+  duties:
+    - code: contoh-b.orders.maintain
+      name: Kelola pesanan
+      privileges:
+        - contoh-b.orders.view

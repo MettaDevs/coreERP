@@ -1,5 +1,8 @@
 import type {
     AnalyticsQuery,
+    AnalyticsResult,
+    BlendQuery,
+    BlendResultSet,
     DashboardDetail,
     DashboardLayoutItem,
     DashboardSummary,
@@ -34,12 +37,15 @@ export function fetchWidgetData(
     widgetId: string,
     signal: AbortSignal,
     refresh = false,
-): Promise<ResultSet> {
+): Promise<AnalyticsResult> {
     const path = `${BASE}/widgets/${encodeURIComponent(widgetId)}`;
 
     return refresh
-        ? apiJson<ResultSet>(`${path}/refresh`, { method: 'POST', signal })
-        : apiJson<ResultSet>(`${path}/data`, { signal });
+        ? apiJson<AnalyticsResult>(`${path}/refresh`, {
+              method: 'POST',
+              signal,
+          })
+        : apiJson<AnalyticsResult>(`${path}/data`, { signal });
 }
 
 export type DashboardInput = {
@@ -247,6 +253,18 @@ export function runQuery(
     });
 }
 
+/** Menjalankan dua query menurut satu dimensi bersama (`POST /analytics/blend`). */
+export function runBlend(
+    query: BlendQuery | string,
+    signal?: AbortSignal,
+): Promise<BlendResultSet> {
+    return apiJson<BlendResultSet>(`${BASE}/blend`, {
+        method: 'POST',
+        body: typeof query === 'string' ? query : JSON.stringify(query),
+        signal,
+    });
+}
+
 /** Dasbor milik sendiri dan yang dibagikan, beserta hak mengubahnya. */
 export async function fetchDashboards(): Promise<DashboardSummary[]> {
     return (await apiJson<{ data: DashboardSummary[] }>(`${BASE}/dashboards`))
@@ -256,7 +274,7 @@ export async function fetchDashboards(): Promise<DashboardSummary[]> {
 export type WidgetInput = {
     title: string;
     type: WidgetType;
-    query: AnalyticsQuery | null;
+    query: AnalyticsQuery | BlendQuery | null;
     visual: WidgetVisual;
 };
 

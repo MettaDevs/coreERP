@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WidgetFailure } from '@/lib/analytics/api';
 import { fetchWidgetData, widgetFailure } from '@/lib/analytics/api';
-import type { ResultSet } from '@/lib/analytics/types';
+import type { AnalyticsResult } from '@/lib/analytics/types';
 
 type Loaded = {
     key: string;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
 };
 
@@ -26,7 +26,7 @@ export function useWidgetData(widgetId: string, enabled: boolean) {
     const [visible, setVisible] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
-    const [previous, setPrevious] = useState<ResultSet | null>(null);
+    const [previous, setPrevious] = useState<AnalyticsResult | null>(null);
     const key = `${widgetId}:${attempt}`;
 
     useEffect(() => {

@@ -18,7 +18,7 @@ import type {
  */
 
 /** Jenis yang menampilkan hasil query; bagian teks tidak memakai data. */
-export type DataWidgetType = Exclude<WidgetType, 'text'>;
+export type DataWidgetType = Exclude<WidgetType, 'text' | 'blend'>;
 
 export const VISUAL_TYPES: ReadonlyArray<{
     type: DataWidgetType;

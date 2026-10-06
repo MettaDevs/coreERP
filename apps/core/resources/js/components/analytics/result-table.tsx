@@ -6,8 +6,8 @@ import {
 } from '@/lib/analytics/format';
 import { dimensionColumns, measureColumns } from '@/lib/analytics/query';
 import type {
+    AnalyticsResult,
     ResultColumn,
-    ResultSet,
     ResultValue,
 } from '@/lib/analytics/types';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,7 @@ export function ResultTable({
     showTotals = true,
     className,
 }: {
-    result: ResultSet;
+    result: Pick<AnalyticsResult, 'columns' | 'rows' | 'totals' | 'meta'>;
     /** Kunci kolom yang ditampilkan, urut; kosong berarti semua pengelompok lalu semua nilai. */
     columns?: string[];
     showTotals?: boolean;
@@ -135,7 +135,7 @@ export function ResultTable({
 
 /** "Total", atau "Total IDR" bila total terbagi per mata uang atau satuan. */
 function totalCaption(
-    result: ResultSet,
+    result: Pick<AnalyticsResult, 'columns' | 'rows' | 'totals' | 'meta'>,
     row: Record<string, ResultValue>,
 ): string {
     if (result.totals.length < 2) {
