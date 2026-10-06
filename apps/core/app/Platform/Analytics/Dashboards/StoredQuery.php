@@ -9,6 +9,7 @@ use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Analytics\Query\Dimension;
+use App\Platform\Analytics\Query\Formula\Formula;
 use App\Platform\Analytics\Query\QueryNormalizer;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\QueryValidator;
@@ -28,6 +29,10 @@ use App\Platform\Analytics\Security\DatasetAccess;
  *   `CompiledDataset::renamed()`, dan kunci yang sudah tidak ada dilaporkan dengan path-nya. Pemanggil
  *   menjadikannya status `field_removed`, bukan galat 500; query lama tidak pernah diam-diam dibuang kolomnya,
  *   karena angka tanpa satu saringan lebih besar dari yang diminta penyusunnya.
+ *
+ * Rumus (area 13) disimpan dengan teks tulisan penyusunnya. Kunci rumus di `measures` bukan measure dataset, jadi
+ * tidak dilaporkan hilang; yang diperiksa adalah setiap `[kunci]` di dalam teks rumus, dan nama measure yang
+ * diganti module ikut diganti di dalam teks itu.
  */
 final class StoredQuery
 {
@@ -56,7 +61,7 @@ final class StoredQuery
             $this->access->authorize($principal, $dataset);
             $this->validator->validate($dataset, $query, $principal);
         } catch (AnalyticsQueryException $e) {
-            throw new AnalyticsQueryException($e->errorCode, $e->getMessage(), $e->status, $path.($e->field === null ? '' : '.'.$e->field), $e);
+            throw new AnalyticsQueryException($e->errorCode, $e->getMessage(), $e->status, $path.($e->field === null ? '' : '.'.$e->field), $e, position: $e->position);
         }
 
         return [$dataset, $query];
@@ -103,6 +108,15 @@ final class StoredQuery
         if ($buckets && ! $query->fillGaps) {
             $out['fill_gaps'] = false;
         }
+        if ($query->compare !== null) {
+            $out['compare'] = $query->compare->value;
+        }
+        if ($query->formulas !== []) {
+            $out['formulas'] = array_map(static fn (Formula $formula): array => $formula->toCompact(), $query->formulas);
+        }
+        if ($query->percentOfTotal !== []) {
+            $out['percent_of_total'] = $query->percentOfTotal;
+        }
 
         return $out;
     }
@@ -127,8 +141,22 @@ final class StoredQuery
                 $missing[$path] = $key;
             }
         }
+        $formulas = [];
+        foreach (self::listOf($query['formulas'] ?? null) as $i => $formula) {
+            if (! is_array($formula)) {
+                continue;
+            }
+            if (is_string($formula['key'] ?? null)) {
+                $formulas[$formula['key']] = true;
+            }
+            foreach (self::formulaMeasures($formula['expression'] ?? null) as $key) {
+                if (! $dataset->hasMeasure($key)) {
+                    $missing["formulas.{$i}.expression"] = $key;
+                }
+            }
+        }
         foreach (self::listOf($query['measures'] ?? null) as $i => $key) {
-            if (is_string($key) && ! $dataset->hasMeasure($key)) {
+            if (is_string($key) && ! isset($formulas[$key]) && ! $dataset->hasMeasure($key)) {
                 $missing["measures.{$i}"] = $key;
             }
         }
@@ -197,6 +225,18 @@ final class StoredQuery
                 return $sort;
             }, $query['sort']);
         }
+        if (is_array($query['percent_of_total'] ?? null)) {
+            $query['percent_of_total'] = array_map($key, $query['percent_of_total']);
+        }
+        if (is_array($query['formulas'] ?? null)) {
+            $query['formulas'] = array_map(static function (mixed $formula) use ($map): mixed {
+                if (is_array($formula) && is_string($formula['expression'] ?? null)) {
+                    $formula['expression'] = Formula::renameMeasures($formula['expression'], $map);
+                }
+
+                return $formula;
+            }, $query['formulas']);
+        }
 
         return $query;
     }
@@ -228,6 +268,22 @@ final class StoredQuery
         }
 
         return $uses;
+    }
+
+    /**
+     * Kunci measure di dalam teks rumus tersimpan, yaitu setiap `[kunci]`. Teks yang rusak tetap ditolak dengan
+     * posisinya saat query widget dibaca ulang untuk dihitung.
+     *
+     * @return list<string>
+     */
+    private static function formulaMeasures(mixed $expression): array
+    {
+        if (! is_string($expression)) {
+            return [];
+        }
+        preg_match_all('/\[([a-z][a-z0-9_]{0,63})\]/', $expression, $matches);
+
+        return array_values(array_unique($matches[1]));
     }
 
     /** @return list<mixed> */

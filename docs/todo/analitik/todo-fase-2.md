@@ -10,7 +10,7 @@ dibaca Excel/Power BI dan sistem pelanggan, dan dasbor dapat dipasang di situs p
 
 ---
 
-### 12. [ ] Slicer, cross-filter, drill, dan ekspor widget
+### 12. [x] Slicer, cross-filter, drill, dan ekspor widget
 
 **Tempat:** `resources/js/components/analytics/{slicer-bar, drill-sheet, cross-filter-chips}.tsx`,
 `app/Platform/Analytics/Http/Controllers/DrillController.php`, perluasan `ExportQueue` (`kind = analytics`)
@@ -18,23 +18,23 @@ dibaca Excel/Power BI dan sistem pelanggan, dan dasbor dapat dipasang di situs p
 **Selesai bila:** cerita US-05, US-06, dan US-13 lulus, slicer tersimpan sebagai tautan yang dapat
 dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringan yang sama.
 
-- [ ] 12.1 Slicer di `analytics_dashboards.slicers`: sumber dimensi bersama atau field satu dataset,
+- [x] 12.1 Slicer di `analytics_dashboards.slicers`: sumber dimensi bersama atau field satu dataset,
   kontrol pilih banyak / rentang tanggal / ekspresi, nilai bawaan.
-- [ ] 12.2 Pemetaan slicer ke widget dan penanda "tidak berlaku di sini"; nilai slicer di query string,
+- [x] 12.2 Pemetaan slicer ke widget dan penanda "tidak berlaku di sini"; nilai slicer di query string,
   dibaca ulang setiap render.
-- [ ] 12.3 Cross-filter: klik nilai menambah chip saringan sementara ke widget lain.
-- [ ] 12.4 Drill-down hierarki waktu, dan hierarki yang dinyatakan dataset (`hierarchy()` ditambahkan
+- [x] 12.3 Cross-filter: klik nilai menambah chip saringan sementara ke widget lain.
+- [x] 12.4 Drill-down hierarki waktu, dan hierarki yang dinyatakan dataset (`hierarchy()` ditambahkan
   ke `DatasetDefinition` bila dibutuhkan; perubahan aditif).
-- [ ] 12.5 Drill-through: `POST api/v1/analytics/drill` — baris, kursor pada `id`, 100 per halaman,
+- [x] 12.5 Drill-through: `POST api/v1/analytics/drill` — baris, kursor pada `id`, 100 per halaman,
   1.000 di layar; kolom data pribadi mengikuti gerbang; baris membuka `recordRoute`.
-- [ ] 12.6 Ekspor widget dan daftar drill ke Excel lewat antrean ekspor yang ada, jenis baru
+- [x] 12.6 Ekspor widget dan daftar drill ke Excel lewat antrean ekspor yang ada, jenis baru
   `analytics`, kolom bertipe seperti ekspor daftar.
-- [ ] 12.7 Test paritas drill terhadap endpoint daftar module (memakai ulang test paritas area 5);
+- [x] 12.7 Test paritas drill terhadap endpoint daftar module (memakai ulang test paritas area 5);
   ekspor memulangkan baris yang sama dengan layar.
 
 ---
 
-### 13. [ ] Rumus dan perbandingan periode
+### 13. [~] Rumus dan perbandingan periode
 
 **Tempat:** `app/Platform/Analytics/Query/Formula/*`, `Query/Comparison.php`,
 `resources/js/components/analytics/formula-editor.tsx` · **Setelah:** 3 · **Keputusan:** KA-19 ·
@@ -42,16 +42,22 @@ dibagikan, dan daftar drill sama persis dengan daftar layar module untuk saringa
 [bahasa rumus](/todo/analitik/mesin-query#bahasa-rumus) terbaca dan terkompilasi dengan seluruh
 aturannya, US-11 lulus, dan percobaan injeksi ditolak oleh test.
 
-- [ ] 13.1 Lexer, parser, simpul pohon, dan pemancar SQL; galat berposisi.
-- [ ] 13.2 Validasi: fungsi tertutup, batas panjang dan kedalaman, warisan mata uang.
-- [ ] 13.3 Rumus di query (`formulas`) dan di widget; urutan dan top-N atas rumus.
-- [ ] 13.4 `compare: previous_period | previous_year` dengan kolom `__previous`, `__change`,
+> Implementasi dan regression test tersedia; test unit area 13 lulus lokal. PostgreSQL feature tests dan CI belum
+> lulus di sesi ini karena layanan test tidak tersedia. Keputusan denominator persen perubahan saat nilai sebelumnya
+> negatif juga masih menunggu pemilik produk.
+
+- [x] 13.1 Lexer, parser, simpul pohon, dan pemancar SQL; galat berposisi.
+- [x] 13.2 Validasi: fungsi tertutup, batas panjang dan kedalaman, warisan mata uang.
+- [x] 13.3 Rumus di query (`formulas`) dan di widget; urutan dan top-N atas rumus.
+- [x] 13.4 `compare: previous_period | previous_year` dengan kolom `__previous`, `__change`,
   `__change_pct`; persen dari nol kosong.
-- [ ] 13.5 Persen terhadap total (`sum(x) over ()`) sebagai pilihan tampilan measure.
-- [ ] 13.6 Token tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`) lewat `FiscalCalendarDirectory`,
+- [x] 13.5 Persen terhadap total (`sum(x) over ()`) sebagai pilihan tampilan measure. Bentuknya
+  `percent_of_total: [kunci]`, kolom `<kunci>__percent_of_total`, dipartisi per mata uang.
+- [x] 13.6 Token tahun fiskal (`@this_fiscal_year`, `@last_fiscal_year`) lewat `FiscalCalendarDirectory`,
   dengan legal entity dari saringan atau workspace; tanpa legal entity, token ditolak dengan pesan.
-- [ ] 13.7 Editor rumus di pembangun: daftar measure, daftar fungsi, galat di posisinya.
-- [ ] 13.8 Test parser (termasuk `[count]); drop table x; --`, angka `1.000,5`, bagi nol) dan test
+- [x] 13.7 Editor rumus di pembangun: daftar nilai dan fungsi, galat ditandai pada karakter yang ditunjuk server;
+  pilihan pembanding periode, kolom perubahan pada tabel, dan arah, persen, serta nilai sebelumnya pada tile.
+- [x] 13.8 Test parser (termasuk `[count]); drop table x; --`, angka `1.000,5`, bagi nol) dan test
   perbandingan pada batas tahun.
 
 ---

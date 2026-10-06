@@ -55,7 +55,8 @@ final class DatasetValidator
     /** Alias berbentuk huruf lalu angka (`d0`, `c0`, `m0`, `r0`) dipakai engine di SQL. */
     private const ENGINE_ALIAS = '/^[a-z][0-9]+$/';
 
-    private const NUMERIC = ['int2', 'int4', 'int8', 'numeric', 'float4', 'float8'];
+    /** Tipe kolom angka PostgreSQL; dipakai juga `QueryValidator` untuk measure terkecil dan terbesar (area 13). */
+    public const NUMERIC = ['int2', 'int4', 'int8', 'numeric', 'float4', 'float8'];
 
     private const TIME = ['date', 'timestamp', 'timestamptz'];
 
@@ -128,6 +129,7 @@ final class DatasetValidator
         $fields = $this->fields($raw['fields'] ?? [], $joins, $source !== null);
         $measures = $this->measures($raw['measures'] ?? [], $joins);
         $times = $this->names($raw['times'] ?? [], 'field waktu');
+        $hierarchies = $this->hierarchies($raw['hierarchies'] ?? []);
         $defaultTime = $raw['defaultTime'] ?? null;
         if ($defaultTime !== null && (! is_string($defaultTime) || ! in_array($defaultTime, $times, true))) {
             throw new InvalidDatasetDefinition('field waktu utama harus salah satu field waktu.');
@@ -162,6 +164,7 @@ final class DatasetValidator
             shared: $this->shared($raw['shared'] ?? []),
             measures: $measures,
             times: $times,
+            hierarchies: $hierarchies,
             defaultTime: $defaultTime,
             recordRoute: $recordRoute,
             version: $version,
@@ -369,6 +372,14 @@ final class DatasetValidator
             }
         }
 
+        foreach ($declared->hierarchies as $name => $levels) {
+            foreach ($levels as $level) {
+                if (! isset($fields[$level])) {
+                    throw new InvalidDatasetDefinition("hierarki {$name} menyebut {$level}, yang bukan field dataset.");
+                }
+            }
+        }
+
         foreach ($declared->renamed as $old => $new) {
             if (isset($fields[$old]) || isset($declared->measures[$old])) {
                 throw new InvalidDatasetDefinition("peta nama {$old} masih dipakai sebagai kunci; kunci lama harus sudah tidak ada.");
@@ -381,7 +392,7 @@ final class DatasetValidator
         $hash = hash('sha256', json_encode([
             $declared->code, $declared->version, $declared->model, $table, $sourceSql, $declared->permission, $declared->policy,
             $fields, $classifications, $types, $references, $declared->shared, $joins, $declared->measures,
-            $declared->times, $declared->defaultTime, $declared->renamed,
+            $declared->times, $declared->hierarchies, $declared->defaultTime, $declared->renamed,
         ], JSON_THROW_ON_ERROR));
 
         return new CompiledDataset(
@@ -396,6 +407,7 @@ final class DatasetValidator
             fields: $fields,
             measures: $declared->measures,
             times: $declared->times,
+            hierarchies: $declared->hierarchies,
             defaultTime: $declared->defaultTime,
             description: $declared->description,
             recordRoute: $declared->recordRoute,
@@ -915,6 +927,29 @@ final class DatasetValidator
         }
 
         return array_values(array_map(fn (mixed $name): string => $this->key($name, $what), $names));
+    }
+
+    /** @return array<string, list<string>> */
+    private function hierarchies(mixed $hierarchies): array
+    {
+        if (! is_array($hierarchies) || ($hierarchies !== [] && array_is_list($hierarchies))) {
+            throw new InvalidDatasetDefinition('hierarki harus berupa pasangan nama dan urutan field.');
+        }
+
+        $out = [];
+        foreach ($hierarchies as $name => $levels) {
+            $name = $this->key((string) $name, 'nama hierarki');
+            if (! is_array($levels) || ! array_is_list($levels) || count($levels) < 2) {
+                throw new InvalidDatasetDefinition("hierarki {$name} harus memuat sedikitnya dua field berurutan.");
+            }
+            $fields = $this->names($levels, "field hierarki {$name}");
+            if (count(array_unique($fields)) !== count($fields)) {
+                throw new InvalidDatasetDefinition("hierarki {$name} tidak boleh mengulang field.");
+            }
+            $out[$name] = $fields;
+        }
+
+        return $out;
     }
 
     private function text(mixed $text, string $message): string

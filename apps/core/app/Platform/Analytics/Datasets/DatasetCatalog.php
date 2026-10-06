@@ -78,16 +78,26 @@ final class DatasetCatalog
                 'format' => $measure->format->value,
                 'currency_key' => $measure->currency,
                 'unit_key' => $measure->unit,
-            ], static fn (?string $value): bool => $value !== null);
+                'numeric' => $dataset->isNumericMeasure($measure->key),
+            ], static fn (mixed $value): bool => $value !== null);
         }
 
         $visible = array_column($fields, 'key');
+        $hierarchies = [];
+        foreach ($dataset->hierarchies() as $key => $levels) {
+            $visibleLevels = array_values(array_intersect($levels, $visible));
+            if (count($visibleLevels) > 1) {
+                $hierarchies[$key] = $visibleLevels;
+            }
+        }
 
         return [
             ...$this->summary($dataset, $principal),
             'fields' => $fields,
             'measures' => $measures,
+            'limits' => ['formulas' => config()->integer('analytics.limits.formulas', 5)],
             'times' => array_values(array_intersect($dataset->times(), $visible)),
+            'hierarchies' => $hierarchies,
             'default_time' => in_array($dataset->defaultTime(), $visible, true) ? $dataset->defaultTime() : null,
         ];
     }

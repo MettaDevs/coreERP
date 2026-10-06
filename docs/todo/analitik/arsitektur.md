@@ -25,7 +25,7 @@ awalan tabel module. Tabelnya berawalan `analytics_`, tabel Core biasa.
 | --- | --- | --- | --- |
 | Satu query | `Actions\RunQuery` | Registry, akses, validasi, lalu compile dan eksekusi di dalam `TenantRunner::runFor()`; dipakai setiap jalur masuk, tempat cache dan log menumpang | 0, 9 |
 | Registry dataset | `Datasets\DatasetRegistry`, `Datasets\DatasetValidator` | Mengumpulkan dataset dari module, memvalidasi definisinya dua tahap, menyaring menurut module terpasang dan berlisensi | 0 (tipis), 1 |
-| Katalog untuk layar | `Datasets\DatasetCatalog` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi) | 6 |
+| Katalog untuk layar | `Datasets\DatasetCatalog`, `CompiledDataset::isNumericMeasure()` | Field dan measure yang boleh dilihat principal ini (izin, data pribadi), tipe hasil measure, dan batas rumus dari config | 6, 13 |
 | Dimensi bersama | `Datasets\SharedDimensionRegistry` | Unit kerja, legal entity, pengguna, vendor, mata uang: label (area 1); periode, pemilih, dan drill-across (area 14) | 1, 14 |
 | Model query | `Query\AnalyticsQuery`, `Query\QueryParser`, `Query\QueryNormalizer`, `Query\QueryValidator` | JSON → objek tak berubah → bentuk normal; batas jumlah; hanya anggota dataset | 0 (tipis), 2 |
 | Rentang relatif | `Query\RelativeRange` | Token `@this_month` dan kawan-kawan → rentang tanggal menurut zona pengguna | 2 |
@@ -177,7 +177,9 @@ apps/core/app/Platform/Analytics/
 │   ├── QueryExecutor.php                                                          (0, 3)
 │   ├── ResultSet.php  ResultColumn.php  AnalyticsQueryException.php               (0, 3)
 │   ├── LabelResolver.php  GapFiller.php                                           (3)
-│   └── Formula/            Lexer.php  Parser.php  Node/*  SqlEmitter.php      (fase 2)
+│   ├── Comparison.php  CompareMode.php  FiscalYearRange.php                   (13)
+│   ├── BoundExpression.php  SqlTemplate.php                                       (13)
+│   └── Formula/            Lexer.php  Token.php  Parser.php  Node/*  Formula.php  FormulaExpression.php  (13)
 ├── Security/
 │   ├── AnalyticsPrincipal.php  UserPrincipal.php  DatasetAccess.php               (0)
 │   ├── DataPolicyScope.php  ScopeFingerprint.php                                  (4)

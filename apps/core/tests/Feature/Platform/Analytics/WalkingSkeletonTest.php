@@ -350,7 +350,8 @@ class WalkingSkeletonTest extends TestCase
             [['filters' => ['acquired_on' => 'bukan tanggal']], 'analytics.invalid_filter', 'filters.acquired_on', 'bukan tanggal'],
             [['sort' => [['key' => 'lifecycle_state', 'direction' => 'asc']]], 'analytics.invalid_query', 'sort.0.key', 'tidak ada di pilihan'],
             [['sort' => [['key' => 'count', 'direction' => 'naik']]], 'analytics.invalid_query', 'sort.0.direction', 'asc atau desc'],
-            [['compare' => 'previous_period'], 'analytics.invalid_query', 'compare', 'belum tersedia'],
+            [['compare' => 'previous_period'], 'analytics.invalid_query', 'compare', 'butuh rentang waktu'],
+            [['formulas' => [['key' => 'rasio', 'expression' => 'BAGI([count]; 0']], 'measures' => ['rasio']], 'analytics.invalid_formula', 'formulas.0.expression', 'karakter 5'],
         ];
 
         foreach ($cases as [$part, $code, $field, $message]) {

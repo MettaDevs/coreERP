@@ -31,7 +31,7 @@
             }
         },
         "measures": {
-            "description": "Kunci measure dataset yang dihitung. Sedikitnya satu.",
+            "description": "Kunci measure dataset, atau kunci rumus yang ditulis di formulas, yang dihitung. Sedikitnya satu; urutannya urutan kolom hasil.",
             "type": "array",
             "minItems": 1,
             "items": { "$ref": "#/$defs/key" }
@@ -57,7 +57,7 @@
                     "$ref": "#/$defs/key"
                 },
                 "range": {
-                    "description": "Token relatif (@today, @yesterday, @this_week, @last_week, @this_month, @last_month, @this_quarter, @last_quarter, @this_year, @last_year, @last_7_days, @last_30_days, @last_90_days, @last_12_months, @year_to_date, @month_to_date) atau ekspresi tanggal sintaks Business Central, misalnya 01/01/2026..31/03/2026.",
+                    "description": "Token relatif (@today, @yesterday, @this_week, @last_week, @this_month, @last_month, @this_quarter, @last_quarter, @this_year, @last_year, @this_fiscal_year, @last_fiscal_year, @last_7_days, @last_30_days, @last_90_days, @last_12_months, @year_to_date, @month_to_date) atau ekspresi tanggal sintaks Business Central, misalnya 01/01/2026..31/03/2026. Tahun fiskal dihitung untuk satu perusahaan: yang disaring tepat satu pada field entitas legal, atau perusahaan workspace pengguna.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 250
@@ -89,6 +89,47 @@
         "fill_gaps": {
             "description": "Isi celah deret waktu. Bawaannya true bila ada pengelompokan menurut waktu.",
             "type": "boolean"
+        },
+        "compare": {
+            "description": "Perbandingan periode: rentang waktu yang sama digeser sepanjang rentang itu sendiri (previous_period) atau satu tahun (previous_year). Butuh time_range yang jelas awal dan akhirnya. Setiap nilai mendapat kolom <kunci>__previous, <kunci>__change, dan <kunci>__change_pct.",
+            "enum": ["previous_period", "previous_year"]
+        },
+        "formulas": {
+            "description": "Rumus atas nilai di baris yang sama (bahasa rumus CoreERP, bukan DAX). Kuncinya dipilih lewat measures. Rumus tidak memakai rumus lain; angka ditulis cara Indonesia (1.000,5) dan isian fungsi dipisah titik koma.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "expression"],
+                "properties": {
+                    "key": {
+                        "description": "Kunci rumus: huruf kecil, angka, dan garis bawah, diawali huruf, tanpa dua garis bawah berturut-turut. Tidak boleh sama dengan kunci kolom atau nilai dataset.",
+                        "type": "string",
+                        "pattern": "^[a-z](?!.*__)[a-z0-9_]{0,63}$"
+                    },
+                    "caption": {
+                        "description": "Nama tampilan kolom hasil. Bawaannya kunci rumus.",
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                    },
+                    "expression": {
+                        "description": "Teks rumus, misalnya BAGI([disposed]; [count]) * 100. Fungsi yang tersedia: BAGI, JIKA, ABS, BULAT, MIN, MAKS.",
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                    },
+                    "format": {
+                        "description": "Format angka hasil. Bawaannya number; money dan quantity mewarisi mata uang atau satuan nilai di dalam rumus.",
+                        "$ref": "#/$defs/format"
+                    }
+                }
+            }
+        },
+        "percent_of_total": {
+            "description": "Kunci di measures yang juga ditampilkan sebagai persen terhadap total seluruh kelompok (kolom <kunci>__percent_of_total), per mata uang untuk nilai uang.",
+            "type": "array",
+            "items": { "$ref": "#/$defs/key" }
         }
     },
     "$defs": {
@@ -101,6 +142,10 @@
         "granularity": {
             "description": "Ukuran ember waktu. Minggu mulai Senin.",
             "enum": ["day", "week", "month", "quarter", "year"]
+        },
+        "format": {
+            "description": "Format angka.",
+            "enum": ["number", "money", "percent", "quantity", "hours"]
         }
     }
 }

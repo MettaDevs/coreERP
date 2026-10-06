@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WidgetFailure } from '@/lib/analytics/api';
 import { fetchWidgetData, widgetFailure } from '@/lib/analytics/api';
+import type { SlicerValues } from '@/lib/analytics/slicer';
 import type { AnalyticsResult } from '@/lib/analytics/types';
 
 type Loaded = {
@@ -21,13 +22,19 @@ type Loaded = {
  * `enabled` palsu untuk widget yang tidak punya data (teks) atau yang definisinya sudah diketahui tidak
  * dapat dihitung; tidak ada permintaan yang dikirim.
  */
-export function useWidgetData(widgetId: string, enabled: boolean) {
+export function useWidgetData(
+    widgetId: string,
+    enabled: boolean,
+    slicers: SlicerValues = {},
+    crossFilters: Record<string, string | string[]> = {},
+) {
     const ref = useRef<HTMLDivElement | null>(null);
     const [visible, setVisible] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
     const [previous, setPrevious] = useState<AnalyticsResult | null>(null);
-    const key = `${widgetId}:${attempt}`;
+    const filtersKey = JSON.stringify([slicers, crossFilters]);
+    const key = `${widgetId}:${attempt}:${filtersKey}`;
 
     useEffect(() => {
         const node = ref.current;
@@ -57,8 +64,17 @@ export function useWidgetData(widgetId: string, enabled: boolean) {
         }
 
         const controller = new AbortController();
+        const [slicerSnapshot, crossFilterSnapshot] = JSON.parse(
+            filtersKey,
+        ) as [SlicerValues, Record<string, string | string[]>];
 
-        fetchWidgetData(widgetId, controller.signal, attempt > 0)
+        fetchWidgetData(
+            widgetId,
+            controller.signal,
+            slicerSnapshot,
+            crossFilterSnapshot,
+            attempt > 0,
+        )
             .then((result) => {
                 setLoaded({ key, result, failure: null });
                 setPrevious(result);
@@ -74,7 +90,7 @@ export function useWidgetData(widgetId: string, enabled: boolean) {
             });
 
         return () => controller.abort();
-    }, [enabled, visible, widgetId, attempt, key]);
+    }, [enabled, visible, widgetId, attempt, key, filtersKey]);
 
     const current = loaded !== null && loaded.key === key ? loaded : null;
 

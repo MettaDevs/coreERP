@@ -41,6 +41,7 @@ final class PenjualanDataset implements Dataset
             ->shared('org_unit_id', SharedDimension::OperatingUnit)
             ->shared('currency_code', SharedDimension::Currency)
             ->shared('dicatat_oleh_user_id', SharedDimension::User)
+            ->hierarchy('legal_entity_unit', ['legal_entity_id', 'org_unit_id'])
             ->time('tanggal', default: true)
             ->time('dicatat_pada')
             ->time('dibayar_pada')
@@ -49,6 +50,10 @@ final class PenjualanDataset implements Dataset
                 field: 'nilai', format: MeasureFormat::Money, currency: 'currency_code')
             ->measure('rata_rata_nilai', 'Rata-rata nilai penjualan', Aggregate::Average,
                 field: 'nilai', format: MeasureFormat::Money, currency: 'currency_code')
+            ->measure('rata_terbit', 'Rata-rata penjualan terbit', Aggregate::Average,
+                field: 'nilai', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => ['terbit']])
+            ->measure('tanggal_pertama', 'Tanggal penjualan pertama', Aggregate::Minimum,
+                field: 'tanggal', format: MeasureFormat::Number)
             ->measure('terbit', 'Penjualan terbit', Aggregate::Count, where: ['status' => ['terbit']])
             ->measure('barang_terjual', 'Barang berbeda yang terjual', Aggregate::CountDistinct, field: 'barang_id')
             ->version(1);

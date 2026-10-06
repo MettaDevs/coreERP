@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Platform\Analytics\Datasets;
 
+use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\SharedDimension;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\FilterField;
@@ -41,6 +42,7 @@ final readonly class CompiledDataset
      * @param  array<string, FilterField>  $fields
      * @param  array<string, CompiledMeasure>  $measures
      * @param  list<string>  $times
+     * @param  array<string, list<string>>  $hierarchies
      * @param  array<string, string>  $renamed  kunci lama => kunci baru
      * @param  array<string, DataClass>  $classifications  per kunci field
      * @param  array<string, string>  $columnTypes  nama tipe PostgreSQL kolom tiap field (`int4`, `date`, …)
@@ -72,6 +74,7 @@ final readonly class CompiledDataset
         private array $joins = [],
         private ?Closure $source = null,
         private string $hash = '',
+        private array $hierarchies = [],
     ) {}
 
     /**
@@ -201,6 +204,19 @@ final readonly class CompiledDataset
         return $this->measures[$key] ?? throw new LogicException("Measure `{$key}` tidak ada di dataset `{$this->code}`.");
     }
 
+    /** Apakah hasil measure berupa angka, bukan tanggal minimum atau maksimum. */
+    public function isNumericMeasure(string $key): bool
+    {
+        $measure = $this->measure($key);
+        if (! in_array($measure->aggregate, [Aggregate::Minimum, Aggregate::Maximum], true)) {
+            return true;
+        }
+
+        return $measure->field !== null
+            && $this->hasField($measure->field)
+            && in_array($this->columnType($measure->field), DatasetValidator::NUMERIC, true);
+    }
+
     /**
      * Kolom berkualifikasi untuk:
      *
@@ -242,6 +258,12 @@ final readonly class CompiledDataset
     public function defaultTime(): ?string
     {
         return $this->defaultTime;
+    }
+
+    /** @return array<string, list<string>> */
+    public function hierarchies(): array
+    {
+        return $this->hierarchies;
     }
 
     /**

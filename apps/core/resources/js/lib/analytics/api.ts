@@ -5,11 +5,15 @@ import type {
     BlendResultSet,
     DashboardDetail,
     DashboardLayoutItem,
+    DashboardSlicer,
     DashboardSummary,
     DashboardWidget,
     DatasetDescription,
     DatasetSummary,
     ResultSet,
+    DrillDownResult,
+    DrillPage,
+    DrillValue,
     SavedQuery,
     WidgetType,
     WidgetVisual,
@@ -36,16 +40,43 @@ function ifMatch(version: number): Record<string, string> {
 export function fetchWidgetData(
     widgetId: string,
     signal: AbortSignal,
+    slicers: Record<string, string | string[]> = {},
+    crossFilters: Record<string, string | string[]> = {},
     refresh = false,
 ): Promise<AnalyticsResult> {
     const path = `${BASE}/widgets/${encodeURIComponent(widgetId)}`;
+    const params = new URLSearchParams();
+    appendFilters(params, 's', slicers);
+    appendFilters(params, 'c', crossFilters);
+    const serialized = params.toString();
+    const query = serialized === '' ? '' : `?${serialized}`;
 
     return refresh
-        ? apiJson<AnalyticsResult>(`${path}/refresh`, {
+        ? apiJson<AnalyticsResult>(`${path}/refresh${query}`, {
               method: 'POST',
               signal,
           })
-        : apiJson<AnalyticsResult>(`${path}/data`, { signal });
+        : apiJson<AnalyticsResult>(`${path}/data${query}`, { signal });
+}
+
+function appendFilters(
+    params: URLSearchParams,
+    prefix: 's' | 'c',
+    filters: Record<string, string | string[]>,
+) {
+    for (const [field, value] of Object.entries(filters)) {
+        if (Array.isArray(value)) {
+            if (value.length === 0) {
+                params.set(`${prefix}[${field}]`, '');
+            } else {
+                for (const item of value) {
+                    params.append(`${prefix}[${field}][]`, item);
+                }
+            }
+        } else {
+            params.set(`${prefix}[${field}]`, value);
+        }
+    }
 }
 
 export type DashboardInput = {
@@ -67,7 +98,10 @@ export async function createDashboard(
 
 export async function updateDashboard(
     dashboard: Pick<DashboardDetail, 'id' | 'version'>,
-    changes: Partial<DashboardInput> & { layout?: DashboardLayoutItem[] },
+    changes: Partial<DashboardInput> & {
+        layout?: DashboardLayoutItem[];
+        slicers?: DashboardSlicer[];
+    },
 ): Promise<DashboardDetail> {
     return (
         await apiJson<{ data: DashboardDetail }>(
@@ -77,6 +111,64 @@ export async function updateDashboard(
                 headers: ifMatch(dashboard.version),
                 body: JSON.stringify(changes),
             },
+        )
+    ).data;
+}
+
+export async function fetchDrillPage(
+    widgetId: string,
+    values: DrillValue[],
+    cursor: string | null,
+    slicers: Record<string, string | string[]>,
+    crossFilters: Record<string, string | string[]>,
+    signal?: AbortSignal,
+): Promise<DrillPage> {
+    return apiJson<DrillPage>(`${BASE}/drill`, {
+        method: 'POST',
+        body: JSON.stringify({
+            widget_id: widgetId,
+            values,
+            cursor,
+            slicers,
+            cross_filters: crossFilters,
+        }),
+        signal,
+    });
+}
+
+export async function fetchDrillDown(
+    widgetId: string,
+    field: string,
+    values: DrillValue[],
+    slicers: Record<string, string | string[]>,
+    crossFilters: Record<string, string | string[]>,
+    signal?: AbortSignal,
+): Promise<DrillDownResult> {
+    return apiJson<DrillDownResult>(`${BASE}/drill`, {
+        method: 'POST',
+        body: JSON.stringify({
+            widget_id: widgetId,
+            action: 'down',
+            dimension_field: field,
+            values,
+            slicers,
+            cross_filters: crossFilters,
+        }),
+        signal,
+    });
+}
+
+export async function enqueueAnalyticsExport(input: {
+    widget_id: string;
+    kind: 'widget' | 'drill';
+    values?: DrillValue[];
+    slicers: Record<string, string | string[]>;
+    cross_filters: Record<string, string | string[]>;
+}): Promise<{ id: string; status: string }> {
+    return (
+        await apiJson<{ data: { id: string; status: string } }>(
+            `${BASE}/exports`,
+            { method: 'POST', body: JSON.stringify(input) },
         )
     ).data;
 }

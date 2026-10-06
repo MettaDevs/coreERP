@@ -6,8 +6,11 @@ namespace App\Platform\Analytics\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Analytics\Dashboards\DashboardAccess;
+use App\Platform\Analytics\Dashboards\SlicerDefinitions;
 use App\Platform\Analytics\Http\Presenters\DashboardPresenter;
 use App\Platform\Analytics\Models\Dashboard;
+use App\Platform\Analytics\Security\UserPrincipal;
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +31,7 @@ use Illuminate\Validation\ValidationException;
  * Mengarsipkan dasbor ikut mengarsipkan widget-nya; tidak ada baris yang dihapus fisik.
  *
  * `layout` hanya menerima letak widget milik dasbor itu, dengan lebar 3, 4, 6, 8, atau 12 dari grid 12 kolom
- * dan tinggi 1–3 baris. Slicer milik fase 2 dan belum diterima.
+ * dan tinggi 1–3 baris. Definisi slicer divalidasi terhadap kolom data yang boleh dibaca pemiliknya.
  */
 final class DashboardController extends Controller
 {
@@ -39,6 +42,8 @@ final class DashboardController extends Controller
     public function __construct(
         private readonly DashboardAccess $access,
         private readonly DashboardPresenter $presenter,
+        private readonly SlicerDefinitions $slicers,
+        private readonly UserClock $clock,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -102,6 +107,7 @@ final class DashboardController extends Controller
             'layout.*.y' => ['required', 'integer', 'min:0', 'max:1000'],
             'layout.*.w' => ['required', 'integer', Rule::in(self::WIDTHS)],
             'layout.*.h' => ['required', 'integer', 'min:1', 'max:'.self::MAX_HEIGHT],
+            'slicers' => ['sometimes', 'array', 'list', 'max:'.SlicerDefinitions::MAX_SLICERS],
         ]);
 
         $values = [];
@@ -120,6 +126,10 @@ final class DashboardController extends Controller
         }
         if (array_key_exists('layout', $data)) {
             $values['layout'] = $this->layout($dashboard, $data['layout']);
+        }
+        if (array_key_exists('slicers', $data)) {
+            $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request));
+            $values['slicers'] = $this->slicers->validate($data['slicers'], $principal);
         }
 
         try {

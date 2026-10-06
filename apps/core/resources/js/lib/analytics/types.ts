@@ -22,6 +22,9 @@ export type AnalyticsQuery = {
     limit?: number;
     totals?: boolean;
     fill_gaps?: boolean;
+    compare?: QueryCompare;
+    formulas?: QueryFormula[];
+    percent_of_total?: string[];
 };
 
 export type ResultColumn = {
@@ -43,6 +46,9 @@ export type ResultColumn = {
     currency_key?: string;
     unit_key?: string;
     implicit?: boolean;
+    /** Kolom turunan (area 13): kunci measure atau rumus asalnya. */
+    derived_from?: string;
+    derivation?: ResultDerivation;
 };
 
 export type ResultValue = string | number | boolean | null;
@@ -136,6 +142,7 @@ export type DatasetMeasure = {
     caption: string;
     aggregate: 'count' | 'count_distinct' | 'sum' | 'avg' | 'min' | 'max';
     format: MeasureFormat;
+    numeric: boolean;
     currency_key?: string;
     unit_key?: string;
 };
@@ -144,7 +151,9 @@ export type DatasetMeasure = {
 export type DatasetDescription = DatasetSummary & {
     fields: DatasetField[];
     measures: DatasetMeasure[];
+    limits: { formulas: number };
     times: string[];
+    hierarchies: Record<string, string[]>;
     default_time: string | null;
 };
 
@@ -247,7 +256,73 @@ export type DashboardSummary = {
 /** Dasbor beserta letak efektif setiap widget-nya, tanpa data widget. */
 export type DashboardDetail = DashboardSummary & {
     layout: DashboardLayoutItem[];
+    slicers: DashboardSlicer[];
+    /** Kolom aman untuk dipilih dan dipetakan pada dasbor ini, per data yang boleh dibaca pengguna. */
+    dataset_fields: Record<string, DatasetDescription>;
     widgets: DashboardWidget[];
+};
+
+export type SlicerSource =
+    | { type: 'field'; dataset: string; field: string }
+    | { type: 'shared'; dimension: string };
+
+export type SlicerControl = 'multi_select' | 'date_range' | 'expression';
+
+export type DashboardSlicer = {
+    key: string;
+    title: string;
+    source: SlicerSource;
+    control: SlicerControl;
+    default_value: string | string[] | null;
+};
+
+/** Saringan sementara dari nilai yang dipilih pengguna di widget lain. */
+export type CrossFilter = {
+    id: string;
+    origin_widget_id: string;
+    title: string;
+    source: {
+        dataset: string;
+        field: string;
+        type: DatasetField['type'];
+        shared_dimension?: string;
+        time: boolean;
+        granularity?: TimeGranularity;
+    };
+    value: string;
+    label: string;
+};
+
+export type DrillValue = {
+    field: string;
+    value: ResultValue;
+    granularity?: TimeGranularity;
+};
+
+export type DrillColumn = {
+    key: string;
+    caption: string;
+    type: DatasetField['type'];
+    label_key?: string;
+};
+
+export type DrillPage = {
+    columns: DrillColumn[];
+    rows: Array<
+        Record<string, ResultValue> & { id: string; record_url: string | null }
+    >;
+    next_cursor: string | null;
+    record_route: string | null;
+};
+
+export type DrillDownResult = {
+    result: ResultSet;
+    next: {
+        field: string;
+        granularity: TimeGranularity | null;
+        caption: string;
+    };
+    path: DrillValue[];
 };
 
 export type SavedQuery = {
@@ -269,3 +344,26 @@ export type SavedQuery = {
 
 /** Hak membuat dasbor pribadi dan mengelola dasbor bersama, untuk tombol di layar. */
 export type DashboardAbilities = { create: boolean; share: boolean };
+
+/*
+ * Area 13: rumus, perbandingan periode, dan persen terhadap total (`docs/todo/analitik/mesin-query.md`, bagian
+ * *Bahasa rumus* dan *Perbandingan periode*).
+ */
+
+/** Periode pembanding: rentang yang sama digeser sepanjang dirinya, atau satu tahun. */
+export type QueryCompare = 'previous_period' | 'previous_year';
+
+/** Satu rumus; kuncinya dipilih lewat `measures`. Teksnya disimpan apa adanya. */
+export type QueryFormula = {
+    key: string;
+    expression: string;
+    caption?: string;
+    format?: MeasureFormat;
+};
+
+/**
+ * Jenis kolom turunan: nilai periode pembanding (`<kunci>__previous`), selisih (`__change`), persen perubahan
+ * (`__change_pct`, kosong bila pembandingnya nol), dan persen terhadap total (`__percent_of_total`).
+ */
+export type ResultDerivation =
+    'previous' | 'change' | 'change_pct' | 'percent_of_total';
