@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB;
 
-use App\Platform\Modules\Contracts\Analytics\Datasets;
 use Illuminate\Support\ServiceProvider;
-use Modules\Apperp\ContohB\Analytics\OrderDataset;
 
 /**
  * Penyedia layanan module. Ia yang memutuskan apa yang dimuat, bukan Core.
@@ -21,7 +19,5 @@ final class ModuleServiceProvider extends ServiceProvider
     {
         // `loadRoutesFrom` menghormati cache rute; memanggil Route::group di sini tidak.
         $this->loadRoutesFrom(dirname(__DIR__).'/routes/web.php');
-
-        $this->app->make(Datasets::class)->register($this->app->make(OrderDataset::class));
     }
 }

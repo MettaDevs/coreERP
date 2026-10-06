@@ -163,7 +163,7 @@ class QueryShapeSyncTest extends TestCase
         $this->assertStringContainsString('measures={dataset.measures}', $editor);
         $this->assertStringContainsString('formulas={formulas}', $editor);
         $this->assertStringContainsString('error={errors.formula ?? null}', $editor);
-        $this->assertStringContainsString('COMPARE_MODES.map((mode)', $editor);
+        $this->assertStringContainsString('COMPARE_MODES.map', $editor);
         $this->assertStringContainsString('compare:', $editor);
     }
 

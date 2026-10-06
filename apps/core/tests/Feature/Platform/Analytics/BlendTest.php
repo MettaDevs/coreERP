@@ -10,10 +10,12 @@ use App\Platform\Analytics\Http\Presenters\DashboardPresenter;
 use App\Platform\Analytics\Models\Widget;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Analytics\Query\Blend;
+use App\Platform\Modules\Contracts\Analytics\Datasets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Apperp\ContohB\Analytics\OrderDataset;
 use Tests\Feature\Platform\Analytics\Support\SalesFixture;
 use Tests\Feature\Platform\Analytics\Support\TestPrincipal;
 use Tests\TestCase;
@@ -38,6 +40,7 @@ class BlendTest extends TestCase
             '--realpath' => true,
             '--force' => true,
         ]);
+        app(Datasets::class)->register(app(OrderDataset::class));
         $this->tenant = $this->salesTenant('Tenant uji gabungan');
         DB::table('core_module_installations')->insert([
             'tenant_id' => $this->tenant, 'module_id' => 'contoh-b', 'version' => '0.1.0',
