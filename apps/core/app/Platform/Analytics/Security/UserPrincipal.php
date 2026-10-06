@@ -23,11 +23,10 @@ use Carbon\CarbonImmutable;
  *
  * Hak data pribadi adalah permission Core `core.analytics.personal-data.read` (duty *Pakai data pribadi di
  * analitik*), dibaca lewat `CorePermissions` yang sama dengan gate rute, sehingga tidak menambah query.
- * Pengguna tidak pernah punya saringan terkunci; batas baris dan waktu dari `config/analytics.php`.
- *
- * Perusahaan workspace sesi ({@see self::workspaceLegalEntity()}) dibaca hanya bila dibutuhkan — token tahun fiskal
- * tanpa saringan perusahaan (area 13) — dan hanya dari permintaan yang punya sesi; perintah artisan dan job tidak
- * punya workspace.
+ * Saringan dasbor dan cross-filter menjadi saringan terkunci selama satu permintaan; batas baris dan waktu tetap
+ * dari `config/analytics.php`. Perusahaan workspace sesi ({@see self::workspaceLegalEntity()}) dibaca hanya bila
+ * dibutuhkan — token tahun fiskal tanpa saringan perusahaan (area 13) — dan hanya dari permintaan yang punya sesi;
+ * perintah artisan dan job tidak punya workspace.
  */
 final class UserPrincipal implements AnalyticsPrincipal
 {
@@ -43,15 +42,18 @@ final class UserPrincipal implements AnalyticsPrincipal
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $policies,
         private readonly CorePermissions $corePermissions,
+        /** @var array<string, array<string, string|list<string>>> */
+        private readonly array $locked = [],
     ) {}
 
     /**
      * Principal dari keanggotaan sesi. Zonanya dari `UserClock`, layanan yang sama dengan yang dipakai
      * laporan (`ReportSource::forModule()`): zona My Profile, lalu zona entitas legal aktif.
      */
-    public static function fromMembership(TenantMembership $membership, string $timezone): self
+    /** @param array<string, array<string, string|list<string>>> $lockedFilters per kode dataset */
+    public static function fromMembership(TenantMembership $membership, string $timezone, array $lockedFilters = []): self
     {
-        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class), app(CorePermissions::class));
+        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class), app(CorePermissions::class), $lockedFilters);
     }
 
     public function tenantId(): string
@@ -78,7 +80,7 @@ final class UserPrincipal implements AnalyticsPrincipal
 
     public function lockedFilters(string $dataset): array
     {
-        return [];
+        return $this->locked[$dataset] ?? [];
     }
 
     public function timezone(): string

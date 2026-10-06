@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Modules\Apperp\ContohA\Analytics\PenjualanDataset;
+use Modules\Apperp\ContohA\Analytics\SourceQuery;
 use Modules\Apperp\ContohA\Models\Barang;
 use Modules\Apperp\ContohA\Models\Penjualan;
 use Modules\Apperp\ContohB\Models\Rak;
@@ -82,6 +83,7 @@ class DatasetValidatorTest extends TestCase
         $this->assertSame(DataClass::CustomerContent, $dataset->classification('barang_bawaan'));
 
         $this->assertSame(['tanggal', 'dicatat_pada', 'dibayar_pada'], $dataset->times());
+        $this->assertSame(['legal_entity_unit' => ['legal_entity_id', 'org_unit_id']], $dataset->hierarchies());
         $this->assertSame('tanggal', $dataset->defaultTime());
         $this->assertSame(['date', 'timestamp', 'timestamptz'], array_map($dataset->timeType(...), $dataset->times()));
         $this->assertSame('numeric', $dataset->columnType('nilai'));
@@ -109,6 +111,23 @@ class DatasetValidatorTest extends TestCase
         }
     }
 
+    public function test_a_hierarchy_requires_two_existing_dataset_fields(): void
+    {
+        try {
+            $this->compile('contoh-a', (new PenjualanDataset)->definition()->hierarchy('broken', ['legal_entity_id', 'not_a_field']));
+            $this->fail('Field yang tidak dinyatakan dataset tidak boleh masuk ke hierarki.');
+        } catch (InvalidDatasetDefinition $exception) {
+            $this->assertStringContainsString('bukan field dataset', $exception->getMessage());
+        }
+
+        try {
+            $this->compile('contoh-a', (new PenjualanDataset)->definition()->hierarchy('broken', ['org_unit_id']));
+            $this->fail('Hierarki harus memiliki sedikitnya dua tingkat.');
+        } catch (InvalidDatasetDefinition $exception) {
+            $this->assertStringContainsString('sedikitnya dua field', $exception->getMessage());
+        }
+    }
+
     public function test_the_definition_hash_is_stable_and_follows_the_definition(): void
     {
         $first = $this->compile('contoh-a', (new PenjualanDataset)->definition());
@@ -123,7 +142,7 @@ class DatasetValidatorTest extends TestCase
     public function test_a_query_source_dataset_reads_its_columns_and_types_from_the_source(): void
     {
         $dataset = $this->compile('contoh-a', DatasetDefinition::make('contoh-a.barang-per-status', 'Barang per status')
-            ->fromQuery(static fn () => Barang::query()->select(['tenant_id', 'bawaan'])->selectRaw('count(*) as jumlah')->groupBy('tenant_id', 'bawaan'))
+            ->fromQuery(static fn () => SourceQuery::from(Barang::class)->select(['tenant_id', 'bawaan'])->selectRaw('count(*) as jumlah')->groupBy('tenant_id', 'bawaan'))
             ->permission('contoh-a.barang.read')
             ->field('bawaan', 'Barang bawaan', FieldType::Boolean, classification: DataClass::CustomerContent)
             ->measure('jumlah', 'Jumlah barang', Aggregate::Sum, field: 'jumlah'));
@@ -176,7 +195,7 @@ class DatasetValidatorTest extends TestCase
             'kode tanpa awalan module' => [static fn () => $sale('contoh-b.penjualan'), 'berawalan id module'],
             'kode berhuruf besar' => [static fn () => $sale('contoh-a.Penjualan'), 'berawalan id module'],
             'tanpa sumber' => [static fn () => DatasetDefinition::make('contoh-a.kosong', 'Kosong')->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tepat satu sumber'],
-            'dua sumber' => [static fn () => $item()->fromQuery(static fn () => Barang::query()), 'tepat satu sumber'],
+            'dua sumber' => [static fn () => $item()->fromQuery(static fn () => SourceQuery::from(Barang::class)), 'tepat satu sumber'],
             'model tanpa BelongsToTenant' => [static fn () => $item()->model(ModuleInstallation::class), 'BelongsToTenant'],
             'module tidak dikenal' => [static fn () => DatasetDefinition::make('tidak-ada.barang', 'Barang')->model(Barang::class)->permission('tidak-ada.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tidak dikenal', 'tidak-ada'],
 

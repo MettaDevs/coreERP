@@ -73,6 +73,13 @@ final class DatasetCatalog
         }
 
         $visible = array_column($fields, 'key');
+        $hierarchies = [];
+        foreach ($dataset->hierarchies() as $key => $levels) {
+            $visibleLevels = array_values(array_intersect($levels, $visible));
+            if (count($visibleLevels) > 1) {
+                $hierarchies[$key] = $visibleLevels;
+            }
+        }
 
         return [
             ...$this->summary($dataset),
@@ -80,6 +87,7 @@ final class DatasetCatalog
             'measures' => $measures,
             'limits' => ['formulas' => config()->integer('analytics.limits.formulas', 5)],
             'times' => array_values(array_intersect($dataset->times(), $visible)),
+            'hierarchies' => $hierarchies,
             'default_time' => in_array($dataset->defaultTime(), $visible, true) ? $dataset->defaultTime() : null,
         ];
     }

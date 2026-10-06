@@ -7,10 +7,13 @@ namespace App\Platform\Analytics\Http\Presenters;
 use App\Platform\Analytics\Dashboards\DashboardAccess;
 use App\Platform\Analytics\Dashboards\StoredQuery;
 use App\Platform\Analytics\Dashboards\WidgetDefinition;
+use App\Platform\Analytics\Datasets\DatasetCatalog;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Dashboard;
 use App\Platform\Analytics\Models\SavedQuery;
 use App\Platform\Analytics\Models\Widget;
+use App\Platform\Analytics\Security\UserPrincipal;
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
 
@@ -36,7 +39,9 @@ final class DashboardPresenter
     public function __construct(
         private readonly DashboardAccess $access,
         private readonly DatasetRegistry $datasets,
+        private readonly DatasetCatalog $catalog,
         private readonly LaunchableAppCatalog $apps,
+        private readonly UserClock $clock,
     ) {}
 
     /**
@@ -80,10 +85,20 @@ final class DashboardPresenter
         $widgets = $dashboard->widgets()->orderBy('created_at')->orderBy('id')->get();
         $ready = $this->apps->readyModules((string) $membership->tenant_id);
         $dashboard->setAttribute('widgets_count', $widgets->count());
+        $principal = UserPrincipal::fromMembership($membership, $this->clock->timezoneFor($membership->user, null));
+        $widgetDatasets = array_fill_keys(array_filter($widgets->pluck('dataset_code')->all()), true);
+        $datasetFields = [];
+        foreach ($this->catalog->forPrincipal($principal) as $dataset) {
+            if (isset($widgetDatasets[$dataset->code])) {
+                $datasetFields[$dataset->code] = $this->catalog->describe($dataset, $principal);
+            }
+        }
 
         return [
             ...$this->summary($dashboard, $membership),
             'layout' => self::effectiveLayout($dashboard->layout, array_values(array_map(static fn (Widget $widget): string => $widget->id, $widgets->all()))),
+            'slicers' => $dashboard->slicers ?? [],
+            'dataset_fields' => $datasetFields,
             'widgets' => $widgets->map(fn (Widget $widget): array => $this->widget($widget, $ready))->values()->all(),
         ];
     }
