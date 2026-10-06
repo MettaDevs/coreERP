@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Platform\Analytics\Query;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Query\Formula\Formula;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Modules\Contracts\Analytics\MeasureFormat;
 
 /**
  * Memeriksa query terhadap dataset dan principal sebelum ada SQL apa pun. Urutannya: batas jumlah, setiap
@@ -23,6 +25,13 @@ use App\Platform\Analytics\Security\AnalyticsPrincipal;
  *
  * Gerbang data pribadi wajib (area 4, diikat ke `Security\PersonalDataGate` lewat {@see FieldUseGate}),
  * supaya tidak ada jalur yang melewatinya.
+ *
+ * Area 13 menambah tiga pemeriksaan. **Rumus**: paling banyak `limits.formulas`, kuncinya tidak bentrok dengan
+ * kolom atau nilai dataset dan dipilih di `measures`, setiap `[kunci]` di dalamnya measure dataset — bukan rumus
+ * lain — dan measure-measure itu tidak mencampur dua kolom mata uang atau dua kolom satuan (KA-22). Kolom yang
+ * dibaca measure di dalam rumus ikut dilaporkan ke gerbang data pribadi. **Perbandingan periode** butuh rentang
+ * waktu yang jelas awal dan akhirnya, dan tanggal yang dikelompokkan harus memakai ukuran waktu. **Persen terhadap
+ * total** hanya untuk nilai yang dipilih.
  */
 final class QueryValidator
 {
@@ -54,7 +63,19 @@ final class QueryValidator
         }
 
         $this->assertWithin($query->measures, 'limits.measures', 12, 'measures', 'Terlalu banyak nilai yang dihitung. Maksimal %d.');
+        $formulas = [];
+        foreach ($query->formulas as $formula) {
+            $formulas[$formula->key] = $formula;
+        }
         foreach ($query->measures as $i => $measure) {
+            if (isset($formulas[$measure])) {
+                if (isset($chosen[$measure])) {
+                    throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai "'.$measure.'" dipilih lebih dari sekali.');
+                }
+                $chosen[$measure] = true;
+
+                continue;
+            }
             if (! $dataset->hasMeasure($measure)) {
                 throw AnalyticsQueryException::measureUnknown("measures.{$i}", $measure);
             }
@@ -64,17 +85,20 @@ final class QueryValidator
                 throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai "'.$measure.'" dipilih lebih dari sekali.');
             }
             $chosen[$measure] = true;
-            // Field yang dibaca measure ikut dilaporkan ke gerbang data pribadi: kolom bahannya bila ia field
-            // dataset, dan setiap field saringan tetapnya. Aturannya sama dengan katalog
-            // (`PersonalDataGate::visibleMeasures()`), supaya measure yang disembunyikan juga ditolak.
-            $definition = $dataset->measure($measure);
-            if ($definition->field !== null && $dataset->hasField($definition->field)) {
-                $uses["measures.{$i}"] = $definition->field;
+            $uses = [...$uses, ...$this->measureUses($dataset, $measure, "measures.{$i}")];
+        }
+
+        $this->assertWithin($query->formulas, 'limits.formulas', 5, 'formulas', 'Terlalu banyak rumus. Maksimal %d.');
+        foreach ($query->formulas as $i => $formula) {
+            $uses = [...$uses, ...$this->formula($dataset, $query, $formula, "formulas.{$i}", $formulas)];
+        }
+
+        foreach ($query->percentOfTotal as $i => $key) {
+            if (! in_array($key, $query->measures, true)) {
+                throw AnalyticsQueryException::invalidQuery("percent_of_total.{$i}", 'Persen terhadap total hanya untuk nilai yang dihitung, dan "'.$key.'" tidak ada di pilihan.');
             }
-            foreach (array_keys($definition->where) as $key) {
-                if ($dataset->hasField($key)) {
-                    $uses["measures.{$i}.where.{$key}"] = $key;
-                }
+            if (! isset($formulas[$key]) && ! $dataset->isNumericMeasure($key)) {
+                throw AnalyticsQueryException::invalidQuery("percent_of_total.{$i}", 'Nilai "'.$key.'" bukan angka, jadi tidak punya persen terhadap total.');
             }
         }
 
@@ -88,6 +112,11 @@ final class QueryValidator
 
         if ($query->timeRange !== null) {
             $uses['time_range.field'] = $this->timeRangeField($dataset, $query->timeRange);
+        }
+
+        if ($query->compare !== null) {
+            $this->comparable($dataset, $query, $principal);
+            $this->assertNoComparisonKeyCollisions($query, $chosen);
         }
 
         $this->assertWithin($query->sort, 'limits.sort', 3, 'sort', 'Terlalu banyak urutan. Maksimal %d.');
@@ -110,6 +139,134 @@ final class QueryValidator
         // belajar dari pesan galat sebelumnya kolom mana yang ada.
         if ($uses !== []) {
             $this->fieldGate->assertUsable($dataset, $principal, $uses);
+        }
+    }
+
+    /**
+     * Field yang dibaca satu measure dataset, untuk gerbang data pribadi: kolom bahannya bila ia field dataset, dan
+     * setiap field saringan tetapnya. Aturannya sama dengan katalog (`PersonalDataGate::visibleMeasures()`), supaya
+     * measure yang disembunyikan juga ditolak — juga bila ia dipakai lewat rumus.
+     *
+     * @return array<string, string> path => kunci field
+     */
+    private function measureUses(CompiledDataset $dataset, string $measure, string $path): array
+    {
+        $uses = [];
+        $definition = $dataset->measure($measure);
+        if ($definition->field !== null && $dataset->hasField($definition->field)) {
+            $uses[$path] = $definition->field;
+        }
+        foreach (array_keys($definition->where) as $key) {
+            if ($dataset->hasField($key)) {
+                $uses["{$path}.where.{$key}"] = $key;
+            }
+        }
+
+        return $uses;
+    }
+
+    /**
+     * Kolom perbandingan memakai akhiran tetap yang tidak boleh menimpa nilai atau pengelompokan terpilih.
+     *
+     * @param  array<string, true>  $chosen
+     */
+    private function assertNoComparisonKeyCollisions(AnalyticsQuery $query, array $chosen): void
+    {
+        foreach ($query->measures as $i => $key) {
+            foreach (['__previous', '__change', '__change_pct'] as $suffix) {
+                if (isset($chosen[$key.$suffix])) {
+                    throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai yang dipilih bertabrakan dengan kolom perbandingan. Pilih nilai lain.');
+                }
+            }
+        }
+    }
+
+    /**
+     * Satu rumus terhadap dataset: kuncinya, setiap measure yang dirujuknya, warisan mata uang dan satuannya, dan
+     * formatnya. Memulangkan field yang dibaca measure di dalamnya, untuk gerbang data pribadi.
+     *
+     * @param  array<string, Formula>  $formulas  semua rumus query per kunci
+     * @return array<string, string>
+     *
+     * @throws AnalyticsQueryException
+     */
+    private function formula(CompiledDataset $dataset, AnalyticsQuery $query, Formula $formula, string $path, array $formulas): array
+    {
+        if ($dataset->hasField($formula->key) || $dataset->hasMeasure($formula->key)) {
+            throw AnalyticsQueryException::invalidQuery("{$path}.key", 'Nama rumus "'.$formula->key.'" sudah dipakai kolom atau nilai data ini. Pilih nama lain.');
+        }
+        if (! in_array($formula->key, $query->measures, true)) {
+            throw AnalyticsQueryException::invalidQuery("{$path}.key", 'Rumus "'.$formula->key.'" belum dipilih sebagai nilai yang dihitung.');
+        }
+
+        $uses = [];
+        // Kolom mata uang dan satuan berkualifikasi => measure pertama yang memakainya.
+        $seen = ['mata uang' => [], 'satuan' => []];
+        foreach ($formula->references() as ['key' => $key, 'position' => $position]) {
+            if (isset($formulas[$key])) {
+                throw AnalyticsQueryException::invalidFormula("{$path}.expression", 'Rumus tidak dapat memakai rumus lain (['.$key.'], di karakter '.$position.'). Tulis ulang isi rumus itu di sini.', $position);
+            }
+            if (! $dataset->hasMeasure($key)) {
+                throw AnalyticsQueryException::formulaMeasureUnknown("{$path}.expression", $key, $position);
+            }
+            if (! $dataset->isNumericMeasure($key)) {
+                throw AnalyticsQueryException::invalidFormula("{$path}.expression", 'Nilai ['.$key.'] bukan angka, jadi tidak dapat dihitung di rumus (karakter '.$position.').', $position);
+            }
+
+            $measure = $dataset->measure($key);
+            foreach (['mata uang' => $measure->currency, 'satuan' => $measure->unit] as $noun => $column) {
+                if ($column === null) {
+                    continue;
+                }
+                $seen[$noun][$dataset->qualified($column)] ??= $key;
+                if (count($seen[$noun]) > 1) {
+                    throw AnalyticsQueryException::invalidFormula(
+                        "{$path}.expression",
+                        'Rumus mencampur nilai dengan '.$noun.' berbeda (['.implode('] dan [', array_values($seen[$noun])).'], di karakter '.$position.'). Pakai nilai yang '.$noun.'nya sama.',
+                        $position,
+                    );
+                }
+            }
+
+            $uses = [...$uses, ...$this->measureUses($dataset, $key, "{$path}.measures.{$key}")];
+        }
+
+        $format = $formula->format();
+        if ($format === MeasureFormat::Money && $seen['mata uang'] === []) {
+            throw AnalyticsQueryException::invalidQuery("{$path}.format", 'Format uang butuh nilai uang di dalam rumusnya, supaya mata uangnya diketahui.');
+        }
+        if ($format === MeasureFormat::Quantity && $seen['satuan'] === []) {
+            throw AnalyticsQueryException::invalidQuery("{$path}.format", 'Format kuantitas butuh nilai kuantitas di dalam rumusnya, supaya satuannya diketahui.');
+        }
+
+        return $uses;
+    }
+
+    /**
+     * Perbandingan periode butuh rentang waktu yang jelas awal dan akhirnya, dan setiap kolom tanggal yang
+     * dikelompokkan harus memakai ukuran waktu: baris periode lalu digabung ke periode yang sedang dilihat menurut
+     * embernya, dan tanggal-jam mentah tidak pernah sama di dua periode. Rentang tahun fiskal dihitung sesudah
+     * validasi, jadi di sini cukup tokennya dikenal.
+     *
+     * @throws AnalyticsQueryException
+     */
+    private function comparable(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): void
+    {
+        if ($query->timeRange === null) {
+            throw AnalyticsQueryException::invalidQuery('compare', 'Perbandingan periode butuh rentang waktu. Pilih periode lebih dulu, misalnya bulan ini.');
+        }
+        if (! RelativeRange::isFiscal($query->timeRange->range) && Comparison::closedBounds($query->timeRange, $principal->now()) === null) {
+            throw Comparison::notClosed();
+        }
+        foreach ($query->dimensions as $i => $dimension) {
+            if ($dimension->granularity === null && in_array($dimension->field, $dataset->times(), true)) {
+                throw AnalyticsQueryException::invalidQuery("dimensions.{$i}", 'Untuk membandingkan periode, kelompokkan kolom tanggal per hari, minggu, bulan, kuartal, atau tahun.');
+            }
+        }
+        foreach ($query->measures as $i => $key) {
+            if ($query->formula($key) === null && ! $dataset->isNumericMeasure($key)) {
+                throw AnalyticsQueryException::invalidQuery("measures.{$i}", 'Nilai "'.$key.'" bukan angka, jadi selisihnya antarperiode tidak dapat dihitung. Lepas nilai ini untuk membandingkan periode.');
+            }
         }
     }
 

@@ -55,7 +55,8 @@ final class DatasetValidator
     /** Alias berbentuk huruf lalu angka (`d0`, `c0`, `m0`, `r0`) dipakai engine di SQL. */
     private const ENGINE_ALIAS = '/^[a-z][0-9]+$/';
 
-    private const NUMERIC = ['int2', 'int4', 'int8', 'numeric', 'float4', 'float8'];
+    /** Tipe kolom angka PostgreSQL; dipakai juga `QueryValidator` untuk measure terkecil dan terbesar (area 13). */
+    public const NUMERIC = ['int2', 'int4', 'int8', 'numeric', 'float4', 'float8'];
 
     private const TIME = ['date', 'timestamp', 'timestamptz'];
 

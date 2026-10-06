@@ -54,11 +54,16 @@ export function ResultTable({
     onDrillRow?: (row: Record<string, ResultValue>) => void;
     drillableField?: string;
 }) {
+    // Kolom turunan (perbandingan periode, persen terhadap total; area 13) ikut di samping nilai asalnya walau
+    // daftar kolom tabel hanya menyebut nilainya.
     const chosen: ResultColumn[] = (
         columns && columns.length > 0
-            ? columns.map((key) =>
+            ? columns.flatMap((key) => [
                   result.columns.find((column) => column.key === key),
-              )
+                  ...result.columns.filter(
+                      (column) => column.derived_from === key,
+                  ),
+              ])
             : [...dimensionColumns(result), ...measureColumns(result)]
     ).filter(
         (column): column is ResultColumn =>

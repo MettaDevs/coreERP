@@ -186,6 +186,7 @@ export function suggestedTitle(
 
     const caption = (key: string) =>
         dataset.measures.find((measure) => measure.key === key)?.caption ??
+        query.formulas?.find((formula) => formula.key === key)?.caption ??
         dataset.fields.find((field) => field.key === key)?.caption ??
         key;
     const groups = (query.dimensions ?? []).map((item) => {

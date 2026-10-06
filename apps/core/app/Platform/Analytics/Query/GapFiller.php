@@ -68,8 +68,9 @@ final class GapFiller
         $bounds = $observed === [] ? [] : [min($observed), max($observed)];
 
         $range = $query->timeRange;
-        if ($range !== null && RelativeRange::isToken($range->range) && ($range->field ?? $dataset->defaultTime()) === $period->key) {
-            [$from, $to] = RelativeRange::bounds($range->range, $now);
+        $tokenBounds = $range !== null && ($range->field ?? $dataset->defaultTime()) === $period->key ? RelativeRange::boundsOf($range, $now) : null;
+        if ($tokenBounds !== null) {
+            [$from, $to] = $tokenBounds;
             $from = self::bucket(CarbonImmutable::parse($from->toDateString(), 'UTC'), $granularity)->toDateString();
             $to = self::bucket(CarbonImmutable::parse($to->toDateString(), 'UTC'), $granularity)->toDateString();
             $bounds = $bounds === [] ? [$from, $to] : [min($from, $bounds[0]), max($to, $bounds[1])];

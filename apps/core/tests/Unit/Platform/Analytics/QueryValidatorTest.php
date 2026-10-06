@@ -61,6 +61,10 @@ class QueryValidatorTest extends TestCase
             measures: [
                 'count' => new CompiledMeasure('count', 'Jumlah', Aggregate::Count, null, MeasureFormat::Number, null, null, []),
                 'total' => new CompiledMeasure('total', 'Total nilai', Aggregate::Sum, 'value', MeasureFormat::Money, 'currency_code', null, []),
+                'count__previous' => new CompiledMeasure('count__previous', 'Jumlah sebelumnya', Aggregate::Count, null, MeasureFormat::Number, null, null, []),
+                'total__change' => new CompiledMeasure('total__change', 'Perubahan total', Aggregate::Sum, 'value', MeasureFormat::Money, 'currency_code', null, []),
+                'total__change_pct' => new CompiledMeasure('total__change_pct', 'Persen perubahan total', Aggregate::Sum, 'value', MeasureFormat::Money, 'currency_code', null, []),
+                'bonus__previous' => new CompiledMeasure('bonus__previous', 'Nilai sebelumnya', Aggregate::Count, null, MeasureFormat::Number, null, null, []),
             ],
             times: ['acquired_on', 'created_at'],
             defaultTime: $defaultTime,
@@ -300,6 +304,47 @@ class QueryValidatorTest extends TestCase
         $this->assertSame('Terlalu banyak nilai yang dihitung. Maksimal 1.', $this->assertRejected(['measures' => ['count', 'total']], 'analytics.limit_exceeded', 'measures')->getMessage());
         $this->assertSame('Terlalu banyak saringan. Maksimal 1.', $this->assertRejected(['filters' => ['name' => 'x', 'value' => '1']], 'analytics.limit_exceeded', 'filters')->getMessage());
         $this->assertSame('Terlalu banyak urutan. Maksimal 1.', $this->assertRejected(['dimensions' => ['group_id'], 'sort' => [['key' => 'count', 'direction' => 'asc'], ['key' => 'group_id', 'direction' => 'asc']]], 'analytics.limit_exceeded', 'sort')->getMessage());
+    }
+
+    public function test_formula_limit_uses_config_and_keeps_its_top_level_error_path(): void
+    {
+        config(['analytics.limits.formulas' => 1]);
+        $formula = ['key' => 'bonus', 'expression' => '[count] * 2'];
+
+        $this->assertAccepted(['measures' => ['count', 'bonus'], 'formulas' => [$formula]]);
+
+        $error = $this->assertRejected([
+            'measures' => ['count', 'bonus', 'bonus_lain'],
+            'formulas' => [$formula, ['key' => 'bonus_lain', 'expression' => '[count] * 3']],
+        ], 'analytics.limit_exceeded', 'formulas');
+
+        $this->assertSame('Terlalu banyak rumus. Maksimal 1.', $error->getMessage());
+        $this->assertSame(422, $error->status);
+    }
+
+    public function test_comparison_rejects_selected_measure_keys_that_collide_with_derived_columns(): void
+    {
+        foreach ([
+            ['count', 'count__previous'],
+            ['total', 'total__change'],
+            ['total', 'total__change_pct'],
+        ] as [$measure, $collision]) {
+            $this->assertRejected([
+                'measures' => [$measure, $collision],
+                'time_range' => ['range' => '01/01/2026..31/01/2026'],
+                'compare' => 'previous_period',
+            ], 'analytics.invalid_query', 'measures.0');
+        }
+    }
+
+    public function test_comparison_rejects_a_formula_key_that_collides_with_a_derived_column(): void
+    {
+        $this->assertRejected([
+            'measures' => ['bonus', 'bonus__previous'],
+            'formulas' => [['key' => 'bonus', 'expression' => '[count] * 2']],
+            'time_range' => ['range' => '01/01/2026..31/01/2026'],
+            'compare' => 'previous_period',
+        ], 'analytics.invalid_query', 'measures.0');
     }
 
     public function test_the_personal_data_gate_hears_every_field_the_query_uses_after_the_structure_is_valid(): void

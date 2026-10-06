@@ -44,8 +44,11 @@ use Illuminate\Support\Sleep;
  */
 final class QueryCache
 {
-    /** Versi bentuk kunci dan isi cache. Naikkan bila bentuk hasil yang disimpan berubah, supaya isi lama tidak terbaca. */
-    public const VERSION = 1;
+    /**
+     * Versi bentuk kunci dan isi cache. Naikkan bila bentuk hasil yang disimpan berubah, supaya isi lama tidak terbaca.
+     * Versi 2 (area 13): kolom hasil membawa `derived_from` dan `derivation`.
+     */
+    public const VERSION = 2;
 
     /** TTL terpendek yang disimpan; TTL di antara 1 dan 59 dinaikkan ke sini. */
     public const MIN_TTL_SECONDS = 60;
