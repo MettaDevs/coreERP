@@ -6,6 +6,7 @@ namespace Tests\Feature\Platform\Analytics;
 
 use App\Platform\Identity\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -74,7 +75,20 @@ class PublicationScreenTest extends TestCase
             ->where('savedQueries.0.id', $this->saved)
             ->where('clients.0.can_read', true)
             // Kode data memuat titik, jadi diperiksa lewat isinya, bukan lewat path bertitik.
-            ->where('datasets', fn ($datasets): bool => collect(collect($datasets)->get(self::ASSET_DATASET)['fields'] ?? [])->contains('key', 'responsible_org_unit_id')));
+            ->where('datasets', static function (mixed $datasets): bool {
+                $dataset = $datasets instanceof Collection
+                    ? $datasets->get(self::ASSET_DATASET)
+                    : (is_array($datasets) ? ($datasets[self::ASSET_DATASET] ?? null) : null);
+                $fields = $dataset instanceof Collection
+                    ? $dataset->get('fields')
+                    : (is_array($dataset) ? ($dataset['fields'] ?? null) : null);
+
+                if ($fields instanceof Collection) {
+                    return $fields->contains('key', 'responsible_org_unit_id');
+                }
+
+                return is_array($fields) && in_array('responsible_org_unit_id', array_column($fields, 'key'), true);
+            }));
 
         // Hanya melihat: daftar tampil, bahan membuat tidak.
         $viewer = $this->member($this->tenant, ['core.analytics.inquire']);

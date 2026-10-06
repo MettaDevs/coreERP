@@ -49,7 +49,9 @@ final class PublicationFeedController extends Controller
             ->whereIn('status', [Publication::ACTIVE, Publication::PAUSED])
             ->whereJsonContains('client_ids', $client->id)
             ->orderBy('code')
-            ->get();
+            ->get()
+            ->filter(fn (Publication $publication): bool => $this->access->ownerStillEntitled($publication))
+            ->values();
 
         return response()->json(['data' => $publications->map(fn (Publication $publication): array => $this->summary($publication))->values()->all()]);
     }

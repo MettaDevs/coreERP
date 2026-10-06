@@ -81,7 +81,7 @@ tanpa join baris lintas module.
 ### 15. [ ] Publikasi dan Query API luar
 
 **Tempat:** migration `analytics_publications`; `app/Platform/Analytics/{Models/Publication,
-Security/PublicationPrincipal, External}/*`; `IntegrationClient::SCOPES`; layar
+Security/PublicationPrincipal, External}/*`; katalog `integration_scopes`; layar
 `pages/platform/analytics/publications.tsx`; `apps/core/contracts/internal/integrasi-analitik.yaml`
 beserta `paths/` dan `components/` · **Setelah:** 4, 6 · **Keputusan:** KA-05, KA-09, **KA-11 (wajib
 disetujui)** · **Skill:** `coreerp-architecture` (Contract decision gate), `api-design`,
@@ -90,12 +90,12 @@ di `/docs` dan lolos pemeriksa cakupan, dan semua test di
 [akses luar](/todo/analitik/akses-luar#test-yang-wajib) hijau.
 
 - [ ] 15.1 Tabel dan model publikasi ([bentuk](/todo/analitik/akses-luar#tabel)), kode unik per tenant.
-- [ ] 15.2 Layar publikasi: buat dari query tersimpan atau dasbor, saringan terkunci, klien yang boleh,
-  format, ambang kelompok kecil, hentikan, cabut, pindahkan pemilik.
+- [ ] 15.2 Layar publikasi: buat dari query tersimpan; publikasi dasbor dan embed menunggu area 17;
+  saringan terkunci, klien yang boleh, format, ambang kelompok kecil, hentikan, cabut, pindahkan pemilik.
 - [ ] 15.3 `PublicationPrincipal`: pemeriksaan ulang pembuat per permintaan; 403
   `analytics.publication_suspended`.
-- [ ] 15.4 Scope `analytics.read` dan `analytics.embed` di `IntegrationClient::SCOPES`; pastikan layar
-  Klien integrasi menampilkannya.
+- [ ] 15.4 Daftarkan scope `analytics.read` dan `analytics.embed` lewat migration pada katalog
+  `integration_scopes`; pastikan layar Klien integrasi menampilkannya.
 - [ ] 15.5 Endpoint daftar, metadata, dan baris (JSON, CSV), kursor, saringan tambahan yang hanya
   menyempitkan.
 - [ ] 15.6 Penyembunyian kelompok kecil.

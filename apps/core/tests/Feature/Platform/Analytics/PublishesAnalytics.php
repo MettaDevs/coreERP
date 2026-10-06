@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Analytics;
 
 use App\Platform\Identity\Models\User;
+use Illuminate\Http\Response;
 use Illuminate\Testing\TestResponse;
 
 /**
@@ -37,13 +38,19 @@ trait PublishesAnalytics
         return ['token' => (string) $response->json('token'), 'id' => (string) $response->json('data.id')];
     }
 
-    /** @param array<string, mixed> $body */
+    /**
+     * @param  array<string, mixed>  $body
+     * @return TestResponse<Response>
+     */
     protected function publish(User $owner, array $body): TestResponse
     {
         return $this->actingAs($owner)->postJson('/api/v1/analytics/publications', $body);
     }
 
-    /** @param array<string, mixed> $query */
+    /**
+     * @param  array<string, mixed>  $query
+     * @return TestResponse<Response>
+     */
     protected function feed(string $token, string $path = '', array $query = []): TestResponse
     {
         // Sistem luar tidak membawa sesi: pengguna yang tadi masuk lewat layar tidak boleh ikut terbawa.

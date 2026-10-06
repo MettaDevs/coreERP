@@ -28,7 +28,6 @@ use App\Platform\Tenant\Models\TenantMembership;
  */
 final class PublicationAccess
 {
-
     /**
      * Principal publikasi bila pemiliknya masih berhak. `$clientId` klien integrasi yang membaca, untuk log.
      *

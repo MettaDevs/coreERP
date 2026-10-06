@@ -91,7 +91,7 @@ bentuk di atas ditambah empat kolom, dan model `Models\Publication`.
 
 ## Scope klien integrasi
 
-Dua scope baru di `IntegrationClient::SCOPES`, dipilih admin saat menerbitkan klien:
+Dua scope baru di katalog `integration_scopes`, dipilih admin saat menerbitkan klien:
 
 | Scope | Nama di layar | Membuka |
 | --- | --- | --- |
@@ -101,7 +101,8 @@ Dua scope baru di `IntegrationClient::SCOPES`, dipilih admin saat menerbitkan kl
 Keduanya tetap dipersempit daftar `client_ids` setiap publikasi: scope membuka pintu, publikasi
 menentukan ruangan mana.
 
-*Dikirim area 15:* keduanya di `IntegrationClient::SCOPES`, jadi tampil di layar Klien integrasi.
+*Dikirim area 15:* keduanya didaftarkan lewat migration pada katalog `integration_scopes`, sehingga tampil
+di layar Klien integrasi dan dapat divalidasi saat klien dibuat atau diubah.
 `analytics.embed` belum membuka endpoint apa pun sampai area 17; kontraknya menyebut itu sebagai yang belum
 tersedia.
 
@@ -147,7 +148,7 @@ setiap log yang dilewatinya.
 **n8n, Make, Zapier**: node HTTP dengan header `Authorization: Bearer <client_id>.<secret>`.
 
 *Dikirim area 15 (4 Oktober 2026):* tiga endpoint pertama di `routes/api.php` (`internal/v1/analytics`, di
-balik `integration-client:analytics.read` dan rate limit klien integrasi yang sudah ada), controller
+balik `integration-client:analytics.read`, rate limit per alamat sebelum autentikasi dan per klien sesudahnya), controller
 `Http\Controllers\Internal\PublicationFeedController`, pembacanya `External\PublicationReader`. Kontraknya
 `contracts/internal/integrasi-analitik.yaml`. Yang ditetapkan saat membangunnya:
 
@@ -172,8 +173,13 @@ balik `integration-client:analytics.read` dan rate limit klien integrasi yang su
 - **Bentuk baris** sama dengan contoh di atas, dengan `meta` berisi `publication`, `generated_at`,
   `timezone`, `truncated`, `small_groups_hidden`, dan `next_cursor`. **Total tidak dikirim**: di samping
   kelompok yang disembunyikan, total membuka selisihnya.
+- **Rate limit**: permintaan dibatasi lebih dulu per alamat IP (`COREERP_INTEGRATION_API_IP_RATE_LIMIT`, bawaan
+  600 per menit), kemudian per klien yang sudah diautentikasi (`COREERP_INTEGRATION_API_RATE_LIMIT`, bawaan
+  120 per menit). Token palsu tidak dapat membuat bucket baru dengan mengganti id di depannya.
 - **CSV** ditulis `External\CsvRows`, bukan penulis ekspor daftar: penulis itu menulis ke berkas dan mengubah
-  uang menjadi float. Aturan sel sama — angka mentah, tanggal ISO, teks berawalan `=+-@` diberi petik.
+  uang menjadi float. Angka mentah dan tanggal ISO tetap; teks dengan awalan `=+-@`, tab, CR, LF, atau padanan
+  lebar penuh diberi petik. Ini mitigasi umum, bukan jaminan universal: spreadsheet dapat melepas escape saat
+  file disimpan lalu dibuka lagi.
   Baris judul berisi kunci kolom (termasuk `<kunci>__label`), cursor halaman berikutnya di header
   `X-Next-Cursor`.
 - **Log**: `RunQuery` dengan sumber `api`; principal tercatat `publication:<id>;client:<id>`.

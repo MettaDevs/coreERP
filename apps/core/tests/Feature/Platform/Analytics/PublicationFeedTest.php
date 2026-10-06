@@ -113,7 +113,26 @@ class PublicationFeedTest extends TestCase
         $log = QueryLogEntry::query()->where('tenant_id', $this->tenant)->where('source', 'api')->latest('id')->firstOrFail();
         $this->assertSame("publication:{$publication['id']};client:{$client['id']}", $log->principal);
         $this->assertSame('success', $log->status);
-        $this->assertNotNull(Publication::query()->findOrFail($publication['id'])->last_used_at);
+        $this->assertNotNull(Publication::query()->whereKey($publication['id'])->firstOrFail()->last_used_at);
+    }
+
+    public function test_invalid_tokens_cannot_create_rate_limit_buckets_by_changing_their_prefix(): void
+    {
+        config()->set('coreerp.integration_api_ip_rate_limit', 2);
+
+        $this->feed('palsu-satu.rahasia')->assertUnauthorized();
+        $this->feed('palsu-dua.rahasia')->assertUnauthorized();
+        $this->feed('palsu-tiga.rahasia')->assertStatus(429);
+    }
+
+    public function test_authenticated_integration_clients_have_their_own_rate_limit(): void
+    {
+        config()->set('coreerp.integration_api_ip_rate_limit', 10);
+        config()->set('coreerp.integration_api_rate_limit', 1);
+        $client = $this->integrationClient($this->director, 'Pembaca data');
+
+        $this->feed($client['token'])->assertOk();
+        $this->feed($client['token'])->assertStatus(429);
     }
 
     public function test_a_caller_filter_only_narrows_and_never_replaces_the_publications_own_filters(): void
@@ -228,7 +247,7 @@ class PublicationFeedTest extends TestCase
         $this->assertSame(implode("\n", [
             'nama,nilai,selisih',
             '"\'=HYPERLINK(""http://contoh"")",1250000.50,-25.00',
-            '+1,3,',
+            "'+1,3,",
             '\'@SUM(A1),0,\'-',
             '',
         ]), $csv);

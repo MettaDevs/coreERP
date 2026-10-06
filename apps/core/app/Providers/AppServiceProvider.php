@@ -12,6 +12,7 @@ use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
+use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
 use App\Platform\License\Support\SiteLicense;
 use App\Platform\Observability\Support\ErrorReporter;
 use Carbon\CarbonImmutable;
@@ -181,10 +182,12 @@ class AppServiceProvider extends ServiceProvider
             $request->header('X-CoreERP-Tenant-Id', 'unknown'),
         ])));
 
-        // Per klien integrasi, dikunci pada id di depan token — bukan per alamat IP, karena satu
-        // aplikasi finance biasanya memanggil dari satu alamat dan yang perlu dibatasi adalah
-        // kliennya. Permintaan tanpa token dibatasi per alamat supaya tebakan token tetap murah
-        // untuk ditolak.
+        // Batas IP berjalan sebelum autentikasi agar pemanggil tidak dapat membuat bucket baru
+        // dengan mengganti id token palsu. Batas per klien berjalan sesudah autentikasi.
+        RateLimiter::for('integration-client-ip', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.integration_api_ip_rate_limit', 600)
+        )->by('ip:'.$request->ip()));
+
         RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
             (int) config('coreerp.integration_api_rate_limit', 120)
         )->by(self::integrationClientKey($request)));
@@ -256,11 +259,10 @@ class AppServiceProvider extends ServiceProvider
         Event::forget(MessageLogged::class);
     }
 
-    /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
+    /** Id klien yang sudah diautentikasi, atau alamat IP sebelum autentikasi. */
     private static function integrationClientKey(Request $request): string
     {
-        $token = (string) $request->bearerToken();
-        $id = str_contains($token, '.') ? strstr($token, '.', true) : '';
+        $id = $request->attributes->get(AuthenticateIntegrationClient::ATTRIBUTE);
 
         return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
     }

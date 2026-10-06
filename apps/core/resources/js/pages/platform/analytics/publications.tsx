@@ -611,8 +611,8 @@ function PublicationSheet({
                             </NativeSelect>
                             <FieldDescription>
                                 Yang dibaca sistem lain adalah isi analisis saat
-                                dipublikasikan. Perubahan analisis tersimpan baru
-                                ikut setelah Anda menerapkannya di sini.
+                                dipublikasikan. Perubahan analisis tersimpan
+                                baru ikut setelah Anda menerapkannya di sini.
                             </FieldDescription>
                             <FieldError>{error('saved_query_id')}</FieldError>
                         </Field>
@@ -629,8 +629,8 @@ function PublicationSheet({
                                     htmlFor="apply-latest"
                                     className="font-normal"
                                 >
-                                    Analisis tersimpan ini sudah berubah. Terapkan
-                                    isi terbarunya saat disimpan.
+                                    Analisis tersimpan ini sudah berubah.
+                                    Terapkan isi terbarunya saat disimpan.
                                 </FieldLabel>
                             </Field>
                         )}
@@ -978,8 +978,8 @@ function HealthNote({ publication }: { publication: Publication }) {
     if (publication.saved_query?.changed && publication.status !== 'revoked') {
         return (
             <span className="block text-xs text-muted-foreground">
-                Analisis tersimpannya sudah berubah; sistem lain masih membaca isi
-                lama sampai pemiliknya menerapkannya.
+                Analisis tersimpannya sudah berubah; sistem lain masih membaca
+                isi lama sampai pemiliknya menerapkannya.
             </span>
         );
     }

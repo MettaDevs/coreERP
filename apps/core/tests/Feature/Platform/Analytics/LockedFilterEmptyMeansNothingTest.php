@@ -59,7 +59,7 @@ class LockedFilterEmptyMeansNothingTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('data.locked_filters', ['responsible_org_unit_id' => [$this->unitA]])
             ->json('data.id');
-        $this->publication = Publication::query()->findOrFail($id);
+        $this->publication = Publication::query()->whereKey($id)->firstOrFail();
     }
 
     public function test_a_locked_filter_narrows_and_a_caller_filter_cannot_lift_it(): void

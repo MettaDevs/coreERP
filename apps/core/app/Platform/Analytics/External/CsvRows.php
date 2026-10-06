@@ -6,8 +6,8 @@ namespace App\Platform\Analytics\External;
 
 /**
  * Baris publikasi sebagai CSV, dengan aturan ekspor daftar yang sudah ada (`Reporting\…\TypedSheetWriter`):
- * angka mentah dengan titik desimal, tanggal ISO, dan teks yang diawali `=`, `+`, `-`, atau `@` diberi awalan
- * petik supaya spreadsheet tidak menjalankannya sebagai rumus.
+ * angka mentah dengan titik desimal, tanggal ISO, dan teks yang diawali karakter pemicu rumus diberi awalan
+ * petik: `=`, `+`, `-`, `@`, tab, CR, LF, serta padanan lebar penuh `＝`, `＋`, `－`, `＠`.
  *
  * Penulis ekspor daftar tidak dipakai langsung karena ia menulis ke berkas dan mengubah uang menjadi float;
  * nilai uang analitik dikirim server sebagai teks desimal persis, dan CSV meneruskannya apa adanya. Angka negatif
@@ -48,10 +48,10 @@ final class CsvRows
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
-        if (! is_string($value) || is_numeric($value)) {
+        if (! is_string($value) || preg_match('/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/D', $value) === 1) {
             return (string) $value;
         }
 
-        return preg_match('/^[=+\-@]/', $value) === 1 ? "'".$value : $value;
+        return preg_match('/^[\x00-\x20\x7f]*[=+\-@＝＋－＠]/u', $value) === 1 ? "'".$value : $value;
     }
 }

@@ -68,14 +68,14 @@ class AnalyticsTenantIsolationTest extends TestCase
             'name' => 'Jumlah aset A', 'shared' => true, 'query' => ['dataset' => self::ASSET_DATASET, 'measures' => ['count']],
         ])->assertCreated()->json('data.id');
 
-        $this->dashboardA = Dashboard::query()->findOrFail($dashboard);
-        $this->widgetA = Widget::query()->findOrFail($widget);
-        $this->savedA = SavedQuery::query()->findOrFail($saved);
+        $this->dashboardA = Dashboard::query()->whereKey($dashboard)->firstOrFail();
+        $this->widgetA = Widget::query()->whereKey($widget)->firstOrFail();
+        $this->savedA = SavedQuery::query()->whereKey($saved)->firstOrFail();
 
         // Area 15: publikasi tenant A dari query tersimpannya.
         $client = $this->integrationClient($this->ownerA, 'Klien A');
         $publication = $this->publish($this->ownerA, ['name' => 'Publikasi A', 'saved_query_id' => $saved, 'client_ids' => [$client['id']]])->assertCreated()->json('data.id');
-        $this->publicationA = Publication::query()->findOrFail($publication);
+        $this->publicationA = Publication::query()->whereKey($publication)->firstOrFail();
     }
 
     public function test_every_endpoint_with_an_id_answers_404_to_another_tenant(): void

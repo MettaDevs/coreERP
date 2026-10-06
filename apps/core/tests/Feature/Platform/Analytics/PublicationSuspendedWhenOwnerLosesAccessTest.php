@@ -93,6 +93,15 @@ class PublicationSuspendedWhenOwnerLosesAccessTest extends TestCase
         $this->feed($this->client['token'], '/jumlah-aset-unit')->assertForbidden()->assertJsonPath('error.code', 'analytics.publication_suspended');
     }
 
+    public function test_suspended_publications_are_not_listed_to_the_integration_client(): void
+    {
+        $this->feed($this->client['token'])->assertOk()->assertJsonPath('data.0.code', 'jumlah-aset-unit');
+
+        $this->roleOf($this->analyst)->duties()->detach('core.analytics.publish');
+
+        $this->feed($this->client['token'])->assertOk()->assertExactJson(['data' => []]);
+    }
+
     public function test_another_publisher_takes_over_and_the_publication_runs_with_their_reach(): void
     {
         $this->membership($this->analyst)->forceFill(['status' => 'inactive'])->save();
