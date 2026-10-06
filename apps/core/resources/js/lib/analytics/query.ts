@@ -104,18 +104,24 @@ export function buildQuery(parts: AnalyticsQuery): AnalyticsQuery {
 }
 
 /** Kolom pengelompok yang dipilih pengguna, tanpa mata uang dan satuan yang ditambahkan server. */
-export function dimensionColumns(result: ResultSet): ResultColumn[] {
+export function dimensionColumns(
+    result: Pick<ResultSet, 'columns'>,
+): ResultColumn[] {
     return result.columns.filter(
         (column) => column.kind === 'dimension' && !column.implicit,
     );
 }
 
 /** Mata uang dan satuan yang ikut dikelompokkan server supaya uang dan kuantitas tidak tercampur. */
-export function implicitColumns(result: ResultSet): ResultColumn[] {
+export function implicitColumns(
+    result: Pick<ResultSet, 'columns'>,
+): ResultColumn[] {
     return result.columns.filter((column) => column.implicit === true);
 }
 
-export function measureColumns(result: ResultSet): ResultColumn[] {
+export function measureColumns(
+    result: Pick<ResultSet, 'columns'>,
+): ResultColumn[] {
     return result.columns.filter((column) => column.kind === 'measure');
 }
 

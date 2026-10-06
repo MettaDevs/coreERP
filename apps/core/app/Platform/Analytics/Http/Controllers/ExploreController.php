@@ -39,7 +39,7 @@ final class ExploreController extends Controller
 
         return Inertia::render('platform/analytics/explore', [
             'datasets' => array_map(
-                fn (CompiledDataset $dataset): array => $this->catalog->summary($dataset),
+                fn (CompiledDataset $dataset): array => $this->catalog->summary($dataset, $principal),
                 $this->catalog->forPrincipal($principal),
             ),
             'abilities' => ['create' => $this->access->mayCreate($membership), 'share' => $this->access->mayShare($membership)],

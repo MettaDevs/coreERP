@@ -8,8 +8,11 @@ import {
     WidgetContent,
 } from '@/components/analytics/widget-content';
 import { formatComputedAt } from '@/lib/analytics/format';
-import type { ResultSet, WidgetVisual } from '@/lib/analytics/types';
-import type { DataWidgetType } from '@/lib/analytics/visual';
+import type {
+    AnalyticsResult,
+    WidgetType,
+    WidgetVisual,
+} from '@/lib/analytics/types';
 import { cn } from '@/lib/utils';
 
 /**
@@ -28,29 +31,27 @@ export function QueryResult({
     title,
     height = 2,
     note,
+    emptyMessage = 'Pilih data dan sedikitnya satu nilai untuk melihat hasilnya.',
     onReload,
 }: {
     /** Query sudah lengkap (data dan sedikitnya satu nilai). */
     ready: boolean;
     loading: boolean;
-    result: ResultSet | null;
-    previous: ResultSet | null;
+    result: AnalyticsResult | null;
+    previous: AnalyticsResult | null;
     /** Kalimat galat untuk area hasil, atau `null`. */
     message: string | null;
-    type: DataWidgetType;
+    type: WidgetType;
     visual: WidgetVisual;
     title: string;
     height?: number;
     /** Catatan tambahan di bawah hasil, misalnya batas baris pratinjau. */
     note?: ReactNode;
+    emptyMessage?: string;
     onReload: () => void;
 }) {
     if (!ready) {
-        return (
-            <ResultState icon={CircleSlash}>
-                Pilih data dan sedikitnya satu nilai untuk melihat hasilnya.
-            </ResultState>
-        );
+        return <ResultState icon={CircleSlash}>{emptyMessage}</ResultState>;
     }
 
     if (message !== null && !loading) {

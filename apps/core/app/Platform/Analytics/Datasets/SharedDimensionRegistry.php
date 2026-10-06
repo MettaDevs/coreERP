@@ -42,6 +42,11 @@ final class SharedDimensionRegistry implements SharedDimensions
         return $this->resolvers[$dimension->value] ?? null;
     }
 
+    public function supports(SharedDimension $dimension): bool
+    {
+        return $this->for($dimension) !== null;
+    }
+
     /**
      * Label untuk id yang ditanyakan. Label nama orang (`EndUserIdentifiableInformation`, misalnya nama
      * pengguna) hanya untuk principal yang berhak membaca data pribadi; tanpa hak itu, tidak ada label dan

@@ -11,8 +11,13 @@ import type { DatasetField, QueryDimension } from '@/lib/analytics/types';
 import { cn } from '@/lib/utils';
 
 /** Kolom tanggal yang baru dipilih dikelompokkan per bulan sampai pengguna memilih ukuran lain. */
-function initialDimension(field: DatasetField): QueryDimension {
-    return field.time ? dimension(field.key, 'month') : field.key;
+function initialDimension(
+    field: DatasetField,
+    allowTimeGranularity: boolean,
+): QueryDimension {
+    return field.time && allowTimeGranularity
+        ? dimension(field.key, 'month')
+        : field.key;
 }
 
 /**
@@ -25,11 +30,17 @@ export function DimensionPicker({
     value,
     onChange,
     portalContainer,
+    maxDimensions,
+    emptyMessage,
+    allowTimeGranularity = true,
 }: {
     fields: DatasetField[];
     value: QueryDimension[];
     onChange: (dimensions: QueryDimension[]) => void;
     portalContainer?: RefObject<HTMLElement | null>;
+    maxDimensions?: number;
+    emptyMessage?: string;
+    allowTimeGranularity?: boolean;
 }) {
     const byKey = new Map(fields.map((field) => [field.key, field]));
     const chosen = value.map(dimensionField);
@@ -49,7 +60,9 @@ export function DimensionPicker({
                         <div
                             className={cn(
                                 'grid min-w-0 flex-1 gap-3',
-                                field?.time && 'sm:grid-cols-2',
+                                field?.time &&
+                                    allowTimeGranularity &&
+                                    'sm:grid-cols-2',
                             )}
                         >
                             <Select
@@ -71,7 +84,10 @@ export function DimensionPicker({
                                     if (picked && picked.key !== key) {
                                         replace(
                                             index,
-                                            initialDimension(picked),
+                                            initialDimension(
+                                                picked,
+                                                allowTimeGranularity,
+                                            ),
                                         );
                                     }
                                 }}
@@ -79,7 +95,7 @@ export function DimensionPicker({
                                 emptyMessage="Kolom tidak ditemukan."
                                 portalContainer={portalContainer}
                             />
-                            {field?.time && (
+                            {field?.time && allowTimeGranularity && (
                                 <Select
                                     label="Per"
                                     items={TIME_GRANULARITIES.map((entry) => ({
@@ -125,36 +141,49 @@ export function DimensionPicker({
                     </div>
                 );
             })}
-            {remaining.length > 0 && (
-                <div className="flex items-center gap-1">
-                    <Plus
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden
-                    />
-                    <Select
-                        label={
-                            value.length === 0
-                                ? 'Kelompokkan menurut kolom'
-                                : 'Tambah pengelompokan'
-                        }
-                        items={remaining.map((field) => ({
-                            value: field.key,
-                            label: field.caption,
-                        }))}
-                        value={null}
-                        onValueChange={(next) => {
-                            const picked =
-                                next === null ? undefined : byKey.get(next);
-
-                            if (picked) {
-                                onChange([...value, initialDimension(picked)]);
+            {remaining.length > 0 &&
+                (maxDimensions === undefined ||
+                    value.length < maxDimensions) && (
+                    <div className="flex items-center gap-1">
+                        <Plus
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden
+                        />
+                        <Select
+                            label={
+                                value.length === 0
+                                    ? 'Kelompokkan menurut kolom'
+                                    : 'Tambah pengelompokan'
                             }
-                        }}
-                        searchPlaceholder="Cari kolom"
-                        emptyMessage="Kolom tidak ditemukan."
-                        portalContainer={portalContainer}
-                    />
-                </div>
+                            items={remaining.map((field) => ({
+                                value: field.key,
+                                label: field.caption,
+                            }))}
+                            value={null}
+                            onValueChange={(next) => {
+                                const picked =
+                                    next === null ? undefined : byKey.get(next);
+
+                                if (picked) {
+                                    onChange([
+                                        ...value,
+                                        initialDimension(
+                                            picked,
+                                            allowTimeGranularity,
+                                        ),
+                                    ]);
+                                }
+                            }}
+                            searchPlaceholder="Cari kolom"
+                            emptyMessage="Kolom tidak ditemukan."
+                            portalContainer={portalContainer}
+                        />
+                    </div>
+                )}
+            {value.length === 0 && remaining.length === 0 && emptyMessage && (
+                <p className="text-sm text-muted-foreground" role="status">
+                    {emptyMessage}
+                </p>
             )}
         </div>
     );

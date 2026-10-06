@@ -123,6 +123,10 @@ class QueryLimitsTest extends TestCase
         $route = Route::getRoutes()->getByName('api.analytics.query');
         $this->assertNotNull($route);
         $this->assertContains('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER, $route->gatherMiddleware());
+
+        $blendRoute = Route::getRoutes()->getByName('api.analytics.blend');
+        $this->assertNotNull($blendRoute);
+        $this->assertContains('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER, $blendRoute->gatherMiddleware());
     }
 
     /** @return list<Lock> */

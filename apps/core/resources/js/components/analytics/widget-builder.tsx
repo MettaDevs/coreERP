@@ -26,12 +26,16 @@ import {
     fetchDatasets,
     updateWidget,
 } from '@/lib/analytics/api';
-import { buildQuery, emptyQuery } from '@/lib/analytics/query';
+import { buildQuery, dimensionField, emptyQuery } from '@/lib/analytics/query';
 import type {
     AnalyticsQuery,
+    BlendQuery,
     DashboardSummary,
     DashboardWidget,
+    DatasetDescription,
     DatasetSummary,
+    TableVisual,
+    WidgetType,
 } from '@/lib/analytics/types';
 import type { DataWidgetType } from '@/lib/analytics/visual';
 import {
@@ -45,10 +49,39 @@ import { CoreApiError, toastSaveError } from '@/lib/core-api';
 /** Baris terbanyak pratinjau; bagian yang disimpan tetap menghitung semua baris dalam batas server. */
 const PREVIEW_ROWS = 50;
 
+function selectedSharedDimension(
+    query: AnalyticsQuery,
+    dataset: DatasetDescription | null,
+): string | null {
+    const dimensions = query.dimensions ?? [];
+
+    if (
+        dataset === null ||
+        query.dataset !== dataset.code ||
+        dimensions.length !== 1
+    ) {
+        return null;
+    }
+
+    const dimension = dimensions[0];
+
+    if (dimension === undefined) {
+        return null;
+    }
+
+    if (typeof dimension !== 'string' && dimension.granularity !== undefined) {
+        return null;
+    }
+
+    return (
+        dataset.fields.find((field) => field.key === dimensionField(dimension))
+            ?.shared_dimension || null
+    );
+}
+
 /**
- * Pembangun bagian dasbor (area 8.1): `Sheet` sisi kanan dengan tujuh langkah — Data, Nilai, Kelompokkan menurut,
- * Saring, Periode, Tampilan, Pratinjau — isi bergulir, dan Simpan/Batal tetap di bawah. Setiap `Select` di dalamnya
- * menerima `portalContainer` isi `Sheet`, supaya menunya dapat diklik di atas lapisan ini.
+ * Pembangun bagian dasbor: query satu data atau dua data yang digabungkan, tetap di `Sheet` sisi kanan dengan isi
+ * bergulir dan Simpan/Batal di bawah. Setiap `Select` di dalamnya menerima `portalContainer` isi `Sheet`.
  *
  * Dipakai untuk menambah dan mengubah bagian di halaman dasbor, dan untuk menyimpan hasil penjelajah ke dasbor
  * (`dashboard` kosong: pengguna memilih dasbor yang boleh ia ubah). Pratinjau menjalankan query yang sama dengan
@@ -75,8 +108,27 @@ export function WidgetBuilder({
     onSaved: (widget: DashboardWidget) => void;
 }) {
     const contentRef = useRef<HTMLDivElement>(null);
-    const [query, setQuery] = useState<AnalyticsQuery>(
-        () => widget?.query ?? initial?.query ?? emptyQuery(),
+    const [query, setQuery] = useState<AnalyticsQuery>(() => {
+        const saved = widget?.query;
+
+        return saved !== null && saved !== undefined && !('queries' in saved)
+            ? saved
+            : (initial?.query ?? emptyQuery());
+    });
+    const [blendQueries, setBlendQueries] = useState<
+        [AnalyticsQuery, AnalyticsQuery]
+    >(() => {
+        const saved = widget?.query;
+
+        return widget?.type === 'blend' &&
+            saved !== null &&
+            saved !== undefined &&
+            'queries' in saved
+            ? saved.queries
+            : [emptyQuery(), emptyQuery()];
+    });
+    const [mode, setMode] = useState<'single' | 'blend'>(() =>
+        widget?.type === 'blend' ? 'blend' : 'single',
     );
     const [chosenType, setChosenType] = useState<DataWidgetType | null>(() =>
         widget !== null && isDataWidgetType(widget.type)
@@ -96,8 +148,32 @@ export function WidgetBuilder({
         query.dataset === '' ? null : query.dataset,
     );
     const dataset = description.description;
+    const firstBlendDescription = useDatasetDescription(
+        blendQueries[0].dataset === '' ? null : blendQueries[0].dataset,
+    );
+    const secondBlendDescription = useDatasetDescription(
+        blendQueries[1].dataset === '' ? null : blendQueries[1].dataset,
+    );
+    const blendDescriptions = [
+        firstBlendDescription,
+        secondBlendDescription,
+    ] as const;
+    const blendDatasets = blendDescriptions.map((item) => item.description);
+    const sharedDimension = selectedSharedDimension(
+        blendQueries[0],
+        blendDatasets[0],
+    );
+    const secondDatasets =
+        sharedDimension === null
+            ? []
+            : catalog.datasets.filter(
+                  (item) =>
+                      item.code !== blendQueries[0].dataset &&
+                      item.shared_dimensions.includes(sharedDimension),
+              );
     const times = dataset?.times ?? [];
     const type = effectiveVisual(chosenType, query, times);
+    const activeType: WidgetType = mode === 'blend' ? 'blend' : type;
     const grouped = (query.dimensions ?? []).length > 0;
     const stored = buildQuery({
         ...query,
@@ -112,6 +188,33 @@ export function WidgetBuilder({
               }
             : null,
     );
+    const storedBlend: BlendQuery = {
+        queries: [buildQuery(blendQueries[0]), buildQuery(blendQueries[1])],
+    };
+    const secondSharedDimension = selectedSharedDimension(
+        blendQueries[1],
+        blendDatasets[1],
+    );
+    const blendReady =
+        sharedDimension !== null &&
+        secondSharedDimension === sharedDimension &&
+        blendQueries[0].dataset !== blendQueries[1].dataset &&
+        secondDatasets.some((item) => item.code === blendQueries[1].dataset) &&
+        blendDatasets[0] !== null &&
+        blendDatasets[1] !== null &&
+        storedBlend.queries[0].measures.length > 0 &&
+        storedBlend.queries[1].measures.length > 0;
+    const blendPreview = useQueryPreview(
+        blendReady
+            ? {
+                  queries: storedBlend.queries.map((item) => ({
+                      ...item,
+                      limit: Math.min(item.limit ?? PREVIEW_ROWS, PREVIEW_ROWS),
+                  })) as [AnalyticsQuery, AnalyticsQuery],
+              }
+            : null,
+    );
+    const blendPlacement = queryErrorPlacement(blendPreview.error);
     const placement = queryErrorPlacement(preview.error);
     const visual = defaultVisual(
         type,
@@ -120,16 +223,38 @@ export function WidgetBuilder({
         widget !== null && widget.type === type ? widget.visual : undefined,
     );
     const suggested = suggestedTitle(stored, dataset);
-    const shownTitle = title ?? suggested;
+    const blendSuggested = blendDatasets
+        .map((item) => item?.caption)
+        .filter((caption): caption is string => caption !== undefined)
+        .join(' + ');
+    const shownTitle = title ?? (mode === 'blend' ? blendSuggested : suggested);
+    const blendVisual: TableVisual = {
+        columns:
+            blendPreview.result?.columns
+                .filter((column) => !column.implicit)
+                .map((column) => column.key) ?? [],
+        show_totals: true,
+    };
     // Saringan yang tidak terbaca baru ditolak saat dihitung, bukan saat disimpan; bagian seperti itu tidak disimpan.
     const rejected =
         preview.error instanceof CoreApiError && preview.error.status === 422;
-    const canSave =
+    const blendRejected =
+        blendPreview.error instanceof CoreApiError &&
+        blendPreview.error.status === 422;
+    const canSaveSingle =
         ready &&
         !rejected &&
         dashboardId !== null &&
         shownTitle.trim() !== '' &&
         !saving;
+    const canSaveBlend =
+        blendReady &&
+        blendPreview.result !== null &&
+        !blendRejected &&
+        dashboardId !== null &&
+        shownTitle.trim() !== '' &&
+        !saving;
+    const canSave = mode === 'blend' ? canSaveBlend : canSaveSingle;
 
     const save = async () => {
         if (!canSave || dashboardId === null) {
@@ -141,9 +266,9 @@ export function WidgetBuilder({
 
         const input = {
             title: shownTitle.trim(),
-            type,
-            query: stored,
-            visual,
+            type: activeType,
+            query: mode === 'blend' ? storedBlend : stored,
+            visual: mode === 'blend' ? blendVisual : visual,
         };
 
         try {
@@ -161,6 +286,42 @@ export function WidgetBuilder({
         } finally {
             setSaving(false);
         }
+    };
+
+    const startBlend = () => {
+        const shared = (query.dimensions ?? []).find((dimension) =>
+            selectedSharedDimension(
+                { ...query, dimensions: [dimension] },
+                dataset,
+            ),
+        );
+        const first = buildQuery({
+            ...query,
+            dimensions: shared === undefined ? [] : [shared],
+        });
+
+        setBlendQueries([first, emptyQuery()]);
+        setMode('blend');
+    };
+
+    const updateBlendQuery = (index: 0 | 1, next: AnalyticsQuery) => {
+        if (index === 0) {
+            const nextSharedDimension = selectedSharedDimension(
+                next,
+                blendDatasets[0],
+            );
+
+            setBlendQueries((current) => [
+                next,
+                nextSharedDimension === sharedDimension
+                    ? current[1]
+                    : emptyQuery(),
+            ]);
+
+            return;
+        }
+
+        setBlendQueries((current) => [current[0], next]);
     };
 
     return (
@@ -185,8 +346,9 @@ export function WidgetBuilder({
                         {widget === null ? 'Bagian baru' : 'Ubah bagian'}
                     </SheetTitle>
                     <SheetDescription>
-                        Pilih data dan nilai yang dihitung, lalu atur
-                        pengelompokan, saringan, periode, dan tampilannya.
+                        {mode === 'blend'
+                            ? 'Pilih dua data dengan satu kolom bersama, lalu pilih nilai yang ingin dibandingkan.'
+                            : 'Pilih data dan nilai yang dihitung, lalu atur pengelompokan, saringan, periode, dan tampilannya.'}{' '}
                         Pratinjau mengikuti setiap perubahan.
                     </SheetDescription>
                 </SheetHeader>
@@ -239,12 +401,44 @@ export function WidgetBuilder({
                                 </Field>
                             </Step>
                         )}
+                        <div
+                            className="flex flex-wrap gap-2"
+                            role="group"
+                            aria-label="Jenis bagian"
+                        >
+                            <Button
+                                type="button"
+                                variant={
+                                    mode === 'single' ? 'default' : 'outline'
+                                }
+                                aria-pressed={mode === 'single'}
+                                disabled={saving}
+                                onClick={() => setMode('single')}
+                            >
+                                Satu data
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={
+                                    mode === 'blend' ? 'default' : 'outline'
+                                }
+                                aria-pressed={mode === 'blend'}
+                                disabled={saving}
+                                onClick={() => {
+                                    if (mode === 'single') {
+                                        startBlend();
+                                    }
+                                }}
+                            >
+                                Gabungkan dua data
+                            </Button>
+                        </div>
                         {catalog.failed ? (
                             <p className="text-sm" role="status">
                                 Daftar data belum dapat dimuat. Tutup lalu coba
                                 lagi.
                             </p>
-                        ) : (
+                        ) : mode === 'single' ? (
                             <QueryEditor
                                 numbered
                                 datasets={catalog.datasets}
@@ -256,15 +450,103 @@ export function WidgetBuilder({
                                 onChange={setQuery}
                                 portalContainer={contentRef}
                             />
+                        ) : (
+                            <div className="flex flex-col gap-5">
+                                <section className="flex min-w-0 flex-col gap-3">
+                                    <h3 className="text-sm font-medium">
+                                        Data pertama
+                                    </h3>
+                                    <QueryEditor
+                                        datasets={catalog.datasets}
+                                        value={blendQueries[0]}
+                                        dataset={blendDatasets[0]}
+                                        datasetLoading={
+                                            blendDescriptions[0].loading
+                                        }
+                                        datasetFailure={
+                                            blendDescriptions[0].failure
+                                        }
+                                        errors={blendPlacement}
+                                        onChange={(next) =>
+                                            updateBlendQuery(0, next)
+                                        }
+                                        portalContainer={contentRef}
+                                        dimensionFilter={(field) =>
+                                            field.shared_dimension !==
+                                                undefined &&
+                                            blendDatasets[0]?.shared_dimensions.includes(
+                                                field.shared_dimension,
+                                            ) === true
+                                        }
+                                        maxDimensions={1}
+                                        dimensionEmptyMessage="Data ini belum menyediakan kolom bersama."
+                                        allowTimeGranularity={false}
+                                    />
+                                </section>
+                                {sharedDimension === null ? (
+                                    <p
+                                        className="text-sm text-muted-foreground"
+                                        role="status"
+                                    >
+                                        Pilih tepat satu kolom bersama pada data
+                                        pertama untuk melihat data yang cocok.
+                                    </p>
+                                ) : secondDatasets.length === 0 ? (
+                                    <p
+                                        className="text-sm text-muted-foreground"
+                                        role="status"
+                                    >
+                                        Belum ada data lain yang menyediakan
+                                        kolom bersama ini.
+                                    </p>
+                                ) : (
+                                    <section className="flex min-w-0 flex-col gap-3">
+                                        <h3 className="text-sm font-medium">
+                                            Data kedua
+                                        </h3>
+                                        <QueryEditor
+                                            datasets={secondDatasets}
+                                            value={blendQueries[1]}
+                                            dataset={blendDatasets[1]}
+                                            datasetLoading={
+                                                blendDescriptions[1].loading
+                                            }
+                                            datasetFailure={
+                                                blendDescriptions[1].failure
+                                            }
+                                            errors={blendPlacement}
+                                            onChange={(next) =>
+                                                updateBlendQuery(1, next)
+                                            }
+                                            portalContainer={contentRef}
+                                            dimensionFilter={(field) =>
+                                                field.shared_dimension ===
+                                                sharedDimension
+                                            }
+                                            maxDimensions={1}
+                                            dimensionEmptyMessage="Data ini belum memiliki kolom untuk gabungan yang dipilih."
+                                            allowTimeGranularity={false}
+                                        />
+                                    </section>
+                                )}
+                            </div>
                         )}
-                        {dataset !== null && (
-                            <Step title="6. Tampilan">
-                                <VisualPicker
-                                    query={stored}
-                                    times={times}
-                                    value={type}
-                                    onChange={setChosenType}
-                                />
+                        {(mode === 'blend' || dataset !== null) && (
+                            <Step
+                                title={
+                                    mode === 'blend'
+                                        ? 'Tampilan'
+                                        : '6. Tampilan'
+                                }
+                            >
+                                {mode === 'single' && (
+                                    <VisualPicker
+                                        query={stored}
+                                        times={times}
+                                        value={type}
+                                        onChange={setChosenType}
+                                    />
+                                )}
                                 <Field data-invalid={Boolean(errors.title)}>
                                     <Input
                                         label="Judul"
@@ -277,10 +559,16 @@ export function WidgetBuilder({
                                         aria-invalid={Boolean(errors.title)}
                                     />
                                     <FieldError>{errors.title?.[0]}</FieldError>
+                                    {mode === 'blend' && (
+                                        <FieldDescription>
+                                            Hasil gabungan akan ditampilkan
+                                            sebagai tabel.
+                                        </FieldDescription>
+                                    )}
                                 </Field>
                             </Step>
                         )}
-                        {query.dataset !== '' && (
+                        {mode === 'single' && query.dataset !== '' && (
                             <Step title="7. Pratinjau">
                                 <QueryResult
                                     ready={ready}
@@ -304,6 +592,22 @@ export function WidgetBuilder({
                                         )
                                     }
                                     onReload={preview.reload}
+                                />
+                            </Step>
+                        )}
+                        {mode === 'blend' && (
+                            <Step title="Pratinjau">
+                                <QueryResult
+                                    ready={blendReady}
+                                    loading={blendPreview.loading}
+                                    result={blendPreview.result}
+                                    previous={blendPreview.previous}
+                                    message={blendPlacement.message}
+                                    type="blend"
+                                    visual={blendVisual}
+                                    title={shownTitle}
+                                    emptyMessage="Pilih dua data, satu kolom bersama, dan sedikitnya satu nilai pada masing-masing data."
+                                    onReload={blendPreview.reload}
                                 />
                             </Step>
                         )}

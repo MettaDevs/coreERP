@@ -36,7 +36,7 @@ final class DatasetController extends Controller
         $principal = UserPrincipal::fromMembership($this->currentMembership($request), $this->clock->timezone($request));
 
         return response()->json(['data' => array_map(
-            fn (CompiledDataset $dataset): array => $this->catalog->summary($dataset),
+            fn (CompiledDataset $dataset): array => $this->catalog->summary($dataset, $principal),
             $this->catalog->forPrincipal($principal),
         )]);
     }

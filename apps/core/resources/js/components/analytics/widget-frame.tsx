@@ -48,12 +48,12 @@ import {
 } from '@/lib/analytics/slicer';
 import type { SlicerValues } from '@/lib/analytics/slicer';
 import type {
+    AnalyticsResult,
     CrossFilter,
     DashboardSlicer,
     DashboardWidget,
     DatasetField,
     ResultColumn,
-    ResultSet,
     ResultValue,
     TextVisual,
     DrillValue,
@@ -369,7 +369,7 @@ function FrameBody({
     height: number;
     hasData: boolean;
     loading: boolean;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
     asTable: boolean;
     onReload: () => void;

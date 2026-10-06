@@ -14,8 +14,9 @@ use Illuminate\Support\Carbon;
 
 /**
  * Satu tile, grafik, tabel, atau teks di satu dasbor. `query` adalah query analitik yang sudah divalidasi
- * saat disimpan (`WidgetDefinition`), dalam bentuk ringkas yang sama dengan badan `POST api/v1/analytics/query`;
- * `visual` adalah cara menggambarnya, aturannya per jenis widget di `docs/todo/analitik/dasbor-dan-visual.md`.
+ * saat disimpan (`WidgetDefinition`): query biasa memakai bentuk ringkas `POST api/v1/analytics/query`, sedangkan
+ * widget gabungan menyimpan dua query ringkas beserta versi dataset masing-masing. `visual` adalah cara menggambarnya,
+ * aturannya per jenis widget di `docs/todo/analitik/dasbor-dan-visual.md`.
  *
  * Widget teks tidak punya dataset maupun query. `dataset_version` adalah versi dataset saat query disimpan:
  * kunci yang sesudahnya diganti nama module dipetakan saat dibaca (`StoredQuery`), dan kunci yang hilang
@@ -42,8 +43,8 @@ class Widget extends Model
 {
     use BindsWithinActiveTenant, HasUlids, SoftDeletes;
 
-    /** Jenis widget fase 1 (FR-21). */
-    public const TYPES = ['kpi', 'bar', 'column', 'line', 'area', 'donut', 'table', 'text'];
+    /** Jenis widget yang dapat disimpan; `blend` menambah gabungan lintas dataset (area 14). */
+    public const TYPES = ['kpi', 'bar', 'column', 'line', 'area', 'donut', 'table', 'text', 'blend'];
 
     protected $table = 'analytics_widgets';
 
