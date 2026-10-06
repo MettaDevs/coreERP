@@ -121,6 +121,7 @@ Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PostingFeed`, di dala
 | `GET /api/internal/v1/finance-postings` | Mode pull: posting yang siap dibukukan | Klien integrasi dengan scope `finance-postings.read` |
 | `POST /api/internal/v1/finance-postings/{posting_id}/ack` | Ack pembaca | Klien integrasi dengan scope `finance-postings.ack` |
 | `GET /api/internal/v1/vendors` | Sinkron vendor untuk tabel penerjemah pembaca | Scope `vendors.read` |
+| `GET /api/internal/v1/legal-entities` | Pilihan perusahaan untuk pembaca: seluruh entitas legal aktif milik tenant token, urut nama lalu id, tanpa pagination | Scope `legal-entities.read` |
 | `GET /api/internal/v1/operating-units` | Sinkron nomor unit untuk tabel penerjemah pembaca | Scope `operating-units.read`, atau kredensial app module |
 | `GET /settings/finance-postings` | Layar pantau | Duty Pantau posting (lihat), permission `core.finance-posting.read` |
 | `GET /api/v1/finance-postings/{id}` | Detail satu posting | `core.finance-posting.read` |
@@ -130,6 +131,14 @@ Module tidak memanggil HTTP. Ia menerbitkan lewat kontrak `PostingFeed`, di dala
 | `/api/v1/integration-clients…` | Klien integrasi: terbitkan, ubah, cabut, token baru, signing secret baru, kirim uji | Melihat: `core.finance-setup.read`. Mengubah: `core.finance-setup.update` |
 
 Ditambah perintah `finance-postings:push`, dijadwalkan setiap menit di `apps/core/routes/console.php`.
+
+Daftar entitas legal membawa `id`, `code` dari `legal_entities.company_code`, `name`, dan
+`status: active`. Identitas dan kode sama dengan `legal_entity` pada vendor dan posting.
+Pembaca menampilkan nama serta kode, menyimpan id untuk filter `legal_entity`, dan mengatur
+pemetaan database finance di sisinya. Entitas baru langsung muncul pada daftar meskipun
+feed-nya belum aktif; aktivasi feed dan cutover tetap keputusan terpisah. Scope baru didaftarkan
+melalui migration data, tanpa menambah scope pada token yang sudah ada. Admin memberikan
+`legal-entities.read` secara eksplisit. Pengujian berada di `IntegrationClientTest`.
 
 Kenapa dibagi begitu:
 
