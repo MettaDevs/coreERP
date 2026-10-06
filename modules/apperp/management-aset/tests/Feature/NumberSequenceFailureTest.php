@@ -63,7 +63,9 @@ class NumberSequenceFailureTest extends TestCase
     public function test_unexpected_issuer_failure_is_a_reported_500_not_validation(): void
     {
         $failure = new RuntimeException('Kegagalan internal penerbit nomor untuk test.');
-        $this->mock(NumberSequenceIssuer::class)->shouldReceive('issue')->once()->andThrow($failure);
+        $issuer = $this->createMock(NumberSequenceIssuer::class);
+        $issuer->expects($this->once())->method('issue')->willThrowException($failure);
+        $this->app->instance(NumberSequenceIssuer::class, $issuer);
         $reported = [];
         app(ExceptionHandler::class)->reportable(function (RuntimeException $error) use (&$reported): void {
             $reported[] = $error;
@@ -77,8 +79,10 @@ class NumberSequenceFailureTest extends TestCase
 
     public function test_empty_generated_number_is_an_internal_error(): void
     {
-        $this->mock(NumberSequenceIssuer::class)->shouldReceive('issue')->once()
-            ->andReturn(['id' => (string) Str::ulid(), 'number' => '', 'status' => 'issued']);
+        $issuer = $this->createMock(NumberSequenceIssuer::class);
+        $issuer->expects($this->once())->method('issue')
+            ->willReturn(['id' => (string) Str::ulid(), 'number' => '', 'status' => 'issued']);
+        $this->app->instance(NumberSequenceIssuer::class, $issuer);
 
         $this->buatMaster()->assertStatus(500);
         $this->assertDatabaseCount('aset_m_kondisi_aset', 0);

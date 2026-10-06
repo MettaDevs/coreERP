@@ -40,7 +40,9 @@ class NumberSequenceScopeTest extends TestCase
     {
         $this->buatTenantUji();
         $manifest = ModuleManifestFiles::read(dirname(__DIR__, 2));
-        $references = collect($manifest['number_sequences']['references'])
+        /** @var list<array{code:string,allowed_scopes:list<string>}> $declared */
+        $declared = $manifest['number_sequences']['references'];
+        $references = collect($declared)
             ->filter(fn (array $reference): bool => in_array('legal_entity', $reference['allowed_scopes'], true))
             ->pluck('code')->sort()->values()->all();
         $expected = array_keys(self::DOCUMENTS);
@@ -121,10 +123,12 @@ class NumberSequenceScopeTest extends TestCase
         $columns = $table === 'aset_tr_dokumen_siklus_aset'
             ? '(tenant_id, legal_entity_id, jenis_dokumen, kode)'
             : '(tenant_id, legal_entity_id, kode)';
-        $indexes = DB::select('SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ?', [$table]);
-        $matching = array_filter($indexes, static fn (object $index): bool => str_contains($index->indexdef, 'UNIQUE')
-            && str_contains($index->indexdef, $columns)
-            && preg_match('/WHERE \(?deleted_at IS NULL\)?$/', $index->indexdef) === 1);
+        /** @var list<string> $indexes */
+        $indexes = DB::table('pg_indexes')->whereRaw('schemaname = current_schema()')
+            ->where('tablename', $table)->pluck('indexdef')->all();
+        $matching = array_filter($indexes, static fn (string $definition): bool => str_contains($definition, 'UNIQUE')
+            && str_contains($definition, $columns)
+            && preg_match('/WHERE \(?deleted_at IS NULL\)?$/', $definition) === 1);
         $this->assertNotEmpty($matching, $table.' harus menjaga nomor aktif per entitas legal dan namespace dokumen.');
     }
 }
