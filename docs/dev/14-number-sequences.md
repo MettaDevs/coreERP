@@ -400,6 +400,9 @@ pembukuan ganda, bukan nomor dokumen saja.
   matriks itu dan sengaja mengganti satu indeks menjadi se-tenant untuk membuktikan guard menolaknya.
 - Setelah migration, baca definisi indeks dari database runtime yang dipakai UI. Metadata skema host atau
   keberhasilan migration di database test tidak membuktikan runtime sudah diperbarui.
+- Uji pemasangan kosong dan upgrade runtime. Normalisasi modul setelah migration tidak boleh menjadi
+  satu-satunya pembuat kolom yang dibutuhkan indeks di dalam migration; tabel siklus aset lama adalah
+  contoh kolom `deleted_at` yang sudah ada di runtime tetapi belum dideklarasikan migration awal.
 
 Kegagalan pada 6 Oktober 2026 berasal dari manifest aset yang memakai counter per PT sementara beberapa
 indeks lama masih se-tenant. Helper test memaksa semuanya ke scope `tenant`, sehingga keadaan runtime

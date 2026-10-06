@@ -14,7 +14,11 @@ Forbidden:
 NotFound:
   description: Data tidak ditemukan pada tenant aktif
 ValidationError:
-  description: Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, milik tenant lain, atau kombinasi model-pabrikan-jenis aset yang tidak sesuai
+  description: |
+    Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, milik tenant lain,
+    atau kombinasi model-pabrikan-jenis aset yang tidak sesuai. Penolakan validasi penerbitan
+    nomor juga memakai 422, dengan `error.code: number_sequence_failed` dan pesan konfigurasi
+    yang perlu diperbaiki. Kegagalan database atau bug penerbit bukan validasi dan memakai 500.
 IdempotencyConflict:
   description: Idempotency-Key sudah dipakai untuk data yang berbeda
   content:
@@ -45,31 +49,19 @@ AttributeValuesInUse:
     application/json:
       schema:
         $ref: '#/components/schemas/AttributeValuesConflictResponse'
-NumberSequenceUnavailable:
+InternalError:
   description: |
-    Kode tidak dapat diterbitkan karena Number Sequence Core tidak dapat dipakai.
-
-    Statusnya selalu 503 karena dari sudut pandang pemanggil penulisan memang tidak dapat
-    diselesaikan, tetapi `error.code` membedakan sebabnya — dan sebab-sebab ini ditangani
-    orang yang berbeda dengan cara yang berbeda:
-
-    | `error.code` | Arti | Ditangani oleh |
-    | --- | --- | --- |
-    | `number_sequence_unreachable` | Core tidak terjangkau dari jaringan app | Operasional; sementara, boleh dicoba lagi |
-    | `number_sequence_unavailable` | Core terjangkau tetapi menjawab 5xx | Operasional; sementara, boleh dicoba lagi |
-    | `number_sequence_throttled` | Permintaan melebihi batas laju Core | Sementara, boleh dicoba lagi |
-    | `number_sequence_forbidden` | Kredensial service app ditolak Core (401/403) | Deployment; token service tidak sinkron dengan Control Plane |
-    | `number_sequence_reference_unknown` | Reference belum terdaftar di Core (404) | Katalog app; manifest belum tercatat |
-    | `number_sequence_rejected` | Core menolak permintaannya (4xx lain) | Pemanggil; periksa idempotency key dan scope |
-    | `number_sequence_not_configured` | URL atau token Core belum diisi pada app | Deployment |
-    | `number_sequence_invalid_response` | Core menjawab tanpa nomor yang sah | Bug Core |
-
-    Mencoba ulang hanya masuk akal untuk tiga kode pertama. Sisanya akan gagal dengan cara
-    yang sama sampai ada yang memperbaiki konfigurasinya.
+    Exception database atau bug internal diteruskan ke handler Laravel sebagai 500 dan
+    dilaporkan ke Sentry. Jangan menganggapnya penolakan validasi 422 atau kegagalan
+    jaringan penomoran 503. Tidak ada record yang disimpan bila transaksi dokumen gagal.
   content:
     application/json:
       schema:
-        $ref: '#/components/schemas/ErrorResponse'
+        type: object
+        required: [message]
+        properties:
+          message: {type: string}
+      example: {message: Server Error}
 VersionRequired:
   description: |
     Versi data yang diubah tidak dikirim (`error.code` = `version_required`). Kirim header `If-Match`

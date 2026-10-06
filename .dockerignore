@@ -4,6 +4,7 @@
 docs
 artifacts
 **/node_modules
+.pnpm-store
 **/vendor
 # Folder halaman Vendor adalah source UI, bukan dependency Composer.
 !apps/core/resources/js/pages/foundation/vendor

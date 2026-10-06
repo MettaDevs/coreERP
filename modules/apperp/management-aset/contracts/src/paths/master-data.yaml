@@ -65,8 +65,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/analisa-maintenance/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -215,8 +215,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/group-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -815,8 +815,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/item-checklist-maintenance/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -965,8 +965,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/jenis-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1115,8 +1115,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/kondisi-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1267,8 +1267,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/lokasi-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1422,8 +1422,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/model-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1572,8 +1572,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/profil-penyusutan/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1722,8 +1722,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/tipe-lokasi-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -1872,8 +1872,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/buku-penyusutan/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -2022,8 +2022,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/tipe-atribut/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -2172,8 +2172,8 @@
         $ref: '#/components/responses/IdempotencyConflict'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/pabrikan-aset/{id}/detail:
   parameters:
   - $ref: '#/components/parameters/RecordId'

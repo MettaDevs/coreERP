@@ -89,9 +89,10 @@ fungsi. Penjaganya `NoInternalHttpTest`, dan ia mencari **dua bahan sekaligus** 
 koneksi, serta alamat atau kredensial Core — karena satu bahan saja terlalu sering muncul pada kode
 yang sah. Komentar dibuang sebelum diperiksa, dan **module yang sedang dipindah tidak dikecualikan**.
 
-Akibat yang mengikuti: penerbitan nomor yang gagal menjawab **422, bukan 503**. Core tidak lagi
-"tidak terjangkau", jadi kode kesalahan jaringan pada jalur itu bukan sekadar berhenti dipakai — ia
-dibuat tidak bisa ditulis lagi.
+Akibat yang mengikuti: penolakan validasi penerbitan nomor menjawab **422, bukan 503**. Core tidak lagi
+"tidak terjangkau" lewat HTTP antar-module. Kegagalan database dan bug internal tetap mungkin di dalam
+proses: exception aslinya diteruskan ke handler Laravel sebagai 500 dan dilaporkan ke Sentry. Jangan
+menangkap semua `Throwable` lalu menganggapnya validasi hanya karena tidak ada jaringan.
 
 ### Nomor, dokumen, dan pengajuan workflow satu transaksi
 

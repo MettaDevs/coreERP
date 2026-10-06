@@ -17,6 +17,15 @@ return new class extends Migration
 
     public function up(): void
     {
+        // Tabel siklus lama belum mendeklarasikan kolom arsip pada migration-nya. Runtime
+        // yang sudah berjalan telah dilengkapi normalisasi modul, tetapi pemasangan baru
+        // harus memilikinya sebelum indeks parsial dibuat, bukan sesudah seluruh migration.
+        if (! Schema::hasColumn('aset_tr_dokumen_siklus_aset', 'deleted_at')) {
+            Schema::table('aset_tr_dokumen_siklus_aset', function (Blueprint $table): void {
+                $table->softDeletes();
+            });
+        }
+
         foreach (self::INDEXES as $tableName => [$oldIndex, $newIndex]) {
             Schema::table($tableName, function (Blueprint $table) use ($oldIndex): void {
                 $table->dropUnique($oldIndex);

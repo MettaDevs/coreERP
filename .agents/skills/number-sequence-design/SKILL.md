@@ -152,6 +152,9 @@ Keep manifest-to-document index coverage so a new scoped reference cannot silent
 Prove the guard rejects a tenant-wide index. The asset module's `NumberSequenceScopeTest` is the example;
 the rationale is in [`docs/dev/14-number-sequences.md`](../../../docs/dev/14-number-sequences.md#scope-nomor-harus-sama-dengan-indeks-dokumen).
 
+Verify the migration on an empty database as well as an existing runtime. Do not rely on post-migration
+module normalization to add a column needed by an index being created inside that migration.
+
 Declare references as app-owned data:
 
 ```yaml

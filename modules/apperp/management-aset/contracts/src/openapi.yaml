@@ -13,6 +13,10 @@ info:
     Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
+    Penerbitan nomor berjalan di dalam proses Core. Penolakan konfigurasi atau scope menjawab
+    422; exception internal tetap 500 dan dilaporkan ke Sentry. Kode kegagalan jaringan
+    penomoran dari bentuk app terpisah sudah tidak dipakai.
+
     Klasifikasi aset mengikuti model Dynamics 365 F&O: seluruh master klasifikasi datar
     dan saling lepas, dan aset menunjuk masing-masing secara langsung. `group aset`
     membawa perlakuan finansial (penyusutan, GL, penomoran), `jenis aset` membawa

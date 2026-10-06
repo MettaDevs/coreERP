@@ -138,7 +138,7 @@
       order yang sama. Work order dibuat lewat jalur yang sama dengan `POST /pemeliharaan-aset`, termasuk
       nomor dan checklist bawaan jenis pekerjaan. Setiap usulan mengklaim versinya sendiri.
     requestBody: {required: true, content: {application/json: {schema: {type: object, required: [lines], properties: {kelompok: {type: string, enum: [baris, aset], default: baris}, lines: {type: array, minItems: 1, maxItems: 100, items: {type: object, required: [id, version], properties: {id: {$ref: '#/components/schemas/Ulid'}, version: {$ref: '#/components/schemas/VersionField'}}}}}}}}}
-    responses: {'201': {description: Work order yang dibuat, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: object, properties: {work_orders: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}}}}}}}}}}}, '403': {$ref: '#/components/responses/Forbidden'}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+    responses: {'201': {description: Work order yang dibuat, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: object, properties: {work_orders: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}}}}}}}}}}}, '403': {$ref: '#/components/responses/Forbidden'}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '500': {$ref: '#/components/responses/InternalError'}}
 /api/v1/jadwal-pemeliharaan/{id}/abaikan:
   parameters: [$ref: '#/components/parameters/RecordId']
   post:
