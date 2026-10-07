@@ -1,0 +1,14 @@
+type: string
+description: |
+  Format baris publikasi. Admin tenant memilih format yang dibuka untuk setiap publikasi; daftar
+  `formats` di metadata menyebut yang boleh diminta.
+
+  | Nilai | Isi |
+  | --- | --- |
+  | `json` | Baris sebagai objek JSON, bersama kolom dan meta halaman |
+  | `csv` | Baris sebagai CSV berjudul kunci kolom, cursor di header `X-Next-Cursor` |
+
+  Daftar ini terbuka: format baru dapat ditambahkan tanpa versi kontrak baru.
+examples:
+  - json
+  - csv

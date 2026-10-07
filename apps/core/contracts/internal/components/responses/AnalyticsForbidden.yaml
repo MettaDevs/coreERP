@@ -1,0 +1,32 @@
+description: |
+  Permintaan ditolak. Pemeriksaannya berurutan, dan yang pertama gagal yang menjawab:
+
+  1. Alamat asal di luar allowlist IP klien — bentuk `Error`.
+  2. Klien tidak punya scope `analytics.read` — bentuk `Error`.
+  3. Publikasi dihentikan sementara (`analytics.publication_paused`) — bentuk `AnalyticsError`.
+  4. Pemilik publikasi tidak lagi berhak membagikan datanya (`analytics.publication_suspended`) —
+     bentuk `AnalyticsError`. Publikasi terbaca lagi setelah admin tenant mengambil alihnya.
+
+  Publikasi yang tidak membuka klien Anda tidak pernah dijawab `403`, melainkan `404`.
+content:
+  application/json:
+    schema:
+      oneOf:
+        - $ref: '#/components/schemas/Error'
+        - $ref: '#/components/schemas/AnalyticsError'
+    examples:
+      scope:
+        summary: Scope kurang
+        value: { message: Klien integrasi ini tidak punya izin analytics.read. }
+      paused:
+        summary: Dihentikan sementara
+        value:
+          error:
+            code: analytics.publication_paused
+            message: Publikasi ini sedang dihentikan sementara oleh admin tenant. Coba lagi setelah dilanjutkan.
+      suspended:
+        summary: Pemilik kehilangan hak
+        value:
+          error:
+            code: analytics.publication_suspended
+            message: Publikasi ini tertahan karena pemiliknya tidak lagi berhak membagikan datanya. Minta admin tenant mengambil alih publikasi ini.

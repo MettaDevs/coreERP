@@ -1,0 +1,32 @@
+type: string
+description: |
+  Kode galat publikasi analitik di `error.code`. Kode tetap; teks `message` dapat berubah.
+
+  | Kode | Status | Arti |
+  | --- | --- | --- |
+  | `analytics.publication_unknown` | 404 | Publikasi tidak ada, sudah dicabut, atau tidak membuka klien Anda |
+  | `analytics.publication_paused` | 403 | Publikasi dihentikan sementara oleh admin tenant |
+  | `analytics.publication_suspended` | 403 | Pemilik publikasi tidak lagi berhak membagikan datanya |
+  | `analytics.publication_unavailable` | 409 | Data atau kolom publikasi tidak dapat dihitung lagi |
+  | `analytics.format_unavailable` | 422 | Format yang diminta tidak dibuka untuk publikasi ini |
+  | `analytics.cursor_invalid` | 422 | Cursor tidak dikenal atau dipakai dengan saringan lain |
+  | `analytics.invalid_parameter` | 422 | Parameter `format`, `limit`, atau `filter` tidak terbaca |
+  | `analytics.invalid_filter` | 422 | Kolom tidak dapat disaring, atau isian saringan tidak terbaca |
+  | `analytics.limit_exceeded` | 422 | Terlalu banyak saringan dalam satu permintaan |
+  | `analytics.query_timeout` | 422 | Perhitungan terlalu berat; persempit saringan |
+  | `analytics.busy` | 429 | Terlalu banyak perhitungan bersamaan di tenant; tunggu `Retry-After` |
+
+  Daftar ini terbuka: kode baru dapat ditambahkan tanpa versi kontrak baru. Perlakukan kode yang
+  belum Anda kenal menurut status HTTP-nya.
+examples:
+  - analytics.publication_unknown
+  - analytics.publication_paused
+  - analytics.publication_suspended
+  - analytics.publication_unavailable
+  - analytics.format_unavailable
+  - analytics.cursor_invalid
+  - analytics.invalid_parameter
+  - analytics.invalid_filter
+  - analytics.limit_exceeded
+  - analytics.query_timeout
+  - analytics.busy

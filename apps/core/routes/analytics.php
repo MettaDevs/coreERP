@@ -6,6 +6,8 @@ use App\Platform\Analytics\Http\Controllers\DashboardController;
 use App\Platform\Analytics\Http\Controllers\DashboardPageController;
 use App\Platform\Analytics\Http\Controllers\DatasetController;
 use App\Platform\Analytics\Http\Controllers\ExploreController;
+use App\Platform\Analytics\Http\Controllers\PublicationController;
+use App\Platform\Analytics\Http\Controllers\PublicationPageController;
 use App\Platform\Analytics\Http\Controllers\QueryController;
 use App\Platform\Analytics\Http\Controllers\SavedQueryController;
 use App\Platform\Analytics\Http\Controllers\WidgetController;
@@ -79,5 +81,32 @@ Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHB
         Route::get('saved-queries/{savedQuery}', [SavedQueryController::class, 'show'])->name('saved-queries.show');
         Route::patch('saved-queries/{savedQuery}', [SavedQueryController::class, 'update'])->name('saved-queries.update');
         Route::delete('saved-queries/{savedQuery}', [SavedQueryController::class, 'destroy'])->name('saved-queries.destroy');
+    });
+});
+
+// Area 15: publikasi untuk sistem luar. Halaman dan pratinjau dijaga `publication.read`, setiap perubahan juga
+// `publication.update`; hanya pemiliknya yang mengubah isi publikasi dan melihat pratinjaunya
+// (`PublicationController`). Endpoint yang dibaca sistem luar ada di routes/api.php (`internal/v1/analytics`),
+// di balik token klien integrasi, bukan sesi. Pratinjau dan pilihan nilai menghitung query, jadi ikut limiter
+// `analytics-interactive`.
+Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_PUBLICATION_READ))->group(function (): void {
+    Route::get('analytics/publications', [PublicationPageController::class, 'index'])->name('analytics.publications.index');
+
+    Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): void {
+        Route::get('publications/{publication}/preview', [PublicationController::class, 'preview'])
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('publications.preview');
+
+        Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_PUBLICATION_UPDATE))->group(function (): void {
+            Route::get('publications/field-values', [PublicationController::class, 'fieldValues'])
+                ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+                ->name('publications.field-values');
+            Route::post('publications', [PublicationController::class, 'store'])->name('publications.store');
+            Route::patch('publications/{publication}', [PublicationController::class, 'update'])->name('publications.update');
+            Route::post('publications/{publication}/pause', [PublicationController::class, 'pause'])->name('publications.pause');
+            Route::post('publications/{publication}/resume', [PublicationController::class, 'resume'])->name('publications.resume');
+            Route::post('publications/{publication}/revoke', [PublicationController::class, 'revoke'])->name('publications.revoke');
+            Route::post('publications/{publication}/take-over', [PublicationController::class, 'takeOver'])->name('publications.take-over');
+        });
     });
 });

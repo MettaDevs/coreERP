@@ -371,7 +371,7 @@ Sistem di luar CoreERP masuk lewat klien integrasi, bukan kredensial app. Kreden
 - Akun aplikasi tidak pernah dapat masuk. Penyedia pengguna `people` di Core dan admin.erp hanya membaca `account_type = 'person'`, dan menjadi jalur bersama login kata sandi, pemulihan sesi, remember-me, dan tautan reset kata sandi. Akun ini bukan anggota tenant, jadi tidak muncul di daftar anggota, pemilih penerima tugas, maupun direktori organisasi. Pemantau identitas penyedia menyaringnya.
 - `users` tinggal di database pusat sedangkan `integration_clients` di database tenant, jadi `integration_clients.user_id` tidak ber-foreign key.
 
-**Rate limit** per klien, dikunci pada id di depan token (`coreerp.integration_api_rate_limit`, bawaan 120 per menit), bukan per alamat IP: satu aplikasi finance biasanya memanggil dari satu alamat, dan yang perlu dibatasi adalah kliennya. Permintaan tanpa token dibatasi per alamat. `last_used_at` diperbarui paling sering sekali semenit: ia tanda bahwa klien masih hidup, bukan jejak audit, dan setiap pull tidak perlu menulis ke baris klien yang sama.
+**Rate limit** memiliki dua lapis: sebelum autentikasi dibatasi per alamat IP (`COREERP_INTEGRATION_API_IP_RATE_LIMIT`, bawaan 600 per menit), lalu permintaan sah dibatasi per klien (`COREERP_INTEGRATION_API_RATE_LIMIT`, bawaan 120 per menit). Id untuk jatah per klien berasal dari token yang sudah diverifikasi, bukan dari teks token yang dikirim pemanggil. `last_used_at` diperbarui paling sering sekali semenit: ia tanda bahwa klien masih hidup, bukan jejak audit, dan setiap pull tidak perlu menulis ke baris klien yang sama.
 
 ## Layar pantau posting
 

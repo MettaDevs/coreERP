@@ -1,0 +1,25 @@
+type: object
+required: [key, caption, type]
+description: Kolom yang boleh disaring lewat `filter[<key>]` di `GET /analytics/publications/{code}/rows`.
+properties:
+  key:
+    type: string
+    examples: [responsible_org_unit_id]
+  caption:
+    type: string
+    examples: [Unit penanggung jawab]
+  type:
+    type: string
+    description: |
+      `text`, `number`, `date`, dan `datetime` disaring dengan ekspresi (`filter[kolom]=ekspresi`);
+      `option`, `boolean`, dan `reference` dengan daftar nilai (`filter[kolom][]=nilai`).
+    examples: [reference, date, option]
+  options:
+    type: array
+    description: Untuk `option`, nilai yang dikenal beserta namanya.
+    items:
+      type: object
+      required: [value, label]
+      properties:
+        value: { type: string }
+        label: { type: string }

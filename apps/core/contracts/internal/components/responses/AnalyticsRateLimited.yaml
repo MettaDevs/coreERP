@@ -1,0 +1,28 @@
+description: |
+  Dua sebab, dibedakan dari bentuknya:
+
+  - **Rate limit klien** (bentuk `Error`): 120 permintaan per menit per klien integrasi, dihitung dari
+    `client_id`, dipakai bersama semua endpoint integrasi yang dipanggil klien itu. Rate limit diperiksa
+    sebelum token, jadi jawaban ini bisa datang lebih dulu dari `401`.
+  - **Tenant sedang sibuk menghitung** (`analytics.busy`, bentuk `AnalyticsError`): terlalu banyak
+    perhitungan analitik bersamaan di tenant ini. Hasil yang sudah ada di cache tidak terkena.
+
+  Keduanya membawa `Retry-After` dalam detik; tunggu selama itu sebelum mengulang.
+headers:
+  Retry-After: { $ref: '#/components/headers/RetryAfter' }
+content:
+  application/json:
+    schema:
+      oneOf:
+        - $ref: '#/components/schemas/Error'
+        - $ref: '#/components/schemas/AnalyticsError'
+    examples:
+      rateLimit:
+        summary: Rate limit klien
+        value: { message: Too Many Attempts. }
+      busy:
+        summary: Tenant sedang sibuk
+        value:
+          error:
+            code: analytics.busy
+            message: Terlalu banyak perhitungan berjalan bersamaan. Coba lagi sebentar.

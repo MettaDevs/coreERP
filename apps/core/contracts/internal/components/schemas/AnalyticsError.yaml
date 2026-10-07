@@ -1,0 +1,15 @@
+type: object
+required: [error]
+description: Galat publikasi analitik. Penolakan token, allowlist, scope, rate limit, dan salinan sandbox memakai bentuk `Error` (`message` saja).
+properties:
+  error:
+    type: object
+    required: [code, message]
+    properties:
+      code: { $ref: '#/components/schemas/AnalyticsErrorCode' }
+      message:
+        type: string
+        description: Penjelasan untuk developer, bahasa Indonesia. Teksnya tidak dijamin tetap.
+      field:
+        type: string
+        description: Parameter yang salah bila ada, misalnya `cursor`, `limit`, atau `filter.responsible_org_unit_id`.

@@ -1,0 +1,28 @@
+description: |
+  Parameter tidak dapat dipakai. `error.field` menunjuk parameternya; `error.code` salah satu dari
+  `analytics.format_unavailable`, `analytics.cursor_invalid`, `analytics.invalid_parameter`,
+  `analytics.invalid_filter`, `analytics.limit_exceeded`, atau `analytics.query_timeout`.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/AnalyticsError' }
+    examples:
+      filter:
+        summary: Kolom yang tidak boleh disaring
+        value:
+          error:
+            code: analytics.invalid_filter
+            message: Kolom "acquisition_value" tidak dapat disaring di publikasi ini. Lihat daftar filterable di metadata publikasi.
+            field: filter.acquisition_value
+      cursor:
+        summary: Cursor dipakai dengan saringan lain
+        value:
+          error:
+            code: analytics.cursor_invalid
+            message: Cursor tidak dikenal atau tidak cocok dengan saringan permintaan ini. Mulai lagi dari halaman pertama.
+            field: cursor
+      timeout:
+        summary: Perhitungan terlalu berat
+        value:
+          error:
+            code: analytics.query_timeout
+            message: Perhitungan ini terlalu berat. Persempit periode atau saringan.

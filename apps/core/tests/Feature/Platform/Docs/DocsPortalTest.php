@@ -3,6 +3,7 @@
 namespace Tests\Feature\Platform\Docs;
 
 use App\Foundation\Currency\Support\MoneyPrecision;
+use App\Platform\Analytics\Models\Publication;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\ProviderAccess;
 use Database\Seeders\AppCatalogSeeder;
@@ -79,9 +80,21 @@ class DocsPortalTest extends TestCase
         $this->assertSame($daftar, $this->jenisDiTabel($model['description']));
         $this->assertSame(['$ref' => '#/components/schemas/PostingType'], $spesifikasi['components']['schemas']['FinancePosting']['properties']['posting_type']);
 
-        $parameter = collect($spesifikasi['paths']['/finance-postings']['get']['parameters'])->firstWhere('name', 'posting_type');
+        $parameters = $spesifikasi['paths']['/finance-postings']['get']['parameters'] ?? [];
+        $this->assertIsArray($parameters);
+        $parameter = null;
+        foreach ($parameters as $candidate) {
+            if (is_array($candidate) && ($candidate['name'] ?? null) === 'posting_type') {
+                $parameter = $candidate;
+
+                break;
+            }
+        }
+        $this->assertIsArray($parameter);
+        $description = $parameter['description'] ?? null;
+        $this->assertIsString($description);
         foreach ($daftar as $jenis) {
-            $this->assertStringContainsString("`{$jenis}`", $parameter['description'], "Parameter posting_type tidak menyebut {$jenis}.");
+            $this->assertStringContainsString("`{$jenis}`", $description, "Parameter posting_type tidak menyebut {$jenis}.");
         }
 
         $contoh = $spesifikasi['paths']['/finance-postings']['get']['responses']['200']['content']['application/json']['examples'];
@@ -92,6 +105,65 @@ class DocsPortalTest extends TestCase
         }
     }
 
+    public function test_tamu_dapat_mengunduh_kontrak_analitik_yang_hanya_memuat_endpoint_publikasi(): void
+    {
+        $this->get('/docs')->assertOk()->assertSee('Integrasi · Analitik', false);
+        $this->get('/docs?spec=integrasi-analitik')->assertOk()->assertSee(route('docs.kontrak', 'integrasi-analitik'), false);
+
+        $spesifikasi = Yaml::parse((string) $this->get('/docs/kontrak/integrasi-analitik.yaml')->assertOk()->getContent());
+        $paths = $spesifikasi['paths'] ?? [];
+        $this->assertIsArray($paths);
+        $pathNames = array_map('strval', array_keys($paths));
+        sort($pathNames);
+        $this->assertSame(['/analytics/publications', '/analytics/publications/{code}', '/analytics/publications/{code}/rows'], $pathNames);
+
+        $schemes = $spesifikasi['components']['securitySchemes'] ?? [];
+        $this->assertIsArray($schemes);
+        $schemeNames = array_map('strval', array_keys($schemes));
+        sort($schemeNames);
+        $this->assertSame(['integrationClient'], $schemeNames);
+        foreach (['Memulai', 'Langkah 1', 'Halaman dan cursor', 'CSV', 'Google Sheets lewat Apps Script', 'n8n, Make, dan Zapier', 'Kode galat'] as $bagian) {
+            $this->assertStringContainsString('## '.$bagian, $spesifikasi['info']['description']);
+        }
+    }
+
+    public function test_daftar_format_dan_kode_galat_analitik_punya_bagian_sendiri_dan_sama_di_setiap_tempat(): void
+    {
+        // Pembaca mencari "format" dan "kode galat" di docs: judul bagian di panduan dan model sendiri harus
+        // memuat daftar yang sama, dan daftar itu harus sama dengan yang dikirim kode.
+        $spesifikasi = Yaml::parseFile(base_path('contracts/terbit/integrasi-analitik.yaml'));
+        $panduan = $spesifikasi['info']['description'];
+
+        $format = $this->nilaiDiTabel($this->bagianPanduan($panduan, 'Format baris'), '[a-z]+');
+        $this->assertSame(Publication::FORMATS, $format);
+        $this->assertSame($format, $spesifikasi['components']['schemas']['AnalyticsFormat']['examples']);
+        $this->assertSame($format, $this->nilaiDiTabel($spesifikasi['components']['schemas']['AnalyticsFormat']['description'], '[a-z]+'));
+        $parameters = $spesifikasi['paths']['/analytics/publications/{code}/rows']['get']['parameters'] ?? [];
+        $this->assertIsArray($parameters);
+        $parameter = null;
+        foreach ($parameters as $candidate) {
+            if (is_array($candidate) && ($candidate['name'] ?? null) === 'format') {
+                $parameter = $candidate;
+
+                break;
+            }
+        }
+        $this->assertIsArray($parameter);
+        $this->assertSame('#/components/schemas/AnalyticsFormat', $parameter['schema']['$ref']);
+
+        $kode = $this->nilaiDiTabel($this->bagianPanduan($panduan, 'Kode galat'), 'analytics\.[a-z_]+');
+        $this->assertNotEmpty($kode);
+        $model = $spesifikasi['components']['schemas']['AnalyticsErrorCode'];
+        $this->assertSame($kode, $model['examples']);
+        $this->assertSame($kode, $this->nilaiDiTabel($model['description'], 'analytics\.[a-z_]+'));
+
+        // Setiap kode yang dapat dikirim galat publikasi ada di daftar.
+        preg_match_all("/'(analytics\.[a-z_]+)'/", (string) file_get_contents(app_path('Platform/Analytics/External/PublicationErrors.php')), $dikirim);
+        foreach (array_unique($dikirim[1]) as $satu) {
+            $this->assertContains($satu, $kode, "Kode {$satu} dikirim kode tetapi tidak ada di daftar Kode galat.");
+        }
+    }
+
     public function test_judul_panduan_tanpa_kode_supaya_hasil_pencarian_menuju_judulnya(): void
     {
         // Scalar membuat alamat hasil pencarian dari seluruh teks judul, tetapi membuang bagian
@@ -99,7 +171,7 @@ class DocsPortalTest extends TestCase
         // membuat hasil pencarian menunjuk `jenis-posting-posting-type`, sedangkan judulnya ber-id
         // `jenis-posting`, sehingga pembaca yang mengkliknya tidak dibawa ke mana pun. Garis bawah
         // tanpa backtick aman; keduanya diuji di Scalar pada 22 September 2026.
-        $berkas = glob(base_path('contracts/terbit/*.yaml'));
+        $berkas = glob(base_path('contracts/terbit/*.yaml')) ?: [];
         $this->assertNotEmpty($berkas);
 
         foreach ($berkas as $satu) {
@@ -174,6 +246,18 @@ class DocsPortalTest extends TestCase
     private function jenisDiTabel(string $markdown): array
     {
         preg_match_all('/^\| `([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)` \|/m', $markdown, $cocok);
+
+        return $cocok[1];
+    }
+
+    /**
+     * Nilai berbentuk `$pola` di kolom pertama tabel markdown, sesuai urutannya.
+     *
+     * @return list<string>
+     */
+    private function nilaiDiTabel(string $markdown, string $pola): array
+    {
+        preg_match_all('/^\| `('.$pola.')` \|/m', $markdown, $cocok);
 
         return $cocok[1];
     }

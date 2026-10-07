@@ -6,6 +6,7 @@ use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceControl
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Foundation\Workflow\Http\Controllers\Internal\InternalWorkflowInstanceController;
+use App\Platform\Analytics\Http\Controllers\Internal\PublicationFeedController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
@@ -45,11 +46,11 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-
  * Hanya untuk sistem di luar CoreERP. Module di runtime ini membaca vendor lewat kontrak VendorDirectory,
  * bukan lewat HTTP, jadi rute ini tidak menerima kredensial app.
  */
-Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:vendors.read'])->group(function (): void {
+Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'integration-client:vendors.read'])->group(function (): void {
     Route::get('vendors', [VendorDirectoryController::class, 'index']);
 });
 
-Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:legal-entities.read'])->group(function (): void {
+Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'integration-client:legal-entities.read'])->group(function (): void {
     Route::get('legal-entities', [OrganizationDirectoryController::class, 'legalEntities']);
 });
 
@@ -57,12 +58,24 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
  * Feed posting finance untuk pembaca mode `pull`. Membaca dan mengirim ack adalah dua scope berbeda:
  * pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.
  */
-Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.read'])->group(function (): void {
+Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'integration-client:finance-postings.read'])->group(function (): void {
     Route::get('finance-postings', [FinancePostingFeedController::class, 'index']);
 });
-Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.ack'])->group(function (): void {
+Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'integration-client:finance-postings.ack'])->group(function (): void {
     Route::post('finance-postings/{posting_id}/ack', [FinancePostingFeedController::class, 'ack'])
         ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*');
+});
+
+/*
+ * Publikasi analitik untuk sistem di luar CoreERP (engine analitik area 15, KA-11): klien integrasi hanya
+ * membaca publikasi yang dibuat pengguna tenant dan yang menyebut klien itu, tidak pernah query bebas.
+ * Kontraknya `contracts/internal/integrasi-analitik.yaml`; rate limit-nya jatah klien integrasi yang sama
+ * dengan feed finance, sesudah batas awal per alamat untuk permintaan yang belum terautentikasi.
+ */
+Route::prefix('internal/v1/analytics')->middleware(['throttle:integration-client-ip', 'integration-client:analytics.read'])->group(function (): void {
+    Route::get('publications', [PublicationFeedController::class, 'index']);
+    Route::get('publications/{code}', [PublicationFeedController::class, 'show'])->where('code', '[A-Za-z0-9][A-Za-z0-9_-]{0,79}');
+    Route::get('publications/{code}/rows', [PublicationFeedController::class, 'rows'])->where('code', '[A-Za-z0-9][A-Za-z0-9_-]{0,79}');
 });
 
 /*

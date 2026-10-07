@@ -181,13 +181,11 @@ class AppServiceProvider extends ServiceProvider
             $request->header('X-CoreERP-Tenant-Id', 'unknown'),
         ])));
 
-        // Per klien integrasi, dikunci pada id di depan token — bukan per alamat IP, karena satu
-        // aplikasi finance biasanya memanggil dari satu alamat dan yang perlu dibatasi adalah
-        // kliennya. Permintaan tanpa token dibatasi per alamat supaya tebakan token tetap murah
-        // untuk ditolak.
-        RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
-            (int) config('coreerp.integration_api_rate_limit', 120)
-        )->by(self::integrationClientKey($request)));
+        // Batas IP berjalan sebelum autentikasi agar pemanggil tidak dapat membuat bucket baru
+        // dengan mengganti id token palsu. Batas per klien berjalan sesudah autentikasi.
+        RateLimiter::for('integration-client-ip', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.integration_api_ip_rate_limit', 600)
+        )->by('ip:'.$request->ip()));
 
         // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
         RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
@@ -195,7 +193,7 @@ class AppServiceProvider extends ServiceProvider
                 $request->header('X-CoreERP-App-Id', 'unknown'),
                 $request->header('X-CoreERP-Tenant-Id', 'unknown'),
             ]))
-            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::integrationClientKey($request)));
+            : Limit::perMinute((int) config('coreerp.integration_api_ip_rate_limit', 600))->by('ip:'.$request->ip()));
     }
 
     /**
@@ -254,14 +252,5 @@ class AppServiceProvider extends ServiceProvider
         // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
         // menjadi pelepasan yang lebih tepat sasaran.
         Event::forget(MessageLogged::class);
-    }
-
-    /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
-    private static function integrationClientKey(Request $request): string
-    {
-        $token = (string) $request->bearerToken();
-        $id = str_contains($token, '.') ? strstr($token, '.', true) : '';
-
-        return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
     }
 }

@@ -70,6 +70,10 @@ tags:
     description: |
       Feed posting finance untuk aplikasi finance pelanggan (docs/todo/feed-posting-finance).
       Hanya klien integrasi; module di dalam CoreERP menerbitkan posting lewat kontrak in-process.
+  - name: Publikasi
+    description: |
+      Publikasi analitik untuk sistem di luar CoreERP (docs/todo/analitik/akses-luar.md). Hanya klien
+      integrasi berscope `analytics.read`, dan hanya publikasi yang menyebut klien itu.
   - name: Pusat admin
     description: |
       Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya

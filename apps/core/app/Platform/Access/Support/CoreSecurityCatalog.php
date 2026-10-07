@@ -92,6 +92,15 @@ final class CoreSecurityCatalog
     /** Mengelola dasbor dan query tersimpan bersama, siapa pun pembuatnya (KA-14, area 6). */
     public const ANALYTICS_SHARED_DASHBOARD_UPDATE = 'core.analytics.shared-dashboard.update';
 
+    /** Melihat publikasi analitik tenant beserta klien yang boleh membacanya (KA-14, area 15). */
+    public const ANALYTICS_PUBLICATION_READ = 'core.analytics.publication.read';
+
+    /**
+     * Membuat, mengubah, menghentikan, mencabut, dan mengambil alih publikasi analitik (KA-14, area 15). Publikasi
+     * yang pemiliknya kehilangan permission ini tertahan sampai diambil alih pemegang lain.
+     */
+    public const ANALYTICS_PUBLICATION_UPDATE = 'core.analytics.publication.update';
+
     /**
      * Middleware rute untuk satu permission layar Core, misalnya `->middleware(CoreSecurityCatalog::gate(...))`.
      *
