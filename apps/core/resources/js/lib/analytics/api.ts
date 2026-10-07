@@ -1,5 +1,8 @@
 import type {
     AnalyticsQuery,
+    AnalyticsResult,
+    BlendQuery,
+    BlendResultSet,
     DashboardDetail,
     DashboardLayoutItem,
     DashboardSlicer,
@@ -40,7 +43,7 @@ export function fetchWidgetData(
     slicers: Record<string, string | string[]> = {},
     crossFilters: Record<string, string | string[]> = {},
     refresh = false,
-): Promise<ResultSet> {
+): Promise<AnalyticsResult> {
     const path = `${BASE}/widgets/${encodeURIComponent(widgetId)}`;
     const params = new URLSearchParams();
     appendFilters(params, 's', slicers);
@@ -49,11 +52,11 @@ export function fetchWidgetData(
     const query = serialized === '' ? '' : `?${serialized}`;
 
     return refresh
-        ? apiJson<ResultSet>(`${path}/refresh${query}`, {
+        ? apiJson<AnalyticsResult>(`${path}/refresh${query}`, {
               method: 'POST',
               signal,
           })
-        : apiJson<ResultSet>(`${path}/data${query}`, { signal });
+        : apiJson<AnalyticsResult>(`${path}/data${query}`, { signal });
 }
 
 function appendFilters(
@@ -74,6 +77,22 @@ function appendFilters(
             params.set(`${prefix}[${field}]`, value);
         }
     }
+}
+
+export type DimensionValueOption = { value: string; label: string };
+
+/** Pilihan unik dimensi bersama, dihitung sebagai principal yang sama dengan query dasbor. */
+export function fetchDatasetFieldValues(
+    datasetCode: string,
+    field: string,
+    signal: AbortSignal,
+): Promise<{ data: DimensionValueOption[]; truncated: boolean }> {
+    const params = new URLSearchParams({ field });
+
+    return apiJson(
+        `${BASE}/datasets/${encodeURIComponent(datasetCode)}/field-values?${params}`,
+        { signal },
+    );
 }
 
 export type DashboardInput = {
@@ -342,6 +361,18 @@ export function runQuery(
     });
 }
 
+/** Menjalankan dua query menurut satu dimensi bersama (`POST /analytics/blend`). */
+export function runBlend(
+    query: BlendQuery | string,
+    signal?: AbortSignal,
+): Promise<BlendResultSet> {
+    return apiJson<BlendResultSet>(`${BASE}/blend`, {
+        method: 'POST',
+        body: typeof query === 'string' ? query : JSON.stringify(query),
+        signal,
+    });
+}
+
 /** Dasbor milik sendiri dan yang dibagikan, beserta hak mengubahnya. */
 export async function fetchDashboards(): Promise<DashboardSummary[]> {
     return (await apiJson<{ data: DashboardSummary[] }>(`${BASE}/dashboards`))
@@ -351,7 +382,7 @@ export async function fetchDashboards(): Promise<DashboardSummary[]> {
 export type WidgetInput = {
     title: string;
     type: WidgetType;
-    query: AnalyticsQuery | null;
+    query: AnalyticsQuery | BlendQuery | null;
     visual: WidgetVisual;
 };
 

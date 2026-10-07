@@ -12,6 +12,7 @@ use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Dashboard;
 use App\Platform\Analytics\Models\SavedQuery;
 use App\Platform\Analytics\Models\Widget;
+use App\Platform\Analytics\Query\Blend;
 use App\Platform\Analytics\Security\UserPrincipal;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
@@ -42,6 +43,7 @@ final class DashboardPresenter
         private readonly DatasetCatalog $catalog,
         private readonly LaunchableAppCatalog $apps,
         private readonly UserClock $clock,
+        private readonly Blend $blend,
     ) {}
 
     /**
@@ -122,6 +124,25 @@ final class DashboardPresenter
             'missing_fields' => [],
             'version' => $widget->version,
         ];
+        if ($widget->type === 'blend' && $widget->query !== null) {
+            $ready ??= $this->apps->readyModules($widget->tenant_id);
+            $read = $this->blend->readStorage($widget->query);
+            $available = true;
+            foreach ($read['datasets'] as $dataset) {
+                if ($dataset === null || ! in_array($dataset->moduleId, $ready, true)) {
+                    $available = false;
+                    break;
+                }
+            }
+
+            return [
+                ...$out,
+                'query' => $read['query'],
+                'visual' => $this->blend->renameVisual($widget->visual, $read['maps'], $read['query']),
+                'status' => ! $available ? 'dataset_unavailable' : ($read['missing'] === [] ? 'ok' : 'field_removed'),
+                'missing_fields' => array_values(array_unique(array_column($read['missing'], 'field'))),
+            ];
+        }
         if ($widget->dataset_code === null || $widget->query === null) {
             return $out;
         }

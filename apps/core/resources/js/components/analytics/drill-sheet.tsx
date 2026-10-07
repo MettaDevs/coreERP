@@ -25,10 +25,10 @@ import {
     fetchDrillPage,
 } from '@/lib/analytics/api';
 import type { SlicerValues } from '@/lib/analytics/slicer';
+import type { WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
     AnalyticsQuery,
     DashboardWidget,
-    DatasetField,
     DrillDownResult,
     DrillColumn,
     DrillPage,
@@ -58,7 +58,7 @@ export function DrillSheet({
     widget: DashboardWidget;
     values: DrillValue[];
     query: AnalyticsQuery;
-    fields: DatasetField[];
+    fields: WidgetDatasetField[];
     hierarchies: Record<string, string[]>;
     slicers: SlicerValues;
     crossFilters: Record<string, string | string[]>;
@@ -484,7 +484,7 @@ export function DrillSheet({
 
 function drillOptions(
     query: AnalyticsQuery,
-    fields: DatasetField[],
+    fields: WidgetDatasetField[],
     hierarchies: Record<string, string[]>,
 ): Array<{ field: string; caption: string }> {
     return (query.dimensions ?? []).flatMap((dimension) => {
@@ -505,7 +505,7 @@ function drillOptions(
 function canDescend(
     field: string,
     granularity: string | null,
-    fields: DatasetField[],
+    fields: WidgetDatasetField[],
     hierarchies: Record<string, string[]>,
 ): boolean {
     const source = fields.find((item) => item.key === field);

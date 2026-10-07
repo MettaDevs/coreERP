@@ -9,6 +9,7 @@ import { dimensionField, emptyQuery } from '@/lib/analytics/query';
 import type {
     AnalyticsQuery,
     DatasetDescription,
+    DatasetField,
     DatasetSummary,
 } from '@/lib/analytics/types';
 
@@ -30,6 +31,10 @@ export function QueryEditor({
     onChange,
     numbered = false,
     portalContainer,
+    dimensionFilter,
+    maxDimensions,
+    dimensionEmptyMessage,
+    allowTimeGranularity = true,
 }: {
     datasets: DatasetSummary[];
     value: AnalyticsQuery;
@@ -42,6 +47,10 @@ export function QueryEditor({
     /** Menomori langkah, untuk alur pembangun. */
     numbered?: boolean;
     portalContainer?: RefObject<HTMLElement | null>;
+    dimensionFilter?: (field: DatasetField) => boolean;
+    maxDimensions?: number;
+    dimensionEmptyMessage?: string;
+    allowTimeGranularity?: boolean;
 }) {
     const title = (step: number, text: string) =>
         numbered ? `${step}. ${text}` : text;
@@ -95,10 +104,17 @@ export function QueryEditor({
                         </Step>
                         <Step title={title(3, 'Kelompokkan menurut')}>
                             <DimensionPicker
-                                fields={dataset.fields}
+                                fields={
+                                    dimensionFilter
+                                        ? dataset.fields.filter(dimensionFilter)
+                                        : dataset.fields
+                                }
                                 value={value.dimensions ?? []}
                                 onChange={(dimensions) => set({ dimensions })}
                                 portalContainer={portalContainer}
+                                maxDimensions={maxDimensions}
+                                emptyMessage={dimensionEmptyMessage}
+                                allowTimeGranularity={allowTimeGranularity}
                             />
                         </Step>
                         <Step title={title(4, 'Saring')}>

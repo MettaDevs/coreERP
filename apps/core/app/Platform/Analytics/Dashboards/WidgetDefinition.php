@@ -7,6 +7,8 @@ namespace App\Platform\Analytics\Dashboards;
 use App\Platform\Analytics\Datasets\CompiledDataset;
 use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Analytics\Query\Blend;
+use App\Platform\Analytics\Query\BlendQuery;
 use App\Platform\Analytics\Query\Dimension;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
 
@@ -23,6 +25,7 @@ use App\Platform\Analytics\Security\AnalyticsPrincipal;
  * | `line`, `area` | Sama, `x` wajib kolom tanggal | Sama |
  * | `donut` | `{category, value, max_slices?}` | Satu pengelompok, satu measure |
  * | `table` | `{columns: [kunci], show_totals?}` | Apa pun dalam batas query |
+ * | `blend` | `{columns: [kunci], show_totals?}` | Dua query satu dimensi bersama, tanpa join tabel |
  * | `text` | `{text}` | Tanpa query; teks biasa, bukan Markdown atau HTML |
  *
  * Bagian `visual` yang tidak dikenal ditolak, bukan diabaikan, seperti kunci query. Galatnya
@@ -40,7 +43,10 @@ final class WidgetDefinition
 
     private const MAX_MEASURES_PER_CHART = 4;
 
-    public function __construct(private readonly StoredQuery $queries) {}
+    public function __construct(
+        private readonly StoredQuery $queries,
+        private readonly Blend $blend,
+    ) {}
 
     /**
      * @return array{dataset_code: ?string, dataset_version: ?int, query: ?array<string, mixed>, visual: array<string, mixed>}
@@ -57,6 +63,17 @@ final class WidgetDefinition
             }
 
             return ['dataset_code' => null, 'dataset_version' => null, 'query' => null, 'visual' => $this->text($visual)];
+        }
+
+        if ($type === 'blend') {
+            $blend = $this->blend->validate($principal, $query);
+
+            return [
+                'dataset_code' => null,
+                'dataset_version' => null,
+                'query' => $this->blend->forStorage($blend),
+                'visual' => $this->blendTable($blend, $visual),
+            ];
         }
 
         [$dataset, $parsed] = $this->queries->validate($principal, $query);
@@ -275,6 +292,21 @@ final class WidgetDefinition
         $keys = [...array_map(static fn (Dimension $dimension): string => $dimension->field, $query->dimensions), ...$query->measures];
 
         $out = ['columns' => $this->subset($visual['columns'] ?? null, $keys, 'visual.columns', 'Pilih kolom tabel dari kolom pengelompokan dan nilai yang dihitung.')];
+        if (isset($visual['show_totals'])) {
+            $out['show_totals'] = $this->flag($visual['show_totals'], 'visual.show_totals');
+        }
+
+        return $out;
+    }
+
+    /** @param array<string, mixed> $visual
+     * @return array<string, mixed>
+     */
+    private function blendTable(BlendQuery $blend, array $visual): array
+    {
+        $this->knownKeys($visual, ['columns', 'show_totals']);
+        $keys = array_column($this->blend->columns($blend), 'key');
+        $out = ['columns' => $this->subset($visual['columns'] ?? null, $keys, 'visual.columns', 'Pilih kolom tabel dari data yang digabungkan.')];
         if (isset($visual['show_totals'])) {
             $out['show_totals'] = $this->flag($visual['show_totals'], 'visual.show_totals');
         }

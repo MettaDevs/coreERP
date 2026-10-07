@@ -46,14 +46,13 @@ import {
     crossFilterValues,
     notApplicableSlicers,
 } from '@/lib/analytics/slicer';
-import type { SlicerValues } from '@/lib/analytics/slicer';
+import type { SlicerValues, WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
+    AnalyticsResult,
     CrossFilter,
     DashboardSlicer,
     DashboardWidget,
-    DatasetField,
     ResultColumn,
-    ResultSet,
     ResultValue,
     TextVisual,
     DrillValue,
@@ -71,7 +70,7 @@ type WidgetFrameProps = {
     onRename?: (widget: DashboardWidget) => void;
     onArchive?: (widget: DashboardWidget) => void;
     className?: string;
-    fields?: DatasetField[];
+    fields?: WidgetDatasetField[];
     hierarchies?: Record<string, string[]>;
     slicers?: DashboardSlicer[];
     slicerValues?: SlicerValues;
@@ -155,7 +154,10 @@ export function WidgetFrame({
 
         const values: DrillValue[] = [];
 
-        for (const dimension of widget.query.dimensions ?? []) {
+        const dimensions =
+            'dimensions' in widget.query ? (widget.query.dimensions ?? []) : [];
+
+        for (const dimension of dimensions) {
             const key =
                 typeof dimension === 'string' ? dimension : dimension.field;
             const granularity =
@@ -334,19 +336,21 @@ export function WidgetFrame({
                     </Button>
                 </CardFooter>
             )}
-            {drilling !== null && widget.query !== null && (
-                <DrillSheet
-                    key={`${widget.id}:${JSON.stringify(drilling)}`}
-                    widget={widget}
-                    values={drilling}
-                    query={widget.query}
-                    fields={fields}
-                    hierarchies={hierarchies}
-                    slicers={slicerValues}
-                    crossFilters={targetFilters}
-                    onClose={() => setDrilling(null)}
-                />
-            )}
+            {drilling !== null &&
+                widget.query !== null &&
+                !('queries' in widget.query) && (
+                    <DrillSheet
+                        key={`${widget.id}:${JSON.stringify(drilling)}`}
+                        widget={widget}
+                        values={drilling}
+                        query={widget.query}
+                        fields={fields}
+                        hierarchies={hierarchies}
+                        slicers={slicerValues}
+                        crossFilters={targetFilters}
+                        onClose={() => setDrilling(null)}
+                    />
+                )}
         </Card>
     );
 }
@@ -369,12 +373,12 @@ function FrameBody({
     height: number;
     hasData: boolean;
     loading: boolean;
-    result: ResultSet | null;
+    result: AnalyticsResult | null;
     failure: WidgetFailure | null;
     asTable: boolean;
     onReload: () => void;
     onEdit?: (widget: DashboardWidget) => void;
-    fields: DatasetField[];
+    fields: WidgetDatasetField[];
     onDimensionSelect: (
         column: ResultColumn,
         row: Record<string, ResultValue>,

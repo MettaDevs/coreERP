@@ -3,6 +3,7 @@
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Analytics\AnalyticsServiceProvider;
 use App\Platform\Analytics\Http\Controllers\AnalyticsExportController;
+use App\Platform\Analytics\Http\Controllers\BlendController;
 use App\Platform\Analytics\Http\Controllers\DashboardController;
 use App\Platform\Analytics\Http\Controllers\DashboardPageController;
 use App\Platform\Analytics\Http\Controllers\DatasetController;
@@ -40,6 +41,10 @@ Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): vo
     Route::post('query', QueryController::class)
         ->middleware([CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_EXPLORE_INVOKE), 'throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER])
         ->name('query');
+    // Area 14: pratinjau gabungan dua dataset; tiap sumber tetap melewati pemeriksaan RunQuery sendiri.
+    Route::post('blend', BlendController::class)
+        ->middleware([CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_EXPLORE_INVOKE), 'throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER])
+        ->name('blend');
 });
 
 // Area 6: penyimpanan dasbor dan API layar. Melihat dijaga `dashboard.read` untuk seluruh blok, membuat juga
@@ -55,6 +60,9 @@ Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHB
     Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): void {
         Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
         Route::get('datasets/{code}', [DatasetController::class, 'show'])->name('datasets.show');
+        Route::get('datasets/{code}/field-values', [DatasetController::class, 'fieldValues'])
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('datasets.field-values');
 
         Route::get('dashboards', [DashboardController::class, 'index'])->name('dashboards.index');
         Route::post('dashboards', [DashboardController::class, 'store'])
