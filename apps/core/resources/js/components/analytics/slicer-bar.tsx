@@ -738,6 +738,7 @@ function useSharedDimensionValues(
 
                     for (const option of response.data) {
                         const label = options.get(option.value);
+
                         if (label === undefined || label === option.value) {
                             options.set(option.value, option.label);
                         }
