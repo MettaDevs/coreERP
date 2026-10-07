@@ -11,6 +11,9 @@ import type {
     TableVisual,
     WidgetType,
     WidgetVisual,
+    DatasetField,
+    ResultColumn,
+    ResultValue,
 } from '@/lib/analytics/types';
 
 /** Recharts hanya diunduh saat ada grafik yang digambar. */
@@ -55,6 +58,11 @@ export function WidgetContent({
     title,
     height = 2,
     asTable = false,
+    fields = [],
+    onDimensionSelect,
+    onPointSelect,
+    onDrillRow,
+    drillableField,
 }: {
     type: WidgetType;
     visual: WidgetVisual;
@@ -63,6 +71,15 @@ export function WidgetContent({
     /** Tinggi di grid, 1–3. */
     height?: number;
     asTable?: boolean;
+    fields?: DatasetField[];
+    onDimensionSelect?: (
+        field: ResultColumn,
+        row: Record<string, ResultValue>,
+        label: string,
+    ) => void;
+    onPointSelect?: (row: Record<string, ResultValue>) => void;
+    onDrillRow?: (row: Record<string, ResultValue>) => void;
+    drillableField?: string;
 }) {
     const chartHeight = CHART_HEIGHT[height] ?? CHART_HEIGHT[2];
     const tableHeight = TABLE_HEIGHT[height] ?? TABLE_HEIGHT[2];
@@ -76,6 +93,10 @@ export function WidgetContent({
                 columns={table?.columns}
                 showTotals={table ? table.show_totals !== false : true}
                 className={tableHeight}
+                fields={fields}
+                onDimensionSelect={onDimensionSelect}
+                onDrillRow={onDrillRow}
+                drillableField={drillableField}
             />
         );
     }
@@ -95,6 +116,7 @@ export function WidgetContent({
                     result={result}
                     title={title}
                     heightClass={chartHeight}
+                    onPointSelect={onPointSelect}
                 />
             </Suspense>
         );

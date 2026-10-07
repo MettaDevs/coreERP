@@ -41,6 +41,7 @@ final class PenjualanDataset implements Dataset
             ->shared('org_unit_id', SharedDimension::OperatingUnit)
             ->shared('currency_code', SharedDimension::Currency)
             ->shared('dicatat_oleh_user_id', SharedDimension::User)
+            ->hierarchy('legal_entity_unit', ['legal_entity_id', 'org_unit_id'])
             ->time('tanggal', default: true)
             ->time('dicatat_pada')
             ->time('dibayar_pada')

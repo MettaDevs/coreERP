@@ -2,9 +2,11 @@
 
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Analytics\AnalyticsServiceProvider;
+use App\Platform\Analytics\Http\Controllers\AnalyticsExportController;
 use App\Platform\Analytics\Http\Controllers\DashboardController;
 use App\Platform\Analytics\Http\Controllers\DashboardPageController;
 use App\Platform\Analytics\Http\Controllers\DatasetController;
+use App\Platform\Analytics\Http\Controllers\DrillController;
 use App\Platform\Analytics\Http\Controllers\ExploreController;
 use App\Platform\Analytics\Http\Controllers\QueryController;
 use App\Platform\Analytics\Http\Controllers\SavedQueryController;
@@ -71,6 +73,14 @@ Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHB
         Route::post('widgets/{widget}/refresh', [WidgetDataController::class, 'refresh'])
             ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
             ->name('widgets.refresh');
+
+        // Area 12: drill-down dan drill-through mengikuti hak viewer dan limiter query interaktif.
+        Route::post('drill', DrillController::class)
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('drill');
+        Route::post('exports', AnalyticsExportController::class)
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('exports.store');
 
         Route::get('saved-queries', [SavedQueryController::class, 'index'])->name('saved-queries.index');
         Route::post('saved-queries', [SavedQueryController::class, 'store'])
