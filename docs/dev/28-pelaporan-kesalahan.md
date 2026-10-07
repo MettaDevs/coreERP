@@ -83,6 +83,25 @@ perlakukan urutan teratas sebagai jawaban. Memperbaikinya menuntut batas **per k
 itu berarti membaca skema — bertanya ke database dari dalam penangan kesalahan, harga yang
 belum sepadan.
 
+## Kegagalan yang terlihat oleh pengguna
+
+Laporan Sentry dan pesan di layar menjawab dua kebutuhan berbeda. Exception yang tercatat di Sentry
+belum berarti pengguna melihat bahwa penyimpanannya gagal. UI harus menyebut tindakan yang belum
+berhasil, mempertahankan isian bila belum tersimpan, dan menyediakan pesan yang tetap terlihat atau
+bisa ditutup pengguna. Toast singkat saja tidak cukup untuk kegagalan 5xx pada tindakan penyimpanan.
+
+Handler `toastSaveError` bersama di `modules/apperp/management-aset/ui/api.ts` membuat pesan error 5xx
+menetap sampai ditutup, memakai kalimat tindakan dari pemanggil dan pesan sehari-hari. Form penerimaan
+juga menampilkan pesan dalam form dan mengarahkan scroll ke sana. Detail SQL dan exception tetap di
+laporan server, bukan pada layar bisnis. Pelaporan exception asli tetap berjalan; jangan mengubah bug
+indeks database menjadi validasi 422 agar hilang dari pemantauan, dan jangan mengirim exception yang
+sama dua kali ke Sentry.
+
+Adapter penomoran aset hanya membungkus `ValidationException` sebagai penolakan 422. Exception database,
+bug internal, dan hasil penerbit yang melanggar kontrak diteruskan ke handler Laravel sebagai 500;
+`NumberSequenceFailureTest` memeriksa bahwa exception asli mencapai jalur pelaporan dan tidak menyimpan
+record. Tidak adanya HTTP antar-module bukan bukti bahwa semua kegagalan di dalam proses adalah validasi.
+
 ## Ke mana perginya
 
 | Tujuan | Selalu ada? | Kegunaannya |

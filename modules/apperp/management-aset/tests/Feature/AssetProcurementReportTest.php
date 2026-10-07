@@ -53,6 +53,7 @@ class AssetProcurementReportTest extends TestCase
         $this->otherTenantId = $this->buatTenantUji();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unit = (string) Str::ulid();
         $this->otherUnit = (string) Str::ulid();
         $this->seedProcurement();

@@ -47,8 +47,8 @@
         $ref: '#/components/responses/Forbidden'
       '422':
         $ref: '#/components/responses/ValidationError'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/pemeliharaan-aset/referensi/job-types:
   get:
     tags:

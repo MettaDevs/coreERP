@@ -41,9 +41,21 @@ class MutasiAsetTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         $this->unitTujuanId = (string) Str::ulid();
         Http::preventStrayRequests();
+    }
+
+    public function test_transfer_numbers_can_repeat_in_another_legal_entity(): void
+    {
+        $locationId = $this->master('lokasi-aset', ['nama' => 'Lokasi tujuan uji']);
+        $first = $this->draftResponse([$this->receive()], $locationId)->assertCreated()->json('data');
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $second = $this->draftResponse([$this->receive()], $locationId)->assertCreated()->json('data');
+        $this->assertSame($first['kode'], $second['kode']);
+        $this->assertNotSame($first['id'], $second['id']);
     }
 
     public function test_draf_tidak_memindahkan_aset_apa_pun(): void

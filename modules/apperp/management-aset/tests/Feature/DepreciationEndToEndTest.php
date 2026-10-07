@@ -42,6 +42,7 @@ class DepreciationEndToEndTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
 
         // Tahun buku Juli–Juni dibuat sungguhan: periode fiskal sekarang dibaca dari database

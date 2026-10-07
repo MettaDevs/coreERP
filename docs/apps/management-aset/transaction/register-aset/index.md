@@ -6,6 +6,25 @@ Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management
 
 Register aset adalah **catatan satu barang fisik milik perusahaan**, sejak diterima sampai dilepas. Satu baris di sini mewakili satu benda nyata: satu mesin, satu mobil, satu laptop. Bukan stok, bukan kuantitas agregat — kalau perusahaan membeli sepuluh laptop yang sama, ada sepuluh baris record.
 
+## Nomor dan penelusuran antarperusahaan
+
+Nomor penerimaan (`management-aset.penerimaan-aset`) dan nomor aset (`management-aset.aset`)
+diterbitkan per entitas legal. Prefix tetap mengikuti konfigurasi number sequence; angka urut
+bertambah dalam PT masing-masing. Dua PT boleh mempunyai nomor yang sama. Indeks unik pada
+`aset_tr_penerimaan_aset` dan `aset_tr_aset` menjaga `(tenant_id, legal_entity_id, kode)` hanya
+untuk baris yang belum diarsipkan, selaras dengan scope penerbitnya.
+
+Identitas relasi dan URL tetap `id`, bukan `kode`. Daftar penerimaan dan register menampilkan
+perusahaan di kolom tersendiri; judul rincian menyebut perusahaan bersama nomor. Posting finance
+membawa `legal_entity` dan `posting_id` yang diturunkan dari id dokumen. Pembaca memilih database
+tujuan berdasarkan entitas legal dan menjaga idempotensi berdasarkan `posting_id`, bukan nomor
+penerimaan saja.
+
+Kegagalan menyimpan atau menyelesaikan penerimaan tampil sebagai pesan yang tetap terlihat di
+form, sementara isian tetap tersedia. Error 5xx tetap dilaporkan oleh penangan server ke Sentry;
+layar tidak menampilkan SQL atau detail exception. Regresi di `PenerimaanAsetTest` memeriksa
+penerimaan hingga aset terbit pada dua PT bernomor sama, serta penolakan duplikat aktif di satu PT.
+
 ```mermaid
 graph TD
     subgraph ASET["Satu Baris Aset (tr_aset)"]

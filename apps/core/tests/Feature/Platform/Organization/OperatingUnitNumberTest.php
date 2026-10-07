@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,36 @@ class OperatingUnitNumberTest extends TestCase
         parent::setUp();
         $this->seed(AppCatalogSeeder::class);
         $this->owner = $this->pemilikBaru('owner@metta.test', 'PT Metta');
+    }
+
+    public function test_operating_unit_is_created_without_legal_entity_fields(): void
+    {
+        $data = ['classification' => 'operating_unit', 'name' => 'Unit uji', 'operating_unit_type' => 'department', 'operating_unit_number' => 'UNIT-TEST'];
+        $this->actingAs($this->owner)->postJson('/api/v1/organizations', $data)->assertCreated()
+            ->assertJsonPath('data.classification', 'operating_unit')
+            ->assertJsonPath('data.legal_entity', null)
+            ->assertJsonPath('data.operating_unit.number', 'UNIT-TEST');
+        $this->post('/settings/organization/organizations', [...$data, 'name' => 'Unit web', 'operating_unit_number' => 'UNIT-WEB', 'timezone' => ''])
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('organizations', ['name' => 'Unit web', 'classification' => 'operating_unit']);
+    }
+
+    public function test_organization_directory_pages_are_separate_and_tenant_scoped(): void
+    {
+        $this->withoutVite();
+        $unit = $this->operatingUnit('Unit halaman', 'department', 'PAGE-UNIT');
+        $this->actingAs($this->owner)->get('/settings/operating-units?section=legal-entities')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/organization/operating-units')
+                ->where('organizations.0.id', $unit->id)
+                ->where('organizations.0.classification', 'operating_unit')
+                ->missing('hierarchies'));
+        $this->get('/settings/legal-entities')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/organization/legal-entities')->missing('hierarchies'));
+        $this->get('/settings/organization-hierarchies')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/organization/hierarchies')->has('hierarchies')->missing('timezones'));
+        $this->get('/settings/organization?section=operating-units')->assertRedirect('/settings/operating-units');
+        $this->get('/settings/organization?section=hierarchies')->assertRedirect('/settings/organization-hierarchies');
     }
 
     public function test_nomor_dirapikan_ke_huruf_besar_dan_tersimpan_bersama_salinan_tenant(): void

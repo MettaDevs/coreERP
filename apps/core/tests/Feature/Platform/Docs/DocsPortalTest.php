@@ -37,13 +37,14 @@ class DocsPortalTest extends TestCase
         $this->assertStringStartsWith('application/yaml', (string) $jawaban->headers->get('Content-Type'));
         $spesifikasi = Yaml::parse((string) $jawaban->getContent());
         $this->assertSame(
-            ['/finance-postings', '/finance-postings/{posting_id}/ack', '/operating-units', '/vendors'],
+            ['/finance-postings', '/finance-postings/{posting_id}/ack', '/legal-entities', '/operating-units', '/vendors'],
             collect(array_keys($spesifikasi['paths']))->sort()->values()->all(),
         );
         $this->assertSame(['integrationClient'], array_keys($spesifikasi['components']['securitySchemes']));
         $this->assertArrayHasKey('financePosting', $spesifikasi['webhooks']);
         // Endpoint yang juga dibaca module menampilkan cara masuk klien integrasi saja.
         $this->assertSame([['integrationClient' => []]], $spesifikasi['paths']['/operating-units']['get']['security']);
+        $this->assertSame([['integrationClient' => []]], $spesifikasi['paths']['/legal-entities']['get']['security']);
         $this->assertStringContainsString('Langkah 1', $spesifikasi['info']['description']);
     }
 

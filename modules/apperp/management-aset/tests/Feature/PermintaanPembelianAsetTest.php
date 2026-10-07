@@ -32,8 +32,24 @@ class PermintaanPembelianAsetTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         $this->jenisId = $this->jenis();
+    }
+
+    public function test_purchase_request_numbers_can_repeat_in_another_legal_entity(): void
+    {
+        $permission = ['management-aset.permintaan-pembelian-aset.create'];
+        $first = $this->sebagaiPengguna($this->tenantId, $permission)
+            ->withHeader('Idempotency-Key', 'request-'.Str::ulid())
+            ->postJson(rtrim(self::API, '/'), $this->payload('Permintaan uji', 1))->assertCreated()->json('data');
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $second = $this->sebagaiPengguna($this->tenantId, $permission)
+            ->withHeader('Idempotency-Key', 'request-'.Str::ulid())
+            ->postJson(rtrim(self::API, '/'), $this->payload('Permintaan uji', 1))->assertCreated()->json('data');
+        $this->assertSame($first['kode'], $second['kode']);
+        $this->assertNotSame($first['id'], $second['id']);
     }
 
     public function test_simpan_kedua_dengan_versi_yang_sama_ditolak_dan_baris_simpan_pertama_bertahan(): void

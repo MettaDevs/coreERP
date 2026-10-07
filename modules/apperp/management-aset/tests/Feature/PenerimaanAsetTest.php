@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Platform\Modules\Contracts\RowVersion;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -52,6 +53,57 @@ class PenerimaanAsetTest extends TestCase
 
         $this->assertSame('draft', (string) DB::table('aset_tr_penerimaan_aset')->where('id', $dokumen)->value('status'));
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->count());
+    }
+
+    public function test_receipt_and_asset_numbers_are_independent_per_legal_entity(): void
+    {
+        $this->pastikanNomorUrutSiap($this->tenantId);
+        $referenceIds = DB::table('app_number_sequence_references')
+            ->whereIn('code', ['management-aset.penerimaan-aset', 'management-aset.aset'])->pluck('id');
+        DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)
+            ->whereIn('reference_id', $referenceIds)->update(['scope_type' => 'legal_entity']);
+
+        $firstReceipt = $this->draf([$this->baris(jumlah: 1)]);
+        $this->selesaikan($firstReceipt)->assertOk();
+        $firstEntityId = $this->legalEntityId;
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $secondReceipt = $this->draf([$this->baris(jumlah: 1)]);
+        $this->selesaikan($secondReceipt)->assertOk();
+
+        $receipts = DB::table('aset_tr_penerimaan_aset')->whereIn('id', [$firstReceipt, $secondReceipt])->get();
+        $assets = DB::table('aset_tr_aset')->whereIn('penerimaan_aset_id', [$firstReceipt, $secondReceipt])->get();
+        $this->assertCount(2, $receipts);
+        $this->assertCount(1, $receipts->pluck('kode')->unique());
+        $this->assertCount(2, $assets);
+        $this->assertCount(1, $assets->pluck('kode')->unique());
+        $this->assertCount(2, $assets->pluck('id')->unique());
+        $this->assertCount(2, $assets->pluck('legal_entity_id')->unique());
+
+        $this->legalEntityId = $firstEntityId;
+        $nextReceipt = $this->draf([$this->baris(jumlah: 1)]);
+        $this->assertNotSame($receipts->first()->kode, DB::table('aset_tr_penerimaan_aset')->where('id', $nextReceipt)->value('kode'));
+    }
+
+    public function test_active_numbers_cannot_repeat_inside_the_same_legal_entity(): void
+    {
+        $receiptId = $this->draf([$this->baris(jumlah: 1)]);
+        $this->selesaikan($receiptId)->assertOk();
+
+        foreach (['aset_tr_penerimaan_aset', 'aset_tr_aset'] as $table) {
+            $record = (array) DB::table($table)->first();
+            $duplicate = [...$record, 'id' => (string) Str::ulid(), 'creation_key' => 'duplicate-'.Str::ulid()];
+            try {
+                DB::transaction(fn () => DB::table($table)->insert($duplicate));
+                $this->fail('Nomor aktif yang sama dalam satu entitas legal harus ditolak.');
+            } catch (UniqueConstraintViolationException) {
+                $this->assertSame(1, DB::table($table)->where('kode', $record['kode'])->count());
+            }
+
+            DB::table($table)->where('id', $record['id'])->update(['deleted_at' => now()]);
+            DB::table($table)->insert($duplicate);
+            $this->assertSame(1, DB::table($table)->where('kode', $record['kode'])->whereNull('deleted_at')->count());
+        }
     }
 
     /**

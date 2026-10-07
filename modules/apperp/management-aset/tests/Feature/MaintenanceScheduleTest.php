@@ -58,6 +58,7 @@ class MaintenanceScheduleTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unitId = (string) Str::ulid();
         $this->jenisId = $this->seedMaster('aset_m_jenis_aset', 'Alat kesehatan');
         $this->jobType = $this->seedMaster('aset_m_maintenance_job_type', 'Kalibrasi', ['category_code' => 'preventive']);

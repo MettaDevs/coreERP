@@ -1,8 +1,10 @@
+import { usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChangeHistory } from '@/components/change-history';
 import type { ChangeHistoryPage } from '@/components/change-history';
 import { useToday } from '@/hooks/use-work-date';
+import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -74,6 +76,7 @@ export default function AsetDetailPage({
     asetId?: string;
     mode: Mode;
 }) {
+    const { workspace } = usePage<{ workspace: Workspace }>().props;
     // Tanggal koreksi nilai perolehan: hari ini menurut zona pengguna, dari jam server (K-34).
     const hariIni = useToday();
     const [detail, setDetail] = useState<RincianAset | null>(null);
@@ -393,7 +396,12 @@ export default function AsetDetailPage({
         );
     }
 
-    const judul = `${detail?.kode} — ${detail?.nama}`;
+    const legalEntityName = workspace.legal_entities.find(
+        (entity) => entity.id === detail?.legal_entity_id,
+    )?.name;
+    const judul = [legalEntityName, `${detail?.kode} — ${detail?.nama}`]
+        .filter(Boolean)
+        .join(' · ');
     const status = detail ? LIFECYCLE[detail.lifecycle_state] : undefined;
     const sudahDilepas = detail?.lifecycle_state === 'disposed';
 

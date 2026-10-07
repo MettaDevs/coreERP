@@ -586,6 +586,12 @@ DB::statement(
 
 `down()` membuangnya dengan `DROP INDEX aset_m_group_tenant_kode_unique`.
 
+Kolom scope pada indeks harus mengikuti reference nomor: contoh master bersama di atas memakai
+`tenant_id`, sedangkan dokumen yang bernomor per PT memakai `(tenant_id, legal_entity_id, kode)`.
+Jika beberapa reference berbagi tabel, discriminator jenis dokumen juga ikut. Counter per PT dengan
+indeks se-tenant tetap gagal saat PT kedua mendapat nomor yang sama. Gate fixture, regresi antar-PT,
+dan pemeriksaan indeks dijelaskan pada [scope nomor dan indeks dokumen](14-number-sequences.md#scope-nomor-harus-sama-dengan-indeks-dokumen).
+
 Aturannya: **setiap indeks unik yang memuat kolom kode bisnis pada tabel yang memiliki `deleted_at`
 wajib parsial.** Indeks unik pada identitas teknis—`id`, `creation_key`, pasangan `tenant_id` dengan
 `id`—tetap penuh, karena nilainya memang tidak boleh dipakai ulang oleh siapa pun.

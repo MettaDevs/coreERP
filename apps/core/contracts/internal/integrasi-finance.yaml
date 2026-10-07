@@ -78,10 +78,17 @@ info:
 
     | Yang dipetakan | Di posting | Sumbernya |
     | --- | --- | --- |
-    | Entitas legal | `legal_entity.code` | Disepakati dengan admin tenant |
+    | Entitas legal | `legal_entity.id` dan `legal_entity.code` | `GET /legal-entities`, scope `legal-entities.read` |
     | Akun | `journal_lines[].account.external_id` | ID akun di aplikasi finance Anda sendiri: admin tenant mengimpor ekspor daftar akun Anda (CSV `external_id,code,name,type,active`) |
     | Business unit dan department | `journal_lines[].financial_dimensions[].value_code` | `GET /operating-units` |
     | Vendor | `vendor.id` dan `vendor.number` | `GET /vendors` |
+
+    Untuk dropdown perusahaan, ambil `GET /legal-entities`: daftar lengkap entitas legal aktif
+    milik tenant token, urut nama, tanpa pagination. Tampilkan `name` dan `code`, simpan `id`,
+    lalu gunakan id itu sebagai filter `legal_entity` pada vendor atau posting. Entitas baru
+    muncul walaupun feed-nya belum aktif. Admin memberi scope `legal-entities.read` secara
+    eksplisit; token yang sudah ada tidak otomatis mendapat scope baru. Daftar ini tidak
+    mengatur database tujuan: pemetaan entitas ke database finance tetap disimpan di sisi Anda.
 
     Sinkronkan secara berkala: simpan `updated_at` terbesar dari sinkron terakhir, kirim sebagai
     `updated_since` berikutnya, dan simpan dengan upsert berdasarkan `id`. Batasnya inklusif, jadi
@@ -357,9 +364,10 @@ tags:
   - name: Finance feed
     description: Posting yang harus dibukukan aplikasi finance, dan ack hasilnya.
   - name: Directory
-    description: Data induk untuk tabel penerjemah — vendor, dan unit organisasi yang menjadi nilai dimensi.
+    description: Data induk untuk tabel penerjemah — entitas legal, vendor, dan unit organisasi yang menjadi nilai dimensi.
 
 paths:
+  /legal-entities: { $ref: 'paths/legal-entities.yaml' }
   /finance-postings: { $ref: 'paths/finance-postings.yaml' }
   /finance-postings/{posting_id}/ack: { $ref: 'paths/finance-postings_posting_id_ack.yaml' }
   /vendors: { $ref: 'paths/vendors.yaml' }

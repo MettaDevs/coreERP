@@ -14,6 +14,10 @@ info:
     Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
+    Penerbitan nomor berjalan di dalam proses Core. Penolakan konfigurasi atau scope menjawab
+    422; exception internal tetap 500 dan dilaporkan ke Sentry. Kode kegagalan jaringan
+    penomoran dari bentuk app terpisah sudah tidak dipakai.
+
     Klasifikasi aset mengikuti model Dynamics 365 F&O: seluruh master klasifikasi datar
     dan saling lepas, dan aset menunjuk masing-masing secara langsung. `group aset`
     membawa perlakuan finansial (penyusutan, GL, penomoran), `jenis aset` membawa
@@ -272,8 +276,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/analisa-maintenance/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -422,8 +426,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/group-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1022,8 +1026,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/item-checklist-maintenance/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1172,8 +1176,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/jenis-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1322,8 +1326,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/kondisi-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1474,8 +1478,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/lokasi-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1629,8 +1633,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/model-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1779,8 +1783,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/profil-penyusutan/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -1929,8 +1933,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/tipe-lokasi-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2079,8 +2083,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/buku-penyusutan/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2229,8 +2233,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/tipe-atribut/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2379,8 +2383,8 @@ paths:
           $ref: '#/components/responses/IdempotencyConflict'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/pabrikan-aset/{id}/detail:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -4276,8 +4280,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           description: Formulir tidak lengkap, berkas bukan CSV, atau `Idempotency-Key` tidak dikirim saat `apply`.
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/penerimaan-aset/impor-saldo-awal/templat:
     get:
       tags:
@@ -4460,12 +4464,7 @@ paths:
         '428':
           $ref: '#/components/responses/VersionRequired'
         '500':
-          description: |
-            Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
-            `posting_failed`. Transaksinya dibatalkan: tidak ada aset yang terdaftar, dan
-            kesalahannya sudah dilaporkan ke pemantauan kesalahan.
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+          $ref: '#/components/responses/InternalError'
   /api/v1/penerimaan-aset/{id}/pratinjau-posting:
     get:
       tags:
@@ -5661,8 +5660,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/pemeliharaan-aset/referensi/job-types:
     get:
       tags:
@@ -6647,8 +6646,8 @@ paths:
           $ref: '#/components/responses/StaleVersion'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/jadwal-pemeliharaan/{id}/abaikan:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -6837,8 +6836,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/permintaan-pemeliharaan/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -7065,8 +7064,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '428':
           $ref: '#/components/responses/VersionRequired'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/alasan-downtime:
     get:
       tags:
@@ -7109,8 +7108,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DowntimeReasonResponse'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/alasan-downtime/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -7718,8 +7719,8 @@ paths:
                 $ref: '#/components/schemas/ServiceContractResponse'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/kontrak-servis/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -7827,8 +7828,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InsuranceTypeResponse'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/jenis-asuransi/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -7943,8 +7946,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/polis-asuransi/vendor:
     get:
       tags:
@@ -13480,8 +13483,11 @@ components:
     NotFound:
       description: Data tidak ditemukan pada tenant aktif
     ValidationError:
-      description: Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, milik tenant lain, atau kombinasi model-pabrikan-jenis
-        aset yang tidak sesuai
+      description: |
+        Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, milik tenant lain,
+        atau kombinasi model-pabrikan-jenis aset yang tidak sesuai. Penolakan validasi penerbitan
+        nomor juga memakai 422, dengan `error.code: number_sequence_failed` dan pesan konfigurasi
+        yang perlu diperbaiki. Kegagalan database atau bug penerbit bukan validasi dan memakai 500.
     IdempotencyConflict:
       description: Idempotency-Key sudah dipakai untuk data yang berbeda
       content:
@@ -13512,31 +13518,22 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/AttributeValuesConflictResponse'
-    NumberSequenceUnavailable:
+    InternalError:
       description: |
-        Kode tidak dapat diterbitkan karena Number Sequence Core tidak dapat dipakai.
-
-        Statusnya selalu 503 karena dari sudut pandang pemanggil penulisan memang tidak dapat
-        diselesaikan, tetapi `error.code` membedakan sebabnya — dan sebab-sebab ini ditangani
-        orang yang berbeda dengan cara yang berbeda:
-
-        | `error.code` | Arti | Ditangani oleh |
-        | --- | --- | --- |
-        | `number_sequence_unreachable` | Core tidak terjangkau dari jaringan app | Operasional; sementara, boleh dicoba lagi |
-        | `number_sequence_unavailable` | Core terjangkau tetapi menjawab 5xx | Operasional; sementara, boleh dicoba lagi |
-        | `number_sequence_throttled` | Permintaan melebihi batas laju Core | Sementara, boleh dicoba lagi |
-        | `number_sequence_forbidden` | Kredensial service app ditolak Core (401/403) | Deployment; token service tidak sinkron dengan Control Plane |
-        | `number_sequence_reference_unknown` | Reference belum terdaftar di Core (404) | Katalog app; manifest belum tercatat |
-        | `number_sequence_rejected` | Core menolak permintaannya (4xx lain) | Pemanggil; periksa idempotency key dan scope |
-        | `number_sequence_not_configured` | URL atau token Core belum diisi pada app | Deployment |
-        | `number_sequence_invalid_response` | Core menjawab tanpa nomor yang sah | Bug Core |
-
-        Mencoba ulang hanya masuk akal untuk tiga kode pertama. Sisanya akan gagal dengan cara
-        yang sama sampai ada yang memperbaiki konfigurasinya.
+        Exception database atau bug internal diteruskan ke handler Laravel sebagai 500 dan
+        dilaporkan ke Sentry. Jangan menganggapnya penolakan validasi 422 atau kegagalan
+        jaringan penomoran 503. Tidak ada record yang disimpan bila transaksi dokumen gagal.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            type: object
+            required:
+            - message
+            properties:
+              message:
+                type: string
+          example:
+            message: Server Error
     VersionRequired:
       description: |
         Versi data yang diubah tidak dikirim (`error.code` = `version_required`). Kirim header `If-Match`

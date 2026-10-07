@@ -193,8 +193,8 @@
         $ref: '#/components/responses/Forbidden'
       '422':
         description: Formulir tidak lengkap, berkas bukan CSV, atau `Idempotency-Key` tidak dikirim saat `apply`.
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/penerimaan-aset/impor-saldo-awal/templat:
   get:
     tags:
@@ -381,8 +381,8 @@
           Jurnal perolehannya tidak dapat diterbitkan karena kesalahan sistem; kode kesalahan
           `posting_failed`. Transaksinya dibatalkan: tidak ada aset yang terdaftar, dan
           kesalahannya sudah dilaporkan ke pemantauan kesalahan.
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
+      '500':
+        $ref: '#/components/responses/InternalError'
 /api/v1/penerimaan-aset/{id}/pratinjau-posting:
   get:
     tags:
