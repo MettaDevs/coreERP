@@ -154,7 +154,10 @@ export function WidgetFrame({
 
         const values: DrillValue[] = [];
 
-        for (const dimension of widget.query.dimensions ?? []) {
+        const dimensions =
+            'dimensions' in widget.query ? (widget.query.dimensions ?? []) : [];
+
+        for (const dimension of dimensions) {
             const key =
                 typeof dimension === 'string' ? dimension : dimension.field;
             const granularity =
