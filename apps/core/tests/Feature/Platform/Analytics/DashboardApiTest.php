@@ -439,9 +439,10 @@ class DashboardApiTest extends TestCase
     {
         $visibleAsset = DB::table('aset_tr_aset')->where('tenant_id', $this->tenant)->first(['legal_entity_id', 'responsible_org_unit_id']);
         $this->assertNotNull($visibleAsset);
+        $visibleEntityName = DB::table('organizations')->where('id', $visibleAsset->legal_entity_id)->value('name');
 
-        $otherEntity = $this->organization($this->tenant, 'legal_entity', 'PT Di luar jangkauan');
-        $otherUnit = $this->organization($this->tenant, 'operating_unit', 'Unit di luar jangkauan');
+        $otherEntity = $this->organization($this->tenant, 'legal_entity', 'Entitas uji');
+        $otherUnit = $this->organization($this->tenant, 'operating_unit', 'Unit uji');
         $this->asset($this->tenant, $otherEntity, $otherUnit, '5000000');
 
         $viewer = $this->member(
@@ -455,7 +456,7 @@ class DashboardApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.value', (string) $visibleAsset->legal_entity_id)
-            ->assertJsonPath('data.0.label', 'PT Dasbor')
+            ->assertJsonPath('data.0.label', $visibleEntityName)
             ->assertJsonPath('truncated', false);
     }
 
