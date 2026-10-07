@@ -595,6 +595,7 @@ function SlicerValue({
             const items = new Map(
                 valuesState.options.map((item) => [item.value, item.label]),
             );
+
             for (const selected of list) {
                 if (!items.has(selected)) {
                     items.set(selected, selected);
@@ -715,39 +716,11 @@ function useSharedDimensionValues(
     } | null>(null);
 
     useEffect(() => {
-        const emptyValues = Object.fromEntries(
-            dimensionList.map((dimension) => [
-                dimension,
-                {
-                    options: [],
-                    loading: false,
-                    truncated: false,
-                    failed: false,
-                },
-            ]),
-        );
-
         if (dimensionList.length === 0 || sources.length === 0) {
-            setLoaded({ key: sourceKey, values: emptyValues });
-
             return;
         }
 
         const controller = new AbortController();
-        setLoaded({
-            key: sourceKey,
-            values: Object.fromEntries(
-                dimensionList.map((dimension) => [
-                    dimension,
-                    {
-                        options: [],
-                        loading: true,
-                        truncated: false,
-                        failed: false,
-                    },
-                ]),
-            ),
-        });
 
         const unique = new Map<string, Map<string, string>>();
         const truncated = new Set<string>();
@@ -771,6 +744,7 @@ function useSharedDimensionValues(
                     }
 
                     unique.set(source.dimension, options);
+
                     if (response.truncated) {
                         truncated.add(source.dimension);
                     }
@@ -778,6 +752,7 @@ function useSharedDimensionValues(
                     if (controller.signal.aborted) {
                         return;
                     }
+
                     failed.add(source.dimension);
                 }
             }
