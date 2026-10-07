@@ -79,6 +79,22 @@ function appendFilters(
     }
 }
 
+export type DimensionValueOption = { value: string; label: string };
+
+/** Pilihan unik dimensi bersama, dihitung sebagai principal yang sama dengan query dasbor. */
+export function fetchDatasetFieldValues(
+    datasetCode: string,
+    field: string,
+    signal: AbortSignal,
+): Promise<{ data: DimensionValueOption[]; truncated: boolean }> {
+    const params = new URLSearchParams({ field });
+
+    return apiJson(
+        `${BASE}/datasets/${encodeURIComponent(datasetCode)}/field-values?${params}`,
+        { signal },
+    );
+}
+
 export type DashboardInput = {
     name: string;
     description: string | null;

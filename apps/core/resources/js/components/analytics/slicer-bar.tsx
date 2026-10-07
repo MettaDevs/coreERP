@@ -1,6 +1,7 @@
 import { Button } from '@apperp/ui/button';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { MultiSelect } from '@apperp/ui/multi-select';
 import { Select } from '@apperp/ui/select';
 import {
     Sheet,
@@ -11,9 +12,11 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Plus, SlidersHorizontal, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { FilterEditor } from '@/components/analytics/filter-editor';
+import { fetchDatasetFieldValues } from '@/lib/analytics/api';
+import type { DimensionValueOption } from '@/lib/analytics/api';
 import type { SlicerValues } from '@/lib/analytics/slicer';
 import type {
     CrossFilter,
@@ -61,6 +64,20 @@ export function SlicerBar({
             ),
         [dashboard.dataset_fields],
     );
+    const sharedDimensions = useMemo(
+        () => [
+            ...new Set(
+                dashboard.slicers.flatMap((slicer) =>
+                    slicer.control === 'multi_select' &&
+                    slicer.source.type === 'shared'
+                        ? [slicer.source.dimension]
+                        : [],
+                ),
+            ),
+        ],
+        [dashboard.slicers],
+    );
+    const sharedValues = useSharedDimensionValues(fields, sharedDimensions);
 
     const save = async (slicer: DashboardSlicer) => {
         const next =
@@ -177,6 +194,13 @@ export function SlicerBar({
                                     <SlicerValue
                                         slicer={slicer}
                                         option={option}
+                                        sharedValues={
+                                            slicer.source.type === 'shared'
+                                                ? sharedValues[
+                                                      slicer.source.dimension
+                                                  ]
+                                                : undefined
+                                        }
                                         value={value}
                                         onChange={(next) =>
                                             onValuesChange({
@@ -285,6 +309,14 @@ function SlicerEditor({
     const [defaultValue, setDefaultValue] = useState<Value>(
         slicer?.default_value ?? emptyValue(slicer?.control ?? 'expression'),
     );
+    const sharedDimensions = useMemo(
+        () =>
+            sourceType === 'shared' && control === 'multi_select' && sourceValue
+                ? [sourceValue]
+                : [],
+        [control, sourceType, sourceValue],
+    );
+    const sharedValues = useSharedDimensionValues(fields, sharedDimensions);
 
     const sharedOptions = useMemo(() => {
         const byCode = new Map<string, string>();
@@ -473,6 +505,11 @@ function SlicerEditor({
                                         default_value: null,
                                     }}
                                     option={sourceOption}
+                                    sharedValues={
+                                        sourceType === 'shared'
+                                            ? sharedValues[sourceValue]
+                                            : undefined
+                                    }
                                     value={defaultValue}
                                     onChange={setDefaultValue}
                                     portalContainer={contentRef}
@@ -509,12 +546,14 @@ function SlicerEditor({
 function SlicerValue({
     slicer,
     option,
+    sharedValues,
     value,
     onChange,
     portalContainer,
 }: {
     slicer: DashboardSlicer;
     option: FieldOption;
+    sharedValues?: SharedDimensionValues;
     value: Value;
     onChange: (value: Value) => void;
     portalContainer?: RefObject<HTMLElement | null>;
@@ -545,6 +584,58 @@ function SlicerValue({
 
     if (slicer.control === 'multi_select') {
         const list = Array.isArray(value) ? value : value ? [value] : [];
+
+        if (slicer.source.type === 'shared') {
+            const valuesState = sharedValues ?? {
+                options: [],
+                loading: true,
+                truncated: false,
+                failed: false,
+            };
+            const items = new Map(
+                valuesState.options.map((item) => [item.value, item.label]),
+            );
+            for (const selected of list) {
+                if (!items.has(selected)) {
+                    items.set(selected, selected);
+                }
+            }
+
+            return (
+                <Field className="w-full">
+                    <MultiSelect
+                        label={slicer.title}
+                        items={[...items].map(([value, label]) => ({
+                            value,
+                            label,
+                        }))}
+                        value={list}
+                        onValueChange={onChange}
+                        searchPlaceholder={`Cari ${slicer.title.toLowerCase()}`}
+                        emptyMessage="Tidak ada nilai yang terlihat pada data ini."
+                        portalContainer={portalContainer}
+                    />
+                    {valuesState.loading && (
+                        <FieldDescription role="status">
+                            Memuat pilihan…
+                        </FieldDescription>
+                    )}
+                    {valuesState.failed && (
+                        <p className="text-sm text-destructive" role="alert">
+                            Pilihan tidak dapat dimuat. Muat ulang halaman untuk
+                            mencoba lagi.
+                        </p>
+                    )}
+                    {valuesState.truncated && (
+                        <FieldDescription>
+                            Daftar terlalu panjang; sebagian nilai tidak
+                            ditampilkan.
+                        </FieldDescription>
+                    )}
+                </Field>
+            );
+        }
+
         const fields = [option.field];
         const moduleId = option.dataset.module_id;
 
@@ -569,6 +660,178 @@ function SlicerValue({
             maxLength={250}
             onChange={(event) => onChange(event.target.value)}
         />
+    );
+}
+
+type SharedDimensionValues = {
+    options: DimensionValueOption[];
+    loading: boolean;
+    truncated: boolean;
+    failed: boolean;
+};
+
+function useSharedDimensionValues(
+    fields: FieldOption[],
+    dimensions: string[],
+): Record<string, SharedDimensionValues> {
+    const dimensionsKey = JSON.stringify([...new Set(dimensions)].sort());
+    const dimensionList = useMemo(
+        () => JSON.parse(dimensionsKey) as string[],
+        [dimensionsKey],
+    );
+    const sources = useMemo(() => {
+        const unique = new Map<
+            string,
+            { dimension: string; dataset: string; field: string }
+        >();
+        const selected = new Set(dimensionList);
+
+        for (const option of fields) {
+            const dimension = option.field.shared_dimension;
+
+            if (dimension !== undefined && selected.has(dimension)) {
+                unique.set(
+                    `${dimension}|${option.dataset.code}|${option.field.key}`,
+                    {
+                        dimension,
+                        dataset: option.dataset.code,
+                        field: option.field.key,
+                    },
+                );
+            }
+        }
+
+        return [...unique.values()].sort(
+            (left, right) =>
+                left.dimension.localeCompare(right.dimension) ||
+                left.dataset.localeCompare(right.dataset) ||
+                left.field.localeCompare(right.field),
+        );
+    }, [dimensionList, fields]);
+    const sourceKey = JSON.stringify(sources);
+    const [loaded, setLoaded] = useState<{
+        key: string;
+        values: Record<string, SharedDimensionValues>;
+    } | null>(null);
+
+    useEffect(() => {
+        const emptyValues = Object.fromEntries(
+            dimensionList.map((dimension) => [
+                dimension,
+                {
+                    options: [],
+                    loading: false,
+                    truncated: false,
+                    failed: false,
+                },
+            ]),
+        );
+
+        if (dimensionList.length === 0 || sources.length === 0) {
+            setLoaded({ key: sourceKey, values: emptyValues });
+
+            return;
+        }
+
+        const controller = new AbortController();
+        setLoaded({
+            key: sourceKey,
+            values: Object.fromEntries(
+                dimensionList.map((dimension) => [
+                    dimension,
+                    {
+                        options: [],
+                        loading: true,
+                        truncated: false,
+                        failed: false,
+                    },
+                ]),
+            ),
+        });
+
+        const unique = new Map<string, Map<string, string>>();
+        const truncated = new Set<string>();
+        const failed = new Set<string>();
+
+        const load = async () => {
+            for (const source of sources) {
+                try {
+                    const response = await fetchDatasetFieldValues(
+                        source.dataset,
+                        source.field,
+                        controller.signal,
+                    );
+                    const options = unique.get(source.dimension) ?? new Map();
+
+                    for (const option of response.data) {
+                        const label = options.get(option.value);
+                        if (label === undefined || label === option.value) {
+                            options.set(option.value, option.label);
+                        }
+                    }
+
+                    unique.set(source.dimension, options);
+                    if (response.truncated) {
+                        truncated.add(source.dimension);
+                    }
+                } catch {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+                    failed.add(source.dimension);
+                }
+            }
+
+            if (controller.signal.aborted) {
+                return;
+            }
+
+            setLoaded({
+                key: sourceKey,
+                values: Object.fromEntries(
+                    dimensionList.map((dimension) => [
+                        dimension,
+                        {
+                            options: failed.has(dimension)
+                                ? []
+                                : [...(unique.get(dimension) ?? new Map())]
+                                      .map(([value, label]) => ({
+                                          value,
+                                          label,
+                                      }))
+                                      .sort((left, right) =>
+                                          left.label.localeCompare(right.label),
+                                      ),
+                            loading: false,
+                            truncated: truncated.has(dimension),
+                            failed: failed.has(dimension),
+                        },
+                    ]),
+                ),
+            });
+        };
+
+        void load();
+
+        return () => controller.abort();
+    }, [dimensionList, sourceKey, sources]);
+
+    if (loaded?.key === sourceKey) {
+        return loaded.values;
+    }
+
+    return Object.fromEntries(
+        dimensionList.map((dimension) => [
+            dimension,
+            {
+                options: [],
+                loading: sources.some(
+                    (source) => source.dimension === dimension,
+                ),
+                truncated: false,
+                failed: false,
+            },
+        ]),
     );
 }
 

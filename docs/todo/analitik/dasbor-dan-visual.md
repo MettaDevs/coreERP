@@ -130,6 +130,7 @@ kontraknya hasil Scramble, bukan tulisan tangan. Setiap rute dijaga permission d
 | --- | --- | --- |
 | `GET datasets` | `dashboard.read` | Dataset yang boleh dibaca pengguna ini |
 | `GET datasets/{code}` | `dashboard.read` | Field, measure, field waktu, dimensi bersama (data pribadi disaring) |
+| `GET datasets/{code}/field-values?field=...` | `dashboard.read`; akses dataset | Nilai unik dimensi bersama dari data yang boleh dibaca; `truncated` menandai daftar yang mencapai batas principal |
 | `POST query` | `explore.invoke` | Menjalankan query bebas |
 | `GET dashboards` | `dashboard.read` | Milik sendiri dan bersama |
 | `POST dashboards` | `dashboard.create`; `shared` butuh `shared-dashboard.update` | |
@@ -150,6 +151,8 @@ Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): vo
     Route::middleware(Security::gate(Security::ANALYTICS_DASHBOARD_READ))->group(function (): void {
         Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
         Route::get('datasets/{code}', [DatasetController::class, 'show'])->name('datasets.show');
+        Route::get('datasets/{code}/field-values', [DatasetController::class, 'fieldValues'])
+            ->middleware('throttle:analytics-interactive')->name('datasets.field-values');
         Route::get('dashboards', [DashboardController::class, 'index'])->name('dashboards.index');
         Route::get('dashboards/{dashboard}', [DashboardController::class, 'show'])->name('dashboards.show');
         Route::get('widgets/{widget}/data', WidgetDataController::class)
@@ -180,6 +183,7 @@ mengarsipkan diputuskan `Dashboards\DashboardAccess` di controller. `{dashboard}
 | --- | --- | --- |
 | `GET datasets` | `{data: DatasetSummary[]}` — module terpasang dan permission baca dipegang | |
 | `GET datasets/{code}` | `{data: DatasetDescription}` — field dan measure data pribadi disaring | 404 `analytics.dataset_unknown`, 403 `analytics.dataset_forbidden` |
+| `GET datasets/{code}/field-values?field=...` | `{data: list<{value, label}>, truncated}` — pilihan unik untuk dimensi bersama, dibaca dengan `RunQuery` dan kebijakan data principal | 404, 403, 422 |
 | `GET dashboards` | `{data: DashboardSummary[]}` milik sendiri dan bersama, urut nama | |
 | `POST dashboards` | 201 `{data: DashboardDetail}`, `ETag` | 403 tanpa hak; 422 nama ganda |
 | `GET dashboards/{id}` | `{data: DashboardDetail}`, `ETag` | 404 pribadi orang lain |

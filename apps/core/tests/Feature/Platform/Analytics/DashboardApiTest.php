@@ -13,6 +13,7 @@ use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\Dataset;
 use App\Platform\Modules\Contracts\Analytics\DatasetDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Tests\TestCase;
@@ -432,6 +433,30 @@ class DashboardApiTest extends TestCase
         $this->actingAs($assetOnly)->getJson('/api/v1/analytics/datasets')->assertForbidden();
         $this->actingAs($assetOnly)->getJson('/api/v1/analytics/dashboards')->assertForbidden();
         $this->actingAs($assetOnly)->getJson('/api/v1/analytics/saved-queries')->assertForbidden();
+    }
+
+    public function test_shared_dimension_values_follow_the_dataset_data_policy(): void
+    {
+        $visibleAsset = DB::table('aset_tr_aset')->where('tenant_id', $this->tenant)->first(['legal_entity_id', 'responsible_org_unit_id']);
+        $this->assertNotNull($visibleAsset);
+
+        $otherEntity = $this->organization($this->tenant, 'legal_entity', 'PT Di luar jangkauan');
+        $otherUnit = $this->organization($this->tenant, 'operating_unit', 'Unit di luar jangkauan');
+        $this->asset($this->tenant, $otherEntity, $otherUnit, '5000000');
+
+        $viewer = $this->member(
+            $this->tenant,
+            ['core.analytics.inquire', 'management-aset.aset.manage'],
+            [[(string) $visibleAsset->legal_entity_id, (string) $visibleAsset->responsible_org_unit_id]],
+        );
+
+        $this->actingAs($viewer)
+            ->getJson('/api/v1/analytics/datasets/'.self::ASSET_DATASET.'/field-values?field=legal_entity_id')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.value', (string) $visibleAsset->legal_entity_id)
+            ->assertJsonPath('data.0.label', 'PT Dasbor')
+            ->assertJsonPath('truncated', false);
     }
 
     public function test_dashboard_pages_render_their_components(): void

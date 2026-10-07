@@ -60,6 +60,9 @@ Route::middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ANALYTICS_DASHB
     Route::prefix('api/v1/analytics')->name('api.analytics.')->group(function (): void {
         Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
         Route::get('datasets/{code}', [DatasetController::class, 'show'])->name('datasets.show');
+        Route::get('datasets/{code}/field-values', [DatasetController::class, 'fieldValues'])
+            ->middleware('throttle:'.AnalyticsServiceProvider::INTERACTIVE_LIMITER)
+            ->name('datasets.field-values');
 
         Route::get('dashboards', [DashboardController::class, 'index'])->name('dashboards.index');
         Route::post('dashboards', [DashboardController::class, 'store'])
