@@ -91,7 +91,7 @@ where ref.app_id <> 'core'
     where e.tenant_id = s.tenant_id and e.app_id = ref.app_id and e.status = 'active'
 );
 
--- Bawaan sebuah sequence yang baru dimaterialisasi: aktif, rentang 0-19999, tidak kontinu,
+-- Bawaan sebuah sequence yang baru dimaterialisasi: aktif, rentang 1-19999, tidak kontinu,
 -- tidak boleh diisi manual. Scope-nya TIDAK dipatok 'tenant': reference transaksi memang
 -- ber-scope legal entity, dan yang benar adalah scope yang diizinkan reference itu sendiri.
 insert into hasil_core
@@ -101,7 +101,7 @@ join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_i
 join app_number_sequence_references ref on ref.id = s.reference_id
 where ref.app_id <> 'core' and (
       s.status <> 'active'
-   or s.minimum_number <> 0
+   or s.minimum_number <> 1
    or s.maximum_number <> 19999
    or not (ref.allowed_scopes::jsonb ? s.scope_type)
    or s.is_continuous

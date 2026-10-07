@@ -143,7 +143,7 @@ dilanggar, dan angkanya dicatat.
 
 | Oracle | Apa yang diperiksa | Dibuktikan merah dengan |
 | --- | --- | --- |
-| `verify.sql` (Core) | batas tenant, materialisasi sequence, terbitan nomor menembus tenant | pemeriksaan `default sequence` sempat memerah 903 saat ekspektasinya masih salah; skrip berhenti dengan exit 3 |
+| `verify.sql` (Core) | batas tenant, materialisasi sequence, terbitan nomor menembus tenant | setelah oracle diselaraskan ke default 1–19999, transaksi test mengubah satu sequence menjadi minimum 0; satu pelanggaran terdeteksi, skrip berhenti dengan exit 3, dan rollback memulihkan nilainya |
 | `verify.sql` (module) | kode/`creation_key` ganda, anak lintas tenant, prefix reference, tiap kode terikat ke satu baris terbitan | `SELFTEST` SQL: satu baris `aset_m_group_aset` disuntik dengan kode `PBRA00001` → dua pemeriksaan naik ke 1, exit 3; baris dihapus, exit kembali 0 |
 | Probe di dalam k6 | baca lintas tenant, tulis induk lintas tenant, eskalasi hak antar master | `SELFTEST=1` pada `master-data.js` → 42 dari 42 probe lintas tenant dan 21 dari 21 probe eskalasi tercatat sebagai pelanggaran, exit 99 |
 | `link_merged_sets` | penggantian kaitan yang saling menyela | `SELFTEST=1` pada `maintenance.js` → 841 dari 841 pembacaan balik tertangkap, exit 99 |

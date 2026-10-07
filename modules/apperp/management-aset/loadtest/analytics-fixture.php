@@ -77,8 +77,19 @@ try {
     $tenantRunner = app(TenantRunner::class);
     $fixtureHash = substr(hash('sha256', $manifest['fixture_id']), 0, 16);
     $tenantTotal = count($manifest['tenants']);
+    $shardCount = (int) (getenv('ANALYTICS_ASSET_SHARD_COUNT') ?: 1);
+    $shardIndex = (int) (getenv('ANALYTICS_ASSET_SHARD_INDEX') ?: 0);
+    if ($shardCount < 1 || $shardIndex < 0 || $shardIndex >= $shardCount) {
+        throw new InvalidArgumentException('Pembagian fixture aset tidak sah.');
+    }
+    $shardTenantCount = 0;
 
     foreach ($manifest['tenants'] as $tenantPosition => &$tenant) {
+        if ($shardIndex !== $tenant['index'] % $shardCount) {
+            continue;
+        }
+        $shardTenantCount++;
+
         $result = $tenantRunner->runFor($tenant['tenant_id'], function () use (
             $assetClass,
             $assetModel,
@@ -98,35 +109,27 @@ try {
             $valueColumn,
             $currencyColumn,
         ): array {
-            return $assetModel->getConnection()->transaction(function () use (
-                $assetClass,
-                $assetModel,
+            $tenantId = $tenant['tenant_id'];
+            $tenantIndex = $tenant['index'];
+            $assetCount = $tenant['asset_count'];
+            $assetKeyPrefix = sprintf('analytics-fixture-%s-tenant-%d-asset-', $fixtureHash, $tenantIndex);
+            $primaryKey = $assetModel->getKeyName();
+            $masterIds = $assetModel->getConnection()->transaction(function () use (
                 $groupModel,
                 $typeModel,
                 $numbers,
-                $assetReference,
                 $typeReference,
-                $tenant,
+                $tenantId,
+                $tenantIndex,
                 $fixtureHash,
-                $columns,
-                $legalEntityColumn,
-                $orgUnitColumn,
-                $groupColumn,
-                $typeColumn,
-                $dateColumn,
-                $valueColumn,
-                $currencyColumn,
             ): array {
-                $tenantId = $tenant['tenant_id'];
-                $tenantIndex = $tenant['index'];
                 $groupIds = [];
-
                 for ($groupIndex = 0; $groupIndex < GROUP_COUNT; $groupIndex++) {
                     $master = ensureMaster(
                         $groupModel,
                         $tenantId,
                         sprintf('analytics-fixture-%s-tenant-%d-group-%d', $fixtureHash, $tenantIndex, $groupIndex),
-                        sprintf('AG%sT%04dG%02d', $fixtureHash, $tenantIndex, $groupIndex),
+                        sprintf('AG%sT%04dG%02d', strtoupper($fixtureHash), $tenantIndex, $groupIndex),
                         sprintf('Kelompok uji %02d', $groupIndex + 1),
                     );
                     $groupIds[] = (string) $master->getKey();
@@ -141,117 +144,160 @@ try {
                     'Jenis uji aset',
                     fn (): string => $numbers->issue($typeReference, $tenantId, 'jenis-aset:'.$typeCreationKey),
                 );
-                $typeId = (string) $type->getKey();
-                $assetCount = $tenant['asset_count'];
-                $assetKeyPrefix = sprintf('analytics-fixture-%s-tenant-%d-asset-', $fixtureHash, $tenantIndex);
-                $primaryKey = $assetModel->getKeyName();
-                $existingRows = $assetClass::withTrashed()
-                    ->where('tenant_id', $tenantId)
-                    ->where('creation_key', 'like', $assetKeyPrefix.'%')
-                    ->get([$primaryKey, 'creation_key']);
-                $existingIds = [];
 
-                foreach ($existingRows as $row) {
-                    $suffix = substr((string) $row->creation_key, strlen($assetKeyPrefix));
-                    if (preg_match('/^\d{5}$/D', $suffix) !== 1 || (int) $suffix >= $assetCount) {
-                        throw new RuntimeException('Jumlah aset fixture berubah; gunakan fixture_id baru.');
-                    }
-                    $existingIds[(int) $suffix] = (string) $row->getAttribute($primaryKey);
+                return [$groupIds, (string) $type->getKey()];
+            });
+            [$groupIds, $typeId] = $masterIds;
+
+            $existingRows = $assetClass::withTrashed()
+                ->where('tenant_id', $tenantId)
+                ->where('creation_key', 'like', $assetKeyPrefix.'%')
+                ->get([$primaryKey, 'creation_key', 'deleted_at']);
+            $existingIds = [];
+            $deletedIndexes = [];
+
+            foreach ($existingRows as $row) {
+                $suffix = substr((string) $row->creation_key, strlen($assetKeyPrefix));
+                if (preg_match('/^\d{5}$/D', $suffix) !== 1 || (int) $suffix >= $assetCount) {
+                    throw new RuntimeException('Jumlah aset fixture berubah; gunakan fixture_id baru.');
                 }
+                $index = (int) $suffix;
+                $existingIds[$index] = (string) $row->getAttribute($primaryKey);
+                if ($row->trashed()) {
+                    $deletedIndexes[$index] = true;
+                }
+            }
 
-                $assetClass::withTrashed()
-                    ->where('tenant_id', $tenantId)
-                    ->where('creation_key', 'like', $assetKeyPrefix.'%')
-                    ->whereNotNull('deleted_at')
-                    ->update(['deleted_at' => null, 'updated_at' => now()]);
+            $sampleIndexes = sampleIndexes($assetCount);
+            $sampleSet = array_fill_keys($sampleIndexes, true);
+            $sampleIds = [];
 
-                $sampleIndexes = sampleIndexes($assetCount);
-                $sampleSet = array_fill_keys($sampleIndexes, true);
-                $sampleIds = [];
-                $batch = [];
-                $timestamp = now();
+            for ($chunkStart = 0; $chunkStart < $assetCount; $chunkStart += INSERT_BATCH_SIZE) {
+                $chunkEnd = min($assetCount, $chunkStart + INSERT_BATCH_SIZE);
+                $chunkSampleIds = $assetModel->getConnection()->transaction(function () use (
+                    $assetClass,
+                    $assetModel,
+                    $numbers,
+                    $assetReference,
+                    $tenant,
+                    $tenantId,
+                    $assetKeyPrefix,
+                    $primaryKey,
+                    $existingIds,
+                    $deletedIndexes,
+                    $groupIds,
+                    $typeId,
+                    $sampleSet,
+                    $columns,
+                    $legalEntityColumn,
+                    $orgUnitColumn,
+                    $groupColumn,
+                    $typeColumn,
+                    $dateColumn,
+                    $valueColumn,
+                    $currencyColumn,
+                    $chunkStart,
+                    $chunkEnd,
+                ): array {
+                    $batch = [];
+                    $sampleIds = [];
+                    $deletedIds = [];
+                    $timestamp = now();
 
-                for ($assetIndex = 0; $assetIndex < $assetCount; $assetIndex++) {
-                    if (isset($existingIds[$assetIndex])) {
-                        if (isset($sampleSet[$assetIndex])) {
-                            $sampleIds[$assetIndex] = $existingIds[$assetIndex];
+                    for ($assetIndex = $chunkStart; $assetIndex < $chunkEnd; $assetIndex++) {
+                        if (isset($existingIds[$assetIndex])) {
+                            if (isset($deletedIndexes[$assetIndex])) {
+                                $deletedIds[] = $existingIds[$assetIndex];
+                            }
+                            if (isset($sampleSet[$assetIndex])) {
+                                $sampleIds[$assetIndex] = $existingIds[$assetIndex];
+                            }
+
+                            continue;
                         }
 
-                        continue;
+                        $id = (string) Str::ulid();
+                        $groupIndex = $assetIndex % GROUP_COUNT;
+                        $groupCycle = intdiv($assetIndex, GROUP_COUNT);
+                        $orgUnitIndex = (intdiv($assetIndex, 2) + $groupCycle) % count($tenant['org_unit_ids']);
+                        $date = acquiredDate($assetIndex);
+                        $creationKey = $assetKeyPrefix.sprintf('%05d', $assetIndex);
+                        $legalEntityId = $tenant['legal_entity_ids'][$groupCycle % 2];
+                        $code = $numbers->issue($assetReference, $tenantId, 'aset:'.$creationKey, $legalEntityId);
+                        $row = [
+                            $primaryKey => $id,
+                            'tenant_id' => $tenantId,
+                            'creation_key' => $creationKey,
+                            'kode' => $code,
+                            'nama' => sprintf('Aset uji %05d', $assetIndex + 1),
+                            $legalEntityColumn => $legalEntityId,
+                            $orgUnitColumn => $tenant['org_unit_ids'][$orgUnitIndex],
+                            $groupColumn => $groupIds[$groupIndex],
+                            $typeColumn => $typeId,
+                            $dateColumn => $date,
+                            $valueColumn => sprintf('%d.00', 1000000 + (($assetIndex * 173) % 50000000)),
+                            $currencyColumn => ($groupCycle + intdiv($assetIndex, 2)) % 10 === 0 ? 'USD' : 'IDR',
+                            'created_at' => $timestamp,
+                            'updated_at' => $timestamp,
+                        ];
+
+                        if (isset($columns['placed_in_service_on'])) {
+                            $row['placed_in_service_on'] = $date;
+                        }
+                        if (isset($columns['lifecycle_state'])) {
+                            $row['lifecycle_state'] = 'received';
+                        }
+                        if (isset($columns['financial_dimension_org_unit_id'])) {
+                            $row['financial_dimension_org_unit_id'] = $tenant['org_unit_ids'][($orgUnitIndex + 1) % count($tenant['org_unit_ids'])];
+                        }
+
+                        $batch[] = $row;
+                        if (isset($sampleSet[$assetIndex])) {
+                            $sampleIds[$assetIndex] = $id;
+                        }
                     }
 
-                    $id = (string) Str::ulid();
-                    $groupIndex = $assetIndex % GROUP_COUNT;
-                    $groupCycle = intdiv($assetIndex, GROUP_COUNT);
-                    $orgUnitIndex = (intdiv($assetIndex, 2) + $groupCycle) % count($tenant['org_unit_ids']);
-                    $date = acquiredDate($assetIndex);
-                    $creationKey = $assetKeyPrefix.sprintf('%05d', $assetIndex);
-                    $legalEntityId = $tenant['legal_entity_ids'][$groupCycle % 2];
-                    $code = $numbers->issue($assetReference, $tenantId, 'aset:'.$creationKey, $legalEntityId);
-                    $row = [
-                        $primaryKey => $id,
-                        'tenant_id' => $tenantId,
-                        'creation_key' => $creationKey,
-                        'kode' => $code,
-                        'nama' => sprintf('Aset uji %05d', $assetIndex + 1),
-                        $legalEntityColumn => $legalEntityId,
-                        $orgUnitColumn => $tenant['org_unit_ids'][$orgUnitIndex],
-                        $groupColumn => $groupIds[$groupIndex],
-                        $typeColumn => $typeId,
-                        $dateColumn => $date,
-                        $valueColumn => sprintf('%d.00', 1000000 + (($assetIndex * 173) % 50000000)),
-                        $currencyColumn => ($groupCycle + intdiv($assetIndex, 2)) % 10 === 0 ? 'USD' : 'IDR',
-                        'created_at' => $timestamp,
-                        'updated_at' => $timestamp,
-                    ];
-
-                    if (isset($columns['placed_in_service_on'])) {
-                        $row['placed_in_service_on'] = $date;
+                    if ($deletedIds !== []) {
+                        $assetClass::withTrashed()
+                            ->where('tenant_id', $tenantId)
+                            ->whereIn($primaryKey, $deletedIds)
+                            ->whereNotNull('deleted_at')
+                            ->update(['deleted_at' => null, 'updated_at' => now()]);
                     }
-                    if (isset($columns['lifecycle_state'])) {
-                        $row['lifecycle_state'] = 'received';
-                    }
-                    if (isset($columns['financial_dimension_org_unit_id'])) {
-                        $row['financial_dimension_org_unit_id'] = $tenant['org_unit_ids'][($orgUnitIndex + 1) % count($tenant['org_unit_ids'])];
-                    }
-
-                    $batch[] = $row;
-                    if (isset($sampleSet[$assetIndex])) {
-                        $sampleIds[$assetIndex] = $id;
-                    }
-                    if (count($batch) >= INSERT_BATCH_SIZE) {
+                    if ($batch !== []) {
                         $assetModel->newQuery()->insert($batch);
-                        $batch = [];
                     }
-                }
 
-                if ($batch !== []) {
-                    $assetModel->newQuery()->insert($batch);
-                }
+                    return $sampleIds;
+                });
+                $sampleIds += $chunkSampleIds;
+            }
 
-                $activeCount = $assetClass::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('creation_key', 'like', $assetKeyPrefix.'%')
-                    ->count();
-                if ($activeCount !== $assetCount) {
-                    throw new RuntimeException('Jumlah aset aktif tidak sama dengan manifest fixture.');
-                }
+            $activeCount = $assetClass::query()
+                ->where('tenant_id', $tenantId)
+                ->where('creation_key', 'like', $assetKeyPrefix.'%')
+                ->count();
+            if ($activeCount !== $assetCount) {
+                throw new RuntimeException('Jumlah aset aktif tidak sama dengan manifest fixture.');
+            }
 
-                ksort($sampleIds);
+            ksort($sampleIds);
 
-                return [
-                    'group_ids' => $groupIds,
-                    'type_id' => $typeId,
-                    'sample_asset_ids' => array_values($sampleIds),
-                    'asset_count' => $activeCount,
-                ];
-            });
+            return [
+                'group_ids' => $groupIds,
+                'type_id' => $typeId,
+                'sample_asset_ids' => array_values($sampleIds),
+                'asset_count' => $activeCount,
+            ];
         });
 
         $tenant = [...$tenant, ...$result];
         fwrite(STDOUT, sprintf("Tenant %d/%d: %d aset siap\n", $tenantPosition + 1, $tenantTotal, $result['asset_count']));
     }
     unset($tenant);
+    if ($shardTenantCount === 0) {
+        throw new InvalidArgumentException('Bagian fixture aset ini tidak memiliki tenant.');
+    }
 
     $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
     if (file_put_contents($manifestPath, $encoded, LOCK_EX) === false) {
@@ -337,6 +383,10 @@ function ensureMaster(Model $prototype, string $tenantId, string $creationKey, s
     if ($master !== null) {
         if ($master->trashed()) {
             $master->restore();
+        }
+        if ($codeIssuer === null && $master->getAttribute('kode') !== $code) {
+            $master->setAttribute('kode', $code);
+            $master->save();
         }
         if (! (bool) $master->getAttribute('aktif')) {
             $master->setAttribute('aktif', true);
