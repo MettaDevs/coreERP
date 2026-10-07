@@ -10,9 +10,11 @@ tanpa menyalin data tenant ke tempat lain, dan uji beban yang membuktikan semuan
 | --- | --- | --- |
 | Dasbor dibuka | Beberapa query agregat bersamaan per pengguna | Cache, widget dimuat saat terlihat, batas widget per dasbor |
 | Penjelajah | Query bebas yang berubah tiap klik | Batas waktu interaktif, batas dimensi, jeda pratinjau 500 ms |
-| Feed OData dan API | Halaman besar, sering dijadwalkan bersamaan jam 07.00 | Batas waktu luar, halaman 5.000 baris, rate limit per klien |
-| Embed | Banyak pengunjung portal untuk publikasi yang sama | Cache per publikasi dan parameter; rate limit per token |
+| Publikasi JSON/CSV (area 15) | Query agregat dibaca sistem luar per halaman | Batas waktu luar, halaman sampai 5.000 baris, rate limit per klien |
 | Job fase 3 | Peringatan dan kirim terjadwal | Batas waktu job, jadwal tersebar |
+
+Area 10 hanya mencakup publikasi JSON/CSV yang dikirim area 15. OData (area 16) dan embed (area 17) ditunda;
+keduanya belum menjadi bagian skenario atau gate area 10.
 
 ## Batas
 
@@ -170,8 +172,11 @@ tiga pengguna: hibah semua, hibah dua unit, dan tanpa hibah aset.
 | `analytics-dashboard` | Membuka dasbor 6 widget: 3 kelompok, 1 deret bulanan, 1 tile, 1 tabel top-10; 70% dari cache | 1000, 128 tenant | Latensi dan kebenaran pada beban campur |
 | `analytics-explore` | Query bebas acak dari daftar 40 bentuk sah, tanpa cache | 300 | Latensi query dingin, batas waktu, batas bersamaan |
 | `analytics-mixed` | `analytics-dashboard` bersamaan dengan skenario penjenuhan module aset yang sudah ada | 700 + 300 | Layar transaksi tetap dalam gate-nya saat analitik berjalan |
-| `analytics-external` | Klien integrasi membaca publikasi JSON dan OData berhalaman | 200 | Rate limit per klien, halaman, tanpa kebocoran |
-| `analytics-embed` | Pengunjung portal dengan token embed, setengahnya memakai token kedaluwarsa | 300 | Penolakan token, CSP, cache per publikasi |
+| `analytics-external` | Klien integrasi membaca publikasi JSON/CSV; halaman 10 baris memastikan cursor dipakai | 200 | Cursor dan format, penolakan baca lintas tenant |
+
+Skenario external membuktikan cursor dan bentuk CSV pada hasil agregat fixture. Hasil itu belum mencapai 5.000
+baris, jadi SLO halaman maksimum di bawah tetap belum terukur; jangan menandai area 10 selesai sampai ada
+fixture area 15 yang mengukurnya dengan batas tenant dan oracle tetap utuh.
 
 Setiap respons berisi angka dicatat k6 bersama pengguna dan tenant-nya untuk dicocokkan oracle.
 

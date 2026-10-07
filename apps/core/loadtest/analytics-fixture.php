@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\RoleAssignment;
-use App\Platform\Access\Models\RoleAssignmentDataPolicyScope;
 use App\Platform\Access\Support\DataPolicyScopeResolver;
 use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Actions\CreateOrganization;
-use App\Platform\Tenant\Models\TenantMembership;
 use App\Platform\Tenant\Actions\RegisterBusiness as RegisterBusinessTenant;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Modules\Apperp\ManagementAset\Models\master\GroupAset;
-use Modules\Apperp\ManagementAset\Models\master\JenisAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 
 $root = getcwd();
 
@@ -30,8 +26,8 @@ $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 $fixtureId = preg_replace('/[^a-zA-Z0-9-]/', '-', getenv('ANALYTICS_FIXTURE_ID') ?: 'a10');
-$datasetCode = getenv('ANALYTICS_DATASET') ?: 'management-aset.asset-register';
-$policyCode = getenv('ANALYTICS_POLICY_CODE') ?: 'management-aset.asset-responsibility';
+$datasetCode = getenv('ANALYTICS_DATASET') ?: '';
+$policyCode = getenv('ANALYTICS_POLICY_CODE') ?: '';
 $moduleId = strstr($datasetCode, '.', true);
 $tenantCount = (int) (getenv('ANALYTICS_TENANTS') ?: 128);
 $assetsMin = (int) (getenv('ANALYTICS_ASSETS_MIN') ?: 5000);
@@ -41,7 +37,9 @@ $policyRed = filter_var(getenv('ANALYTICS_POLICY_RED') ?: false, FILTER_VALIDATE
 $outputPath = getenv('ANALYTICS_FIXTURE_OUTPUT') ?: '/results/analytics-fixture.json';
 $appIds = [$moduleId];
 
-if ($moduleId === false || $moduleId === '' || $tenantCount < 100 || $assetsMin < 1 || $assetsMax < $assetsMin) {
+if ($fixtureId === null || $fixtureId === '' || strlen($fixtureId) > 80
+    || $moduleId === false || $moduleId === '' || $policyCode === ''
+    || $tenantCount < 100 || $assetsMin < 1 || $assetsMax < $assetsMin) {
     throw new InvalidArgumentException('Setelan fixture analitik tidak sah.');
 }
 
@@ -65,18 +63,11 @@ Schema::create('lt_analytics_user_scope', function (Blueprint $table): void {
     $table->unique(['fixture_id', 'user_email']);
 });
 
-$assetTable = (new Aset)->getTable();
-$groupTable = (new GroupAset)->getTable();
-$typeTable = (new JenisAset)->getTable();
-$hasAuditActors = Schema::hasColumn($assetTable, 'created_by_user_id')
-    && Schema::hasColumn($assetTable, 'updated_by_user_id');
-$hasVersion = Schema::hasColumn($assetTable, 'version');
 $createOrganization = app(CreateOrganization::class);
 $registerBusiness = app(RegisterBusinessTenant::class);
 $scopeResolver = app(DataPolicyScopeResolver::class);
 $fixtureTenants = [];
 $scopeRows = [];
-$baseDate = new DateTimeImmutable('2023-01-01');
 
 for ($tenantIndex = 0; $tenantIndex < $tenantCount; $tenantIndex++) {
     $suffix = sprintf('%04d', $tenantIndex + 1);
@@ -134,13 +125,6 @@ for ($tenantIndex = 0; $tenantIndex < $tenantCount; $tenantIndex++) {
     ]);
     $role->duties()->sync($ownerRole->duties()->pluck('security_duties.code')->all());
 
-    $groupId = DB::table($groupTable)->where('tenant_id', $tenantId)->whereNull('deleted_at')->value('id');
-    $typeId = DB::table($typeTable)->where('tenant_id', $tenantId)->whereNull('deleted_at')->value('id');
-
-    if (! $groupId || ! $typeId) {
-        throw new RuntimeException("Master aset untuk fixture tenant {$suffix} belum tersedia.");
-    }
-
     $users = [
         'owner' => ['id' => (int) $owner->id, 'email' => $ownerEmail],
         'two_units' => createUser($fixtureId, $suffix, 'two-units', $tenantId, $password, $role, $policyCode, $scopeResolver, [
@@ -156,68 +140,17 @@ for ($tenantIndex = 0; $tenantIndex < $tenantCount; $tenantIndex++) {
 
     mt_srand(crc32($fixtureId.'-'.$tenantIndex));
     $assetCount = mt_rand($assetsMin, $assetsMax);
+
     $fixtureTenants[] = [
         'index' => $tenantIndex,
         'tenant_id' => $tenantId,
         'legal_entity_ids' => $legalEntityIds,
         'org_unit_ids' => $orgUnitIds,
-        'group_id' => (string) $groupId,
-        'type_id' => (string) $typeId,
         'asset_count' => $assetCount,
         'users' => $users,
     ];
 
-    $rows = [];
-
-    for ($assetIndex = 0; $assetIndex < $assetCount; $assetIndex++) {
-        $unitIndex = $assetIndex % count($orgUnitIds);
-        $unitId = $orgUnitIds[$unitIndex];
-        $financialUnitId = $orgUnitIds[($unitIndex + 1) % count($orgUnitIds)];
-        $month = intdiv($assetIndex, 2) % 36;
-        $date = $baseDate->modify("+{$month} months");
-        $date = $date->modify($assetIndex % 2 === 0 ? 'first day of this month' : 'last day of this month');
-        $number = $tenantIndex * $assetsMax + $assetIndex + 1;
-        $row = [
-            'id' => (string) Str::ulid(),
-            'tenant_id' => $tenantId,
-            'creation_key' => substr("{$fixtureId}-{$suffix}-{$assetIndex}", 0, 160),
-            'kode' => sprintf('LT%04d-%05d', $tenantIndex + 1, $assetIndex + 1),
-            'nama' => "Load {$fixtureId} asset {$number}",
-            'legal_entity_id' => $legalEntityIds[intdiv($unitIndex, 4)],
-            'responsible_org_unit_id' => $unitId,
-            'financial_dimension_org_unit_id' => $financialUnitId,
-            'group_aset_id' => $groupId,
-            'jenis_aset_id' => $typeId,
-            'acquired_on' => $date->format('Y-m-d'),
-            'acquisition_value' => (string) (($assetIndex % 1000 + 1) * 10000),
-            'currency_code' => $assetIndex % 10 === 0 ? 'USD' : 'IDR',
-            'lifecycle_state' => 'received',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ];
-
-        if ($hasAuditActors) {
-            $row['created_by_user_id'] = $owner->id;
-            $row['updated_by_user_id'] = $owner->id;
-        }
-
-        if ($hasVersion) {
-            $row['version'] = 1;
-        }
-
-        $rows[] = $row;
-
-        if (count($rows) === 500) {
-            DB::table($assetTable)->insert($rows);
-            $rows = [];
-        }
-    }
-
-    if ($rows !== []) {
-        DB::table($assetTable)->insert($rows);
-    }
-
-    fwrite(STDOUT, sprintf("Tenant %d/%d: %d aset\n", $tenantIndex + 1, $tenantCount, $assetCount));
+    fwrite(STDOUT, sprintf("Tenant %d/%d: fixture akses siap; %d aset disiapkan untuk module\n", $tenantIndex + 1, $tenantCount, $assetCount));
 }
 
 DB::table('lt_analytics_user_scope')->insert($scopeRows);

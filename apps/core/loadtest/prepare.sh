@@ -24,5 +24,6 @@ done
 case "${LOADTEST_ANALYTICS:-0}" in
     1|true|yes)
         php /loadtest/analytics-fixture.php
+        php /loadtest/analytics-assets-fixture.php
         ;;
 esac

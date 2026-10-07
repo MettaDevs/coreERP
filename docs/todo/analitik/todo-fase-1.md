@@ -709,7 +709,7 @@ pernah terlihat merah.
 
 - [ ] 10.1 Data uji di `prepare.sh` (ukuran tenant acak, dua legal entity, delapan unit, IDR dan USD,
   tanggal di batas bulan, tiga pengguna per tenant).
-- [ ] 10.2 Lima skenario k6, mencatat angka yang diamati untuk oracle.
+- [ ] 10.2 Skenario k6 dashboard, explore, mixed, dan publikasi JSON/CSV; mencatat angka yang diamati untuk oracle.
 - [ ] 10.3 Oracle SQL di `verify.sql`; pembuktian merah dengan kebijakan data yang sengaja dimatikan.
 - [ ] 10.4 Gate latensi dan laporan sumber daya di README uji beban.
 - [ ] 10.5 Skenario campur membuktikan layar transaksi aset tetap dalam gate-nya.

@@ -1008,9 +1008,17 @@ tenant, masing-masing dua legal entity, delapan unit, tiga akun, dan jumlah aset
 di stack uji yang boleh dihapus.
 
 ```powershell
-docker compose up -d --wait db pgbouncer
-docker compose run --rm --no-deps -e LOADTEST_ANALYTICS=1 init
-docker compose up -d api1 api2 api3 api4 lb
+$project = 'core-loadtest-a10'
+$env:CORE_IMAGE = 'coreerp-analytics-a10:local'
+$env:LOADTEST_DB_PORT = '15553'
+$env:LOADTEST_HTTP_PORT = '18093'
+$network = "${project}_default"
+
+# Image dan volume milik project ini sendiri; jangan membangun ulang tag runtime dev.
+docker compose -p $project build api1
+docker compose -p $project up -d --wait db pgbouncer
+docker compose -p $project run --rm --no-deps -e LOADTEST_ANALYTICS=1 init
+docker compose -p $project up -d api1 api2 api3 api4 lb
 ```
 
 `ANALYTICS_FIXTURE_ID` mengikat tenant, akun, dan hasil SQL. Gunakan nilai yang sama saat menyiapkan fixture
@@ -1019,36 +1027,78 @@ environment Compose. Fixture membuat akun Owner, akun dengan scope dua unit, dan
 aset menaruh `financial_dimension_org_unit_id` pada unit yang berbeda dari `responsible_org_unit_id`, sehingga
 oracle menangkap pemakaian kolom policy yang keliru.
 
-Skenario pertama query analitik yang dibaca pengguna. Profil `saturation` menahan 1.000 VU selama 90 detik;
-profil `latency` mengukur satu tingkat concurrency selama 90 detik. Ulangi profil latensi dengan kenaikan VU
-sampai p95 atau p99 melewati SLO, lalu catat tingkat tertinggi yang masih lulus.
+Harness Core menyiapkan tenant, pengguna, scope, dan manifest. Baris aset serta master group/jenis dibuat oleh
+skrip milik module `modules/apperp/management-aset/loadtest/analytics-fixture.php`; kode aset dan jenis tetap
+diterbitkan Number Sequence module. Tiap tenant mendapat 12 group agar query kelompok dan tabel top-10 punya
+data yang cukup.
+
+Skenario explore memutar 40 bentuk query pada 300 VU. Dasbor menjalankan 1.000 VU; skenario campur
+menjalankan 700 VU analitik dan 300 VU transaksi aset; feed publikasi dibaca 200 VU. Profil `latency`
+mengukur satu tingkat concurrency selama 90 detik. Ulangi profil latensi dengan kenaikan VU sampai p95
+atau p99 melewati SLO, lalu catat tingkat tertinggi yang masih lulus.
 
 ```powershell
 $core = "$PWD\k6"
-docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+docker run --rm -i --network $network --ulimit nofile=65536:65536 `
   -v "${core}:/scripts" -v "$PWD\results:/results" `
-  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=300 -e DURATION=90s `
   -e RUN_ID=analytics-sat-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
   grafana/k6:0.55.0 run --out json=/results/analytics-sat-a10.ndjson /scripts/analytics-explore.js
 
-docker run --rm -i --network core-loadtest_default `
+docker run --rm -i --network $network `
   -v "${core}:/scripts" -v "$PWD\results:/results" `
   -e BASE_URL=http://lb -e PROFILE=latency -e TENANTS=128 -e LATENCY_VUS=8 -e DURATION=90s `
   -e RUN_ID=analytics-lat-8-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
   grafana/k6:0.55.0 run --out json=/results/analytics-lat-8-a10.ndjson /scripts/analytics-explore.js
 
+# Dasbor enam bagian; 70% siklus memakai cache, 30% memanggil refresh.
+docker run --rm -i --network $network --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=1000 -e DURATION=90s `
+  -e RUN_ID=analytics-dashboard-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
+  grafana/k6:0.55.0 run --out json=/results/analytics-dashboard-a10.ndjson /scripts/analytics-dashboard.js
+
+# 700 VU query analitik berjalan bersamaan dengan 300 VU yang membaca dan mengoreksi aset.
+docker run --rm -i --network $network --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e ANALYTICS_VUS=700 -e ASSET_VUS=300 -e DURATION=90s `
+  -e RUN_ID=analytics-mixed-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
+  grafana/k6:0.55.0 run --out json=/results/analytics-mixed-a10.ndjson /scripts/analytics-mixed.js
+
+# 200 VU membaca publikasi JSON berhalaman dan CSV dengan scope analytics.read.
+docker run --rm -i --network $network --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=128 -e VUS=200 -e DURATION=90s `
+  -e RUN_ID=analytics-external-a10 -e ANALYTICS_FIXTURE_ID=a10 -e LOADTEST_PASSWORD=Loadtest-Owner-2026! `
+  grafana/k6:0.55.0 run --out json=/results/analytics-external-a10.ndjson /scripts/analytics-external.js
+
 python .\k6\analytics-observations.py .\results\analytics-*.ndjson `
   --output .\results\analytics-observed.csv
-docker compose exec -T db psql -U core_erp -d core_erp -v run_id=a10 -v analytics=true -f - < verify.sql
+docker compose -p $project exec -T db psql -U core_erp -d core_erp -v run_id=a10 -v analytics=true -f - < verify.sql
 ```
 
-`analytics-observations.py` mengambil sample metric per baris dari output JSON k6; `verify.sql` memuatnya ke
-tabel sementara lalu membandingkan langsung dengan `aset_tr_aset`. Ia memeriksa tenant, scope dua unit menurut
+`analytics-explore.js` memutar 40 bentuk query yang sah; bentuk pertama menjadi sample oracle. `analytics-dashboard.js`
+membuka dasbor enam bagian dan memuat ulang semua widget secara bersamaan; 70% siklus memakai cache. `analytics-mixed.js`
+menulis `keterangan` melalui PATCH aset, jadi data yang dihitung query tetap sama sementara transaksi memakai database bersama.
+Skenario explore, mixed, dan external merekam sample oracle. `analytics-observations.py` mengambil sample metric per baris dari output JSON k6;
+`verify.sql` memuatnya ke tabel sementara lalu membandingkan langsung dengan `aset_tr_aset`. Ia memeriksa tenant, scope dua unit menurut
 `responsible_org_unit_id`, pengguna tanpa grant, dan jumlah uang terpisah per mata uang. Profil latensi
 menerapkan p95 < 200 ms dan p99 < 500 ms. Profil penjenuhan menjaga 0 error 5xx aplikasi; 502/504, timeout,
 dan 429 `analytics.busy` dicatat terpisah sebagai tanda kapasitas.
 
-Untuk melihat oracle scope memerah, siapkan **stack uji terpisah** dengan `ANALYTICS_POLICY_RED=1`. Itu memberi
+Skenario external hanya membaca publikasi JSON/CSV area 15. Ia meminta halaman 10 baris untuk benar-benar
+melewati cursor pada hasil fixture, memeriksa `X-Next-Cursor` pada CSV, dan mencoba membaca publikasi tenant
+sebelah dengan token milik tenant sendiri; jawaban yang benar adalah 404. Nama analisis tersimpan dan klien
+integrasi menyertakan `RUN_ID`, jadi setiap putaran harus memakai `RUN_ID` baru.
+
+SLO halaman berisi 5.000 baris tetap berlaku, tetapi fixture agregat ini belum menghasilkan keluaran sebanyak
+itu. Skenario ini membuktikan cursor dan format, bukan latensi payload maksimum; area 10 tetap terbuka sampai
+ukuran tersebut diuji tanpa mengendurkan batas tenant atau oracle.
+
+OData menyusul di area 16 dan embed di area 17; keduanya belum menjadi endpoint skenario area 10.
+
+Untuk melihat oracle scope memerah, siapkan **project Compose dan database uji terpisah** dengan
+`ANALYTICS_POLICY_RED=1`, project name, image tag, dan port yang berbeda dari gate normal. Fixture ini memberi
 akun dua-unit grant seluruh organisasi, sementara tabel oracle tetap menyimpan scope yang seharusnya. Jalankan
 skenario sedikitnya 384 VU agar semua akun dua-unit mendapat query, konversi observasi, lalu jalankan `verify.sql`;
 hasil yang diharapkan adalah exit code 3 pada pemeriksaan policy. Buang stack negative-control sesudahnya dan
