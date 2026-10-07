@@ -50,7 +50,7 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'int
     Route::get('vendors', [VendorDirectoryController::class, 'index']);
 });
 
-Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:legal-entities.read'])->group(function (): void {
+Route::prefix('internal/v1')->middleware(['throttle:integration-client-ip', 'integration-client:legal-entities.read'])->group(function (): void {
     Route::get('legal-entities', [OrganizationDirectoryController::class, 'legalEntities']);
 });
 
