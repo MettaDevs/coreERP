@@ -101,4 +101,9 @@ The Shell sends `theme: { appearance: 'light' | 'dark', font: 'poppins' | 'geist
 
 ## Checks
 
+For failed saves or processing actions, a 5xx must produce a visible message that remains until corrected
+or dismissed, using the action's everyday wording. A brief toast or a successful Sentry capture alone
+does not satisfy user feedback. Preserve unsaved inputs and keep technical details in server reports.
+Use the existing shared API error handler; see `docs/dev/28-pelaporan-kesalahan.md`, "Kegagalan yang terlihat oleh pengguna".
+
 Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.

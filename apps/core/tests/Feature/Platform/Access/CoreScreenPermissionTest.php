@@ -41,14 +41,14 @@ class CoreScreenPermissionTest extends TestCase
         ]);
     }
 
-    public function test_the_core_catalog_registers_twenty_eight_duties_down_to_entry_points(): void
+    public function test_the_core_catalog_registers_duties_down_to_entry_points(): void
     {
         $duties = SecurityDuty::query()->where('app_id', CoreSecurityCatalog::APP_ID)->with('privileges.permissions')->get();
 
         // Delapan belas dari katalog layar Core, dua dari log perubahan (Lihat riwayat, Kelola log), dua dari retensi data,
         // satu dari preset laporan bersama, dan lima dari engine analitik (3 Okt 2026, KA-14: lihat dasbor, susun dan
-        // analisis, dasbor bersama, publikasi, data pribadi).
-        $this->assertCount(28, $duties);
+        // analisis, dasbor bersama, publikasi, data pribadi), serta dua untuk klien integrasi sistem luar.
+        $this->assertCount(30, $duties);
         foreach ($duties as $duty) {
             $this->assertNotEmpty($duty->privileges, $duty->code);
             foreach ($duty->privileges as $privilege) {
@@ -64,6 +64,8 @@ class CoreScreenPermissionTest extends TestCase
         // Duty Lihat hanya membawa read; Kelola membawa read dan ubah.
         $this->assertSame([CoreSecurityCatalog::VENDOR_READ], $this->permissionsOfDuty('core.vendor.inquire'));
         $this->assertSame([CoreSecurityCatalog::VENDOR_READ, CoreSecurityCatalog::VENDOR_UPDATE], $this->permissionsOfDuty('core.vendor.manage'));
+        $this->assertSame([CoreSecurityCatalog::INTEGRATION_CLIENT_READ], $this->permissionsOfDuty('core.integration-clients.inquire'));
+        $this->assertSame([CoreSecurityCatalog::INTEGRATION_CLIENT_READ, CoreSecurityCatalog::INTEGRATION_CLIENT_UPDATE], $this->permissionsOfDuty('core.integration-clients.manage'));
         $this->assertSame([CoreSecurityCatalog::FINANCE_POSTING_READ], $this->permissionsOfDuty('core.finance-posting.inquire'));
         $this->assertSame(
             [CoreSecurityCatalog::FINANCE_POSTING_PROCESS, CoreSecurityCatalog::FINANCE_POSTING_READ],

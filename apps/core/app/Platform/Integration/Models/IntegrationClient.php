@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 /**
- * Sistem di luar CoreERP yang membaca feed posting finance (K-03, TODO area 4).
+ * Sistem di luar CoreERP yang memakai API tenant (K-03, TODO area 4).
  *
  * @property string $id
  * @property string $tenant_id
@@ -52,17 +52,6 @@ class IntegrationClient extends Model
     public const ACTIVE = 'active';
 
     public const REVOKED = 'revoked';
-
-    /**
-     * Scope yang dapat diberikan. Sengaja sempit dan per sumber daya: pembaca yang hanya perlu
-     * membaca posting tidak perlu dapat mengirim `ack`, dan sebaliknya.
-     */
-    public const SCOPES = [
-        'finance-postings.read' => 'Membaca posting finance',
-        'finance-postings.ack' => 'Mengirim ack posting (dibukukan atau ditolak)',
-        'vendors.read' => 'Membaca vendor',
-        'operating-units.read' => 'Membaca operating unit dan nomornya',
-    ];
 
     protected $fillable = [
         'tenant_id', 'name', 'token_digest', 'scopes', 'allowed_ips', 'posting_type_prefixes',

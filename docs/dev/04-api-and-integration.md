@@ -89,9 +89,10 @@ fungsi. Penjaganya `NoInternalHttpTest`, dan ia mencari **dua bahan sekaligus** 
 koneksi, serta alamat atau kredensial Core — karena satu bahan saja terlalu sering muncul pada kode
 yang sah. Komentar dibuang sebelum diperiksa, dan **module yang sedang dipindah tidak dikecualikan**.
 
-Akibat yang mengikuti: penerbitan nomor yang gagal menjawab **422, bukan 503**. Core tidak lagi
-"tidak terjangkau", jadi kode kesalahan jaringan pada jalur itu bukan sekadar berhenti dipakai — ia
-dibuat tidak bisa ditulis lagi.
+Akibat yang mengikuti: penolakan validasi penerbitan nomor menjawab **422, bukan 503**. Core tidak lagi
+"tidak terjangkau" lewat HTTP antar-module. Kegagalan database dan bug internal tetap mungkin di dalam
+proses: exception aslinya diteruskan ke handler Laravel sebagai 500 dan dilaporkan ke Sentry. Jangan
+menangkap semua `Throwable` lalu menganggapnya validasi hanya karena tidak ada jaringan.
 
 ### Nomor, dokumen, dan pengajuan workflow satu transaksi
 
@@ -270,6 +271,21 @@ antar-module di satu runtime. Saluran ini milik `App\Platform\Integration`: klie
 token, scope, dan IP yang diizinkan, signature push, dan aturan URL tujuan. Data yang dikirim milik
 fiturnya masing-masing; feed posting finance milik `App\Foundation\FinancePosting`, dan aplikasi
 finance pelanggan hanyalah satu klien integrasi.
+
+Pengelolaan koneksi memakai duty `core.integration-clients.inquire` dan
+`core.integration-clients.manage`, terpisah dari setup finance. Duty Kelola boleh memberikan scope
+yang terdaftar kepada koneksi; ini kewenangan pengelola integrasi, bukan turunan hak baca data
+finance atau HR pengguna tersebut. Token sistem luar tetap dibatasi scope yang diberikan.
+
+Katalog scope tersimpan di `integration_scopes`, dibaca melalui `IntegrationScope`. Nama dan kode
+scope baru didaftarkan lewat migration oleh fitur pemilik API; controller klien tidak menyimpan
+daftar domain. Scope tidak terdaftar atau terarsip ditolak saat menyimpan koneksi. Pengarsipan
+katalog tidak mencabut scope pada token yang sudah diterbitkan; untuk mencabut akses, ubah scope
+koneksi atau cabut klien. Form koneksi baru tidak memilih scope atau prefix posting otomatis.
+
+Mendaftarkan scope tidak membuat API atau mesin pengiriman baru. Fitur pemilik data tetap
+mengimplementasikan endpoint, pemeriksaan scope token, pembatasan tenant/organisasi yang berlaku,
+dan kontraknya. Hak untuk memanggil resource tidak berasal dari permission pengelolaan koneksi.
 
 Hari ini mesin pengirimnya baru mengenal satu jenis data, yaitu jurnal posting. Rencana menjadikannya
 umum — padanan Business events di Dynamics 365 F&O dan webhook subscription di Business Central —

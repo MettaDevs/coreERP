@@ -132,6 +132,29 @@ Do not create a generic transaction number when distinct documents have differen
 
 ## Manifest and verification
 
+### Check persistence, not only the issuer
+
+Compare the manifest reference, materialized scope, caller context, document columns, active-record unique
+index, and lookups. A legal-entity counter with a tenant-wide document index fails when a second company
+receives the same number. If several references share a table, include their document-kind discriminator
+in the uniqueness namespace. Soft-deleted records need the active-record partial index.
+
+Fixtures must derive scope from the manifest using the production default-scope rule and create real
+organization rows. Never force all references to `tenant` to simplify tests. Exercise two legal entities
+receiving the same formatted number and successfully persisting documents, rejection of a duplicate in
+one scope, and idempotent replay. Follow documents through the numbered records they generate.
+
+An in-process issuer can still suffer database failures and bugs. Translate only known validation
+exceptions to 422; never catch every `Throwable` and classify it as validation. Unexpected failures must
+reach the normal exception reporter as 5xx, with a durable user-facing failure message.
+
+Keep manifest-to-document index coverage so a new scoped reference cannot silently skip verification.
+Prove the guard rejects a tenant-wide index. The asset module's `NumberSequenceScopeTest` is the example;
+the rationale is in [`docs/dev/14-number-sequences.md`](../../../docs/dev/14-number-sequences.md#scope-nomor-harus-sama-dengan-indeks-dokumen).
+
+Verify the migration on an empty database as well as an existing runtime. Do not rely on post-migration
+module normalization to add a column needed by an index being created inside that migration.
+
 Declare references as app-owned data:
 
 ```yaml

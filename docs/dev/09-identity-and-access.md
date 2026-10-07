@@ -84,9 +84,16 @@ padanan duty *Inquire* dan *Maintain* di Dynamics 365:
 | Tata letak laporan | `core.report-layout.inquire` | `core.report-layout.manage` |
 | Workflow | `core.workflow.inquire` | `core.workflow.manage` |
 | Setup finance | `core.finance-setup.inquire` | `core.finance-setup.manage` |
+| Klien integrasi sistem luar | `core.integration-clients.inquire` | `core.integration-clients.manage` |
 | Vendor | `core.vendor.inquire` | `core.vendor.manage` |
 | Riwayat perubahan | `core.change-log.inquire` | `core.change-log.manage` |
 | Retensi data | `core.retention.inquire` | `core.retention.manage` |
+
+Klien integrasi memakai permission `core.integration-clients.read` dan `core.integration-clients.update`.
+Duty Lihat hanya membuka daftar; duty Kelola juga mengatur scope, membuat dan mengubah koneksi,
+mencabut akses, mengganti token/signing secret, serta mengirim uji. Setup finance tidak memberikan
+hak ini. Role Owner mendapat duty integrasi; role lain harus diberi secara eksplisit. Rantai
+role → duty → privilege → permission → entry point dan aturan segregation of duties tetap berlaku.
 
 Preset laporan bersama hanya punya duty Kelola, `core.report-preset.manage` (permission
 `core.report-preset.update`): membaca preset bersama sudah ikut hak menjalankan laporannya.

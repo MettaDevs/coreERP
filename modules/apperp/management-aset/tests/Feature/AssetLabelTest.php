@@ -31,6 +31,7 @@ class AssetLabelTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->classification = $this->classification($this->tenantId);
     }
 

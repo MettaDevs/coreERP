@@ -1,5 +1,7 @@
+import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -52,6 +54,10 @@ export default function PenerimaanListPage({
     permissions: string[];
 }) {
     const can = izin(permissions);
+    const { workspace } = usePage<{ workspace: Workspace }>().props;
+    const legalEntityNames = new Map(
+        workspace.legal_entities.map((entity) => [entity.id, entity.name]),
+    );
     const [penerimaan, setPenerimaan] = useState<Penerimaan[]>([]);
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
@@ -95,6 +101,7 @@ export default function PenerimaanListPage({
             : penerimaan.filter((baris) =>
                   [
                       baris.kode,
+                      legalEntityNames.get(baris.legal_entity_id),
                       baris.keterangan,
                       baris.lokasi_aset_nama,
                       baris.responsible_org_unit_nama,
@@ -107,6 +114,16 @@ export default function PenerimaanListPage({
               );
 
     const columns: DataTableColumn<Penerimaan>[] = [
+        {
+            id: 'legal_entity',
+            header: 'Perusahaan',
+            cell: (receipt) =>
+                legalEntityNames.get(receipt.legal_entity_id) ??
+                'Perusahaan tidak dikenal',
+            sortValue: (receipt) =>
+                legalEntityNames.get(receipt.legal_entity_id) ?? '',
+            width: 220,
+        },
         {
             id: 'kode',
             header: 'No. penerimaan',

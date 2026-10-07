@@ -38,6 +38,7 @@ class SiklusHidupAsetTest extends TestCase
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->orgUnitId = (string) Str::ulid();
         $this->unitId = $this->buatSatuanUji($this->tenantId, 'kVA', 'Kilovolt-ampere');
 

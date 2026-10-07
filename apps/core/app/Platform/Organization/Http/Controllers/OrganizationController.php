@@ -31,10 +31,19 @@ use Inertia\Response;
 
 class OrganizationController extends Controller
 {
+    public function directory(Request $request): RedirectResponse
+    {
+        return redirect()->route(match ($request->string('section')->toString()) {
+            'operating-units' => 'organization.operating-units',
+            'hierarchies' => 'organization.hierarchies',
+            default => 'organization.legal-entities',
+        });
+    }
+
     public function index(Request $request): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
-        $section = $request->string('section')->toString();
+        $section = $request->route('section');
         $section = in_array($section, ['legal-entities', 'operating-units', 'hierarchies'], true)
             ? $section
             : 'legal-entities';
@@ -46,6 +55,17 @@ class OrganizationController extends Controller
 
         if ($request->is('api/*')) {
             return response()->json(['data' => $organizations]);
+        }
+
+        $props = [
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
+            'operatingUnitTypes' => config('coreerp.operating_unit_types'),
+        ];
+        if ($section !== 'hierarchies') {
+            return Inertia::render('platform/organization/'.$section, $props + [
+                'organizations' => $organizations->where('classification', $section === 'operating-units' ? 'operating_unit' : 'legal_entity')->values(),
+                'timezones' => UserClock::options(),
+            ]);
         }
 
         $hierarchies = OrganizationHierarchy::query()
@@ -62,15 +82,10 @@ class OrganizationController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('platform/organization/organization', [
-            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
-            'section' => $section,
-            'tenant' => $membership->tenant->only(['id', 'name']),
+        return Inertia::render('platform/organization/hierarchies', $props + [
             'organizations' => $organizations,
             'hierarchies' => $hierarchies,
             'purposes' => HierarchyPurpose::query()->orderBy('name')->get(['code', 'name', 'description']),
-            'operatingUnitTypes' => config('coreerp.operating_unit_types'),
-            'timezones' => UserClock::options(),
         ]);
     }
 

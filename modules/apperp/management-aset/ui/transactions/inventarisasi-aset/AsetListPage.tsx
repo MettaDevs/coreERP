@@ -1,6 +1,8 @@
+import { usePage } from '@inertiajs/react';
 import { FileSpreadsheet, QrCode } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -40,6 +42,10 @@ export default function AsetListPage({
     canUpdate: boolean;
     permissions: string[];
 }) {
+    const { workspace } = usePage<{ workspace: Workspace }>().props;
+    const legalEntityNames = new Map(
+        workspace.legal_entities.map((entity) => [entity.id, entity.name]),
+    );
     const [aset, setAset] = useState<Aset[]>([]);
     const [search, setSearch] = useState('');
     const [memuat, setMemuat] = useState(true);
@@ -100,6 +106,16 @@ export default function AsetListPage({
     }, [aset, search]);
 
     const columns: DataTableColumn<Aset>[] = [
+        {
+            id: 'legal_entity',
+            header: 'Perusahaan',
+            cell: (asset) =>
+                legalEntityNames.get(asset.legal_entity_id) ??
+                'Perusahaan tidak dikenal',
+            sortValue: (asset) =>
+                legalEntityNames.get(asset.legal_entity_id) ?? '',
+            width: 220,
+        },
         {
             id: 'kode',
             header: 'Kode aset',

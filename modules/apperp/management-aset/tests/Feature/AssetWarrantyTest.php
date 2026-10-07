@@ -52,6 +52,7 @@ class AssetWarrantyTest extends TestCase
         $this->travelTo(now('UTC')->startOfDay()->addHours(5));
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unitId = (string) Str::ulid();
         $this->jenisAset = $this->seedMaster('aset_m_jenis_aset', 'Alat kesehatan');
         $this->vendorId = $this->pastikanVendorUji($this->tenantId, $this->legalEntityId, 'PT Servis Alat');

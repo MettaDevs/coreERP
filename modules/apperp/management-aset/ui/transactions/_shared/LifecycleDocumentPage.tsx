@@ -22,7 +22,12 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    api,
+    errorMessage,
+    newIdempotencyKey,
+    saveErrorMessage,
+} from '../../api';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Record = {
@@ -93,7 +98,7 @@ export default function LifecycleDocumentPage({
             form.reset();
             await load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Dokumen belum dapat disimpan.'));
+            setError(saveErrorMessage(caught, 'Dokumen belum dapat disimpan.'));
         } finally {
             setSaving(false);
         }

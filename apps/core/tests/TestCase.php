@@ -296,16 +296,20 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Memasang ulang katalog layar Core sesudah `TRUNCATE apps ... CASCADE` di kelas ber-`DatabaseTruncation`.
+     * Memasang ulang katalog layar Core dan scope integrasi sesudah kelas ber-`DatabaseTruncation`.
      *
      * Katalognya ditulis migration, jadi ia ikut terhapus bersama `apps`, dan kelas test sesudahnya di proses
      * yang sama mendapati role Owner tanpa duty Core. Hanya merah di CI paralel, dan hanya bila urutannya
      * kebetulan begitu. Semua migration katalog (`*_security_catalog.php`) dijalankan berurutan, supaya
-     * katalog baru ikut tanpa harus diingat di sini; semuanya idempoten.
+     * katalog baru ikut tanpa harus diingat di sini; semuanya idempoten. Katalog scope ikut karena
+     * TRUNCATE mengosongkan datanya tanpa menjalankan migration pembentuknya lagi.
      */
     protected static function reinstallCoreSecurityCatalog(): void
     {
-        foreach (glob(database_path('migrations/*_security_catalog.php')) ?: [] as $migration) {
+        foreach ([
+            ...(glob(database_path('migrations/*_security_catalog.php')) ?: []),
+            ...(glob(database_path('migrations/*_integration_scopes.php')) ?: []),
+        ] as $migration) {
             (require $migration)->up();
         }
     }

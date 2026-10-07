@@ -11,7 +11,7 @@
     operationId: createInsuranceType
     parameters: [$ref: '#/components/parameters/IdempotencyKey']
     requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}
-    responses: {'201': {description: Jenis asuransi dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/InsuranceTypeResponse'}}}}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+    responses: {'201': {description: Jenis asuransi dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/InsuranceTypeResponse'}}}}, '422': {$ref: '#/components/responses/ValidationError'}, '500': {$ref: '#/components/responses/InternalError'}}
 /api/v1/jenis-asuransi/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Asuransi aset], operationId: getInsuranceType, responses: {'200': {description: Jenis asuransi, headers: {ETag: {$ref: '#/components/headers/ETag'}}, content: {application/json: {schema: {$ref: '#/components/schemas/InsuranceTypeResponse'}}}}}}
@@ -30,7 +30,7 @@
     description: Nomor polis sistem diterbitkan Number Sequence Core per entitas legal. Penanggung wajib vendor entitas legal itu.
     parameters: [$ref: '#/components/parameters/IdempotencyKeyTransaksi']
     requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InsurancePolicyWrite'}}}}
-    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Polis dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/InsurancePolicyResponse'}}}}, '403': {$ref: '#/components/responses/Forbidden'}, '422': {$ref: '#/components/responses/ValidationError'}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Polis dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/InsurancePolicyResponse'}}}}, '403': {$ref: '#/components/responses/Forbidden'}, '422': {$ref: '#/components/responses/ValidationError'}, '500': {$ref: '#/components/responses/InternalError'}}
 /api/v1/polis-asuransi/vendor:
   get:
     tags: [Asuransi aset]

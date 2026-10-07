@@ -230,14 +230,24 @@ export function AppSidebar() {
                 ],
             },
             {
-                label: 'Organization',
+                label: 'Organisasi',
                 icon: Building2,
-                href: '/settings/organization',
+                href: '/settings/legal-entities',
                 children: [
                     {
-                        label: 'Organisasi',
+                        label: 'Entitas legal',
                         icon: Building2,
-                        href: '/settings/organization',
+                        href: '/settings/legal-entities',
+                        permission: 'core.organization.read',
+                    },
+                    {
+                        label: 'Operating unit',
+                        href: '/settings/operating-units',
+                        permission: 'core.organization.read',
+                    },
+                    {
+                        label: 'Hierarki organisasi',
+                        href: '/settings/organization-hierarchies',
                         permission: 'core.organization.read',
                     },
                 ],
@@ -330,7 +340,7 @@ export function AppSidebar() {
                         label: 'Klien integrasi',
                         icon: Plug,
                         href: '/settings/integration-clients',
-                        permission: 'core.finance-setup.read',
+                        permission: 'core.integration-clients.read',
                     },
                 ],
             },

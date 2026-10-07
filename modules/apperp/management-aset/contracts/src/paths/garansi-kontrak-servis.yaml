@@ -56,7 +56,7 @@
     description: Nomor diterbitkan Number Sequence Core per entitas legal. Aset wajib dalam jangkauan pengguna dan milik entitas legal kontrak.
     parameters: [$ref: '#/components/parameters/IdempotencyKeyTransaksi']
     requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractWrite'}}}}
-    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Kontrak dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '422': {$ref: '#/components/responses/ValidationError'}, '503': {$ref: '#/components/responses/NumberSequenceUnavailable'}}
+    responses: {'200': {description: 'Permintaan ulang; header `Idempotent-Replayed: true`'}, '201': {description: Kontrak dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '422': {$ref: '#/components/responses/ValidationError'}, '500': {$ref: '#/components/responses/InternalError'}}
 /api/v1/kontrak-servis/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Garansi dan kontrak servis], operationId: getServiceContract, description: '`aset` hanya memuat aset dalam jangkauan pengguna; `lines_count` menghitung seluruhnya.', responses: {'200': {description: Kontrak, headers: {ETag: {$ref: '#/components/headers/ETag'}}, content: {application/json: {schema: {$ref: '#/components/schemas/ServiceContractResponse'}}}}, '404': {$ref: '#/components/responses/NotFound'}}}
