@@ -46,10 +46,7 @@ import {
     crossFilterValues,
     notApplicableSlicers,
 } from '@/lib/analytics/slicer';
-import type {
-    SlicerValues,
-    WidgetDatasetField,
-} from '@/lib/analytics/slicer';
+import type { SlicerValues, WidgetDatasetField } from '@/lib/analytics/slicer';
 import type {
     AnalyticsResult,
     CrossFilter,
