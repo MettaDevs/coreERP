@@ -338,7 +338,7 @@ function LockedFilterRow({
                             {failure}
                         </FieldDescription>
                     ) : choices === null ? (
-                        <FieldDescription>Memuat pilihanâ€¦</FieldDescription>
+                        <FieldDescription>Memuat pilihan…</FieldDescription>
                     ) : choices.length === 0 ? (
                         <FieldDescription>
                             Belum ada nilai pada data yang boleh Anda baca.
@@ -834,7 +834,7 @@ function PublicationSheet({
                             Batal
                         </Button>
                         <Button type="button" disabled={saving} onClick={save}>
-                            {saving ? 'Menyimpanâ€¦' : 'Simpan'}
+                            {saving ? 'Menyimpan…' : 'Simpan'}
                         </Button>
                     </div>
                 </SheetFooter>
@@ -898,7 +898,7 @@ function PreviewDialog({
                         <p className="text-sm text-destructive">{failure}</p>
                     ) : preview === null ? (
                         <p className="text-sm text-muted-foreground">
-                            Menghitungâ€¦
+                            Menghitung…
                         </p>
                     ) : (
                         <div className="flex flex-col gap-2">
@@ -1110,7 +1110,7 @@ export default function AnalyticsPublications({
                                                     </TableCell>
                                                     <TableCell>
                                                         {publication.saved_query
-                                                            ?.name ?? 'â€”'}
+                                                            ?.name ?? '—'}
                                                         <span className="block text-xs text-muted-foreground">
                                                             {publication.dataset
                                                                 ?.caption ?? ''}
@@ -1123,7 +1123,7 @@ export default function AnalyticsPublications({
                                                     </TableCell>
                                                     <TableCell>
                                                         {publication.owner
-                                                            .name ?? 'â€”'}
+                                                            .name ?? '—'}
                                                     </TableCell>
                                                     <TableCell>
                                                         {publication.clients
@@ -1135,7 +1135,7 @@ export default function AnalyticsPublications({
                                                                           client,
                                                                       ) =>
                                                                           client.name ??
-                                                                          'â€”',
+                                                                          '—',
                                                                   )
                                                                   .join(', ')}
                                                     </TableCell>
