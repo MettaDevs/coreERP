@@ -319,8 +319,7 @@ function validateManifest(mixed $manifest): void
         || $manifest['dataset'] === ''
         || ! is_array($manifest['tenants'] ?? null)
         || ! array_is_list($manifest['tenants'])
-        || count($manifest['tenants']) < 100
-        || $manifest['tenants'] === []) {
+        || count($manifest['tenants']) < 100) {
         throw new InvalidArgumentException('Bentuk manifest fixture tidak sah.');
     }
 

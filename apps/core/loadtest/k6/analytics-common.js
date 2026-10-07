@@ -4,6 +4,15 @@ import { BASE, jsonHeaders } from './lib.js';
 
 const PASSWORD = __ENV.LOADTEST_PASSWORD || 'Loadtest-Owner-2026!';
 const fixturePath = '/results/analytics-fixture.json';
+const fixture = (() => {
+    try {
+        return JSON.parse(open(fixturePath));
+    } catch (error) {
+        fail(
+            `Fixture analitik tidak terbaca. Siapkan stack dengan LOADTEST_ANALYTICS=1: ${String(error)}`,
+        );
+    }
+})();
 const jarCache = new Map();
 
 function batch(requests) {
@@ -83,16 +92,6 @@ function loginSessions(fixture) {
 }
 
 export function setupAnalytics() {
-    let fixture;
-
-    try {
-        fixture = JSON.parse(open(fixturePath));
-    } catch (error) {
-        fail(
-            `Fixture analitik tidak terbaca. Siapkan stack dengan LOADTEST_ANALYTICS=1: ${String(error)}`,
-        );
-    }
-
     if (fixture.tenants.length < 100) {
         fail(
             `Fixture hanya berisi ${fixture.tenants.length} tenant; gate meminta sedikitnya 100.`,
