@@ -27,7 +27,8 @@
 \echo '=== PEMERIKSAAN KEBENARAN MANAGEMENT ASET (semua pelanggaran harus 0) ==='
 
 create temporary view terbitan as
-select s.tenant_id, r.code as referensi, i.formatted_value
+select s.tenant_id, s.id as sequence_id, s.scope_type, r.code as referensi,
+       i.scope_key, i.period_key, i.formatted_value
 from number_sequence_issues i
 join tenant_number_sequences s on s.id = i.sequence_id
 join app_number_sequence_references r on r.id = s.reference_id;
@@ -105,38 +106,38 @@ prefix_salah as (
       + (select count(*) from aset_m_tipe_atribut where kode not like 'TATR%') as n
 ),
 -- Oracle nomor, pengganti `/__stats` milik tiruan Core: tiap kode yang tersimpan module wajib
--- punya satu baris terbitan pada tenant DAN reference yang benar.
+-- punya satu baris terbitan pada tenant, reference, dan scope yang benar.
 nomor_tanpa_terbitan as (
     select
-        (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_model_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.model-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_pabrikan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.pabrikan-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_kondisi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.kondisi-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_tipe_lokasi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.tipe-lokasi-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_item_checklist_maintenance t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.item-checklist-maintenance' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_analisa_maintenance t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.analisa-maintenance' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_maintenance_job_type t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.maintenance-job-types' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_maintenance_checklist_variable t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.maintenance-checklist-variables' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_profil_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.profil-penyusutan' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_tipe_atribut t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.tipe-atribut' and i.formatted_value = t.kode))
-      + (select count(*) from aset_tr_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_tr_perencanaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.perencanaan-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_tr_pemeliharaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.pemeliharaan-aset' and i.formatted_value = t.kode)) as n
+        (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_model_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.model-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_pabrikan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.pabrikan-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_kondisi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.kondisi-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_tipe_lokasi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.tipe-lokasi-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_item_checklist_maintenance t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.item-checklist-maintenance' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_analisa_maintenance t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.analisa-maintenance' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_maintenance_job_type t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.maintenance-job-types' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_maintenance_checklist_variable t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.maintenance-checklist-variables' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_profil_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.profil-penyusutan' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_tipe_atribut t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'tenant:' || t.tenant_id and i.referensi = 'management-aset.tipe-atribut' and i.formatted_value = t.kode))
+      + (select count(*) from aset_tr_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'legal_entity:' || t.legal_entity_id and i.referensi = 'management-aset.aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_tr_perencanaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'legal_entity:' || t.legal_entity_id and i.referensi = 'management-aset.perencanaan-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_tr_pemeliharaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.scope_key = 'legal_entity:' || t.legal_entity_id and i.referensi = 'management-aset.pemeliharaan-aset' and i.formatted_value = t.kode)) as n
 ),
 nomor_terbit_ganda as (
-    -- Satu nomor tidak boleh diterbitkan dua kali pada tenant dan reference yang sama. Ini
-    -- yang dulu dibuktikan dengan membandingkan jumlah terbit dan jumlah nomor unik di stub.
+    -- Satu nomor tidak boleh diterbitkan dua kali pada sequence, scope, dan period yang sama.
     select count(*) as n from (
-        select tenant_id, referensi, formatted_value from terbitan group by 1, 2, 3 having count(*) > 1
+        select sequence_id, scope_key, period_key, formatted_value
+        from terbitan group by 1, 2, 3, 4 having count(*) > 1
     ) d
 ),
 nomor_dipakai_dua_record as (
-    -- Satu nomor terbit dipakai dua baris berbeda dalam satu tenant.
+    -- Nomor aset dan dokumen legal_entity-scoped boleh berulang di entitas lain, tidak di scope yang sama.
     select count(*) as n from (
-        select tenant_id, kode from aset_m_group_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from aset_m_maintenance_job_type group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from aset_tr_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from aset_tr_perencanaan_aset group by 1, 2 having count(*) > 1
+        select tenant_id, null::text as scope, kode from aset_m_group_aset group by 1, 3 having count(*) > 1
+        union all select tenant_id, null::text, kode from aset_m_maintenance_job_type group by 1, 3 having count(*) > 1
+        union all select tenant_id, legal_entity_id, kode from aset_tr_aset group by 1, 2, 3 having count(*) > 1
+        union all select tenant_id, legal_entity_id, kode from aset_tr_perencanaan_aset group by 1, 2, 3 having count(*) > 1
     ) d
 ),
 tenant_kosong as (
@@ -155,10 +156,13 @@ tenant_tak_dikenal as (
       + (select count(*) from aset_m_maintenance_job_type t left join tenants c on c.id = t.tenant_id where c.id is null) as n
 ),
 aset_duplikat as (
-    select count(*) as n from (
-        select tenant_id, kode from aset_tr_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, creation_key from aset_tr_aset group by 1, 2 having count(*) > 1
-    ) d
+    select
+        (select count(*) from (
+            select tenant_id, legal_entity_id, kode from aset_tr_aset group by 1, 2, 3 having count(*) > 1
+        ) d)
+      + (select count(*) from (
+            select tenant_id, creation_key from aset_tr_aset group by 1, 2 having count(*) > 1
+        ) d) as n
 ),
 penempatan_lintas_tenant as (
     select count(*) as n from aset_tr_penempatan_aset p join aset_tr_aset a on a.id = p.aset_id where p.tenant_id <> a.tenant_id
@@ -567,7 +571,10 @@ select 'kode monitoring tanpa baris terbitan Number Sequence', count(*)
 from aset_tr_monitoring_aset t
 where not exists (
     select 1 from terbitan i
-    where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.monitoring-aset' and i.formatted_value = t.kode
+    where i.tenant_id = t.tenant_id
+      and i.scope_key = 'legal_entity:' || t.legal_entity_id
+      and i.referensi = 'management-aset.monitoring-aset'
+      and i.formatted_value = t.kode
 );
 
 -- Baris menunjuk dokumen dan aset di tenant yang sama, dan dokumennya ada.
@@ -706,7 +713,7 @@ order by 1;
 
 \echo
 \echo '=== TERBITAN NOMOR (Core, bukan tiruan) ==='
-select referensi, count(*) as terbit, count(distinct formatted_value || ' ' || tenant_id) as unik
+select referensi, count(*) as terbit, count(distinct (formatted_value, tenant_id, scope_key)) as unik
 from terbitan
 where referensi like 'management-aset.%'
 group by referensi

@@ -43,8 +43,9 @@ menerbitkan nomor lewat HTTP, dan sekaligus menjadi oracle nomor lewat `/__stats
 runtime, nomor diterbitkan proses yang sama lewat kontrak `NumberSequenceIssuer`; tidak ada yang tersisa
 untuk ditiru. Oracle-nya pindah ke `verify.sql`, dan pindah ke atas: tiap `kode` yang tersimpan
 modul harus punya satu baris di `number_sequence_issues` pada tenant **dan** reference yang benar.
-Yang dulu dibuktikan dengan menghitung ("4.342 terbit, 4.342 unik") sekarang dibuktikan dengan
-mengikat tiap baris ke terbitannya.
+Scope sequence ikut diperiksa: nomor aset boleh berulang pada legal entity yang berbeda, tetapi
+tidak pada scope yang sama. Yang dulu dibuktikan dengan menghitung ("4.342 terbit, 4.342 unik")
+sekarang dibuktikan dengan mengikat tiap baris ke terbitannya.
 
 **Tidak ada lagi token konteks.** Rute modul berada di belakang `['web', 'auth']` dengan awalan
 `/api/modules/management-aset/v1/`; identitasnya sesi Core, lengkap dengan cookie dan CSRF. Karena

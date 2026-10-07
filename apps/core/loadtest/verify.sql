@@ -91,7 +91,7 @@ where ref.app_id <> 'core'
     where e.tenant_id = s.tenant_id and e.app_id = ref.app_id and e.status = 'active'
 );
 
--- Bawaan sebuah sequence yang baru dimaterialisasi: aktif, rentang 0-19999, tidak kontinu,
+-- Bawaan sebuah sequence yang baru dimaterialisasi: aktif, rentang 1-19999, tidak kontinu,
 -- tidak boleh diisi manual. Scope-nya TIDAK dipatok 'tenant': reference transaksi memang
 -- ber-scope legal entity, dan yang benar adalah scope yang diizinkan reference itu sendiri.
 insert into hasil_core
@@ -101,7 +101,7 @@ join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_i
 join app_number_sequence_references ref on ref.id = s.reference_id
 where ref.app_id <> 'core' and (
       s.status <> 'active'
-   or s.minimum_number <> 0
+   or s.minimum_number <> 1
    or s.maximum_number <> 19999
    or not (ref.allowed_scopes::jsonb ? s.scope_type)
    or s.is_continuous
@@ -176,6 +176,113 @@ left join role_assignments ra on e.table_name = 'role_assignments' and ra.id::te
 left join roles rr on rr.id = ra.role_id
 where e.table_name in ('roles', 'role_assignments')
   and coalesce(r.tenant_id, rr.tenant_id)::text <> e.tenant_id::text;
+
+\if :{?analytics}
+create temporary table lt_analytics_observed (
+    fixture_id text not null,
+    run_id text not null,
+    scenario text not null,
+    query_code text not null,
+    metric text not null,
+    tenant_id char(26) not null,
+    user_email text not null,
+    access_kind text not null,
+    group_key char(26),
+    currency_code char(3),
+    observed_value numeric not null
+);
+
+\copy lt_analytics_observed from '/results/analytics-observed.csv' with (format csv, header true, null '')
+
+insert into hasil_core
+select 'observasi analitik tidak cocok dengan fixture pengguna', count(*)
+from lt_analytics_observed o
+left join lt_analytics_user_scope s
+  on s.fixture_id = o.fixture_id and s.tenant_id = o.tenant_id and s.user_email = o.user_email
+where o.fixture_id = :'run_id'
+  and (s.id is null or s.access_kind <> o.access_kind);
+
+insert into hasil_core
+select 'pengguna fixture tidak memiliki observasi analitik', count(*)
+from lt_analytics_user_scope s
+where s.fixture_id = :'run_id'
+  and not exists (
+      select 1 from lt_analytics_observed o
+      where o.fixture_id = s.fixture_id and o.tenant_id = s.tenant_id and o.user_email = s.user_email
+        and o.query_code = 'asset-register-by-group'
+  );
+
+insert into hasil_core
+select 'observasi aset berasal dari tenant lain', count(*)
+from lt_analytics_observed o
+where o.fixture_id = :'run_id'
+  and o.metric in ('count', 'acquisition_value')
+  and o.group_key is not null
+  and not exists (
+      select 1 from aset_tr_aset a
+      where a.tenant_id = o.tenant_id and a.group_aset_id = o.group_key and a.deleted_at is null
+  );
+
+insert into hasil_core
+select 'nilai uang analitik tidak membawa mata uang', count(*)
+from lt_analytics_observed o
+where o.fixture_id = :'run_id' and o.metric = 'acquisition_value'
+  and nullif(trim(o.currency_code), '') is null;
+
+with scopes as (
+    select * from lt_analytics_user_scope where fixture_id = :'run_id'
+), expected_values as (
+    select s.tenant_id, s.user_email, 'count'::text as metric,
+           a.group_aset_id::char(26) as group_key, a.currency_code::char(3) as currency_code,
+           count(*)::numeric as expected_value
+    from scopes s
+    join aset_tr_aset a on a.tenant_id = s.tenant_id and a.deleted_at is null
+    where s.access_kind = 'all'
+       or (s.access_kind = 'two_units'
+           and a.legal_entity_id = s.legal_entity_id
+           and a.responsible_org_unit_id::text in (select jsonb_array_elements_text(s.unit_ids)))
+    group by s.tenant_id, s.user_email, a.group_aset_id, a.currency_code
+
+    union all
+
+    select s.tenant_id, s.user_email, 'acquisition_value'::text,
+           a.group_aset_id::char(26), a.currency_code::char(3), sum(a.acquisition_value)::numeric
+    from scopes s
+    join aset_tr_aset a on a.tenant_id = s.tenant_id and a.deleted_at is null
+    where s.access_kind = 'all'
+       or (s.access_kind = 'two_units'
+           and a.legal_entity_id = s.legal_entity_id
+           and a.responsible_org_unit_id::text in (select jsonb_array_elements_text(s.unit_ids)))
+    group by s.tenant_id, s.user_email, a.group_aset_id, a.currency_code
+), expected as (
+    select * from expected_values
+    union all
+    select s.tenant_id, s.user_email, 'empty'::text, null::char(26), null::char(3), 0::numeric
+    from scopes s where s.access_kind = 'none'
+), observed as (
+    select o.tenant_id, o.user_email, o.metric, o.group_key, o.currency_code,
+           min(o.observed_value) as minimum_value, max(o.observed_value) as maximum_value
+    from lt_analytics_observed o
+    where o.fixture_id = :'run_id' and o.query_code = 'asset-register-by-group'
+    group by o.tenant_id, o.user_email, o.metric, o.group_key, o.currency_code
+), mismatches as (
+    select 1
+    from expected e
+    full join observed o
+      on o.tenant_id = e.tenant_id
+     and o.user_email = e.user_email
+     and o.metric = e.metric
+     and o.group_key is not distinct from e.group_key
+     and o.currency_code is not distinct from e.currency_code
+    where e.expected_value is null
+       or o.minimum_value is null
+       or e.expected_value <> o.minimum_value
+       or e.expected_value <> o.maximum_value
+)
+insert into hasil_core
+select 'tenant, policy data, atau jumlah per mata uang analitik tidak cocok', count(*)
+from mismatches;
+\endif
 
 select pemeriksaan, pelanggaran from hasil_core order by pemeriksaan;
 

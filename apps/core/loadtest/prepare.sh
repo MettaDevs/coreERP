@@ -20,3 +20,10 @@ for module in $MODULES; do
     php artisan app:register-manifest "$module"
     php artisan module:migrate "$module"
 done
+
+case "${LOADTEST_ANALYTICS:-0}" in
+    1|true|yes)
+        php /loadtest/analytics-fixture.php
+        php /loadtest/analytics-assets-fixture.php
+        ;;
+esac
