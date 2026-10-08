@@ -1,0 +1,35 @@
+id: procurement
+name: Procurement
+description: Kerangka aplikasi pengadaan. Fitur bisnis belum tersedia.
+publisher: apperp
+version: 0.1.0
+kind: business-app
+requires:
+  core: ^0.1
+dependsOn: {}
+table_prefix: procurement_
+ui: {}
+
+# Contoh deklarasi bawaan template; belum terhubung ke halaman atau endpoint.
+# Katalog mewajibkan empat lapis keamanan meskipun module belum memiliki UI.
+# Ganti dengan resource dan tindakan yang disetujui saat fitur pertama dibuat.
+security:
+  entry_points:
+    - code: procurement.example.form
+      name: Contoh entry point template
+      type: form
+  permissions:
+    - code: procurement.example.read
+      entry_point: procurement.example.form
+      access: read
+      name: Contoh permission template
+  privileges:
+    - code: procurement.example.view
+      name: Contoh privilege template
+      permissions:
+        - procurement.example.read
+  duties:
+    - code: procurement.example.access
+      name: Contoh duty template
+      privileges:
+        - procurement.example.view

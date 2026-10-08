@@ -82,6 +82,7 @@ Setiap module memakai satu namespace dan satu awalan tabel, dan keduanya diturun
 | --- | --- | --- |
 | `apperp/human-resources` | `Modules\Apperp\HumanResources\` | `hr_` |
 | `apperp/management-aset` | `Modules\Apperp\ManagementAset\` | `aset_` |
+| `apperp/procurement` | `Modules\Apperp\Procurement\` | `procurement_` |
 
 Namespace mengikuti `StudlyCase` dari nama folder. Awalan tabel **tidak** selalu sama dengan nama folder:
 ia dipilih pendek dan tidak berubah setelah module pertama kali dipasang, karena mengubahnya berarti
