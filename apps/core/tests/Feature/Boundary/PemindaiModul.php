@@ -68,7 +68,7 @@ final class PemindaiModul
     }
 
     /**
-     * Modul yang punya folder migration, beserta awalan tabel yang dinyatakan manifestnya.
+     * Modul yang punya berkas migration, beserta awalan tabel yang dinyatakan manifestnya.
      *
      * Modul yang sedang dipindah tidak ikut. Lihat penjelasan asimetrinya di
      * `ModuleTableBoundaryTest`; ringkasnya, penjaga tabel **menjalankan** migration, jadi
@@ -86,6 +86,11 @@ final class PemindaiModul
             $migrations = $folder.'/database/migrations';
 
             if ($dipindah->marks($nama) || ! is_dir($migrations)) {
+                continue;
+            }
+
+            // Kerangka module boleh menyediakan folder kosong untuk pekerjaan berikutnya.
+            if ((glob($migrations.'/*.php') ?: []) === []) {
                 continue;
             }
 

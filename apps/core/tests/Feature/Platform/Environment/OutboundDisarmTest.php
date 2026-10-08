@@ -62,8 +62,8 @@ class OutboundDisarmTest extends TestCase
         config()->set('coreerp.app_context_signing_key', 'kunci-uji');
         config()->set('coreerp.event_endpoints', [[
             'type' => 'core.workflow.decision.v2',
-            'url' => 'https://procurement.test/events',
-            'module' => 'procurement',
+            'url' => 'https://external-addon.test/events',
+            'module' => 'external-addon',
         ]]);
         config()->set('coreerp.discord.webhook_url', self::WEBHOOK);
         config()->set('coreerp.discord.mention', '@here');
@@ -104,11 +104,11 @@ class OutboundDisarmTest extends TestCase
     {
         $this->activate($this->production());
         $id = $this->outbox();
-        Http::fake(['https://procurement.test/events' => Http::response(['data' => ['accepted' => true]])]);
+        Http::fake(['https://external-addon.test/events' => Http::response(['data' => ['accepted' => true]])]);
 
         Artisan::call('workflow-events:publish');
 
-        Http::assertSent(fn ($request) => $request->url() === 'https://procurement.test/events'
+        Http::assertSent(fn ($request) => $request->url() === 'https://external-addon.test/events'
             && $request->hasHeader('X-CoreERP-Event-Signature')
             && $request['id'] === $id);
         $this->assertNotNull(DB::table('outbox_events')->where('id', $id)->value('published_at'));
