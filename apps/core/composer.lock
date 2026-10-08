@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c2adcf802566fe22f58f797f5ac77e5a",
+    "content-hash": "a5ce04fa8c172b0c15ccaf0e3d657cbd",
     "packages": [
         {
             "name": "apperp/human-resources",
@@ -63,6 +63,37 @@
                 "proprietary"
             ],
             "description": "Module Management Aset. Berjalan di dalam runtime CoreERP, bukan sebagai aplikasi tersendiri.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "apperp/procurement",
+            "version": "dev-codex/procurement-scaffold",
+            "dist": {
+                "type": "path",
+                "url": "../../modules/apperp/procurement",
+                "reference": "752684eb205f283447d608abc9e07b15ac4b9dbb"
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Apperp\\Procurement\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Modules\\Apperp\\Procurement\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Procurement — module CoreERP.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -13361,7 +13392,8 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "apperp/human-resources": 20,
-        "apperp/management-aset": 20
+        "apperp/management-aset": 20,
+        "apperp/procurement": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
