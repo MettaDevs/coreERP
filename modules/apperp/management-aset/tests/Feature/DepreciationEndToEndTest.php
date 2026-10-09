@@ -236,7 +236,7 @@ class DepreciationEndToEndTest extends TestCase
         $this->finalize($periodId);
         $this->assertSame(1100.0, $this->netBookValue($book));
 
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.cancel'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
             ->assertCreated();
 
@@ -356,7 +356,7 @@ class DepreciationEndToEndTest extends TestCase
 
     private function reverse(string $periodId): void
     {
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.cancel'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
             ->assertCreated();
     }

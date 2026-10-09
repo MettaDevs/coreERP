@@ -30,7 +30,8 @@ use Illuminate\Support\Carbon;
 #[DataClassification(DataClass::CustomerContent)]
 class AssetCancellation extends Model
 {
-    use BelongsToTenant, HasUlids, SoftDeletes;
+    use BelongsToTenant;
+    use HasUlids, SoftDeletes;
 
     public const COLUMN_CLASSIFICATION = [
         'requested_by_user_id' => DataClass::EndUserPseudonymousIdentifiers,
