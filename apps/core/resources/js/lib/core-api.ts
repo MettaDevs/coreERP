@@ -31,6 +31,96 @@ function csrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
+type ErrorBody = {
+    message?: unknown;
+    errors?: Record<string, string[]>;
+    error?: { code?: unknown; message?: unknown; field?: unknown };
+};
+
+function responseError(status: number, body: ErrorBody | null): CoreApiError {
+    const firstError = body?.errors
+        ? Object.values(body.errors)[0]?.[0]
+        : undefined;
+
+    return new CoreApiError(
+        typeof firstError === 'string'
+            ? firstError
+            : typeof body?.error?.message === 'string'
+              ? body.error.message
+              : typeof body?.message === 'string' && body.message
+                ? body.message
+                : 'Permintaan belum berhasil.',
+        status,
+        body?.errors ?? {},
+        typeof body?.error?.code === 'string' ? body.error.code : null,
+        typeof body?.error?.field === 'string' ? body.error.field : null,
+    );
+}
+
+/** XHR menyediakan progres transfer berkas; sesi, CSRF, dan pesan error sama dengan apiRequest. */
+export function apiUpload<T>(
+    path: string,
+    file: File,
+    onProgress: (fraction: number) => void,
+    signal: AbortSignal,
+): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        const abort = () => request.abort();
+        request.open('POST', path);
+        request.setRequestHeader('Accept', 'application/json');
+        request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        request.setRequestHeader('X-XSRF-TOKEN', csrfToken());
+        request.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                onProgress(event.loaded / event.total);
+            }
+        };
+        request.onload = () => {
+            let body;
+
+            try {
+                body = JSON.parse(request.responseText);
+            } catch {
+                body = null;
+            }
+
+            if (request.status < 200 || request.status >= 300) {
+                reject(responseError(request.status, body));
+            } else if (body === null) {
+                reject(
+                    new CoreApiError(
+                        'Jawaban upload belum dapat dibaca. Muat ulang daftar berkas.',
+                        502,
+                    ),
+                );
+            } else {
+                resolve(body as T);
+            }
+        };
+        request.onerror = () =>
+            reject(
+                new Error(
+                    'Koneksi terputus. Muat ulang daftar berkas sebelum mencoba lagi.',
+                ),
+            );
+        request.onabort = () =>
+            reject(new DOMException('Upload dihentikan.', 'AbortError'));
+        request.onloadend = () => signal.removeEventListener('abort', abort);
+
+        if (signal.aborted) {
+            reject(new DOMException('Upload dihentikan.', 'AbortError'));
+
+            return;
+        }
+
+        signal.addEventListener('abort', abort, { once: true });
+        const body = new FormData();
+        body.append('file', file);
+        request.send(body);
+    });
+}
+
 export async function apiRequest(
     path: string,
     init: RequestInit = {},
@@ -58,27 +148,9 @@ export async function apiRequest(
     });
 
     if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-            message?: unknown;
-            errors?: Record<string, string[]>;
-            error?: { code?: unknown; message?: unknown; field?: unknown };
-        } | null;
-        const firstError = body?.errors
-            ? Object.values(body.errors)[0]?.[0]
-            : undefined;
-
-        throw new CoreApiError(
-            typeof firstError === 'string'
-                ? firstError
-                : typeof body?.error?.message === 'string'
-                  ? body.error.message
-                  : typeof body?.message === 'string' && body.message
-                    ? body.message
-                    : 'Permintaan belum berhasil.',
+        throw responseError(
             response.status,
-            body?.errors ?? {},
-            typeof body?.error?.code === 'string' ? body.error.code : null,
-            typeof body?.error?.field === 'string' ? body.error.field : null,
+            (await response.json().catch(() => null)) as ErrorBody | null,
         );
     }
 
