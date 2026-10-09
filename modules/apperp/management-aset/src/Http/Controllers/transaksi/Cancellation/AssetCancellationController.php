@@ -9,6 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\transaksi\Cancellation\AssetCancellation;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
+use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
@@ -24,8 +26,8 @@ final class AssetCancellationController
         return DB::transaction(function () use ($request, $resource, $id, $engine): JsonResponse {
             $document = $engine->subject($resource, $id, $request);
             $request->validate(['posting_date' => ['nullable', 'date_format:Y-m-d']]);
-            $originalDate = $document instanceof \Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod ? $document->period_ends_on->toDateString() : $document->tanggal->toDateString();
-            if ($document instanceof \Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset) {
+            $originalDate = $document instanceof DepreciationPeriod ? $document->period_ends_on->toDateString() : $document->tanggal->toDateString();
+            if ($document instanceof PenerimaanAset) {
                 $postingId = AcquisitionPosting::postingId($id, (string) $document->cara_perolehan);
                 $original = app(PostingFeed::class)->status((string) $document->tenant_id, $postingId);
                 $originalDate = $original['posting_date'] ?? $originalDate;

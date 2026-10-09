@@ -197,7 +197,7 @@ final class AssetCancellationEngine
                             'legal_entity_id' => $document->legal_entity_id, 'source_document_type' => 'pembatalan-aset',
                             'source_document_id' => $cancellation->id,
                             'decision_context' => ['cancellation_id' => $cancellation->id, 'legal_entity_id' => $document->legal_entity_id,
-                            'responsible_org_unit_id' => $cancellation->responsible_org_unit_id, 'document_number' => $document instanceof DepreciationPeriod ? ($this->depreciationBook($document)->aset_code.' · '.$document->period_ends_on->toDateString()) : $document->kode,
+                                'responsible_org_unit_id' => $cancellation->responsible_org_unit_id, 'document_number' => $document instanceof DepreciationPeriod ? ($this->depreciationBook($document)->aset_code.' · '.$document->period_ends_on->toDateString()) : $document->kode,
                                 'reason' => $data['reason'], 'posting_date' => $data['posting_date'],
                                 'document_url' => $this->documentUrl($resource, $id)],
                         ]);

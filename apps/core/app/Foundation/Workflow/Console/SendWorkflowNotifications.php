@@ -76,7 +76,7 @@ class SendWorkflowNotifications extends Command
                     ]);
                     $this->warn('Notifikasi '.$id.' belum terkirim; akan dicoba kembali.');
                 } finally {
-                    if ($previousTenant !== null) {
+                    if (is_string($previousTenant)) {
                         app()->instance(TenantScope::KEY, $previousTenant);
                     } else {
                         app()->forgetInstance(TenantScope::KEY);

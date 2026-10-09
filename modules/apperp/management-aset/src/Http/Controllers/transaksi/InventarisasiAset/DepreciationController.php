@@ -274,15 +274,16 @@ class DepreciationController extends Controller
                 return ['period' => $period];
             }
             DepreciationPeriod::query()->where('id', $id)->update(['status' => 'final', 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
-            // Hitung di database dengan angka desimal, agar finalisasi serentak tidak kehilangan
-            // pembaruan dan angka besar tidak dibulatkan melalui float PHP.
+            // Kunci buku dan hitung sebagai desimal: finalisasi serentak tidak kehilangan
+            // pembaruan dan angka besar tidak melewati float PHP.
             $amount = BigDecimal::of((string) $period->amount);
-            $updated = BukuAset::query()->where('id', $period->buku_aset_id)->where('status', 'active')->update([
-                'accumulated_depreciation' => DB::raw('accumulated_depreciation + '.$amount),
-                'net_book_value' => DB::raw('net_book_value - '.$amount),
+            $book = BukuAset::query()->where('id', $period->buku_aset_id)->where('status', 'active')->lockForUpdate()->first();
+            abort_unless($book !== null, 409, 'Buku aset sudah ditutup; penyusutan belum dapat difinalkan.');
+            $book->update([
+                'accumulated_depreciation' => (string) BigDecimal::of($book->accumulated_depreciation)->plus($amount),
+                'net_book_value' => (string) BigDecimal::of($book->net_book_value)->minus($amount),
                 'updated_at' => now(),
             ]);
-            abort_unless($updated > 0, 409, 'Buku aset sudah ditutup; penyusutan belum dapat difinalkan.');
 
             return ['period' => DepreciationPeriod::query()->where('id', $id)->toBase()->first()];
         });

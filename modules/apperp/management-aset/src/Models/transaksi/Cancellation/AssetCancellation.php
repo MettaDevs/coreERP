@@ -8,6 +8,7 @@ use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ?string $responsible_org_unit_id
  * @property ?int $source_version
  * @property string $reason
- * @property \Illuminate\Support\Carbon $posting_date
+ * @property Carbon $posting_date
  * @property string $status
  * @property string $requested_by_user_id
  * @property ?string $acted_by_user_id

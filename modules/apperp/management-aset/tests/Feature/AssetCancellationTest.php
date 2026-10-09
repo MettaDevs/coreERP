@@ -9,10 +9,12 @@ use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Support\TenantScope;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Modules\Apperp\ManagementAset\Tests\Concerns\MenerbitkanJurnalPenerimaan;
 use Modules\Apperp\ManagementAset\Tests\Concerns\MenyiapkanNilaiBukuAset;
@@ -149,13 +151,20 @@ class AssetCancellationTest extends TestCase
         $request = $this->sebagaiPenggunaBernama('requester', $this->tenantId, ['management-aset.penerimaan-aset.request-cancellation'])
             ->postJson(self::API.'penerimaan-aset/'.$receipt.'/ajukan-pembatalan', $this->cancellationBody('penerimaan-aset', $receipt))->assertCreated()->json('data');
         config(['coreerp.sso.api_url' => 'https://sso.test/api/v1', 'coreerp.sso.api_client_id' => 'test-client', 'coreerp.sso.api_client_secret' => 'test-secret']);
-        $environment = \Mockery::mock(ActiveEnvironment::class);
-        $environment->shouldReceive('forget');
-        $environment->shouldReceive('outboundAllowed')->andReturn(false, true, true);
+        $environment = new class($this->app) extends ActiveEnvironment
+        {
+            public bool $allowOutbound = false;
+
+            public function outboundAllowed(): bool
+            {
+                return $this->allowOutbound;
+            }
+        };
         app()->instance(ActiveEnvironment::class, $environment);
         Http::fake(['https://sso.test/api/v1/notifications/send' => Http::sequence()->push([], 500)->push(['success' => true])]);
         Artisan::call('workflow:notify');
         Http::assertNothingSent();
+        $environment->allowOutbound = true;
         Artisan::call('workflow:notify');
         Artisan::call('workflow:notify');
         Http::assertSentCount(1);
@@ -249,6 +258,7 @@ class AssetCancellationTest extends TestCase
         $this->assertSame(1, FinancePosting::query()->where('posting_type', 'asset.acquisition_reversal')->count());
     }
 
+    /** @return array<string,mixed> */
     private function cancellationBody(string $resource, string $id): array
     {
         $table = match ($resource) {
@@ -258,7 +268,8 @@ class AssetCancellationTest extends TestCase
         return ['reason' => 'Transaksi keliru', 'posting_date' => '2026-10-31', 'version' => DB::table($table)->where('id', $id)->value('version')];
     }
 
-    private function cancel(string $resource, string $id)
+    /** @return TestResponse<JsonResponse> */
+    private function cancel(string $resource, string $id): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$resource.'.cancel'])
             ->postJson(self::API.$resource.'/'.$id.'/batal', $this->cancellationBody($resource, $id));
