@@ -386,11 +386,12 @@ Label yang ditempel pada barang, lalu dipindai saat stock opname. Padanannya lap
 ## Lampiran aset
 
 Lampiran adalah berkas pendukung satu record aset, seperti foto kondisi atau dokumen pembelian.
-Foto utama untuk mengenali barang terpisah dari daftar lampiran; upload gambar sebagai lampiran
-tidak menjadikannya foto utama. Polanya mengikuti [attachments pada kartu Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-how-add-link-to-record).
+Galeri foto untuk mengenali barang terpisah dari daftar lampiran. **Satu aset dapat memiliki beberapa
+gambar**, dan setiap upload menambah foto tanpa menimpa foto sebelumnya. Polanya mengadaptasi
+[MediaSet pada record Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-working-with-media-on-records).
 
 Halaman rincian memasok isi tab **Detail** melalui slot `details` pada `RecordFactBox`. Untuk aset,
-isinya komponen `AssetPicture`, yang menampilkan dan mengganti foto lewat `RecordPicture` Core.
+isinya komponen `AssetPicture`, yang menampilkan galeri lewat `RecordPictures` Core.
 Halaman lain bebas memasok isi yang berbeda; FactBox SDK tidak mengandung aturan aset, vendor,
 atau isi bisnis lain. SDK mengatur tab Detail/Lampiran, collapse–expand, dan layout pendamping.
 
@@ -405,18 +406,23 @@ hash berkas tetap berlaku. Preview memakai URL blob sementara yang dilepas saat 
 PDF, Word, dan Excel diunduh untuk dibuka di perangkat pengguna. Kegagalan upload, preview, download,
 atau arsip tetap terlihat. Catatan teks langsung belum menjadi bagian panel ini.
 
-Foto utama memakai `GET` dan `POST /api/v1/records/{tabel}/{id}/picture`. Berkasnya tetap disimpan
+Galeri memakai `GET` dan `POST /api/v1/records/{tabel}/{id}/pictures`. Berkasnya tetap disimpan
 layanan Core pada `document_attachments`, dengan `kind = picture`; daftar lampiran hanya membaca
-`kind = document`. Hak dan klasifikasi mengikuti record yang sama, tanpa permission baru. Indeks
-unik parsial menjaga satu foto aktif per record. Penggantian mengarsipkan foto lama dan menyimpan
-foto baru dalam satu transaksi dengan advisory lock PostgreSQL; dua penggantian yang bersamaan
-bergiliran, dan foto dari penggantian terakhir yang selesai menjadi foto aktif. Pengarsipan foto
-memakai endpoint arsip berkas yang sama dan membawa versi foto yang dibuka.
+`kind = document`. Hak dan klasifikasi mengikuti record yang sama, tanpa permission baru. Tidak
+ada batas satu foto per record: migration melepas indeks unik tunggal dari rilis 0.15.0 tanpa
+mengubah atau menghapus foto yang sudah tersimpan. Upload yang bersamaan menambah baris terpisah
+dan tidak mengarsipkan foto lainnya. Galeri diurutkan menurut waktu upload lalu id. Pengarsipan
+memakai endpoint arsip berkas yang sama dan membawa id serta versi foto yang dipilih; foto lain
+tetap aktif. Foto yang sudah diarsipkan tidak dipulihkan otomatis.
 
 Foto hanya menerima JPG/JPEG/PNG, dengan batas ukuran dari konfigurasi lampiran Core. Foto lama
-beserta berkasnya tetap tersimpan. Foto utama tidak mempunyai nomor baris dokumen dan tidak
+beserta berkasnya tetap tersimpan. Foto tidak mempunyai nomor baris dokumen dan tidak
 menambah jumlah pada tab Lampiran. Metadata lampiran dimuat ketika panel terbuka agar angka di
 tab sesuai daftar; isi berkas baru diambil saat preview atau download.
+
+Pemilih berkas menerima beberapa foto sekaligus, kemudian mengunggahnya satu per satu. Jika
+upload berhenti di tengah, foto yang sudah berhasil tetap tampil dan pesan menyebut jumlahnya;
+foto sisanya dapat dipilih kembali. Preview dapat berpindah ke foto sebelumnya atau berikutnya.
 
 ## Aturan yang dijaga, dan alasannya
 
@@ -477,7 +483,7 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | `ui/transactions/inventarisasi-aset/AssetPicture.tsx` | Isi tab Detail yang ditentukan halaman aset |
 | `packages/ui/src/components/fact-box.tsx` (dari akar repo) | Wadah, tab, collapse–expand, dan layout bersama |
 | `apps/core/resources/js/components/record-fact-box.tsx` (dari akar repo) | Penghubung FactBox dengan lampiran Core |
-| `apps/core/resources/js/components/record-picture.tsx` (dari akar repo) | Upload, preview, ganti, dan arsip foto utama |
+| `apps/core/resources/js/components/record-pictures.tsx` (dari akar repo) | Upload beberapa foto, galeri, preview, dan arsip per foto |
 | `apps/core/resources/js/components/record-attachments.tsx` (dari akar repo) | Panel lampiran bersama, preview, download, dan arsip |
 | `src/Http/Controllers/transaksi/MutasiAset/MutasiAsetController.php` | Dokumen mutasi dan penyelesaian serah terima |
 | `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
