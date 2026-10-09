@@ -1,5 +1,4 @@
 import {
-    GripVertical,
     Info,
     Maximize2,
     Minimize2,
@@ -17,6 +16,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from './collapsible';
+import { Separator } from './separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 
 const DEFAULT_WIDTH = 384;
@@ -80,15 +80,16 @@ export function FactBox({
             className={cn(
                 'grid min-w-0 items-start gap-3',
                 open
-                    ? 'xl:grid-cols-[minmax(0,1fr)_0.75rem_minmax(0,var(--fact-box-width))]'
+                    ? 'xl:grid-cols-[minmax(0,1fr)_1px_minmax(0,var(--fact-box-width))]'
                     : 'xl:grid-cols-[minmax(0,1fr)_2.5rem]',
                 className,
             )}
         >
             <div className="min-w-0 space-y-4">{children}</div>
             {open && (
-                <div
-                    role="separator"
+                <Separator
+                    decorative={false}
+                    orientation="vertical"
                     tabIndex={0}
                     aria-label="Ubah lebar panel detail dan lampiran"
                     aria-orientation="vertical"
@@ -98,7 +99,7 @@ export function FactBox({
                     aria-valuenow={panelWidth}
                     aria-valuetext={`${Math.round(panelWidth)} piksel`}
                     title="Tarik untuk mengubah lebar. Tombol panah kiri/kanan juga bisa digunakan. Klik dua kali untuk mengembalikan lebar."
-                    className="bg-border/40 text-muted-foreground hover:bg-accent focus-visible:outline-ring hidden touch-none select-none self-stretch rounded-sm focus-visible:outline-2 xl:flex xl:cursor-col-resize xl:items-start xl:justify-center"
+                    className="focus-visible:outline-ring relative hidden touch-none select-none self-stretch after:absolute after:-inset-x-1 after:inset-y-0 focus-visible:outline-2 xl:block xl:cursor-col-resize"
                     onDoubleClick={() => resize(DEFAULT_WIDTH)}
                     onPointerDown={(event) => {
                         if (event.button !== 0) {
@@ -106,7 +107,8 @@ export function FactBox({
                         }
 
                         event.preventDefault();
-                        event.currentTarget.focus();
+                        // Pembatas setinggi form: fokus biasa menggulir layar ke tengahnya.
+                        event.currentTarget.focus({ preventScroll: true });
                         drag.current = {
                             pointerId: event.pointerId,
                             x: event.clientX,
@@ -153,12 +155,7 @@ export function FactBox({
                             resize(next);
                         }
                     }}
-                >
-                    <GripVertical
-                        aria-hidden="true"
-                        className="mt-4 size-4 shrink-0"
-                    />
-                </div>
+                />
             )}
             <aside
                 id={panelId}

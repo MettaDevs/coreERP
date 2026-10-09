@@ -124,6 +124,8 @@ ui:
           label: Analisa maintenance
           permission: management-aset.analisa-maintenance.read
       transaksi:
+        # Menu yang belum dipakai disembunyikan sementara dengan mengomentari entrinya.
+        # Halaman, rute, dan hak akses tetap tersedia.
         - id: perencanaan-aset
           label: Perencanaan aset
           permission: management-aset.perencanaan-aset.read
@@ -138,30 +140,27 @@ ui:
         - id: mutasi-aset
           label: Mutasi aset
           permission: management-aset.mutasi-aset.read
-        - id: asuransi-aset
-          label: Asuransi aset
-          permission: management-aset.polis-asuransi.read
-        - id: garansi-kontrak-servis
-          label: Garansi dan kontrak servis
-          permission: management-aset.garansi-aset.read
-        - id: permintaan-pemeliharaan
-          label: Permintaan pemeliharaan
-          permission: management-aset.permintaan-pemeliharaan.read
-        - id: jadwal-pemeliharaan
-          label: Jadwal pemeliharaan
-          permission: management-aset.jadwal-pemeliharaan.read
+        # - id: asuransi-aset
+        #   label: Asuransi aset
+        #   permission: management-aset.polis-asuransi.read
+        # - id: garansi-kontrak-servis
+        #   label: Garansi dan kontrak servis
+        #   permission: management-aset.garansi-aset.read
+        # - id: permintaan-pemeliharaan
+        #   label: Permintaan pemeliharaan
+        #   permission: management-aset.permintaan-pemeliharaan.read
+        # - id: jadwal-pemeliharaan
+        #   label: Jadwal pemeliharaan
+        #   permission: management-aset.jadwal-pemeliharaan.read
         - id: pemeliharaan-aset
           label: Pemeliharaan aset
           permission: management-aset.pemeliharaan-aset.read
-        - id: pembacaan-counter
-          label: Pembacaan counter
-          permission: management-aset.pembacaan-counter.read
-        - id: downtime-aset
-          label: Downtime aset
-          permission: management-aset.downtime-aset.read
-        - id: dekomisioning-aset
-          label: Dekomisioning aset
-          permission: management-aset.dekomisioning-aset.read
+        # - id: pembacaan-counter
+        #   label: Pembacaan counter
+        #   permission: management-aset.pembacaan-counter.read
+        # - id: downtime-aset
+        #   label: Downtime aset
+        #   permission: management-aset.downtime-aset.read
         - id: penjualan-aset
           label: Penjualan aset
           permission: management-aset.penjualan-aset.read
@@ -171,15 +170,18 @@ ui:
         - id: monitoring-aset
           label: Monitoring aset
           permission: management-aset.monitoring-aset.read
-        - id: penyusutan
-          label: Penyusutan aset
-          permission: management-aset.penyusutan.read
-        - id: penyesuaian-nilai-aset
-          label: Penyesuaian nilai aset
-          permission: management-aset.penyesuaian-nilai-aset.read
-        - id: reklasifikasi-aset
-          label: Reklasifikasi aset
-          permission: management-aset.reklasifikasi-aset.read
+        - id: dekomisioning-aset
+          label: Dekomisioning aset
+          permission: management-aset.dekomisioning-aset.read
+        # - id: penyusutan
+        #   label: Penyusutan aset
+        #   permission: management-aset.penyusutan.read
+        # - id: penyesuaian-nilai-aset
+        #   label: Penyesuaian nilai aset
+        #   permission: management-aset.penyesuaian-nilai-aset.read
+        # - id: reklasifikasi-aset
+        #   label: Reklasifikasi aset
+        #   permission: management-aset.reklasifikasi-aset.read
       laporan:
         - id: laporan-penyusutan-aset
           label: Laporan penyusutan aset

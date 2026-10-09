@@ -397,6 +397,13 @@ atau isi bisnis lain. SDK mengatur tab Detail/Lampiran, collapse–expand, dan l
 Lebar panel dapat diubah melalui pembatas pada desktop, dengan pointer maupun tombol panah;
 form utama tetap terpasang agar perubahan ukuran tidak membuang isian. Tombol perlebar memakai
 ruang yang tersedia tanpa menutupi form utama. Pada layar sempit panel ditumpuk di bawah form.
+Pembatas tampil sebagai garis satu piksel dengan area tarik transparan. Fokus pointer memakai
+`preventScroll`, sebab pembatas setinggi form dapat menggulir browser ke tengah form bila menerima
+fokus biasa. Perubahan lebar, collapse, dan expand tidak memasang ulang form utama.
+
+Daftar menu mengikuti `app.yaml` yang didaftarkan ke katalog Core. Menu transaksi yang belum
+dipakai disembunyikan dengan mengomentari entri navigasinya; form, route, dan permission tetap
+tersedia. Setelah rilis, manifest wajib didaftarkan ulang agar menu server sesuai source.
 
 Tab **Lampiran** memakai panel `RecordAttachments` milik Core, dengan jenis record `aset_tr_aset`.
 Panel memakai endpoint sesi Core, bukan endpoint baru di module. Daftar dan batas upload dibaca

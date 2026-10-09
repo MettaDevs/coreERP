@@ -34,6 +34,13 @@ Halaman module ikut build shell Core. Tidak ada iframe dan tidak ada aplikasi Re
 merender halaman Inertia dengan nama `<id module>::<nama berkas>`, dan Core menyusun tautan sidebar
 dengan aturan `/<id module>/<id entri menu>` dari manifest yang sama.
 
+Shell menetapkan tinggi viewport dan menempatkan header serta spanduk di luar area gulir
+card utama. Halaman biasa menggulir di area isi Shell yang bertanda `scroll-region`.
+Halaman yang menyatakan `data-layout="full-height"` menerima sisa tinggi card dan mengelola
+scroll pada panelnya sendiri; pembungkus sampai ke halaman wajib meneruskan `h-full min-h-0`.
+Stylesheet module tidak boleh mengubah overflow `html`/`body` atau semua elemen `main`, karena
+stylesheet yang sudah termuat tetap memengaruhi halaman module lain.
+
 ## Bentuk lama: app dengan repository dan container sendiri
 
 **Bentuk ini sudah tidak berlaku.** Ia dicatat di sini supaya sebuah repo `app-erp-*` lama yang
