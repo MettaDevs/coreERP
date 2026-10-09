@@ -1,4 +1,4 @@
-import { RecordPicture } from '@/components/record-picture';
+import { RecordPictures } from '@/components/record-pictures';
 import {
     CollapsibleSection,
     CollapsibleSectionGroup,
@@ -9,7 +9,7 @@ export default function AssetPicture({ assetId }: { assetId: string }) {
     return (
         <CollapsibleSectionGroup defaultValue={['picture']}>
             <CollapsibleSection value="picture" title="Foto aset">
-                <RecordPicture
+                <RecordPictures
                     key={assetId}
                     recordType="aset_tr_aset"
                     recordId={assetId}

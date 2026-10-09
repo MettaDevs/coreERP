@@ -101,20 +101,23 @@ final class AttachmentController extends Controller
         return response()->json(['data' => $this->present($attachment, $this->userNames(collect([$attachment])))], 201);
     }
 
-    public function picture(Request $request, string $recordType, string $recordId): JsonResponse
+    public function pictures(Request $request, string $recordType, string $recordId): JsonResponse
     {
         $tenantId = $this->currentMembership($request)->tenant_id;
         $type = $this->recordType($request);
         $this->requireReadable($type, $tenantId, $recordId);
-        $picture = DocumentAttachment::query()
+        $pictures = DocumentAttachment::query()
             ->where('tenant_id', $tenantId)
             ->where('record_type', $type->recordType())
             ->where('record_id', $recordId)
             ->where('kind', 'picture')
-            ->first();
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+        $names = $this->userNames($pictures);
 
         return response()->json([
-            'data' => $picture === null ? null : $this->present($picture, $this->userNames(collect([$picture]))),
+            'data' => $pictures->map(fn (DocumentAttachment $picture): array => $this->present($picture, $names))->values(),
             'meta' => [
                 'can_change' => $type->canChange($tenantId, $recordId),
                 'max_kb' => $this->maxKb(),
@@ -128,7 +131,7 @@ final class AttachmentController extends Controller
         $tenantId = $this->currentMembership($request)->tenant_id;
         $type = $this->recordType($request);
         $this->requireReadable($type, $tenantId, $recordId);
-        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi belum dapat mengganti fotonya.');
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi belum dapat menambah foto.');
         $request->validate([
             'file' => ['required', 'file', 'image', 'max:'.$this->maxKb(), 'extensions:jpg,jpeg,png', 'mimes:jpg,jpeg,png'],
             'line_number' => ['prohibited'],
@@ -140,7 +143,7 @@ final class AttachmentController extends Controller
             'file.max' => 'Foto terlalu besar. Ukuran paling besar '.$this->maxKb().' KB.',
             'file.extensions' => 'Pilih foto JPG, JPEG, atau PNG.',
             'file.mimes' => 'Isi foto tidak sesuai dengan jenisnya. Pilih foto JPG, JPEG, atau PNG.',
-            'line_number.prohibited' => 'Foto utama menempel pada data ini, bukan pada baris dokumennya.',
+            'line_number.prohibited' => 'Foto menempel pada data ini, bukan pada baris dokumennya.',
         ]);
         /** @var UploadedFile $file */
         $file = $request->file('file');
@@ -225,16 +228,6 @@ final class AttachmentController extends Controller
 
         try {
             $attachment = DB::transaction(function () use ($id, $tenantId, $type, $recordId, $lineNumber, $file, $path, $hash, $kind): DocumentAttachment {
-                if ($kind === 'picture') {
-                    // Satu foto aktif: dua penggantian serentak harus bergiliran, bukan saling menabrak indeks unik.
-                    DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['picture:'.$tenantId.':'.$type->recordType().':'.$recordId]);
-                    DocumentAttachment::query()
-                        ->where('tenant_id', $tenantId)
-                        ->where('record_type', $type->recordType())
-                        ->where('record_id', $recordId)
-                        ->where('kind', 'picture')
-                        ->update(['deleted_at' => now()]);
-                }
                 $attachment = new DocumentAttachment;
                 $attachment->forceFill([
                     'id' => $id,
