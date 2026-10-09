@@ -43,6 +43,15 @@ supaya ia tidak menuntut tabel. Alasannya ditulis di `apps/control-plane/bootstr
 
 Layarnya Inertia + React di `resources/js/pages/`.
 
+Rincian lingkungan menampilkan **Versi terpasang**. Untuk lingkungan di server kita, nomornya
+dibaca dari `platform_release` pada `GET /api/internal/v1/fleet`: Core mengambilnya dari
+`SENTRY_RELEASE` yang dikirim pemasang SaaS untuk rilis yang sedang dijalankan. Semua lingkungan
+di runtime itu memakai versi kode yang sama, meskipun sidik skema databasenya bisa berbeda.
+Untuk server klien, sumbernya `sites.reported_release` dari laporan agen terakhir, bukan rilis
+terbaru di katalog atau rilis yang baru diantrekan. Versi kosong tampil "Belum diketahui";
+kegagalan menghubungi Core ditampilkan tanpa menutup rincian lingkungan. Lingkungan aktif yang
+memakai database bersama tidak dianggap belum siap hanya karena tidak punya database sendiri.
+
 ## Batas data: apa milik sisi pusat
 
 Tabel yang hanya dibaca-tulis konsol ditandai di sisi Core dengan trait

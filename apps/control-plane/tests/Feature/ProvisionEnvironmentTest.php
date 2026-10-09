@@ -126,6 +126,7 @@ class ProvisionEnvironmentTest extends TestCase
 
     public function test_the_show_screen_says_whether_an_environment_may_be_provisioned(): void
     {
+        Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([])]);
         $ready = $this->environment('provisioning');
         $live = $this->environment('active', 'production');
 
@@ -137,7 +138,40 @@ class ProvisionEnvironmentTest extends TestCase
         // Pasangan merahnya, dan ia yang membuat yang di atas berarti: lingkungan yang sudah hidup
         // tidak boleh menampilkan tombol yang akan ditolak Core dengan 409.
         $this->actingAs($operator)->get('/lingkungan/'.$live->id)
-            ->assertInertia(fn ($page) => $page->where('canProvision', false));
+            ->assertInertia(fn ($page) => $page
+                ->where('canProvision', false)
+                ->where('installedRelease.version', null));
+    }
+
+    public function test_the_show_screen_reads_the_installed_release_from_core(): void
+    {
+        Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([
+            'platform_release' => '0.8.1',
+        ])]);
+
+        $environment = $this->environment('active', 'production');
+
+        $this->actingAs($this->operator())->get('/lingkungan/'.$environment->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('installedRelease.version', '0.8.1')
+                ->where('installedRelease.error', null));
+
+        Http::assertSent(fn (OutboundRequest $request): bool => $request->url() === self::BASE_URL.'/api/internal/v1/fleet'
+            && $request->hasHeader('Authorization', 'Bearer kunci-uji'));
+    }
+
+    public function test_a_release_lookup_failure_does_not_hide_the_environment(): void
+    {
+        Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([], 503)]);
+
+        $environment = $this->environment('active', 'production');
+
+        $this->actingAs($this->operator())->get('/lingkungan/'.$environment->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('installedRelease.version', null)
+                ->where('installedRelease.error', fn ($error): bool => str_contains($error, '503')));
     }
 
     /**
@@ -150,6 +184,7 @@ class ProvisionEnvironmentTest extends TestCase
      */
     public function test_a_demo_without_its_own_database_does_not_borrow_production_installations(): void
     {
+        Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([])]);
         $tenant = $this->tenant();
 
         $production = Environment::query()->create([

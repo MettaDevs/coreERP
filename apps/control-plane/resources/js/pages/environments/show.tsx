@@ -76,6 +76,7 @@ export default function Show({
     canProvision,
     serverClient,
     installCommand,
+    installedRelease,
 }: {
     environment: Environment;
     history: Operation[];
@@ -83,6 +84,7 @@ export default function Show({
     canProvision: boolean;
     serverClient: ServerClient | null;
     installCommand: InstallCommand | null;
+    installedRelease: { version: string | null; error: string | null };
 }) {
     const last = history[0];
     const [running, setRunning] = useState(false);
@@ -96,11 +98,8 @@ export default function Show({
     // formulir yang menampungnya — ia dibaca langsung dari props halaman.
     const provisionError = usePage().props.errors.provision;
 
-    // Spanduknya muncul juga ketika penyiapan tidak diizinkan, asalkan databasenya memang belum
-    // ada. Layar yang diam pada keadaan itu memaksa operator menebak apakah ia sedang melihat
-    // lingkungan yang belum siap atau lingkungan yang sudah siap tetapi kosong.
-    const showBanner =
-        !onClientServer && (canProvision || !environment.ownDatabase);
+    // Lingkungan aktif boleh memakai database bersama; tanpa database sendiri bukan berarti belum siap.
+    const showBanner = !onClientServer && canProvision;
     const sentence = retry
         ? 'Penyiapan terakhirnya berhenti di tengah jalan. Menjalankannya lagi aman: ia melanjutkan langkah yang belum selesai, bukan memulai dari nol.'
         : environment.ownDatabase
@@ -261,6 +260,22 @@ export default function Show({
                             ) : (
                                 <StatusBadge status={environment.status} />
                             )}
+                        </Row>
+                        <Row label="Versi terpasang">
+                            <div className="max-w-md text-end">
+                                <span className="font-mono text-xs">
+                                    {installedRelease.version ??
+                                        'Belum diketahui'}
+                                </span>
+                                {!installedRelease.version && (
+                                    <p className="mt-1 text-xs font-normal text-muted-foreground">
+                                        {installedRelease.error ??
+                                            (onClientServer
+                                                ? 'Agen belum melaporkan versi yang terpasang.'
+                                                : 'Runtime Core belum mencatat nomor rilisnya.')}
+                                    </p>
+                                )}
+                            </div>
                         </Row>
                         <Row label="Slug">
                             <span className="font-mono text-xs">
