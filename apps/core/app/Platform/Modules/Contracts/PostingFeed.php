@@ -75,6 +75,7 @@ interface PostingFeed
 
     /**
      * Jurnal asal beserta baris masukannya, untuk membalik porsi sebuah posting ringkas.
+     *
      * @return array<string,mixed>|null
      */
     public function journal(string $tenantId, string $postingId): ?array;

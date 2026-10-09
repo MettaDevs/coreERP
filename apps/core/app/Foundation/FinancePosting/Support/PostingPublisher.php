@@ -144,7 +144,7 @@ final class PostingPublisher
     }
 
     /**
-     * @param array<string,mixed> $cancellation
+     * @param  array<string,mixed>  $cancellation
      * @return list<array<string,mixed>>
      */
     public function reverse(string $tenantId, string $originalPostingId, array $cancellation, bool $preview = false): array
@@ -199,8 +199,8 @@ final class PostingPublisher
     }
 
     /**
-     * @param array{status:string,manual_reason:?string,problems:list<array<string,mixed>>,payload:array<string,mixed>,lines:list<array<string,mixed>>} $value
-     * @param array<string,mixed> $input
+     * @param  array{status:string,manual_reason:?string,problems:list<array<string,mixed>>,payload:array<string,mixed>,lines:list<array<string,mixed>>}  $value
+     * @param  array<string,mixed>  $input
      * @return array{status:string,manual_reason:?string,problems:list<array<string,mixed>>,payload:array<string,mixed>,lines:list<array<string,mixed>>}
      */
     private function reversalSnapshot(array $value, array $input): array
@@ -255,7 +255,7 @@ final class PostingPublisher
     }
 
     /**
-     * @param array<string,mixed> $input
+     * @param  array<string,mixed>  $input
      */
     private function reversalDecimals(array $input): ?int
     {

@@ -158,7 +158,7 @@ export function CancellationAction({
                     }
                 }}
             >
-                <DialogContent>
+                <DialogContent className="sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>
                             {canCancel
@@ -171,7 +171,7 @@ export function CancellationAction({
                                 : 'Transaksi tetap berlaku sampai pengguna berwenang menyetujui pembatalannya. Permintaan tersedia di aplikasi dan pemberitahuan dikirim melalui email.'}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+                    <div className="max-h-[60vh] space-y-4 overflow-y-auto py-3 pr-1">
                         {error && (
                             <p
                                 role="alert"
