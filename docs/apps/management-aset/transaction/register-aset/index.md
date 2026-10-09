@@ -394,6 +394,9 @@ Halaman rincian memasok isi tab **Detail** melalui slot `details` pada `RecordFa
 isinya komponen `AssetPicture`, yang menampilkan galeri lewat `RecordPictures` Core.
 Halaman lain bebas memasok isi yang berbeda; FactBox SDK tidak mengandung aturan aset, vendor,
 atau isi bisnis lain. SDK mengatur tab Detail/Lampiran, collapse–expand, dan layout pendamping.
+Lebar panel dapat diubah melalui pembatas pada desktop, dengan pointer maupun tombol panah;
+form utama tetap terpasang agar perubahan ukuran tidak membuang isian. Tombol perlebar memakai
+ruang yang tersedia tanpa menutupi form utama. Pada layar sempit panel ditumpuk di bawah form.
 
 Tab **Lampiran** memakai panel `RecordAttachments` milik Core, dengan jenis record `aset_tr_aset`.
 Panel memakai endpoint sesi Core, bukan endpoint baru di module. Daftar dan batas upload dibaca
@@ -420,9 +423,19 @@ beserta berkasnya tetap tersimpan. Foto tidak mempunyai nomor baris dokumen dan 
 menambah jumlah pada tab Lampiran. Metadata lampiran dimuat ketika panel terbuka agar angka di
 tab sesuai daftar; isi berkas baru diambil saat preview atau download.
 
-Pemilih berkas menerima beberapa foto sekaligus, kemudian mengunggahnya satu per satu. Jika
-upload berhenti di tengah, foto yang sudah berhasil tetap tampil dan pesan menyebut jumlahnya;
-foto sisanya dapat dipilih kembali. Preview dapat berpindah ke foto sebelumnya atau berikutnya.
+Foto dan dokumen memakai `RecordUploadDialog` Core yang sama, dengan drag-and-drop atau pemilih
+berkas lokal. Keduanya menerima beberapa berkas sekaligus lalu mengunggahnya satu per satu.
+Ekstensi dan ukuran ditampilkan pada daftar, galeri, dan preview. Batas ukuran dan jenis berkas
+tetap berasal dari metadata endpoint, dan server tetap memvalidasi isi berkas.
+
+`apiUpload` memakai XHR supaya progres berasal dari transfer multipart sebenarnya, dengan sesi,
+CSRF, dan `CoreApiError` yang sama seperti klien fetch. Progres transfer dibedakan dari keberhasilan
+penyimpanan: berkas baru dihitung selesai setelah server menjawab sukses. Menghentikan antrean
+menyelesaikan permintaan aktif lalu melewati sisanya, sehingga tidak ada jawaban upload yang
+dibuang hanya karena pengguna menekan berhenti. Jika upload gagal di tengah, berkas yang sudah
+berhasil tetap tampil dan pesan menyebut jumlahnya; sisanya dapat dipilih kembali. Preview foto
+dapat berpindah ke foto sebelumnya atau berikutnya. Pemeriksaan klien upload ada pada
+`apps/core/scripts/test-core-api.mjs` dan berjalan dalam CI.
 
 ## Aturan yang dijaga, dan alasannya
 

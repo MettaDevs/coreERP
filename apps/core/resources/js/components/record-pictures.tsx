@@ -23,15 +23,13 @@ import {
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
 import { ChevronLeft, ChevronRight, ImageIcon, Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    AttachmentPreview,
-    attachmentError,
-    fileSize,
-} from '@/components/record-attachments';
-import type { Attachment } from '@/components/record-attachments';
+import { AttachmentPreview } from '@/components/record-attachments';
+import { RecordUploadDialog } from '@/components/record-upload-dialog';
 import { apiJson, apiRequest } from '@/lib/core-api';
+import { attachmentError, fileExtension, fileSize } from '@/lib/record-files';
+import type { Attachment } from '@/lib/record-files';
 
 type PicturesPage = {
     data: Attachment[];
@@ -53,7 +51,7 @@ export function RecordPictures({
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [archiving, setArchiving] = useState<Attachment | null>(null);
-    const input = useRef<HTMLInputElement>(null);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/pictures`;
     const pictures = page?.data ?? [];
     const selectedIndex = pictures.findIndex(
@@ -85,56 +83,6 @@ export function RecordPictures({
 
         return () => controller.abort();
     }, [path, reloadVersion]);
-
-    async function upload(files: File[]) {
-        if (!page || files.length === 0) {
-            return;
-        }
-
-        setError(null);
-        const invalid = files.find(
-            (file) =>
-                !page.meta.extensions.includes(
-                    file.name.split('.').pop()?.toLowerCase() ?? '',
-                ) || file.size > page.meta.max_kb * 1024,
-        );
-
-        if (invalid) {
-            setError(
-                `${invalid.name}: pilih foto ${page.meta.extensions.join(', ').toUpperCase()} dengan ukuran maksimal ${fileSize(page.meta.max_kb * 1024)} per berkas.`,
-            );
-
-            return;
-        }
-
-        setBusy(true);
-        let uploaded = 0;
-
-        try {
-            for (const file of files) {
-                const body = new FormData();
-                body.append('file', file);
-                const result = await apiJson<{ data: Attachment }>(path, {
-                    method: 'POST',
-                    body,
-                });
-                setPage((current) =>
-                    current
-                        ? { ...current, data: [...current.data, result.data] }
-                        : current,
-                );
-                uploaded += 1;
-            }
-
-            toast.success(`${uploaded} foto sudah ditambahkan.`);
-        } catch (caught) {
-            setError(
-                `${uploaded ? `${uploaded} foto sudah ditambahkan. ` : ''}${attachmentError(caught, 'Foto berikutnya belum dapat diunggah.')} Foto lainnya belum diunggah; pilih kembali untuk mencoba lagi.`,
-            );
-        } finally {
-            setBusy(false);
-        }
-    }
 
     async function archive(picture: Attachment) {
         setBusy(true);
@@ -169,6 +117,25 @@ export function RecordPictures({
 
     return (
         <div className="space-y-4">
+            {page?.meta.can_change && (
+                <RecordUploadDialog
+                    open={uploadOpen}
+                    onOpenChange={setUploadOpen}
+                    title="Tambah foto"
+                    path={path}
+                    limits={page.meta}
+                    onUploaded={(attachment) =>
+                        setPage((current) =>
+                            current
+                                ? {
+                                      ...current,
+                                      data: [...current.data, attachment],
+                                  }
+                                : current,
+                        )
+                    }
+                />
+            )}
             {error && (
                 <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
@@ -232,6 +199,12 @@ export function RecordPictures({
                                     >
                                         {picture.file_name}
                                     </figcaption>
+                                    <p className="text-xs text-muted-foreground">
+                                        {fileExtension(
+                                            picture.file_name,
+                                        ).toUpperCase()}{' '}
+                                        · {fileSize(picture.size_bytes)}
+                                    </p>
                                     {page.meta.can_change && (
                                         <Button
                                             type="button"
@@ -254,29 +227,12 @@ export function RecordPictures({
             )}
             {page?.meta.can_change && (
                 <>
-                    <input
-                        ref={input}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        aria-label="Pilih foto"
-                        accept={page.meta.extensions
-                            .map((item) => `.${item}`)
-                            .join(',')}
-                        onChange={(event) => {
-                            const files = Array.from(
-                                event.currentTarget.files ?? [],
-                            );
-                            event.currentTarget.value = '';
-                            void upload(files);
-                        }}
-                    />
                     <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         disabled={busy || loading}
-                        onClick={() => input.current?.click()}
+                        onClick={() => setUploadOpen(true)}
                     >
                         <Upload />
                         {busy ? 'Mengunggah…' : 'Tambah foto'}
@@ -302,7 +258,8 @@ export function RecordPictures({
                             Foto {selectedIndex + 1} dari {pictures.length}
                         </DialogTitle>
                         <DialogDescription>
-                            {selected?.file_name}
+                            {selected &&
+                                `${selected.file_name} · ${fileExtension(selected.file_name).toUpperCase()} · ${fileSize(selected.size_bytes)}`}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody>

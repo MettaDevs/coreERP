@@ -31,48 +31,21 @@ import {
 } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
 import { Download, FileText, Paperclip, Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { RecordUploadDialog } from '@/components/record-upload-dialog';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
-import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
-
-export type Attachment = {
-    id: string;
-    version: number;
-    file_name: string;
-    mime_type: string;
-    size_bytes: number;
-    created_by_name: string | null;
-    created_at: string | null;
-};
+import { apiJson, apiRequest } from '@/lib/core-api';
+import { attachmentError, fileExtension, fileSize } from '@/lib/record-files';
+import type { Attachment } from '@/lib/record-files';
 
 type AttachmentPage = {
     data: Attachment[];
     meta: { can_change: boolean; max_kb: number; extensions: string[] };
 };
 
-export function fileSize(bytes: number): string {
-    return bytes < 1024 * 1024
-        ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-        : `${(bytes / (1024 * 1024)).toLocaleString('id-ID', { maximumFractionDigits: 1 })} MB`;
-}
-
 function downloadPath(attachment: Attachment): string {
     return `/api/v1/attachments/${encodeURIComponent(attachment.id)}/download`;
-}
-
-export function attachmentError(caught: unknown, fallback: string): string {
-    if (caught instanceof CoreApiError && caught.status >= 500) {
-        return `${fallback} Terjadi kesalahan sistem. Coba lagi atau hubungi pengelola aplikasi.`;
-    }
-
-    if (caught instanceof CoreApiError && [401, 419].includes(caught.status)) {
-        return 'Sesi kamu sudah berakhir. Muat ulang halaman lalu masuk kembali.';
-    }
-
-    return caught instanceof CoreApiError
-        ? errorText(caught, fallback)
-        : fallback;
 }
 
 export function AttachmentPreview({ attachment }: { attachment: Attachment }) {
@@ -184,7 +157,7 @@ export function RecordAttachments({
     const [busy, setBusy] = useState(false);
     const [selected, setSelected] = useState<Attachment | null>(null);
     const [archiving, setArchiving] = useState<Attachment | null>(null);
-    const input = useRef<HTMLInputElement>(null);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const formatDateTime = useDateTimeFormat();
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/attachments`;
 
@@ -195,7 +168,6 @@ export function RecordAttachments({
                 if (!controller.signal.aborted) {
                     setPage(result);
                     setError(null);
-                    onCountChange?.(result.data.length);
                 }
             })
             .catch((caught: unknown) => {
@@ -212,49 +184,13 @@ export function RecordAttachments({
             });
 
         return () => controller.abort();
-    }, [path, reloadVersion, onCountChange]);
+    }, [path, reloadVersion]);
 
-    async function upload(file: File) {
-        if (!page) {
-            return;
+    useEffect(() => {
+        if (page) {
+            onCountChange?.(page.data.length);
         }
-
-        setError(null);
-        const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-
-        if (
-            !page.meta.extensions.includes(extension) ||
-            file.size > page.meta.max_kb * 1024
-        ) {
-            setError(
-                `Pilih berkas ${page.meta.extensions.join(', ').toUpperCase()} dengan ukuran maksimal ${fileSize(page.meta.max_kb * 1024)}.`,
-            );
-
-            return;
-        }
-
-        setBusy(true);
-        const body = new FormData();
-        body.append('file', file);
-
-        try {
-            const result = await apiJson<{ data: Attachment }>(path, {
-                method: 'POST',
-                body,
-            });
-            setPage((current) =>
-                current
-                    ? { ...current, data: [...current.data, result.data] }
-                    : current,
-            );
-            toast.success('Berkas sudah dilampirkan.');
-            onCountChange?.(page.data.length + 1);
-        } catch (caught) {
-            setError(attachmentError(caught, 'Berkas belum dapat diunggah.'));
-        } finally {
-            setBusy(false);
-        }
-    }
+    }, [page, onCountChange]);
 
     async function download(attachment: Attachment) {
         setBusy(true);
@@ -299,7 +235,6 @@ export function RecordAttachments({
             );
             setArchiving(null);
             toast.success('Lampiran sudah diarsipkan.');
-            onCountChange?.(Math.max(0, (page?.data.length ?? 1) - 1));
         } catch (caught) {
             setError(
                 attachmentError(caught, 'Lampiran belum dapat diarsipkan.'),
@@ -328,6 +263,13 @@ export function RecordAttachments({
             ),
         },
         {
+            id: 'extension',
+            header: 'Ekstensi',
+            width: 78,
+            minWidth: 70,
+            cell: (item) => fileExtension(item.file_name).toUpperCase(),
+        },
+        {
             id: 'size',
             header: 'Ukuran',
             width: 72,
@@ -338,6 +280,25 @@ export function RecordAttachments({
 
     return (
         <>
+            {page?.meta.can_change && (
+                <RecordUploadDialog
+                    open={uploadOpen}
+                    onOpenChange={setUploadOpen}
+                    title="Upload berkas"
+                    path={path}
+                    limits={page.meta}
+                    onUploaded={(attachment) =>
+                        setPage((current) =>
+                            current
+                                ? {
+                                      ...current,
+                                      data: [...current.data, attachment],
+                                  }
+                                : current,
+                        )
+                    }
+                />
+            )}
             <section className="space-y-4" aria-label="Dokumen lampiran">
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="text-base font-medium">
@@ -350,7 +311,7 @@ export function RecordAttachments({
                                 size="sm"
                                 variant="outline"
                                 disabled={busy || loading}
-                                onClick={() => input.current?.click()}
+                                onClick={() => setUploadOpen(true)}
                             >
                                 <Upload />
                                 {busy ? 'Memproses…' : 'Upload'}
@@ -359,23 +320,6 @@ export function RecordAttachments({
                     )}
                 </div>
                 <div className="space-y-4">
-                    <input
-                        ref={input}
-                        type="file"
-                        className="hidden"
-                        aria-label="Pilih berkas lampiran"
-                        accept={page?.meta.extensions
-                            .map((item) => `.${item}`)
-                            .join(',')}
-                        onChange={(event) => {
-                            const file = event.currentTarget.files?.[0];
-                            event.currentTarget.value = '';
-
-                            if (file) {
-                                void upload(file);
-                            }
-                        }}
-                    />
                     {error && (
                         <Alert variant="destructive">
                             <AlertDescription>{error}</AlertDescription>
@@ -482,7 +426,7 @@ export function RecordAttachments({
                         <DialogTitle>{selected?.file_name}</DialogTitle>
                         <DialogDescription>
                             {selected &&
-                                `${fileSize(selected.size_bytes)} · ${selected.created_by_name ?? 'Pengguna'} · ${formatDateTime(selected.created_at)}`}
+                                `${fileExtension(selected.file_name).toUpperCase()} · ${fileSize(selected.size_bytes)} · ${selected.created_by_name ?? 'Pengguna'} · ${formatDateTime(selected.created_at)}`}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody>
