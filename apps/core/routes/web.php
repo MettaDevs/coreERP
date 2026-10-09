@@ -331,6 +331,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('change-log/{table}/{record}', [ChangeLogController::class, 'history'])->name('change-log.history')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::CHANGE_LOG_READ));
         // Lampiran dokumen: haknya mengikuti record induk, dijawab pemilik tabelnya; lihat ResolveAttachmentContext.
         Route::middleware(ResolveAttachmentContext::class)->group(function (): void {
+            Route::get('records/{recordType}/{recordId}/picture', [AttachmentController::class, 'picture'])->name('pictures.show');
+            Route::post('records/{recordType}/{recordId}/picture', [AttachmentController::class, 'storePicture'])->middleware('throttle:60,1')->name('pictures.store');
             Route::get('records/{recordType}/{recordId}/attachments', [AttachmentController::class, 'index'])->name('attachments.index');
             Route::post('records/{recordType}/{recordId}/attachments', [AttachmentController::class, 'store'])->middleware('throttle:60,1')->name('attachments.store');
             Route::get('attachments/{attachment}/download', [AttachmentController::class, 'download'])->name('attachments.download');

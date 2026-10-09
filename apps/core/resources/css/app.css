@@ -26,6 +26,6 @@
  * Ditulis sebagai satu pola untuk semua module, bukan satu baris per module: daftar yang
  * harus ditambah setiap kali module baru mendarat adalah daftar yang akan terlupa.
  */
-@source '../../../../modules/*/*/ui';
+@source '../../../../modules/*/*/ui/**/*.{ts,tsx}';
 
 @custom-variant dark (&:is(.dark *));
