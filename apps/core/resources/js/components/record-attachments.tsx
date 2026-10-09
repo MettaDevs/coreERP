@@ -318,7 +318,7 @@ export function RecordAttachments({
             cell: (item) => (
                 <button
                     type="button"
-                    className="text-primary block w-full text-left hover:underline"
+                    className="block w-full text-left text-primary hover:underline"
                     onClick={() => setSelected(item)}
                 >
                     <span className="block truncate" title={item.file_name}>
@@ -461,7 +461,7 @@ export function RecordAttachments({
                         ))
                     )}
                     {page?.meta.can_change && (
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-xs text-muted-foreground">
                             {page.meta.extensions.join(', ').toUpperCase()} ·
                             Maksimal {fileSize(page.meta.max_kb * 1024)} per
                             berkas
