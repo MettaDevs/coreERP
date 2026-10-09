@@ -30,6 +30,13 @@ get:
             type: object
             required: [platform_fingerprint, counts, environments]
             properties:
+              platform_release:
+                type: string
+                nullable: true
+                description: |
+                  Nomor rilis runtime Core, dari SENTRY_RELEASE yang dikirim pemasang SaaS
+                  (coreerp@MAJOR.MINOR.PATCH). Null bila runtime belum mencatat nomor rilis,
+                  termasuk pembangunan lokal. Ini versi kode yang berjalan, bukan sidik skema.
               platform_fingerprint:
                 type: string
                 description: |
