@@ -39,6 +39,7 @@ export function FactBox({
     className?: string;
 }) {
     const [open, setOpen] = useState(defaultOpen);
+    const [tab, setTab] = useState('details');
     const [width, setWidth] = useState(DEFAULT_WIDTH);
     const [maxWidth, setMaxWidth] = useState(DEFAULT_WIDTH);
     const layout = useRef<HTMLDivElement>(null);
@@ -210,7 +211,7 @@ export function FactBox({
                     </CollapsibleTrigger>
                 </div>
                 <CollapsibleContent>
-                    <Tabs defaultValue="details">
+                    <Tabs value={tab} onValueChange={setTab}>
                         <Card>
                             <CardHeader>
                                 <TabsList

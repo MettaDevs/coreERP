@@ -121,6 +121,7 @@ export function RecordUploadDialog({
             }
 
             toast.success(`${uploaded} berkas sudah diunggah.`);
+            setFiles([]);
             onOpenChange(false);
         } catch (caught) {
             if (!controller.signal.aborted) {
