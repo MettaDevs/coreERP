@@ -13,7 +13,7 @@ import {
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage } from '../../api';
+import { ApiError, api, errorMessage } from '../../api';
 import { PostingPreviewPanel } from './PostingPreviewPanel';
 import type { PostingPreview } from './PostingPreviewPanel';
 
@@ -29,6 +29,10 @@ type Preview = {
         failure_message: string | null;
     } | null;
 };
+
+function cancellationError(error: unknown, fallback: string): string {
+    return error instanceof ApiError ? errorMessage(error, fallback) : fallback;
+}
 
 /** Cancel Entries BC: alasan, pilihan tanggal pembukuan baru, lalu pratinjau jurnal pembalik. */
 export function CancellationAction({
@@ -74,7 +78,12 @@ export function CancellationAction({
                 setReason(result.data.cancellation.reason);
             }
         } catch (caught) {
-            setError(errorMessage(caught, 'Pembatalan belum dapat diperiksa.'));
+            setError(
+                cancellationError(
+                    caught,
+                    'Pembatalan belum dapat diperiksa. Periksa sambungan Anda, lalu coba lagi.',
+                ),
+            );
         } finally {
             setBusy(false);
         }
@@ -113,7 +122,12 @@ export function CancellationAction({
             setOpen(false);
             onComplete();
         } catch (caught) {
-            setError(errorMessage(caught, 'Pembatalan belum dapat diproses.'));
+            setError(
+                cancellationError(
+                    caught,
+                    'Pembatalan belum dapat diproses. Periksa sambungan Anda, lalu coba lagi.',
+                ),
+            );
         } finally {
             setBusy(false);
         }
@@ -134,7 +148,12 @@ export function CancellationAction({
             setPreview(result.data);
             setError(null);
         } catch (caught) {
-            setError(errorMessage(caught, 'Pratinjau belum dapat dimuat.'));
+            setError(
+                cancellationError(
+                    caught,
+                    'Pratinjau belum dapat dimuat. Periksa sambungan Anda, lalu coba lagi.',
+                ),
+            );
         } finally {
             setBusy(false);
         }
