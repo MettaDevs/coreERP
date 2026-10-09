@@ -237,7 +237,7 @@ class LokasiAsetAlamatDanUnitBawaanTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, $this->izinLokasi())
             ->withHeader('Idempotency-Key', 'lokasi-'.Str::ulid())
-            ->postJson(self::BASE.'lokasi-aset', $this->denganKodeKetik('lokasi-aset', $payload));
+            ->postJson(self::BASE.'lokasi-aset', $payload);
     }
 
     /**

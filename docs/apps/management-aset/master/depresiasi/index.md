@@ -14,6 +14,9 @@ Satu aset bisa disusutkan beberapa kali dengan cara berbeda — sekali untuk lap
 
 Tabelnya: `aset_m_profil_penyusutan`, `aset_m_buku_penyusutan`, `aset_m_group_buku_penyusutan` untuk matriksnya, dan `aset_tr_buku_aset` untuk buku milik tiap aset.
 
+
+Kode buku penyusutan baru diterbitkan lewat reference `management-aset.buku-penyusutan` sesuai pengaturan Nomor dokumen Core, termasuk buku bawaan saat tenant disiapkan. Form tidak meminta kode ketik. Buku bawaan yang sudah ada dikenali lewat `creation_key`, sehingga penyediaan ulang mempertahankan kode dan pilihan pengguna. `SetupMasterNumberSequenceTest` memeriksa penerbitan, replay, dan penolakan ketika urutan nomor tidak aktif.
+
 ## Profil penyusutan
 
 Master biasa dengan kolom tambahan yang menentukan hitungan:

@@ -162,8 +162,7 @@ class NumberSequenceFailureTest extends TestCase
     }
 
     /**
-     * Master bernomor apa pun cukup; kondisi aset dipakai karena ia berdiri sendiri. Group aset
-     * tidak lagi bisa menjadi contohnya: kodenya diketik, tidak diterbitkan urutan nomor (K-24).
+     * Master bernomor apa pun cukup; kondisi aset dipakai karena ia berdiri sendiri.
      *
      * @return TestResponse<Response>
      */

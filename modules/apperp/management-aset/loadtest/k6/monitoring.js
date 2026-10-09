@@ -28,7 +28,7 @@ import exec from 'k6/execution';
 import http from 'k6/http';
 import { Counter, Trend } from 'k6/metrics';
 import { FIXTURE, RUN_ID, bangunJar, paramsUntuk, sempitkanTenant, siapkanTenant, tenantVu, urlModule } from '../lib.js';
-import { kodeManual, lahirkanAset } from './seed-aset.js';
+import { lahirkanAset } from './seed-aset.js';
 
 const PROFILE = __ENV.PROFILE || 'saturation';
 const VUS = Number(__ENV.VUS || 1000);
@@ -151,11 +151,11 @@ export function setup() {
     const kunci = (nama, index) => `mon-${FIXTURE}-${nama}-${index}`;
 
     const lokasiIds = ids(tahap('lokasi-aset', semua((tenant, index) => ['POST', ASET('lokasi-aset'), JSON.stringify({ nama: `LT-MON lokasi ${index}` }), params(tenant, kunci('lokasi', index))])));
-    const groupResponses = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeManual('MON', FIXTURE, 'G', index), nama: `LT-MON group ${index}` }), params(tenant, kunci('group', index))]));
+    const groupResponses = tahap('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `LT-MON group ${index}` }), params(tenant, kunci('group', index))]));
     const groupIds = ids(groupResponses);
     const jenisIds = ids(tahap('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `LT-MON jenis ${index}` }), params(tenant, kunci('jenis', index))])));
     const profilIds = ids(tahap('profil-penyusutan', semua((tenant, index) => ['POST', ASET('profil-penyusutan'), JSON.stringify({ nama: `LT-MON profil ${index}`, method: 'straight_line', frequency: 'monthly', year_basis: 'calendar', useful_life_periods: 48, convention: 'full_month' }), params(tenant, kunci('profil', index))])));
-    const bukuIds = ids(tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ kode: kodeManual('MON', FIXTURE, 'B', index), nama: `LT-MON buku ${index}`, posting_layer: 'current' }), params(tenant, kunci('buku', index))])));
+    const bukuIds = ids(tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ nama: `LT-MON buku ${index}`, posting_layer: 'current' }), params(tenant, kunci('buku', index))])));
     tahap(
         'matriks group x buku',
         semua((tenant, index) => [

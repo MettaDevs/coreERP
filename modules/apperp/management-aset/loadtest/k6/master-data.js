@@ -24,7 +24,7 @@ import exec from 'k6/execution';
 import http from 'k6/http';
 import { Counter, Trend } from 'k6/metrics';
 import { siapkanTenant, sempitkanTenant, paramsUntuk, bangunJar, tenantVu, urlModule, RUN_ID } from '../lib.js';
-import { kodeManual, lahirkanAset, tandaRun } from './seed-aset.js';
+import { lahirkanAset } from './seed-aset.js';
 
 const PROFILE = __ENV.PROFILE || 'saturation';
 const VUS = Number(__ENV.VUS || 1000);
@@ -51,9 +51,9 @@ const CHAINED = {
 };
 const STANDALONE = ['group-aset', 'jenis-aset', 'kondisi-aset', 'pabrikan-aset', 'item-checklist-maintenance', 'analisa-maintenance', 'tipe-lokasi-aset'];
 // Prefix mengikuti `default_prefix` pada manifest, yang tersimpan di
-// `app_number_sequence_references` dan dibaca Number Sequence Core. Group aset tidak ada di sini:
-// kodenya diketik (K-24), bukan diterbitkan urutan nomor.
+// `app_number_sequence_references` dan dibaca Number Sequence Core.
 const KODE_PREFIX = {
+    'group-aset': 'GRPA',
     'model-aset': 'MDLA',
     'jenis-aset': 'JNSA',
     'kondisi-aset': 'KNDA',
@@ -173,14 +173,14 @@ export function setup() {
 
     // Kunci seed stabil per RUN_ID: menjalankan ulang pada database yang sama memakai kembali
     // record yang sama, bukan menumbuhkan data seed.
-    const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: kodeManual('SEED', RUN_ID, 'G', index), nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
+    const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
     const groupIds = groupResponses.map((response) => response.json('data.id'));
     const jenisResponses = tahapRespons('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Jenis seed ${index}` }), params(tenant, `seed-${RUN_ID}-jenis-${index}`)]));
     const jenisIds = jenisResponses.map((response) => response.json('data.id'));
     const pabrikanIds = tahap('pabrikan-aset', semua((tenant, index) => ['POST', ASET('pabrikan-aset'), JSON.stringify({ nama: `Pabrikan seed ${index}` }), params(tenant, `seed-${RUN_ID}-pabrikan-${index}`)]));
     const modelIds = tahap('model-aset', semua((tenant, index) => ['POST', ASET('model-aset'), JSON.stringify({ nama: `Model seed ${index}`, pabrikan_aset_id: pabrikanIds[index], jenis_aset_id: jenisIds[index] }), params(tenant, `seed-${RUN_ID}-model-${index}`)]));
     const profilIds = tahap('profil-penyusutan', semua((tenant, index) => ['POST', ASET('profil-penyusutan'), JSON.stringify({ nama: `Profil seed ${index}`, method: 'straight_line', frequency: 'monthly', year_basis: 'calendar', useful_life_periods: 60 }), params(tenant, `seed-${RUN_ID}-profil-${index}`)]));
-    const bukuIds = tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ kode: kodeManual('SEED', RUN_ID, 'B', index), nama: `Buku seed ${index}`, posting_layer: 'current', depreciation_profile_id: profilIds[index] }), params(tenant, `seed-${RUN_ID}-buku-${index}`)]));
+    const bukuIds = tahap('buku-penyusutan', semua((tenant, index) => ['POST', ASET('buku-penyusutan'), JSON.stringify({ nama: `Buku seed ${index}`, posting_layer: 'current', depreciation_profile_id: profilIds[index] }), params(tenant, `seed-${RUN_ID}-buku-${index}`)]));
     const tipeAtributResponses = tahapRespons('tipe-atribut', semua((tenant, index) => ['POST', ASET('tipe-atribut'), JSON.stringify({ nama: `Warna load test ${index}`, data_type: 'string' }), params(tenant, `seed-${RUN_ID}-tipe-atribut-${index}`)]));
     const tipeAtributIds = tipeAtributResponses.map((response) => response.json('data.id'));
 
@@ -295,10 +295,6 @@ function createMaster(tenant) {
     const kunci = `${RUN_ID}-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}-${resource}`;
     const body = { nama: `${resource} ${kunci}`, keterangan: 'load test' };
 
-    if (resource === 'group-aset') {
-        body.kode = kodeManual('LT', tandaRun(RUN_ID), exec.vu.idInTest, exec.scenario.iterationInTest);
-    }
-
     if (chained) {
         body[chained.parentField] = tenant[chained.seed];
     }
@@ -366,7 +362,7 @@ function updateMaster(tenant) {
 /** Dua permintaan identik berbarengan harus menghasilkan tepat satu record. */
 function idempotencyRace(tenant) {
     const kunci = `race-${RUN_ID}-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`;
-    const body = JSON.stringify({ kode: kodeManual('RACE', tandaRun(RUN_ID), exec.vu.idInTest, exec.scenario.iterationInTest), nama: `race ${kunci}` });
+    const body = JSON.stringify({ nama: `race ${kunci}` });
     const params = paramsUntuk(tenant, { tags: { op: 'race', resource: 'group-aset' } }, { 'Idempotency-Key': kunci });
 
     const [first, second] = http.batch([

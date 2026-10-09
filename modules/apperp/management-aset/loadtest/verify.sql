@@ -89,9 +89,6 @@ prefix_salah as (
     -- Prefix kode berasal dari reference Number Sequence yang berbeda per master. Prefix yang
     -- tertukar berarti satu master memakai reference milik master lain.
     --
-    -- Group aset dan buku penyusutan tidak ada di sini: kodenya diketik pengguna (cbb0816), dan
-    -- buku `FISKAL`/`KOMERSIAL` lahir dari data awal standar Indonesia. Keduanya dijaga
-    -- `kode_diketik_tidak_sah` dan `duplikat_kode`, bukan oracle nomor.
     select
         (select count(*) from aset_m_jenis_aset where kode not like 'JNSA%')
       + (select count(*) from aset_m_model_aset where kode not like 'MDLA%')
@@ -108,7 +105,9 @@ prefix_salah as (
 -- punya satu baris terbitan pada tenant DAN reference yang benar.
 nomor_tanpa_terbitan as (
     select
-        (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
+        (select count(*) from aset_m_group_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.group-aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_buku_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.buku-penyusutan' and i.formatted_value = t.kode))
+      + (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_model_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.model-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_pabrikan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.pabrikan-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_kondisi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.kondisi-aset' and i.formatted_value = t.kode))
@@ -268,13 +267,6 @@ work_order_child_tidak_sah as (
       + (select count(*) from aset_tr_pemeliharaan_aset_details d left join aset_tr_pemeliharaan_aset h on h.id = d.pemeliharaan_aset_id where h.id is null)
       + (select count(*) from aset_tr_pemeliharaan_aset_checklist c join aset_tr_pemeliharaan_aset_details d on d.id = c.pemeliharaan_aset_detail_id where c.tenant_id <> d.tenant_id)
       + (select count(*) from aset_tr_pemeliharaan_aset_status_log l join aset_tr_pemeliharaan_aset h on h.id = l.pemeliharaan_aset_id where l.tenant_id <> h.tenant_id) as n
-),
-kode_diketik_tidak_sah as (
-    -- Bentuk yang ditegakkan `MasterDataController::kodeManual()`, ditulis ulang di sini sebagai
-    -- data: huruf besar, angka, dan tanda hubung di antaranya, paling panjang 30.
-    select
-        (select count(*) from aset_m_group_aset where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30)
-      + (select count(*) from aset_m_buku_penyusutan where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30) as n
 ),
 penerimaan_tanpa_posting as (
     -- Jurnal penerimaan terbit di transaksi yang sama dengan penyelesaiannya: jurnal perolehan
@@ -516,7 +508,6 @@ union all select 'prefix nomor work order salah', n from work_order_prefix_salah
 union all select 'detail/checklist/status log work order lintas tenant atau yatim', n from work_order_child_tidak_sah
 union all select 'transisi status work order di luar grafik', n from work_order_transisi_tidak_sah
 union all select 'akumulasi buku aset tidak sama dengan jumlah periode final', n from saldo_buku_tidak_cocok_periode
-union all select 'kode diketik group aset atau buku penyusutan tidak sah', n from kode_diketik_tidak_sah
 union all select 'penerimaan selesai tanpa tepat satu posting perolehan', n from penerimaan_tanpa_posting
 union all select 'posting perolehan tanpa penerimaan selesai di tenant yang sama', n from posting_perolehan_tanpa_penerimaan_selesai
 union all select 'debit posting perolehan tidak sama dengan register ditambah PPN', n from posting_perolehan_tidak_sama_dengan_register

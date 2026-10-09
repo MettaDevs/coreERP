@@ -60,14 +60,12 @@ class ConvertEnvironmentTest extends TestCase
             'status' => 'active',
         ]);
 
-        // Setelan penerbit event, disalin dari `OutboundDisarmTest`. Penandanya kunci
-        // `module`: sebuah penerima yang kodenya dimuat runtime ini akan dilewati penerbit, dan
-        // test yang memakai id module yang ada akan hijau tanpa membuktikan apa pun.
+        // Penerima ini berada di luar proses, jadi tidak membawa kunci `module`.
+        // Mengikatnya ke module terpasang membuat penerbit melewati HTTP yang sedang diuji.
         config()->set('coreerp.app_context_signing_key', 'kunci-uji');
         config()->set('coreerp.event_endpoints', [[
             'type' => 'core.workflow.decision.v2',
             'url' => self::RECIPIENT,
-            'module' => 'procurement',
         ]]);
     }
 

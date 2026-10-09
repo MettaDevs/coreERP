@@ -25,12 +25,6 @@ class BukuPenyusutanController extends MasterDataController
         return BukuPenyusutan::class;
     }
 
-    /** Kode diketik, misalnya `KOMERSIAL`; lihat MasterDataController::manualCode(). */
-    protected function manualCode(): bool
-    {
-        return true;
-    }
-
     protected function childMasters(): array
     {
         return [

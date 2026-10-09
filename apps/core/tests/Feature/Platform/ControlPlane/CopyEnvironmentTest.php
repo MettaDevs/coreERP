@@ -74,7 +74,6 @@ class CopyEnvironmentTest extends TestCase
         config()->set('coreerp.event_endpoints', [[
             'type' => 'core.workflow.decision.v2',
             'url' => self::WEBHOOK,
-            'module' => 'procurement',
         ]]);
     }
 

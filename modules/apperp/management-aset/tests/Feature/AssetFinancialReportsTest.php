@@ -33,6 +33,9 @@ class AssetFinancialReportsTest extends TestCase
     private string $komersial;
 
     /** @var array<string, string> */
+    private array $groupCodes = [];
+
+    /** @var array<string, string> */
     private array $aset = [];
 
     protected function setUp(): void
@@ -42,6 +45,7 @@ class AssetFinancialReportsTest extends TestCase
 
         [$kendaraan, $this->komersial, $fiskal] = $this->groupLengkap('KENDARAAN', 'Kendaraan');
         $alkes = $this->groupBukuSama('ALKES', 'Alat kesehatan', $this->komersial, $fiskal);
+        $this->groupCodes = ['vehicle' => $this->groupCode($kendaraan), 'equipment' => $this->groupCode($alkes)];
         $this->aset['satu'] = $this->terimaSatu($kendaraan);
         $this->aset['dua'] = $this->terimaSatu($kendaraan, 24000000);
         $this->susutkan('2026-10-01', '2026-10-31');
@@ -100,28 +104,28 @@ class AssetFinancialReportsTest extends TestCase
 
         // Kendaraan: 48 + 24 juta diperoleh, 24 juta keluar ke Alat kesehatan, 12 juta pecahan dijual. Pecah di
         // dalam satu group tidak dijurnal dan saling meniadakan.
-        $this->assertSame('1-2300', $baris['KENDARAAN|Harga perolehan']['kode_akun']);
-        $this->assertAmounts(['saldo_register' => 36000000, 'menunggu' => 36000000, 'belum_diterbitkan' => 0, 'selisih' => 36000000], $baris['KENDARAAN|Harga perolehan']);
+        $this->assertSame('1-2300', $baris[$this->groupCodes['vehicle'].'|Harga perolehan']['kode_akun']);
+        $this->assertAmounts(['saldo_register' => 36000000, 'menunggu' => 36000000, 'belum_diterbitkan' => 0, 'selisih' => 36000000], $baris[$this->groupCodes['vehicle'].'|Harga perolehan']);
         // Penyusutan Oktober belum di-post ke finance; yang keluar lewat reklasifikasi dan pelepasan sudah terbit.
-        $this->assertAmounts(['saldo_register' => 750000, 'belum_diterbitkan' => 1500000, 'menunggu' => -750000], $baris['KENDARAAN|Akumulasi penyusutan']);
-        $this->assertAmounts(['saldo_register' => 1500000, 'menunggu' => 1500000], $baris['KENDARAAN|Akumulasi penurunan nilai']);
-        $this->assertSame('1-2400', $baris['ALKES|Harga perolehan']['kode_akun']);
-        $this->assertAmounts(['saldo_register' => 24000000, 'menunggu' => 24000000], $baris['ALKES|Harga perolehan']);
-        $this->assertAmounts(['saldo_register' => 500000, 'menunggu' => 500000], $baris['ALKES|Akumulasi penyusutan']);
+        $this->assertAmounts(['saldo_register' => 750000, 'belum_diterbitkan' => 1500000, 'menunggu' => -750000], $baris[$this->groupCodes['vehicle'].'|Akumulasi penyusutan']);
+        $this->assertAmounts(['saldo_register' => 1500000, 'menunggu' => 1500000], $baris[$this->groupCodes['vehicle'].'|Akumulasi penurunan nilai']);
+        $this->assertSame('1-2400', $baris[$this->groupCodes['equipment'].'|Harga perolehan']['kode_akun']);
+        $this->assertAmounts(['saldo_register' => 24000000, 'menunggu' => 24000000], $baris[$this->groupCodes['equipment'].'|Harga perolehan']);
+        $this->assertAmounts(['saldo_register' => 500000, 'menunggu' => 500000], $baris[$this->groupCodes['equipment'].'|Akumulasi penyusutan']);
 
         // Saldo register per group sama dengan saldo buku komersial aset yang sekarang ada di group itu.
-        $this->assertEqualsWithDelta((float) $this->buku($this->aset['satu'], $this->komersial)['acquisition_value'], (float) $baris['KENDARAAN|Harga perolehan']['saldo_register'], 0.001);
+        $this->assertEqualsWithDelta((float) $this->buku($this->aset['satu'], $this->komersial)['acquisition_value'], (float) $baris[$this->groupCodes['vehicle'].'|Harga perolehan']['saldo_register'], 0.001);
 
         // Jurnal perolehan aset satu dibukukan aplikasi finance: pindah ke kolomnya, selisihnya mengecil.
         $receipt = (string) DB::table('aset_tr_aset')->where('id', $this->aset['satu'])->value('penerimaan_aset_id');
         FinancePosting::query()->where('posting_id', 'AST-ACQ-'.$receipt)->update(['status' => 'posted', 'external_reference' => 'JV-2026-0001', 'acknowledged_at' => now()]);
         $sesudah = $this->perAkun($this->dataset('laporan-rekonsiliasi-aset-buku-besar', ['per_tanggal' => '2026-11-30'])['tables']['baris']);
-        $this->assertAmounts(['saldo_register' => 36000000, 'sudah_dibukukan' => 48000000, 'menunggu' => -12000000, 'selisih' => -12000000], $sesudah['KENDARAAN|Harga perolehan']);
+        $this->assertAmounts(['saldo_register' => 36000000, 'sudah_dibukukan' => 48000000, 'menunggu' => -12000000, 'selisih' => -12000000], $sesudah[$this->groupCodes['vehicle'].'|Harga perolehan']);
 
         // Per tanggal sebelum reklasifikasi: aset dua masih di Kendaraan.
         $oktober = $this->perAkun($this->dataset('laporan-rekonsiliasi-aset-buku-besar', ['per_tanggal' => '2026-10-30'])['tables']['baris']);
-        $this->assertAmounts(['saldo_register' => 72000000], $oktober['KENDARAAN|Harga perolehan']);
-        $this->assertArrayNotHasKey('ALKES|Harga perolehan', $oktober);
+        $this->assertAmounts(['saldo_register' => 72000000], $oktober[$this->groupCodes['vehicle'].'|Harga perolehan']);
+        $this->assertArrayNotHasKey($this->groupCodes['equipment'].'|Harga perolehan', $oktober);
     }
 
     public function test_projection_uses_the_depreciation_calculator_from_the_current_book_state(): void

@@ -33,6 +33,8 @@ Penjelasan lengkapnya di [Penyusutan: profil, buku, dan matriks](/apps/managemen
 
 ## Aturan yang dijaga
 
+**Kode group mengikuti Nomor dokumen Core.** Form baru menampilkan kode otomatis saat disimpan; API mengabaikan `kode` kiriman klien dan memakai reference `management-aset.group-aset`. Kode tetap setelah record tersimpan. Pengecualian kode ketik pada integrasi finance dicabut pada 9 Oktober 2026 karena melewati konfigurasi nomor tenant. Regresinya diuji di `tests/Feature/SetupMasterNumberSequenceTest.php`, termasuk penolakan ketika urutan nomor tidak aktif.
+
 **Group tidak bisa diganti setelah aset dibuat.** Buku penyusutan aset sudah terbentuk dari matriks group lama. Permintaan yang mencobanya ditolak dengan pesan yang menyebut alasannya — bukan diabaikan diam-diam, supaya pengguna tidak mengira group sudah berganti.
 
 **Kelompok harta fiskal harus ada di referensi tenant.** Divalidasi terhadap `aset_m_kelompok_harta_fiskal`, yang diisi otomatis saat tenant disiapkan.

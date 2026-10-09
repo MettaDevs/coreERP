@@ -62,7 +62,7 @@ class OpeningBalanceTest extends TestCase
         ));
         $aset = $payload['details']['assets'];
         $this->assertCount(2, $aset);
-        $this->assertSame(['KOM-KENDARAAN', '120000000.00', '60000000.00', '60000000.00'], [$aset[0]['book'], $aset[0]['acquisition_value'], $aset[0]['accumulated_depreciation'], $aset[0]['net_book_value']]);
+        $this->assertSame([$this->bookCode($komersial), '120000000.00', '60000000.00', '60000000.00'], [$aset[0]['book'], $aset[0]['acquisition_value'], $aset[0]['accumulated_depreciation'], $aset[0]['net_book_value']]);
 
         // Buku aset lahir dengan akumulasinya masing-masing, dan penyusutannya mulai di cutover.
         $this->assertSame(['60000000.00', '60000000.00', 24, '60000000.00', '2026-01-01'], $this->bukuAset($id, $komersial));
@@ -149,7 +149,7 @@ class OpeningBalanceTest extends TestCase
             ->assertJsonValidationErrors(['details.0.akumulasi_per_unit' => 'Akumulasi paling banyak 2 angka di belakang koma.']);
         // Angka baris berlaku juga untuk buku fiskal yang tidak diisi tersendiri, yang umurnya lebih pendek.
         $salah($this->barisSaldoAwal($group, 1, '10000000', '5000000', 60))
-            ->assertJsonValidationErrors(['details.0.periode_berjalan' => 'Periode berjalan melebihi masa manfaat buku FIS-KENDARAAN (48 periode). Isi angka buku itu tersendiri.']);
+            ->assertJsonValidationErrors(['details.0.periode_berjalan' => 'Periode berjalan melebihi masa manfaat buku '.$this->bookCode($fiskal).' (48 periode). Isi angka buku itu tersendiri.']);
         $this->kirimDraf($this->headerSaldoAwal(), [$this->barisSaldoAwal($group, 1, '10000000', '5000000', 60, [
             ['buku_id' => $fiskal, 'akumulasi_per_unit' => '10000000', 'periode_berjalan' => 48],
         ])])->assertCreated();
@@ -174,8 +174,8 @@ class OpeningBalanceTest extends TestCase
             ->getJson(self::API.'penerimaan-aset/buku?group_aset_id='.$group)
             ->assertOk()
             ->assertExactJson(['data' => [
-                ['buku_id' => $komersial, 'kode' => 'KOM-KENDARAAN', 'nama' => 'Komersial Kendaraan', 'posting_layer' => 'current', 'di_post' => true, 'masa_manfaat' => 60],
-                ['buku_id' => $fiskal, 'kode' => 'FIS-KENDARAAN', 'nama' => 'Fiskal Kendaraan', 'posting_layer' => 'none', 'di_post' => false, 'masa_manfaat' => 96],
+                ['buku_id' => $komersial, 'kode' => $this->bookCode($komersial), 'nama' => 'Komersial Kendaraan', 'posting_layer' => 'current', 'di_post' => true, 'masa_manfaat' => 60],
+                ['buku_id' => $fiskal, 'kode' => $this->bookCode($fiskal), 'nama' => 'Fiskal Kendaraan', 'posting_layer' => 'none', 'di_post' => false, 'masa_manfaat' => 96],
             ]]);
     }
 
@@ -188,7 +188,7 @@ class OpeningBalanceTest extends TestCase
         $posting = $this->posting($id, 'AST-OPB-');
         $this->assertSame('held', $posting->status);
         $this->assertSame(
-            ['Group KENDARAAN · harga perolehan belum dipetakan ke akun.', 'Group KENDARAAN · akumulasi penyusutan belum dipetakan ke akun.', 'Group KENDARAAN · penyeimbang saldo awal belum dipetakan ke akun.'],
+            ['Group '.$this->groupCode($group).' · harga perolehan belum dipetakan ke akun.', 'Group '.$this->groupCode($group).' · akumulasi penyusutan belum dipetakan ke akun.', 'Group '.$this->groupCode($group).' · penyeimbang saldo awal belum dipetakan ke akun.'],
             array_column($posting->hold_reasons, 'message'),
         );
 

@@ -76,7 +76,7 @@ class AcquisitionPostingTest extends TestCase
 
         $aset = $payload['details']['assets'];
         $this->assertCount(3, $aset);
-        $this->assertSame(['KENDARAAN', 'B-KENDARAAN', '250000000.00', '27500000.00'], [$aset[0]['asset_group'], $aset[0]['book'], $aset[0]['acquisition_value'], $aset[0]['tax_amount']]);
+        $this->assertSame([$this->groupCode($kendaraan), 'B-KENDARAAN', '250000000.00', '27500000.00'], [$aset[0]['asset_group'], $aset[0]['book'], $aset[0]['acquisition_value'], $aset[0]['tax_amount']]);
         $this->assertSame(
             DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->orderBy('kode')->pluck('kode')->all(),
             array_column($aset, 'asset_code'),
@@ -115,9 +115,9 @@ class AcquisitionPostingTest extends TestCase
         $this->assertSame(1, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->count());
         $masalah = collect($posting->hold_reasons)->keyBy('line_no');
         $this->assertSame('ACCOUNT_NOT_MAPPED', $masalah[1]['code']);
-        $this->assertSame('Group RUANG · harga perolehan belum dipetakan ke akun.', $masalah[1]['message']);
+        $this->assertSame('Group '.$this->groupCode($group).' · harga perolehan belum dipetakan ke akun.', $masalah[1]['message']);
         $this->assertSame(['label' => 'Buka pemetaan akun', 'url' => '/management-aset/fixed-aset-posting-profiles'], $masalah[1]['fix']);
-        $this->assertSame('Group RUANG · lawan hutang belum dipetakan ke akun.', $masalah[2]['message']);
+        $this->assertSame('Group '.$this->groupCode($group).' · lawan hutang belum dipetakan ke akun.', $masalah[2]['message']);
 
         // Konsultan mengisi posting group, lalu Validasi ulang di layar pantau Core melepasnya.
         $this->petakan($group, ['acquisition_account_id' => $this->akun['kendaraan'], 'payable_account_id' => $this->akun['hutang']]);
@@ -206,7 +206,7 @@ class AcquisitionPostingTest extends TestCase
         $this->selesaikan($kedua)->assertOk();
         $tertahan = $this->posting($kedua);
         $this->assertSame('held', $tertahan->status);
-        $this->assertSame('Group SUMBANGAN · lawan hibah belum dipetakan ke akun.', $tertahan->hold_reasons[0]['message']);
+        $this->assertSame('Group '.$this->groupCode($belum).' · lawan hibah belum dipetakan ke akun.', $tertahan->hold_reasons[0]['message']);
     }
 
     public function test_a_group_without_a_posted_book_blocks_completion_like_dynamics(): void
@@ -217,10 +217,10 @@ class AcquisitionPostingTest extends TestCase
 
         $pesan = 'Group %s belum punya buku yang di-post ke finance. Tambahkan buku yang lapisan posting-nya bukan "none" di matriks group x buku (Master data › Group aset), lalu selesaikan lagi.';
         $this->pratinjau($id)->assertOk()
-            ->assertJsonPath('data.blockers.0', ['field' => 'details.0.group_aset_id', 'message' => sprintf($pesan, 'FISKAL-SAJA')])
-            ->assertJsonPath('data.blockers.1', ['field' => 'details.1.group_aset_id', 'message' => sprintf($pesan, 'TANPA-BUKU')]);
+            ->assertJsonPath('data.blockers.0', ['field' => 'details.0.group_aset_id', 'message' => sprintf($pesan, $this->groupCode($memorandum))])
+            ->assertJsonPath('data.blockers.1', ['field' => 'details.1.group_aset_id', 'message' => sprintf($pesan, $this->groupCode($tanpaBuku))]);
         $this->selesaikan($id)->assertStatus(422)
-            ->assertJsonValidationErrors(['details.0.group_aset_id' => sprintf($pesan, 'FISKAL-SAJA'), 'details.1.group_aset_id' => sprintf($pesan, 'TANPA-BUKU')]);
+            ->assertJsonValidationErrors(['details.0.group_aset_id' => sprintf($pesan, $this->groupCode($memorandum)), 'details.1.group_aset_id' => sprintf($pesan, $this->groupCode($tanpaBuku))]);
 
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->count());
         $this->assertSame(0, FinancePosting::query()->count());
@@ -257,7 +257,7 @@ class AcquisitionPostingTest extends TestCase
             ->assertJsonPath('data.status', 'held')
             ->assertJsonPath('data.blockers', [])
             ->assertJsonPath('data.currency', ['code' => 'IDR', 'decimals' => 2])
-            ->assertJsonPath('data.problems.0.message', 'Group KENDARAAN · lawan hutang belum dipetakan ke akun.')
+            ->assertJsonPath('data.problems.0.message', 'Group '.$this->groupCode($group).' · lawan hutang belum dipetakan ke akun.')
             ->json('data.lines');
         $this->selesaikan($id)->assertOk();
 

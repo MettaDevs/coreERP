@@ -23,6 +23,8 @@ class OpeningBalanceImportTest extends TestCase
 
     private string $group;
 
+    private string $groupNumber;
+
     private string $fiskal;
 
     private string $jenisKode;
@@ -32,6 +34,7 @@ class OpeningBalanceImportTest extends TestCase
         parent::setUp();
         $this->siapkanJurnalPenerimaan();
         $this->group = $this->groupTanpaBuku('KENDARAAN', 'Kendaraan');
+        $this->groupNumber = $this->groupCode($this->group);
         $komersial = $this->buku('KOM-KENDARAAN', 'current');
         $this->fiskal = $this->buku('FIS-KENDARAAN', 'none');
         foreach ([$komersial, $this->fiskal] as $buku) {
@@ -47,9 +50,9 @@ class OpeningBalanceImportTest extends TestCase
     {
         $csv = implode("\n", [
             'tanggal,tanggal_siap_pakai,nama,group,jenis,jumlah,nilai_per_unit,akumulasi_per_unit,periode_berjalan,akumulasi_per_unit:fis-kendaraan,periode_berjalan:FIS-KENDARAAN',
-            "2022-01-15,2022-01-15,Ambulans,kendaraan,{$this->jenisKode},2,120000000,60000000,24,30000000,24",
-            "15/01/2022,15/01/2022,Kursi roda,KENDARAAN,{$this->jenisKode},3,1500000.50,750000,24,,",
-            "2023-03-01,,Mobil operasional,KENDARAAN,{$this->jenisKode},1,200000000,50000000,12,,",
+            '2022-01-15,2022-01-15,Ambulans,'.strtolower($this->groupNumber).",{$this->jenisKode},2,120000000,60000000,24,30000000,24",
+            "15/01/2022,15/01/2022,Kursi roda,{$this->groupNumber},{$this->jenisKode},3,1500000.50,750000,24,,",
+            "2023-03-01,,Mobil operasional,{$this->groupNumber},{$this->jenisKode},1,200000000,50000000,12,,",
         ]);
 
         $pratinjau = $this->impor($csv)->assertOk()->json('data');
@@ -88,7 +91,7 @@ class OpeningBalanceImportTest extends TestCase
     {
         $csv = implode("\r\n", [
             'tanggal;nama;group;jenis;jumlah;nilai_per_unit;akumulasi_per_unit;periode_berjalan',
-            "15/01/2022;Ambulans;KENDARAAN;{$this->jenisKode};1;1.500.000,50;750.000;24",
+            "15/01/2022;Ambulans;{$this->groupNumber};{$this->jenisKode};1;1.500.000,50;750.000;24",
         ]);
 
         $this->impor($csv, ['apply' => '1'])->assertCreated();
@@ -104,9 +107,9 @@ class OpeningBalanceImportTest extends TestCase
         $klinik = $this->lokasi('Klinik');
         $csv = implode("\n", [
             'tanggal,lokasi,nama,group,jenis,jumlah,nilai_per_unit',
-            "2022-01-15,{$gudang['kode']},Rak,KENDARAAN,{$this->jenisKode},1,1000000",
-            "2022-01-15,{$klinik['kode']},Ranjang,KENDARAAN,{$this->jenisKode},1,2000000",
-            "2022-01-15,{$gudang['kode']},Lemari,KENDARAAN,{$this->jenisKode},1,3000000",
+            "2022-01-15,{$gudang['kode']},Rak,{$this->groupNumber},{$this->jenisKode},1,1000000",
+            "2022-01-15,{$klinik['kode']},Ranjang,{$this->groupNumber},{$this->jenisKode},1,2000000",
+            "2022-01-15,{$gudang['kode']},Lemari,{$this->groupNumber},{$this->jenisKode},1,3000000",
         ]);
 
         // Lokasi milik kepala dokumen, jadi baris bertanggal sama di lokasi lain menjadi draf lain.
@@ -120,10 +123,10 @@ class OpeningBalanceImportTest extends TestCase
         $csv = implode("\n", [
             'tanggal,nama,group,jenis,jumlah,nilai_per_unit,akumulasi_per_unit,periode_berjalan',
             "2022-01-15,Ambulans,TIDAK-ADA,{$this->jenisKode},1,100000000,0,0",
-            "2026-02-01,Mobil baru,KENDARAAN,{$this->jenisKode},1,100000000,0,0",
-            "2022-02-01,Kursi,KENDARAAN,{$this->jenisKode},1,1000000,2000000,10",
-            "01-02-2022,Meja,KENDARAAN,{$this->jenisKode},dua,1000000,0,0",
-            "2022-03-01,Lemari,KENDARAAN,{$this->jenisKode},1,1000000,0,0",
+            "2026-02-01,Mobil baru,{$this->groupNumber},{$this->jenisKode},1,100000000,0,0",
+            "2022-02-01,Kursi,{$this->groupNumber},{$this->jenisKode},1,1000000,2000000,10",
+            "01-02-2022,Meja,{$this->groupNumber},{$this->jenisKode},dua,1000000,0,0",
+            "2022-03-01,Lemari,{$this->groupNumber},{$this->jenisKode},1,1000000,0,0",
         ]);
 
         $hasil = $this->impor($csv, ['apply' => '1'])->assertOk()->json('data');
@@ -142,9 +145,9 @@ class OpeningBalanceImportTest extends TestCase
 
     public function test_unknown_or_missing_columns_reject_the_whole_file(): void
     {
-        $this->impor("tanggal,nama,group,jenis,jumlah,nilai,catatan\n2022-01-15,A,KENDARAAN,{$this->jenisKode},1,1,x")->assertOk()
+        $this->impor("tanggal,nama,group,jenis,jumlah,nilai,catatan\n2022-01-15,A,{$this->groupNumber},{$this->jenisKode},1,1,x")->assertOk()
             ->assertJsonPath('data.rejected.0.reason', 'Kolom tidak dikenal: nilai, catatan. Unduh templatnya untuk melihat nama kolom yang benar.');
-        $this->impor("tanggal,nama,group,jenis\n2022-01-15,A,KENDARAAN,{$this->jenisKode}")->assertOk()
+        $this->impor("tanggal,nama,group,jenis\n2022-01-15,A,{$this->groupNumber},{$this->jenisKode}")->assertOk()
             ->assertJsonPath('data.rejected.0.reason', 'Kolom wajib belum ada: jumlah, nilai_per_unit.');
     }
 
