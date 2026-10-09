@@ -11,6 +11,7 @@ use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,61 @@ class DocumentAttachmentTest extends TestCase
         $this->owner = $this->pemilik('owner@metta.test', 'PT Metta');
         $this->tenantId = $this->owner->activeMembership()->tenant_id;
         $this->vendorId = $this->vendor($this->owner, 'PT Metta Sehat', 'META');
+    }
+
+    public function test_picture_is_separate_from_document_attachments_and_replacements_are_archived(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/picture';
+        $this->actingAs($this->owner)->getJson($path)->assertOk()->assertJsonPath('data', null);
+        $first = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('first.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $second = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('second.jpg')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $this->actingAs($this->owner)->getJson($path)->assertOk()->assertJsonPath('data.id', $second);
+        $this->actingAs($this->owner)->getJson($this->daftar($this->vendorId))->assertOk()->assertJsonCount(0, 'data');
+        $old = DocumentAttachment::withTrashed()->findOrFail($first);
+        $this->assertNotNull($old->deleted_at);
+        Storage::disk('s3')->assertExists($old->storage_path);
+        $this->get('/api/v1/attachments/'.$first.'/download')->assertNotFound();
+        $this->get('/api/v1/attachments/'.$second.'/download')->assertOk();
+        $this->deleteJson('/api/v1/attachments/'.$second, ['version' => 1])->assertNoContent();
+        $this->getJson($path)->assertOk()->assertJsonPath('data', null);
+    }
+
+    public function test_picture_requires_record_rights_and_rejects_documents(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/picture';
+        $this->actingAs($this->owner)->post($path, ['file' => $this->pdf('document.pdf')], ['Accept' => 'application/json'])->assertUnprocessable();
+        $reader = $this->anggota(['core.vendor.inquire']);
+        $this->actingAs($reader)->getJson($path)->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])->assertForbidden();
+        $unauthorized = $this->anggota([]);
+        $this->actingAs($unauthorized)->getJson($path)->assertNotFound();
+        $this->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])->assertNotFound();
+    }
+
+    public function test_picture_does_not_leak_between_tenants(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/picture';
+        $picture = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        // Tenant baru dibuat lewat fixture yang sama dengan pengujian lampiran.
+        $otherOwner = $this->pemilik('picture-other-owner@example.test', Str::random(12));
+        $this->actingAs($otherOwner)->getJson($path)->assertNotFound();
+        $this->get('/api/v1/attachments/'.$picture.'/download')->assertNotFound();
+        $this->post($path, ['file' => UploadedFile::fake()->image('other.png')], ['Accept' => 'application/json'])->assertNotFound();
+        $this->deleteJson('/api/v1/attachments/'.$picture, ['version' => 1])->assertNotFound();
+    }
+
+    public function test_database_rejects_two_active_pictures_for_the_same_record(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/picture';
+        $id = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $duplicate = DocumentAttachment::query()->findOrFail($id)->replicate();
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('document_attachments_active_picture_unique');
+        $duplicate->save();
     }
 
     public function test_lampiran_vendor_diunggah_didaftar_dan_diunduh_utuh(): void

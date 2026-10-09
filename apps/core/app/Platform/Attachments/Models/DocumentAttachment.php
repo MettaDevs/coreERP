@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $tenant_id
  * @property string $record_type
  * @property string $record_id
+ * @property string $kind
  * @property ?int $line_number
  * @property string $file_name
  * @property string $mime_type
@@ -46,11 +47,12 @@ class DocumentAttachment extends Model
         'storage_path' => DataClass::SystemMetadata,
         'content_hash' => DataClass::SystemMetadata,
         'data_class' => DataClass::SystemMetadata,
+        'kind' => DataClass::SystemMetadata,
     ];
 
     protected $fillable = [
         'tenant_id', 'record_type', 'record_id', 'line_number', 'file_name', 'mime_type', 'size_bytes',
-        'storage_path', 'content_hash', 'data_class',
+        'storage_path', 'content_hash', 'data_class', 'kind',
     ];
 
     /** @return array<string, string> */

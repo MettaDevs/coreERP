@@ -49,6 +49,7 @@ final class AttachmentController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('record_type', $type->recordType())
             ->where('record_id', $recordId)
+            ->where('kind', 'document')
             ->orderByRaw('line_number nulls first')
             ->orderBy('created_at')
             ->orderBy('id')
@@ -98,6 +99,54 @@ final class AttachmentController extends Controller
         $attachment = $this->save($tenantId, $type, $recordId, $lineNumber, $file);
 
         return response()->json(['data' => $this->present($attachment, $this->userNames(collect([$attachment])))], 201);
+    }
+
+    public function picture(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $picture = DocumentAttachment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())
+            ->where('record_id', $recordId)
+            ->where('kind', 'picture')
+            ->first();
+
+        return response()->json([
+            'data' => $picture === null ? null : $this->present($picture, $this->userNames(collect([$picture]))),
+            'meta' => [
+                'can_change' => $type->canChange($tenantId, $recordId),
+                'max_kb' => $this->maxKb(),
+                'extensions' => ['jpg', 'jpeg', 'png'],
+            ],
+        ]);
+    }
+
+    public function storePicture(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi belum dapat mengganti fotonya.');
+        $request->validate([
+            'file' => ['required', 'file', 'image', 'max:'.$this->maxKb(), 'extensions:jpg,jpeg,png', 'mimes:jpg,jpeg,png'],
+            'line_number' => ['prohibited'],
+        ], [
+            'file.required' => 'Pilih foto yang akan diunggah.',
+            'file.file' => 'Foto gagal terunggah. Coba lagi.',
+            'file.uploaded' => 'Foto gagal terunggah. Coba lagi, atau pilih foto yang lebih kecil.',
+            'file.image' => 'Pilih foto JPG, JPEG, atau PNG.',
+            'file.max' => 'Foto terlalu besar. Ukuran paling besar '.$this->maxKb().' KB.',
+            'file.extensions' => 'Pilih foto JPG, JPEG, atau PNG.',
+            'file.mimes' => 'Isi foto tidak sesuai dengan jenisnya. Pilih foto JPG, JPEG, atau PNG.',
+            'line_number.prohibited' => 'Foto utama menempel pada data ini, bukan pada baris dokumennya.',
+        ]);
+        /** @var UploadedFile $file */
+        $file = $request->file('file');
+        $picture = $this->save($tenantId, $type, $recordId, null, $file, 'picture');
+
+        return response()->json(['data' => $this->present($picture, $this->userNames(collect([$picture])))], 201);
     }
 
     public function download(Request $request, string $attachment): Response
@@ -154,7 +203,7 @@ final class AttachmentController extends Controller
      * Berkas ditulis lebih dulu, baru barisnya. Baris yang gagal disimpan membuang berkasnya lagi, supaya tidak
      * ada berkas tanpa baris; yang dibuang berkas yang belum pernah menjadi lampiran siapa pun.
      */
-    private function save(string $tenantId, AttachmentRecordType $type, string $recordId, ?int $lineNumber, UploadedFile $file): DocumentAttachment
+    private function save(string $tenantId, AttachmentRecordType $type, string $recordId, ?int $lineNumber, UploadedFile $file, string $kind = 'document'): DocumentAttachment
     {
         $id = (string) Str::ulid();
         $path = 'attachments/'.$tenantId.'/'.$id;
@@ -175,20 +224,35 @@ final class AttachmentController extends Controller
         }
 
         try {
-            $attachment = new DocumentAttachment;
-            $attachment->forceFill([
-                'id' => $id,
-                'tenant_id' => $tenantId,
-                'record_type' => $type->recordType(),
-                'record_id' => $recordId,
-                'line_number' => $lineNumber,
-                'file_name' => $this->fileName($file->getClientOriginalName()),
-                'mime_type' => Str::limit((string) $file->getMimeType(), 150, ''),
-                'size_bytes' => (int) $file->getSize(),
-                'storage_path' => $path,
-                'content_hash' => $hash,
-                'data_class' => $type->dataClass()->value,
-            ])->save();
+            $attachment = DB::transaction(function () use ($id, $tenantId, $type, $recordId, $lineNumber, $file, $path, $hash, $kind): DocumentAttachment {
+                if ($kind === 'picture') {
+                    // Satu foto aktif: dua penggantian serentak harus bergiliran, bukan saling menabrak indeks unik.
+                    DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['picture:'.$tenantId.':'.$type->recordType().':'.$recordId]);
+                    DocumentAttachment::query()
+                        ->where('tenant_id', $tenantId)
+                        ->where('record_type', $type->recordType())
+                        ->where('record_id', $recordId)
+                        ->where('kind', 'picture')
+                        ->update(['deleted_at' => now()]);
+                }
+                $attachment = new DocumentAttachment;
+                $attachment->forceFill([
+                    'id' => $id,
+                    'tenant_id' => $tenantId,
+                    'record_type' => $type->recordType(),
+                    'record_id' => $recordId,
+                    'line_number' => $lineNumber,
+                    'file_name' => $this->fileName($file->getClientOriginalName()),
+                    'mime_type' => Str::limit((string) $file->getMimeType(), 150, ''),
+                    'size_bytes' => (int) $file->getSize(),
+                    'storage_path' => $path,
+                    'content_hash' => $hash,
+                    'data_class' => $type->dataClass()->value,
+                    'kind' => $kind,
+                ])->save();
+
+                return $attachment;
+            });
         } catch (Throwable $exception) {
             $disk->delete($path);
 
