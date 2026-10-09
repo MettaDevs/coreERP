@@ -5,11 +5,16 @@ info:
   title: Management Aset API
   version: 0.1.0
   description: |
-    Master data aset. Seluruh endpoint dibatasi tenant dan policy
-    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
-    Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
+    Master data aset. Endpoint memakai sesi Core dan policy
+    `management-aset.asset-responsibility` dari konteks module tepercaya;
+    `tenant_id` tidak pernah diterima dari request browser. Policy
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.
+
+    Permintaan yang mengubah data membawa X-XSRF-TOKEN. Tidak ada token konteks app
+    tersendiri. Gap dokumentasi lama: sebagian path sumber masih memakai /api/v1 dari
+    bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.
+    Path pembatalan sudah memakai alamat runtime tersebut.
 
     Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
@@ -5381,6 +5386,177 @@ paths:
         '500':
           description: Jurnal gagal diterbitkan karena kesalahan sistem (`error.code` = `posting_failed`); nilai buku tidak
             berubah
+  /api/modules/management-aset/v1/penerimaan-aset/{id}/pratinjau-pembatalan:
+    get:
+      security:
+      - CoreERPContext: []
+      operationId: previewReceiptCancellation
+      tags:
+      - Lifecycle aset
+      summary: Periksa pembatalan penerimaan dan jurnal baliknya tanpa menyimpan
+      parameters: &id004
+      - $ref: '#/components/parameters/RecordId'
+      - name: posting_date
+        in: query
+        schema:
+          type: string
+          format: date
+      responses: &id005
+        '200':
+          description: Penghalang, tanggal asal, versi dokumen, jurnal balik, dan pengajuan terakhir
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/modules/management-aset/v1/penerimaan-aset/{id}/batal:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: cancelAssetReceipt
+      tags:
+      - Lifecycle aset
+      summary: Batalkan penerimaan selesai dengan hak pembatalan tersendiri
+      description: |
+        Memerlukan management-aset.penerimaan-aset.cancel. Aset yang mempunyai transaksi lanjutan
+        menahan pembatalan. Aset hasil penerimaan diarsipkan, buku ditutup, dan jurnal perolehan
+        beserta koreksi nilainya dibalik dari akun dan dimensi tersimpan. Transaksi asal tetap ada.
+        Jurnal balik hanya dikirim ke finance setelah jurnal asal di-ack posted.
+      parameters: &id001
+      - $ref: '#/components/parameters/RecordId'
+      requestBody: &id002
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetCancellationRequest'
+      responses: &id003
+        '201':
+          description: Pembatalan tercatat; status applied untuk pembatalan langsung, pending untuk pengajuan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetCancellation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Dokumen berubah; muat ulang dan periksa kembali
+        '422':
+          description: Transaksi lanjutan menahan pembatalan atau workflow belum dapat dijalankan
+  /api/modules/management-aset/v1/penerimaan-aset/{id}/ajukan-pembatalan:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: requestAssetReceiptCancellation
+      tags:
+      - Lifecycle aset
+      summary: Ajukan pembatalan penerimaan tanpa hak membatalkan langsung
+      description: |
+        Memerlukan management-aset.penerimaan-aset.request-cancellation. Workflow bertipe
+        management-aset.penerimaan-aset-cancellation harus aktif pada entitas legal dokumen.
+        Penyetuju wajib memegang approve-cancellation dan scope unit dokumen. Pengaju tidak
+        menyetujui permintaannya sendiri. Versi dan transaksi lanjutan diperiksa lagi saat keputusan.
+        Pengajuan pending yang sama dikembalikan, sehingga retry tidak membuat permintaan ganda.
+        Email melalui SSO memberi tautan ke inbox; pengiriman gagal tidak menghilangkan pengajuan.
+      parameters: *id001
+      requestBody: *id002
+      responses: *id003
+  /api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/pratinjau-pembatalan:
+    get:
+      security:
+      - CoreERPContext: []
+      operationId: previewAssetValueAdjustmentCancellation
+      tags:
+      - Lifecycle aset
+      summary: Periksa pembatalan penyesuaian nilai dan jurnal baliknya
+      parameters: *id004
+      responses: *id005
+  /api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/batal:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: cancelAssetValueAdjustment
+      tags:
+      - Lifecycle aset
+      summary: Batalkan penyesuaian nilai yang diposting
+      description: |
+        Memerlukan management-aset.penyesuaian-nilai-aset.cancel. Saldo penurunan atau kenaikan
+        nilai asal dikurangi, nilai buku dikembalikan, dan jurnal asal dibalik. Ini bukan membuat
+        penyesuaian berlawanan jenis. Penyusutan sesudah tanggal penyesuaian harus dibatalkan lebih
+        dulu; buku yang ditutup menahan. Nilai sebelum/sesudah pada dokumen asal tetap beku.
+      parameters: *id001
+      requestBody: *id002
+      responses: *id003
+  /api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/ajukan-pembatalan:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: requestAssetValueAdjustmentCancellation
+      tags:
+      - Lifecycle aset
+      summary: Ajukan pembatalan penyesuaian nilai melalui workflow
+      description: Memerlukan request-cancellation pada resource ini; penyetuju memegang approve-cancellation dengan scope
+        yang sesuai.
+      parameters: *id001
+      requestBody: *id002
+      responses: *id003
+  /api/modules/management-aset/v1/penyusutan/{id}/pratinjau-pembatalan:
+    get:
+      security:
+      - CoreERPContext: []
+      operationId: previewDepreciationCancellation
+      tags:
+      - Penyusutan
+      summary: Periksa pembatalan usulan atau penyusutan final
+      parameters: *id004
+      responses: *id005
+  /api/modules/management-aset/v1/penyusutan/{id}/batal:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: cancelDepreciation
+      tags:
+      - Penyusutan
+      summary: Batalkan penyusutan dan bebaskan periodenya untuk dihitung ulang
+      description: |
+        Memerlukan management-aset.penyusutan.cancel, terpisah dari create, finalize, correct, dan
+        post. Usulan dibatalkan tanpa jurnal; periode final mendapat baris pembalik baru. Periode
+        yang pernah dikirim ke finance menerbitkan asset.depreciation_reversal untuk porsi aset itu.
+        Penyusutan yang lebih baru harus dibatalkan lebih dulu. Catatan asal dan pembalik tetap
+        tersimpan, sementara proposal berikutnya dapat dibuat untuk tanggal akhir yang sama.
+      parameters: *id001
+      requestBody: *id002
+      responses: *id003
+  /api/modules/management-aset/v1/penyusutan/{id}/ajukan-pembatalan:
+    post:
+      security:
+      - CoreERPContext: []
+        ModuleCsrf: []
+      operationId: requestDepreciationCancellation
+      tags:
+      - Penyusutan
+      summary: Ajukan pembatalan penyusutan melalui workflow
+      description: Memerlukan request-cancellation pada penyusutan; penyetuju memegang approve-cancellation dengan scope yang
+        sesuai.
+      parameters: *id001
+      requestBody: *id002
+      responses: *id003
   /api/v1/reklasifikasi-aset:
     get:
       tags:
@@ -8609,10 +8785,15 @@ paths:
 components:
   securitySchemes:
     CoreERPContext:
-      type: http
-      scheme: bearer
-      bearerFormat: CoreERP context token
-      description: Token singkat bertanda tangan yang diterbitkan Web Shell untuk aplikasi ini.
+      type: apiKey
+      in: header
+      name: Cookie
+      description: Sesi pengguna Core; browser mengirim cookie login pada permintaan same-origin.
+    ModuleCsrf:
+      type: apiKey
+      in: header
+      name: X-XSRF-TOKEN
+      description: Nilai cookie XSRF-TOKEN yang sudah di-URL-decode untuk permintaan yang mengubah data.
   parameters:
     RecordId:
       name: id
@@ -13467,6 +13648,79 @@ components:
           oneOf:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
+    AssetCancellationRequest:
+      type: object
+      required:
+      - reason
+      - posting_date
+      - version
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 250
+        posting_date:
+          type: string
+          format: date
+        version:
+          type: integer
+          minimum: 1
+    AssetCancellation:
+      type: object
+      required:
+      - id
+      - tenant_id
+      - resource
+      - document_id
+      - reason
+      - posting_date
+      - status
+      properties:
+        id:
+          type: string
+          minLength: 26
+          maxLength: 26
+        tenant_id:
+          type: string
+        resource:
+          type: string
+          enum:
+          - penyusutan
+          - penerimaan-aset
+          - penyesuaian-nilai-aset
+        document_id:
+          type: string
+        reason:
+          type: string
+        posting_date:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - applied
+          - rejected
+          - blocked
+        workflow_instance_id:
+          type:
+          - string
+          - 'null'
+        requested_by_user_id:
+          type: string
+        acted_by_user_id:
+          type:
+          - string
+          - 'null'
+        posting_ids:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        failure_message:
+          type:
+          - string
+          - 'null'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

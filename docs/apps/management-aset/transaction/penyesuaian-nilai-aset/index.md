@@ -51,6 +51,12 @@ Saat aset itu dilepas, jurnal pelepasan mendebit akumulasi penurunan nilai dan m
 | --- | --- | --- |
 | `draft` | Disusun. Nilai buku sebelum dan sesudah di layar dibaca dari buku aset sekarang. | ubah, arsipkan, pratinjau posting, posting |
 | `posted` | Nilai buku sudah berubah; nilai sebelum dan sesudah dibekukan di baris, `posting_id` tercatat. | hanya dibaca dan dilampiri |
+| `cancelled` | Dampak penyesuaian dibalik; nilai sebelum/sesudah dokumen asal tetap beku. | dibaca, dengan status jurnal pembatalannya |
+
+Penyesuaian `posted` dapat [dibatalkan](/apps/management-aset/transaction/pembatalan/) dengan
+hak tersendiri, atau diajukan melalui workflow. Pembatalan write-down mengurangi saldo write-down
+asal; ia bukan appreciation. Penyusutan atau reklasifikasi lanjutan dan saldo yang tidak cukup
+menahan pembatalan.
 
 ## Data yang disimpan
 

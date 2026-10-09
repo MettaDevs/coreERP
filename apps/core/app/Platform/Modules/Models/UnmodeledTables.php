@@ -85,6 +85,11 @@ final class UnmodeledTables implements DataClassificationRegistry
             'workflow_parameters' => ['default' => DataClass::CustomerContent],
             'workflow_work_items' => ['default' => DataClass::CustomerContent, 'columns' => [
                 'assigned_membership_id' => DataClass::EndUserPseudonymousIdentifiers,
+                'review_url' => DataClass::SystemMetadata,
+                'email_notified_at' => DataClass::SystemMetadata,
+                'email_next_attempt_at' => DataClass::SystemMetadata,
+                'email_attempts' => DataClass::SystemMetadata,
+                'email_last_error' => DataClass::SystemMetadata,
             ]],
         ];
     }

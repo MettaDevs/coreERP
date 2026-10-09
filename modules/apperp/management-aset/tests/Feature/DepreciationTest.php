@@ -45,7 +45,7 @@ class DepreciationTest extends TestCase
     public function test_reversal_creates_a_new_final_period_without_rewriting_the_original(): void
     {
         [$book] = $this->book();
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.correct']);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.cancel']);
         $period = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
         $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk();
         $reversal = $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Koreksi periode'])->assertCreated()->json('data.period');

@@ -35,6 +35,8 @@ import {
     toastSaveError,
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { CancellationAction } from '../_shared/CancellationAction';
+import { CancellationStatus } from '../_shared/CancellationStatus';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
 import type {
@@ -109,6 +111,7 @@ export default function ValueAdjustmentDetailPage({
         responsible_org_unit_id: context.org_unit_id ?? '',
         details: [emptyLine()],
     }));
+    const [reload, setReload] = useState(0);
     const [tersimpan, setTersimpan] = useState<Adjustment | null>(null);
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
@@ -173,7 +176,7 @@ export default function ValueAdjustmentDetailPage({
         return () => {
             dibatalkan = true;
         };
-    }, [adjustmentId]);
+    }, [adjustmentId, reload]);
 
     const pesan = (field: string) => galat[field]?.[0];
 
@@ -412,7 +415,21 @@ export default function ValueAdjustmentDetailPage({
                         </Button>
                     </>
                 )}
+                {mode === 'view' &&
+                    tersimpan?.status === 'posted' &&
+                    adjustmentId && (
+                        <CancellationAction
+                            resource="penyesuaian-nilai-aset"
+                            documentId={adjustmentId}
+                            permissions={permissions}
+                            awaitingApproval={
+                                tersimpan.cancellation?.status === 'pending'
+                            }
+                            onComplete={() => setReload((value) => value + 1)}
+                        />
+                    )}
             </RecordActionBar>
+            <CancellationStatus summary={tersimpan?.cancellation} />
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">

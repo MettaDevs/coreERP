@@ -31,6 +31,9 @@ namespace App\Platform\Modules\Contracts;
  */
 interface WorkflowEngine
 {
+    /** Menutup pengajuan milik module ketika transaksi sumber sudah ditangani langsung oleh pengguna berwenang. */
+    public function withdraw(string $tenantId, string $appId, string $instanceId, string $actorUserId): void;
+
     /**
      * @param  array{legal_entity_id?: ?string, source_document_type: string, source_document_id: string, decision_context: array<string, mixed>}  $data
      * @return array{id: string, status: string, terulang: bool}

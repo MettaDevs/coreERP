@@ -8,6 +8,7 @@ use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Platform\Modules\Contracts\WorkflowEngine;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use stdClass;
@@ -41,6 +42,27 @@ use stdClass;
 final class WorkflowEngineCore implements WorkflowEngine
 {
     public function __construct(private readonly WorkflowRuntime $runtime) {}
+
+    public function withdraw(string $tenantId, string $appId, string $instanceId, string $actorUserId): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new \LogicException('Penutupan workflow harus berada dalam transaksi dokumen sumber.');
+        }
+        $membershipId = DB::table('tenant_memberships')->where('tenant_id', $tenantId)->where('user_id', $actorUserId)->where('status', 'active')->value('id');
+        if ($membershipId === null) {
+            throw ValidationException::withMessages(['workflow' => 'Pengguna pembatalan tidak aktif pada tenant ini.']);
+        }
+        $instance = DB::table('workflow_instances')->where('tenant_id', $tenantId)->where('id', $instanceId)
+            ->whereIn('workflow_type_id', DB::table('workflow_types')->where('app_id', $appId)->select('id'))->lockForUpdate()->first();
+        if ($instance === null || $instance->status !== 'pending') {
+            return;
+        }
+        DB::table('workflow_instances')->where('id', $instanceId)->update(['status' => 'cancelled', 'updated_at' => now()]);
+        DB::table('workflow_work_items')->where('instance_id', $instanceId)->where('status', 'pending')->update(['status' => 'cancelled', 'completed_at' => now(), 'updated_at' => now()]);
+        DB::table('workflow_history')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId,
+            'instance_id' => $instanceId, 'actor_membership_id' => $membershipId, 'event_type' => 'cancelled',
+            'details' => json_encode(['reason' => 'Transaksi sumber ditangani langsung oleh pengguna berwenang.']), 'occurred_at' => now()]);
+    }
 
     /**
      * @param  array{legal_entity_id?: ?string, source_document_type: string, source_document_id: string, decision_context: array<string, mixed>}  $data

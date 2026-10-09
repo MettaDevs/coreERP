@@ -36,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $penanggung_jawab_user_id
  * @property ?string $lokasi_aset_id
  * @property string $currency_code
+ * @property string $cara_perolehan
  * @property ?string $keterangan
  * @property string $status
  * @property int $version

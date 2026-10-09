@@ -65,6 +65,21 @@ namespace App\Platform\Modules\Contracts;
 interface PostingFeed
 {
     /**
+     * Membalik jurnal tersimpan, termasuk koreksi nilainya bila diminta. Akun, dimensi, dan
+     * presisi diambil dari jurnal asal; module tidak menyusun ulang pemetaan yang sudah terbit.
+     *
+     * @param  array{posting_id:string,posting_date:string,source_document:array<string,mixed>,include_adjustments?:bool}  $cancellation
+     * @return list<array<string,mixed>>
+     */
+    public function reverse(string $tenantId, string $originalPostingId, array $cancellation, bool $preview = false): array;
+
+    /**
+     * Jurnal asal beserta baris masukannya, untuk membalik porsi sebuah posting ringkas.
+     * @return array<string,mixed>|null
+     */
+    public function journal(string $tenantId, string $postingId): ?array;
+
+    /**
      * Menerbitkan satu posting **di dalam transaksi dokumen sumber pemanggil**. Tidak membuka
      * transaksi sendiri: dokumen yang batal tidak meninggalkan posting, dan posting yang gagal
      * membatalkan dokumennya.
@@ -96,7 +111,7 @@ interface PostingFeed
      * `settlement_mode` adalah mode yang tercatat saat posting itu terbit. Koreksinya memilih akun
      * lawan dari mode ini, bukan dari setelan hari ini (K-10).
      *
-     * @return array{posting_id: string, status: string, settlement_mode: ?string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
+     * @return array{posting_id: string, status: string, settlement_mode: ?string, posting_date: string, manual_reason: ?string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
      */
     public function status(string $tenantId, string $postingId): ?array;
 }

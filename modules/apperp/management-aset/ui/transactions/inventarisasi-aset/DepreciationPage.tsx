@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
@@ -23,6 +24,7 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { api, errorMessage } from '../../api';
+import { CancellationAction } from '../_shared/CancellationAction';
 import { DepreciationPostingSheet } from './DepreciationPostingSheet';
 import type { BukuPost } from './DepreciationPostingSheet';
 import type { Context } from './penerimaan';
@@ -47,6 +49,8 @@ type Period = {
     status: string;
     currency_code: string;
     reverses_period_id: string | null;
+    cancelled_at: string | null;
+    cancellation_status: string | null;
     buku_id: string | null;
     /** Lapisan posting bukunya; `none` berarti buku itu tidak pernah mengirim ke aplikasi finance. */
     posting_layer: string | null;
@@ -78,6 +82,7 @@ function pilihanPost(periods: Period[]): { books: BukuPost[]; akhir: string } {
         if (
             period.status === 'final' &&
             !period.reverses_period_id &&
+            !period.cancelled_at &&
             !period.posted_posting_id &&
             period.period_ends_on > akhir
         ) {
@@ -94,13 +99,13 @@ function pilihanPost(periods: Period[]): { books: BukuPost[]; akhir: string } {
 export default function DepreciationPage({
     canCreate,
     canFinalize,
-    canCorrect,
+    permissions,
     canPost,
     context,
 }: {
     canCreate: boolean;
     canFinalize: boolean;
-    canCorrect: boolean;
+    permissions: string[];
     canPost: boolean;
     context: Context;
 }) {
@@ -234,23 +239,6 @@ export default function DepreciationPage({
             setError(
                 errorMessage(caught, 'Penyusutan belum dapat difinalisasi.'),
             );
-        }
-    };
-    const reverse = async (period: Period) => {
-        const reason = window.prompt('Alasan koreksi penyusutan:');
-
-        if (!reason) {
-            return;
-        }
-
-        try {
-            await api(`/penyusutan/${period.id}/reversal`, {
-                method: 'POST',
-                body: JSON.stringify({ reason }),
-            });
-            muatUlang();
-        } catch (caught) {
-            setError(errorMessage(caught, 'Penyusutan belum dapat dibalik.'));
         }
     };
 
@@ -387,6 +375,7 @@ export default function DepreciationPage({
                                             {period.amount}
                                         </span>
                                         {period.status === 'proposed' &&
+                                            !period.cancelled_at &&
                                             canFinalize && (
                                                 <Button
                                                     size="sm"
@@ -397,19 +386,24 @@ export default function DepreciationPage({
                                                     Finalisasi
                                                 </Button>
                                             )}
-                                        {period.status === 'final' &&
-                                            !period.reverses_period_id &&
-                                            canCorrect && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        void reverse(period)
+                                        {!period.reverses_period_id &&
+                                            !period.cancelled_at && (
+                                                <CancellationAction
+                                                    resource="penyusutan"
+                                                    documentId={period.id}
+                                                    permissions={permissions}
+                                                    awaitingApproval={
+                                                        period.cancellation_status ===
+                                                        'pending'
                                                     }
-                                                >
-                                                    Balikkan
-                                                </Button>
+                                                    onComplete={muatUlang}
+                                                />
                                             )}
+                                        {period.cancelled_at && (
+                                            <Badge variant="outline">
+                                                Dibatalkan
+                                            </Badge>
+                                        )}
                                     </div>
                                 </div>
                             ))}

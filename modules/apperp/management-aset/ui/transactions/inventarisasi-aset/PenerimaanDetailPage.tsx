@@ -45,6 +45,8 @@ import {
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { CancellationAction } from '../_shared/CancellationAction';
+import { CancellationStatus } from '../_shared/CancellationStatus';
 import {
     AcquisitionJournal,
     VendorPicker,
@@ -115,6 +117,7 @@ export default function PenerimaanDetailPage({
     const [record, setRecord] = useState<EditablePenerimaan>(() =>
         penerimaanKosong(context, workDate),
     );
+    const [reload, setReload] = useState(0);
     const [tersimpan, setTersimpan] = useState<Penerimaan | null>(null);
     const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);
     const [terbit, setTerbit] = useState<AsetTerbit[]>([]);
@@ -152,7 +155,7 @@ export default function PenerimaanDetailPage({
     );
 
     const readOnly = mode === 'view';
-    const selesai = tersimpan?.status === 'selesai';
+    const selesai = tersimpan !== null && tersimpan.status !== 'draft';
 
     useEffect(() => {
         if (!penerimaanId) {
@@ -227,7 +230,7 @@ export default function PenerimaanDetailPage({
         return () => {
             dibatalkan = true;
         };
-    }, [penerimaanId]);
+    }, [penerimaanId, reload]);
 
     // Ringkasan dibaca untuk draf saja: begitu dokumen selesai, peringatan ambang
     // kapitalisasi tidak lagi menawarkan keputusan apa pun — nomornya sudah terbit.
@@ -644,7 +647,21 @@ export default function PenerimaanDetailPage({
                         </Button>
                     </>
                 )}
+                {mode === 'view' &&
+                    tersimpan?.status === 'selesai' &&
+                    penerimaanId && (
+                        <CancellationAction
+                            resource="penerimaan-aset"
+                            documentId={penerimaanId}
+                            permissions={permissions}
+                            awaitingApproval={
+                                tersimpan.cancellation?.status === 'pending'
+                            }
+                            onComplete={() => setReload((value) => value + 1)}
+                        />
+                    )}
             </RecordActionBar>
+            <CancellationStatus summary={tersimpan?.cancellation} />
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">

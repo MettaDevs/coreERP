@@ -244,7 +244,7 @@ final class AssetDepreciationProjectionReport implements ReportDefinition
         // yang sudah dibalik, karena tanggal akhirnya tidak dapat diusulkan lagi.
         $periodeAsli = DepreciationPeriod::query()
             ->whereColumn('aset_tr_penyusutan_aset.buku_aset_id', 'buku.id')
-            ->whereNull('aset_tr_penyusutan_aset.reverses_period_id')
+            ->whereNull('aset_tr_penyusutan_aset.reverses_period_id')->whereNull('aset_tr_penyusutan_aset.cancelled_at')
             ->where('aset_tr_penyusutan_aset.status', 'final');
 
         return $query

@@ -230,9 +230,7 @@ export default function App({
                     canFinalize={permissions.includes(
                         'management-aset.penyusutan.finalize',
                     )}
-                    canCorrect={permissions.includes(
-                        'management-aset.penyusutan.correct',
-                    )}
+                    permissions={permissions}
                     canPost={permissions.includes(
                         'management-aset.penyusutan.post',
                     )}

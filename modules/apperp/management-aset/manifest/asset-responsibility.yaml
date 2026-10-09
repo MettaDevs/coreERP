@@ -9,6 +9,15 @@ security:
     - code: management-aset.asset-responsibility
       name: Akses aset menurut unit penanggung jawab
       protected_permissions:
+        - management-aset.penyusutan.cancel
+        - management-aset.penyusutan.request-cancellation
+        - management-aset.penyusutan.approve-cancellation
+        - management-aset.penerimaan-aset.cancel
+        - management-aset.penerimaan-aset.request-cancellation
+        - management-aset.penerimaan-aset.approve-cancellation
+        - management-aset.penyesuaian-nilai-aset.cancel
+        - management-aset.penyesuaian-nilai-aset.request-cancellation
+        - management-aset.penyesuaian-nilai-aset.approve-cancellation
         - management-aset.aset.read
         - management-aset.aset.create
         - management-aset.aset.update

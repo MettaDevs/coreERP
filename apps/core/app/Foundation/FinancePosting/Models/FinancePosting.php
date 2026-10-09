@@ -78,6 +78,8 @@ class FinancePosting extends Model
 
     public const MANUAL_USER = 'user';
 
+    public const MANUAL_ORIGINAL_REJECTED = 'original_rejected';
+
     /**
      * Status yang boleh ditandai manual oleh pengguna (TODO 7.3.2). `posted` tidak termasuk: pembaca
      * sudah membukukannya, jadi menandainya manual berarti jurnal kedua.
@@ -152,6 +154,24 @@ class FinancePosting extends Model
         }
 
         return $payload;
+    }
+
+    /**
+     * Jurnal balik baru dikirim setelah pembaca mengakui jurnal asalnya sudah dibukukan.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeReadyForDelivery(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('finance_postings.reverses_posting_id')->orWhereExists(function ($parent): void {
+                $parent->selectRaw('1')->from('finance_postings as origin')
+                    ->whereColumn('origin.tenant_id', 'finance_postings.tenant_id')
+                    ->whereColumn('origin.posting_id', 'finance_postings.reverses_posting_id')
+                    ->where('origin.status', self::POSTED);
+            });
+        });
     }
 
     /** @return HasMany<FinancePostingLine, $this> */

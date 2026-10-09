@@ -1,0 +1,133 @@
+# Pembatalan, pengajuan, dan persetujuan dipisah per resource. Tidak masuk duty kelola lama.
+security:
+  entry_points:
+    - code: management-aset.penyusutan.cancellation-api
+      name: API pembatalan penyusutan
+      type: api
+    - code: management-aset.penerimaan-aset.cancellation-api
+      name: API pembatalan penerimaan aset
+      type: api
+    - code: management-aset.penyesuaian-nilai-aset.cancellation-api
+      name: API pembatalan penyesuaian nilai aset
+      type: api
+  permissions:
+    - code: management-aset.penyusutan.cancel
+      name: Batalkan penyusutan
+      entry_point: management-aset.penyusutan.cancellation-api
+      access: delete
+    - code: management-aset.penyusutan.request-cancellation
+      name: Ajukan pembatalan penyusutan
+      entry_point: management-aset.penyusutan.cancellation-api
+      access: invoke
+    - code: management-aset.penyusutan.approve-cancellation
+      name: Setujui pembatalan penyusutan
+      entry_point: management-aset.penyusutan.cancellation-api
+      access: invoke
+    - code: management-aset.penerimaan-aset.cancel
+      name: Batalkan penerimaan aset
+      entry_point: management-aset.penerimaan-aset.cancellation-api
+      access: delete
+    - code: management-aset.penerimaan-aset.request-cancellation
+      name: Ajukan pembatalan penerimaan aset
+      entry_point: management-aset.penerimaan-aset.cancellation-api
+      access: invoke
+    - code: management-aset.penerimaan-aset.approve-cancellation
+      name: Setujui pembatalan penerimaan aset
+      entry_point: management-aset.penerimaan-aset.cancellation-api
+      access: invoke
+    - code: management-aset.penyesuaian-nilai-aset.cancel
+      name: Batalkan penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.cancellation-api
+      access: delete
+    - code: management-aset.penyesuaian-nilai-aset.request-cancellation
+      name: Ajukan pembatalan penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.cancellation-api
+      access: invoke
+    - code: management-aset.penyesuaian-nilai-aset.approve-cancellation
+      name: Setujui pembatalan penyesuaian nilai aset
+      entry_point: management-aset.penyesuaian-nilai-aset.cancellation-api
+      access: invoke
+  privileges:
+    - code: management-aset.penyusutan.cancel-document
+      name: Batalkan penyusutan
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.cancel]
+    - code: management-aset.penyusutan.submit-cancellation
+      name: Ajukan pembatalan penyusutan
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.request-cancellation]
+    - code: management-aset.penyusutan.approve-cancellation-request
+      name: Setujui pembatalan penyusutan
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.approve-cancellation]
+    - code: management-aset.penerimaan-aset.cancel-document
+      name: Batalkan penerimaan aset
+      permissions: [management-aset.penerimaan-aset.read, management-aset.penerimaan-aset.cancel]
+    - code: management-aset.penerimaan-aset.submit-cancellation
+      name: Ajukan pembatalan penerimaan aset
+      permissions: [management-aset.penerimaan-aset.read, management-aset.penerimaan-aset.request-cancellation]
+    - code: management-aset.penerimaan-aset.approve-cancellation-request
+      name: Setujui pembatalan penerimaan aset
+      permissions: [management-aset.penerimaan-aset.read, management-aset.penerimaan-aset.approve-cancellation]
+    - code: management-aset.penyesuaian-nilai-aset.cancel-document
+      name: Batalkan penyesuaian nilai aset
+      permissions: [management-aset.penyesuaian-nilai-aset.read, management-aset.penyesuaian-nilai-aset.cancel]
+    - code: management-aset.penyesuaian-nilai-aset.submit-cancellation
+      name: Ajukan pembatalan penyesuaian nilai aset
+      permissions: [management-aset.penyesuaian-nilai-aset.read, management-aset.penyesuaian-nilai-aset.request-cancellation]
+    - code: management-aset.penyesuaian-nilai-aset.approve-cancellation-request
+      name: Setujui pembatalan penyesuaian nilai aset
+      permissions: [management-aset.penyesuaian-nilai-aset.read, management-aset.penyesuaian-nilai-aset.approve-cancellation]
+  duties:
+    - code: management-aset.penyusutan.cancellation
+      name: Batalkan penyusutan
+      privileges: [management-aset.penyusutan.cancel-document]
+    - code: management-aset.penyusutan.cancellation-request
+      name: Ajukan pembatalan penyusutan
+      privileges: [management-aset.penyusutan.submit-cancellation]
+    - code: management-aset.penyusutan.cancellation-approval
+      name: Setujui pembatalan penyusutan
+      privileges: [management-aset.penyusutan.approve-cancellation-request]
+    - code: management-aset.penerimaan-aset.cancellation
+      name: Batalkan penerimaan aset
+      privileges: [management-aset.penerimaan-aset.cancel-document]
+    - code: management-aset.penerimaan-aset.cancellation-request
+      name: Ajukan pembatalan penerimaan aset
+      privileges: [management-aset.penerimaan-aset.submit-cancellation]
+    - code: management-aset.penerimaan-aset.cancellation-approval
+      name: Setujui pembatalan penerimaan aset
+      privileges: [management-aset.penerimaan-aset.approve-cancellation-request]
+    - code: management-aset.penyesuaian-nilai-aset.cancellation
+      name: Batalkan penyesuaian nilai aset
+      privileges: [management-aset.penyesuaian-nilai-aset.cancel-document]
+    - code: management-aset.penyesuaian-nilai-aset.cancellation-request
+      name: Ajukan pembatalan penyesuaian nilai aset
+      privileges: [management-aset.penyesuaian-nilai-aset.submit-cancellation]
+    - code: management-aset.penyesuaian-nilai-aset.cancellation-approval
+      name: Setujui pembatalan penyesuaian nilai aset
+      privileges: [management-aset.penyesuaian-nilai-aset.approve-cancellation-request]
+workflow_types:
+  - code: management-aset.penyusutan-cancellation
+    name: Persetujuan pembatalan penyusutan
+    scope: legal_entity
+    decision_context_schema:
+      required: [cancellation_id, legal_entity_id, responsible_org_unit_id, document_number, reason, posting_date, document_url]
+      x-approval-authority:
+        permission: management-aset.penyusutan.approve-cancellation
+        data_policy: management-aset.asset-responsibility
+        disallow_submitter: true
+  - code: management-aset.penerimaan-aset-cancellation
+    name: Persetujuan pembatalan penerimaan aset
+    scope: legal_entity
+    decision_context_schema:
+      required: [cancellation_id, legal_entity_id, responsible_org_unit_id, document_number, reason, posting_date, document_url]
+      x-approval-authority:
+        permission: management-aset.penerimaan-aset.approve-cancellation
+        data_policy: management-aset.asset-responsibility
+        disallow_submitter: true
+  - code: management-aset.penyesuaian-nilai-aset-cancellation
+    name: Persetujuan pembatalan penyesuaian nilai aset
+    scope: legal_entity
+    decision_context_schema:
+      required: [cancellation_id, legal_entity_id, responsible_org_unit_id, document_number, reason, posting_date, document_url]
+      x-approval-authority:
+        permission: management-aset.penyesuaian-nilai-aset.approve-cancellation
+        data_policy: management-aset.asset-responsibility
+        disallow_submitter: true

@@ -135,6 +135,16 @@ class AcquisitionPostingTest extends TestCase
         Exceptions::fake();
         $this->app->instance(PostingFeed::class, new class implements PostingFeed
         {
+            public function reverse(string $tenantId, string $originalPostingId, array $cancellation, bool $preview = false): array
+            {
+                throw new InvalidPosting('Tidak boleh ada jurnal pembatalan pada test ini.');
+            }
+
+            public function journal(string $tenantId, string $postingId): ?array
+            {
+                return null;
+            }
+
             public function publish(array $posting): array
             {
                 throw new InvalidPosting('Jurnal tidak seimbang: debit 1, kredit 2.');

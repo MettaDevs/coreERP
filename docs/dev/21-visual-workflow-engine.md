@@ -197,6 +197,37 @@ registry dan satu titik penegakan sudah cukup. Alasannya ada di
 pelanggan yang menjalankan pembaruannya sendiri, dan itu ongkos yang tidak sebanding untuk sebuah
 sakelar.
 
+## Pemberitahuan email melalui SSO
+
+Tugas persetujuan tersedia di `/workflow-inbox` walaupun email belum terkirim. Work item menyimpan
+`review_url`, `email_notified_at`, `email_attempts`, `email_next_attempt_at`, dan `email_last_error`.
+`workflow:notify` berjalan setiap menit, memeriksa ulang penugasan serta hak, dan meminta SSO
+mengirim pemberitahuan. Tautan email membuka tugas di aplikasi; membuka tautan belum menyetujui.
+Pengiriman gagal dicoba kembali dengan jeda bertambah, paling lama satu jam antar percobaan.
+
+Core memakai `COREERP_SSO_API_URL`, `COREERP_SSO_API_CLIENT_ID`, dan
+`COREERP_SSO_API_CLIENT_SECRET` yang sudah ada; pasangan OIDC menjadi fallback bila pasangan API
+kosong. Kredensial SMTP tidak disalin ke Core. Di SSO, isi `MAIL_MAILER=smtp`, `MAIL_SCHEME`,
+`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, dan
+`MAIL_FROM_NAME` sesuai penyedia email. Port 587 lazim memakai scheme `smtp` dengan STARTTLS;
+port 465 memakai `smtps`. Isi password pada konfigurasi server, bukan di repo. `.env.example`
+SSO sudah menyediakan field tersebut. Pastikan mailer SSO memakai SMTP dan worker antreannya
+berjalan; respons API hanya menyatakan email diterima antrean, bukan bukti email sudah sampai.
+
+Client SSO harus mendaftarkan alamat aplikasi pada launch URL atau redirect URI. Endpoint
+`POST /api/v1/notifications/send` menerima header `X-Client-ID` dan
+`X-Client-Secret`, memeriksa host tautan yang terdaftar, dan mendeduplikasi `idempotency_key` selama
+24 jam. Core memakai ID work item sebagai kunci dan mencatat penerimaan sukses pada item itu,
+sehingga item sukses tidak dikirim ulang. Kontrak consumer ada di
+`apps/core/contracts/external/sso-workflow-notifications.yaml`. Tidak ada endpoint persetujuan
+tanpa login atau persetujuan melalui GET.
+
+Tipe yang membawa `decision_context_schema.x-approval-authority` dapat mengikat persetujuan ke
+permission dan data policy modul, serta melarang pengaju menyetujui sendiri. Konfigurasi role atau
+pengguna menentukan penerima; metadata tipe membatasi siapa yang sah. Ini dipakai oleh
+[pembatalan transaksi aset](/apps/management-aset/transaction/pembatalan/), tanpa mengubah
+parameter persetujuan mandiri tenant bagi tipe workflow lain.
+
 ## Di mana kodenya
 
 | Berkas | Isinya |

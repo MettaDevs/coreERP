@@ -10,11 +10,11 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Pengangkut untuk API pengelolaan penyedia SSO — pencarian pengguna dan permintaan kirim undangan.
+ * Pengangkut API penyedia SSO: pencarian pengguna, undangan, dan pemberitahuan workflow.
  *
  * Bukan bagian dari OIDC, dan itu bukan kelalaian melainkan kenyataan yang harus ditulis: alamat
- * kedua endpoint ini **tidak ada di dokumen discovery**. Setiap alamat lain yang dipakai
- * `SharedIdentityProvider` ditemukan sendiri dari `.well-known/openid-configuration`; dua ini tidak
+ * API pengelolaan ini **tidak ada di dokumen discovery**. Setiap alamat lain yang dipakai
+ * `SharedIdentityProvider` ditemukan sendiri dari `.well-known/openid-configuration`; API ini tidak
  * dapat, jadi ia disetel — `COREERP_SSO_API_URL`, dan bila kosong diturunkan dari issuer.
  *
  * ## Kredensial

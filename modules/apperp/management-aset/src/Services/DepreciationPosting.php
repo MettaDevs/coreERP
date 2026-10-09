@@ -174,7 +174,7 @@ final class DepreciationPosting
      * @throws ValidationException Nilainya lebih halus dari presisi mata uang yang berlaku sekarang.
      * @throws DepreciationPostingFailed
      */
-    public function publishReversal(string $tenantId, stdClass $original, string $reversalPeriodId, stdClass $asset, string $reason): ?array
+    public function publishReversal(string $tenantId, stdClass $original, string $reversalPeriodId, stdClass $asset, string $reason, ?string $postingDate = null, bool $preview = false): ?array
     {
         if (($original->posted_posting_id ?? null) === null) {
             return null;
@@ -182,7 +182,11 @@ final class DepreciationPosting
 
         $tanggal = self::date($original->period_ends_on);
         $mataUang = (string) $asset->currency_code;
-        $desimal = $this->decimals($tenantId, $mataUang);
+        $journal = $this->publisher->journal($tenantId, (string) $original->posted_posting_id);
+        if ($journal === null) {
+            throw ValidationException::withMessages(['document' => 'Jurnal asal penyusutan tidak ditemukan. Pembatalan belum dapat dijalankan.']);
+        }
+        $desimal = (int) $journal['payload']['currency']['decimals'];
         $nilai = BigDecimal::of((string) $original->amount);
         if ($nilai->strippedOfTrailingZeros()->getScale() > $desimal) {
             throw ValidationException::withMessages(['id' => sprintf(
@@ -207,8 +211,8 @@ final class DepreciationPosting
             'posting_type' => self::REVERSAL_TYPE,
             'legal_entity_id' => (string) $original->legal_entity_id,
             'currency_code' => $mataUang,
-            'posting_date' => $tanggal,
-            'document_date' => $tanggal,
+            'posting_date' => $postingDate ?? $tanggal,
+            'document_date' => $postingDate ?? $tanggal,
             'occurred_at' => now()->toIso8601String(),
             'reverses_posting_id' => (string) $original->posted_posting_id,
             'source_document' => [
@@ -233,7 +237,48 @@ final class DepreciationPosting
             ]]],
         ];
 
-        return $this->orFail(fn (): array => $this->publisher->publish($input));
+        // Pilih dua baris asal porsi aset ini. Group dan department berasal dari periodenya,
+        // business unit dari salinan jurnal asal, sehingga perubahan hierarki tidak menggesernya.
+        $expenseIndex = null;
+        foreach ($journal['input_lines'] as $index => $line) {
+            if (($line['mapping']['reference'] ?? null) === PostingGroupAccountResolver::reference($group, 'depreciation_expense_account_id') && $line['org_unit_id'] === $unit) {
+                $expenseIndex = $index;
+                break;
+            }
+        }
+        $accumulatedIndex = null;
+        if ($expenseIndex !== null) {
+            foreach ($journal['input_lines'] as $index => $line) {
+                if (($line['mapping']['reference'] ?? null) === PostingGroupAccountResolver::reference($group, 'accumulated_depreciation_account_id')
+                    && $journal['lines'][$index]['business_unit_code'] === $journal['lines'][$expenseIndex]['business_unit_code']) {
+                    $accumulatedIndex = $index;
+                    break;
+                }
+            }
+        }
+        if ($expenseIndex === null || $accumulatedIndex === null) {
+            throw ValidationException::withMessages(['document' => 'Baris jurnal asal penyusutan belum dapat dicocokkan dengan aset ini. Pembatalan belum dapat dijalankan.']);
+        }
+        $snapshotLines = [];
+        $payloadLines = [];
+        foreach ([$accumulatedIndex, $expenseIndex] as $newIndex => $sourceIndex) {
+            $sourceLine = $journal['lines'][$sourceIndex];
+            $description = $input['lines'][$newIndex]['description'];
+            $zero = (string) BigDecimal::zero()->toScale($desimal);
+            $debit = $newIndex === 0 ? $jumlah : $zero;
+            $credit = $newIndex === 0 ? $zero : $jumlah;
+            $input['lines'][$newIndex] = ['account_id' => $sourceLine['account_id'], 'org_unit_id' => $sourceLine['org_unit_id'], 'description' => $description, 'debit' => $debit, 'credit' => $credit];
+            if ($journal['status'] === 'held') {
+                $input['lines'][$newIndex]['mapping'] = $journal['input_lines'][$sourceIndex]['mapping'] ?? null;
+            }
+            $snapshotLines[] = array_replace($sourceLine, ['line_no' => $newIndex + 1, 'description' => $description, 'debit' => $debit, 'credit' => $credit]);
+            $payloadLines[] = array_replace($journal['payload']['journal_lines'][$sourceIndex], ['line_no' => $newIndex + 1, 'description' => $description, 'debit' => $debit, 'credit' => $credit]);
+        }
+        if ($journal['status'] !== 'held') {
+            $input['reversal_snapshot'] = ['currency' => $journal['payload']['currency'], 'totals' => ['debit' => $jumlah, 'credit' => $jumlah], 'journal_lines' => $payloadLines, 'lines' => $snapshotLines];
+        }
+
+        return $this->orFail(fn (): array => $preview ? $this->publisher->preview($input) : $this->publisher->publish($input));
     }
 
     /**
