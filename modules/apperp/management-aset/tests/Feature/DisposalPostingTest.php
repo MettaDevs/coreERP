@@ -30,7 +30,7 @@ class DisposalPostingTest extends TestCase
 
     public function test_a_draft_does_not_dispose_and_posting_removes_cost_and_depreciation_and_books_the_gain(): void
     {
-        [$group] = $this->groupLengkap('KENDARAAN', 'Kendaraan');
+        [$group, $book] = $this->groupLengkap('KENDARAAN', 'Kendaraan');
         $aset = $this->terimaSatu($group);
         $this->susutkan('2026-10-01', '2026-10-31');
         $this->hentikan($aset);
@@ -61,7 +61,7 @@ class DisposalPostingTest extends TestCase
             ['7-1100', '0.00', '3000000.00', ['BUSINESS_UNIT:KLN-A', 'DEPARTMENT:POLI-UMUM']],
         ], $this->jurnal($payload));
         $this->assertSame(['debit' => '51000000.00', 'credit' => '51000000.00'], $payload['totals']);
-        $this->assertSame(['KOM-KENDARAAN', '47000000.00', '3000000.00'], [
+        $this->assertSame([$this->bookCode($book), '47000000.00', '3000000.00'], [
             $payload['details']['assets'][0]['book'],
             $payload['details']['assets'][0]['net_book_value'],
             $payload['details']['assets'][0]['gain_loss'],

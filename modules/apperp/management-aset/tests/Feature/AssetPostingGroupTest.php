@@ -74,14 +74,14 @@ class AssetPostingGroupTest extends TestCase
             ->assertJsonPath('data.accounts.0', ['column' => 'acquisition_account_id', 'label' => 'Harga perolehan', 'required' => true])
             ->assertJsonPath('data.accounts.4', ['column' => 'clearing_account_id', 'label' => 'Perantara', 'required' => false])
             ->assertJsonPath('data.account_details.'.$this->akun['hutang_lain'].'.code', '2-1200');
-        $groups = $matriks->collect('data.groups')->keyBy('kode');
+        $groups = $matriks->collect('data.groups')->keyBy('id');
         // Baris masa depan tidak menggantikan baris yang berlaku hari ini.
-        $this->assertSame('2026-01-01', $groups['KENDARAAN']['current']['effective_from']);
-        $this->assertSame([$besok, '2026-01-01'], array_column($groups['KENDARAAN']['rows'], 'effective_from'));
-        $this->assertSame([], $groups['KENDARAAN']['missing']);
-        $this->assertNull($groups['ALKES']['current']);
-        $this->assertSame(AssetPostingGroup::REQUIRED_ACCOUNTS, $groups['ALKES']['missing']);
-        $this->assertSame($alkes, $groups['ALKES']['id']);
+        $this->assertSame('2026-01-01', $groups[$kendaraan]['current']['effective_from']);
+        $this->assertSame([$besok, '2026-01-01'], array_column($groups[$kendaraan]['rows'], 'effective_from'));
+        $this->assertSame([], $groups[$kendaraan]['missing']);
+        $this->assertNull($groups[$alkes]['current']);
+        $this->assertSame(AssetPostingGroup::REQUIRED_ACCOUNTS, $groups[$alkes]['missing']);
+        $this->assertSame($alkes, $groups[$alkes]['id']);
     }
 
     public function test_reading_creating_updating_and_archiving_are_separate_permissions(): void

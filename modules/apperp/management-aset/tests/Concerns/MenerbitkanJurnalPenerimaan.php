@@ -124,9 +124,19 @@ trait MenerbitkanJurnalPenerimaan
     {
         return (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
             ->withHeader('Idempotency-Key', 'group-'.Str::ulid())
-            ->postJson(self::API.'group-aset', ['kode' => $kode, 'nama' => $nama ?? 'Group '.$kode])
+            ->postJson(self::API.'group-aset', ['nama' => $nama ?? 'Group '.$kode])
             ->assertCreated()
             ->json('data.id');
+    }
+
+    private function groupCode(string $id): string
+    {
+        return (string) DB::table('aset_m_group_aset')->where('id', $id)->value('kode');
+    }
+
+    private function bookCode(string $id): string
+    {
+        return (string) DB::table('aset_m_buku_penyusutan')->where('id', $id)->value('kode');
     }
 
     /** @param  array<string, string>  $akun */

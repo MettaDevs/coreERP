@@ -59,14 +59,14 @@ class AssetReclassificationTest extends TestCase
         $this->assertSame('asset.reclassification', $payload['posting_type']);
         $this->assertSame(['2026-10-31', '2026-10-31'], [$payload['posting_date'], $payload['document_date']]);
         $this->assertSame([
-            ['1-2400', '48000000.00', '0.00'],
+            ['1-2300', '0.00', '48000000.00'],
             ['1-2390', '1000000.00', '0.00'],
             ['1-2395', '2000000.00', '0.00'],
+            ['1-2400', '48000000.00', '0.00'],
             ['1-2490', '0.00', '1000000.00'],
             ['1-2495', '0.00', '2000000.00'],
-            ['1-2300', '0.00', '48000000.00'],
-        ], array_map(static fn (array $baris): array => array_slice($baris, 0, 3), $this->jurnal($payload)));
-        $this->assertSame(['KENDARAAN', 'ALKES', '48000000.00'], [
+        ], array_map(static fn (array $baris): array => array_slice($baris, 0, 3), collect($this->jurnal($payload))->sortBy(static fn (array $row): string => $row[0])->values()->all()));
+        $this->assertSame([$this->groupCode($kendaraan), $this->groupCode($alkes), '48000000.00'], [
             $payload['details']['assets'][0]['from_group'],
             $payload['details']['assets'][0]['to_group'],
             $payload['details']['assets'][0]['acquisition_value'],
@@ -133,11 +133,11 @@ class AssetReclassificationTest extends TestCase
         $this->postingReklas($id)->assertOk();
 
         $this->assertSame([
-            ['1-2400', '12000000.00', '0.00'],
-            ['1-2390', '250000.00', '0.00'],
-            ['1-2490', '0.00', '250000.00'],
             ['1-2300', '0.00', '12000000.00'],
-        ], array_map(static fn (array $baris): array => array_slice($baris, 0, 3), $this->jurnal($this->payloadPosting('AST-RCL-'.$id))));
+            ['1-2390', '250000.00', '0.00'],
+            ['1-2400', '12000000.00', '0.00'],
+            ['1-2490', '0.00', '250000.00'],
+        ], array_map(static fn (array $baris): array => array_slice($baris, 0, 3), collect($this->jurnal($this->payloadPosting('AST-RCL-'.$id)))->sortBy(static fn (array $row): string => $row[0])->values()->all()));
         // Dua baris dihitung dari saldo sebelum diposting: 25% dan 10% dari 48 juta.
         $this->assertSame(['31200000.00', '650000.00'], [$this->buku($aset, $komersial)['acquisition_value'], $this->buku($aset, $komersial)['accumulated_depreciation']]);
         $baru = DB::table('aset_tr_reklasifikasi_aset_details')->where('reklasifikasi_aset_id', $id)->orderBy('line_number')->pluck('aset_baru_id')->all();

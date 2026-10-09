@@ -66,7 +66,7 @@ class DepreciationPostingTest extends TestCase
         $this->assertSame('asset.depreciation', $payload['posting_type']);
         // Jurnalnya bertanggal akhir periode, begitu juga tanggal dokumennya (TODO 11.2.8).
         $this->assertSame([self::AKHIR, self::AKHIR], [$payload['posting_date'], $payload['document_date']]);
-        $this->assertSame('Penyusutan buku KOM-KENDARAAN s.d. 31/10/2026', $payload['source_document']['description']);
+        $this->assertSame('Penyusutan buku '.$this->bookCode($komersial).' s.d. 31/10/2026', $payload['source_document']['description']);
         // Beban per department (akun laba rugi: BU + department), akumulasi per business unit.
         $this->assertEqualsCanonicalizing([
             ['6-5100', '2000000.00', '0.00', ['BUSINESS_UNIT:KLN-A', 'DEPARTMENT:POLI-UMUM']],
@@ -111,12 +111,12 @@ class DepreciationPostingTest extends TestCase
 
     public function test_a_book_that_never_posts_is_refused_with_a_clear_message(): void
     {
-        [$group, , $fiskal] = $this->groupMenyusut('KENDARAAN', 'Kendaraan');
+        [$group, $komersial, $fiskal] = $this->groupMenyusut('KENDARAAN', 'Kendaraan');
         $this->petakanPenyusutan($group);
         $this->terima($group, $this->poli, 1, 48000000);
         $this->usulkanDanFinalkan();
 
-        $pesan = 'Buku FIS-KENDARAAN tidak di-post ke aplikasi finance karena lapisan posting-nya none. Penyusutannya tetap tercatat di register aset.';
+        $pesan = 'Buku '.$this->bookCode($fiskal).' tidak di-post ke aplikasi finance karena lapisan posting-nya none. Penyusutannya tetap tercatat di register aset.';
         $this->pratinjauPost($fiskal)->assertOk()
             ->assertJsonPath('data.blockers.0.message', $pesan)
             ->assertJsonPath('data.posting', null);
@@ -126,7 +126,7 @@ class DepreciationPostingTest extends TestCase
         // Daftar periode membawa lapisan posting bukunya, supaya layar tidak menawarkan buku ini untuk di-post.
         $lapisan = $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read'])
             ->getJson(self::API.'penyusutan')->assertOk()->collect('data')->pluck('posting_layer', 'book_code')->sortKeys()->all();
-        $this->assertSame(['FIS-KENDARAAN' => 'none', 'KOM-KENDARAAN' => 'current'], $lapisan);
+        $this->assertSame([$this->bookCode($komersial) => 'current', $this->bookCode($fiskal) => 'none'], $lapisan);
     }
 
     public function test_only_the_book_that_posted_the_acquisition_sends_depreciation(): void
@@ -158,7 +158,7 @@ class DepreciationPostingTest extends TestCase
         app(MoneyPrecision::class)->forget();
 
         $this->jalankanPost($komersial)->assertStatus(422)->assertJsonValidationErrors([
-            'buku_id' => 'Penyusutan 1 aset di buku KOM-KENDARAAN lebih halus dari presisi IDR (0 desimal), jadi jurnalnya tidak akan sama persis dengan register. Atur pembulatan penyusutan di matriks group x buku (Master data › Group aset) supaya penyusutan berikutnya sesuai presisi.',
+            'buku_id' => 'Penyusutan 1 aset di buku '.$this->bookCode($komersial).' lebih halus dari presisi IDR (0 desimal), jadi jurnalnya tidak akan sama persis dengan register. Atur pembulatan penyusutan di matriks group x buku (Master data › Group aset) supaya penyusutan berikutnya sesuai presisi.',
         ]);
         $this->assertNull(DB::table('aset_tr_penyusutan_aset')->where('status', 'final')->value('posted_posting_id'));
     }
@@ -289,7 +289,7 @@ class DepreciationPostingTest extends TestCase
 
         $pratinjau = $this->pratinjauPost($komersial)->assertOk()->json('data');
         $this->assertSame(['held', 1, '1000000.00'], [$pratinjau['posting']['status'], $pratinjau['assets'], $pratinjau['register_total']]);
-        $this->assertSame(['Group KENDARAAN · beban penyusutan belum dipetakan ke akun.'], array_column($pratinjau['posting']['problems'], 'message'));
+        $this->assertSame(['Group '.$this->groupCode($group).' · beban penyusutan belum dipetakan ke akun.'], array_column($pratinjau['posting']['problems'], 'message'));
         $this->assertSame(0, DB::table('aset_tr_penyusutan_aset')->whereNotNull('posted_posting_id')->count());
 
         // Pemetaan yang kosong tidak menahan proses: posting terbit `held` dan periodenya tetap
