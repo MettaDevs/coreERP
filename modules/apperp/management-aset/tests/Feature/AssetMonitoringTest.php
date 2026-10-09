@@ -461,9 +461,9 @@ class AssetMonitoringTest extends TestCase
 
         // Baca saja: master dan register tidak dapat ditulis.
         $this->withHeader('Idempotency-Key', 'lokasi-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/lokasi-aset', $this->denganKodeKetik('lokasi-aset', ['nama' => 'Lokasi liar']))->assertForbidden();
+            ->postJson('/api/modules/management-aset/v1/lokasi-aset', ['nama' => 'Lokasi liar'])->assertForbidden();
         $this->withHeader('Idempotency-Key', 'kondisi-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/kondisi-aset', $this->denganKodeKetik('kondisi-aset', ['nama' => 'Kondisi liar']))->assertForbidden();
+            ->postJson('/api/modules/management-aset/v1/kondisi-aset', ['nama' => 'Kondisi liar'])->assertForbidden();
         $this->patchJson('/api/modules/management-aset/v1/aset/'.$aset, ['nama' => 'Televisi diganti', 'version' => $asetVersion])->assertForbidden();
         $this->assertSame('Televisi', (string) DB::table('aset_tr_aset')->where('id', $aset)->value('nama'));
     }
@@ -666,7 +666,7 @@ class AssetMonitoringTest extends TestCase
             ['read', 'create', 'update', 'archive'],
         ))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload))
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()->json('data.id');
     }
 

@@ -64,6 +64,8 @@ Yang tersisa bergantung pada pihak aplikasi finance.
 - [x] 0.7 Konfirmasi ke konsultan: presisi nilai IDR (0 atau 2 desimal) dan presisi harga satuan (K-20). Pastikan presisi kolom nilai di old-finance sama atau lebih halus.
   2 desimal untuk nilai dan 3 untuk harga satuan (K-37), sama dengan bawaan `MoneyPrecision`. Kode
   old-finance membulatkan nilai ke 2 desimal.
+> Koreksi 9 Oktober 2026: pengecualian kode ketik group aset dan buku penyusutan pada 0.8, 8.6.4, dan 8.7 dicabut. Kode baru mengikuti Nomor dokumen Core; kode record yang sudah ada tetap. Item di bawah mencatat pekerjaan historis, bukan aturan penomoran saat ini.
+
 - [x] 0.8 Minta tim old-finance menyiapkan kode group aset dan buku penyusutan versi manual bersama konsultan (misalnya `KENDARAAN`, `ALKES`, `KOMERSIAL`), untuk dipakai di 8.7.
   Tidak ada kode bawaan (K-24): admin tenant mengetik kode group dan buku sendiri, seperti kode *FA Class*
   dan *Depreciation Book* di BC. Contoh di atas hanya contoh dokumentasi.

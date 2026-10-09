@@ -11,34 +11,6 @@ import { BASE, paramsUntuk, urlModule } from '../lib.js';
 
 const ASET = (path) => urlModule('management-aset', path);
 
-/**
- * Kode diketik untuk group aset dan buku penyusutan (K-24): huruf besar, angka, dan tanda hubung,
- * paling panjang 30 karakter. Kode unik per tenant, termasuk kode record yang sudah diarsipkan.
- */
-export function kodeManual(...bagian) {
-    return bagian
-        .join('-')
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 30)
-        .replace(/-+$/, '');
-}
-
-/**
- * Penanda pendek untuk satu run, dipakai di dalam kode diketik yang panjangnya dibatasi. Run berbeda pada
- * fixture yang sama berbagi tenant, jadi kode yang hanya disusun dari nomor VU dan iterasi bertabrakan.
- */
-export function tandaRun(runId) {
-    let hash = 0;
-
-    for (const huruf of String(runId)) {
-        hash = (hash * 31 + huruf.charCodeAt(0)) >>> 0;
-    }
-
-    return hash.toString(36).toUpperCase();
-}
-
 function wajib(label, responses, statusSah) {
     responses.forEach((response, index) => {
         if (!statusSah.includes(response.status)) {

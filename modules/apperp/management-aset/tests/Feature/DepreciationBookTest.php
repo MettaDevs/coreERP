@@ -87,9 +87,9 @@ class DepreciationBookTest extends TestCase
     {
         $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('buku-penyusutan'))
             ->withHeader('Idempotency-Key', 'buku-saklar-lama')
-            ->postJson('/api/modules/management-aset/v1/buku-penyusutan', $this->denganKodeKetik('buku-penyusutan', [
+            ->postJson('/api/modules/management-aset/v1/buku-penyusutan', [
                 'nama' => 'Buku lama', 'export_to_backoffice' => true,
-            ]))
+            ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('export_to_backoffice');
 
@@ -254,7 +254,7 @@ class DepreciationBookTest extends TestCase
     {
         return $this->sebagaiPengguna($tenantId ?? $this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload))
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()
             ->json('data.id');
     }

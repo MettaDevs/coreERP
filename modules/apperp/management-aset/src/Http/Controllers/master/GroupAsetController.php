@@ -23,12 +23,6 @@ class GroupAsetController extends MasterDataController
         return GroupAset::class;
     }
 
-    /** Kode diketik, misalnya `KENDARAAN`; lihat MasterDataController::manualCode(). */
-    protected function manualCode(): bool
-    {
-        return true;
-    }
-
     protected function childMasters(): array
     {
         // Setelah rantai klasifikasi diratakan, yang menggantung pada group bukan lagi

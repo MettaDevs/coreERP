@@ -28,7 +28,9 @@ dijelaskan di sini hanya yang khas modul ini.
 yang tahu, karena tiga perubahan produk tidak ikut sampai ke skenarionya: `POST /aset` dipensiunkan
 (aset hanya lahir dari penerimaan yang diselesaikan), `POST /aset/{id}/penempatan` dibuang (pemindahan
 lewat berita acara mutasi), dan kode group aset serta buku penyusutan menjadi diketik (K-24). Ketiganya
-kini ditangani `seed-aset.js` dan operasi mutasi di `master-data.js`.
+kini ditangani `seed-aset.js` dan operasi mutasi di `master-data.js`. Pengecualian kode ketik dicabut
+pada 9 Oktober 2026: group aset dan buku penyusutan baru memakai Number Sequence, dan SQL oracle
+kembali memeriksa keduanya terhadap `number_sequence_issues`.
 
 Dua pelajaran yang berlaku untuk skenario lain. Sebelum mengandalkan skenario sebagai gate, jalankan
 dulu dalam ukuran kecil (`TENANTS=4 VUS=20 DURATION=20s`) dan pastikan setiap check punya kelulusan,

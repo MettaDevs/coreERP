@@ -42,8 +42,6 @@ security:
         - management-aset.buku-penyusutan.retire
 number_sequences:
   references:
-    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
-    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
     - code: management-aset.buku-penyusutan
       name: Kode buku penyusutan
       default_prefix: BKPY
