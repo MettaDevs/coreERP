@@ -10,7 +10,7 @@ Tabel pendamping `aset_tr_export_penyusutan` adalah jalur lama: hasil finalisasi
 
 | Langkah | Hasil | Bisa dibatalkan? |
 | --- | --- | --- |
-| **Proposal** | periode `proposed` | Ya, tinggal diulang |
+| **Proposal** | periode `proposed` | Ya, lewat Batal atau pengajuan pembatalan; sesudahnya dapat diusulkan lagi |
 | **Finalisasi** | periode `final`, saldo buku bertambah | Tidak. Harus lewat pembalikan |
 | **Post penyusutan** | satu jurnal `asset.depreciation`, periodenya ditandai `posted_posting_id` | Tidak. Pembalikan menerbitkan jurnal baliknya |
 
@@ -44,6 +44,11 @@ Kalau tidak ada penempatan yang berlaku, permintaan ditolak. Angka yang tidak je
 **Finalisasi aman diulang.** Kalau periode sudah `final`, permintaan ulang mengembalikan periode itu tanpa menambah saldo buku untuk kedua kalinya. Jaringan yang putus setelah server selesai memproses tidak boleh menghasilkan pembukuan ganda.
 
 **Pembalikan adalah satu-satunya jalan mundur.** Periode `final` tidak bisa dihapus atau diedit. Membalik membuat catatan baru yang meniadakan yang lama, sehingga jejaknya tetap ada.
+
+Sejak 9 Oktober 2026, [pembatalan transaksi aset](/apps/management-aset/transaction/pembatalan/)
+memberi hak Batal yang terpisah, jalur pengajuan workflow, dan pilihan tanggal jurnal balik baru.
+`cancelled_at` pada periode asli membebaskan tanggal akhir itu untuk dihitung ulang. Periode
+yang dibatalkan dan baris pembalik tidak menambah hitungan masa manfaat yang sudah berjalan.
 
 ## Post penyusutan
 

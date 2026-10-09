@@ -46,5 +46,7 @@ final class WorkflowDecisionTaken
         public readonly string $correlationId,
         public readonly ?string $legalEntityId,
         public readonly array $data,
+        // Pelaku hanya untuk listener in-process. Amplop HTTP v2 tetap memakai bentuk yang sudah terbit.
+        public readonly ?string $actorUserId = null,
     ) {}
 }

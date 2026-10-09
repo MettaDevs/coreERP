@@ -86,6 +86,9 @@ final class PostingAcknowledger
             $posting = FinancePosting::query()->lockForUpdate()->findOrFail($postingRowId);
 
             if ($posting->status === FinancePosting::PENDING) {
+                if (! FinancePosting::query()->whereKey($posting->id)->readyForDelivery()->exists()) {
+                    return ['result' => self::CONFLICT, 'posting' => $posting];
+                }
                 $posting->fill([
                     'status' => $ack['status'],
                     'external_reference' => $ack['external_reference'],
@@ -105,6 +108,16 @@ final class PostingAcknowledger
                         'reason_code' => $ack['reason_code'],
                     ]),
                 );
+                if ($posting->status === FinancePosting::REJECTED) {
+                    // Pembaca belum membukukan asal, sehingga tidak boleh menerima jurnal negatifnya.
+                    $children = FinancePosting::query()->where('tenant_id', $posting->tenant_id)
+                        ->where('reverses_posting_id', $posting->posting_id)->whereIn('status', [FinancePosting::PENDING, FinancePosting::HELD])->lockForUpdate()->get();
+                    foreach ($children as $child) {
+                        $from = $child->status;
+                        $child->update(['status' => FinancePosting::MANUAL, 'manual_reason' => FinancePosting::MANUAL_ORIGINAL_REJECTED, 'hold_reasons' => null]);
+                        FinancePostingEvent::record($child, 'original_rejected', $from, FinancePosting::MANUAL, $client->id);
+                    }
+                }
 
                 return ['result' => self::APPLIED, 'posting' => $posting];
             }

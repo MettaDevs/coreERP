@@ -30,4 +30,14 @@ final class PostingFeedCore implements PostingFeed
     {
         return $this->publisher->status($tenantId, $postingId);
     }
+
+    public function reverse(string $tenantId, string $originalPostingId, array $cancellation, bool $preview = false): array
+    {
+        return $this->publisher->reverse($tenantId, $originalPostingId, $cancellation, $preview);
+    }
+
+    public function journal(string $tenantId, string $postingId): ?array
+    {
+        return $this->publisher->journal($tenantId, $postingId);
+    }
 }

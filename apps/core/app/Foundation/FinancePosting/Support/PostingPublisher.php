@@ -71,19 +71,19 @@ final class PostingPublisher
      * @param  array<string, mixed>  $input
      * @return array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}
      */
-    public function publish(array $input): array
+    public function publish(array $input, ?int $decimals = null): array
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('PostingFeed::publish harus dipanggil di dalam transaksi dokumen sumbernya.');
         }
 
         $exists = $this->existing($input);
-        $postingInput = $this->normalize($input, $exists?->currency_decimals);
+        $postingInput = $this->normalize($input, $exists->currency_decimals ?? $decimals ?? $this->reversalDecimals($input));
         if ($exists !== null) {
             return $this->existingResult($exists, $postingInput);
         }
 
-        $value = $this->evaluate($postingInput, now()->toIso8601String());
+        $value = $this->reversalSnapshot($this->evaluate($postingInput, now()->toIso8601String()), $input);
 
         try {
             // SAVEPOINT di dalam transaksi pemanggil: bentrokan `posting_id` dari permintaan lain
@@ -103,15 +103,15 @@ final class PostingPublisher
      * @param  array<string, mixed>  $input
      * @return array{posting_id: string, status: string, problems: list<array<string, mixed>>, payload: array<string, mixed>, created: bool}
      */
-    public function preview(array $input): array
+    public function preview(array $input, ?int $decimals = null): array
     {
         $exists = $this->existing($input);
-        $postingInput = $this->normalize($input, $exists?->currency_decimals);
+        $postingInput = $this->normalize($input, $exists->currency_decimals ?? $decimals ?? $this->reversalDecimals($input));
         if ($exists !== null) {
             return $this->existingResult($exists, $postingInput);
         }
 
-        $value = $this->evaluate($postingInput, now()->toIso8601String());
+        $value = $this->reversalSnapshot($this->evaluate($postingInput, now()->toIso8601String()), $input);
 
         return [
             'posting_id' => $postingInput->postingId,
@@ -123,7 +123,7 @@ final class PostingPublisher
     }
 
     /**
-     * @return array{posting_id: string, status: string, settlement_mode: ?string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
+     * @return array{posting_id: string, status: string, settlement_mode: ?string, posting_date: string, manual_reason: ?string, external_reference: ?string, reason_code: ?string, reason: ?string, acknowledged_at: ?string, problems: list<array<string, mixed>>}|null
      */
     public function status(string $tenantId, string $postingId): ?array
     {
@@ -133,12 +133,135 @@ final class PostingPublisher
             'posting_id' => $posting->posting_id,
             'status' => $posting->status,
             'settlement_mode' => $posting->settlement_mode,
+            'posting_date' => $posting->posting_date->toDateString(),
+            'manual_reason' => $posting->manual_reason,
             'external_reference' => $posting->external_reference,
             'reason_code' => $posting->reason_code,
             'reason' => $posting->reason,
             'acknowledged_at' => $posting->acknowledged_at?->toIso8601String(),
             'problems' => $posting->hold_reasons ?? [],
         ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $cancellation
+     * @return list<array<string,mixed>>
+     */
+    public function reverse(string $tenantId, string $originalPostingId, array $cancellation, bool $preview = false): array
+    {
+        if (! $preview && DB::transactionLevel() === 0) {
+            throw new LogicException('Pembalikan wajib berada dalam transaksi dokumen.');
+        }
+        $query = FinancePosting::query()->where('tenant_id', $tenantId)
+            ->where(function ($query) use ($originalPostingId, $cancellation): void {
+                $query->where('posting_id', $originalPostingId);
+                if ($cancellation['include_adjustments'] ?? false) {
+                    $query->orWhere('adjusts_posting_id', $originalPostingId);
+                }
+            })->orderBy('posting_id');
+        if (! $preview) {
+            $query->lockForUpdate();
+        }
+        $results = [];
+        foreach ($query->get() as $original) {
+            $input = $original->input;
+            $storedLines = $original->lines()->orderBy('line_no')->get([
+                'line_no', 'account_id', 'account_external_id', 'account_code', 'debit', 'credit',
+                'description', 'org_unit_id', 'business_unit_code', 'department_code',
+            ])->toArray();
+            $input['lines'] = array_map(static function (array $line): array {
+                [$line['debit'], $line['credit']] = [$line['credit'], $line['debit']];
+
+                return $line;
+            }, $input['lines']);
+            // Akun hasil validasi ulang menjadi akun asal pembalikan, bukan pemetaan hari ini.
+            foreach ($storedLines as $i => $line) {
+                if ($original->status !== FinancePosting::HELD) {
+                    $input['lines'][$i]['account_id'] = $line['account_id'];
+                    unset($input['lines'][$i]['mapping']);
+                }
+            }
+            $input['posting_id'] = $cancellation['posting_id'].'-'.substr(hash('sha256', $original->posting_id), 0, 16);
+            $input['posting_type'] = $original->posting_type.'_reversal';
+            $input['posting_date'] = $cancellation['posting_date'];
+            $input['document_date'] = $cancellation['posting_date'];
+            $input['occurred_at'] = now()->toIso8601String();
+            $input['source_document'] = $cancellation['source_document'];
+            $input['reverses_posting_id'] = $original->posting_id;
+            unset($input['adjusts_posting_id']);
+            $input['details'] = ['original_posting_id' => $original->posting_id];
+            $input['reverse_full_journal'] = true;
+            $result = $preview ? $this->preview($input, $original->currency_decimals) : $this->publish($input, $original->currency_decimals);
+            $results[] = $result;
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param  array{status:string,manual_reason:?string,problems:list<array<string,mixed>>,payload:array<string,mixed>,lines:list<array<string,mixed>>}  $value
+     * @param  array<string,mixed>  $input
+     * @return array{status:string,manual_reason:?string,problems:list<array<string,mixed>>,payload:array<string,mixed>,lines:list<array<string,mixed>>}
+     */
+    private function reversalSnapshot(array $value, array $input): array
+    {
+        if (isset($input['reversal_snapshot'])) {
+            foreach (['journal_lines', 'currency', 'totals'] as $key) {
+                $value['payload'][$key] = $input['reversal_snapshot'][$key];
+            }
+            $value['lines'] = $input['reversal_snapshot']['lines'];
+
+            return $value;
+        }
+        if (! ($input['reverse_full_journal'] ?? false)) {
+            return $value;
+        }
+        $original = $this->find($input['tenant_id'], $input['reverses_posting_id']);
+        if (in_array($original->status, [FinancePosting::MANUAL, FinancePosting::REJECTED], true)) {
+            $value['status'] = FinancePosting::MANUAL;
+            $value['manual_reason'] = $original->status === FinancePosting::REJECTED ? FinancePosting::MANUAL_ORIGINAL_REJECTED : $original->manual_reason;
+            $value['problems'] = [];
+        } elseif ($original->status === FinancePosting::HELD) {
+            $value['status'] = FinancePosting::HELD;
+            $value['problems'] = $original->hold_reasons ?? [];
+
+            return $value;
+        }
+        foreach (['currency', 'legal_entity', 'vendor', 'totals'] as $key) {
+            $value['payload'][$key] = $original->payload[$key];
+        }
+        $swap = static function (array $line): array {
+            [$line['debit'], $line['credit']] = [$line['credit'], $line['debit']];
+
+            return $line;
+        };
+        $value['payload']['journal_lines'] = array_map($swap, $original->payload['journal_lines']);
+        $value['lines'] = array_values(array_map($swap, $original->lines()->orderBy('line_no')->get([
+            'line_no', 'account_id', 'account_external_id', 'account_code', 'debit', 'credit',
+            'description', 'org_unit_id', 'business_unit_code', 'department_code',
+        ])->toArray()));
+
+        return $value;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function journal(string $tenantId, string $postingId): ?array
+    {
+        $posting = $this->find($tenantId, $postingId);
+
+        return $posting === null ? null : ['status' => $posting->status, 'input_lines' => $posting->input['lines'], 'payload' => $posting->payload,
+            'lines' => $posting->lines()->orderBy('line_no')->get(['line_no', 'account_id', 'account_external_id', 'account_code', 'debit', 'credit',
+                'description', 'org_unit_id', 'business_unit_code', 'department_code'])->toArray()];
+    }
+
+    /**
+     * @param  array<string,mixed>  $input
+     */
+    private function reversalDecimals(array $input): ?int
+    {
+        $id = $input['reverses_posting_id'] ?? null;
+
+        return is_string($id) && is_string($input['tenant_id'] ?? null) ? $this->find($input['tenant_id'], $id)?->currency_decimals : null;
     }
 
     /**
@@ -347,6 +470,9 @@ final class PostingPublisher
             $type, $legalEntity->id, $currency, $postingDate, $documentDate, $mode, $vendorId, $reverses, $corrects,
             array_map(static fn (array $line): array => [$line['account_id'], $line['debit'], $line['credit'], $line['org_unit_id']], $lines),
         ], JSON_THROW_ON_ERROR));
+        if (isset($input['reversal_snapshot'])) {
+            $hash = hash('sha256', $hash.json_encode($input['reversal_snapshot'], JSON_THROW_ON_ERROR));
+        }
 
         return new PostingInput(
             tenantId: $tenant,
@@ -378,10 +504,14 @@ final class PostingPublisher
     private function evaluate(PostingInput $postingInput, string $publishedAt): array
     {
         $shape = $this->shape($postingInput, $publishedAt);
+        $origin = $postingInput->reversesPostingId === null ? null : $this->find($postingInput->tenantId, $postingInput->reversesPostingId);
         $settings = $this->settings->setting($postingInput->legalEntityId);
         $cutover = $settings?->cutover_date?->toDateString();
 
         [$status, $reason] = match (true) {
+            $origin?->status === FinancePosting::REJECTED => [FinancePosting::MANUAL, FinancePosting::MANUAL_ORIGINAL_REJECTED],
+            $origin?->status === FinancePosting::MANUAL => [FinancePosting::MANUAL, $origin->manual_reason],
+            $origin?->status === FinancePosting::HELD => [FinancePosting::HELD, null],
             $settings === null || ! $settings->enabled => [FinancePosting::MANUAL, FinancePosting::MANUAL_FEED_DISABLED],
             $cutover !== null && $postingInput->postingDate < $cutover => [FinancePosting::MANUAL, FinancePosting::MANUAL_BEFORE_CUTOVER],
             $shape['problems'] !== [] => [FinancePosting::HELD, null],
@@ -576,7 +706,7 @@ final class PostingPublisher
     {
         $input = $this->currentAccounts($posting);
         $postingInput = $this->normalize($input, $posting->currency_decimals);
-        $value = $this->evaluate($postingInput, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String()));
+        $value = $this->reversalSnapshot($this->evaluate($postingInput, (string) ($posting->payload['published_at'] ?? $posting->published_at->toIso8601String())), $input);
 
         return DB::transaction(function () use ($posting, $input, $postingInput, $value, $event, $userId): FinancePosting {
             $locked = FinancePosting::query()->lockForUpdate()->findOrFail($posting->id);

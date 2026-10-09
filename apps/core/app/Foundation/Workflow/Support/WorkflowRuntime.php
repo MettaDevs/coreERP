@@ -15,6 +15,7 @@ class WorkflowRuntime
     public function __construct(
         private readonly WorkflowParameters $parameter,
         private readonly ModuleEventDispatcher $dispatcher,
+        private readonly WorkflowApprovalAuthority $authority,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -54,14 +55,19 @@ class WorkflowRuntime
     {
         return DB::transaction(function () use ($actor, $workItemId, $decision, $comment): object {
             $workItem = DB::table('workflow_work_items')->where('id', $workItemId)->where('tenant_id', $actor->tenant_id)
-                ->where('assigned_membership_id', $actor->id)->lockForUpdate()->first();
+                ->where('assigned_membership_id', $actor->id)->first();
             abort_unless($workItem, 404);
+            // Kunci instance lebih dulu: dua penyetuju tidak boleh saling memegang work item
+            // ketika penyetuju pertama menutup tugas lain pada kebijakan "satu cukup".
+            $instance = DB::table('workflow_instances')->where('id', $workItem->instance_id)->where('tenant_id', $actor->tenant_id)->lockForUpdate()->first();
+            abort_unless($instance !== null, 404);
+            $workItem = DB::table('workflow_work_items')->where('id', $workItemId)->where('tenant_id', $actor->tenant_id)->lockForUpdate()->first();
             if ($workItem->status !== 'pending') {
                 throw ValidationException::withMessages(['decision' => 'Tugas ini sudah ditangani.']);
             }
 
-            $instance = DB::table('workflow_instances')->where('id', $workItem->instance_id)->where('tenant_id', $actor->tenant_id)->lockForUpdate()->first();
-            abort_unless($instance && $instance->status === 'pending', 409, 'Permintaan ini sudah selesai.');
+            abort_unless($instance->status === 'pending', 409, 'Permintaan ini sudah selesai.');
+            abort_unless($this->authority->allows($instance, $actor), 403, 'Anda belum memiliki hak persetujuan untuk dokumen atau unit kerja ini.');
             // Pengaju yang menyetujui dokumennya sendiri: dilarang atau tidak, tenant yang
             // memutuskan. Dulu ini aturan mati di sini, dan aturan mati itu jalan buntu untuk
             // organisasi yang penggunanya rangkap jabatan — mesin ini tidak punya delegasi
@@ -146,8 +152,13 @@ class WorkflowRuntime
 
         $config = json_decode($element->configuration, true, 512, JSON_THROW_ON_ERROR);
         $candidates = $this->assignees($tenantId, $config);
+        $instance = DB::table('workflow_instances')->where('id', $instanceId)->first();
+        $candidates = $candidates->filter(fn (string $id): bool => $this->authority->allows($instance, TenantMembership::query()->findOrFail($id)))->values();
         $membershipIds = $this->withoutSubmitter($tenantId, $instanceId, $candidates);
         if ($membershipIds->isEmpty()) {
+            if (isset($this->authority->rules($instance)['permission'])) {
+                throw ValidationException::withMessages(['workflow' => 'Belum ada penyetuju aktif yang memiliki hak dan unit kerja untuk dokumen ini. Minta admin memeriksa penerima tugas.']);
+            }
             // Dua sebab yang berbeda, dan bedanya penting bagi yang membacanya: tidak ada
             // penerima sama sekali adalah konfigurasi yang salah, sedangkan penerima yang habis
             // karena disaring adalah kebijakan yang bertabrakan dengan susunan orangnya. Pesan
@@ -161,9 +172,11 @@ class WorkflowRuntime
             return;
         }
         foreach ($membershipIds as $membershipId) {
+            $workItemId = (string) Str::ulid();
             DB::table('workflow_work_items')->insert([
-                'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'instance_id' => $instanceId,
+                'id' => $workItemId, 'tenant_id' => $tenantId, 'instance_id' => $instanceId,
                 'element_id' => $element->id, 'assigned_membership_id' => $membershipId, 'status' => 'pending',
+                'review_url' => url('/workflow-inbox').'?item='.$workItemId,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -226,7 +239,7 @@ class WorkflowRuntime
         };
     }
 
-    private function completeWhenDone(string $tenantId, ?object $instance, ?string $actorMembershipId): void
+    private function completeWhenDone(string $tenantId, ?\stdClass $instance, ?string $actorMembershipId): void
     {
         if (! $instance || $instance->status !== 'pending') {
             return;
@@ -238,10 +251,15 @@ class WorkflowRuntime
         }
     }
 
-    private function finish(string $tenantId, object $instance, string $status, ?string $comment, ?string $actorMembershipId): void
+    private function finish(string $tenantId, \stdClass $instance, string $status, ?string $comment, ?string $actorMembershipId): void
     {
         if ($instance->status !== 'pending') {
             return;
+        }
+        if ($status === 'approved' && isset($this->authority->rules($instance)['permission'])) {
+            $actor = $actorMembershipId === null ? null : TenantMembership::query()->find($actorMembershipId);
+            abort_unless($actor !== null && $this->authority->allows($instance, $actor), 422, 'Pembatalan membutuhkan persetujuan pengguna berwenang. Tambahkan langkah persetujuan pada workflow.');
+            abort_unless(DB::table('workflow_history')->where('instance_id', $instance->id)->where('event_type', 'approved')->whereNotNull('actor_membership_id')->exists(), 422, 'Pembatalan membutuhkan langkah persetujuan, bukan hanya tugas manual.');
         }
         DB::table('workflow_work_items')->where('instance_id', $instance->id)->where('status', 'pending')->update(['status' => 'cancelled', 'completed_at' => now(), 'updated_at' => now()]);
         DB::table('workflow_instances')->where('id', $instance->id)->update(['status' => $status, 'updated_at' => now()]);
@@ -290,7 +308,8 @@ class WorkflowRuntime
         // middleware rute module — jadi tanpa ini setiap query model module di dalam listener
         // melempar "tanpa tenant aktif", dan kegagalannya membatalkan keputusan yang sah.
         $this->dispatcher->dispatch(
-            new WorkflowDecisionTaken($eventId, $tenantId, $correlationId, $legalEntityId === null ? null : (string) $legalEntityId, $content),
+            new WorkflowDecisionTaken($eventId, $tenantId, $correlationId, $legalEntityId === null ? null : (string) $legalEntityId, $content,
+                $actorMembershipId === null ? null : (string) TenantMembership::query()->findOrFail($actorMembershipId)->user_id),
             $tenantId,
         );
     }

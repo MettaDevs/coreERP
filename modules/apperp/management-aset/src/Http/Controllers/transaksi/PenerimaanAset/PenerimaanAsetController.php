@@ -27,6 +27,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
+use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\LocationInheritance;
@@ -128,9 +129,10 @@ class PenerimaanAsetController extends Controller
         $vendor = $penerimaan->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $penerimaan->vendor_id);
         $penerimaan->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
         // Keadaan jurnalnya di feed posting finance, sesudah diselesaikan: perolehan, atau saldo awal.
-        $penerimaan->posting = $penerimaan->status === PenerimaanStatus::SELESAI
+        $penerimaan->posting = in_array($penerimaan->status, [PenerimaanStatus::SELESAI, PenerimaanStatus::CANCELLED], true)
             ? app(PostingFeed::class)->status($tenant, AcquisitionPosting::postingId($id, (string) $penerimaan->cara_perolehan))
             : null;
+        $penerimaan->cancellation = app(AssetCancellationEngine::class)->summary('penerimaan-aset', $id);
 
         return response()->json(['data' => $penerimaan], 200, ['ETag' => RowVersion::etag((int) $penerimaan->version)]);
     }

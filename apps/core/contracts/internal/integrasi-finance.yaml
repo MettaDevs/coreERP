@@ -218,6 +218,11 @@ info:
     | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
     | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
     | `asset.reclassification` | Reklasifikasi aset antar group aset diposting | Sudah |
+    | `asset.acquisition_reversal` | Penerimaan aset dibatalkan | Sudah |
+    | `asset.opening_balance_reversal` | Penerimaan saldo awal dibatalkan | Sudah |
+    | `asset.acquisition_adjustment_reversal` | Koreksi nilai penerimaan dibalik bersama penerimaannya | Sudah |
+    | `asset.write_down_reversal` | Penurunan nilai aset dibatalkan | Sudah |
+    | `asset.appreciation_reversal` | Kenaikan nilai aset dibatalkan | Sudah |
 
     **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
     *Belum* tidak pernah muncul di `GET /finance-postings` sampai modulnya menerbitkannya.

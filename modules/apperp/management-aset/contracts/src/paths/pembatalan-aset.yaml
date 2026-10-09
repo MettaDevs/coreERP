@@ -1,0 +1,132 @@
+# Dijalankan oleh engine aset; approval tetap memakai workflow Core.
+/api/modules/management-aset/v1/penerimaan-aset/{id}/pratinjau-pembatalan:
+  get:
+    security: [{ CoreERPContext: [] }]
+    operationId: previewReceiptCancellation
+    tags: [Lifecycle aset]
+    summary: Periksa pembatalan penerimaan dan jurnal baliknya tanpa menyimpan
+    parameters: &cancellationParameters
+      - $ref: '#/components/parameters/RecordId'
+      - name: posting_date
+        in: query
+        schema: { type: string, format: date }
+    responses: &previewResponses
+      '200':
+        description: Penghalang, tanggal asal, versi dokumen, jurnal balik, dan pengajuan terakhir
+        content:
+          application/json:
+            schema: { type: object, properties: { data: { type: object } } }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+/api/modules/management-aset/v1/penerimaan-aset/{id}/batal:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: cancelAssetReceipt
+    tags: [Lifecycle aset]
+    summary: Batalkan penerimaan selesai dengan hak pembatalan tersendiri
+    description: |
+      Memerlukan management-aset.penerimaan-aset.cancel. Aset yang mempunyai transaksi lanjutan
+      menahan pembatalan. Aset hasil penerimaan diarsipkan, buku ditutup, dan jurnal perolehan
+      beserta koreksi nilainya dibalik dari akun dan dimensi tersimpan. Transaksi asal tetap ada.
+      Jurnal balik hanya dikirim ke finance setelah jurnal asal di-ack posted.
+    parameters: &recordParameters
+      - $ref: '#/components/parameters/RecordId'
+    requestBody: &cancellationBody
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AssetCancellationRequest' }
+    responses: &cancellationResponses
+      '201':
+        description: Pembatalan tercatat; status applied untuk pembatalan langsung, pending untuk pengajuan
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data: { $ref: '#/components/schemas/AssetCancellation' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+      '409': { description: Dokumen berubah; muat ulang dan periksa kembali }
+      '422': { description: Transaksi lanjutan menahan pembatalan atau workflow belum dapat dijalankan }
+/api/modules/management-aset/v1/penerimaan-aset/{id}/ajukan-pembatalan:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: requestAssetReceiptCancellation
+    tags: [Lifecycle aset]
+    summary: Ajukan pembatalan penerimaan tanpa hak membatalkan langsung
+    description: |
+      Memerlukan management-aset.penerimaan-aset.request-cancellation. Workflow bertipe
+      management-aset.penerimaan-aset-cancellation harus aktif pada entitas legal dokumen.
+      Penyetuju wajib memegang approve-cancellation dan scope unit dokumen. Pengaju tidak
+      menyetujui permintaannya sendiri. Versi dan transaksi lanjutan diperiksa lagi saat keputusan.
+      Pengajuan pending yang sama dikembalikan, sehingga retry tidak membuat permintaan ganda.
+      Email melalui SSO memberi tautan ke inbox; pengiriman gagal tidak menghilangkan pengajuan.
+    parameters: *recordParameters
+    requestBody: *cancellationBody
+    responses: *cancellationResponses
+/api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/pratinjau-pembatalan:
+  get:
+    security: [{ CoreERPContext: [] }]
+    operationId: previewAssetValueAdjustmentCancellation
+    tags: [Lifecycle aset]
+    summary: Periksa pembatalan penyesuaian nilai dan jurnal baliknya
+    parameters: *cancellationParameters
+    responses: *previewResponses
+/api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/batal:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: cancelAssetValueAdjustment
+    tags: [Lifecycle aset]
+    summary: Batalkan penyesuaian nilai yang diposting
+    description: |
+      Memerlukan management-aset.penyesuaian-nilai-aset.cancel. Saldo penurunan atau kenaikan
+      nilai asal dikurangi, nilai buku dikembalikan, dan jurnal asal dibalik. Ini bukan membuat
+      penyesuaian berlawanan jenis. Penyusutan sesudah tanggal penyesuaian harus dibatalkan lebih
+      dulu; buku yang ditutup menahan. Nilai sebelum/sesudah pada dokumen asal tetap beku.
+    parameters: *recordParameters
+    requestBody: *cancellationBody
+    responses: *cancellationResponses
+/api/modules/management-aset/v1/penyesuaian-nilai-aset/{id}/ajukan-pembatalan:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: requestAssetValueAdjustmentCancellation
+    tags: [Lifecycle aset]
+    summary: Ajukan pembatalan penyesuaian nilai melalui workflow
+    description: Memerlukan request-cancellation pada resource ini; penyetuju memegang approve-cancellation dengan scope yang sesuai.
+    parameters: *recordParameters
+    requestBody: *cancellationBody
+    responses: *cancellationResponses
+/api/modules/management-aset/v1/penyusutan/{id}/pratinjau-pembatalan:
+  get:
+    security: [{ CoreERPContext: [] }]
+    operationId: previewDepreciationCancellation
+    tags: [Penyusutan]
+    summary: Periksa pembatalan usulan atau penyusutan final
+    parameters: *cancellationParameters
+    responses: *previewResponses
+/api/modules/management-aset/v1/penyusutan/{id}/batal:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: cancelDepreciation
+    tags: [Penyusutan]
+    summary: Batalkan penyusutan dan bebaskan periodenya untuk dihitung ulang
+    description: |
+      Memerlukan management-aset.penyusutan.cancel, terpisah dari create, finalize, correct, dan
+      post. Usulan dibatalkan tanpa jurnal; periode final mendapat baris pembalik baru. Periode
+      yang pernah dikirim ke finance menerbitkan asset.depreciation_reversal untuk porsi aset itu.
+      Penyusutan yang lebih baru harus dibatalkan lebih dulu. Catatan asal dan pembalik tetap
+      tersimpan, sementara proposal berikutnya dapat dibuat untuk tanggal akhir yang sama.
+    parameters: *recordParameters
+    requestBody: *cancellationBody
+    responses: *cancellationResponses
+/api/modules/management-aset/v1/penyusutan/{id}/ajukan-pembatalan:
+  post:
+    security: [{ CoreERPContext: [], ModuleCsrf: [] }]
+    operationId: requestDepreciationCancellation
+    tags: [Penyusutan]
+    summary: Ajukan pembatalan penyusutan melalui workflow
+    description: Memerlukan request-cancellation pada penyusutan; penyetuju memegang approve-cancellation dengan scope yang sesuai.
+    parameters: *recordParameters
+    requestBody: *cancellationBody
+    responses: *cancellationResponses

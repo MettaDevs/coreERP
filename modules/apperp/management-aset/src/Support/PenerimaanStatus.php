@@ -20,10 +20,12 @@ final class PenerimaanStatus
 
     public const SELESAI = 'selesai';
 
+    public const CANCELLED = 'cancelled';
+
     /** @return list<string> */
     public static function semua(): array
     {
-        return [self::DRAFT, self::SELESAI];
+        return [self::DRAFT, self::SELESAI, self::CANCELLED];
     }
 
     /**

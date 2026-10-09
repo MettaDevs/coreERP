@@ -18,6 +18,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\ValueAdjustment\AssetValueAdjustment;
 use Modules\Apperp\ManagementAset\Models\transaksi\ValueAdjustment\AssetValueAdjustmentLine;
+use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
@@ -415,7 +416,7 @@ class AssetValueAdjustmentController extends Controller
         $tenant = $this->tenant($request);
         $buku = BukuPenyusutan::withTrashed()->whereKey($dokumen->buku_id)->toBase()->first(['kode', 'nama', 'posting_layer']);
         $rows = app(ValueAdjustmentPosting::class)->rows($dokumen);
-        $diposting = $dokumen->status === AssetValueAdjustment::POSTED;
+        $diposting = in_array($dokumen->status, [AssetValueAdjustment::POSTED, 'cancelled'], true);
         $turun = $dokumen->jenis === AssetValueAdjustment::WRITE_DOWN;
         $keadaan = $dokumen->posting_id === null ? null : app(PostingFeed::class)->status($tenant, $dokumen->posting_id);
         $frozen = $diposting ? AssetValueAdjustmentLine::query()->where('penyesuaian_nilai_aset_id', $id)->toBase()->get(['id', 'nilai_buku_sebelum', 'nilai_buku_sesudah'])->keyBy('id') : collect();
@@ -451,6 +452,7 @@ class AssetValueAdjustmentController extends Controller
             'buku_di_post' => ($buku->posting_layer ?? BukuPenyusutan::POSTING_LAYER_NONE) !== BukuPenyusutan::POSTING_LAYER_NONE,
             'posting' => $keadaan === null ? null : ['posting_id' => $keadaan['posting_id'], 'status' => $keadaan['status']],
             'details' => $details,
+            'cancellation' => app(AssetCancellationEngine::class)->summary('penyesuaian-nilai-aset', $id),
         ]], $status, [...$headers, 'ETag' => RowVersion::etag((int) $dokumen->version)]);
     }
 

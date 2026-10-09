@@ -148,6 +148,11 @@ paths:
         atau yang bertanggal sebelum cutover, berstatus `manual` dan tidak pernah disajikan;
         jawabannya tetap `200`.
 
+        **Pembalikan menunggu asalnya.** Posting dengan `reverses_posting_id` belum disajikan sebelum
+        posting asal di-ack `posted`. Ini menjaga jurnal balik bertanggal lama tetap mengikuti jurnal
+        asalnya. Asal yang ditolak membuat pembalikannya tidak dikirim; penolakan tidak boleh melahirkan
+        jurnal negatif atas jurnal yang belum pernah dibukukan.
+
         **Urutan field tidak dijamin.** Kunci di dalam setiap posting tidak terkirim dalam urutan
         properti skema `FinancePosting`, dan urutannya bisa berubah tanpa versi kontrak baru. Baca
         sebagai objek JSON menurut nama kunci; jangan membandingkan teksnya. Yang dijamin hanya
@@ -193,6 +198,11 @@ paths:
           - `asset.write_down` — penurunan nilai aset diposting
           - `asset.appreciation` — kenaikan nilai aset diposting
           - `asset.reclassification` — reklasifikasi aset antar group aset diposting
+          - `asset.acquisition_reversal` — penerimaan aset dibatalkan
+          - `asset.opening_balance_reversal` — penerimaan saldo awal dibatalkan
+          - `asset.acquisition_adjustment_reversal` — koreksi nilai penerimaan dibalik bersama penerimaannya
+          - `asset.write_down_reversal` — penurunan nilai aset dibatalkan
+          - `asset.appreciation_reversal` — kenaikan nilai aset dibatalkan
 
           Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
       - name: legal_entity
@@ -244,6 +254,338 @@ paths:
                         description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu
                           pull lagi.
               examples:
+                pembatalan_aset:
+                  summary: Jurnal balik penerimaan, saldo awal, koreksi perolehan, penurunan dan kenaikan
+                    nilai
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-CAN-EXAMPLE-1
+                      posting_type: asset.acquisition_reversal
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-09-28'
+                      document_date: '2026-09-28'
+                      occurred_at: '2026-09-28T23:50:00+07:00'
+                      published_at: '2026-09-28T16:50:04+00:00'
+                      source_document:
+                        module: management-aset
+                        type: pembatalan-aset
+                        number: null
+                        description: Pembatalan transaksi aset
+                      vendor:
+                        id: 01J9Z2BBBBBBBBBBBBBBBBBBBB
+                        number: VND-000123
+                        name: PT Karoseri Sehat
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '0.00'
+                        credit: '500000000.00'
+                        description: PNA-2026-09-0007 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1501'
+                          code: 1-1500
+                          name: PPN Masukan
+                        debit: '0.00'
+                        credit: '55000000.00'
+                        description: PPN Masukan · PNA-2026-09-0007 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '2110'
+                          code: 2-1100
+                          name: Hutang Usaha
+                        debit: '555000000.00'
+                        credit: '0.00'
+                        description: PT Karoseri Sehat · PNA-2026-09-0007
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '555000000.00'
+                        credit: '555000000.00'
+                      reverses_posting_id: AST-ORIGINAL-EXAMPLE-1
+                      adjusts_posting_id: null
+                      details:
+                        original_posting_id: AST-ORIGINAL-EXAMPLE-1
+                    - contract_version: 1
+                      posting_id: AST-CAN-EXAMPLE-2
+                      posting_type: asset.opening_balance_reversal
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-01-01'
+                      document_date: '2022-01-15'
+                      occurred_at: '2026-01-05T09:10:00+07:00'
+                      published_at: '2026-01-05T02:10:02+00:00'
+                      source_document:
+                        module: management-aset
+                        type: pembatalan-aset
+                        number: null
+                        description: Pembatalan transaksi aset
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '0.00'
+                        credit: '500000000.00'
+                        description: PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1459'
+                          code: 1-2390
+                          name: Akumulasi Penyusutan - Kendaraan
+                        debit: '200000000.00'
+                        credit: '0.00'
+                        description: Akumulasi penyusutan · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '3900'
+                          code: 3-9000
+                          name: Penyeimbang Saldo Awal
+                        debit: '300000000.00'
+                        credit: '0.00'
+                        description: Saldo awal · PNA-2026-01-0003 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '500000000.00'
+                        credit: '500000000.00'
+                      reverses_posting_id: AST-ORIGINAL-EXAMPLE-2
+                      adjusts_posting_id: null
+                      details:
+                        original_posting_id: AST-ORIGINAL-EXAMPLE-2
+                    - contract_version: 1
+                      posting_id: AST-CAN-EXAMPLE-3
+                      posting_type: asset.acquisition_adjustment_reversal
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-05'
+                      document_date: '2026-10-05'
+                      occurred_at: '2026-10-05T10:15:00+07:00'
+                      published_at: '2026-10-05T03:15:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: pembatalan-aset
+                        number: null
+                        description: Pembatalan transaksi aset
+                      vendor:
+                        id: 01J9Z2BBBBBBBBBBBBBBBBBBBB
+                        number: VND-000123
+                        name: PT Karoseri Sehat
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '0.00'
+                        credit: '10000000.00'
+                        description: Koreksi nilai perolehan · KEND-0012 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '2110'
+                          code: 2-1100
+                          name: Hutang Usaha
+                        debit: '10000000.00'
+                        credit: '0.00'
+                        description: PT Karoseri Sehat · koreksi KEND-0012
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '10000000.00'
+                        credit: '10000000.00'
+                      reverses_posting_id: AST-ORIGINAL-EXAMPLE-3
+                      adjusts_posting_id: null
+                      details:
+                        original_posting_id: AST-ORIGINAL-EXAMPLE-3
+                    - contract_version: 1
+                      posting_id: AST-CAN-EXAMPLE-4
+                      posting_type: asset.write_down_reversal
+                      settlement_mode: null
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-10-31'
+                      document_date: '2026-10-31'
+                      occurred_at: '2026-11-03T10:00:00+07:00'
+                      published_at: '2026-11-03T03:00:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: pembatalan-aset
+                        number: null
+                        description: Pembatalan transaksi aset
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '6520'
+                          code: 6-5200
+                          name: Rugi Penurunan Nilai Aset
+                        debit: '0.00'
+                        credit: '11000000.00'
+                        description: Penurunan nilai aset 31/10/2026 · PNLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                        - code: DEPARTMENT
+                          display_name: Department
+                          value_code: POLI-UMUM
+                          value_display_name: Poli Umum
+                          value_id: 01J9Z2DDDDDDDDDDDDDDDDDDDD
+                      - line_no: 2
+                        account:
+                          external_id: '1458'
+                          code: 1-2395
+                          name: Akumulasi Penurunan Nilai - Kendaraan
+                        debit: '11000000.00'
+                        credit: '0.00'
+                        description: Penurunan nilai aset 31/10/2026 · PNLA-2026-10-0001 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '11000000.00'
+                        credit: '11000000.00'
+                      reverses_posting_id: AST-ORIGINAL-EXAMPLE-4
+                      adjusts_posting_id: null
+                      details:
+                        original_posting_id: AST-ORIGINAL-EXAMPLE-4
+                    - contract_version: 1
+                      posting_id: AST-CAN-EXAMPLE-5
+                      posting_type: asset.appreciation_reversal
+                      settlement_mode: null
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-12-31'
+                      document_date: '2026-12-31'
+                      occurred_at: '2027-01-05T10:00:00+07:00'
+                      published_at: '2027-01-05T03:00:01+00:00'
+                      source_document:
+                        module: management-aset
+                        type: pembatalan-aset
+                        number: null
+                        description: Pembatalan transaksi aset
+                      vendor: null
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1453'
+                          code: 1-2310
+                          name: Revaluasi Aset Tetap - Kendaraan
+                        debit: '0.00'
+                        credit: '2000000.00'
+                        description: Kenaikan nilai aset 31/12/2026 · PNLA-2026-12-0002 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '3410'
+                          code: 3-4100
+                          name: Surplus Revaluasi Aset Tetap
+                        debit: '2000000.00'
+                        credit: '0.00'
+                        description: Kenaikan nilai aset 31/12/2026 · PNLA-2026-12-0002 · Kendaraan
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '2000000.00'
+                        credit: '2000000.00'
+                      reverses_posting_id: AST-ORIGINAL-EXAMPLE-5
+                      adjusts_posting_id: null
+                      details:
+                        original_posting_id: AST-ORIGINAL-EXAMPLE-5
+                    meta:
+                      count: 5
+                      has_more: false
                 perolehan:
                   summary: Satu penerimaan ambulans, langsung ke hutang
                   value:
@@ -3488,6 +3830,11 @@ components:
         | `asset.write_down` | Penurunan nilai aset diposting | Sudah |
         | `asset.appreciation` | Kenaikan nilai aset diposting | Sudah |
         | `asset.reclassification` | Reklasifikasi aset antar group aset diposting | Sudah |
+        | `asset.acquisition_reversal` | Penerimaan aset dibatalkan | Sudah |
+        | `asset.opening_balance_reversal` | Penerimaan saldo awal dibatalkan | Sudah |
+        | `asset.acquisition_adjustment_reversal` | Koreksi nilai penerimaan dibalik bersama penerimaannya | Sudah |
+        | `asset.write_down_reversal` | Penurunan nilai aset dibatalkan | Sudah |
+        | `asset.appreciation_reversal` | Kenaikan nilai aset dibatalkan | Sudah |
 
         **Tersedia** menyebut apakah modul penerbitnya sudah menerbitkan jenis itu. Jenis bertanda
         *Belum* tidak pernah muncul di feed sampai modulnya menerbitkannya.
@@ -3506,6 +3853,11 @@ components:
       - asset.write_down
       - asset.appreciation
       - asset.reclassification
+      - asset.acquisition_reversal
+      - asset.opening_balance_reversal
+      - asset.acquisition_adjustment_reversal
+      - asset.write_down_reversal
+      - asset.appreciation_reversal
     Reservation:
       type: object
       required:

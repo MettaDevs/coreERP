@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { Badge } from '@apperp/ui/badge';
+import type { CancellationSummary } from '../_shared/CancellationStatus';
 
 /**
  * Bentuk data, kosakata, dan navigasi penyesuaian nilai aset — dipakai bersama oleh daftar dan halaman
@@ -29,6 +30,7 @@ export type Adjustment = {
     kode: string;
     jenis: 'write_down' | 'appreciation';
     status: string;
+    cancellation?: CancellationSummary | null;
     version: number;
     legal_entity_id: string;
     responsible_org_unit_id: string;
@@ -70,6 +72,7 @@ export const STATUS: Record<
     { label: string; variant: 'default' | 'secondary' | 'outline' }
 > = {
     draft: { label: 'Draf', variant: 'outline' },
+    cancelled: { label: 'Dibatalkan', variant: 'outline' },
     posted: { label: 'Diposting', variant: 'secondary' },
 };
 

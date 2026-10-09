@@ -30,6 +30,7 @@ use Modules\Apperp\ManagementAset\Analytics\ValueAdjustmentsDataset;
 use Modules\Apperp\ManagementAset\Analytics\WarrantiesDataset;
 use Modules\Apperp\ManagementAset\Analytics\WorkOrdersDataset;
 use Modules\Apperp\ManagementAset\Console\Commands\BuildBuiltinLayouts;
+use Modules\Apperp\ManagementAset\Listeners\ApplyAssetCancellationDecision;
 use Modules\Apperp\ManagementAset\Listeners\SiapkanDataAwalTenant;
 use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetAcquisitionListReport;
@@ -180,6 +181,7 @@ final class ModuleServiceProvider extends ServiceProvider
         // berjalan di dalam transaksi keputusan Core, jadi dokumen dan instance workflow
         // berpindah status bersama-sama.
         Event::listen(WorkflowDecisionTaken::class, TerapkanKeputusanDekomisioning::class);
+        Event::listen(WorkflowDecisionTaken::class, ApplyAssetCancellationDecision::class);
 
         // Tenant baru: sama, arah masuk. Berjalan di dalam transaksi pendaftaran usaha,
         // sehingga tenant yang tersimpan pasti sudah punya data awalnya.

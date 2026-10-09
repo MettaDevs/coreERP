@@ -4,11 +4,16 @@ info:
   title: Management Aset API
   version: 0.1.0
   description: |
-    Master data aset. Seluruh endpoint dibatasi tenant dan policy
-    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
-    Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
+    Master data aset. Endpoint memakai sesi Core dan policy
+    `management-aset.asset-responsibility` dari konteks module tepercaya;
+    `tenant_id` tidak pernah diterima dari request browser. Policy
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.
+
+    Permintaan yang mengubah data membawa X-XSRF-TOKEN. Tidak ada token konteks app
+    tersendiri. Gap dokumentasi lama: sebagian path sumber masih memakai /api/v1 dari
+    bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.
+    Path pembatalan sudah memakai alamat runtime tersebut.
 
     Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
@@ -89,6 +94,7 @@ x-bundle:
   - paths/monitoring-aset.yaml
   - paths/pelepasan-aset.yaml
   - paths/penyesuaian-nilai-aset.yaml
+  - paths/pembatalan-aset.yaml
   - paths/reklasifikasi-aset.yaml
   - paths/pemeliharaan-aset.yaml
   - paths/pemeliharaan-preventif.yaml

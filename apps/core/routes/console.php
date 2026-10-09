@@ -69,3 +69,5 @@ Schedule::command('environment:purge')
     ->onOneServer()
     ->withoutOverlapping()
     ->skip(fn (): bool => PurgeEnvironment::nothingToPurge());
+
+Schedule::command('workflow:notify')->everyMinute()->onOneServer()->withoutOverlapping();

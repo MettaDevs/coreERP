@@ -1,5 +1,3 @@
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardContent,
@@ -13,26 +11,20 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldLabel } from '@apperp/ui/field';
-import { Textarea } from '@apperp/ui/textarea';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import Heading from '@/components/heading';
+import type { ApprovalRequest } from './ApprovalRequestCard';
+import { ApprovalRequestCard } from './ApprovalRequestCard';
 
-type WorkItem = {
-    id: string;
-    created_at: string;
-    source_document_type: string;
-    source_document_id: string;
-    workflow_name: string;
-    app_name: string;
-};
-type Props = { items: WorkItem[] };
+type Props = { items: ApprovalRequest[] };
 export default function WorkflowInbox({ items }: Props) {
-    const form = useForm({ decision: '', comment: '' });
-    const decide = (id: string, decision: 'approve' | 'reject') => {
-        form.transform((data) => ({ ...data, decision }));
-        form.post(`/workflow-inbox/${id}/decision`, { preserveScroll: true });
-    };
+    const { url } = usePage();
+    const target = new URLSearchParams(url.split('?')[1] ?? '').get('item');
+    const visibleItems = target
+        ? [...items].sort(
+              (a, b) => Number(b.id === target) - Number(a.id === target),
+          )
+        : items;
 
     return (
         <>
@@ -64,65 +56,11 @@ export default function WorkflowInbox({ items }: Props) {
                                 </EmptyHeader>
                             </Empty>
                         ) : (
-                            items.map((item) => (
-                                <div
+                            visibleItems.map((item) => (
+                                <ApprovalRequestCard
                                     key={item.id}
-                                    className="rounded-md border p-4"
-                                >
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div>
-                                            <p className="font-medium">
-                                                {item.workflow_name}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {item.app_name} · Dokumen{' '}
-                                                {item.source_document_type}
-                                            </p>
-                                            <p className="mt-1 text-sm break-all text-muted-foreground">
-                                                ID dokumen:{' '}
-                                                {item.source_document_id}
-                                            </p>
-                                        </div>
-                                        <Badge variant="secondary">
-                                            Menunggu
-                                        </Badge>
-                                    </div>
-                                    <Field className="mt-4">
-                                        <FieldLabel>
-                                            Catatan keputusan (opsional)
-                                        </FieldLabel>
-                                        <Textarea
-                                            value={form.data.comment}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'comment',
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
-                                    <div className="mt-3 flex gap-2">
-                                        <Button
-                                            type="button"
-                                            disabled={form.processing}
-                                            onClick={() =>
-                                                decide(item.id, 'approve')
-                                            }
-                                        >
-                                            Setujui
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            disabled={form.processing}
-                                            onClick={() =>
-                                                decide(item.id, 'reject')
-                                            }
-                                        >
-                                            Tolak
-                                        </Button>
-                                    </div>
-                                </div>
+                                    item={item}
+                                />
                             ))
                         )}
                     </CardContent>

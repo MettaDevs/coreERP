@@ -3259,3 +3259,27 @@ PengaturanAsetTetapWrite:
       oneOf:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
+
+AssetCancellationRequest:
+  type: object
+  required: [reason, posting_date, version]
+  properties:
+    reason: {type: string, minLength: 1, maxLength: 250}
+    posting_date: {type: string, format: date}
+    version: {type: integer, minimum: 1}
+AssetCancellation:
+  type: object
+  required: [id, tenant_id, resource, document_id, reason, posting_date, status]
+  properties:
+    id: {type: string, minLength: 26, maxLength: 26}
+    tenant_id: {type: string}
+    resource: {type: string, enum: [penyusutan, penerimaan-aset, penyesuaian-nilai-aset]}
+    document_id: {type: string}
+    reason: {type: string}
+    posting_date: {type: string}
+    status: {type: string, enum: [pending, applied, rejected, blocked]}
+    workflow_instance_id: {type: [string, 'null']}
+    requested_by_user_id: {type: string}
+    acted_by_user_id: {type: [string, 'null']}
+    posting_ids: {type: [array, 'null'], items: {type: string}}
+    failure_message: {type: [string, 'null']}

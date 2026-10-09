@@ -515,7 +515,7 @@ final class ReclassificationPosting
         $asal = $bagian['book'];
         $berjalan = (int) $asal->elapsed_periods_offset + DepreciationPeriod::query()
             ->where('buku_aset_id', $asal->id)
-            ->whereNull('reverses_period_id')
+            ->whereNull('reverses_period_id')->whereNull('cancelled_at')
             ->whereDate('period_ends_on', '<=', $tanggal)
             ->count();
 

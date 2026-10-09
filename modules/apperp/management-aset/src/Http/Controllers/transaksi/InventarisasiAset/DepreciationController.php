@@ -2,15 +2,20 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
+use App\Platform\Modules\Contracts\PostingFeed;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\transaksi\Cancellation\AssetCancellation;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
+use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\DepreciationPosting;
 use Modules\Apperp\ManagementAset\Services\DepreciationPostingFailed;
@@ -40,7 +45,10 @@ class DepreciationController extends Controller
         // dalamnya — tetapi memulangkan baris apa adanya, bukan model. Itu yang menjaga
         // jawaban HTTP tetap sama persis: tanggal tetap 'YYYY-MM-DD' dan angka tetap teks
         // seperti yang dikirim database, bukan hasil cast model.
-        $periods = $query->select('aset_tr_penyusutan_aset.*', 'book.book_code', 'book.buku_id', 'buku.posting_layer', 'aset.kode as aset_code', 'aset.currency_code')->orderByDesc('aset_tr_penyusutan_aset.period_ends_on')->toBase()->get();
+        $periods = $query->select('aset_tr_penyusutan_aset.*', 'book.book_code', 'book.buku_id', 'buku.posting_layer', 'aset.kode as aset_code', 'aset.currency_code')
+            ->selectSub(AssetCancellation::query()->select('status')
+                ->whereColumn('document_id', 'aset_tr_penyusutan_aset.id')->where('resource', 'penyusutan')->latest()->orderByDesc('id')->limit(1), 'cancellation_status')
+            ->orderByDesc('aset_tr_penyusutan_aset.period_ends_on')->toBase()->get();
 
         return response()->json(['data' => $periods]);
     }
@@ -61,60 +69,64 @@ class DepreciationController extends Controller
 
     public function propose(Request $request): JsonResponse
     {
-        $this->can($request, 'create');
-        $tenant = $this->tenant($request);
-        $data = $request->validate(['buku_aset_id' => ['required', 'ulid'], 'period_starts_on' => ['required', 'date'], 'period_ends_on' => ['required', 'date'], 'consumption_amount' => ['nullable', 'numeric', 'min:0']]);
-        $query = BukuAset::query()->join('aset_m_profil_penyusutan as profile', function ($join): void {
-            $join->on('profile.id', '=', 'aset_tr_buku_aset.depreciation_profile_id')->on('profile.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-        })->join('aset_tr_aset as aset', function ($join): void {
-            $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-        })->where('aset_tr_buku_aset.id', $data['buku_aset_id']);
-        app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
-        $book = $query->select(
-            'aset_tr_buku_aset.*',
-            'profile.method', 'profile.frequency', 'profile.rate_percent', 'profile.manual_schedule',
-            // Masa manfaat dan konvensi diambil dari buku aset bila ada, karena di sanalah
-            // nilai dari matriks group x buku sudah tersalin; profil hanya cadangannya.
-            DB::raw('coalesce(aset_tr_buku_aset.useful_life_periods, profile.useful_life_periods) as useful_life_periods'),
-            'aset.legal_entity_id', 'aset.responsible_org_unit_id',
-        )->toBase()->first();
-        abort_unless($book !== null, 404);
-        abort_if(! ($book->depreciate ?? true), 422, 'Buku aset ini ditandai tidak disusutkan.');
-        // Buku yang sudah ditutup mengikuti aset yang sudah dijual atau dimusnahkan.
-        abort_unless(($book->status ?? 'active') === 'active', 422, 'Buku aset ini sudah ditutup karena asetnya sudah dilepas.');
-        abort_if(
-            $book->depreciation_start_on !== null && $data['period_ends_on'] < $book->depreciation_start_on,
-            422,
-            'Periode ini berakhir sebelum aset mulai disusutkan.'
-        );
-        $existing = DepreciationPeriod::query()->where(['buku_aset_id' => $book->id, 'period_ends_on' => $data['period_ends_on']])->whereNull('reverses_period_id')->toBase()->first();
-        if ($existing) {
-            return response()->json(['data' => $existing]);
-        }
-        // Periode yang sudah disusutkan sistem lama sebelum cutover ikut dihitung (TODO 10.4):
-        // periode pertama sesudah saldo awal adalah periode ke-(offset + 1).
-        $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0)
-            + DepreciationPeriod::query()->where('buku_aset_id', $book->id)->whereNull('reverses_period_id')->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
-        $calculator = app(DepreciationCalculator::class);
-        // Saldo menurun berpindah ke profil alternatif begitu garis lurus sisa umur
-        // menghasilkan angka lebih besar, supaya aset tetap habis di akhir masa manfaat.
-        $calculator->applyAlternativeProfile($book, $elapsedPeriods);
-        $amount = $calculator->amount($book, $elapsedPeriods, $data['consumption_amount'] ?? null);
-        $placement = PenempatanAset::query()->where('aset_id', $book->aset_id)->whereDate('effective_on', '<=', $data['period_ends_on'])->orderByDesc('effective_on')->orderByDesc('id')->toBase()->first();
-        abort_unless($placement?->usage_org_unit_id, 422, 'Aset belum memiliki unit penggunaan untuk periode ini.');
-        app(OrganizationScope::class)->require($request, $book->legal_entity_id, $placement->usage_org_unit_id);
-        $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id, 'legal_entity_id' => $book->legal_entity_id, 'usage_org_unit_id' => $placement->usage_org_unit_id, 'period_starts_on' => $data['period_starts_on'], 'period_ends_on' => $data['period_ends_on'], 'amount' => $amount, 'status' => 'proposed', 'created_at' => now(), 'updated_at' => now()];
-        try {
-            // Bukan `firstOrCreate`: index unik parsial di database yang memutuskan siapa
-            // yang menang, dan yang kalah memperlakukan miliknya sebagai sudah ada.
-            (new DepreciationPeriod)->forceFill($period)->save();
-        } catch (UniqueConstraintViolationException) {
-            $period = DepreciationPeriod::query()->where(['buku_aset_id' => $book->id, 'period_ends_on' => $data['period_ends_on']])->whereNull('reverses_period_id')->toBase()->first();
+        return DB::transaction(function () use ($request): JsonResponse {
+            $this->can($request, 'create');
+            $tenant = $this->tenant($request);
+            $data = $request->validate(['buku_aset_id' => ['required', 'ulid'], 'period_starts_on' => ['required', 'date'], 'period_ends_on' => ['required', 'date'], 'consumption_amount' => ['nullable', 'numeric', 'min:0']]);
+            $assetId = BukuAset::query()->whereKey($data['buku_aset_id'])->value('aset_id');
+            app(OrganizationScope::class)->asetQuery(Aset::query()->whereKey($assetId), $request)->lockForUpdate()->firstOrFail();
+            $query = BukuAset::query()->join('aset_m_profil_penyusutan as profile', function ($join): void {
+                $join->on('profile.id', '=', 'aset_tr_buku_aset.depreciation_profile_id')->on('profile.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
+            })->join('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
+            })->where('aset_tr_buku_aset.id', $data['buku_aset_id']);
+            app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
+            $book = $query->select(
+                'aset_tr_buku_aset.*',
+                'profile.method', 'profile.frequency', 'profile.rate_percent', 'profile.manual_schedule',
+                // Masa manfaat dan konvensi diambil dari buku aset bila ada, karena di sanalah
+                // nilai dari matriks group x buku sudah tersalin; profil hanya cadangannya.
+                DB::raw('coalesce(aset_tr_buku_aset.useful_life_periods, profile.useful_life_periods) as useful_life_periods'),
+                'aset.legal_entity_id', 'aset.responsible_org_unit_id',
+            )->lock('FOR UPDATE OF aset_tr_buku_aset')->toBase()->first();
+            abort_unless($book !== null, 404);
+            abort_if(! ($book->depreciate ?? true), 422, 'Buku aset ini ditandai tidak disusutkan.');
+            // Buku yang sudah ditutup mengikuti aset yang sudah dijual atau dimusnahkan.
+            abort_unless(($book->status ?? 'active') === 'active', 422, 'Buku aset ini sudah ditutup karena asetnya sudah dilepas.');
+            abort_if(
+                $book->depreciation_start_on !== null && $data['period_ends_on'] < $book->depreciation_start_on,
+                422,
+                'Periode ini berakhir sebelum aset mulai disusutkan.'
+            );
+            $existing = DepreciationPeriod::query()->where(['buku_aset_id' => $book->id, 'period_ends_on' => $data['period_ends_on']])->whereNull('reverses_period_id')->whereNull('cancelled_at')->toBase()->first();
+            if ($existing) {
+                return response()->json(['data' => $existing]);
+            }
+            // Periode yang sudah disusutkan sistem lama sebelum cutover ikut dihitung (TODO 10.4):
+            // periode pertama sesudah saldo awal adalah periode ke-(offset + 1).
+            $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0)
+                + DepreciationPeriod::query()->where('buku_aset_id', $book->id)->whereNull('reverses_period_id')->whereNull('cancelled_at')->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
+            $calculator = app(DepreciationCalculator::class);
+            // Saldo menurun berpindah ke profil alternatif begitu garis lurus sisa umur
+            // menghasilkan angka lebih besar, supaya aset tetap habis di akhir masa manfaat.
+            $calculator->applyAlternativeProfile($book, $elapsedPeriods);
+            $amount = $calculator->amount($book, $elapsedPeriods, $data['consumption_amount'] ?? null);
+            $placement = PenempatanAset::query()->where('aset_id', $book->aset_id)->whereDate('effective_on', '<=', $data['period_ends_on'])->orderByDesc('effective_on')->orderByDesc('id')->toBase()->first();
+            abort_unless($placement?->usage_org_unit_id, 422, 'Aset belum memiliki unit penggunaan untuk periode ini.');
+            app(OrganizationScope::class)->require($request, $book->legal_entity_id, $placement->usage_org_unit_id);
+            $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id, 'legal_entity_id' => $book->legal_entity_id, 'usage_org_unit_id' => $placement->usage_org_unit_id, 'period_starts_on' => $data['period_starts_on'], 'period_ends_on' => $data['period_ends_on'], 'amount' => $amount, 'status' => 'proposed', 'created_at' => now(), 'updated_at' => now()];
+            try {
+                // Bukan `firstOrCreate`: index unik parsial di database yang memutuskan siapa
+                // yang menang, dan yang kalah memperlakukan miliknya sebagai sudah ada.
+                DB::transaction(fn () => (new DepreciationPeriod)->forceFill($period)->save());
+            } catch (UniqueConstraintViolationException) {
+                $period = DepreciationPeriod::query()->where(['buku_aset_id' => $book->id, 'period_ends_on' => $data['period_ends_on']])->whereNull('reverses_period_id')->whereNull('cancelled_at')->toBase()->first();
 
-            return response()->json(['data' => $period]);
-        }
+                return response()->json(['data' => $period]);
+            }
 
-        return response()->json(['data' => $period], 201);
+            return response()->json(['data' => $period], 201);
+        }, 3);
     }
 
     /**
@@ -129,95 +141,101 @@ class DepreciationController extends Controller
      */
     public function bulk(Request $request): JsonResponse
     {
-        $this->can($request, 'create');
-        $tenant = $this->tenant($request);
-        $data = $request->validate([
-            'period_starts_on' => ['required', 'date'],
-            'period_ends_on' => ['required', 'date', 'after_or_equal:period_starts_on'],
-            // Penyaring opsional agar tutup bulan dapat dijalankan bertahap per group
-            // atau hanya untuk buku komersial lebih dahulu.
-            'group_aset_id' => ['nullable', 'ulid'],
-            'buku_id' => ['nullable', 'ulid'],
-        ]);
+        return DB::transaction(function () use ($request): JsonResponse {
+            $this->can($request, 'create');
+            $tenant = $this->tenant($request);
+            $data = $request->validate([
+                'period_starts_on' => ['required', 'date'],
+                'period_ends_on' => ['required', 'date', 'after_or_equal:period_starts_on'],
+                // Penyaring opsional agar tutup bulan dapat dijalankan bertahap per group
+                // atau hanya untuk buku komersial lebih dahulu.
+                'group_aset_id' => ['nullable', 'ulid'],
+                'buku_id' => ['nullable', 'ulid'],
+            ]);
 
-        $query = BukuAset::query()->join('aset_m_profil_penyusutan as profile', function ($join): void {
-            $join->on('profile.id', '=', 'aset_tr_buku_aset.depreciation_profile_id')->on('profile.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-        })->join('aset_tr_aset as aset', function ($join): void {
-            $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-        })->where('aset_tr_buku_aset.status', 'active')
-            ->where('aset_tr_buku_aset.depreciate', true)
-            // Konsumsi butuh angka pemakaian yang hanya diketahui per aset, jadi ia tidak
-            // pernah bisa diusulkan massal dan disaring di sini, bukan dilaporkan sebagai
-            // ratusan baris terlewat.
-            ->where('profile.method', '!=', 'consumption');
-        app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
-        foreach (['group_aset_id' => 'aset.group_aset_id', 'buku_id' => 'aset_tr_buku_aset.buku_id'] as $input => $column) {
-            if ($data[$input] ?? null) {
-                $query->where($column, $data[$input]);
+            $query = BukuAset::query()->join('aset_m_profil_penyusutan as profile', function ($join): void {
+                $join->on('profile.id', '=', 'aset_tr_buku_aset.depreciation_profile_id')->on('profile.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
+            })->join('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
+            })->where('aset_tr_buku_aset.status', 'active')
+                ->where('aset_tr_buku_aset.depreciate', true)
+                // Konsumsi butuh angka pemakaian yang hanya diketahui per aset, jadi ia tidak
+                // pernah bisa diusulkan massal dan disaring di sini, bukan dilaporkan sebagai
+                // ratusan baris terlewat.
+                ->where('profile.method', '!=', 'consumption');
+            app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
+            foreach (['group_aset_id' => 'aset.group_aset_id', 'buku_id' => 'aset_tr_buku_aset.buku_id'] as $input => $column) {
+                if ($data[$input] ?? null) {
+                    $query->where($column, $data[$input]);
+                }
             }
-        }
-        $books = $query->select(
-            'aset_tr_buku_aset.*',
-            'profile.method', 'profile.frequency', 'profile.rate_percent', 'profile.manual_schedule',
-            DB::raw('coalesce(aset_tr_buku_aset.useful_life_periods, profile.useful_life_periods) as useful_life_periods'),
-            'aset.legal_entity_id', 'aset.kode as aset_code',
-        )->orderBy('aset.kode')->toBase()->get();
-
-        $calculator = app(DepreciationCalculator::class);
-        $created = [];
-        $skipped = [];
-
-        foreach ($books as $book) {
-            $reason = $this->bulkSkipReason($book, $data);
-            if ($reason !== null) {
-                $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => $reason];
-
-                continue;
+            $assetIds = (clone $query)->distinct()->pluck('aset_tr_buku_aset.aset_id')->sort()->values()->all();
+            foreach (array_chunk($assetIds, 500) as $ids) {
+                Aset::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get(['id']);
             }
-            $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0) + DepreciationPeriod::query()
-                ->where('buku_aset_id', $book->id)
-                ->whereNull('reverses_period_id')
-                ->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
-            $calculator->applyAlternativeProfile($book, $elapsedPeriods);
-            $amount = $calculator->amount($book, $elapsedPeriods);
-            if ($amount <= 0.0) {
-                $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'sudah_habis'];
+            $books = $query->select(
+                'aset_tr_buku_aset.*',
+                'profile.method', 'profile.frequency', 'profile.rate_percent', 'profile.manual_schedule',
+                DB::raw('coalesce(aset_tr_buku_aset.useful_life_periods, profile.useful_life_periods) as useful_life_periods'),
+                'aset.legal_entity_id', 'aset.kode as aset_code',
+            )->orderBy('aset_tr_buku_aset.id')->lock('FOR UPDATE OF aset_tr_buku_aset')->toBase()->get();
 
-                continue;
+            $calculator = app(DepreciationCalculator::class);
+            $created = [];
+            $skipped = [];
+
+            foreach ($books as $book) {
+                $reason = $this->bulkSkipReason($book, $data);
+                if ($reason !== null) {
+                    $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => $reason];
+
+                    continue;
+                }
+                $elapsedPeriods = (int) ($book->elapsed_periods_offset ?? 0) + DepreciationPeriod::query()
+                    ->where('buku_aset_id', $book->id)
+                    ->whereNull('reverses_period_id')->whereNull('cancelled_at')
+                    ->whereDate('period_ends_on', '<', $data['period_ends_on'])->count();
+                $calculator->applyAlternativeProfile($book, $elapsedPeriods);
+                $amount = $calculator->amount($book, $elapsedPeriods);
+                if ($amount <= 0.0) {
+                    $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'sudah_habis'];
+
+                    continue;
+                }
+                $placement = PenempatanAset::query()
+                    ->where('aset_id', $book->aset_id)
+                    ->whereDate('effective_on', '<=', $data['period_ends_on'])
+                    ->orderByDesc('effective_on')->orderByDesc('id')->toBase()->first();
+                if (! $placement?->usage_org_unit_id) {
+                    $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'tanpa_unit_penggunaan'];
+
+                    continue;
+                }
+                $period = [
+                    'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id,
+                    'legal_entity_id' => $book->legal_entity_id, 'usage_org_unit_id' => $placement->usage_org_unit_id,
+                    'period_starts_on' => $data['period_starts_on'], 'period_ends_on' => $data['period_ends_on'],
+                    'amount' => $amount, 'status' => 'proposed', 'created_at' => now(), 'updated_at' => now(),
+                ];
+                try {
+                    DB::transaction(fn () => (new DepreciationPeriod)->forceFill($period)->save());
+                } catch (UniqueConstraintViolationException) {
+                    // Dua tutup bulan berbarengan: yang kalah memperlakukan miliknya sebagai
+                    // sudah ada, bukan sebagai kegagalan.
+                    $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'sudah_ada'];
+
+                    continue;
+                }
+                $created[] = $period;
             }
-            $placement = PenempatanAset::query()
-                ->where('aset_id', $book->aset_id)
-                ->whereDate('effective_on', '<=', $data['period_ends_on'])
-                ->orderByDesc('effective_on')->orderByDesc('id')->toBase()->first();
-            if (! $placement?->usage_org_unit_id) {
-                $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'tanpa_unit_penggunaan'];
 
-                continue;
-            }
-            $period = [
-                'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id,
-                'legal_entity_id' => $book->legal_entity_id, 'usage_org_unit_id' => $placement->usage_org_unit_id,
-                'period_starts_on' => $data['period_starts_on'], 'period_ends_on' => $data['period_ends_on'],
-                'amount' => $amount, 'status' => 'proposed', 'created_at' => now(), 'updated_at' => now(),
-            ];
-            try {
-                (new DepreciationPeriod)->forceFill($period)->save();
-            } catch (UniqueConstraintViolationException) {
-                // Dua tutup bulan berbarengan: yang kalah memperlakukan miliknya sebagai
-                // sudah ada, bukan sebagai kegagalan.
-                $skipped[] = ['buku_aset_id' => $book->id, 'aset_code' => $book->aset_code, 'reason' => 'sudah_ada'];
-
-                continue;
-            }
-            $created[] = $period;
-        }
-
-        return response()->json(['data' => [
-            'dibuat' => count($created),
-            'dilewati' => count($skipped),
-            'periode' => $created,
-            'rincian_dilewati' => $skipped,
-        ]], 201);
+            return response()->json(['data' => [
+                'dibuat' => count($created),
+                'dilewati' => count($skipped),
+                'periode' => $created,
+                'rincian_dilewati' => $skipped,
+            ]], 201);
+        }, 3);
     }
 
     /** @param array<string, mixed> $data */
@@ -228,7 +246,7 @@ class DepreciationController extends Controller
         }
         $exists = DepreciationPeriod::query()
             ->where(['buku_aset_id' => $book->id, 'period_ends_on' => $data['period_ends_on']])
-            ->whereNull('reverses_period_id')->exists();
+            ->whereNull('reverses_period_id')->whereNull('cancelled_at')->exists();
 
         return $exists ? 'sudah_ada' : null;
     }
@@ -249,24 +267,22 @@ class DepreciationController extends Controller
             $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
             $period = $query->lockForUpdate()->toBase()->first();
             abort_unless($period !== null, 404);
+            abort_if($period->cancelled_at !== null || $period->reverses_period_id !== null, 409, 'Penyusutan yang sudah dibatalkan tidak dapat difinalkan.');
             if ($period->status === 'final') {
                 // Retry finalisasi harus aman: periode yang sudah final dikembalikan tanpa
                 // menambah saldo buku untuk kedua kalinya.
                 return ['period' => $period];
             }
-            DepreciationPeriod::query()->where('id', $id)->update(['status' => 'final', 'updated_at' => now()]);
-            // Penambahan dikerjakan database, bukan PHP, dan itu menahan kehilangan pembaruan:
-            // pada `finalize()` yang terkunci hanya periodenya, sehingga dua periode milik satu
-            // buku boleh difinalkan bersamaan. `incrementEach()` menyusun ekspresi `kolom + n`
-            // yang sama seperti sebelumnya, menolak nilai yang bukan angka, dan ikut mengisi
-            // `updated_at`.
-            //
-            // Pembulatan `round(..., 2)` yang dulu ditulis di sini dibuang karena ia tidak
-            // pernah mengubah apa pun: kedua kolom `decimal(18,2)`, dan PostgreSQL membulatkan
-            // ke skala kolom saat nilainya disimpan.
-            BukuAset::query()->where('id', $period->buku_aset_id)->incrementEach([
-                'accumulated_depreciation' => (float) $period->amount,
-                'net_book_value' => -(float) $period->amount,
+            DepreciationPeriod::query()->where('id', $id)->update(['status' => 'final', 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+            // Kunci buku dan hitung sebagai desimal: finalisasi serentak tidak kehilangan
+            // pembaruan dan angka besar tidak melewati float PHP.
+            $amount = BigDecimal::of((string) $period->amount);
+            $book = BukuAset::query()->where('id', $period->buku_aset_id)->where('status', 'active')->lockForUpdate()->first();
+            abort_unless($book !== null, 409, 'Buku aset sudah ditutup; penyusutan belum dapat difinalkan.');
+            $book->update([
+                'accumulated_depreciation' => (string) BigDecimal::of($book->accumulated_depreciation)->plus($amount),
+                'net_book_value' => (string) BigDecimal::of($book->net_book_value)->minus($amount),
+                'updated_at' => now(),
             ]);
 
             return ['period' => DepreciationPeriod::query()->where('id', $id)->toBase()->first()];
@@ -285,42 +301,15 @@ class DepreciationController extends Controller
      */
     public function reverse(Request $request, string $id): JsonResponse
     {
-        $this->can($request, 'correct');
-        $tenant = $this->tenant($request);
-        $data = $request->validate(['reason' => ['required', 'string', 'max:250']]);
-        $scope = app(OrganizationScope::class);
-        try {
-            $result = DB::transaction(function () use ($tenant, $id, $data, $request, $scope): array {
-                $query = DepreciationPeriod::query()->where('id', $id);
-                $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
-                $original = $query->lockForUpdate()->toBase()->first();
-                abort_unless($original !== null, 404);
-                abort_unless($original->status === 'final', 409, 'Hanya periode final yang dapat dibalik.');
-                abort_if(DepreciationPeriod::query()->where('reverses_period_id', $original->id)->exists(), 409, 'Periode penyusutan ini sudah dibalik.');
-                $book = BukuAset::query()->join('aset_tr_aset as aset', function ($join): void {
-                    $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
-                })->where('aset_tr_buku_aset.id', $original->buku_aset_id)->select('aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code', 'aset.group_aset_id')->lockForUpdate()->toBase()->first();
-                abort_unless($book !== null, 404);
-                $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'buku_aset_id' => $book->id, 'legal_entity_id' => $original->legal_entity_id, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'status' => 'final', 'reverses_period_id' => $original->id, 'created_at' => now(), 'updated_at' => now()];
-                (new DepreciationPeriod)->forceFill($period)->save();
-                BukuAset::query()->where('id', $book->id)->incrementEach([
-                    'accumulated_depreciation' => -(float) $original->amount,
-                    'net_book_value' => (float) $original->amount,
-                ]);
+        $period = DepreciationPeriod::query()->findOrFail($id);
+        abort_unless($period->status === 'final' && $period->cancelled_at === null && $period->reverses_period_id === null, 409, 'Hanya penyusutan final yang belum dibatalkan yang dapat dibalik.');
+        $request->merge(['posting_date' => $request->input('posting_date', $period->period_ends_on->toDateString()), 'version' => $request->input('version', $period->version)]);
+        $cancellation = app(AssetCancellationEngine::class)->start($request, 'penyusutan', $id, false);
+        $reversal = DepreciationPeriod::query()->where('reverses_period_id', $id)->toBase()->first();
+        $postingId = $cancellation->posting_ids[0] ?? null;
+        $posting = $postingId === null ? null : app(PostingFeed::class)->status((string) $period->tenant_id, $postingId);
 
-                $posting = app(DepreciationPosting::class)->publishReversal($tenant, $original, $period['id'], $book, $data['reason']);
-                if ($posting !== null) {
-                    DepreciationPeriod::query()->where('id', $period['id'])->update(['posted_posting_id' => $posting['posting_id']]);
-                    $period['posted_posting_id'] = $posting['posting_id'];
-                }
-
-                return ['period' => $period, 'posting' => $posting === null ? null : ['posting_id' => $posting['posting_id'], 'status' => $posting['status']]];
-            });
-        } catch (DepreciationPostingFailed $kegagalan) {
-            return $this->postingFailed($kegagalan);
-        }
-
-        return response()->json(['data' => $result], 201);
+        return response()->json(['data' => ['period' => $reversal, 'posting' => $posting === null ? null : ['posting_id' => $postingId, 'status' => $posting['status']]]], 201);
     }
 
     /**

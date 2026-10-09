@@ -81,6 +81,7 @@ final class PostingPusher
     private function pushFor(IntegrationClient $client, int $limit): array
     {
         $query = FinancePosting::query()
+            ->readyForDelivery()
             ->where('tenant_id', $client->tenant_id)
             ->where('status', FinancePosting::PENDING)
             ->whereDoesntHave('deliveries', fn ($inner) => $inner

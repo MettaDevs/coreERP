@@ -26,7 +26,7 @@ final class BookPeriods
     /** Kalimat masalah untuk satu buku aset, atau `null` bila nilai bukunya boleh berubah pada `$date`. */
     public function problem(string $bukuAsetId, string $date, string $assetCode): ?string
     {
-        $base = DepreciationPeriod::query()->where('buku_aset_id', $bukuAsetId)->whereNull('reverses_period_id');
+        $base = DepreciationPeriod::query()->where('buku_aset_id', $bukuAsetId)->whereNull('reverses_period_id')->whereNull('cancelled_at');
 
         if ((clone $base)->where('status', 'proposed')->exists()) {
             return sprintf(

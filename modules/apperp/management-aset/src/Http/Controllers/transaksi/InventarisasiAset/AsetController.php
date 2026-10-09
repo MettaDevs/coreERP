@@ -127,6 +127,10 @@ class AsetController extends Controller
                     ->where('id', $aset->id)
                     ->lockForUpdate()
                     ->firstOrFail();
+                // Proposal mengambil kunci aset yang sama. Periksa ulang sesudah menunggu kunci,
+                // agar proposal yang terbit sementara itu tidak memakai nilai sebelum koreksi.
+                $periods = $this->hasPeriods($asetTerkunci->id);
+                abort_if($periods && $touchesValue, 409, self::VALUE_LOCKED);
 
                 abort_unless(
                     StatusAset::bolehDikoreksi($asetTerkunci->lifecycle_state),
@@ -384,6 +388,7 @@ class AsetController extends Controller
                 $join->on('book.id', '=', 'aset_tr_penyusutan_aset.buku_aset_id')->on('book.tenant_id', '=', 'aset_tr_penyusutan_aset.tenant_id');
             })
             ->where('book.aset_id', $asetId)
+            ->whereNull('aset_tr_penyusutan_aset.reverses_period_id')->whereNull('aset_tr_penyusutan_aset.cancelled_at')
             ->exists();
     }
 

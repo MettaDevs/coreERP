@@ -207,6 +207,24 @@ class DepreciationPostingTest extends TestCase
         $this->assertNull(DB::table('aset_tr_penyusutan_aset')->where('id', $periode[0])->value('posted_posting_id'));
     }
 
+    public function test_reversal_keeps_the_original_account_and_dimension_snapshots(): void
+    {
+        [$group, $book] = $this->groupMenyusut('UJI', 'Aset uji');
+        $this->petakanPenyusutan($group);
+        $this->terima($group, $this->poli, 1, 48000000);
+        $periods = $this->usulkan($book);
+        $this->finalkan($periods[0]);
+        $originalId = $this->jalankanPost($book)->assertCreated()->json('data.posting.posting_id');
+        $original = FinancePosting::query()->where('posting_id', $originalId)->firstOrFail()->payload;
+        FinanceReferenceAccount::query()->whereKey($this->akun['akumulasi'])->update(['code' => 'NEW-CODE', 'external_id' => 'NEW-ACCOUNT']);
+        DB::table('operating_units')->where('organization_id', $this->klinik)->update(['number' => 'NEW-BU']);
+        $result = $this->balikkan($periods[0])->assertCreated()->json('data.posting.posting_id');
+        $reversal = FinancePosting::query()->where('posting_id', $result)->firstOrFail()->payload;
+        $this->assertSame($original['journal_lines'][1]['account'], $reversal['journal_lines'][0]['account']);
+        $this->assertSame($original['journal_lines'][1]['financial_dimensions'], $reversal['journal_lines'][0]['financial_dimensions']);
+        $this->assertSame($original['journal_lines'][0]['financial_dimensions'], $reversal['journal_lines'][1]['financial_dimensions']);
+    }
+
     public function test_a_period_reversed_while_the_run_waits_for_its_lock_is_left_out(): void
     {
         [$group, $komersial] = $this->groupMenyusut('KENDARAAN', 'Kendaraan');
@@ -308,7 +326,7 @@ class DepreciationPostingTest extends TestCase
     {
         [, $komersial] = $this->groupMenyusut('KENDARAAN', 'Kendaraan');
 
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read', 'management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.correct'])
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read', 'management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.cancel'])
             ->postJson(self::API.'penyusutan/posting', $this->masukanPost($komersial))
             ->assertForbidden();
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read'])
@@ -433,7 +451,7 @@ class DepreciationPostingTest extends TestCase
     /** @return TestResponse<Response> */
     private function balikkan(string $periodeId): TestResponse
     {
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.cancel'])
             ->postJson(self::API.'penyusutan/'.$periodeId.'/reversal', ['reason' => 'Salah periode']);
     }
 

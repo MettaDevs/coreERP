@@ -34,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property ?string $reverses_period_id
  * @property ?string $posted_posting_id
+ * @property ?Carbon $cancelled_at
+ * @property int $version
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
@@ -47,7 +49,7 @@ class DepreciationPeriod extends Model
 
     protected $fillable = [
         'tenant_id', 'buku_aset_id', 'legal_entity_id', 'usage_org_unit_id',
-        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id', 'posted_posting_id',
+        'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id', 'posted_posting_id', 'cancelled_at', 'version',
     ];
 
     /** @return array<string, string> */
@@ -57,6 +59,8 @@ class DepreciationPeriod extends Model
             'period_starts_on' => 'date',
             'period_ends_on' => 'date',
             'amount' => 'decimal:2',
+            'cancelled_at' => 'datetime',
+            'version' => 'integer',
         ];
     }
 

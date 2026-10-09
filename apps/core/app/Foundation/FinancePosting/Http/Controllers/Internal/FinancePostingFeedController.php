@@ -34,6 +34,7 @@ final class FinancePostingFeedController extends Controller
         $limit = (int) ($filter['limit'] ?? 100);
 
         $query = FinancePosting::query()
+            ->readyForDelivery()
             ->where('tenant_id', $client->tenant_id)
             ->where('status', FinancePosting::PENDING);
         FinancePosting::restrictToClient($query, $client);

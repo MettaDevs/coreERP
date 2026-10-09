@@ -521,6 +521,23 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Daftar jenis posting dan contoh payload di kontrak | `DocsPortalTest::test_daftar_jenis_posting_punya_bagian_sendiri_dan_sama_di_setiap_tempat`, `test_contoh_payload_di_panduan_cocok_dengan_skemanya_dan_seimbang` |
 | Kontrak terbaca parser YAML yang ketat | `apps/core/tests/Unit/ContractYamlTest.php` |
 
+## Pembatalan dan urutan pengiriman
+
+Modul aset menerbitkan `asset.acquisition_reversal`, `asset.opening_balance_reversal`,
+`asset.acquisition_adjustment_reversal`, `asset.write_down_reversal`, dan
+`asset.appreciation_reversal` melalui [pembatalan transaksi aset](/apps/management-aset/transaction/pembatalan/).
+`PostingFeed::reverse()` menyalin akun, dimensi, vendor, dan presisi dari jurnal tersimpan.
+Pembalikan penyusutan memakai porsi dua baris asal melalui `PostingFeed::journal()`; mengganti
+pemetaan atau nomor dimensi setelah posting tidak mengganti isi jurnal yang dibalik.
+
+Pull dan push memakai `FinancePosting::readyForDelivery()`: jurnal yang membawa
+`reverses_posting_id` menunggu ack `posted` pada asalnya. Pemeriksaan
+yang sama berlaku pada ack, sehingga pembaca tidak dapat mengakui pembalikan yang belum siap.
+Asal `manual` membuat pembalikannya `manual`; asal yang ditolak tidak menghasilkan jurnal balik
+yang dikirim. Penolakan asal setelah pembalikan dibuat juga menghentikan pengiriman anaknya,
+dengan event `original_rejected` pada riwayat feed. Register yang dibatalkan dan jurnal yang
+sudah dibukukan tetap dua status yang ditampilkan terpisah.
+
 ## Celah yang diketahui
 
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.

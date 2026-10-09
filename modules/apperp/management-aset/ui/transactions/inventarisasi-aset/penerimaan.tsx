@@ -5,6 +5,7 @@ import type {
 } from '@/components/finance/posting-check';
 import { Badge } from '@apperp/ui/badge';
 import type { FieldConfig } from '../../master/fields';
+import type { CancellationSummary } from '../_shared/CancellationStatus';
 
 /**
  * Bentuk data, kosakata status, dan navigasi dokumen penerimaan aset.
@@ -53,6 +54,7 @@ export type Penerimaan = {
     id: string;
     kode: string;
     status: string;
+    cancellation?: CancellationSummary | null;
     version: number;
     tanggal: string;
     tanggal_siap_pakai: string | null;
@@ -199,6 +201,7 @@ export const STATUS: Record<
     }
 > = {
     draft: { label: 'Draf', variant: 'outline' },
+    cancelled: { label: 'Dibatalkan', variant: 'outline' },
     selesai: { label: 'Selesai', variant: 'secondary' },
 };
 

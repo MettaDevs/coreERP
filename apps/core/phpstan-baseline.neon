@@ -727,21 +727,9 @@ parameters:
 			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
 
 		-
-			message: '#^Access to an undefined property object\:\:\$configuration_version_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$decision_context\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
 			message: '#^Access to an undefined property object\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 18
+			count: 9
 			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
 
 		-
@@ -764,30 +752,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property object\:\:\$outcome\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$source_document_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$source_document_type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$workflow_type_id\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Foundation/Workflow/Support/WorkflowRuntime.php
