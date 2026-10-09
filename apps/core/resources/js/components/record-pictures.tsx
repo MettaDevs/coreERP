@@ -203,7 +203,7 @@ export function RecordPictures({
                                         {fileExtension(
                                             picture.file_name,
                                         ).toUpperCase()}{' '}
-                                        � {fileSize(picture.size_bytes)}
+                                        · {fileSize(picture.size_bytes)}
                                     </p>
                                     {page.meta.can_change && (
                                         <Button
@@ -259,7 +259,7 @@ export function RecordPictures({
                         </DialogTitle>
                         <DialogDescription>
                             {selected &&
-                                `${selected.file_name} � ${fileExtension(selected.file_name).toUpperCase()} � ${fileSize(selected.size_bytes)}`}
+                                `${selected.file_name} · ${fileExtension(selected.file_name).toUpperCase()} · ${fileSize(selected.size_bytes)}`}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody>

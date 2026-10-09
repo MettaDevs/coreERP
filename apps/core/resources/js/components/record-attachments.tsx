@@ -426,7 +426,7 @@ export function RecordAttachments({
                         <DialogTitle>{selected?.file_name}</DialogTitle>
                         <DialogDescription>
                             {selected &&
-                                `${fileSize(selected.size_bytes)} · ${selected.created_by_name ?? 'Pengguna'} · ${formatDateTime(selected.created_at)}`}
+                                `${fileExtension(selected.file_name).toUpperCase()} · ${fileSize(selected.size_bytes)} · ${selected.created_by_name ?? 'Pengguna'} · ${formatDateTime(selected.created_at)}`}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody>
