@@ -72,6 +72,51 @@ class HalamanModuleShellTest extends TestCase
         ]);
     }
 
+    public function test_shared_search_navigation_contains_authorized_module_pages(): void
+    {
+        $this->actingAs($this->pemilik)->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('launchableProducts.0.id', 'contoh-a')
+                ->where('launchableProducts.0.navigation.0.items.0.href', self::TAUTAN_MENU)
+                ->etc());
+    }
+
+    public function test_shared_search_navigation_hides_modules_without_permission(): void
+    {
+        $this->actingAs($this->tanpaIzin)->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('launchableProducts', 0)
+                ->etc());
+    }
+
+    public function test_search_catalog_includes_nested_pages_without_adding_sidebar_items(): void
+    {
+        $app = CoreApp::query()->findOrFail('contoh-a');
+        $navigation = $app->navigation;
+        $navigation['search'] = [[
+            'id' => 'record-summary', 'label' => 'Ringkasan barang',
+            'parent' => 'daftar-barang', 'path' => 'ringkasan',
+            'permission' => 'contoh-a.barang.read',
+        ]];
+        $app->update(['navigation' => $navigation]);
+        $catalog = app(LaunchableAppCatalog::class);
+        $membership = $this->pemilik->activeMembership();
+
+        $this->assertCount(1, $catalog->navigationFor($membership, $app)[0]['items']);
+        $this->actingAs($this->pemilik)->get('/dashboard')
+            ->assertInertia(fn ($page) => $page
+                ->where('launchableProducts.0.navigation.0.items.1.label', 'Ringkasan barang')
+                ->where('launchableProducts.0.navigation.0.items.1.href', self::TAUTAN_MENU.'/ringkasan')
+                ->etc());
+
+        $navigation['search'][0]['permission'] = 'contoh-a.not-granted.read';
+        $app->update(['navigation' => $navigation]);
+        $this->assertCount(1, $catalog->navigationFor($membership, $app, includeSearchPages: true)[0]['items']);
+        $this->assertSame([], $catalog->navigationFor($this->tanpaIzin->activeMembership(), $app, includeSearchPages: true));
+    }
+
     public function test_menu_module_menunjuk_rute_module_bukan_halaman_iframe(): void
     {
         $menu = $this->menuModule();

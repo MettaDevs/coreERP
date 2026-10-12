@@ -20,6 +20,12 @@ api:
 ui:
   image: registry.apperp.local/apps/management-aset-ui:0.1.0
   navigation:
+    search:
+      - id: asset-receipts
+        label: Penerimaan aset
+        parent: inventarisasi-aset
+        path: penerimaan
+        permission: management-aset.penerimaan-aset.read
     rail:
       - id: master
         label: Master data

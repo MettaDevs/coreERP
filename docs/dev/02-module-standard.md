@@ -949,6 +949,17 @@ App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan id
 
 Kontrak host navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core.
 
+Halaman turunan yang tidak menjadi entri sidebar dapat ikut pencarian Shell melalui
+`ui.navigation.search` di `app.yaml`. Setiap deklarasi membawa `id`, `label`, `parent`
+(ID entri sidebar), `path` (ruas URL setelah parent), dan `permission` read milik module.
+Core membentuk URL `/<id module>/<parent>/<path>`; path hanya menerima ruas huruf kecil,
+angka, dan tanda hubung, bukan URL bebas atau parameter record. Parent dan permission
+halaman harus sama-sama dapat dibuka anggota aktif. Deklarasi disimpan pada
+`apps.navigation.search`, lalu dimasukkan hanya ke katalog pencarian; sidebar tetap
+membaca `rail` dan `sidebar`. Contohnya, Penerimaan aset berada di bawah
+`inventarisasi-aset` dengan path `penerimaan`. Setelah deklarasi berubah, daftarkan
+ulang manifest pada runtime dan verifikasi hasil pencarian beserta halaman tujuannya.
+
 **Id entri menu adalah jalur rutenya**: Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu. Module tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
 
 ## Lifecycle app

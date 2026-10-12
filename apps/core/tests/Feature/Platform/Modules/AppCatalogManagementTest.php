@@ -422,6 +422,39 @@ class AppCatalogManagementTest extends TestCase
             ->assertJsonValidationErrors('navigation.sidebar');
     }
 
+    public function test_search_pages_are_registered_with_nested_paths(): void
+    {
+        $manifest = $this->manifest();
+        $manifest['navigation']['search'] = [[
+            'id' => 'record-summary', 'label' => 'Ringkasan data',
+            'parent' => 'records', 'path' => 'ringkasan',
+            'permission' => 'sample-app.records.read',
+        ]];
+
+        $this->actingAs($this->providerAdmin())
+            ->postJson('/api/v1/provider/apps', $manifest)
+            ->assertCreated();
+        $this->assertEquals($manifest['navigation']['search'], CoreApp::query()->findOrFail('sample-app')->navigation['search']);
+    }
+
+    public function test_search_pages_reject_unsafe_paths_unknown_parents_and_non_read_permissions(): void
+    {
+        foreach ([['path', '../records'], ['path', 'https://example.test'], ['parent', 'missing'], ['permission', 'sample-app.records.create']] as [$field, $value]) {
+            $manifest = $this->manifest();
+            $manifest['navigation']['search'] = [[
+                'id' => 'record-summary', 'label' => 'Ringkasan data',
+                'parent' => 'records', 'path' => 'ringkasan',
+                'permission' => 'sample-app.records.read',
+            ]];
+            $manifest['navigation']['search'][0][$field] = $value;
+
+            $response = $this->actingAs($this->providerAdmin())
+                ->postJson('/api/v1/provider/apps', $manifest)
+                ->assertStatus(422);
+            $this->assertNotEmpty($response->json('errors'));
+        }
+    }
+
     public function test_duty_must_use_a_declared_privilege(): void
     {
         $manifest = $this->manifest();

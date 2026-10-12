@@ -181,14 +181,24 @@ class HandleInertiaRequests extends Middleware
             ->all());
     }
 
-    /** @return list<array{id:string,name:string,description:string,href:string}> */
+    /** @return list<array{id:string,name:string,description:string,href:string,version:string,navigation:list<array<string,mixed>>}> */
     private function launchableProducts(?TenantMembership $membership): array
     {
         if (! $membership) {
             return [];
         }
 
-        return app(LaunchableAppCatalog::class)->for($membership);
+        $catalog = app(LaunchableAppCatalog::class);
+        $products = collect($catalog->for($membership))->keyBy('id');
+
+        return CoreApp::query()
+            ->whereIn('id', $products->keys())
+            ->orderBy('name')
+            ->get(['id', 'navigation'])
+            ->map(fn (CoreApp $app): array => [
+                ...$products[$app->id],
+                'navigation' => $catalog->navigationFor($membership, $app, includeSearchPages: true),
+            ])->all();
     }
 
     /** @return list<array<string, mixed>> */
