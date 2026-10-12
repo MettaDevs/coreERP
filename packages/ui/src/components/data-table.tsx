@@ -343,7 +343,7 @@ next.delete(key)
     <div ref={containerRef} className={cn("relative overflow-hidden rounded-md border bg-background", className)}>
       <Table
         ref={tableRef}
-        className="table-fixed border-separate border-spacing-0"
+        className="table-fixed border-separate border-spacing-0 leading-5"
         style={{
           width: "100%",
           minWidth: columns.reduce(
@@ -403,7 +403,7 @@ next.delete(key)
                       : undefined
                   }
                   className={cn(
-                    "group relative h-9 overflow-hidden border-r border-b bg-muted/70 px-3 font-semibold select-none last:border-r-0",
+                    "group relative h-9 overflow-hidden border-r border-b bg-muted/70 px-3 text-[13px] font-medium select-none last:border-r-0",
                     column.align === "center" && "text-center",
                     column.align === "right" && "text-right"
                   )}

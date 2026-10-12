@@ -1,4 +1,4 @@
-import type { Auth, EntitledProduct } from '@/types/auth';
+import type { Auth, EntitledProduct, LaunchableProduct } from '@/types/auth';
 import type { HostedNavigation } from '@/types/navigation';
 
 declare module 'react' {
@@ -14,7 +14,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             entitledProducts: EntitledProduct[];
-            launchableProducts: EntitledProduct[];
+            launchableProducts: LaunchableProduct[];
             app?: {
                 id: string;
                 name: string;

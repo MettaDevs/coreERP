@@ -14,7 +14,6 @@ import { AppCommandPalette } from '@/components/app-command-palette';
 import { ExportTray } from '@/components/export-tray';
 import { NotificationBell } from '@/components/notification-bell';
 import { PrintDialog } from '@/components/print-dialog';
-import { ProductLauncher } from '@/components/product-launcher';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { WorkDateBadge } from '@/components/work-date-notice';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
@@ -45,23 +44,34 @@ export function AppSidebarHeader({
     return (
         <header
             className={cn(
-                'sticky top-0 z-20 min-h-16 shrink-0 border-b bg-background transition-[border-radius,box-shadow] duration-200',
+                'sticky top-0 z-20 min-h-12 shrink-0 border-b bg-background transition-[border-radius,box-shadow] duration-200',
                 isScrolled ? 'rounded-none shadow-sm' : 'rounded-t-2xl',
             )}
         >
-            <div className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-3 sm:gap-4 sm:px-5">
-                <SidebarTrigger className="shrink-0" />
-                <div className="hidden h-6 w-px bg-border sm:block" />
+            <div className="flex min-h-12 min-w-0 flex-wrap items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-4">
+                <SidebarTrigger className="shrink-0 md:hidden" />
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="lg:hidden"
+                    aria-label="Cari halaman atau aplikasi"
+                    onClick={() => setCommandOpen(true)}
+                >
+                    <Search />
+                </Button>
                 <WorkspaceSwitcher />
                 <WorkDateBadge />
                 <div className="hidden h-6 w-px bg-border lg:block" />
                 <Button
                     variant="outline"
-                    className="hidden h-10 max-w-sm min-w-32 flex-1 justify-start px-3 font-normal text-muted-foreground shadow-xs lg:flex"
+                    size="sm"
+                    aria-label="Cari halaman atau aplikasi"
+                    aria-keyshortcuts="Control+K Meta+K"
+                    className="hidden max-w-sm min-w-32 flex-1 justify-start font-normal text-muted-foreground lg:flex"
                     onClick={() => setCommandOpen(true)}
                 >
                     <Search data-icon="inline-start" />
-                    <span>Search...</span>
+                    <span>Cari halaman…</span>
                     <span className="ml-auto hidden sm:block">
                         <Kbd>
                             <Command />K
@@ -70,7 +80,6 @@ export function AppSidebarHeader({
                 </Button>
 
                 <div className="ml-auto flex items-center gap-1">
-                    <ProductLauncher />
                     <ExportTray />
                     <NotificationBell />
                     <Button

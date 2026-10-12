@@ -1,3 +1,5 @@
+import type { HostedNavigationRail } from './navigation';
+
 export type User = {
     id: number;
     name: string;
@@ -49,6 +51,10 @@ export type EntitledProduct = {
     name: string;
     description: string;
     href: string;
+};
+
+export type LaunchableProduct = EntitledProduct & {
+    navigation: HostedNavigationRail[];
 };
 
 /* @chisel-passkeys */
