@@ -98,6 +98,9 @@ jobs:
       - name: Lint Frontend
         run: npm run lint:check
 
+      - name: Check Upload Client
+        run: node scripts/test-core-api.mjs
+
       # ESLint dan Prettier memeriksa bentuk, bukan tipe. Tanpa langkah ini, empat
       # kesalahan TS2322 berdiri di cabang utama tanpa ada yang menahannya. Berkas
       # Wayfinder harus sudah dibuat lebih dulu, karena halaman mengimpor tipe dari sana.

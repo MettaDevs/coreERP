@@ -34,6 +34,13 @@ Halaman module ikut build shell Core. Tidak ada iframe dan tidak ada aplikasi Re
 merender halaman Inertia dengan nama `<id module>::<nama berkas>`, dan Core menyusun tautan sidebar
 dengan aturan `/<id module>/<id entri menu>` dari manifest yang sama.
 
+Shell menetapkan tinggi viewport dan menempatkan header serta spanduk di luar area gulir
+card utama. Halaman biasa menggulir di area isi Shell yang bertanda `scroll-region`.
+Halaman yang menyatakan `data-layout="full-height"` menerima sisa tinggi card dan mengelola
+scroll pada panelnya sendiri; pembungkus sampai ke halaman wajib meneruskan `h-full min-h-0`.
+Stylesheet module tidak boleh mengubah overflow `html`/`body` atau semua elemen `main`, karena
+stylesheet yang sudah termuat tetap memengaruhi halaman module lain.
+
 ## Bentuk lama: app dengan repository dan container sendiri
 
 **Bentuk ini sudah tidak berlaku.** Ia dicatat di sini supaya sebuah repo `app-erp-*` lama yang
@@ -943,6 +950,17 @@ Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Ro
 App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan identitas, route, menu utama pada rail, menu turunan pada sidebar, dan permission entry point-nya. Nama, ikon, urutan, dan label menu berasal dari metadata app/host SDK, bukan daftar app yang di-hardcode di Web Shell.
 
 Navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Command `app:register-manifest` memvalidasi permission menu dan menyimpannya pada katalog Core. Shell menyaring menu menurut izin anggota aktif dan merendernya dengan komponen bersama. UI module berjalan di pohon React Core; tidak ada iframe atau pesan kesiapan antar aplikasi.
+
+Halaman turunan yang tidak menjadi entri sidebar dapat ikut pencarian Shell melalui
+`ui.navigation.search` di `app.yaml`. Setiap deklarasi membawa `id`, `label`, `parent`
+(ID entri sidebar), `path` (ruas URL setelah parent), dan `permission` read milik module.
+Core membentuk URL `/<id module>/<parent>/<path>`; path hanya menerima ruas huruf kecil,
+angka, dan tanda hubung, bukan URL bebas atau parameter record. Parent dan permission
+halaman harus sama-sama dapat dibuka anggota aktif. Deklarasi disimpan pada
+`apps.navigation.search`, lalu dimasukkan hanya ke katalog pencarian; sidebar tetap
+membaca `rail` dan `sidebar`. Contohnya, Penerimaan aset berada di bawah
+`inventarisasi-aset` dengan path `penerimaan`. Setelah deklarasi berubah, daftarkan
+ulang manifest pada runtime dan verifikasi hasil pencarian beserta halaman tujuannya.
 
 Halaman turunan yang tidak menjadi entri sidebar dapat ikut pencarian Shell melalui
 `ui.navigation.search` di `app.yaml`. Setiap deklarasi membawa `id`, `label`, `parent`
