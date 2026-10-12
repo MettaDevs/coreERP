@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers\Environments;
 
+use ControlPlane\Environments\EnvironmentRejected;
+use ControlPlane\Environments\FleetFromCore;
 use ControlPlane\Environments\InstalledModules;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Environment;
@@ -33,7 +35,7 @@ use Inertia\Response as InertiaResponse;
  */
 class Show extends Controller
 {
-    public function __invoke(Request $request, string $environment, InstalledModules $modules, SiteOperations $operations): InertiaResponse
+    public function __invoke(Request $request, string $environment, InstalledModules $modules, SiteOperations $operations, FleetFromCore $fleet): InertiaResponse
     {
         $row = Environment::query()
             ->with('tenant:id,name,slug')
@@ -48,6 +50,7 @@ class Show extends Controller
                 'createdAt' => $row->created_at?->toDateTimeString(),
             ],
             'history' => fn (): array => $this->history($row),
+            'installedRelease' => fn (): array => $this->installedRelease($row, $fleet),
             // Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement tenantnya.
             // Entitlement menjawab apa yang boleh ada; hanya tabel di dalam databasenya yang
             // menjawab apa yang benar-benar ada — dan selisih keduanya persis yang dicari operator
@@ -61,6 +64,20 @@ class Show extends Controller
             'serverClient' => fn (): ?array => $row->runsOnClientServer() ? $this->serverClient($row, $operations) : null,
             'installCommand' => fn (): ?array => $this->installCommand($request),
         ]);
+    }
+
+    /** @return array{version: ?string, error: ?string} */
+    private function installedRelease(Environment $row, FleetFromCore $fleet): array
+    {
+        if ($row->hosting === 'client_server') {
+            return ['version' => $row->site?->reported_release, 'error' => null];
+        }
+
+        try {
+            return ['version' => $fleet()['platform_release'], 'error' => null];
+        } catch (EnvironmentRejected $failure) {
+            return ['version' => null, 'error' => $failure->getMessage()];
+        }
     }
 
     /** @return list<array<string, mixed>> */

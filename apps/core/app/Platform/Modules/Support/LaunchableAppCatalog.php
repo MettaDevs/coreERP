@@ -26,13 +26,13 @@ class LaunchableAppCatalog
     /**
      * @return list<array{id:string,label:string,href:string,items:list<array{id:string,label:string,href:string}>}>
      */
-    public function navigationFor(TenantMembership $membership, CoreApp $app): array
+    public function navigationFor(TenantMembership $membership, CoreApp $app, bool $includeSearchPages = false): array
     {
         $allowed = array_flip($this->permissionsFor($membership, $app->id));
         $navigation = $app->navigation ?? [];
         $sidebar = is_array($navigation['sidebar'] ?? null) ? $navigation['sidebar'] : [];
 
-        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sidebar): ?array {
+        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sidebar, $navigation, $includeSearchPages): ?array {
             $items = array_values(collect($sidebar[$rail['id']] ?? [])
                 ->filter(fn (array $item): bool => isset($allowed[$item['permission']]))
                 ->map(fn (array $item): array => [
@@ -40,6 +40,20 @@ class LaunchableAppCatalog
                     'label' => $item['label'],
                     'href' => $this->menuLink($app->id, (string) $item['id']),
                 ])->all());
+
+            if ($includeSearchPages) {
+                $parents = array_column($items, 'href', 'id');
+
+                foreach ($navigation['search'] ?? [] as $page) {
+                    if (isset($parents[$page['parent']], $allowed[$page['permission']])) {
+                        $items[] = [
+                            'id' => $page['id'],
+                            'label' => $page['label'],
+                            'href' => $parents[$page['parent']].'/'.$page['path'],
+                        ];
+                    }
+                }
+            }
 
             return $items === [] ? null : [
                 'id' => $rail['id'],

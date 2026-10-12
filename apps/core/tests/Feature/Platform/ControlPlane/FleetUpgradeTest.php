@@ -71,6 +71,27 @@ final class FleetUpgradeTest extends TestCase
 
     // ---------------------------------------------------------------- membaca keadaan
 
+    public function test_the_fleet_reports_the_running_release_separately_from_its_schema(): void
+    {
+        config()->set('sentry.release', 'coreerp@0.8.1');
+
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()
+            ->assertJsonPath('platform_release', '0.8.1');
+
+        config()->set('sentry.release', null);
+
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()
+            ->assertJsonPath('platform_release', null);
+
+        config()->set('sentry.release', 'commit-without-release-number');
+
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()
+            ->assertJsonPath('platform_release', null);
+    }
+
     public function test_the_fleet_reports_one_state_per_environment(): void
     {
         // Tinggal di database pusat, dan database pusat di dalam test ini memang sudah termigrasi

@@ -15,6 +15,8 @@ import {
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -37,14 +39,6 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
 import { api, ApiError, errorMessage, toastSaveError } from '../api';
 
 type AccountColumn = { column: string; label: string; required: boolean };
@@ -172,8 +166,8 @@ export default function AssetPostingGroupPage({
     }, [versiMuat]);
 
     return (
-        <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="border-b px-5 py-4">
+        <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
+            <CardHeader className="shrink-0 border-b px-5 py-4">
                 <CardTitle>Posting group aset</CardTitle>
                 <p className="text-muted-foreground mt-1 text-sm">
                     Akun jurnal untuk setiap group aset. Posting memakai baris
@@ -181,7 +175,7 @@ export default function AssetPostingGroupPage({
                     tanggal postingnya.
                 </p>
             </CardHeader>
-            <CardContent className="space-y-4 px-5 py-4">
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
                 {loadError && <FieldError>{loadError}</FieldError>}
                 {matrix && matrix.groups.length === 0 && (
                     <Empty>
@@ -196,7 +190,9 @@ export default function AssetPostingGroupPage({
                 )}
                 {matrix && matrix.groups.length > 0 && (
                     <>
-                        <Summary matrix={matrix} />
+                        <div className="shrink-0">
+                            <Summary matrix={matrix} />
+                        </div>
                         <PostingMatrix
                             matrix={matrix}
                             canEdit={can('create') || can('update')}
@@ -260,82 +256,83 @@ function PostingMatrix({
     canEdit: boolean;
     onOpen: (group: Group) => void;
 }) {
+    const columns: DataTableColumn<Group>[] = [
+        {
+            id: 'kode',
+            header: 'Kode group aset',
+            width: 200,
+            minWidth: 140,
+            sortValue: (group) => group.kode,
+            cell: (group) => (
+                <span className="font-mono text-xs">{group.kode}</span>
+            ),
+        },
+        {
+            id: 'nama',
+            header: 'Nama group aset',
+            width: 240,
+            minWidth: 160,
+            sortValue: (group) => group.nama,
+            cell: (group) => (
+                <>
+                    <DataTableText>{group.nama}</DataTableText>
+                    {!group.aktif && (
+                        <Badge variant="outline" className="mt-1">
+                            Nonaktif
+                        </Badge>
+                    )}
+                </>
+            ),
+        },
+        {
+            id: 'effective_from',
+            header: 'Berlaku sejak',
+            width: 180,
+            minWidth: 140,
+            sortValue: (group) => group.current?.effective_from ?? '',
+            cell: (group) => (
+                <>
+                    {group.current
+                        ? formatDate(group.current.effective_from)
+                        : 'Belum ada'}
+                    {group.rows.length > 1 && (
+                        <span className="text-muted-foreground block text-xs">
+                            {group.rows.length} tanggal berlaku
+                        </span>
+                    )}
+                </>
+            ),
+        },
+        ...matrix.accounts.map((column): DataTableColumn<Group> => ({
+            id: column.column,
+            header: `${column.label} (${column.required ? 'wajib' : 'bila dipakai'})`,
+            width: 280,
+            minWidth: 180,
+            cell: (group) => (
+                <AccountCell
+                    column={column}
+                    accountId={accountOf(group.current, column.column)}
+                    details={matrix.account_details}
+                />
+            ),
+        })),
+    ];
+
     return (
-        <div className="overflow-x-auto rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="min-w-48">Group aset</TableHead>
-                        <TableHead className="min-w-32">
-                            Berlaku sejak
-                        </TableHead>
-                        {matrix.accounts.map((account) => (
-                            <TableHead
-                                key={account.column}
-                                className="min-w-44 align-bottom"
-                            >
-                                <span className="block">{account.label}</span>
-                                <span className="text-muted-foreground block text-xs font-normal">
-                                    {account.required
-                                        ? 'Wajib'
-                                        : 'Bila dipakai'}
-                                </span>
-                            </TableHead>
-                        ))}
-                        <TableHead className="w-24">
-                            <span className="sr-only">Aksi</span>
-                        </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {matrix.groups.map((group) => (
-                        <TableRow key={group.id}>
-                            <TableCell>
-                                <span className="block font-mono text-xs">
-                                    {group.kode}
-                                </span>
-                                <span className="block">{group.nama}</span>
-                                {!group.aktif && (
-                                    <Badge variant="outline" className="mt-1">
-                                        Nonaktif
-                                    </Badge>
-                                )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {group.current
-                                    ? formatDate(group.current.effective_from)
-                                    : 'Belum ada'}
-                                {group.rows.length > 1 && (
-                                    <span className="text-muted-foreground block text-xs">
-                                        {group.rows.length} tanggal berlaku
-                                    </span>
-                                )}
-                            </TableCell>
-                            {matrix.accounts.map((column) => (
-                                <AccountCell
-                                    key={column.column}
-                                    column={column}
-                                    accountId={accountOf(
-                                        group.current,
-                                        column.column,
-                                    )}
-                                    details={matrix.account_details}
-                                />
-                            ))}
-                            <TableCell>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => onOpen(group)}
-                                >
-                                    {canEdit ? 'Atur' : 'Lihat'}
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
+        <DataTable
+            scrollMode="viewport"
+            className="min-h-0 flex-1"
+            columns={columns}
+            data={matrix.groups}
+            getRowKey={(group) => group.id}
+            getRowLabel={(group) => `${group.kode} — ${group.nama}`}
+            actions={[
+                { id: 'open', label: canEdit ? 'Ubah akun' : 'Lihat akun' },
+            ]}
+            actionsPlacement="inline"
+            onRowAction={(_, group) => onOpen(group)}
+            emptyMessage="Belum ada group aset."
+        />
     );
 }
 
@@ -352,41 +349,41 @@ function AccountCell({
     const reason = accountId === null ? null : accountProblem(account);
     const problem = (accountId === null && column.required) || reason !== null;
     const className = problem
-        ? 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'
+        ? 'rounded-sm bg-destructive/10 px-2 py-1 text-destructive'
         : undefined;
 
     if (accountId === null) {
         return (
-            <TableCell className={className}>
+            <div className={className}>
                 {column.required ? (
                     <span className="text-sm font-medium">Kosong</span>
                 ) : (
                     <span className="text-muted-foreground">—</span>
                 )}
-            </TableCell>
+            </div>
         );
     }
 
     return (
-        <TableCell className={className}>
+        <div className={className}>
             {account ? (
                 <>
                     <span className="block font-mono text-xs">
-                        {account.code}
+                        <DataTableText>{account.code}</DataTableText>
                     </span>
-                    <span className="block max-w-56 truncate text-sm">
-                        {account.name}
+                    <span className="block text-sm">
+                        <DataTableText>{account.name}</DataTableText>
                     </span>
                     {reason && (
                         <span className="block text-xs font-medium">
-                            {reason}
+                            <DataTableText>{reason}</DataTableText>
                         </span>
                     )}
                 </>
             ) : (
                 <span className="text-sm font-medium">{reason}</span>
             )}
-        </TableCell>
+        </div>
     );
 }
 

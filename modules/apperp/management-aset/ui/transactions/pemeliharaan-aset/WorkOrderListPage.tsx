@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { FileOutput } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -213,156 +214,148 @@ export default function WorkOrderListPage({
     ];
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar
-                title="Work order"
-                trailing={
-                    can('execute') ? (
-                        <label className="flex items-center gap-2 text-sm">
-                            <Switch
-                                checked={hanyaPekerjaanSaya}
-                                onCheckedChange={setHanyaPekerjaanSaya}
-                            />
-                            Pekerjaan saya
-                        </label>
-                    ) : undefined
-                }
-            >
-                {can('create') && !hanyaPekerjaanSaya && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={bukaWorkOrderBaru}
-                    >
-                        Tambah work order
-                    </ActionButton>
-                )}
-                {!hanyaPekerjaanSaya && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                            requestPrint({
-                                report: 'daftar-work-order',
-                                title: 'Ekspor daftar work order',
-                                parameters: {},
-                            })
-                        }
-                    >
-                        <FileOutput />
-                        Ekspor daftar
-                    </Button>
-                )}
-            </RecordActionBar>
-
-            <div className="min-h-0 flex-1 overflow-auto">
-                {hanyaPekerjaanSaya ? (
-                    !pekerjaanSaya.length ? (
-                        <Empty>
-                            <EmptyHeader>
-                                <EmptyTitle>
-                                    Tidak ada pekerjaan untuk Anda
-                                </EmptyTitle>
-                                <EmptyDescription>
-                                    Pekerjaan muncul di sini setelah dijadwalkan
-                                    dan ditugaskan kepada Anda.
-                                </EmptyDescription>
-                            </EmptyHeader>
-                        </Empty>
-                    ) : (
-                        <DataTable
-                            columns={pekerjaanSayaColumns}
-                            data={pekerjaanSaya}
-                            getRowKey={(job) => String(job.id)}
-                            getRowLabel={(job) =>
-                                String(job.work_order_kode ?? 'pekerjaan')
+        <ListPageLayout
+            header={
+                <RecordActionBar
+                    title="Work order"
+                    trailing={
+                        can('execute') ? (
+                            <label className="flex items-center gap-2 text-sm">
+                                <Switch
+                                    checked={hanyaPekerjaanSaya}
+                                    onCheckedChange={setHanyaPekerjaanSaya}
+                                />
+                                Pekerjaan saya
+                            </label>
+                        ) : undefined
+                    }
+                >
+                    {can('create') && !hanyaPekerjaanSaya && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaWorkOrderBaru}
+                        >
+                            Tambah work order
+                        </ActionButton>
+                    )}
+                    {!hanyaPekerjaanSaya && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                requestPrint({
+                                    report: 'daftar-work-order',
+                                    title: 'Ekspor daftar work order',
+                                    parameters: {},
+                                })
                             }
-                            actions={[
-                                { id: 'detail', label: 'Buka rincian' },
-                                { id: 'checklist', label: 'Isi checklist' },
-                            ]}
-                            onRowClick={(job) => {
-                                if (can('read')) {
-                                    bukaWorkOrder(
-                                        String(job.pemeliharaan_aset_id),
-                                    );
-                                }
-                            }}
-                            onRowAction={(action, job) => {
-                                if (action === 'detail' && can('read')) {
-                                    bukaWorkOrder(
-                                        String(job.pemeliharaan_aset_id),
-                                    );
-                                }
-
-                                if (action === 'checklist') {
-                                    bukaChecklistJob(
-                                        String(job.pemeliharaan_aset_id),
-                                        String(job.id),
-                                    );
-                                }
-                            }}
-                        />
-                    )
-                ) : !workOrders.length ? (
+                        >
+                            <FileOutput />
+                            Ekspor daftar
+                        </Button>
+                    )}
+                </RecordActionBar>
+            }
+        >
+            {hanyaPekerjaanSaya ? (
+                !pekerjaanSaya.length ? (
                     <Empty>
                         <EmptyHeader>
-                            <EmptyTitle>Belum ada work order</EmptyTitle>
+                            <EmptyTitle>
+                                Tidak ada pekerjaan untuk Anda
+                            </EmptyTitle>
                             <EmptyDescription>
-                                Work order memuat baris pekerjaan per aset,
-                                sehingga satu perintah kerja dapat mencakup
-                                beberapa aset.
+                                Pekerjaan muncul di sini setelah dijadwalkan dan
+                                ditugaskan kepada Anda.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
                 ) : (
-                    <div>
-                        <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div className="space-y-1">
-                                <p className="font-semibold">
-                                    Daftar work order
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    {visibleWorkOrders.length} work order
-                                    ditampilkan
-                                </p>
-                            </div>
-                            <Input
-                                className="w-full sm:w-80"
-                                type="search"
-                                placeholder="Cari kode, jenis, atau keterangan"
-                                aria-label="Cari work order"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
-                        </div>
-                        <DataTable
-                            columns={workOrderColumns}
-                            data={visibleWorkOrders}
-                            getRowKey={(workOrder) => workOrder.id}
-                            getRowLabel={(workOrder) => workOrder.kode}
-                            actions={workOrderActions}
-                            onRowClick={(workOrder) => {
-                                if (can('read')) {
-                                    bukaWorkOrder(workOrder.id);
-                                }
-                            }}
-                            onRowAction={(action, workOrder) => {
-                                if (action === 'detail' && can('read')) {
-                                    bukaWorkOrder(workOrder.id);
-                                }
+                    <DataTable
+                        columns={pekerjaanSayaColumns}
+                        data={pekerjaanSaya}
+                        getRowKey={(job) => String(job.id)}
+                        getRowLabel={(job) =>
+                            String(job.work_order_kode ?? 'pekerjaan')
+                        }
+                        actions={[
+                            { id: 'detail', label: 'Buka rincian' },
+                            { id: 'checklist', label: 'Isi checklist' },
+                        ]}
+                        onRowClick={(job) => {
+                            if (can('read')) {
+                                bukaWorkOrder(String(job.pemeliharaan_aset_id));
+                            }
+                        }}
+                        onRowAction={(action, job) => {
+                            if (action === 'detail' && can('read')) {
+                                bukaWorkOrder(String(job.pemeliharaan_aset_id));
+                            }
 
-                                if (action === 'edit' && can('update')) {
-                                    bukaWorkOrderUbah(workOrder.id);
-                                }
-                            }}
-                            emptyMessage="Tidak ada work order yang cocok dengan pencarian."
+                            if (action === 'checklist') {
+                                bukaChecklistJob(
+                                    String(job.pemeliharaan_aset_id),
+                                    String(job.id),
+                                );
+                            }
+                        }}
+                    />
+                )
+            ) : !workOrders.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada work order</EmptyTitle>
+                        <EmptyDescription>
+                            Work order memuat baris pekerjaan per aset, sehingga
+                            satu perintah kerja dapat mencakup beberapa aset.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <div className="flex h-full min-h-0 flex-col">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-1">
+                            <p className="font-semibold">Daftar work order</p>
+                            <p className="text-muted-foreground text-sm">
+                                {visibleWorkOrders.length} work order
+                                ditampilkan
+                            </p>
+                        </div>
+                        <Input
+                            className="w-full sm:w-80"
+                            type="search"
+                            placeholder="Cari kode, jenis, atau keterangan"
+                            aria-label="Cari work order"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
                         />
                     </div>
-                )}
-            </div>
-        </div>
+                    <DataTable
+                        className="min-h-0 flex-1"
+                        columns={workOrderColumns}
+                        data={visibleWorkOrders}
+                        getRowKey={(workOrder) => workOrder.id}
+                        getRowLabel={(workOrder) => workOrder.kode}
+                        actions={workOrderActions}
+                        onRowClick={(workOrder) => {
+                            if (can('read')) {
+                                bukaWorkOrder(workOrder.id);
+                            }
+                        }}
+                        onRowAction={(action, workOrder) => {
+                            if (action === 'detail' && can('read')) {
+                                bukaWorkOrder(workOrder.id);
+                            }
+
+                            if (action === 'edit' && can('update')) {
+                                bukaWorkOrderUbah(workOrder.id);
+                            }
+                        }}
+                        emptyMessage="Tidak ada work order yang cocok dengan pencarian."
+                    />
+                </div>
+            )}
+        </ListPageLayout>
     );
 }

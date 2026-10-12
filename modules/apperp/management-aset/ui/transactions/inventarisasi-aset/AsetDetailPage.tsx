@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ChangeHistory } from '@/components/change-history';
 import type { ChangeHistoryPage } from '@/components/change-history';
+import { RecordFactBox } from '@/components/record-fact-box';
 import { useToday } from '@/hooks/use-work-date';
 import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -48,6 +49,7 @@ import {
     referenceDefaults,
     textDefaults,
 } from './aset';
+import AssetPicture from './AssetPicture';
 import type { AttributeDefinition } from './attributes';
 import { toFieldConfig } from './attributes';
 import { printAssetLabels } from './labels';
@@ -469,7 +471,13 @@ export default function AsetDetailPage({
             </RecordActionBar>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="space-y-4 p-5">
+                <RecordFactBox
+                    className="p-5"
+                    key={asetId}
+                    recordType="aset_tr_aset"
+                    recordId={asetId}
+                    details={asetId ? <AssetPicture assetId={asetId} /> : null}
+                >
                     {mode === 'edit' && (
                         <p className="text-muted-foreground text-sm">
                             Group aset dan lokasi tidak dapat diganti di sini.
@@ -480,6 +488,7 @@ export default function AsetDetailPage({
                     )}
 
                     <CollapsibleSectionGroup
+                        className="min-w-0"
                         defaultValue={['klasifikasi', 'perolehan']}
                     >
                         <CollapsibleSection
@@ -863,7 +872,7 @@ export default function AsetDetailPage({
                             </Field>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>
-                </div>
+                </RecordFactBox>
             </div>
         </div>
     );

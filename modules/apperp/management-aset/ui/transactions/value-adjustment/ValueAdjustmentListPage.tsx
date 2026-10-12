@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -166,110 +167,115 @@ export default function ValueAdjustmentListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Penyesuaian nilai aset">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={bukaPenyesuaianBaru}
-                    >
-                        Buat penyesuaian
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor bukti, alasan, atau buku"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-56">
-                    <Select
-                        label="Jenis"
-                        items={PILIHAN_JENIS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_JENIS.find(
-                                (pilihan) => pilihan.value === jenis,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan jenis"
-                        onValueChange={(value) =>
-                            setJenis(
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Penyesuaian nilai aset">
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaPenyesuaianBaru}
+                        >
+                            Buat penyesuaian
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor bukti, alasan, atau buku"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-56">
+                        <Select
+                            label="Jenis"
+                            items={PILIHAN_JENIS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_JENIS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? '',
-                            )
-                        }
-                    />
-                </div>
-                <div className="w-full sm:w-48">
-                    <Select
-                        label="Status"
-                        items={PILIHAN_STATUS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_STATUS.find(
-                                (pilihan) => pilihan.value === status,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) =>
-                            setStatus(
+                                    (pilihan) => pilihan.value === jenis,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan jenis"
+                            onValueChange={(value) =>
+                                setJenis(
+                                    PILIHAN_JENIS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? '',
+                                )
+                            }
+                        />
+                    </div>
+                    <div className="w-full sm:w-48">
+                        <Select
+                            label="Status"
+                            items={PILIHAN_STATUS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? '',
-                            )
-                        }
-                    />
+                                    (pilihan) => pilihan.value === status,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) =>
+                                setStatus(
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? '',
+                                )
+                            }
+                        />
+                    </div>
                 </div>
-            </div>
+            }
+        >
+            {!memuat && !terlihat.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada penyesuaian nilai</EmptyTitle>
+                        <EmptyDescription>
+                            Penyesuaian nilai menurunkan nilai buku aset yang
+                            nilainya turun, atau menaikkannya saat revaluasi.
+                            Penyusutan berikutnya dihitung dari nilai buku yang
+                            baru.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={terlihat}
+                    getRowKey={(baris) => baris.id}
+                    getRowLabel={(baris) => baris.kode}
+                    actions={actions}
+                    onRowClick={(baris) => bukaPenyesuaian(baris.id)}
+                    onRowAction={(action, baris) => {
+                        if (action === 'detail') {
+                            bukaPenyesuaian(baris.id);
+                        }
 
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!memuat && !terlihat.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada penyesuaian nilai</EmptyTitle>
-                            <EmptyDescription>
-                                Penyesuaian nilai menurunkan nilai buku aset
-                                yang nilainya turun, atau menaikkannya saat
-                                revaluasi. Penyusutan berikutnya dihitung dari
-                                nilai buku yang baru.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={terlihat}
-                        getRowKey={(baris) => baris.id}
-                        getRowLabel={(baris) => baris.kode}
-                        actions={actions}
-                        onRowClick={(baris) => bukaPenyesuaian(baris.id)}
-                        onRowAction={(action, baris) => {
-                            if (action === 'detail') {
-                                bukaPenyesuaian(baris.id);
+                        if (action === 'edit') {
+                            if (baris.status !== 'draft') {
+                                toast.error(
+                                    'Penyesuaian yang sudah diposting tidak dapat diubah. Buat penyesuaian baru bila nilainya perlu dikoreksi.',
+                                );
+
+                                return;
                             }
 
-                            if (action === 'edit') {
-                                if (baris.status !== 'draft') {
-                                    toast.error(
-                                        'Penyesuaian yang sudah diposting tidak dapat diubah. Buat penyesuaian baru bila nilainya perlu dikoreksi.',
-                                    );
-
-                                    return;
-                                }
-
-                                bukaPenyesuaianUbah(baris.id);
-                            }
-                        }}
-                    />
-                )}
-            </div>
-        </div>
+                            bukaPenyesuaianUbah(baris.id);
+                        }
+                    }}
+                />
+            )}
+        </ListPageLayout>
     );
 }

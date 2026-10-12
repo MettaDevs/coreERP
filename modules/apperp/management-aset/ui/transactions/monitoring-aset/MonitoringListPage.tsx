@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -185,106 +186,109 @@ export default function MonitoringListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Monitoring aset">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={bukaMonitoringBaru}
-                    >
-                        Buat monitoring
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor bukti, lokasi, atau orang"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-44">
-                    <Input
-                        label="Dari tanggal"
-                        type="date"
-                        value={dari}
-                        onChange={(event) => setDari(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-44">
-                    <Input
-                        label="Sampai tanggal"
-                        type="date"
-                        value={sampai}
-                        onChange={(event) => setSampai(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-48">
-                    <Select
-                        label="Status"
-                        items={PILIHAN_STATUS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_STATUS.find(
-                                (pilihan) => pilihan.value === status,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) =>
-                            setStatus(
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Monitoring aset">
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaMonitoringBaru}
+                        >
+                            Buat monitoring
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor bukti, lokasi, atau orang"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-44">
+                        <Input
+                            label="Dari tanggal"
+                            type="date"
+                            value={dari}
+                            onChange={(event) => setDari(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-44">
+                        <Input
+                            label="Sampai tanggal"
+                            type="date"
+                            value={sampai}
+                            onChange={(event) => setSampai(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-48">
+                        <Select
+                            label="Status"
+                            items={PILIHAN_STATUS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? '',
-                            )
-                        }
-                    />
+                                    (pilihan) => pilihan.value === status,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) =>
+                                setStatus(
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? '',
+                                )
+                            }
+                        />
+                    </div>
                 </div>
-            </div>
+            }
+        >
+            {!memuat && !terlihat.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada monitoring aset</EmptyTitle>
+                        <EmptyDescription>
+                            Monitoring mencatat hasil pemeriksaan fisik aset di
+                            satu lokasi: mana yang ada, mana yang tidak, dan
+                            mana yang tidak cocok dengan catatan aset.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={terlihat}
+                    getRowKey={(baris) => baris.id}
+                    getRowLabel={(baris) => baris.kode}
+                    actions={actions}
+                    onRowClick={(baris) => bukaMonitoring(baris.id)}
+                    onRowAction={(action, baris) => {
+                        if (action === 'detail') {
+                            bukaMonitoring(baris.id);
+                        }
 
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!memuat && !terlihat.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada monitoring aset</EmptyTitle>
-                            <EmptyDescription>
-                                Monitoring mencatat hasil pemeriksaan fisik aset
-                                di satu lokasi: mana yang ada, mana yang tidak,
-                                dan mana yang tidak cocok dengan catatan aset.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={terlihat}
-                        getRowKey={(baris) => baris.id}
-                        getRowLabel={(baris) => baris.kode}
-                        actions={actions}
-                        onRowClick={(baris) => bukaMonitoring(baris.id)}
-                        onRowAction={(action, baris) => {
-                            if (action === 'detail') {
-                                bukaMonitoring(baris.id);
+                        if (action === 'edit') {
+                            if (baris.status !== 'draft') {
+                                toast.error(
+                                    'Monitoring yang sudah selesai tidak dapat diubah. Buat monitoring baru bila temuannya perlu dikoreksi.',
+                                );
+
+                                return;
                             }
 
-                            if (action === 'edit') {
-                                if (baris.status !== 'draft') {
-                                    toast.error(
-                                        'Monitoring yang sudah selesai tidak dapat diubah. Buat monitoring baru bila temuannya perlu dikoreksi.',
-                                    );
-
-                                    return;
-                                }
-
-                                bukaMonitoringUbah(baris.id);
-                            }
-                        }}
-                    />
-                )}
-            </div>
-        </div>
+                            bukaMonitoringUbah(baris.id);
+                        }
+                    }}
+                />
+            )}
+        </ListPageLayout>
     );
 }

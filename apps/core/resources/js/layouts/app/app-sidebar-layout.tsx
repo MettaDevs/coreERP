@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
@@ -12,15 +12,6 @@ import type { AppLayoutProps } from '@/types';
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
     const [isScrolled, setIsScrolled] = useState(false);
 
-    useEffect(() => {
-        const updateScrolled = () => setIsScrolled(window.scrollY > 8);
-
-        updateScrolled();
-        window.addEventListener('scroll', updateScrolled, { passive: true });
-
-        return () => window.removeEventListener('scroll', updateScrolled);
-    }, []);
-
     return (
         <AppShell variant="sidebar">
             <AppSidebar />
@@ -28,26 +19,30 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                 variant="sidebar"
                 className="h-svh min-w-0 overflow-hidden bg-muted/30 py-2 pr-2 pl-0"
             >
-                <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-                    <div className="flex min-h-[calc(100svh-1rem)] w-full min-w-0 flex-col rounded-2xl border bg-background shadow-sm">
-                        <AppSidebarHeader isScrolled={isScrolled} />
-                        {/*
+                <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-sm">
+                    <AppSidebarHeader isScrolled={isScrolled} />
+                    {/*
                             Di bawah header, di atas isi halaman — dan tidak dapat ditutup.
                             Spanduk yang bisa dibuang adalah spanduk yang dibuang orang pada hari
                             pertama, lalu tidak pernah terlihat lagi justru ketika ia dibutuhkan.
                         */}
-                        <EnvironmentBanner />
-                        {/*
+                    <EnvironmentBanner />
+                    {/*
                             Peringatan lisensi, bila ada. Spanduk ini sendiri tidak menghalangi
                             apa pun — yang mengunci server, dan pengguna yang terkunci tidak pernah
                             sampai ke kerangka ini.
                         */}
-                        <SiteLicenseBanner />
-                        {/* Tanggal kerja yang bukan hari ini; yang ini boleh ditutup untuk sisa sesi. */}
-                        <WorkDateNotice />
-                        <div className="min-w-0 flex-1 bg-muted/30">
-                            {children}
-                        </div>
+                    <SiteLicenseBanner />
+                    {/* Tanggal kerja yang bukan hari ini; yang ini boleh ditutup untuk sisa sesi. */}
+                    <WorkDateNotice />
+                    <div
+                        scroll-region=""
+                        className="min-h-0 min-w-0 flex-1 overflow-auto bg-muted/30 has-[[data-layout=full-height]]:overflow-hidden"
+                        onScroll={(event) =>
+                            setIsScrolled(event.currentTarget.scrollTop > 8)
+                        }
+                    >
+                        {children}
                     </div>
                 </div>
             </AppContent>

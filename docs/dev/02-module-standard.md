@@ -194,12 +194,14 @@ serta menolak pembaruan versi yang akan melanggar rentang app lain yang bergantu
 padanya. Katalog tidak menerima dependency yang belum terdaftar karena tidak ada
 urutan instalasi yang dapat diverifikasi untuk target yang belum dikenal.
 
-Saat tenant memilih produk, Core menutup seluruh dependency transitif secara
-otomatis: entitlement prerequisite dibuat bersama entitlement produk pilihan dan
-job placement-nya dijadwalkan lebih dulu. Worker juga menahan app turunan sampai
-semua prerequisite `ready` pada placement yang sama. Ini mekanisme teknis; layar
-penjualan harus menerangkan prerequisite sebagai bagian dari paket, bukan meminta
-pembeli mencari atau membeli app teknis satu per satu.
+Dependency katalog tidak membuktikan bahwa prerequisite sudah terpasang pada tenant.
+`InstallModule` memeriksa catatan `core_module_installations` pada tenant yang sama:
+status prerequisite harus `installed`. Pemasangan module yang bergantung padanya
+ditolak bila catatan itu belum ada. Pemeriksaan pemasangan saat ini belum membandingkan
+versi prerequisite yang terpasang; rentang versi diperiksa terhadap katalog saat registrasi.
+Tidak ada job placement atau status `ready` untuk module di dalam runtime Core.
+Layar penjualan tetap menerangkan prerequisite sebagai bagian dari paket, bukan
+meminta pembeli mencari atau membeli module teknis satu per satu.
 
 Contoh manifest utuh yang sudah berjalan ada di module aset: identitas dan menunya di `modules/apperp/management-aset/app.yaml`, daftar berkodenya di folder `manifest/` di sebelahnya. Isinya jauh lebih panjang dari contoh di atas, yang sengaja dipersingkat.
 
@@ -930,19 +932,48 @@ Web Shell memiliki layout bersama agar pengguna tidak berpindah-pindah pola saat
 
 | Area layar | Pemilik | Isi |
 | --- | --- | --- |
-| Pemilih aplikasi di header | Web Shell | Launcher aplikasi: hanya app yang berhak dipakai tenant, tercatat `ready` pada installation registry, dan boleh dibuka user yang aktif. |
+| Pemilih aplikasi di header | Web Shell | Launcher module: hak pemakaian tenant dan izin user diperiksa; pemasangan dibuktikan oleh `core_module_installations` dengan status `installed`. |
 | Rail paling kiri | App aktif | Navigasi utama app, misalnya Dashboard, Organisasi, dan Akses. |
 | Header | Web Shell | Konteks kerja yang dipakai bersama, pencarian, notifikasi, preferensi tampilan, dan menu akun. |
-| Sidebar di kanan rail | App aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan UI artifact melalui host SDK. |
+| Sidebar di kanan rail | Module aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan melalui `ui.navigation` pada manifest. |
 | Konten utama | App aktif | Halaman dan alur bisnis app aktif. |
 
-Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; isi sidebarnya adalah daftar master pada blok `ui.navigation` di `modules/apperp/management-aset/app.yaml`. Setiap entry sidebar membawa `entryPoint` berupa permission `read` master tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah aplikasi melalui header, kedua navigasi tersebut diganti seluruhnya oleh navigasi aplikasi aktif.
+Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; isi sidebarnya adalah daftar master pada blok `ui.navigation` di `modules/apperp/management-aset/app.yaml`. Setiap entry sidebar membawa `permission` untuk membaca layar tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah module melalui header, kedua navigasi tersebut diganti oleh navigasi module aktif.
 
 App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan identitas, route, menu utama pada rail, menu turunan pada sidebar, dan permission entry point-nya. Nama, ikon, urutan, dan label menu berasal dari metadata app/host SDK, bukan daftar app yang di-hardcode di Web Shell.
 
-Kontrak host navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core.
+Navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Command `app:register-manifest` memvalidasi permission menu dan menyimpannya pada katalog Core. Shell menyaring menu menurut izin anggota aktif dan merendernya dengan komponen bersama. UI module berjalan di pohon React Core; tidak ada iframe atau pesan kesiapan antar aplikasi.
+
+Halaman turunan yang tidak menjadi entri sidebar dapat ikut pencarian Shell melalui
+`ui.navigation.search` di `app.yaml`. Setiap deklarasi membawa `id`, `label`, `parent`
+(ID entri sidebar), `path` (ruas URL setelah parent), dan `permission` read milik module.
+Core membentuk URL `/<id module>/<parent>/<path>`; path hanya menerima ruas huruf kecil,
+angka, dan tanda hubung, bukan URL bebas atau parameter record. Parent dan permission
+halaman harus sama-sama dapat dibuka anggota aktif. Deklarasi disimpan pada
+`apps.navigation.search`, lalu dimasukkan hanya ke katalog pencarian; sidebar tetap
+membaca `rail` dan `sidebar`. Contohnya, Penerimaan aset berada di bawah
+`inventarisasi-aset` dengan path `penerimaan`. Setelah deklarasi berubah, daftarkan
+ulang manifest pada runtime dan verifikasi hasil pencarian beserta halaman tujuannya.
 
 **Id entri menu adalah jalur rutenya**: Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu. Module tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
+
+### Scroll pada halaman daftar dan form
+
+Shell menetapkan tinggi viewport dan mempertahankan header serta spanduk di luar area isi. Module tidak mengubah `overflow` pada `html` atau `body`; satu module yang memuat CSS global akan memengaruhi halaman lain setelah navigasi.
+
+Daftar operasional memakai `ListPageLayout` dari `@apperp/ui/list-page-layout`. Komponen ini memiliki slot header, filter, dan footer yang tidak ikut digulir, serta memberikan sisa tinggi kepada tabel. DataTable di dalamnya otomatis memakai mode `viewport`: satu container native menangani scroll vertikal dan horizontal, header kolom memakai `sticky`, dan scrollbar horizontal berada di bawah area yang terlihat. Pengguna tidak perlu menuju baris terakhir untuk menggeser kolom.
+
+```tsx
+<ListPageLayout header={actionBar} filters={filters} footer={pagination}>
+    <DataTable columns={columns} data={rows} getRowKey={(row) => row.id} />
+</ListPageLayout>
+```
+
+Kembalikan layout tersebut sebagai root halaman. Bila module masih memiliki pembungkus `main`, pembungkus itu meneruskan `h-full min-h-0` dan tidak membuat area scroll tambahan. Form/detail memakai scroll isi Shell; tabel kecil di dalam form atau dialog tetap `inline`. Dialog/Sheet ditempatkan sebagai saudara layout daftar, atau tabel di dalam overlay diberi `scrollMode="inline"` secara eksplisit. Card daftar yang sudah membatasi tinggi dapat memilih `scrollMode="viewport"` tanpa memakai layout baru.
+
+Container native memakai atribut `scroll-region` agar Inertia mengelola posisi scroll ketika berpindah halaman. Keadaan header dibaca dari container pemilik scroll, bukan dari `window.scrollY`. Jangan memakai tinggi piksel tetap yang menghitung sendiri tinggi header/filter, scrollbar duplikat yang disinkronkan lewat JavaScript, atau Shift+wheel sebagai satu-satunya jalan untuk menggeser kolom.
+
+Implementasi bersama berada di `packages/ui/src/components/list-page-layout.tsx`, `data-table.tsx`, dan `table.tsx`; batas tinggi Shell berada di `apps/core/resources/js/layouts/app/app-sidebar-layout.tsx`. Contoh pemakaiannya ada di `modules/apperp/management-aset/ui/transactions/inventarisasi-aset/AsetListPage.tsx`.
 
 ## Lifecycle app
 

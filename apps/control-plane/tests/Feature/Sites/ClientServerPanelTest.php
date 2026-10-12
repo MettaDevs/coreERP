@@ -40,6 +40,7 @@ final class ClientServerPanelTest extends SiteTestCase
 
     public function test_the_panel_is_offered_only_for_a_production_on_the_client_server(): void
     {
+        Http::fake([self::CORE_URL.'/api/internal/v1/fleet' => Http::response([])]);
         $operator = $this->operator();
         $clientServer = $this->clientServerEnvironment($this->tenant('PT Klinik Satu'));
         $ours = $this->providerEnvironment($this->tenant('PT Klinik Dua'));
@@ -50,6 +51,7 @@ final class ClientServerPanelTest extends SiteTestCase
                 ->component('environments/show')
                 ->where('environment.hosting', 'client_server')
                 ->where('serverClient.site', null)
+                ->where('installedRelease.version', null)
                 ->where('serverClient.progress.state', 'not_prepared')
                 ->where('serverClient.progress.final', true)
                 // Lingkungan di server klien lahir `provisioning`, dan Core menolak menyiapkannya.
@@ -62,6 +64,24 @@ final class ClientServerPanelTest extends SiteTestCase
             ->assertInertia(fn ($page) => $page
                 ->where('environment.hosting', 'provider')
                 ->where('serverClient', null));
+    }
+
+    public function test_the_installed_release_comes_from_this_client_servers_report(): void
+    {
+        $environment = $this->clientServerEnvironment($this->tenant('PT Uji Versi'));
+        $this->site([
+            'tenant_id' => $environment->tenant_id,
+            'environment_id' => $environment->id,
+            'reported_release' => '0.7.2',
+        ]);
+
+        $this->actingAs($this->operator())->get("/lingkungan/{$environment->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('installedRelease.version', '0.7.2')
+                ->where('installedRelease.error', null));
+
+        Http::assertNothingSent();
     }
 
     public function test_preparing_creates_one_site_named_after_the_tenant_and_audits_it(): void

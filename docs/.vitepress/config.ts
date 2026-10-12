@@ -58,6 +58,7 @@ export default withMermaid({
     'todo/buku-alamat-global/README.md':
       'todo/buku-alamat-global/index.md',
     'todo/analitik/README.md': 'todo/analitik/index.md',
+    'todo/workflow-temporal/README.md': 'todo/workflow-temporal/index.md',
     'todo/master-bersama/README.md': 'todo/master-bersama/index.md',
     'todo/lapis-core/README.md': 'todo/lapis-core/index.md',
   },
@@ -410,6 +411,22 @@ export default withMermaid({
                 { text: 'TODO fase 0–1', link: '/todo/analitik/todo-fase-1' },
                 { text: 'TODO fase 2', link: '/todo/analitik/todo-fase-2' },
                 { text: 'TODO fase 3', link: '/todo/analitik/todo-fase-3' },
+              ],
+            },
+            {
+              text: 'Fondasi proses custom',
+              collapsed: false,
+              items: [
+                { text: 'Peta dan keputusan', link: '/todo/workflow-temporal/' },
+                { text: 'PRD: satu flow aset', link: '/todo/workflow-temporal/prd' },
+                { text: 'Pilot dan pemilihan engine', link: '/todo/workflow-temporal/pemilihan-engine' },
+                { text: 'Riset dan bukti', link: '/todo/workflow-temporal/riset' },
+                { text: 'Fondasi Signavio', link: '/todo/workflow-temporal/fondasi-signavio' },
+                { text: 'Bukti XML trial Signavio', link: '/todo/workflow-temporal/contoh-xml-signavio' },
+                { text: 'Arsitektur', link: '/todo/workflow-temporal/arsitektur' },
+                { text: 'Pemasangan', link: '/todo/workflow-temporal/pemasangan' },
+                { text: 'TODO dan gate', link: '/todo/workflow-temporal/TODO' },
+                { text: 'Verifikasi dan beban', link: '/todo/workflow-temporal/verifikasi' },
               ],
             },
             {

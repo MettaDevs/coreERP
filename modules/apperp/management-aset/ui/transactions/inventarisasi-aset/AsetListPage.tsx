@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/react';
 import { FileSpreadsheet, QrCode } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { RecordFactBox } from '@/components/record-fact-box';
 import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
@@ -19,17 +20,19 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { api, errorMessage } from '../../api';
 import { requestListExport } from '../../listExport';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import type { Aset } from './aset';
 import { LIFECYCLE, bukaAset, bukaAsetUbah, money } from './aset';
+import AssetPicture from './AssetPicture';
 import { printAssetLabels } from './labels';
 import { bukaPenerimaanDaftar, izin } from './penerimaan';
 
 /**
- * Register aset: daftar saja.
+ * Register aset dengan FactBox untuk aset yang dipilih.
  *
  * Menerima dan mengoreksi aset adalah urusan halaman rincian yang punya alamat sendiri,
  * bentuk yang sama dengan work order dan mutasi. Sebelum 18 September 2026 keduanya
@@ -53,6 +56,7 @@ export default function AsetListPage({
     const [sort, setSort] = useState<DataTableSort | null>(null);
     // Aset yang dicentang untuk dicetak labelnya. Tanpa centang, yang dicetak semua yang tampil.
     const [selected, setSelected] = useState<string[]>([]);
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
     const { options: groupOptions } = useMasterOptions('group-aset');
     const { options: typeOptions } = useMasterOptions('jenis-aset');
@@ -105,22 +109,20 @@ export default function AsetListPage({
         );
     }, [aset, search]);
 
+    const activeAsset = visible.find((asset) => asset.id === activeRowId);
+
     const columns: DataTableColumn<Aset>[] = [
-        {
-            id: 'legal_entity',
-            header: 'Perusahaan',
-            cell: (asset) =>
-                legalEntityNames.get(asset.legal_entity_id) ??
-                'Perusahaan tidak dikenal',
-            sortValue: (asset) =>
-                legalEntityNames.get(asset.legal_entity_id) ?? '',
-            width: 220,
-        },
         {
             id: 'kode',
             header: 'Kode aset',
             cell: (aset) => (
-                <span className="text-primary font-medium">{aset.kode}</span>
+                <button
+                    type="button"
+                    className="text-primary font-medium hover:underline"
+                    onClick={() => bukaAset(aset.id)}
+                >
+                    {aset.kode}
+                </button>
             ),
             sortValue: (aset) => aset.kode,
             width: 160,
@@ -131,6 +133,16 @@ export default function AsetListPage({
             cell: (aset) => aset.nama,
             sortValue: (aset) => aset.nama,
             width: 240,
+        },
+        {
+            id: 'legal_entity',
+            header: 'Perusahaan',
+            cell: (asset) =>
+                legalEntityNames.get(asset.legal_entity_id) ??
+                'Perusahaan tidak dikenal',
+            sortValue: (asset) =>
+                legalEntityNames.get(asset.legal_entity_id) ?? '',
+            width: 220,
         },
         {
             id: 'serial',
@@ -233,66 +245,85 @@ export default function AsetListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Inventarisasi aset">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={exportList}
-                    disabled={memuat}
-                    title="Ekspor semua aset yang cocok dengan pencarian, dengan kolom dan urutan seperti di layar"
-                >
-                    <FileSpreadsheet />
-                    Ekspor ke Excel
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={printLabels}
-                    disabled={memuat || !visible.length}
-                    title={
-                        selected.length
-                            ? 'Cetak label berkode QR untuk aset yang dicentang'
-                            : 'Cetak label berkode QR untuk semua aset yang tampil. Centang aset untuk mencetak sebagian saja.'
-                    }
-                >
-                    <QrCode />
-                    {selected.length
-                        ? `Cetak label (${selected.length})`
-                        : 'Cetak label'}
-                </Button>
-                {/*
-                 * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
-                 * 2026 — juga yang datang satuan, yang menjadi dokumen berbaris satu.
-                 */}
-                {izin(permissions)('read') && (
-                    <ActionButton
-                        action="create"
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Inventarisasi aset">
+                    <Button
                         type="button"
-                        onClick={bukaPenerimaanDaftar}
+                        variant="outline"
+                        onClick={exportList}
+                        disabled={memuat}
+                        title="Ekspor semua aset yang cocok dengan pencarian, dengan kolom dan urutan seperti di layar"
                     >
-                        Penerimaan aset
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                <p className="text-muted-foreground text-sm">
-                    {visible.length} aset ditampilkan
-                    {selected.length ? `, ${selected.length} dicentang` : ''}
-                </p>
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Kode, nama, atau nomor seri"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
+                        <FileSpreadsheet />
+                        Ekspor ke Excel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={printLabels}
+                        disabled={memuat || !visible.length}
+                        title={
+                            selected.length
+                                ? 'Cetak label berkode QR untuk aset yang dicentang'
+                                : 'Cetak label berkode QR untuk semua aset yang tampil. Centang aset untuk mencetak sebagian saja.'
+                        }
+                    >
+                        <QrCode />
+                        {selected.length
+                            ? `Cetak label (${selected.length})`
+                            : 'Cetak label'}
+                    </Button>
+                    {/*
+                     * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
+                     * 2026 — juga yang datang satuan, yang menjadi dokumen berbaris satu.
+                     */}
+                    {izin(permissions)('read') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaPenerimaanDaftar}
+                        >
+                            Penerimaan aset
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                    <p className="text-muted-foreground text-sm">
+                        {visible.length} aset ditampilkan
+                        {selected.length
+                            ? `, ${selected.length} dicentang`
+                            : ''}
+                    </p>
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Kode, nama, atau nomor seri"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
                 </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-auto">
+            }
+        >
+            <RecordFactBox
+                fillHeight
+                className="px-5 pb-3"
+                recordType="aset_tr_aset"
+                recordId={activeAsset?.id}
+                details={
+                    activeAsset ? (
+                        <AssetPicture assetId={activeAsset.id} />
+                    ) : (
+                        <p className="text-muted-foreground text-sm">
+                            Pilih aset untuk melihat fotonya.
+                        </p>
+                    )
+                }
+            >
                 {!memuat && !visible.length ? (
                     <Empty>
                         <EmptyHeader>
@@ -318,11 +349,19 @@ export default function AsetListPage({
                         onSortChange={setSort}
                         selection={{
                             selectedKeys: selected,
-                            onSelectedKeysChange: (keys) =>
-                                setSelected(keys.map(String)),
+                            onSelectedKeysChange: (keys) => {
+                                const ids = keys.map(String);
+                                setSelected(ids);
+                                setActiveRowId(ids.at(-1) ?? null);
+                            },
                         }}
                         actions={rowActions}
-                        onRowClick={(aset) => bukaAset(aset.id)}
+                        activeRowKey={activeAsset?.id}
+                        rowActivation="single-click"
+                        onRowClick={(asset) => {
+                            setSelected([asset.id]);
+                            setActiveRowId(asset.id);
+                        }}
                         onRowAction={(action, aset) => {
                             if (action === 'detail') {
                                 bukaAset(aset.id);
@@ -345,7 +384,7 @@ export default function AsetListPage({
                         }}
                     />
                 )}
-            </div>
-        </div>
+            </RecordFactBox>
+        </ListPageLayout>
     );
 }

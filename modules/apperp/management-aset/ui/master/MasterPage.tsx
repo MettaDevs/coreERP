@@ -445,12 +445,12 @@ export default function MasterPage({
     }
 
     return (
-        <div>
+        <div className="h-full min-h-0 overflow-hidden">
             <Card
                 aria-labelledby="list-title"
-                className="min-h-full rounded-none border-0 shadow-none"
+                className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
             >
-                <CardHeader className="min-h-0 border-b px-5 py-3">
+                <CardHeader className="min-h-0 shrink-0 border-b px-5 py-3">
                     <CardTitle id="list-title" className="text-base">
                         {config.title}
                     </CardTitle>
@@ -463,8 +463,8 @@ export default function MasterPage({
                     )}
                 </CardHeader>
 
-                <CardContent className="px-0">
-                    <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                <CardContent className="flex min-h-0 flex-1 flex-col px-0">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
                         <div className="space-y-1">
                             <p className="font-semibold">
                                 Daftar {config.singular}
@@ -567,7 +567,7 @@ export default function MasterPage({
                         </div>
                     </div>
                     {selectedIds.length > 0 && (
-                        <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 border-b px-5 py-2 text-sm">
+                        <div className="bg-muted/40 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-2 text-sm">
                             <span>{selectedIds.length} data dipilih</span>
                             <div className="flex gap-2">
                                 {can('update') && (
@@ -623,6 +623,8 @@ export default function MasterPage({
                         </Empty>
                     ) : (
                         <DataTable
+                            scrollMode="viewport"
+                            className="min-h-0 flex-1"
                             columns={columns}
                             data={items}
                             getRowKey={(item) => item.id}
@@ -646,7 +648,7 @@ export default function MasterPage({
                 </CardContent>
                 {meta.last_page > 1 && (
                     <CardFooter
-                        className="text-muted-foreground justify-end gap-3 border-t text-sm"
+                        className="text-muted-foreground shrink-0 justify-end gap-3 border-t text-sm"
                         aria-label={`Halaman daftar ${config.singular}`}
                     >
                         <Button

@@ -4,6 +4,7 @@ namespace Tests\Feature\Platform\Attachments;
 
 use App\Platform\Access\Models\Role;
 use App\Platform\Attachments\Models\DocumentAttachment;
+use App\Platform\Attachments\Models\DocumentNote;
 use App\Platform\Attachments\Support\AttachmentContentMismatch;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
@@ -28,6 +29,38 @@ class DocumentAttachmentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_notes_follow_record_rights_tenant_and_version_and_archive_softly(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/notes';
+        $this->actingAs($this->owner)->postJson($path, ['content' => ' '])->assertUnprocessable();
+        $note = $this->postJson($path, ['content' => 'Periksa kondisi sebelum digunakan.'])
+            ->assertCreated()->json('data');
+        $this->getJson($path)->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.created_by_name', $this->owner->name);
+        $reader = $this->anggota(['core.vendor.inquire']);
+        $this->actingAs($reader)->getJson($path)->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->postJson($path, ['content' => 'Tidak boleh'])->assertForbidden();
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Tidak boleh', 'version' => $note['version']])->assertForbidden();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertForbidden();
+
+        $otherOwner = $this->pemilik('notes@other.test', 'Tenant catatan lain');
+        $this->actingAs($otherOwner)->getJson($path)->assertNotFound();
+        $this->postJson($path, ['content' => 'Tidak boleh'])->assertNotFound();
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Tidak boleh', 'version' => $note['version']])->assertNotFound();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertNotFound();
+        $otherVendor = $this->vendor($this->owner, 'Perusahaan lain untuk catatan', 'NOTE');
+        $this->actingAs($this->owner)->deleteJson('/api/v1/records/vendors/'.$otherVendor.'/notes/'.$note['id'], ['version' => $note['version']])->assertNotFound();
+
+        $updated = $this->patchJson($path.'/'.$note['id'], ['content' => 'Sudah diperiksa.', 'version' => $note['version']])
+            ->assertOk()->json('data');
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Data basi', 'version' => $note['version']])->assertConflict();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertConflict();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $updated['version']])->assertNoContent();
+        $this->getJson($path)->assertOk()->assertJsonCount(0, 'data');
+        $this->assertDatabaseHas('document_notes', ['id' => $note['id'], 'content' => 'Sudah diperiksa.']);
+        $this->assertNotNull(DocumentNote::withTrashed()->findOrFail($note['id'])->deleted_at);
+    }
+
     private const PDF = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
 
     private User $owner;
@@ -45,6 +78,62 @@ class DocumentAttachmentTest extends TestCase
         $this->owner = $this->pemilik('owner@metta.test', 'PT Metta');
         $this->tenantId = $this->owner->activeMembership()->tenant_id;
         $this->vendorId = $this->vendor($this->owner, 'PT Metta Sehat', 'META');
+    }
+
+    public function test_pictures_accumulate_separately_from_documents_and_archive_individually(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/pictures';
+        $this->actingAs($this->owner)->getJson($path)->assertOk()->assertJsonCount(0, 'data');
+        $first = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('first.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $second = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('second.jpg')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $this->actingAs($this->owner)->getJson($path)->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $first)->assertJsonPath('data.1.id', $second);
+        $this->actingAs($this->owner)->getJson($this->daftar($this->vendorId))->assertOk()->assertJsonCount(0, 'data');
+        $old = DocumentAttachment::withTrashed()->findOrFail($first);
+        $this->assertNull($old->deleted_at);
+        Storage::disk('s3')->assertExists($old->storage_path);
+        $this->get('/api/v1/attachments/'.$first.'/download')->assertOk();
+        $this->get('/api/v1/attachments/'.$second.'/download')->assertOk();
+        $this->deleteJson('/api/v1/attachments/'.$second, ['version' => 1])->assertNoContent();
+        $this->getJson($path)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $first);
+        $this->get('/api/v1/attachments/'.$first.'/download')->assertOk();
+    }
+
+    public function test_picture_requires_record_rights_and_rejects_documents(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/pictures';
+        $this->actingAs($this->owner)->post($path, ['file' => $this->pdf('document.pdf')], ['Accept' => 'application/json'])->assertUnprocessable();
+        $reader = $this->anggota(['core.vendor.inquire']);
+        $this->actingAs($reader)->getJson($path)->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])->assertForbidden();
+        $unauthorized = $this->anggota([]);
+        $this->actingAs($unauthorized)->getJson($path)->assertNotFound();
+        $this->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])->assertNotFound();
+    }
+
+    public function test_picture_does_not_leak_between_tenants(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/pictures';
+        $picture = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        // Tenant baru dibuat lewat fixture yang sama dengan pengujian lampiran.
+        $otherOwner = $this->pemilik('picture-other-owner@example.test', Str::random(12));
+        $this->actingAs($otherOwner)->getJson($path)->assertNotFound();
+        $this->get('/api/v1/attachments/'.$picture.'/download')->assertNotFound();
+        $this->post($path, ['file' => UploadedFile::fake()->image('other.png')], ['Accept' => 'application/json'])->assertNotFound();
+        $this->deleteJson('/api/v1/attachments/'.$picture, ['version' => 1])->assertNotFound();
+    }
+
+    public function test_database_allows_multiple_active_pictures_for_the_same_record(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/pictures';
+        $id = $this->actingAs($this->owner)->post($path, ['file' => UploadedFile::fake()->image('photo.png')], ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $duplicate = DocumentAttachment::query()->findOrFail($id)->replicate();
+        $duplicate->save();
+        $this->assertSame(2, DocumentAttachment::query()->where('kind', 'picture')->where('record_id', $this->vendorId)->count());
     }
 
     public function test_lampiran_vendor_diunggah_didaftar_dan_diunduh_utuh(): void

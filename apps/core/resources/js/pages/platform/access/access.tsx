@@ -1619,6 +1619,7 @@ function InviteForm({
                             getRowKey={(code) => code.key}
                             getRowLabel={() => 'kode undangan'}
                             activeRowKey={activeKey ?? undefined}
+                            rowActivation="single-click"
                             onRowClick={(code) => setActiveKey(code.key)}
                             actions={[
                                 { id: 'duplicate', label: 'Duplikat baris' },

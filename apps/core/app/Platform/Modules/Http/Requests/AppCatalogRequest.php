@@ -60,6 +60,12 @@ class AppCatalogRequest extends FormRequest
             'navigation.sidebar.*.*.id' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'navigation.sidebar.*.*.label' => ['required', 'string', 'max:100'],
             'navigation.sidebar.*.*.permission' => ['required', 'string', 'max:160'],
+            'navigation.search' => ['nullable', 'array'],
+            'navigation.search.*.id' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
+            'navigation.search.*.label' => ['required', 'string', 'max:100'],
+            'navigation.search.*.parent' => ['required', 'string', 'max:80'],
+            'navigation.search.*.path' => ['required', 'string', 'max:160', 'regex:/^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/'],
+            'navigation.search.*.permission' => ['required', 'string', 'max:160'],
             'repository_url' => ['nullable', 'url', 'max:2048', 'starts_with:https://'],
             'contract_url' => ['nullable', 'url', 'max:2048', 'starts_with:https://'],
 
@@ -243,6 +249,19 @@ class AppCatalogRequest extends FormRequest
                 $validator->errors()->add('navigation.sidebar', 'ID menu app tidak boleh duplikat.');
             }
 
+            foreach ($this->collect('navigation.search') as $page) {
+                if (! in_array($page['parent'] ?? null, $navigationItemIds, true)) {
+                    $validator->errors()->add('navigation.search', 'Halaman pencarian harus berada di bawah menu yang sudah dideklarasikan.');
+                }
+                if (! in_array($page['permission'] ?? null, $readPermissions, true)) {
+                    $validator->errors()->add('navigation.search', 'Halaman pencarian harus memakai permission read milik app yang sama.');
+                }
+            }
+            $searchIds = $this->collect('navigation.search')->pluck('id')->all();
+            if (count($searchIds) !== count(array_unique($searchIds)) || array_intersect($searchIds, $navigationItemIds) !== []) {
+                $validator->errors()->add('navigation.search', 'ID halaman pencarian tidak boleh duplikat dengan halaman atau menu lain.');
+            }
+
             $referenceCodes = $this->collect('number_sequences.references')->pluck('code')->all();
             if (count($referenceCodes) !== count(array_unique($referenceCodes))) {
                 $validator->errors()->add('number_sequences.references', 'Kode reference nomor tidak boleh duplikat.');
@@ -362,7 +381,7 @@ class AppCatalogRequest extends FormRequest
             ->all();
     }
 
-    /** @return array{rail:list<array{id:string,label:string}>,sidebar:array<string,list<array{id:string,label:string,permission:string}>>}|null */
+    /** @return array{rail:list<array{id:string,label:string}>,sidebar:array<string,list<array{id:string,label:string,permission:string}>>,search:list<array{id:string,label:string,parent:string,path:string,permission:string}>}|null */
     private function navigationPayload(): ?array
     {
         if (! $this->has('navigation')) {
@@ -384,6 +403,13 @@ class AppCatalogRequest extends FormRequest
                 'label' => (string) $item['label'],
             ])->all()),
             'sidebar' => $sidebar,
+            'search' => array_values($this->collect('navigation.search')->map(fn (array $page): array => [
+                'id' => (string) $page['id'],
+                'label' => (string) $page['label'],
+                'parent' => (string) $page['parent'],
+                'path' => (string) $page['path'],
+                'permission' => (string) $page['permission'],
+            ])->all()),
         ];
     }
 

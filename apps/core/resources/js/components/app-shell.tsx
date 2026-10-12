@@ -20,7 +20,13 @@ export function AppShell({ children, variant = 'sidebar' }: Props) {
     return (
         <SidebarProvider
             defaultOpen={isOpen}
-            style={{ '--sidebar-width': '20rem' } as React.CSSProperties}
+            className="h-svh min-h-0 min-w-[320px] overflow-hidden"
+            style={
+                {
+                    '--sidebar-width': '16rem',
+                    '--sidebar-width-icon': '4.5rem',
+                } as React.CSSProperties
+            }
         >
             {children}
         </SidebarProvider>

@@ -34,6 +34,7 @@ final class FleetFromCore
     /**
      * @return array{
      *     platform_fingerprint: string,
+     *     platform_release: ?string,
      *     counts: array{current: int, behind: int, failed: int, unknown: int},
      *     environments: list<array<string, mixed>>
      * }
@@ -68,6 +69,9 @@ final class FleetFromCore
         $rows = $this->rows($payload['environments'] ?? null);
 
         return [
+            'platform_release' => is_string($payload['platform_release'] ?? null) && $payload['platform_release'] !== ''
+                ? $payload['platform_release']
+                : null,
             'platform_fingerprint' => is_string($payload['platform_fingerprint'] ?? null)
                 ? $payload['platform_fingerprint']
                 : '—',

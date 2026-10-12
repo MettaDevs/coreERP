@@ -6,6 +6,26 @@ Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management
 
 Register aset adalah **catatan satu barang fisik milik perusahaan**, sejak diterima sampai dilepas. Satu baris di sini mewakili satu benda nyata: satu mesin, satu mobil, satu laptop. Bukan stok, bukan kuantitas agregat — kalau perusahaan membeli sepuluh laptop yang sama, ada sepuluh baris record.
 
+## FactBox dan catatan record
+
+Daftar inventarisasi mempunyai record aktif yang terpisah dari pilihan banyak untuk cetak label.
+Klik baris memilih satu aset dan memperbarui FactBox tanpa berpindah halaman; kode aset dan tindakan
+**Buka rincian** membuka halaman record. Tidak ada aset aktif saat daftar pertama kali dimuat.
+Foto, lampiran, dan catatan dibaca berdasarkan ID aset aktif, bukan kode bisnisnya.
+
+Tab Lampiran pada daftar dan rincian memuat berkas serta catatan teks, mengikuti
+[Notes pada FactBox Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-how-add-link-to-record).
+Catatan disimpan Core di `document_notes`, dengan `tenant_id`, `record_type`, `record_id`, `content`,
+klasifikasi data induk, penulis, waktu, dan versi baris. Catatan tidak mengubah keterangan pada aset.
+Hak baca dan ubah mengikuti `AttachmentRecordType` induk; record di luar tenant atau hak organisasi
+tetap dijawab 404. Arsip mengisi `deleted_at`, dan edit maupun arsip memerlukan versi terbaru.
+Catatan tidak memerlukan nomor dokumen atau workflow sendiri.
+
+Endpoint sesi Shell berada di `/api/v1/records/{recordType}/{recordId}/notes`: GET untuk daftar,
+POST untuk menambah, serta PATCH/DELETE pada `/{note}` untuk mengubah atau mengarsipkan.
+Implementasinya ada pada `AttachmentController`, `DocumentNote`, dan `record-notes.tsx` di Core;
+regresi hak akses, tenant, versi, dan arsip ada pada `DocumentAttachmentTest`.
+
 ## Nomor dan penelusuran antarperusahaan
 
 Nomor penerimaan (`management-aset.penerimaan-aset`) dan nomor aset (`management-aset.aset`)
@@ -383,6 +403,60 @@ Label yang ditempel pada barang, lalu dipindai saat stock opname. Padanannya lap
 | Batas | 240 label (10 lembar) sekali cetak; lebih dari itu ditolak dengan pesan, juga di layar sebelum tab terbuka |
 | `ids` tanpa id sah | Tidak pernah jatuh menjadi "semua aset" |
 
+## Lampiran aset
+
+Lampiran adalah berkas pendukung satu record aset, seperti foto kondisi atau dokumen pembelian.
+Galeri foto untuk mengenali barang terpisah dari daftar lampiran. **Satu aset dapat memiliki beberapa
+gambar**, dan setiap upload menambah foto tanpa menimpa foto sebelumnya. Polanya mengadaptasi
+[MediaSet pada record Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-working-with-media-on-records).
+
+Halaman rincian memasok isi tab **Detail** melalui slot `details` pada `RecordFactBox`. Untuk aset,
+isinya komponen `AssetPicture`, yang menampilkan galeri lewat `RecordPictures` Core.
+Halaman lain bebas memasok isi yang berbeda; FactBox SDK tidak mengandung aturan aset, vendor,
+atau isi bisnis lain. SDK mengatur tab Detail/Lampiran, collapse–expand, dan layout pendamping.
+Lebar panel dapat diubah melalui pembatas pada desktop, dengan pointer maupun tombol panah;
+form utama tetap terpasang agar perubahan ukuran tidak membuang isian. Tombol perlebar memakai
+ruang yang tersedia tanpa menutupi form utama. Pada layar sempit panel ditumpuk di bawah form.
+
+Tab **Lampiran** memakai panel `RecordAttachments` milik Core, dengan jenis record `aset_tr_aset`.
+Panel memakai endpoint sesi Core, bukan endpoint baru di module. Daftar dan batas upload dibaca
+dari respons layanan; hak membaca dan mengubah tetap diperiksa `AssetAttachments`, termasuk
+kebijakan organisasi record induk. Upload dan arsip dapat dilakukan dari mode baca halaman
+bila pengguna punya hak mengubah aset. Pengarsipan membawa versi lampiran yang sedang dibuka.
+
+Gambar JPEG/PNG dibuka dari endpoint download yang sama, sehingga pemeriksaan hak dan
+hash berkas tetap berlaku. Preview memakai URL blob sementara yang dilepas saat dialog ditutup;
+PDF, Word, dan Excel diunduh untuk dibuka di perangkat pengguna. Kegagalan upload, preview, download,
+atau arsip tetap terlihat. Catatan teks langsung belum menjadi bagian panel ini.
+
+Galeri memakai `GET` dan `POST /api/v1/records/{tabel}/{id}/pictures`. Berkasnya tetap disimpan
+layanan Core pada `document_attachments`, dengan `kind = picture`; daftar lampiran hanya membaca
+`kind = document`. Hak dan klasifikasi mengikuti record yang sama, tanpa permission baru. Tidak
+ada batas satu foto per record: migration melepas indeks unik tunggal dari rilis 0.15.0 tanpa
+mengubah atau menghapus foto yang sudah tersimpan. Upload yang bersamaan menambah baris terpisah
+dan tidak mengarsipkan foto lainnya. Galeri diurutkan menurut waktu upload lalu id. Pengarsipan
+memakai endpoint arsip berkas yang sama dan membawa id serta versi foto yang dipilih; foto lain
+tetap aktif. Foto yang sudah diarsipkan tidak dipulihkan otomatis.
+
+Foto hanya menerima JPG/JPEG/PNG, dengan batas ukuran dari konfigurasi lampiran Core. Foto lama
+beserta berkasnya tetap tersimpan. Foto tidak mempunyai nomor baris dokumen dan tidak
+menambah jumlah pada tab Lampiran. Metadata lampiran dimuat ketika panel terbuka agar angka di
+tab sesuai daftar; isi berkas baru diambil saat preview atau download.
+
+Foto dan dokumen memakai `RecordUploadDialog` Core yang sama, dengan drag-and-drop atau pemilih
+berkas lokal. Keduanya menerima beberapa berkas sekaligus lalu mengunggahnya satu per satu.
+Ekstensi dan ukuran ditampilkan pada daftar, galeri, dan preview. Batas ukuran dan jenis berkas
+tetap berasal dari metadata endpoint, dan server tetap memvalidasi isi berkas.
+
+`apiUpload` memakai XHR supaya progres berasal dari transfer multipart sebenarnya, dengan sesi,
+CSRF, dan `CoreApiError` yang sama seperti klien fetch. Progres transfer dibedakan dari keberhasilan
+penyimpanan: berkas baru dihitung selesai setelah server menjawab sukses. Menghentikan antrean
+menyelesaikan permintaan aktif lalu melewati sisanya, sehingga tidak ada jawaban upload yang
+dibuang hanya karena pengguna menekan berhenti. Jika upload gagal di tengah, berkas yang sudah
+berhasil tetap tampil dan pesan menyebut jumlahnya; sisanya dapat dipilih kembali. Preview foto
+dapat berpindah ke foto sebelumnya atau berikutnya. Pemeriksaan klien upload ada pada
+`apps/core/scripts/test-core-api.mjs` dan berjalan dalam CI.
+
 ## Aturan yang dijaga, dan alasannya
 
 **Group tidak bisa diganti setelah aset dibuat.** Buku penyusutan sudah terbentuk dari matriks group × buku saat penerimaan. Mengganti group berarti bukunya salah tanpa ada yang menyadari. Permintaan yang mencoba mengubahnya ditolak dengan pesan yang menjelaskan alasannya.
@@ -438,6 +512,12 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | `resources/views/asset-labels.blade.php` | Tata letak lembar label A4 |
 | `ui/transactions/inventarisasi-aset/labels.ts` | Tombol Cetak label di daftar dan rincian aset |
 | `ui/transactions/inventarisasi-aset/AcquisitionAdjustmentPreview.tsx` | Pratinjau dan alasan koreksi nilai di detail aset |
+| `ui/transactions/inventarisasi-aset/AsetDetailPage.tsx` | Rincian aset dan pemasangan FactBox Core |
+| `ui/transactions/inventarisasi-aset/AssetPicture.tsx` | Isi tab Detail yang ditentukan halaman aset |
+| `packages/ui/src/components/fact-box.tsx` (dari akar repo) | Wadah, tab, collapse–expand, dan layout bersama |
+| `apps/core/resources/js/components/record-fact-box.tsx` (dari akar repo) | Penghubung FactBox dengan lampiran Core |
+| `apps/core/resources/js/components/record-pictures.tsx` (dari akar repo) | Upload beberapa foto, galeri, preview, dan arsip per foto |
+| `apps/core/resources/js/components/record-attachments.tsx` (dari akar repo) | Panel lampiran bersama, preview, download, dan arsip |
 | `src/Http/Controllers/transaksi/MutasiAset/MutasiAsetController.php` | Dokumen mutasi dan penyelesaian serah terima |
 | `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
 | `src/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |

@@ -83,6 +83,8 @@ final class FleetController extends Controller
 
         return response()->json([
             'platform_fingerprint' => $platform,
+            // Pemasang mengirim nomor rilis image yang sedang berjalan melalui SENTRY_RELEASE.
+            'platform_release' => $this->platformRelease(),
             'counts' => $counts,
             'environments' => $rows,
         ]);
@@ -281,6 +283,15 @@ final class FleetController extends Controller
         sort($names);
 
         return (string) end($names);
+    }
+
+    private function platformRelease(): ?string
+    {
+        $release = config('sentry.release');
+
+        return is_string($release) && preg_match('/^coreerp@([0-9]+\.[0-9]+\.[0-9]+)$/', $release, $matches) === 1
+            ? $matches[1]
+            : null;
     }
 
     private function fingerprintOf(string $connection): ?string

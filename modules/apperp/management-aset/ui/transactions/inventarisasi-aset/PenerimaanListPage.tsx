@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -200,71 +201,75 @@ export default function PenerimaanListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Penerimaan aset">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={bukaPenerimaanBaru}
-                    >
-                        Catat penerimaan
-                    </ActionButton>
-                )}
-                {can('create') && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setImpor(true)}
-                    >
-                        Impor saldo awal
-                    </Button>
-                )}
-                <Button type="button" variant="outline" onClick={bukaDaftar}>
-                    Register aset
-                </Button>
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor penerimaan, lokasi, atau unit"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-52">
-                    <Select
-                        label="Status"
-                        items={PILIHAN_STATUS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_STATUS.find(
-                                (pilihan) => pilihan.value === status,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) =>
-                            setStatus(
-                                PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? '',
-                            )
-                        }
-                    />
-                </div>
-            </div>
-
-            {impor && (
-                <ImporSaldoAwal
-                    context={context}
-                    onClose={() => setImpor(false)}
-                    onApplied={() => setPutaran((nilai) => nilai + 1)}
-                />
-            )}
-
-            <div className="min-h-0 flex-1 overflow-auto">
+        <>
+            <ListPageLayout
+                header={
+                    <RecordActionBar title="Penerimaan aset">
+                        {can('create') && (
+                            <ActionButton
+                                action="create"
+                                type="button"
+                                onClick={bukaPenerimaanBaru}
+                            >
+                                Catat penerimaan
+                            </ActionButton>
+                        )}
+                        {can('create') && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setImpor(true)}
+                            >
+                                Impor saldo awal
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={bukaDaftar}
+                        >
+                            Register aset
+                        </Button>
+                    </RecordActionBar>
+                }
+                filters={
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
+                        <div className="w-full sm:w-72">
+                            <Input
+                                label="Cari"
+                                type="search"
+                                placeholder="Nomor penerimaan, lokasi, atau unit"
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="w-full sm:w-52">
+                            <Select
+                                label="Status"
+                                items={PILIHAN_STATUS.map(
+                                    (pilihan) => pilihan.label,
+                                )}
+                                value={
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.value === status,
+                                    )?.label ?? null
+                                }
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) =>
+                                    setStatus(
+                                        PILIHAN_STATUS.find(
+                                            (pilihan) =>
+                                                pilihan.label === value,
+                                        )?.value ?? '',
+                                    )
+                                }
+                            />
+                        </div>
+                    </div>
+                }
+            >
                 {!memuat && !terlihat.length ? (
                     <Empty>
                         <EmptyHeader>
@@ -305,7 +310,14 @@ export default function PenerimaanListPage({
                         }}
                     />
                 )}
-            </div>
-        </div>
+            </ListPageLayout>
+            {impor && (
+                <ImporSaldoAwal
+                    context={context}
+                    onClose={() => setImpor(false)}
+                    onApplied={() => setPutaran((nilai) => nilai + 1)}
+                />
+            )}
+        </>
     );
 }

@@ -7,6 +7,7 @@ namespace App\Platform\Attachments\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Platform\Attachments\Http\Middleware\ResolveAttachmentContext;
 use App\Platform\Attachments\Models\DocumentAttachment;
+use App\Platform\Attachments\Models\DocumentNote;
 use App\Platform\Attachments\Support\AttachmentContentMismatch;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordType;
@@ -39,6 +40,82 @@ use Throwable;
  */
 final class AttachmentController extends Controller
 {
+    public function notes(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $notes = DocumentNote::query()->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())->where('record_id', $recordId)
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+        $names = $this->userNames($notes);
+
+        return response()->json([
+            'data' => $notes->map(fn (DocumentNote $note): array => $this->presentNote($note, $names))->values(),
+            'meta' => ['can_change' => $type->canChange($tenantId, $recordId)],
+        ]);
+    }
+
+    public function storeNote(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi tidak dapat menambah catatan.');
+        $data = $request->validate(['content' => ['required', 'string', 'max:10000']], [
+            'content.required' => 'Isi catatan terlebih dahulu.',
+            'content.max' => 'Catatan paling panjang 10.000 karakter.',
+        ]);
+        $note = DocumentNote::create([
+            'tenant_id' => $tenantId, 'record_type' => $type->recordType(), 'record_id' => $recordId,
+            'content' => $data['content'], 'data_class' => $type->dataClass()->value,
+        ])->refresh();
+
+        return response()->json(['data' => $this->presentNote($note, $this->userNames(collect([$note])))], 201);
+    }
+
+    public function updateNote(Request $request, string $recordType, string $recordId, string $note): JsonResponse
+    {
+        return $this->changeNote($request, $recordId, $note, false);
+    }
+
+    public function destroyNote(Request $request, string $recordType, string $recordId, string $note): JsonResponse
+    {
+        return $this->changeNote($request, $recordId, $note, true);
+    }
+
+    private function changeNote(Request $request, string $recordId, string $noteId, bool $archive): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $query = DocumentNote::query()->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())->where('record_id', $recordId)->whereKey($noteId);
+        $note = (clone $query)->firstOrFail();
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah catatan pada data ini.');
+        $version = RowVersion::expected($request);
+        $data = $archive ? ['deleted_at' => now()] : $request->validate([
+            'content' => ['required', 'string', 'max:10000'],
+        ], ['content.required' => 'Isi catatan terlebih dahulu.', 'content.max' => 'Catatan paling panjang 10.000 karakter.']);
+        DB::transaction(function () use ($query, $version, $data): void {
+            RowVersion::claim($query, $version);
+            (clone $query)->update([...$data, 'updated_at' => now()]);
+        });
+
+        return $archive ? response()->json(status: 204)
+            : response()->json(['data' => $this->presentNote($note->refresh(), $this->userNames(collect([$note])))]);
+    }
+
+    /** @param array<int, string> $names */
+    private function presentNote(DocumentNote $note, array $names): array
+    {
+        return [
+            'id' => $note->id, 'content' => $note->content, 'version' => $note->version,
+            'created_by_name' => $names[$note->created_by_user_id] ?? null,
+            'created_at' => $note->created_at?->toIso8601String(),
+        ];
+    }
+
     public function index(Request $request, string $recordType, string $recordId): JsonResponse
     {
         $tenantId = $this->currentMembership($request)->tenant_id;
@@ -49,6 +126,7 @@ final class AttachmentController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('record_type', $type->recordType())
             ->where('record_id', $recordId)
+            ->where('kind', 'document')
             ->orderByRaw('line_number nulls first')
             ->orderBy('created_at')
             ->orderBy('id')
@@ -98,6 +176,57 @@ final class AttachmentController extends Controller
         $attachment = $this->save($tenantId, $type, $recordId, $lineNumber, $file);
 
         return response()->json(['data' => $this->present($attachment, $this->userNames(collect([$attachment])))], 201);
+    }
+
+    public function pictures(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $pictures = DocumentAttachment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())
+            ->where('record_id', $recordId)
+            ->where('kind', 'picture')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+        $names = $this->userNames($pictures);
+
+        return response()->json([
+            'data' => $pictures->map(fn (DocumentAttachment $picture): array => $this->present($picture, $names))->values(),
+            'meta' => [
+                'can_change' => $type->canChange($tenantId, $recordId),
+                'max_kb' => $this->maxKb(),
+                'extensions' => ['jpg', 'jpeg', 'png'],
+            ],
+        ]);
+    }
+
+    public function storePicture(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi belum dapat menambah foto.');
+        $request->validate([
+            'file' => ['required', 'file', 'image', 'max:'.$this->maxKb(), 'extensions:jpg,jpeg,png', 'mimes:jpg,jpeg,png'],
+            'line_number' => ['prohibited'],
+        ], [
+            'file.required' => 'Pilih foto yang akan diunggah.',
+            'file.file' => 'Foto gagal terunggah. Coba lagi.',
+            'file.uploaded' => 'Foto gagal terunggah. Coba lagi, atau pilih foto yang lebih kecil.',
+            'file.image' => 'Pilih foto JPG, JPEG, atau PNG.',
+            'file.max' => 'Foto terlalu besar. Ukuran paling besar '.$this->maxKb().' KB.',
+            'file.extensions' => 'Pilih foto JPG, JPEG, atau PNG.',
+            'file.mimes' => 'Isi foto tidak sesuai dengan jenisnya. Pilih foto JPG, JPEG, atau PNG.',
+            'line_number.prohibited' => 'Foto menempel pada data ini, bukan pada baris dokumennya.',
+        ]);
+        /** @var UploadedFile $file */
+        $file = $request->file('file');
+        $picture = $this->save($tenantId, $type, $recordId, null, $file, 'picture');
+
+        return response()->json(['data' => $this->present($picture, $this->userNames(collect([$picture])))], 201);
     }
 
     public function download(Request $request, string $attachment): Response
@@ -154,7 +283,7 @@ final class AttachmentController extends Controller
      * Berkas ditulis lebih dulu, baru barisnya. Baris yang gagal disimpan membuang berkasnya lagi, supaya tidak
      * ada berkas tanpa baris; yang dibuang berkas yang belum pernah menjadi lampiran siapa pun.
      */
-    private function save(string $tenantId, AttachmentRecordType $type, string $recordId, ?int $lineNumber, UploadedFile $file): DocumentAttachment
+    private function save(string $tenantId, AttachmentRecordType $type, string $recordId, ?int $lineNumber, UploadedFile $file, string $kind = 'document'): DocumentAttachment
     {
         $id = (string) Str::ulid();
         $path = 'attachments/'.$tenantId.'/'.$id;
@@ -175,20 +304,25 @@ final class AttachmentController extends Controller
         }
 
         try {
-            $attachment = new DocumentAttachment;
-            $attachment->forceFill([
-                'id' => $id,
-                'tenant_id' => $tenantId,
-                'record_type' => $type->recordType(),
-                'record_id' => $recordId,
-                'line_number' => $lineNumber,
-                'file_name' => $this->fileName($file->getClientOriginalName()),
-                'mime_type' => Str::limit((string) $file->getMimeType(), 150, ''),
-                'size_bytes' => (int) $file->getSize(),
-                'storage_path' => $path,
-                'content_hash' => $hash,
-                'data_class' => $type->dataClass()->value,
-            ])->save();
+            $attachment = DB::transaction(function () use ($id, $tenantId, $type, $recordId, $lineNumber, $file, $path, $hash, $kind): DocumentAttachment {
+                $attachment = new DocumentAttachment;
+                $attachment->forceFill([
+                    'id' => $id,
+                    'tenant_id' => $tenantId,
+                    'record_type' => $type->recordType(),
+                    'record_id' => $recordId,
+                    'line_number' => $lineNumber,
+                    'file_name' => $this->fileName($file->getClientOriginalName()),
+                    'mime_type' => Str::limit((string) $file->getMimeType(), 150, ''),
+                    'size_bytes' => (int) $file->getSize(),
+                    'storage_path' => $path,
+                    'content_hash' => $hash,
+                    'data_class' => $type->dataClass()->value,
+                    'kind' => $kind,
+                ])->save();
+
+                return $attachment;
+            });
         } catch (Throwable $exception) {
             $disk->delete($path);
 
@@ -262,7 +396,7 @@ final class AttachmentController extends Controller
     }
 
     /**
-     * @param  Collection<int, DocumentAttachment>  $attachments
+     * @param  Collection<int, DocumentAttachment>|Collection<int, DocumentNote>  $attachments
      * @return array<int, string>
      */
     private function userNames(Collection $attachments): array
