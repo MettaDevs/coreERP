@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { FileOutput } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -174,115 +175,118 @@ export default function MutasiListPage({
     actions.push({ id: 'cetak', label: 'Cetak berita acara' });
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Mutasi aset">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Mutasi aset">
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaMutasiBaru}
+                        >
+                            Catat mutasi
+                        </ActionButton>
+                    )}
+                    <Button
                         type="button"
-                        onClick={bukaMutasiBaru}
+                        variant="outline"
+                        onClick={() =>
+                            requestPrint({
+                                report: 'daftar-mutasi-aset',
+                                title: 'Ekspor daftar mutasi aset',
+                                parameters: status ? { status } : {},
+                            })
+                        }
                     >
-                        Catat mutasi
-                    </ActionButton>
-                )}
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                        requestPrint({
-                            report: 'daftar-mutasi-aset',
-                            title: 'Ekspor daftar mutasi aset',
-                            parameters: status ? { status } : {},
-                        })
-                    }
-                >
-                    <FileOutput />
-                    Ekspor daftar
-                </Button>
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor bukti, alasan, atau lokasi"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-52">
-                    <Select
-                        label="Status"
-                        items={PILIHAN_STATUS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_STATUS.find(
-                                (pilihan) => pilihan.value === status,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) =>
-                            setStatus(
+                        <FileOutput />
+                        Ekspor daftar
+                    </Button>
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor bukti, alasan, atau lokasi"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-52">
+                        <Select
+                            label="Status"
+                            items={PILIHAN_STATUS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? '',
-                            )
-                        }
-                    />
+                                    (pilihan) => pilihan.value === status,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) =>
+                                setStatus(
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? '',
+                                )
+                            }
+                        />
+                    </div>
                 </div>
-            </div>
+            }
+        >
+            {!memuat && !terlihat.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada mutasi aset</EmptyTitle>
+                        <EmptyDescription>
+                            Mutasi mencatat perpindahan aset beserta berita
+                            acara serah terimanya. Buat satu untuk memulai.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={terlihat}
+                    getRowKey={(baris) => baris.id}
+                    getRowLabel={(baris) => baris.kode}
+                    actions={actions}
+                    onRowClick={(baris) => bukaMutasi(baris.id)}
+                    onRowAction={(action, baris) => {
+                        if (action === 'detail') {
+                            bukaMutasi(baris.id);
+                        }
 
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!memuat && !terlihat.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada mutasi aset</EmptyTitle>
-                            <EmptyDescription>
-                                Mutasi mencatat perpindahan aset beserta berita
-                                acara serah terimanya. Buat satu untuk memulai.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={terlihat}
-                        getRowKey={(baris) => baris.id}
-                        getRowLabel={(baris) => baris.kode}
-                        actions={actions}
-                        onRowClick={(baris) => bukaMutasi(baris.id)}
-                        onRowAction={(action, baris) => {
-                            if (action === 'detail') {
-                                bukaMutasi(baris.id);
+                        if (action === 'edit') {
+                            bukaMutasiUbah(baris.id);
+                        }
+
+                        if (action === 'cetak') {
+                            // Berita acara adalah bukti bahwa sesuatu sudah
+                            // terjadi; server menolak mencetak draf, dan
+                            // layar mengatakannya lebih dahulu agar orang
+                            // tidak menunggu dialog cetak untuk kabar itu.
+                            if (baris.status !== 'selesai') {
+                                toast.error(
+                                    'Berita acara hanya dapat dicetak setelah mutasi diselesaikan.',
+                                );
+
+                                return;
                             }
 
-                            if (action === 'edit') {
-                                bukaMutasiUbah(baris.id);
-                            }
-
-                            if (action === 'cetak') {
-                                // Berita acara adalah bukti bahwa sesuatu sudah
-                                // terjadi; server menolak mencetak draf, dan
-                                // layar mengatakannya lebih dahulu agar orang
-                                // tidak menunggu dialog cetak untuk kabar itu.
-                                if (baris.status !== 'selesai') {
-                                    toast.error(
-                                        'Berita acara hanya dapat dicetak setelah mutasi diselesaikan.',
-                                    );
-
-                                    return;
-                                }
-
-                                requestPrint({
-                                    report: 'berita-acara-serah-terima',
-                                    title: `Cetak berita acara ${baris.kode}`,
-                                    parameters: { id: baris.id },
-                                });
-                            }
-                        }}
-                    />
-                )}
-            </div>
-        </div>
+                            requestPrint({
+                                report: 'berita-acara-serah-terima',
+                                title: `Cetak berita acara ${baris.kode}`,
+                                parameters: { id: baris.id },
+                            });
+                        }
+                    }}
+                />
+            )}
+        </ListPageLayout>
     );
 }

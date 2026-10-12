@@ -10,7 +10,7 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
-import { DataTable } from '@apperp/ui/data-table';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Dialog,
@@ -256,9 +256,7 @@ export function RecordAttachments({
                     className="block w-full text-left text-primary hover:underline"
                     onClick={() => setSelected(item)}
                 >
-                    <span className="block truncate" title={item.file_name}>
-                        {item.file_name}
-                    </span>
+                    <DataTableText>{item.file_name}</DataTableText>
                 </button>
             ),
         },
@@ -354,6 +352,7 @@ export function RecordAttachments({
                                 data={page.data}
                                 getRowKey={(item) => item.id}
                                 getRowLabel={(item) => item.file_name}
+                                scrollMode="inline"
                                 actionsPlacement="inline"
                                 onRowClick={setSelected}
                                 actions={[

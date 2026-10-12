@@ -1,6 +1,6 @@
 ---
 name: coreerp-ui
-description: Standardize CoreERP and app React interfaces with @apperp/ui. Use when changing controls, forms, dialogs, tables, typography, accessibility, dark mode, iframe theme context, or app UI packaging.
+description: Standardize CoreERP and module React interfaces with @apperp/ui. Use when changing controls, forms, dialogs, tables, typography, accessibility, dark mode, Shell theme context, or app UI packaging.
 ---
 
 # CoreERP UI
@@ -14,11 +14,14 @@ Use `@apperp/ui@0.6.2` as the single source for generic UI. Inspect its componen
 - App CSS may define layout and domain presentation. It must not redefine fonts, tokens, controls, dialogs, tables, focus rings, invalid/disabled/loading states, or dark mode.
 - Redefining an SDK component from the page has three recognisable shapes, and all three are the same mistake. Reaching into its internals with arbitrary variants (`[&_thead_th]:bg-primary` on `DataTable`); zeroing the spacing it owns (`CardHeader className="py-0"`); or re-implementing what it already does (`DialogContent` given `fixed top-1/2 left-1/2 -translate-*` when it centres itself, where a `size` prop is then silently overridden by a `max-w-*` on the same element). Each one makes that screen drift from every other screen, and each one breaks quietly when the SDK changes its internal markup — no error, just a style that stops applying. If the new look is right, it belongs in the SDK as a variant so every screen gets it; if it is right for one screen only, it is probably not right.
 - Do not copy Control Plane source. Import public subpaths such as `@apperp/ui/input`, `@apperp/ui/dialog`, and `@apperp/ui/table`.
-- A hosted app fills the iframe canvas. Do not add a second rounded, bordered page container when the Shell already provides the page frame.
+- A module renders inside the Core Shell. Do not add a second rounded, bordered page container when the Shell already provides the page frame.
 - For a Shell sidebar, apply a custom `--sidebar-width` to the SDK Sidebar root so its spacer and rendered panel always share the same width. Show a label tooltip only when overflow is actually detected; never attach one to every menu item.
-- Use the SDK `DataTable` for dense operational lists. Put row actions in its `…` menu, and show bulk actions only after rows are selected. Keep a list header compact; do not spend a tall card section on a title that has no additional context. Resizable columns must show a full-height drag guide and truncate labels/cells at their minimum width; text must never overlap its neighboring column. A record master rendered as the two-pane layout below is the exception: its left pane replaces the table.
+- Use `DataTable` from `@apperp/ui/data-table` for dense operational lists; do not rebuild these tables with `Table` or plain HTML. Show bulk actions only after rows are selected. Keep a list header compact; do not spend a tall card section on a title that has no additional context. Headers wrap to multiple lines; only a single header word wider than the available width receives an ellipsis. Row values stay on one line by default and use an ellipsis when they exceed the column width. Both headers and row values show their full text on hover by default. For custom cell markup, use `DataTableText` around its text; use `multiline` only for headers or an explicitly requested multiline value. Resizing moves a full-height drag guide while the pointer is held; column widths change only on release, and cancelling leaves widths unchanged. Text must never overlap its neighboring column. A record master rendered as the two-pane layout below is the exception: its left pane replaces the table.
+- **Row actions must use the SDK's `⋯` menu through `actions` and `onRowAction`, with `actionsPlacement="inline"`.** Put the code/primary identity in the first data column so the menu appears immediately after it. For records with a code and name, use separate columns in this order: **`# → code → ⋯ → name → other fields`**. Selection checkboxes, when needed, remain in the SDK's leading selection column. Do not place actions at the far right or replace the menu with per-row buttons such as “Atur”, “Ubah”, or “Lihat”; those actions belong inside the menu. Use `actionsPlacement="trailing"` only when the user explicitly requests that placement.
 
 ### Pilihan baris pada tabel master-detail
+
+Pada `DataTable`, membuka detail baris memakai event native `onDoubleClick` secara default, bukan klik sekali atau penghitung klik dengan timer. `onRowClick` adalah callback aktivasinya; `rowActivation="single-click"` hanya untuk memilih baris aktif tanpa membuka detail. Menu `⋯`, checkbox, link, dan kontrol edit tidak boleh ikut memicu pembukaan baris. Enter/Space saat fokus berada pada baris menyediakan aktivasi lewat keyboard; kontrol di dalam baris mempertahankan perilaku keyboard-nya sendiri.
 
 Sebut pola ini **tabel master-detail dengan pilihan baris**. Pilih bentuknya dari kebutuhan kerja, bukan dari tampilan:
 
@@ -78,26 +81,19 @@ Two mistakes shipped a page with a doubled header and no way to reach it. Both a
 - **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to and give it the Core screen permission that guards its route (`permission: 'core.<group>.read'`; the sidebar hides it from members who lack it, while the route enforces it), and add it to the settings sub-nav too only if the page uses that layout.
 - **Verify by walking the rail**, not by opening the URL directly: open the Shell, click through the rail to the new page, and confirm one header and one sidebar. A page reached by typing its URL proves nothing about either rule.
 
-## Theme bridge
+## Theme and workspace build
 
-The Shell sends `theme: { appearance: 'light' | 'dark', font: 'poppins' | 'geist' }` in `coreerp.context`. After validating `event.source`, `event.origin`, and `appId`, call `applyCoreErpTheme(event.data.theme)` from `@apperp/ui/theme`. Fonts are self-hosted by the package.
+Modules share the Shell's React tree, theme, and fonts; they do not create an iframe, a second React root, or a `coreerp.ready`/`coreerp.context` handshake. Import public `@apperp/ui` subpaths and inherit the Shell stylesheet.
 
-## Local and release artifacts
+`packages/ui` is an npm workspace in this repository. Core and Control Plane use `"@apperp/ui": "*"`; the root lockfile resolves the workspace. Run the existing `ui:build` script before consumer type-check/build. Local runtime builds use `erp-dev/start.ps1 -Build`, which builds the SDK and consumers inside Docker. Do not introduce a vendored tarball or import package source from another repository.
 
-- Local dependency: `"@apperp/ui": "file:vendor/apperp-ui.tgz"`.
-- Never reference package source across repositories.
-- `erp-dev/start.ps1` builds and distributes the tarball with Docker; host Node and registry signup are unnecessary. This Docker build is the only authoritative build of the SDK. **Never `npm pack` it on the host and copy that tarball into a consumer's vendor directory.** Two builds of identical source are not guaranteed to produce a byte-identical tarball — the packed archive's hash is a function of the whole file, not just its logical content. A host-built tarball will differ from what `start.ps1`'s Docker build produces, `Publish-UiSdk` will treat that difference as a real change and overwrite it on the very next `-Build`, and every consumer that had a lockfile matched to the host tarball breaks with `npm error code EINTEGRITY` in its own next `docker compose build` — a fully working local stack, self-inflicted, without a single line of app or SDK source changing.
-- `npm ci` verifies a `file:` dependency's package-lock.json entry by hash. Whenever the vendored tarball's bytes change for any reason, every consumer's `package-lock.json` has to be refreshed in the same step — not as a followup, not "later" — or the very next `npm ci` (host or Docker) fails EINTEGRITY against a hash the file no longer has. `Publish-UiSdk` in `erp-dev/start.ps1` does this automatically via `Sync-UiSdkLockfile` whenever it re-vendors a changed tarball; that is what makes it safe to run `-Build` repeatedly. If a tarball is ever vendored by hand outside that function, its lockfile refresh has to be done by hand too, immediately, for every consumer: delete that dependency's entry from `package-lock.json` first — `npm install` alone will not re-verify an entry it already trusts as resolved, even against a tarball whose content changed — then run `npm install --package-lock-only`.
-- **The tarball is gitignored in consumers, so a directory-level `git add` stages the lockfile and silently skips the tarball.** Consumers ignore `vendor/*` or `.packages/*` and keep the tarball tracked by an earlier forced add. `git add ui` therefore commits `package-lock.json` pointing at a hash the committed tarball does not have, and `main` breaks `npm ci` for everyone while the working tree that produced it looks perfectly fine. Stage the tarball by explicit path in the same commit as the lockfile, and confirm before pushing:
+## Native page and table scrolling
 
-  ```bash
-  git hash-object ui/vendor/apperp-ui.tgz          # bytes on disk
-  git rev-parse HEAD:ui/vendor/apperp-ui.tgz       # bytes recorded in the commit
-  ```
-
-  The two must be equal. Never verify a binary artifact by redirecting `git show HEAD:<path>` to a file in PowerShell — its redirection applies text encoding and corrupts the bytes, so the hash you compute matches nothing and points at a problem that does not exist, or hides one that does.
-- The ignored tarball is a development adapter. Release CI must publish the same version to the artifact registry.
-- Generated output is not source. Generated directories belong in `.gitignore` at the repository root (anchored, e.g. `/dist`, so a same-named directory deeper in the tree is not swept up by accident), not in git. Committing them makes every regeneration surface as a thousand-line diff nobody can review, and the bytes stay in history after the files are removed.
+- Operational lists use `ListPageLayout` from `@apperp/ui/list-page-layout` as their page root, with `header`, `filters`, `footer`, and the primary table as children. It marks `data-layout="full-height"` and centralizes the flex/height rules; do not reproduce those wrappers on every page.
+- The Shell fixes the viewport height, keeps its header/banners outside the scrolling content, and gives full-height pages the remaining space. Do not set `html`/`body` overflow or style every `main` from module CSS. Module wrappers above a full-height layout must propagate `h-full min-h-0` rather than grow with the records.
+- A DataTable inside ListPageLayout automatically uses `viewport` scroll mode: one native container owns both axes, its horizontal scrollbar stays at the visible bottom, and its column header is sticky. Parent wrappers do not add another scroll area. Explicit `scrollMode="viewport"` remains available for existing bounded Card layouts.
+- Form/detail content scrolls within the Shell content area. Small embedded tables use `scrollMode="inline"`; place Dialog/Sheet components outside the list layout, or explicitly select inline mode for a table inside an overlay.
+- Native containers carry `scroll-region` so Inertia manages navigation scroll positions. Listen to the actual scroll owner instead of `window.scrollY` for header state. Do not duplicate/synchronize scrollbars with JavaScript or require Shift+wheel to reach columns.
 
 ## Checks
 
@@ -106,4 +102,4 @@ or dismissed, using the action's everyday wording. A brief toast or a successful
 does not satisfy user feedback. Preserve unsaved inputs and keep technical details in server reports.
 Use the existing shared API error handler; see `docs/dev/28-pelaporan-kesalahan.md`, "Kegagalan yang terlihat oleh pengguna".
 
-Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the iframe. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.
+Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the running Shell. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.

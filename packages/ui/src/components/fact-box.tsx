@@ -30,6 +30,7 @@ export function FactBox({
     attachmentCount,
     defaultOpen = true,
     className,
+    fillHeight = false,
 }: {
     children: ReactNode;
     details: ReactNode;
@@ -37,6 +38,8 @@ export function FactBox({
     attachmentCount?: number | null;
     defaultOpen?: boolean;
     className?: string;
+    /** Daftar memakai seluruh tinggi Shell; tabel dan panel menggulir secara terpisah. */
+    fillHeight?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [tab, setTab] = useState('details');
@@ -83,9 +86,18 @@ export function FactBox({
                     ? 'xl:grid-cols-[minmax(0,1fr)_1px_minmax(0,var(--fact-box-width))]'
                     : 'xl:grid-cols-[minmax(0,1fr)_2.5rem]',
                 className,
+                fillHeight &&
+                    'h-full min-h-0 overflow-y-auto xl:items-stretch xl:overflow-hidden',
             )}
         >
-            <div className="min-w-0 space-y-4">{children}</div>
+            <div
+                className={cn(
+                    'min-w-0 space-y-4',
+                    fillHeight && 'flex min-h-0 flex-col overflow-hidden',
+                )}
+            >
+                {children}
+            </div>
             {open && (
                 <Separator
                     decorative={false}
@@ -160,7 +172,10 @@ export function FactBox({
             <aside
                 id={panelId}
                 aria-label="Detail dan lampiran"
-                className="min-w-0 xl:sticky xl:top-0"
+                className={cn(
+                    'min-w-0 xl:sticky xl:top-0',
+                    fillHeight && 'min-h-0 xl:overflow-y-auto',
+                )}
             >
                 <div className="flex justify-end">
                     {open && (

@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
@@ -183,85 +184,86 @@ export default function MaintenanceRequestListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Permintaan pemeliharaan">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={openNewRequest}
-                    >
-                        Buat permintaan
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor, aset, lokasi, atau deskripsi"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Permintaan pemeliharaan">
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={openNewRequest}
+                        >
+                            Buat permintaan
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor, aset, lokasi, atau deskripsi"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-52">
+                        <Select
+                            label="Status"
+                            items={STATUS_FILTER}
+                            value={status || ALL}
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) => {
+                                setLoading(true);
+                                setStatus(!value || value === ALL ? '' : value);
+                            }}
+                        />
+                    </div>
                 </div>
-                <div className="w-full sm:w-52">
-                    <Select
-                        label="Status"
-                        items={STATUS_FILTER}
-                        value={status || ALL}
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) => {
-                            setLoading(true);
-                            setStatus(!value || value === ALL ? '' : value);
-                        }}
-                    />
-                </div>
-            </div>
+            }
+        >
+            {!loading && !visible.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>
+                            Belum ada permintaan pemeliharaan
+                        </EmptyTitle>
+                        <EmptyDescription>
+                            Unit melaporkan kerusakan atau kebutuhan perbaikan
+                            aset di sini. Perencana meninjaunya lalu membuatkan
+                            work order.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={visible}
+                    getRowKey={(row) => row.id}
+                    getRowLabel={(row) => row.kode}
+                    actions={actions}
+                    onRowClick={(row) => openRequest(row.id)}
+                    onRowAction={(action, row) => {
+                        if (action === 'detail') {
+                            openRequest(row.id);
+                        }
 
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!loading && !visible.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>
-                                Belum ada permintaan pemeliharaan
-                            </EmptyTitle>
-                            <EmptyDescription>
-                                Unit melaporkan kerusakan atau kebutuhan
-                                perbaikan aset di sini. Perencana meninjaunya
-                                lalu membuatkan work order.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={visible}
-                        getRowKey={(row) => row.id}
-                        getRowLabel={(row) => row.kode}
-                        actions={actions}
-                        onRowClick={(row) => openRequest(row.id)}
-                        onRowAction={(action, row) => {
-                            if (action === 'detail') {
-                                openRequest(row.id);
+                        if (action === 'edit') {
+                            if (row.status !== 'draft') {
+                                toast.error(
+                                    'Hanya permintaan draf yang dapat diubah.',
+                                );
+
+                                return;
                             }
 
-                            if (action === 'edit') {
-                                if (row.status !== 'draft') {
-                                    toast.error(
-                                        'Hanya permintaan draf yang dapat diubah.',
-                                    );
-
-                                    return;
-                                }
-
-                                openRequestEdit(row.id);
-                            }
-                        }}
-                    />
-                )}
-            </div>
-        </div>
+                            openRequestEdit(row.id);
+                        }
+                    }}
+                />
+            )}
+        </ListPageLayout>
     );
 }

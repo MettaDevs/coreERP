@@ -4,6 +4,7 @@ namespace Tests\Feature\Platform\Attachments;
 
 use App\Platform\Access\Models\Role;
 use App\Platform\Attachments\Models\DocumentAttachment;
+use App\Platform\Attachments\Models\DocumentNote;
 use App\Platform\Attachments\Support\AttachmentContentMismatch;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
@@ -27,6 +28,38 @@ use Tests\TestCase;
 class DocumentAttachmentTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_notes_follow_record_rights_tenant_and_version_and_archive_softly(): void
+    {
+        $path = '/api/v1/records/vendors/'.$this->vendorId.'/notes';
+        $this->actingAs($this->owner)->postJson($path, ['content' => ' '])->assertUnprocessable();
+        $note = $this->postJson($path, ['content' => 'Periksa kondisi sebelum digunakan.'])
+            ->assertCreated()->json('data');
+        $this->getJson($path)->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.created_by_name', $this->owner->name);
+        $reader = $this->anggota(['core.vendor.inquire']);
+        $this->actingAs($reader)->getJson($path)->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->postJson($path, ['content' => 'Tidak boleh'])->assertForbidden();
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Tidak boleh', 'version' => $note['version']])->assertForbidden();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertForbidden();
+
+        $otherOwner = $this->pemilik('notes@other.test', 'Tenant catatan lain');
+        $this->actingAs($otherOwner)->getJson($path)->assertNotFound();
+        $this->postJson($path, ['content' => 'Tidak boleh'])->assertNotFound();
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Tidak boleh', 'version' => $note['version']])->assertNotFound();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertNotFound();
+        $otherVendor = $this->vendor($this->owner, 'Perusahaan lain untuk catatan', 'NOTE');
+        $this->actingAs($this->owner)->deleteJson('/api/v1/records/vendors/'.$otherVendor.'/notes/'.$note['id'], ['version' => $note['version']])->assertNotFound();
+
+        $updated = $this->patchJson($path.'/'.$note['id'], ['content' => 'Sudah diperiksa.', 'version' => $note['version']])
+            ->assertOk()->json('data');
+        $this->patchJson($path.'/'.$note['id'], ['content' => 'Data basi', 'version' => $note['version']])->assertConflict();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $note['version']])->assertConflict();
+        $this->deleteJson($path.'/'.$note['id'], ['version' => $updated['version']])->assertNoContent();
+        $this->getJson($path)->assertOk()->assertJsonCount(0, 'data');
+        $this->assertDatabaseHas('document_notes', ['id' => $note['id'], 'content' => 'Sudah diperiksa.']);
+        $this->assertNotNull(DocumentNote::withTrashed()->findOrFail($note['id'])->deleted_at);
+    }
 
     private const PDF = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
 

@@ -6,6 +6,26 @@ Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management
 
 Register aset adalah **catatan satu barang fisik milik perusahaan**, sejak diterima sampai dilepas. Satu baris di sini mewakili satu benda nyata: satu mesin, satu mobil, satu laptop. Bukan stok, bukan kuantitas agregat — kalau perusahaan membeli sepuluh laptop yang sama, ada sepuluh baris record.
 
+## FactBox dan catatan record
+
+Daftar inventarisasi mempunyai record aktif yang terpisah dari pilihan banyak untuk cetak label.
+Klik baris memilih satu aset dan memperbarui FactBox tanpa berpindah halaman; kode aset dan tindakan
+**Buka rincian** membuka halaman record. Tidak ada aset aktif saat daftar pertama kali dimuat.
+Foto, lampiran, dan catatan dibaca berdasarkan ID aset aktif, bukan kode bisnisnya.
+
+Tab Lampiran pada daftar dan rincian memuat berkas serta catatan teks, mengikuti
+[Notes pada FactBox Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-how-add-link-to-record).
+Catatan disimpan Core di `document_notes`, dengan `tenant_id`, `record_type`, `record_id`, `content`,
+klasifikasi data induk, penulis, waktu, dan versi baris. Catatan tidak mengubah keterangan pada aset.
+Hak baca dan ubah mengikuti `AttachmentRecordType` induk; record di luar tenant atau hak organisasi
+tetap dijawab 404. Arsip mengisi `deleted_at`, dan edit maupun arsip memerlukan versi terbaru.
+Catatan tidak memerlukan nomor dokumen atau workflow sendiri.
+
+Endpoint sesi Shell berada di `/api/v1/records/{recordType}/{recordId}/notes`: GET untuk daftar,
+POST untuk menambah, serta PATCH/DELETE pada `/{note}` untuk mengubah atau mengarsipkan.
+Implementasinya ada pada `AttachmentController`, `DocumentNote`, dan `record-notes.tsx` di Core;
+regresi hak akses, tenant, versi, dan arsip ada pada `DocumentAttachmentTest`.
+
 ## Nomor dan penelusuran antarperusahaan
 
 Nomor penerimaan (`management-aset.penerimaan-aset`) dan nomor aset (`management-aset.aset`)

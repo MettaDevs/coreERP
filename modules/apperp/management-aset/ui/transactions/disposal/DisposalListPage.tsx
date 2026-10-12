@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -134,55 +135,52 @@ export default function DisposalListPage({
     ];
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title={jenis.title}>
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={() => bukaBaru(resource)}
-                    >
-                        {jenis.create}
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="border-b px-5 py-3">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor bukti, aset, atau keterangan"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
+        <ListPageLayout
+            header={
+                <RecordActionBar title={jenis.title}>
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={() => bukaBaru(resource)}
+                        >
+                            {jenis.create}
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="border-b px-5 py-3">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor bukti, aset, atau keterangan"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
                 </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!memuat && !terlihat.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>
-                                Belum ada dokumen {jenis.noun}
-                            </EmptyTitle>
-                            <EmptyDescription>{jenis.empty}</EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={terlihat}
-                        getRowKey={(baris) => baris.id}
-                        getRowLabel={(baris) => baris.kode}
-                        actions={[{ id: 'detail', label: 'Buka rincian' }]}
-                        onRowClick={(baris) => bukaDokumen(resource, baris.id)}
-                        onRowAction={(_, baris) =>
-                            bukaDokumen(resource, baris.id)
-                        }
-                    />
-                )}
-            </div>
-        </div>
+            }
+        >
+            {!memuat && !terlihat.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada dokumen {jenis.noun}</EmptyTitle>
+                        <EmptyDescription>{jenis.empty}</EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={terlihat}
+                    getRowKey={(baris) => baris.id}
+                    getRowLabel={(baris) => baris.kode}
+                    actions={[{ id: 'detail', label: 'Buka rincian' }]}
+                    onRowClick={(baris) => bukaDokumen(resource, baris.id)}
+                    onRowAction={(_, baris) => bukaDokumen(resource, baris.id)}
+                />
+            )}
+        </ListPageLayout>
     );
 }

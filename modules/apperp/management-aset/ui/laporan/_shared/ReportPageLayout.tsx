@@ -70,8 +70,8 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
     };
 
     return (
-        <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="min-h-0 border-b px-5 py-3">
+        <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
+            <CardHeader className="min-h-0 shrink-0 border-b px-5 py-3">
                 <CardTitle>{title}</CardTitle>
                 {description && (
                     <CardDescription>{description}</CardDescription>
@@ -106,10 +106,10 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                 </CardAction>
             </CardHeader>
 
-            <CardContent className="px-0">
-                {filterBar}
+            <CardContent className="flex min-h-0 flex-1 flex-col px-0">
+                <div className="shrink-0">{filterBar}</div>
 
-                <div className="space-y-4 px-5 py-4">
+                <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
                     {error && (
                         <Alert variant="destructive">
                             <AlertCircle />
@@ -137,8 +137,9 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                             </EmptyHeader>
                         </Empty>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="min-h-0 flex-1 overflow-hidden">
                             <DataTable
+                                scrollMode="viewport"
                                 columns={columns}
                                 data={rows}
                                 getRowKey={(row) => keys.get(row) ?? -1}
@@ -150,7 +151,7 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                 </div>
             </CardContent>
 
-            <CardFooter className="text-muted-foreground flex flex-col items-start justify-between gap-2 border-t px-5 py-3 text-xs sm:flex-row sm:items-center">
+            <CardFooter className="text-muted-foreground flex shrink-0 flex-col items-start justify-between gap-2 border-t px-5 py-3 text-xs sm:flex-row sm:items-center">
                 <div>
                     Menampilkan{' '}
                     <span className="text-foreground font-medium">

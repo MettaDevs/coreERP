@@ -7,6 +7,7 @@ namespace App\Platform\Attachments\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Platform\Attachments\Http\Middleware\ResolveAttachmentContext;
 use App\Platform\Attachments\Models\DocumentAttachment;
+use App\Platform\Attachments\Models\DocumentNote;
 use App\Platform\Attachments\Support\AttachmentContentMismatch;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordType;
@@ -39,6 +40,82 @@ use Throwable;
  */
 final class AttachmentController extends Controller
 {
+    public function notes(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $notes = DocumentNote::query()->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())->where('record_id', $recordId)
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+        $names = $this->userNames($notes);
+
+        return response()->json([
+            'data' => $notes->map(fn (DocumentNote $note): array => $this->presentNote($note, $names))->values(),
+            'meta' => ['can_change' => $type->canChange($tenantId, $recordId)],
+        ]);
+    }
+
+    public function storeNote(Request $request, string $recordType, string $recordId): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah data ini, jadi tidak dapat menambah catatan.');
+        $data = $request->validate(['content' => ['required', 'string', 'max:10000']], [
+            'content.required' => 'Isi catatan terlebih dahulu.',
+            'content.max' => 'Catatan paling panjang 10.000 karakter.',
+        ]);
+        $note = DocumentNote::create([
+            'tenant_id' => $tenantId, 'record_type' => $type->recordType(), 'record_id' => $recordId,
+            'content' => $data['content'], 'data_class' => $type->dataClass()->value,
+        ])->refresh();
+
+        return response()->json(['data' => $this->presentNote($note, $this->userNames(collect([$note])))], 201);
+    }
+
+    public function updateNote(Request $request, string $recordType, string $recordId, string $note): JsonResponse
+    {
+        return $this->changeNote($request, $recordId, $note, false);
+    }
+
+    public function destroyNote(Request $request, string $recordType, string $recordId, string $note): JsonResponse
+    {
+        return $this->changeNote($request, $recordId, $note, true);
+    }
+
+    private function changeNote(Request $request, string $recordId, string $noteId, bool $archive): JsonResponse
+    {
+        $tenantId = $this->currentMembership($request)->tenant_id;
+        $type = $this->recordType($request);
+        $this->requireReadable($type, $tenantId, $recordId);
+        $query = DocumentNote::query()->where('tenant_id', $tenantId)
+            ->where('record_type', $type->recordType())->where('record_id', $recordId)->whereKey($noteId);
+        $note = (clone $query)->firstOrFail();
+        abort_unless($type->canChange($tenantId, $recordId), 403, 'Kamu tidak punya hak mengubah catatan pada data ini.');
+        $version = RowVersion::expected($request);
+        $data = $archive ? ['deleted_at' => now()] : $request->validate([
+            'content' => ['required', 'string', 'max:10000'],
+        ], ['content.required' => 'Isi catatan terlebih dahulu.', 'content.max' => 'Catatan paling panjang 10.000 karakter.']);
+        DB::transaction(function () use ($query, $version, $data): void {
+            RowVersion::claim($query, $version);
+            (clone $query)->update([...$data, 'updated_at' => now()]);
+        });
+
+        return $archive ? response()->json(status: 204)
+            : response()->json(['data' => $this->presentNote($note->refresh(), $this->userNames(collect([$note])))]);
+    }
+
+    /** @param array<int, string> $names */
+    private function presentNote(DocumentNote $note, array $names): array
+    {
+        return [
+            'id' => $note->id, 'content' => $note->content, 'version' => $note->version,
+            'created_by_name' => $names[$note->created_by_user_id] ?? null,
+            'created_at' => $note->created_at?->toIso8601String(),
+        ];
+    }
+
     public function index(Request $request, string $recordType, string $recordId): JsonResponse
     {
         $tenantId = $this->currentMembership($request)->tenant_id;
@@ -319,7 +396,7 @@ final class AttachmentController extends Controller
     }
 
     /**
-     * @param  Collection<int, DocumentAttachment>  $attachments
+     * @param  Collection<int, DocumentAttachment>|Collection<int, DocumentNote>  $attachments
      * @return array<int, string>
      */
     private function userNames(Collection $attachments): array

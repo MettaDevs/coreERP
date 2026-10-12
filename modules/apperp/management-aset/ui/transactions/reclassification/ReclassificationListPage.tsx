@@ -1,3 +1,4 @@
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -158,110 +159,115 @@ export default function ReclassificationListPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Reklasifikasi aset">
-                {can('create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={bukaReklasifikasiBaru}
-                    >
-                        Buat reklasifikasi
-                    </ActionButton>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-72">
-                    <Input
-                        label="Cari"
-                        type="search"
-                        placeholder="Nomor bukti atau alasan"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                    />
-                </div>
-                <div className="w-full sm:w-56">
-                    <Select
-                        label="Jenis"
-                        items={PILIHAN_JENIS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_JENIS.find(
-                                (pilihan) => pilihan.value === jenis,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan jenis"
-                        onValueChange={(value) =>
-                            setJenis(
+        <ListPageLayout
+            header={
+                <RecordActionBar title="Reklasifikasi aset">
+                    {can('create') && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            onClick={bukaReklasifikasiBaru}
+                        >
+                            Buat reklasifikasi
+                        </ActionButton>
+                    )}
+                </RecordActionBar>
+            }
+            filters={
+                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="w-full sm:w-72">
+                        <Input
+                            label="Cari"
+                            type="search"
+                            placeholder="Nomor bukti atau alasan"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                        />
+                    </div>
+                    <div className="w-full sm:w-56">
+                        <Select
+                            label="Jenis"
+                            items={PILIHAN_JENIS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_JENIS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? SEMUA,
-                            )
-                        }
-                    />
-                </div>
-                <div className="w-full sm:w-48">
-                    <Select
-                        label="Status"
-                        items={PILIHAN_STATUS.map((pilihan) => pilihan.label)}
-                        value={
-                            PILIHAN_STATUS.find(
-                                (pilihan) => pilihan.value === status,
-                            )?.label ?? null
-                        }
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) =>
-                            setStatus(
+                                    (pilihan) => pilihan.value === jenis,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan jenis"
+                            onValueChange={(value) =>
+                                setJenis(
+                                    PILIHAN_JENIS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? SEMUA,
+                                )
+                            }
+                        />
+                    </div>
+                    <div className="w-full sm:w-48">
+                        <Select
+                            label="Status"
+                            items={PILIHAN_STATUS.map(
+                                (pilihan) => pilihan.label,
+                            )}
+                            value={
                                 PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.label === value,
-                                )?.value ?? SEMUA,
-                            )
-                        }
-                    />
+                                    (pilihan) => pilihan.value === status,
+                                )?.label ?? null
+                            }
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) =>
+                                setStatus(
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.label === value,
+                                    )?.value ?? SEMUA,
+                                )
+                            }
+                        />
+                    </div>
                 </div>
-            </div>
+            }
+        >
+            {!memuat && !terlihat.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada reklasifikasi</EmptyTitle>
+                        <EmptyDescription>
+                            Reklasifikasi memindah aset ke group lain, atau
+                            memecah sebagian nilainya menjadi aset baru, beserta
+                            harga perolehan, akumulasi penyusutan, dan
+                            penyesuaian nilainya.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={terlihat}
+                    getRowKey={(baris) => baris.id}
+                    getRowLabel={(baris) => baris.kode}
+                    actions={actions}
+                    onRowClick={(baris) => bukaReklasifikasi(baris.id)}
+                    onRowAction={(action, baris) => {
+                        if (action === 'detail') {
+                            bukaReklasifikasi(baris.id);
+                        }
 
-            <div className="min-h-0 flex-1 overflow-auto">
-                {!memuat && !terlihat.length ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada reklasifikasi</EmptyTitle>
-                            <EmptyDescription>
-                                Reklasifikasi memindah aset ke group lain, atau
-                                memecah sebagian nilainya menjadi aset baru,
-                                beserta harga perolehan, akumulasi penyusutan,
-                                dan penyesuaian nilainya.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={terlihat}
-                        getRowKey={(baris) => baris.id}
-                        getRowLabel={(baris) => baris.kode}
-                        actions={actions}
-                        onRowClick={(baris) => bukaReklasifikasi(baris.id)}
-                        onRowAction={(action, baris) => {
-                            if (action === 'detail') {
-                                bukaReklasifikasi(baris.id);
+                        if (action === 'edit') {
+                            if (baris.status !== 'draft') {
+                                toast.error(
+                                    'Reklasifikasi yang sudah diposting tidak dapat diubah. Buat reklasifikasi baru bila perlu dikoreksi.',
+                                );
+
+                                return;
                             }
 
-                            if (action === 'edit') {
-                                if (baris.status !== 'draft') {
-                                    toast.error(
-                                        'Reklasifikasi yang sudah diposting tidak dapat diubah. Buat reklasifikasi baru bila perlu dikoreksi.',
-                                    );
-
-                                    return;
-                                }
-
-                                bukaReklasifikasiUbah(baris.id);
-                            }
-                        }}
-                    />
-                )}
-            </div>
-        </div>
+                            bukaReklasifikasiUbah(baris.id);
+                        }
+                    }}
+                />
+            )}
+        </ListPageLayout>
     );
 }

@@ -48,6 +48,19 @@
       ],
       "cwd": "apps/core",
       "port": 8002
+    },
+    {
+      "name": "pratinjau-a13",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "localhost:8012",
+        "-t",
+        "public",
+        "C:/Users/Msi_/AppData/Local/Temp/claude/D--Kerja-CoreERP/2857b0e4-5a47-4911-a367-fcf5f8d4bde9/scratchpad/pratinjau/router.php"
+      ],
+      "cwd": ".claude/worktrees/analitik-13/apps/core",
+      "port": 8012
     }
   ]
 }
