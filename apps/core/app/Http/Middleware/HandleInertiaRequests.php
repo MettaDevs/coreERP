@@ -189,16 +189,25 @@ class HandleInertiaRequests extends Middleware
         }
 
         $catalog = app(LaunchableAppCatalog::class);
-        $products = collect($catalog->for($membership))->keyBy('id');
-
-        return CoreApp::query()
-            ->whereIn('id', $products->keys())
-            ->orderBy('name')
+        $products = $catalog->for($membership);
+        $apps = CoreApp::query()
+            ->whereIn('id', array_column($products, 'id'))
             ->get(['id', 'navigation'])
-            ->map(fn (CoreApp $app): array => [
-                ...$products[$app->id],
-                'navigation' => $catalog->navigationFor($membership, $app, includeSearchPages: true),
-            ])->all();
+            ->keyBy('id');
+        $result = [];
+
+        foreach ($products as $product) {
+            $app = $apps->get($product['id']);
+
+            if ($app === null) {
+                continue;
+            }
+
+            $product['navigation'] = $catalog->navigationFor($membership, $app, includeSearchPages: true);
+            $result[] = $product;
+        }
+
+        return $result;
     }
 
     /** @return list<array<string, mixed>> */
