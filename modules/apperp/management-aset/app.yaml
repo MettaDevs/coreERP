@@ -179,9 +179,9 @@ ui:
         - id: dekomisioning-aset
           label: Dekomisioning aset
           permission: management-aset.dekomisioning-aset.read
-        # - id: penyusutan
-        #   label: Penyusutan aset
-        #   permission: management-aset.penyusutan.read
+        - id: penyusutan
+          label: Penyusutan aset
+          permission: management-aset.penyusutan.read
         # - id: penyesuaian-nilai-aset
         #   label: Penyesuaian nilai aset
         #   permission: management-aset.penyesuaian-nilai-aset.read
