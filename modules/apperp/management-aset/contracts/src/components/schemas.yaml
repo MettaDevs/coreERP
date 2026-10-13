@@ -1855,6 +1855,12 @@ LokasiAsetCreate:
   allOf:
   - $ref: '#/components/schemas/MasterCreate'
   - $ref: '#/components/schemas/LokasiAsetFields'
+  - type: object
+    properties:
+      kode:
+        type: [string, 'null']
+        maxLength: 50
+        description: Kode manual hanya diterima bila diizinkan oleh Number Sequence Core; harus mengikuti format dan unik dalam tenant. Kosong atau null memakai nomor otomatis. Kode tidak dapat diubah setelah dibuat.
 LokasiAsetPatch:
   allOf:
   - $ref: '#/components/schemas/MasterPatch'

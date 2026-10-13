@@ -13,6 +13,12 @@ Lokasi menjawab **di mana barangnya berada**. Yang membuatnya lebih menarik dari
 
 Lokasi bisa bersarang: gedung berisi lantai, lantai berisi ruang. Karena itu ia punya `parent_id` yang menunjuk tabelnya sendiri.
 
+## Kode lokasi
+
+Kode lokasi diterbitkan Number Sequence Core dalam transaksi yang sama dengan penyimpanan lokasi. Saat `allow_manual` aktif, `POST lokasi-aset` menerima `kode` sesuai format nomor dan unik dalam tenant. Nilai kosong atau `null` tetap meminta nomor otomatis; nomor manual tidak memajukan counter. Core menolak kode manual ketika pengaturan tidak mengizinkannya. Kode yang sudah tersimpan tidak dapat diubah lewat `PATCH`.
+
+Form membaca izin tersebut lewat `GET /api/modules/management-aset/v1/lokasi-aset/number-policy`, dengan permission `management-aset.lokasi-aset.create`. Pembacaan ini tidak menerbitkan nomor atau mengubah konfigurasi. Retry dengan idempotency key dan data yang sama mengembalikan lokasi sebelumnya; kode manual berbeda dengan key yang sama ditolak 409.
+
 **Lingkaran ditolak.** A → B → A diperiksa saat penyimpanan. Tanpa itu, penelusuran induk akan berputar tanpa henti.
 
 ## Padanan di Business Central dan Dynamics 365

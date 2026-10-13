@@ -33,7 +33,7 @@ class AssetNumberSequenceIssuer
      *
      * @throws NumberSequenceException
      */
-    public function issue(string $reference, string $tenantId, string $idempotencyKey, ?string $legalEntityId = null): string
+    public function issue(string $reference, string $tenantId, string $idempotencyKey, ?string $legalEntityId = null, ?string $manualValue = null): string
     {
         try {
             $result = $this->issuer->issue(
@@ -44,6 +44,7 @@ class AssetNumberSequenceIssuer
                 ],
                 $reference,
                 $idempotencyKey,
+                $manualValue,
             );
         } catch (ValidationException $failure) {
             throw $this->fail('number_sequence_failed', $failure->getMessage(), $reference, $tenantId, $failure);

@@ -170,7 +170,7 @@ Permission berlaku per resource. Memiliki `group-aset.update` tidak memberikan i
 
 ## Aturan Bersama yang Dijaga
 
-**Kode selalu dari Core.** `POST` meminta nomor ke Number Sequence lewat `NumberSequenceClient`. Jika referensi penomoran belum aktif di Control Plane, permintaan gagal `503 Service Unavailable`.
+**Kode selalu dari Core.** `POST` meminta nomor lewat `AssetNumberSequenceIssuer` dan kontrak `NumberSequenceIssuer` dalam transaksi penyimpanan master. Konfigurasi nomor yang belum aktif ditolak 422. [Lokasi aset](/apps/management-aset/master/lokasi/) boleh meneruskan kode manual bila pengaturan tenant mengizinkannya; kode kosong tetap otomatis. Master lain mengabaikan kode klien. Kode yang sudah tersimpan tidak dapat diubah.
 
 **`POST` wajib membawa `Idempotency-Key`.** Kunci disimpan di `creation_key` dengan batasan `unique(tenant_id, creation_key)` pada database. Kirim ulang kunci yang sama akan mengembalikan record yang sama dengan header `Idempotent-Replayed: true`.
 

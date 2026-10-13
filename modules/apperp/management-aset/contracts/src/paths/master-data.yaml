@@ -1199,6 +1199,30 @@
         $ref: '#/components/responses/StaleVersion'
       '428':
         $ref: '#/components/responses/VersionRequired'
+/api/modules/management-aset/v1/lokasi-aset/number-policy:
+  get:
+    tags: [Lokasi aset]
+    summary: Membaca izin kode manual lokasi aset
+    description: Memerlukan permission management-aset.lokasi-aset.create. Tidak menerbitkan nomor atau mengubah pengaturan tenant.
+    responses:
+      '200':
+        description: Izin manual dari konfigurasi nomor aktif tenant
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [allow_manual]
+                  properties:
+                    allow_manual:
+                      type: boolean
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
 /api/v1/lokasi-aset:
   get:
     tags:

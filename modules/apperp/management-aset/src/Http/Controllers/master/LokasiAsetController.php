@@ -3,6 +3,9 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\AddressDirectory;
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
@@ -35,6 +38,15 @@ class LokasiAsetController extends MasterDataController
     protected function model(): string
     {
         return LokasiAset::class;
+    }
+
+    public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse
+    {
+        $this->requirePermission($request, 'create');
+
+        return response()->json(['data' => ['allow_manual' => $numbers->allowsManual(
+            $this->tenantId($request), static::APP_ID, static::APP_ID.'.'.$this->resource(),
+        )]]);
     }
 
     protected function parentMasters(): array
@@ -76,6 +88,7 @@ class LokasiAsetController extends MasterDataController
         // diperiksa hanya bentuknya. Keabsahan unit ditegakkan saat aset ditempatkan,
         // lewat scope organisasi pada token konteks.
         return [
+            ...($creating ? ['kode' => ['nullable', 'string', 'max:50']] : []),
             'org_unit_id' => ['sometimes', 'nullable', 'ulid'],
             // Keberadaan keduanya diperiksa lewat kontrak Core di afterWriteValidation().
             'alamat_id' => ['sometimes', 'nullable', 'ulid'],
@@ -86,6 +99,10 @@ class LokasiAsetController extends MasterDataController
     protected function afterWriteValidation(array $data, string $tenantId, bool $creating, ?MasterData $record = null): void
     {
         $errors = [];
+        $manualCode = trim((string) ($data['kode'] ?? ''));
+        if ($creating && $manualCode !== '' && LokasiAset::query()->where('kode', $manualCode)->exists()) {
+            $errors['kode'] = 'Kode lokasi ini sudah digunakan.';
+        }
         $address = $data['alamat_id'] ?? null;
         if ($address !== null && app(AddressDirectory::class)->describe($tenantId, [$address]) === []) {
             $errors['alamat_id'] = 'Alamat tidak ditemukan di buku alamat. Pilih alamat yang tersedia.';

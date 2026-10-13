@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -79,6 +79,36 @@ export default function MasterForm({
         [config.extraFields],
     );
     const isAsetLocation = config.resource === 'lokasi-aset';
+    const [manualCode, setManualCode] = useState('');
+    const [allowManual, setAllowManual] = useState(false);
+    const [numberPolicyError, setNumberPolicyError] = useState('');
+    useEffect(() => {
+        if (!isAsetLocation || value) {
+            return;
+        }
+
+        let cancelled = false;
+        api<{ data: { allow_manual: boolean } }>('/lokasi-aset/number-policy')
+            .then((result) => {
+                if (!cancelled) {
+                    setAllowManual(result.data.allow_manual);
+                }
+            })
+            .catch((caught) => {
+                if (!cancelled) {
+                    setNumberPolicyError(
+                        errorMessage(
+                            caught,
+                            'Pengaturan kode belum dapat dimuat.',
+                        ),
+                    );
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAsetLocation, value]);
     const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(
             extraFields.map((field) => [field.name, valueFrom(value, field)]),
@@ -135,6 +165,9 @@ export default function MasterForm({
                         // Versi dibaca dari `value` saat menyimpan, bukan disalin ke state form:
                         // rincian di bawah form dapat menaikkannya lebih dahulu.
                         ...(value ? { version: value.version } : {}),
+                        ...(!value && isAsetLocation && allowManual
+                            ? { kode: manualCode.trim() || null }
+                            : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,
                         aktif: form.aktif,
@@ -217,16 +250,34 @@ export default function MasterForm({
                 >
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FieldGroup>
-                            <Field data-disabled="true">
+                            <Field
+                                data-disabled={Boolean(value) || !allowManual}
+                            >
                                 <Input
                                     id="code"
                                     label={config.kodeLabel}
                                     value={
                                         value?.kode ??
-                                        'Dibuat otomatis saat disimpan'
+                                        (allowManual
+                                            ? manualCode
+                                            : 'Dibuat otomatis saat disimpan')
                                     }
-                                    disabled
+                                    placeholder="Kosongkan untuk membuat kode otomatis"
+                                    maxLength={50}
+                                    disabled={Boolean(value) || !allowManual}
+                                    onChange={(event) =>
+                                        setManualCode(event.target.value)
+                                    }
                                 />
+                                {!value && allowManual && (
+                                    <FieldDescription>
+                                        Isi kode sesuai format nomor, atau
+                                        kosongkan untuk membuatnya otomatis.
+                                    </FieldDescription>
+                                )}
+                                {numberPolicyError && (
+                                    <FieldError>{numberPolicyError}</FieldError>
+                                )}
                             </Field>
 
                             <Field>

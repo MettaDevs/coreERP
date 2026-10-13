@@ -18,6 +18,9 @@ namespace App\Platform\Modules\Contracts;
  */
 interface NumberSequenceIssuer
 {
+    /** Membaca izin input manual tanpa menerbitkan nomor atau mengubah konfigurasi. */
+    public function allowsManual(string $tenantId, string $appId, string $referenceCode): bool;
+
     /**
      * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $context
      * @return array{id: string, number: string, status: string}

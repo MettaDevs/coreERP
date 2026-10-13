@@ -15,7 +15,7 @@ Alamat endpoint di bawah ditulis lengkap. Rute JSON module dipasang di bawah `ap
 
 ## Master data
 
-Master tersedia pada `GET /api/modules/management-aset/v1/{resource}`. Daftar yang berlaku adalah array `$masters` di `routes/api/master-data.php`; jumlahnya bertambah seiring modul tumbuh, jadi tabel di bawah hanya memuat master dasar. Semuanya memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, dan `keterangan`, ditambah penanda `aktif`. Data selalu dibatasi tenant dari konteks permintaan yang disusun Core (kontrak `RequestContext`), bukan dari isi permintaan.
+Master tersedia pada `GET /api/modules/management-aset/v1/{resource}`. Daftar yang berlaku adalah array `$masters` di `routes/api/master-data.php`; jumlahnya bertambah seiring modul tumbuh, jadi tabel di bawah hanya memuat master dasar. Semuanya memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, tidak dapat diubah setelah dibuat), `nama`, dan `keterangan`, ditambah penanda `aktif`. Data selalu dibatasi tenant dari konteks permintaan yang disusun Core (kontrak `RequestContext`), bukan dari isi permintaan.
 
 Pemisahan data per organisasi diterangkan di [Batas tenant dan organisasi](../../../docs/apps/management-aset/arsitektur/batas-tenant-dan-organisasi.md) dan [rancangan scope data aset](../../../docs/apps/management-aset/arsitektur/rancangan-scope-data-aset.md). Permission transaksi yang dibatasi unit penanggung jawab didaftarkan di `manifest/asset-responsibility.yaml`.
 
@@ -401,7 +401,7 @@ Arsip memakai soft delete agar record yang kelak direferensikan data turunan tid
 
 ### Penomoran
 
-Setiap master memiliki reference Number Sequence sendiri. Master tenant memakai scope `tenant`, sedangkan nomor aset dan dokumen siklus memakai scope `legal_entity`. Aplikasi tidak menyimpan counter dan tidak menerima `kode` dari klien; nilai `kode` yang dikirim klien diabaikan.
+Setiap master memiliki reference Number Sequence sendiri. Master tenant memakai scope `tenant`, sedangkan nomor aset dan dokumen siklus memakai scope `legal_entity`. Aplikasi tidak menyimpan counter. Lokasi aset meneruskan `kode` manual saat pembuatan bila pengaturan tenant mengizinkannya; Core memeriksa format dan uniqueness. Kode kosong tetap otomatis. Master lain mengabaikan `kode` dari klien; kode yang tersimpan tidak dapat diubah.
 
 Prefix di bawah adalah `default_prefix` pada berkas fitur di `manifest/`; `loadtest/verify.sql` memeriksa prefix yang sama supaya nomor yang tertukar antar reference langsung ketahuan.
 

@@ -16,7 +16,8 @@ info:
     bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.
     Path pembatalan sudah memakai alamat runtime tersebut.
 
-    Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
+    Kode setiap master diterbitkan Number Sequence Core. Lokasi aset menerima kode manual
+    bila konfigurasi tenant mengizinkannya; kode kosong tetap otomatis. Master lain mengabaikan kode klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
     Penerbitan nomor berjalan di dalam proses Core. Penolakan konfigurasi atau scope menjawab
@@ -1415,6 +1416,34 @@ paths:
           $ref: '#/components/responses/StaleVersion'
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/modules/management-aset/v1/lokasi-aset/number-policy:
+    get:
+      tags:
+      - Lokasi aset
+      summary: Membaca izin kode manual lokasi aset
+      description: Memerlukan permission management-aset.lokasi-aset.create. Tidak menerbitkan nomor atau mengubah pengaturan
+        tenant.
+      responses:
+        '200':
+          description: Izin manual dari konfigurasi nomor aktif tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - allow_manual
+                    properties:
+                      allow_manual:
+                        type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/lokasi-aset:
     get:
       tags:
@@ -11435,6 +11464,15 @@ components:
       allOf:
       - $ref: '#/components/schemas/MasterCreate'
       - $ref: '#/components/schemas/LokasiAsetFields'
+      - type: object
+        properties:
+          kode:
+            type:
+            - string
+            - 'null'
+            maxLength: 50
+            description: Kode manual hanya diterima bila diizinkan oleh Number Sequence Core; harus mengikuti format dan unik
+              dalam tenant. Kosong atau null memakai nomor otomatis. Kode tidak dapat diubah setelah dibuat.
     LokasiAsetPatch:
       allOf:
       - $ref: '#/components/schemas/MasterPatch'
