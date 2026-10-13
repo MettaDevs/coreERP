@@ -55,6 +55,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'productVersion' => config('app.product_version'),
             /*
              * Lingkungan yang sedang dilayani, dan HANYA ketika ia bukan produksi.
              *

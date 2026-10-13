@@ -122,6 +122,8 @@ RUN for f in /usr/lib/postgresql/${VERSI_KLIEN_PG}/bin/pg_dump /usr/lib/postgres
     && test -s /paket-pg.txt
 
 FROM debian:trixie-slim
+ARG PRODUCT_VERSION
+ENV COREERP_PRODUCT_VERSION=${PRODUCT_VERSION}
 ARG VERSI_KLIEN_PG=17
 # `php.ini` adalah `php.ini-production` milik PHP itu sendiri — padanan php.ini Debian yang dulu dipakai:
 # display_errors mati, batas memori 128M untuk peran web. Binari `php` membaca `php-cli.ini` lebih dulu,
