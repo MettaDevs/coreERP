@@ -310,8 +310,8 @@ export default function MasterForm({
                                             <FieldDescription>
                                                 Tipe data terkunci karena
                                                 atribut ini sudah pernah diisi
-                                                pada aset. Buat tipe atribut
-                                                baru bila bentuk datanya
+                                                pada aset. Buat komponen atribut
+                                                aset baru bila bentuk datanya
                                                 berbeda.
                                             </FieldDescription>
                                         </Field>

@@ -17,7 +17,7 @@ type Row = { tipe_atribut_id: string; wajib: boolean };
  * memaksa seluruh client mengisinya. Aset mewarisi daftar ini dari jenis yang dipilih.
  *
  * Pasang/lepasnya lewat `TransferList` (tersedia/terpasang); "wajib diisi" adalah sifat
- * pemasangan itu sendiri (satu tipe atribut boleh wajib pada satu jenis aset dan opsional
+ * pemasangan itu sendiri (satu komponen atribut aset boleh wajib pada satu jenis aset dan opsional
  * pada jenis lain) sehingga tidak muat pada `TransferList` yang generik, dan disunting
  * lewat daftar terpisah di bawahnya.
  */
@@ -113,7 +113,7 @@ export default function JenisAsetAtribut({
     };
     const unknown = (id: string): TransferListItem => ({
         id,
-        label: 'Tipe atribut tidak dikenal',
+        label: 'Komponen Atribut Aset tidak dikenal',
     });
     const itemById = (id: string) => {
         const type = types.find((item) => item.id === id);
@@ -181,11 +181,11 @@ export default function JenisAsetAtribut({
                 remaining={remaining}
                 selected={selected}
                 onChange={applyTransfer}
-                remainingTitle="Tipe atribut tersedia"
-                selectedTitle="Tipe atribut terpasang"
+                remainingTitle="Komponen Atribut Aset tersedia"
+                selectedTitle="Komponen Atribut Aset terpasang"
                 disabled={!canEdit}
-                remainingEmptyLabel="Semua tipe atribut sudah terpasang."
-                selectedEmptyLabel="Belum ada tipe atribut yang dipasang."
+                remainingEmptyLabel="Semua komponen atribut aset sudah terpasang."
+                selectedEmptyLabel="Belum ada komponen atribut aset yang dipasang."
             />
 
             {rows.length > 0 && (

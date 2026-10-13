@@ -53,7 +53,7 @@ export type FieldValue = string | number | boolean | string[] | null;
 /** Nilai awal satu field saat form dibuka tanpa data. */
 export function emptyValue(field: FieldConfig): FieldValue {
     if (field.type === 'boolean') {
-        return false;
+        return field.name === 'aktif';
     }
 
     if (field.type === 'multiselect') {

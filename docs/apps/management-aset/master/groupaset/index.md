@@ -15,7 +15,7 @@ Selain bentuk dasar master, group punya:
 | `kelompok_harta_fiskal_id` | Kelompok pajak menurut PMK 72/2023 |
 | `property_type` | Jenis harta — menentukan perlakuan yang tidak bisa disimpulkan dari kelompok fiskal saja |
 | `asset_location_id` | Lokasi bawaan untuk aset baru di group ini |
-| `capitalization_threshold` | Batas nilai untuk dianggap aset, bukan biaya |
+| `capitalization_threshold` | Batas nilai perolehan per aset; nilai di bawah batas tidak disusutkan, sedangkan nilai tepat pada batas sudah memenuhi syarat nilai untuk disusutkan |
 
 ## Yang disalin, bukan ditunjuk
 

@@ -107,7 +107,7 @@ export const MASTERS: MasterConfig[] = [
         extraFields: [
             {
                 name: 'kelompok_harta_fiskal_id',
-                label: 'Kelompok harta fiskal',
+                label: 'Kelompok Aset',
                 type: 'reference',
                 resource: 'reference-data/kelompok-harta-fiskal',
                 help: 'Menentukan aturan fiskal dan masa manfaat yang dipakai group ini. Versi aturan baru dapat ditambahkan tanpa mengubah form.',
@@ -131,7 +131,7 @@ export const MASTERS: MasterConfig[] = [
             },
             {
                 name: 'capitalization_threshold',
-                label: 'Ambang kapitalisasi',
+                label: 'Nilai Perolehan Non Penyusutan',
                 type: 'number',
                 min: 0,
                 step: 0.01,
@@ -639,13 +639,13 @@ export const MASTERS: MasterConfig[] = [
     },
     {
         resource: 'tipe-atribut',
-        nav: 'Tipe atribut',
-        title: 'Tipe atribut',
+        nav: 'Komponen Atribut Aset',
+        title: 'Komponen Atribut Aset',
         subtitle:
-            'Ciri tambahan aset yang dapat dipasang pada jenis aset, tanpa menambah tingkat klasifikasi.',
-        kodeLabel: 'Kode tipe atribut',
-        namaLabel: 'Nama tipe atribut',
-        singular: 'tipe atribut',
+            'Ciri tambahan seperti bahan bakar kendaraan, yang dapat dipasang pada jenis aset.',
+        kodeLabel: 'Kode komponen atribut aset',
+        namaLabel: 'Nama komponen atribut aset',
+        singular: 'komponen atribut aset',
         extraFields: [
             {
                 name: 'data_type',
@@ -695,8 +695,8 @@ export const MASTERS: MasterConfig[] = [
     },
     {
         resource: 'buku-penyusutan',
-        nav: 'Buku penyusutan',
-        title: 'Buku penyusutan',
+        nav: 'Buku dan Metode Penyusutan',
+        title: 'Buku dan Metode Penyusutan',
         subtitle:
             'Buku yang melacak nilai aset, misalnya satu komersial dan satu fiskal.',
         kodeLabel: 'Kode buku penyusutan',
@@ -725,14 +725,14 @@ export const MASTERS: MasterConfig[] = [
             },
             {
                 name: 'depreciation_profile_id',
-                label: 'Profil utama',
+                label: 'Metode utama',
                 type: 'reference',
                 resource: 'profil-penyusutan',
-                help: 'Dipakai bila baris matriks group tidak menentukan profil khusus.',
+                help: 'Dipakai bila baris matriks group tidak menentukan metode khusus.',
             },
             {
                 name: 'alternative_profile_id',
-                label: 'Profil pengganti (opsional)',
+                label: 'Metode pengganti (opsional)',
                 type: 'reference',
                 resource: 'profil-penyusutan',
                 help: 'Dipakai saat saldo menurun sudah menghasilkan angka lebih kecil daripada garis lurus sisa umur.',
@@ -741,17 +741,17 @@ export const MASTERS: MasterConfig[] = [
     },
     {
         resource: 'profil-penyusutan',
-        nav: 'Profil penyusutan',
-        title: 'Profil penyusutan',
+        nav: 'Metode Penyusutan',
+        title: 'Metode Penyusutan',
         subtitle:
             'Aturan penyusutan yang dapat dipakai ulang oleh banyak aset.',
-        kodeLabel: 'Kode profil penyusutan',
-        namaLabel: 'Nama profil penyusutan',
-        singular: 'profil penyusutan',
+        kodeLabel: 'Kode metode penyusutan',
+        namaLabel: 'Nama metode penyusutan',
+        singular: 'metode penyusutan',
         extraFields: [
             {
                 name: 'method',
-                label: 'Metode',
+                label: 'Cara perhitungan',
                 type: 'select',
                 required: true,
                 options: [
@@ -791,13 +791,13 @@ export const MASTERS: MasterConfig[] = [
                 name: 'effective_from',
                 label: 'Berlaku mulai',
                 type: 'date',
-                help: 'Kosong berarti profil tidak dibatasi dari tanggal awal.',
+                help: 'Kosong berarti metode tidak dibatasi dari tanggal awal.',
             },
             {
                 name: 'effective_to',
                 label: 'Berlaku sampai',
                 type: 'date',
-                help: 'Kosong berarti profil tetap berlaku sampai diganti versi baru.',
+                help: 'Kosong berarti metode tetap berlaku sampai diganti versi baru.',
             },
             // Field berikut hanya relevan untuk sebagian metode; disembunyikan agar
             // pengguna tidak mengisi nilai yang tidak akan pernah dipakai.
