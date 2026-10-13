@@ -333,7 +333,13 @@ function CreateOrganizationDialog({
                                         )}
                                     >
                                         <Input
-                                            label="Nomor Unit"
+                                            label="Kode unit"
+                                            required={[
+                                                'business_unit',
+                                                'department',
+                                            ].includes(
+                                                form.data.operating_unit_type,
+                                            )}
                                             value={
                                                 form.data.operating_unit_number
                                             }
@@ -351,9 +357,10 @@ function CreateOrganizationDialog({
                                             )}
                                         />
                                         <FieldDescription>
-                                            Nomor yang dikirim ke aplikasi
-                                            finance. Huruf besar, angka, dan
-                                            tanda hubung.
+                                            Kode unik untuk membedakan unit yang
+                                            namanya sama. Gunakan huruf besar,
+                                            angka, atau tanda hubung. Kode ini
+                                            juga dikirim ke Finance.
                                         </FieldDescription>
                                         <FieldError>
                                             {form.errors.operating_unit_number}
@@ -803,7 +810,17 @@ function OrganizationDetailPage({
                                                 )}
                                             >
                                                 <Input
-                                                    label="Nomor Unit"
+                                                    label="Kode unit"
+                                                    required={
+                                                        editing &&
+                                                        [
+                                                            'business_unit',
+                                                            'department',
+                                                        ].includes(
+                                                            form.data
+                                                                .operating_unit_type,
+                                                        )
+                                                    }
                                                     value={
                                                         form.data
                                                             .operating_unit_number
@@ -827,11 +844,13 @@ function OrganizationDetailPage({
                                                     )}
                                                 />
                                                 <FieldDescription>
-                                                    Nomor yang dikirim ke
-                                                    aplikasi finance sebagai
-                                                    dimensi. Mengganti nomor
-                                                    tidak mengubah jurnal yang
-                                                    sudah terkirim.
+                                                    Kode unik untuk membedakan
+                                                    unit yang namanya sama.
+                                                    Gunakan huruf besar, angka,
+                                                    atau tanda hubung. Kode ini
+                                                    juga dikirim ke Finance;
+                                                    perubahan tidak mengubah
+                                                    jurnal yang sudah terkirim.
                                                 </FieldDescription>
                                                 <FieldError>
                                                     {

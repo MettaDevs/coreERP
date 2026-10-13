@@ -18,10 +18,10 @@ export function MissingNumberBadge() {
         <Badge
             variant="outline"
             className="border-warning/40 text-warning"
-            title="Posting finance untuk unit ini akan tertahan sampai nomornya diisi."
+            title="Posting finance untuk unit ini akan tertahan sampai kode unit diisi."
         >
             <CircleAlert />
-            Belum bernomor
+            Kode belum diisi
         </Badge>
     );
 }

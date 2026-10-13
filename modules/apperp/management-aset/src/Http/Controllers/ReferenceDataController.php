@@ -64,10 +64,12 @@ final class ReferenceDataController extends Controller
         $this->guardDirektori($request);
 
         return response()->json(['data' => array_map(
-            // `kode` sengaja disamakan dengan nama: kontrak Core tidak memulangkan kode
-            // unit, dan label dropdown modul ini berbentuk `kode — nama`. Tanpa penyamaan
-            // itu, pilihannya terbaca sebagai "— Divisi Engineering".
-            static fn (array $unit): array => ['id' => $unit['id'], 'kode' => $unit['nama'], 'nama' => $unit['nama'], 'display_label' => $unit['nama']],
+            static fn (array $unit): array => [
+                'id' => $unit['id'],
+                'kode' => $unit['nomor'] ?? '',
+                'nama' => $unit['nama'],
+                'display_label' => $unit['nomor'] === null ? $unit['nama'] : $unit['nomor'].' — '.$unit['nama'],
+            ],
             $direktori->operatingUnits((string) $request->attributes->get('coreerp.tenant_id')),
         )]);
     }

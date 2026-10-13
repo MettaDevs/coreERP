@@ -173,7 +173,9 @@ paths:
         monitoring, atau lokasi aset — sama seperti daftar satuan.
       responses:
         '200':
-          description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
+          description: Daftar unit kerja dengan `id`, `kode` (nomor operating unit, kosong bila belum diisi), `nama`, dan
+            `display_label` (kode — nama, atau nama saja bila belum punya kode). Relasi memakai `id`; nama pada laporan tidak
+            ditambahi kode.
         '403':
           description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
   /api/v1/reference-data/alamat:

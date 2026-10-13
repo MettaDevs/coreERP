@@ -6,6 +6,7 @@ use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Models\AppServiceCredential;
 use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Organization\Models\OperatingUnit;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
@@ -146,7 +147,7 @@ class OperatingUnitNumberTest extends TestCase
         $this->assertDatabaseHas('organizations', ['id' => $unit->id, 'name' => 'Poli Umum Lantai 2']);
     }
 
-    public function test_nomor_boleh_diganti_dan_dikosongkan(): void
+    public function test_department_code_can_change_but_cannot_be_cleared(): void
     {
         $unit = $this->operatingUnit('Poli Umum', 'department', 'POLI-UMUM');
 
@@ -159,8 +160,41 @@ class OperatingUnitNumberTest extends TestCase
         $this->patch("/settings/organization/organizations/{$unit->id}", [
             'version' => $unit->fresh()->version,
             'name' => 'Poli Umum', 'operating_unit_type' => 'department', 'operating_unit_number' => '',
-        ])->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('operating_units', ['organization_id' => $unit->id, 'number' => null]);
+        ])->assertSessionHasErrors('operating_unit_number');
+        $this->assertDatabaseHas('operating_units', ['organization_id' => $unit->id, 'number' => 'PU-01']);
+    }
+
+    public function test_business_unit_and_department_require_a_code_on_creation(): void
+    {
+        foreach (['business_unit', 'department'] as $type) {
+            foreach ([[], ['operating_unit_number' => '   ']] as $number) {
+                $this->actingAs($this->owner)->postJson('/api/v1/organizations', [
+                    'classification' => 'operating_unit', 'name' => 'Unit without code',
+                    'operating_unit_type' => $type, ...$number,
+                ])->assertUnprocessable()->assertJsonValidationErrors('operating_unit_number');
+            }
+        }
+        $this->assertSame(0, OperatingUnit::query()->count());
+    }
+
+    public function test_other_unit_types_can_be_created_without_a_code(): void
+    {
+        foreach (['cost_center', 'value_stream', 'retail_channel'] as $type) {
+            $this->actingAs($this->owner)->postJson('/api/v1/organizations', [
+                'classification' => 'operating_unit', 'name' => $type,
+                'operating_unit_type' => $type,
+            ])->assertCreated()->assertJsonPath('data.operating_unit.number', null);
+        }
+    }
+
+    public function test_existing_unnumbered_unit_requires_a_code_when_updated(): void
+    {
+        $unit = $this->operatingUnit('Legacy unit', 'department', null);
+        $this->actingAs($this->owner)->patchJson("/api/v1/organizations/{$unit->id}", [
+            'version' => $unit->fresh()->version,
+            'name' => 'Legacy unit renamed', 'operating_unit_type' => 'department',
+        ])->assertUnprocessable()->assertJsonValidationErrors('operating_unit_number');
+        $this->assertDatabaseHas('organizations', ['id' => $unit->id, 'name' => 'Legacy unit']);
     }
 
     public function test_nomor_milik_unit_lain_ditolak_saat_mengubah(): void
@@ -368,6 +402,16 @@ class OperatingUnitNumberTest extends TestCase
 
     private function operatingUnit(string $nama, string $tipe, ?string $nomor): Organization
     {
+        if ($nomor === null) {
+            // Data lama yang lahir sebelum kode diwajibkan.
+            $organization = Organization::create([
+                'tenant_id' => TenantMembership::where('user_id', $this->owner->id)->firstOrFail()->tenant_id,
+                'classification' => 'operating_unit', 'name' => $nama, 'status' => 'active',
+            ]);
+            $organization->operatingUnit()->create(['tenant_id' => $organization->tenant_id, 'type' => $tipe, 'number' => null]);
+
+            return $organization;
+        }
         $this->actingAs($this->owner)->post('/settings/organization/organizations', array_filter([
             'classification' => 'operating_unit',
             'name' => $nama,

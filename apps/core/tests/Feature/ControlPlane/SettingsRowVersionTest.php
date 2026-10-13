@@ -332,6 +332,9 @@ class SettingsRowVersionTest extends TestCase
     /** @param  array<string, string>  $data */
     private function organization(array $data): Organization
     {
+        if (($data['classification'] ?? null) === 'operating_unit') {
+            $data['operating_unit_number'] ??= 'UNIT-'.(Organization::query()->count() + 1);
+        }
         $id = $this->actingAs($this->owner)->postJson('/api/v1/organizations', $data)->assertCreated()->json('data.id');
 
         return Organization::query()->findOrFail($id);

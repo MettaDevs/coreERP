@@ -284,6 +284,7 @@ class OrganizationHierarchyTest extends TestCase
             'classification' => 'operating_unit',
             'name' => 'Asset operations',
             'operating_unit_type' => 'department',
+            'operating_unit_number' => 'ASSET-OPS',
         ])->assertCreated();
     }
 
@@ -305,6 +306,9 @@ class OrganizationHierarchyTest extends TestCase
 
     private function createOrganization(array $data): Organization
     {
+        if (($data['classification'] ?? null) === 'operating_unit') {
+            $data['operating_unit_number'] ??= 'UNIT-'.(Organization::query()->count() + 1);
+        }
         $id = $this->actingAs($this->owner)->postJson('/api/v1/organizations', $data)->assertCreated()->json('data.id');
 
         return Organization::query()->findOrFail($id);
