@@ -349,6 +349,7 @@ class FinancePostingSettingsTest extends TestCase
     {
         $this->actingAs($this->owner)->post('/settings/organization/organizations', [
             'classification' => 'operating_unit', 'name' => $nama, 'operating_unit_type' => 'business_unit',
+            'operating_unit_number' => 'UNIT-'.(DB::table('organizations')->count() + 1),
         ])->assertSessionHasNoErrors();
 
         return (string) DB::table('organizations')->where('name', $nama)->value('id');

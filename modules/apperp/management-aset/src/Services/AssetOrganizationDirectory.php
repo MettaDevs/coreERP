@@ -35,12 +35,12 @@ final class AssetOrganizationDirectory
     /**
      * Unit kerja tenant sebagai pilihan dropdown.
      *
-     * @return list<array{id: string, nama: string}>
+     * @return list<array{id: string, nama: string, nomor: ?string}>
      */
     public function operatingUnits(string $tenantId): array
     {
         return array_map(
-            static fn (array $unit): array => ['id' => $unit['id'], 'nama' => $unit['nama']],
+            static fn (array $unit): array => ['id' => $unit['id'], 'nama' => $unit['nama'], 'nomor' => $unit['nomor']],
             $this->directory->operatingUnits($tenantId),
         );
     }

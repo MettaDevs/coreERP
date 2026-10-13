@@ -48,6 +48,8 @@ class OrganizationRequest extends FormRequest
             ],
             'operating_unit_number' => [
                 'prohibited_if:classification,legal_entity',
+                Rule::requiredIf($this->input('classification') === 'operating_unit'
+                    && in_array($this->input('operating_unit_type'), ['business_unit', 'department'], true)),
                 'nullable',
                 'string',
                 'max:'.OperatingUnit::NUMBER_LENGTH,
@@ -60,8 +62,9 @@ class OrganizationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'operating_unit_number.regex' => 'Nomor unit hanya boleh huruf besar, angka, dan tanda hubung, tanpa spasi.',
-            'operating_unit_number.prohibited_if' => 'Nomor unit hanya untuk operating unit.',
+            'operating_unit_number.required' => 'Isi kode unit untuk Business unit atau Department.',
+            'operating_unit_number.regex' => 'Kode unit hanya boleh huruf besar, angka, dan tanda hubung, tanpa spasi.',
+            'operating_unit_number.prohibited_if' => 'Kode unit hanya untuk operating unit.',
             'timezone.in' => 'Pilih zona waktu dari daftar.',
             'timezone.prohibited_if' => 'Zona waktu hanya untuk entitas legal.',
         ];

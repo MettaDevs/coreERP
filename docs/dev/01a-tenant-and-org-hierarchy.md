@@ -105,7 +105,8 @@ Operating unit tidak memiliki kode organisasi umum. Jika proses regulator atau i
 
 `operating_units.number` adalah identifier domain seperti yang dimaksud paragraf di atas: nilai dimensi keuangan `BUSINESS_UNIT` dan `DEPARTMENT` yang dikirim feed posting finance, padanan *operating unit number* di Dynamics 365 F&O.
 
-- Opsional. Business unit dan department yang belum bernomor ditandai di layar organisasi, karena posting finance untuk unit itu akan tertahan.
+- Di layar disebut **Kode unit**, karena nilainya dapat berupa huruf, angka, dan tanda hubung. Wajib diisi saat membuat atau menyunting Business unit dan Department; tipe operating unit lain tetap opsional. Unit lama yang belum punya kode harus dilengkapi saat disunting. Perubahan lewat API yang tidak mengirim field ini tetap mempertahankan kode yang sudah ada.
+- Kode membedakan unit yang namanya sama; hubungan ke business unit ditentukan hierarki, bukan prefix kode. Dropdown unit kerja Management Aset menampilkan kode dan nama, sedangkan nama pada laporan tetap memakai nama organisasi.
 - Unik per tenant lewat indeks unik parsial `(tenant_id, number) WHERE number IS NOT NULL`. `tenant_id` disalin dari `organizations` tanpa foreign key ke `tenants`, karena tabel itu milik sisi pusat.
 - Huruf besar dan angka, dipisah tanda hubung tunggal, paling panjang 30 karakter.
 - Boleh diganti. Posting yang sudah terbit menyimpan nomor pada saat terbit, jadi yang berubah hanya posting berikutnya.

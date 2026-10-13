@@ -70,7 +70,7 @@ class CreateOrganization
     public static function numberInUse(): ValidationException
     {
         return ValidationException::withMessages([
-            'operating_unit_number' => 'Nomor unit sudah dipakai operating unit lain pada tenant ini.',
+            'operating_unit_number' => 'Kode unit sudah dipakai unit lain dalam bisnis ini.',
         ]);
     }
 }

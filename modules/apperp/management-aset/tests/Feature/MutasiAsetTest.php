@@ -371,6 +371,27 @@ class MutasiAsetTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_unit_options_distinguish_same_names_without_changing_names(): void
+    {
+        $ids = [];
+        foreach (['DPS-UMUM', 'CDS-UMUM'] as $code) {
+            $id = $this->unitKerjaCore('Poli Umum');
+            $ids[] = $id;
+            DB::table('operating_units')->insert([
+                'organization_id' => $id, 'tenant_id' => $this->tenantId,
+                'type' => 'department', 'number' => $code,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $options = $this->sebagaiPengguna($this->tenantId, ['management-aset.lokasi-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/reference-data/unit-kerja')
+            ->assertOk()->json('data');
+
+        $this->assertEqualsCanonicalizing($ids, array_column($options, 'id'));
+        $this->assertEqualsCanonicalizing(['DPS-UMUM — Poli Umum', 'CDS-UMUM — Poli Umum'], array_column($options, 'display_label'));
+        $this->assertSame(['Poli Umum', 'Poli Umum'], array_column($options, 'nama'));
+    }
+
     public function test_aset_dari_badan_hukum_lain_ditolak(): void
     {
         $aset = $this->receive();
