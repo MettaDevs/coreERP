@@ -72,6 +72,8 @@ $masters = [
     'alasan-downtime' => DowntimeReasonController::class,
 ];
 
+Route::get('lokasi-aset/number-policy', [LokasiAsetController::class, 'numberPolicy']);
+
 // Matriks group x buku disunting di dalam form group, jadi ia memakai permission
 // group dan tidak berdiri sendiri sebagai master.
 // Atribut menempel pada jenis aset dan pilihan nilainya pada tipe atribut;

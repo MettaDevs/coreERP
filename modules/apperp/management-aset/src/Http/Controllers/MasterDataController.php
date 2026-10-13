@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
@@ -166,6 +167,9 @@ abstract class MasterDataController extends Controller
         $tenantId = $this->tenantId($request);
         $data = $request->validate($this->writeRules($tenantId, creating: true));
         $payload = $this->payload($data);
+        if ($this->resource() === 'lokasi-aset' && ($manualValue = $this->trimmedOrNull($data['kode'] ?? null)) !== null) {
+            $payload['kode'] = $manualValue;
+        }
 
         if ($existing = $this->creationKeyQuery($creationKey)->first()) {
             return $this->replay($existing, $payload);
@@ -186,6 +190,7 @@ abstract class MasterDataController extends Controller
                     static::APP_ID.'.'.$this->resource(),
                     $tenantId,
                     $this->resource().':'.$creationKey,
+                    manualValue: $payload['kode'] ?? null,
                 );
 
                 // Dibaca ulang supaya jawaban membawa versi awal yang diisi database.
@@ -201,6 +206,10 @@ abstract class MasterDataController extends Controller
         } catch (QueryException $exception) {
             $existing = $this->creationKeyQuery($creationKey)->first();
             if (! $existing) {
+                if ($this->resource() === 'lokasi-aset' && $exception->getCode() === '23505'
+                    && str_contains($exception->getMessage(), 'm_lokasi_aset_tenant_id_kode_unique')) {
+                    throw ValidationException::withMessages(['kode' => 'Kode lokasi ini sudah digunakan.']);
+                }
                 throw $exception;
             }
 
@@ -357,12 +366,12 @@ abstract class MasterDataController extends Controller
         }
     }
 
-    private function tenantId(Request $request): string
+    protected function tenantId(Request $request): string
     {
         return (string) $request->attributes->get('coreerp.tenant_id');
     }
 
-    private function requirePermission(Request $request, string $action): void
+    protected function requirePermission(Request $request, string $action): void
     {
         $permission = static::APP_ID.'.'.$this->resource().'.'.$action;
         if (in_array($permission, $request->attributes->get('coreerp.permissions', []), true)) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Foundation\NumberSequence\ModuleServices;
 
 use App\Foundation\NumberSequence\Actions\NumberSequenceService;
+use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 
 /**
@@ -17,6 +18,17 @@ use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 final class NumberSequenceIssuerCore implements NumberSequenceIssuer
 {
     public function __construct(private readonly NumberSequenceService $service) {}
+
+    public function allowsManual(string $tenantId, string $appId, string $referenceCode): bool
+    {
+        return TenantNumberSequence::query()
+            ->where('tenant_id', $tenantId)
+            ->whereHas('reference', fn ($query) => $query->where('app_id', $appId)->where('code', $referenceCode))
+            ->where('status', 'active')
+            ->where('is_continuous', false)
+            ->where('allow_manual', true)
+            ->exists();
+    }
 
     public function issue(array $context, string $referenceCode, string $idempotencyKey, ?string $manualValue = null): array
     {
