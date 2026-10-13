@@ -106,6 +106,8 @@ graph TD
 
 ---
 
+Sheet master sederhana ditutup setelah penyimpanan berhasil, lalu DataTable dimuat ulang. `MasterPage` menentukan kelanjutan dari `extraSectionFor`, bukan pengecualian nama master. Setelah create, Sheet tetap terbuka hanya bila ada rincian yang memerlukan ID record baru, misalnya pilihan nilai pada tipe atribut teks. PATCH biasa menutup Sheet. Master daftar-detail tetap mengikuti alur panelnya sendiri.
+
 ## Arsitektur Backend: Dua Base Controller
 
 ### 1. `MasterDataController` — Untuk Master Mandiri

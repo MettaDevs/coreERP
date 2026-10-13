@@ -681,10 +681,19 @@ export default function MasterPage({
                     onClose={() => setEditing(undefined)}
                     key={editing?.id ?? 'baru'}
                     onSaved={(savedRecord, created) => {
-                        // Jenis asuransi selesai setelah disimpan; master lain tetap dibuka
-                        // untuk mengisi rincian lanjutannya dari record hasil POST.
+                        // Form hanya tetap terbuka bila ada rincian lanjutan yang
+                        // baru dapat diisi setelah record pemiliknya tersimpan.
                         const keepOpen =
-                            created && config.resource !== 'jenis-asuransi';
+                            created &&
+                            Boolean(
+                                extraSectionFor(
+                                    config.resource,
+                                    savedRecord,
+                                    can('update'),
+                                    (version) =>
+                                        changeVersion(savedRecord.id, version),
+                                ),
+                            );
                         setEditing(keepOpen ? savedRecord : undefined);
                         void load();
                     }}
