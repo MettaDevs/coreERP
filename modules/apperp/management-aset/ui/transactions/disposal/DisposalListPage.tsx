@@ -1,4 +1,3 @@
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -11,6 +10,7 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { api, errorMessage } from '../../api';
 import type { Disposal, DisposalResource } from './disposal';
