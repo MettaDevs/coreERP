@@ -1,5 +1,7 @@
 # Database
 
+`aset_m_kelompok_harta_fiskal` kini dapat dibaca dan diubah melalui halaman Kelompok harta. Tidak ada perubahan skema: tanggal tetap tersimpan, label dropdown hanya menampilkan nama, dan edit memakai `version` yang sudah tersedia. `tenant_id`, `template_key` dan yurisdiksi tidak dapat diubah oleh endpoint. Perubahan tidak menyalin ulang profil penyusutan.
+
 ## Dekomisioning dan keputusan workflow
 
 `tr_dokumen_siklus_aset.workflow_instance_id` mengikat usulan dekomisioning ke workflow CoreERP. `processed_core_events` adalah inbox idempoten: event keputusan yang sama hanya mengubah status sekali. Kedua tabel tetap berada di database Aset; CoreERP tidak mengaksesnya langsung.

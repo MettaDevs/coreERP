@@ -87,6 +87,7 @@ x-bundle:
   paths:
   - paths/platform.yaml
   - paths/master-data.yaml
+  - paths/asset-classifications.yaml
   - paths/maintenance.yaml
   - paths/aset.yaml
   - paths/penerimaan-aset.yaml

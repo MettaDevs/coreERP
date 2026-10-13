@@ -904,7 +904,7 @@ FiscalClassification:
       maxLength: 150
     display_label:
       type: string
-      description: Label siap tampil yang membedakan versi berdasarkan tanggal berlaku.
+      description: Nama kelompok untuk dropdown, tanpa tanggal berlaku. Tanggal tetap tersedia pada effective_from.
     regulation_reference:
       type:
       - string

@@ -156,7 +156,7 @@ final class ReferenceDataController extends Controller
                 'id' => $record->id,
                 'kode' => $record->template_key,
                 'nama' => $record->label,
-                'display_label' => $this->displayLabel($record),
+                'display_label' => $record->label,
                 'template_key' => $record->template_key,
                 'jurisdiction' => $record->jurisdiction,
                 'label' => $record->label,
@@ -177,11 +177,5 @@ final class ReferenceDataController extends Controller
                 'total' => $page->total(),
             ],
         ]);
-    }
-
-    /** Tanggal berlaku selalu terisi — kolomnya NOT NULL — jadi label selalu menyebutkannya. */
-    private function displayLabel(KelompokHartaFiskal $record): string
-    {
-        return $record->label.' — berlaku '.$record->effective_from->format('d/m/Y');
     }
 }

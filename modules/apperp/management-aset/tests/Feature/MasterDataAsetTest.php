@@ -379,7 +379,8 @@ class MasterDataAsetTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $reference)
-            ->assertJsonPath('data.0.display_label', 'Kelompok uji — berlaku 17/07/2023')
+            ->assertJsonPath('data.0.display_label', 'Kelompok uji')
+            ->assertJsonPath('data.0.effective_from', '2023-07-17')
             ->assertJsonPath('meta.total', 1);
     }
 

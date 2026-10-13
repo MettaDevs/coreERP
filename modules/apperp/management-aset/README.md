@@ -1,5 +1,7 @@
 # App ERP Management Aset
 
+Kelompok harta dapat dilihat dan diubah melalui `management-aset/kelompok-harta`, dengan izin baca dan ubah tersendiri. Dropdown Group aset menampilkan nama tanpa tanggal; detail dan tanggal aturan tetap disimpan. Penyuntingan referensi tidak memperbarui profil penyusutan yang sudah dibuat. Rinciannya di [Kelompok harta](../../../docs/apps/management-aset/master/kelompok-harta/index.md).
+
 Module bisnis di `modules/apperp/management-aset`. Ia berjalan di runtime Core, memakai database tenant yang
 sama dengan Core, dan tabelnya berawalan `aset_`. Tidak ada lagi API, database, atau container sendiri; folder
 `api/` hanya menyisakan satu `Dockerfile` peninggalan masa itu.

@@ -144,6 +144,7 @@ export default withMermaid({
           items: [
             { text: 'Master data', link: '/apps/management-aset/master/' },
             { text: 'Group aset', link: '/apps/management-aset/master/groupaset/' },
+            { text: 'Kelompok harta', link: '/apps/management-aset/master/kelompok-harta/' },
             { text: 'Jenis aset dan atribut', link: '/apps/management-aset/master/jenisaset/' },
             { text: 'Pabrikan dan model', link: '/apps/management-aset/master/katalog-model/' },
             { text: 'Lokasi, alamat, dan dimensi keuangan', link: '/apps/management-aset/master/lokasi/' },

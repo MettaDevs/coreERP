@@ -46,6 +46,10 @@ export type PropsModul = {
  * hilang, dan setiap permintaan datanya berjalan lagi.
  */
 const MasterPage = lazy(() => import('./master/MasterPage'));
+const AssetClassificationPage = lazy(
+    () =>
+        import('./transactions/asset-classifications/AssetClassificationPage'),
+);
 const MasterDetailPage = lazy(() => import('./master/detail/MasterDetailPage'));
 const AsetPage = lazy(
     () => import('./transactions/inventarisasi-aset/AsetPage'),
@@ -241,6 +245,20 @@ export default function App({
                     )}
                     context={konteks}
                 />
+            </main>
+        );
+    }
+
+    if (
+        view === 'kelompok-harta' &&
+        permissions.includes('management-aset.kelompok-harta.read')
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <AssetClassificationPage permissions={permissions} />
             </main>
         );
     }
