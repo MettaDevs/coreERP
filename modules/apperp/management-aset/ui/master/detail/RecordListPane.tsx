@@ -169,10 +169,10 @@ export default function RecordListPane({
                                 }`}
                             >
                                 <span className="block truncate text-base font-semibold leading-tight">
-                                    {item.kode}
+                                    {item.nama}
                                 </span>
                                 <span className="text-muted-foreground mt-0.5 block truncate text-xs">
-                                    {item.nama}
+                                    {item.kode}
                                     {item.aktif ? '' : ' · Tidak aktif'}
                                 </span>
                             </button>
