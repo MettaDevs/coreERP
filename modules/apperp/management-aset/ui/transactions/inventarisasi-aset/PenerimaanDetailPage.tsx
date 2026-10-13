@@ -1,4 +1,3 @@
-import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { usePage } from '@inertiajs/react';
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -43,6 +42,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';

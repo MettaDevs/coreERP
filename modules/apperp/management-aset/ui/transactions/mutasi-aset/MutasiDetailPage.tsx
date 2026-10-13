@@ -1,4 +1,3 @@
-import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { FileText, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -36,6 +35,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
