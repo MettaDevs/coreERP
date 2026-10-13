@@ -119,6 +119,7 @@ export type DatasetDescription = DatasetSummary & {
     fields: DatasetField[];
     measures: DatasetMeasure[];
     times: string[];
+    hierarchies: Record<string, string[]>;
     default_time: string | null;
 };
 
@@ -211,7 +212,73 @@ export type DashboardSummary = {
 /** Dasbor beserta letak efektif setiap widget-nya, tanpa data widget. */
 export type DashboardDetail = DashboardSummary & {
     layout: DashboardLayoutItem[];
+    slicers: DashboardSlicer[];
+    /** Kolom aman untuk dipilih dan dipetakan pada dasbor ini, per data yang boleh dibaca pengguna. */
+    dataset_fields: Record<string, DatasetDescription>;
     widgets: DashboardWidget[];
+};
+
+export type SlicerSource =
+    | { type: 'field'; dataset: string; field: string }
+    | { type: 'shared'; dimension: string };
+
+export type SlicerControl = 'multi_select' | 'date_range' | 'expression';
+
+export type DashboardSlicer = {
+    key: string;
+    title: string;
+    source: SlicerSource;
+    control: SlicerControl;
+    default_value: string | string[] | null;
+};
+
+/** Saringan sementara dari nilai yang dipilih pengguna di widget lain. */
+export type CrossFilter = {
+    id: string;
+    origin_widget_id: string;
+    title: string;
+    source: {
+        dataset: string;
+        field: string;
+        type: DatasetField['type'];
+        shared_dimension?: string;
+        time: boolean;
+        granularity?: TimeGranularity;
+    };
+    value: string;
+    label: string;
+};
+
+export type DrillValue = {
+    field: string;
+    value: ResultValue;
+    granularity?: TimeGranularity;
+};
+
+export type DrillColumn = {
+    key: string;
+    caption: string;
+    type: DatasetField['type'];
+    label_key?: string;
+};
+
+export type DrillPage = {
+    columns: DrillColumn[];
+    rows: Array<
+        Record<string, ResultValue> & { id: string; record_url: string | null }
+    >;
+    next_cursor: string | null;
+    record_route: string | null;
+};
+
+export type DrillDownResult = {
+    result: ResultSet;
+    next: {
+        field: string;
+        granularity: TimeGranularity | null;
+        caption: string;
+    };
+    path: DrillValue[];
 };
 
 export type SavedQuery = {

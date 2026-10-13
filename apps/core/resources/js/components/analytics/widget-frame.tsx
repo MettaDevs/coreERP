@@ -19,6 +19,7 @@ import { Skeleton } from '@apperp/ui/skeleton';
 import {
     ChartColumn,
     CircleSlash,
+    Download,
     Ellipsis,
     LockKeyhole,
     RotateCw,
@@ -28,19 +29,36 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { DrillSheet } from '@/components/analytics/drill-sheet';
+import { SlicerApplicability } from '@/components/analytics/slicer-bar';
 import { useWidgetData } from '@/components/analytics/use-widget-data';
 import {
     CHART_HEIGHT,
     isChartType,
     WidgetContent,
 } from '@/components/analytics/widget-content';
+import { enqueueAnalyticsExport } from '@/lib/analytics/api';
 import type { WidgetFailure } from '@/lib/analytics/api';
 import { formatComputedAt } from '@/lib/analytics/format';
+import {
+    crossFilterFromRow,
+    crossFilterValues,
+    notApplicableSlicers,
+} from '@/lib/analytics/slicer';
+import type { SlicerValues } from '@/lib/analytics/slicer';
 import type {
+    CrossFilter,
+    DashboardSlicer,
     DashboardWidget,
+    DatasetField,
+    ResultColumn,
     ResultSet,
+    ResultValue,
     TextVisual,
+    DrillValue,
 } from '@/lib/analytics/types';
+import { toastSaveError } from '@/lib/core-api';
 import { cn } from '@/lib/utils';
 
 type WidgetFrameProps = {
@@ -53,6 +71,12 @@ type WidgetFrameProps = {
     onRename?: (widget: DashboardWidget) => void;
     onArchive?: (widget: DashboardWidget) => void;
     className?: string;
+    fields?: DatasetField[];
+    hierarchies?: Record<string, string[]>;
+    slicers?: DashboardSlicer[];
+    slicerValues?: SlicerValues;
+    crossFilters?: CrossFilter[];
+    onCrossFilter?: (filter: CrossFilter) => void;
 };
 
 /**
@@ -72,18 +96,79 @@ export function WidgetFrame({
     onRename,
     onArchive,
     className,
+    fields = [],
+    hierarchies = {},
+    slicers = [],
+    slicerValues = {},
+    crossFilters = [],
+    onCrossFilter,
 }: WidgetFrameProps) {
     const hasData =
         widget.type !== 'text' &&
         widget.query !== null &&
         widget.status === 'ok';
+    const targetFilters = crossFilterValues(
+        widget,
+        fields,
+        slicers,
+        slicerValues,
+        crossFilters,
+    );
     const { ref, loading, result, failure, previous, reload } = useWidgetData(
         widget.id,
         hasData,
+        slicerValues,
+        targetFilters,
     );
     const [asTable, setAsTable] = useState(false);
+    const [drilling, setDrilling] = useState<DrillValue[] | null>(null);
     const chart = isChartType(widget.type);
     const shown = result ?? (loading ? previous : null);
+    const notApplicable = notApplicableSlicers(slicers, widget, fields);
+
+    const selectDimension = (
+        column: ResultColumn,
+        row: Record<string, ResultValue>,
+        label: string,
+    ) => {
+        const field = fields.find((item) => item.key === column.key);
+        const filter =
+            field === undefined
+                ? null
+                : crossFilterFromRow(
+                      widget,
+                      field,
+                      row[column.key],
+                      label,
+                      column.granularity,
+                  );
+
+        if (filter) {
+            onCrossFilter?.(filter);
+        }
+    };
+
+    const selectPoint = (row: Record<string, ResultValue>) => {
+        if (shown === null || widget.query === null) {
+            return;
+        }
+
+        const values: DrillValue[] = [];
+
+        for (const dimension of widget.query.dimensions ?? []) {
+            const key =
+                typeof dimension === 'string' ? dimension : dimension.field;
+            const granularity =
+                typeof dimension === 'string'
+                    ? undefined
+                    : dimension.granularity;
+            values.push({ field: key, value: row[key] ?? null, granularity });
+        }
+
+        if (values.length > 0) {
+            setDrilling(values);
+        }
+    };
     const menu: Array<
         | {
               label: string;
@@ -106,6 +191,29 @@ export function WidgetFrame({
             : []),
         ...(hasData
             ? [
+                  {
+                      label: 'Ekspor ke Excel',
+                      icon: Download,
+                      onSelect: () => {
+                          void enqueueAnalyticsExport({
+                              widget_id: widget.id,
+                              kind: 'widget',
+                              slicers: slicerValues,
+                              cross_filters: targetFilters,
+                          })
+                              .then(() =>
+                                  toast.success(
+                                      'Ekspor bagian masuk ke antrean. Buka menu Ekspor untuk melihat hasilnya.',
+                                  ),
+                              )
+                              .catch((caught: unknown) =>
+                                  toastSaveError(
+                                      caught,
+                                      'Ekspor belum diminta.',
+                                  ),
+                              );
+                      },
+                  },
                   {
                       label: 'Muat ulang',
                       icon: RotateCw,
@@ -188,6 +296,7 @@ export function WidgetFrame({
                 )}
             </CardHeader>
             <CardContent className="min-h-0 flex-1">
+                <SlicerApplicability titles={notApplicable} />
                 <FrameBody
                     widget={widget}
                     height={height}
@@ -198,6 +307,9 @@ export function WidgetFrame({
                     asTable={asTable}
                     onReload={reload}
                     onEdit={onEdit}
+                    fields={fields}
+                    onDimensionSelect={selectDimension}
+                    onPointSelect={selectPoint}
                 />
             </CardContent>
             {hasData && shown !== null && (
@@ -222,6 +334,19 @@ export function WidgetFrame({
                     </Button>
                 </CardFooter>
             )}
+            {drilling !== null && widget.query !== null && (
+                <DrillSheet
+                    key={`${widget.id}:${JSON.stringify(drilling)}`}
+                    widget={widget}
+                    values={drilling}
+                    query={widget.query}
+                    fields={fields}
+                    hierarchies={hierarchies}
+                    slicers={slicerValues}
+                    crossFilters={targetFilters}
+                    onClose={() => setDrilling(null)}
+                />
+            )}
         </Card>
     );
 }
@@ -236,6 +361,9 @@ function FrameBody({
     asTable,
     onReload,
     onEdit,
+    fields,
+    onDimensionSelect,
+    onPointSelect,
 }: {
     widget: DashboardWidget;
     height: number;
@@ -246,6 +374,13 @@ function FrameBody({
     asTable: boolean;
     onReload: () => void;
     onEdit?: (widget: DashboardWidget) => void;
+    fields: DatasetField[];
+    onDimensionSelect: (
+        column: ResultColumn,
+        row: Record<string, ResultValue>,
+        label: string,
+    ) => void;
+    onPointSelect: (row: Record<string, ResultValue>) => void;
 }) {
     const edit = onEdit && (
         <Button
@@ -351,6 +486,10 @@ function FrameBody({
                 title={widget.title}
                 height={height}
                 asTable={asTable}
+                fields={fields}
+                onDimensionSelect={onDimensionSelect}
+                onPointSelect={onPointSelect}
+                onDrillRow={onPointSelect}
             />
         </div>
     );

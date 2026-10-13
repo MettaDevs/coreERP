@@ -54,6 +54,9 @@ final class DatasetDefinition
     /** @var array<string, SharedDimension> */
     private array $shared = [];
 
+    /** @var array<string, list<string>> */
+    private array $hierarchies = [];
+
     /** @var (Closure(): Builder<Model>)|null */
     private ?Closure $source = null;
 
@@ -237,6 +240,19 @@ final class DatasetDefinition
         if ($default) {
             $this->defaultTime = $field;
         }
+
+        return $this;
+    }
+
+    /**
+     * Urutan field yang dapat ditelusuri bertingkat, dari tingkat atas ke bawah. Setiap level harus field
+     * dataset; Core menyaring tenant dan kebijakan data yang sama pada setiap permintaan drill.
+     *
+     * @param  list<string>  $fields
+     */
+    public function hierarchy(string $name, array $fields): self
+    {
+        $this->hierarchies[$name] = $fields;
 
         return $this;
     }

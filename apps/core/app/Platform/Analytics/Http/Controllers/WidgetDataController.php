@@ -7,6 +7,7 @@ namespace App\Platform\Analytics\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Platform\Analytics\Actions\RunQuery;
 use App\Platform\Analytics\Dashboards\DashboardAccess;
+use App\Platform\Analytics\Dashboards\SlicerDefinitions;
 use App\Platform\Analytics\Dashboards\StoredQuery;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Models\Widget;
@@ -33,7 +34,8 @@ use Illuminate\Http\Request;
  *
  * Hasilnya di-cache selama `cache_ttl_seconds` widget (kosong = bawaan config, `0` = selalu menghitung ulang;
  * area 9, `Cache\QueryCache`). `refresh` — tombol Muat ulang — melewati cache untuk widget ini lalu menimpa
- * hasilnya; keduanya tunduk pada limiter `analytics-interactive`. Slicer (fase 2) belum dibaca dari query string.
+ * hasilnya; keduanya tunduk pada limiter `analytics-interactive`. Slicer URL dan cross-filter diterapkan sebagai
+ * saringan terkunci, sebelum saringan yang disimpan pada widget.
  */
 final class WidgetDataController extends Controller
 {
@@ -44,6 +46,7 @@ final class WidgetDataController extends Controller
         private readonly QueryParser $parser,
         private readonly RunQuery $run,
         private readonly UserClock $clock,
+        private readonly SlicerDefinitions $slicers,
     ) {}
 
     public function show(Request $request, Widget $widget): JsonResponse
@@ -81,9 +84,20 @@ final class WidgetDataController extends Controller
                 );
             }
 
+            $query = $this->parser->parse($read['query']);
+            $locked = $this->slicers->filtersForWidget(
+                $widget->dashboard->slicers ?? [],
+                $request->query('s'),
+                $request->query('c'),
+                $dataset,
+                $read['query'],
+                $principal,
+            );
+            $principal = UserPrincipal::fromMembership($membership, $this->clock->timezone($request), [$dataset->code => $locked]);
+
             $result = $this->run->handle(
                 $principal,
-                $this->parser->parse($read['query']),
+                $query,
                 cacheTtl: $widget->cache_ttl_seconds,
                 refresh: $refresh,
                 source: QueryLog::SOURCE_WIDGET,

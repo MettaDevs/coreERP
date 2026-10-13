@@ -32,6 +32,7 @@ final readonly class DeclaredDataset
      * @param  array<string, SharedDimension>  $shared
      * @param  array<string, CompiledMeasure>  $measures
      * @param  list<string>  $times
+     * @param  array<string, list<string>>  $hierarchies
      * @param  array<string, string>  $renamed
      */
     public function __construct(
@@ -50,6 +51,7 @@ final readonly class DeclaredDataset
         public array $shared,
         public array $measures,
         public array $times,
+        public array $hierarchies,
         public ?string $defaultTime,
         public ?string $recordRoute,
         public int $version,

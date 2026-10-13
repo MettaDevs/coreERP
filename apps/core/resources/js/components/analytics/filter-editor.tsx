@@ -320,6 +320,7 @@ export function FilterEditor({
     errors = {},
     onChange,
     portalContainer,
+    alwaysShowFields = [],
 }: {
     /** Module pemilik data, untuk endpoint lookup rujukannya. */
     moduleId: string;
@@ -329,6 +330,8 @@ export function FilterEditor({
     errors?: Record<string, string>;
     onChange: (filters: Record<string, FilterValue>) => void;
     portalContainer?: RefObject<HTMLElement | null>;
+    /** Paksa satu field tampil saat kontrol dipakai di luar editor query, misalnya saringan dasbor. */
+    alwaysShowFields?: string[];
 }) {
     const [added, setAdded] = useState<string[]>([]);
     const byKey = useMemo(
@@ -340,6 +343,7 @@ export function FilterEditor({
     const shown = [
         ...new Set([
             ...Object.keys(value).filter((key) => filled(value[key])),
+            ...alwaysShowFields,
             ...added,
         ]),
     ];

@@ -2,6 +2,7 @@
 
 namespace App\Platform\Reporting\Jobs;
 
+use App\Platform\Analytics\Actions\AnalyticsExporter;
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Reporting\Support\ExportQueue;
@@ -101,7 +102,7 @@ final class RunReportExport implements ShouldQueue
         return array_values(array_map(intval(...), (array) config('reporting.export_retry_seconds')));
     }
 
-    public function handle(ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
+    public function handle(ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists, AnalyticsExporter $analytics): void
     {
         $export = $this->row();
         if ($export === null || ! ExportStatus::isActive($export->status)) {
@@ -120,7 +121,7 @@ final class RunReportExport implements ShouldQueue
         }
 
         // Worker hidup lama: pelaku dipasang untuk job ini saja, supaya tidak terbawa ke job berikutnya.
-        AuditActor::runAs($export->user_id, fn () => $this->export($export, $catalog, $client, $layouts, $pipeline, $identities, $dataOnly, $lists));
+        AuditActor::runAs($export->user_id, fn () => $this->export($export, $catalog, $client, $layouts, $pipeline, $identities, $dataOnly, $lists, $analytics));
     }
 
     /**
@@ -149,7 +150,7 @@ final class RunReportExport implements ShouldQueue
         $this->markFailed($message, $exception);
     }
 
-    private function export(stdClass $export, ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
+    private function export(stdClass $export, ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists, AnalyticsExporter $analytics): void
     {
         $layout = null;
         $rendered = null;
@@ -158,7 +159,15 @@ final class RunReportExport implements ShouldQueue
             $membership = TenantMembership::query()->whereKey($export->membership_id)->where('status', 'active')->first()
                 ?? throw new RenderException('Keanggotaan Anda tidak lagi aktif; ekspor dibatalkan.');
 
-            if (($export->kind ?? ExportQueue::KIND_LAYOUT) === ExportQueue::KIND_LIST) {
+            if (($export->kind ?? ExportQueue::KIND_LAYOUT) === ExportQueue::KIND_ANALYTICS) {
+                $this->update(['progress' => 10]);
+                $result = $analytics->render($export, $membership, fn (int $written, int $total) => $this->update([
+                    'progress' => $total > 0 ? min(95, 10 + intdiv(85 * $written, $total)) : 95,
+                ]));
+                $rendered = $result['file'];
+                $rowCount = $result['rows'];
+                $fileName = $result['name'].'-'.now(app(UserClock::class)->timezoneFor($membership->user, $export->legal_entity_id))->format('Ymd-His');
+            } elseif (($export->kind ?? ExportQueue::KIND_LAYOUT) === ExportQueue::KIND_LIST) {
                 // Daftar di layar: baris dibaca bertahap dari module dan langsung ditulis ke berkas (K-27).
                 $this->update(['progress' => 10]);
                 $result = $lists->render($export, $membership, fn (int $written, int $total) => $this->update([

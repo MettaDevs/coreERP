@@ -80,6 +80,7 @@ export default function ChartWidget({
     result,
     title,
     heightClass,
+    onPointSelect,
 }: {
     type: ChartWidgetType;
     visual: CartesianVisual | DonutVisual;
@@ -87,6 +88,7 @@ export default function ChartWidget({
     title: string;
     /** Tinggi area gambar, kelas Tailwind lengkap, misalnya `h-64`. */
     heightClass: string;
+    onPointSelect?: (row: Row) => void;
 }) {
     const panels = groupRowsByImplicit(result.rows, implicitColumns(result));
 
@@ -105,6 +107,7 @@ export default function ChartWidget({
                             title={title}
                             panel={panel.label}
                             heightClass={heightClass}
+                            onPointSelect={onPointSelect}
                         />
                     ) : (
                         <CartesianPanel
@@ -115,6 +118,7 @@ export default function ChartWidget({
                             title={title}
                             panel={panel.label}
                             heightClass={heightClass}
+                            onPointSelect={onPointSelect}
                         />
                     )}
                 </section>
@@ -162,6 +166,29 @@ type Point = {
     [series: string]: number | null | string | Record<string, Row>;
 };
 
+function rowFromChartEvent(value: unknown, seriesId?: string): Row | null {
+    if (typeof value !== 'object' || value === null) {
+        return null;
+    }
+
+    const event = value as { payload?: unknown };
+    const point = (event.payload ?? value) as Record<string, unknown>;
+    const rows = point.__rows;
+
+    if (typeof rows !== 'object' || rows === null) {
+        return null;
+    }
+
+    const selected =
+        seriesId === undefined
+            ? Object.values(rows as Record<string, unknown>)[0]
+            : (rows as Record<string, unknown>)[seriesId];
+
+    return typeof selected === 'object' && selected !== null
+        ? (selected as Row)
+        : null;
+}
+
 function CartesianPanel({
     type,
     result,
@@ -170,6 +197,7 @@ function CartesianPanel({
     title,
     panel,
     heightClass,
+    onPointSelect,
 }: {
     type: Exclude<ChartWidgetType, 'donut'>;
     result: ResultSet;
@@ -178,6 +206,7 @@ function CartesianPanel({
     title: string;
     panel: string;
     heightClass: string;
+    onPointSelect?: (row: Row) => void;
 }) {
     const x = columnOf(result, visual.x);
     const series = columnOf(result, visual.series);
@@ -403,6 +432,13 @@ function CartesianPanel({
                             dot={data.length <= 31}
                             connectNulls={false}
                             isAnimationActive={false}
+                            onClick={(event: unknown) => {
+                                const row = rowFromChartEvent(event, key.id);
+
+                                if (row) {
+                                    onPointSelect?.(row);
+                                }
+                            }}
                         >
                             {labels(key)}
                         </Line>
@@ -430,6 +466,13 @@ function CartesianPanel({
                             strokeWidth={2}
                             stackId={stackId}
                             isAnimationActive={false}
+                            onClick={(event: unknown) => {
+                                const row = rowFromChartEvent(event, key.id);
+
+                                if (row) {
+                                    onPointSelect?.(row);
+                                }
+                            }}
                         >
                             {labels(key)}
                         </Area>
@@ -471,6 +514,13 @@ function CartesianPanel({
                             radius={stackId ? 0 : 4}
                             stackId={stackId}
                             isAnimationActive={false}
+                            onClick={(event: unknown) => {
+                                const row = rowFromChartEvent(event, key.id);
+
+                                if (row) {
+                                    onPointSelect?.(row);
+                                }
+                            }}
                         >
                             {labels(key)}
                         </Bar>
@@ -487,6 +537,7 @@ type Slice = {
     value: number;
     /** Nilai asli dari server (atau jumlah persisnya untuk potongan "Lainnya"). */
     raw: string | number | null;
+    row?: Row;
 };
 
 function DonutPanel({
@@ -496,6 +547,7 @@ function DonutPanel({
     title,
     panel,
     heightClass,
+    onPointSelect,
 }: {
     result: ResultSet;
     visual: DonutVisual;
@@ -503,6 +555,7 @@ function DonutPanel({
     title: string;
     panel: string;
     heightClass: string;
+    onPointSelect?: (row: Row) => void;
 }) {
     const category = columnOf(result, visual.category);
     const measure = columnOf(result, visual.value);
@@ -522,6 +575,7 @@ function DonutPanel({
             label: formatDimensionValue(category, row, result.meta.timezone),
             value: Number(row[measure.key] ?? 0),
             raw: row[measure.key] as string | number | null,
+            row,
         }))
         .sort((a, b) => b.value - a.value);
     const limit = visual.max_slices ?? DEFAULT_DONUT_SLICES;
@@ -606,6 +660,24 @@ function DonutPanel({
                     outerRadius="85%"
                     strokeWidth={2}
                     isAnimationActive={false}
+                    onClick={(entry: unknown) => {
+                        if (typeof entry !== 'object' || entry === null) {
+                            return;
+                        }
+
+                        const payload = (entry as { payload?: unknown })
+                            .payload;
+
+                        if (typeof payload !== 'object' || payload === null) {
+                            return;
+                        }
+
+                        const row = (payload as Slice).row;
+
+                        if (row) {
+                            onPointSelect?.(row);
+                        }
+                    }}
                 >
                     {slices.map((slice, index) => (
                         <Cell

@@ -26,6 +26,9 @@ final class ExportQueue
     /** Daftar di layar module: kolom, urutan, dan filter yang tampil, tanpa layout (K-27). */
     public const KIND_LIST = 'list';
 
+    /** Hasil widget atau daftar drill analitik (area 12). */
+    public const KIND_ANALYTICS = 'analytics';
+
     public function __construct(
         private readonly LayoutStore $layouts,
         private readonly RetentionService $retention,
@@ -104,6 +107,29 @@ final class ExportQueue
             // xlsx sampai batas satu lembar Excel; worker menggantinya CSV bila barisnya lebih banyak.
             'format' => 'xlsx',
             'parameters' => $request,
+        ]);
+
+        return $this->present($this->find($membership->tenant_id, $membership->user_id, $id));
+    }
+
+    /**
+     * Ekspor analitik tetap berada di antrean Core dan memakai tray serta retensi yang sama.
+     *
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, mixed>
+     */
+    public function enqueueAnalytics(string $moduleId, string $datasetCode, string $name, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $parameters): array
+    {
+        $this->assertCapacity($membership);
+        $id = $this->insert($membership, $legalEntityId, $orgUnitId, [
+            'kind' => self::KIND_ANALYTICS,
+            'app_id' => $moduleId,
+            'report_code' => $datasetCode,
+            'report_name' => $name,
+            'layout_ref' => '',
+            'layout_name' => 'Data analitik',
+            'format' => 'xlsx',
+            'parameters' => $parameters,
         ]);
 
         return $this->present($this->find($membership->tenant_id, $membership->user_id, $id));

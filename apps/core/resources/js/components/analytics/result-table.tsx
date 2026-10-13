@@ -1,5 +1,7 @@
+import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { Rows3 } from 'lucide-react';
 import {
     formatDimensionValue,
     formatMeasureValue,
@@ -10,6 +12,7 @@ import type {
     ResultSet,
     ResultValue,
 } from '@/lib/analytics/types';
+import type { DatasetField } from '@/lib/analytics/types';
 import { cn } from '@/lib/utils';
 
 type Line = {
@@ -31,6 +34,10 @@ export function ResultTable({
     columns,
     showTotals = true,
     className,
+    fields = [],
+    onDimensionSelect,
+    onDrillRow,
+    drillableField,
 }: {
     result: ResultSet;
     /** Kunci kolom yang ditampilkan, urut; kosong berarti semua pengelompok lalu semua nilai. */
@@ -38,6 +45,14 @@ export function ResultTable({
     showTotals?: boolean;
     /** Pembungkus bergulir, misalnya batas tinggi widget. */
     className?: string;
+    fields?: DatasetField[];
+    onDimensionSelect?: (
+        field: ResultColumn,
+        row: Record<string, ResultValue>,
+        label: string,
+    ) => void;
+    onDrillRow?: (row: Record<string, ResultValue>) => void;
+    drillableField?: string;
 }) {
     const chosen: ResultColumn[] = (
         columns && columns.length > 0
@@ -96,7 +111,45 @@ export function ResultTable({
                                 result.meta.timezone,
                             );
 
-                return (
+                const canSelect =
+                    column.kind === 'dimension' &&
+                    line.total === null &&
+                    fields.some((field) => field.key === column.key);
+
+                return canSelect && (onDimensionSelect || onDrillRow) ? (
+                    <div className="flex min-w-0 items-center gap-1">
+                        {onDimensionSelect && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto min-w-0 justify-start truncate p-0 text-left font-normal"
+                                title={text}
+                                aria-label={`Saring bagian lain dengan ${column.caption}: ${text}`}
+                                onClick={() =>
+                                    onDimensionSelect(column, line.row, text)
+                                }
+                            >
+                                <span className="truncate">{text}</span>
+                            </Button>
+                        )}
+                        {onDrillRow &&
+                            (drillableField === undefined ||
+                                drillableField === column.key) && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-auto shrink-0 px-1 text-xs"
+                                    aria-label={`Lihat baris untuk ${column.caption}: ${text}`}
+                                    onClick={() => onDrillRow(line.row)}
+                                >
+                                    <Rows3 />
+                                    Baris
+                                </Button>
+                            )}
+                    </div>
+                ) : (
                     <span
                         className={cn(
                             column.kind === 'measure' && 'tabular-nums',
