@@ -1,45 +1,50 @@
 security:
   entry_points:
     - code: management-aset.kelompok-harta.form
-      name: Layar kelompok harta
+      name: Layar kelompok aset
       type: form
     - code: management-aset.kelompok-harta.api
-      name: API kelompok harta
+      name: API kelompok aset
       type: api
   permissions:
+    - code: management-aset.kelompok-harta.create
+      name: Tambah kelompok aset
+      entry_point: management-aset.kelompok-harta.api
+      access: create
     - code: management-aset.kelompok-harta.read
-      name: Lihat kelompok harta
+      name: Lihat kelompok aset
       entry_point: management-aset.kelompok-harta.form
       access: read
     - code: management-aset.kelompok-harta.update
-      name: Ubah kelompok harta
+      name: Ubah kelompok aset
       entry_point: management-aset.kelompok-harta.api
       access: update
     - code: management-aset.kelompok-harta.archive
-      name: Arsipkan kelompok harta
+      name: Arsipkan kelompok aset
       entry_point: management-aset.kelompok-harta.api
       access: delete
   privileges:
     - code: management-aset.kelompok-harta.view
-      name: Lihat kelompok harta
+      name: Lihat kelompok aset
       permissions:
         - management-aset.kelompok-harta.read
     - code: management-aset.kelompok-harta.maintain
-      name: Pelihara kelompok harta
+      name: Pelihara kelompok aset
       permissions:
         - management-aset.kelompok-harta.read
+        - management-aset.kelompok-harta.create
         - management-aset.kelompok-harta.update
     - code: management-aset.kelompok-harta.retire
-      name: Arsipkan kelompok harta
+      name: Arsipkan kelompok aset
       permissions:
         - management-aset.kelompok-harta.archive
   duties:
     - code: management-aset.kelompok-harta.view
-      name: Lihat kelompok harta
+      name: Lihat kelompok aset
       privileges:
         - management-aset.kelompok-harta.view
     - code: management-aset.kelompok-harta.manage
-      name: Kelola kelompok harta
+      name: Kelola kelompok aset
       privileges:
         - management-aset.kelompok-harta.maintain
         - management-aset.kelompok-harta.retire

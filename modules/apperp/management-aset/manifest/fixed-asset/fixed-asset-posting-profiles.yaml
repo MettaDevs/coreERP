@@ -1,41 +1,41 @@
 security:
   entry_points:
     - code: management-aset.fixed-asset-posting-profiles.form
-      name: Layar posting group aset
+      name: Layar setup akun/COA aset
       type: form
     - code: management-aset.fixed-asset-posting-profiles.api
-      name: API posting group aset
+      name: API setup akun/COA aset
       type: api
   permissions:
     - code: management-aset.fixed-asset-posting-profiles.read
-      name: Lihat posting group aset
+      name: Lihat setup akun/COA aset
       entry_point: management-aset.fixed-asset-posting-profiles.form
       access: read
     - code: management-aset.fixed-asset-posting-profiles.create
-      name: Tambah baris posting group aset
+      name: Tambah baris setup akun/COA aset
       entry_point: management-aset.fixed-asset-posting-profiles.api
       access: create
     - code: management-aset.fixed-asset-posting-profiles.update
-      name: Ubah akun posting group aset
+      name: Ubah akun setup akun/COA aset
       entry_point: management-aset.fixed-asset-posting-profiles.api
       access: update
     - code: management-aset.fixed-asset-posting-profiles.archive
-      name: Arsipkan baris posting group aset
+      name: Arsipkan baris setup akun/COA aset
       entry_point: management-aset.fixed-asset-posting-profiles.api
       access: delete
   privileges:
     - code: management-aset.fixed-asset-posting-profiles.view
-      name: Lihat posting group aset
+      name: Lihat setup akun/COA aset
       permissions:
         - management-aset.fixed-asset-posting-profiles.read
     - code: management-aset.fixed-asset-posting-profiles.maintain
-      name: Pelihara posting group aset
+      name: Pelihara setup akun/COA aset
       permissions:
         - management-aset.fixed-asset-posting-profiles.read
         - management-aset.fixed-asset-posting-profiles.create
         - management-aset.fixed-asset-posting-profiles.update
     - code: management-aset.fixed-asset-posting-profiles.retire
-      name: Arsipkan posting group aset
+      name: Arsipkan setup akun/COA aset
       permissions:
         - management-aset.fixed-asset-posting-profiles.archive
   duties:
@@ -43,7 +43,7 @@ security:
     # lama tidak boleh diam-diam dapat mengubah akun jurnal (keputusan pemilik produk,
     # 22 September 2026).
     - code: management-aset.fixed-asset-posting-profiles.manage
-      name: Kelola posting group aset
+      name: Kelola setup akun/COA aset
       privileges:
         - management-aset.fixed-asset-posting-profiles.maintain
         - management-aset.fixed-asset-posting-profiles.retire

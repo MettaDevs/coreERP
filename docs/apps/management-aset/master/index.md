@@ -4,6 +4,27 @@ Halaman ini untuk developer. Isinya arsitektur dan perilaku yang **dipakai bersa
 
 Master data adalah daftar pilihan yang dipakai berulang di seluruh alur transaksi: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `routes/api/master-data.php` pada array `$masters`.
 
+## Nama layar dan nama internal
+
+Label Master diperbarui pada 13 Oktober 2026. Nama resource, tabel, kolom, controller, dan kode permission tetap mengikuti konsep yang disimpan. Gunakan pemetaan ini saat menelusuri layar ke backend; perubahan label tidak menggabungkan master atau mengubah perhitungan.
+
+| Nama di layar | Resource atau kolom | Tabel | Controller di `src/Http/Controllers/master/` |
+| --- | --- | --- | --- |
+| Kelompok Aset | `kelompok-harta`, referensi `kelompok_harta_fiskal_id` | `aset_m_kelompok_harta_fiskal` | `AssetClassifications/AssetClassificationController.php` |
+| Nilai Perolehan Non Penyusutan | `group-aset.capitalization_threshold` | `aset_m_group_aset` | `GroupAsetController.php` |
+| Buku dan Metode Penyusutan | `buku-penyusutan` | `aset_m_buku_penyusutan` | `BukuPenyusutanController.php` |
+| Metode Penyusutan | `profil-penyusutan` | `aset_m_profil_penyusutan` | `ProfilPenyusutanController.php` |
+| Komponen Atribut Aset | `tipe-atribut` | `aset_m_tipe_atribut` | `TipeAtributController.php` |
+| Setup Akun/COA Aset | `posting-group-aset` | `aset_m_posting_group` | `AssetPostingGroupController.php` |
+
+**Kelompok Aset tetap referensi fiskal**, berbeda dari Group aset yang menentukan perlakuan finansial. **Nilai Perolehan Non Penyusutan tetap batas nilai per aset**, bukan nilai perolehan yang dicatat pada transaksi: perolehan di bawah batas tidak disusutkan; tepat pada batas sudah memenuhi syarat nilai untuk disusutkan. Saklar penyusutan pada matriks buku tetap berlaku.
+
+**Metode Penyusutan tetap paket aturan**, termasuk frekuensi, masa manfaat, tarif, dan masa berlaku. Field `method` berlabel Cara perhitungan agar berbeda dari nama master. Buku tetap menunjuk paket aturan utama dan pengganti; tidak menyimpan salinan master metode.
+
+**Komponen Atribut Aset tetap definisi ciri tambahan**, misalnya Bahan bakar dengan pilihan nilai yang dikelola tenant. Definisi dipasang pada Jenis aset; ini bukan daftar bagian fisik kendaraan dan tidak menambah relasi atribut pada Group aset.
+
+Pada panel detail Master, Keterangan dan Aktif berada di Umum; bagian Lain-lain dihilangkan. Record baru dimulai aktif pada form daftar-detail maupun form lama, dengan fallback aktif di `MasterDataController`. Menyunting record nonaktif mempertahankan statusnya sampai pengguna mengubahnya. Pembagian bagian pada layar tidak mengubah payload atau skema.
+
 ```mermaid
 graph TD
     subgraph KLASIFIKASI["Dua Sumbu Klasifikasi Sejajar (Datar)"]

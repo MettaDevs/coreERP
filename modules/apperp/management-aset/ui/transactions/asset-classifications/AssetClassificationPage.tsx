@@ -14,13 +14,16 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import EditShield from '../../_shared/EditShield';
-import { api, ApiError, errorMessage } from '../../api';
+import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
 
 type Classification = {
     id: string;
@@ -32,6 +35,7 @@ type Classification = {
     straight_line_rate_percent: string | null;
     reducing_balance_rate_percent: string | null;
     allow_reducing_balance: boolean;
+    allow_straight_line: boolean;
     depreciable: boolean;
     aktif: boolean;
     version: number;
@@ -51,15 +55,21 @@ export default function AssetClassificationPage({
     const [loadError, setLoadError] = useState('');
     const [reload, setReload] = useState(0);
     const [editing, setEditing] = useState(false);
+    const [creating, setCreating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [formNonce, setFormNonce] = useState(0);
     const [dirty, setDirty] = useState(false);
     const [pendingChange, setPendingChange] = useState<
-        { id: string } | { search: string } | null
+        { id: string } | { search: string } | { create: true } | null
     >(null);
     const [archiving, setArchiving] = useState(false);
     const [actionError, setActionError] = useState('');
-    const selected = items.find((item) => item.id === selectedId) ?? items[0];
+    const selected = creating
+        ? null
+        : (items.find((item) => item.id === selectedId) ?? items[0]);
+    const canCreate = permissions.includes(
+        'management-aset.kelompok-harta.create',
+    );
     const canUpdate = permissions.includes(
         'management-aset.kelompok-harta.update',
     );
@@ -67,23 +77,29 @@ export default function AssetClassificationPage({
         'management-aset.kelompok-harta.archive',
     );
 
-    function commitChange(change: { id: string } | { search: string }) {
+    function commitChange(
+        change: { id: string } | { search: string } | { create: true },
+    ) {
+        setCreating('create' in change);
+
         if ('id' in change) {
             setSelectedId(change.id);
-        } else {
+        } else if ('search' in change) {
             setSearch(change.search);
             setPage(1);
             setSelectedId(null);
         }
 
-        setEditing(false);
+        setEditing('create' in change);
         setDirty(false);
         setFormNonce((value) => value + 1);
         setPendingChange(null);
         setActionError('');
     }
 
-    function requestChange(change: { id: string } | { search: string }) {
+    function requestChange(
+        change: { id: string } | { search: string } | { create: true },
+    ) {
         if (saving || ('id' in change && change.id === selected?.id)) {
             return;
         }
@@ -116,10 +132,10 @@ export default function AssetClassificationPage({
             setSelectedId(null);
             setPage(1);
             setReload((value) => value + 1);
-            toast.success('Kelompok harta diarsipkan.');
+            toast.success('Kelompok Aset diarsipkan.');
         } catch (caught) {
             setActionError(
-                errorMessage(caught, 'Kelompok harta belum dapat diarsipkan.'),
+                errorMessage(caught, 'Kelompok Aset belum dapat diarsipkan.'),
             );
         } finally {
             setSaving(false);
@@ -152,7 +168,7 @@ export default function AssetClassificationPage({
                     setLoadError(
                         errorMessage(
                             caught,
-                            'Kelompok harta belum dapat dimuat.',
+                            'Kelompok Aset belum dapat dimuat.',
                         ),
                     );
                 }
@@ -171,7 +187,7 @@ export default function AssetClassificationPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar title="Kelompok harta">
+            <RecordActionBar title="Kelompok Aset">
                 {editing ? (
                     <>
                         <Button
@@ -186,6 +202,7 @@ export default function AssetClassificationPage({
                             disabled={saving}
                             onClick={() => {
                                 setEditing(false);
+                                setCreating(false);
                                 setDirty(false);
                                 setFormNonce((value) => value + 1);
                             }}
@@ -195,6 +212,15 @@ export default function AssetClassificationPage({
                     </>
                 ) : (
                     <>
+                        {canCreate && (
+                            <ActionButton
+                                action="create"
+                                disabled={saving || loading || !!loadError}
+                                onClick={() => requestChange({ create: true })}
+                            >
+                                Tambah data
+                            </ActionButton>
+                        )}
                         {canUpdate && (
                             <ActionButton
                                 action="edit"
@@ -231,12 +257,12 @@ export default function AssetClassificationPage({
             )}
             <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[20rem_minmax(0,1fr)]">
                 <aside
-                    aria-label="Daftar kelompok harta"
+                    aria-label="Daftar kelompok aset"
                     className="flex min-h-0 flex-col border-r"
                 >
                     <div className="space-y-2 border-b px-4 py-3">
                         <p className="text-sm font-semibold">
-                            Daftar kelompok harta
+                            Daftar kelompok aset
                         </p>
                         <Input
                             type="search"
@@ -281,14 +307,14 @@ export default function AssetClassificationPage({
                         ))}
                         {loading && (
                             <p role="status" className="p-4 text-sm">
-                                Memuat kelompok harta…
+                                Memuat kelompok aset…
                             </p>
                         )}
                         {!loading && !loadError && items.length === 0 && (
                             <p className="text-muted-foreground p-4 text-sm">
                                 {search
                                     ? 'Tidak ada kelompok yang cocok dengan pencarian.'
-                                    : 'Belum ada kelompok harta.'}
+                                    : 'Belum ada kelompok aset.'}
                             </p>
                         )}
                         {page < lastPage && (
@@ -303,22 +329,34 @@ export default function AssetClassificationPage({
                     </div>
                 </aside>
                 <div className="min-h-0 overflow-y-auto p-4">
-                    {selected && (
+                    {(selected || creating) && (
                         <ClassificationForm
-                            key={`${selected.id}:${selected.version}:${formNonce}`}
-                            record={selected}
+                            key={`${selected?.id ?? 'new'}:${selected?.version ?? 0}:${formNonce}`}
+                            record={selected ?? null}
                             editing={editing}
                             saving={saving}
-                            canEdit={canUpdate && !loading && !loadError}
+                            canEdit={
+                                (creating ? canCreate : canUpdate) &&
+                                !loading &&
+                                !loadError
+                            }
                             onRequestEdit={() => setEditing(true)}
                             onDirtyChange={setDirty}
                             onSaving={setSaving}
                             onSaved={(record) => {
                                 setItems((current) =>
-                                    current.map((item) =>
-                                        item.id === record.id ? record : item,
-                                    ),
+                                    current.some(
+                                        (item) => item.id === record.id,
+                                    )
+                                        ? current.map((item) =>
+                                              item.id === record.id
+                                                  ? record
+                                                  : item,
+                                          )
+                                        : [record, ...current],
                                 );
+                                setSelectedId(record.id);
+                                setCreating(false);
                                 setEditing(false);
                                 setDirty(false);
                             }}
@@ -336,8 +374,8 @@ export default function AssetClassificationPage({
                             Perubahan belum disimpan
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Pindah ke kelompok harta lain akan membuang
-                            perubahan yang belum Anda simpan.
+                            Pindah ke kelompok aset lain akan membuang perubahan
+                            yang belum Anda simpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -396,7 +434,7 @@ function ClassificationForm({
     onSaving,
     onSaved,
 }: {
-    record: Classification;
+    record: Classification | null;
     editing: boolean;
     saving: boolean;
     canEdit: boolean;
@@ -405,11 +443,15 @@ function ClassificationForm({
     onSaving: (value: boolean) => void;
     onSaved: (record: Classification) => void;
 }) {
-    const [active, setActive] = useState(record.aktif);
-    const [depreciable, setDepreciable] = useState(record.depreciable);
+    const [active, setActive] = useState(record?.aktif ?? true);
+    const [depreciable, setDepreciable] = useState(record?.depreciable ?? true);
     const [reducingBalance, setReducingBalance] = useState(
-        record.allow_reducing_balance,
+        record?.allow_reducing_balance ?? false,
     );
+    const [straightLine, setStraightLine] = useState(
+        record?.allow_straight_line ?? true,
+    );
+    const creationKey = useRef(newIdempotencyKey());
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const formRef = useRef<HTMLFormElement>(null);
@@ -443,6 +485,7 @@ function ClassificationForm({
             name: 'useful_life_years',
             label: 'Masa manfaat (tahun)',
             type: 'number',
+            min: 1,
             max: 1000,
             step: '1',
             required: depreciable,
@@ -451,29 +494,19 @@ function ClassificationForm({
             name: 'straight_line_rate_percent',
             label: 'Tarif garis lurus (%)',
             type: 'number',
+            min: 0,
             max: 100,
             step: '0.0001',
-            required: depreciable,
+            required: depreciable && straightLine,
         },
         {
             name: 'reducing_balance_rate_percent',
             label: 'Tarif saldo menurun (%)',
             type: 'number',
+            min: 0,
             max: 100,
             step: '0.0001',
             required: depreciable && reducingBalance,
-        },
-        {
-            name: 'effective_from',
-            label: 'Berlaku mulai',
-            type: 'date',
-            required: true,
-        },
-        {
-            name: 'effective_to',
-            label: 'Berlaku sampai',
-            type: 'date',
-            required: false,
         },
     ] as const;
 
@@ -491,9 +524,12 @@ function ClassificationForm({
 
         try {
             const result = await api<{ data: Classification }>(
-                `/kelompok-harta/${record.id}`,
+                `/kelompok-harta${record ? `/${record.id}` : ''}`,
                 {
-                    method: 'PATCH',
+                    method: record ? 'PATCH' : 'POST',
+                    headers: record
+                        ? undefined
+                        : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify({
                         ...Object.fromEntries(
                             ['label', ...fields.map((field) => field.name)].map(
@@ -503,15 +539,16 @@ function ClassificationForm({
                         aktif: active,
                         depreciable,
                         allow_reducing_balance: reducingBalance,
-                        version: record.version,
+                        allow_straight_line: straightLine,
+                        ...(record ? { version: record.version } : {}),
                     }),
                 },
             );
             onSaved(result.data);
-            toast.success('Kelompok harta disimpan.');
+            toast.success('Kelompok Aset disimpan.');
         } catch (caught) {
             setError(
-                errorMessage(caught, 'Kelompok harta belum dapat disimpan.'),
+                errorMessage(caught, 'Kelompok Aset belum dapat disimpan.'),
             );
 
             if (caught instanceof ApiError) {
@@ -534,8 +571,8 @@ function ClassificationForm({
                 <Field className="flex-1" data-field-name="label">
                     <Input
                         name="label"
-                        label="Nama kelompok harta"
-                        defaultValue={record.label}
+                        label="Nama kelompok aset"
+                        defaultValue={record?.label ?? ''}
                         readOnly={!editing || saving}
                         onFocus={() => enterEdit('label')}
                         required
@@ -544,8 +581,8 @@ function ClassificationForm({
                     />
                     <FieldError>{errors.label?.join(' ')}</FieldError>
                 </Field>
-                <Badge variant={record.aktif ? 'default' : 'secondary'}>
-                    {record.aktif ? 'Aktif' : 'Tidak aktif'}
+                <Badge variant={active ? 'default' : 'secondary'}>
+                    {active ? 'Aktif' : 'Tidak aktif'}
                 </Badge>
             </div>
             {error && (
@@ -553,112 +590,142 @@ function ClassificationForm({
                     {error}
                 </p>
             )}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Aturan penyusutan</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field data-field-name="depreciable">
-                            <FieldLabel htmlFor="classification-depreciable">
-                                Disusutkan
-                            </FieldLabel>
-                            <EditShield
-                                active={!editing}
-                                label="Disusutkan"
-                                onActivate={() => enterEdit('depreciable')}
-                            >
-                                <Switch
-                                    id="classification-depreciable"
-                                    checked={depreciable}
-                                    onCheckedChange={(value) => {
-                                        if (editing && !saving) {
-                                            onDirtyChange(true);
-                                            setDepreciable(value);
-                                        }
-                                    }}
-                                />
-                            </EditShield>
-                        </Field>
-                        <Field data-field-name="allow_reducing_balance">
-                            <FieldLabel htmlFor="classification-reducing">
-                                Boleh memakai saldo menurun
-                            </FieldLabel>
-                            <EditShield
-                                active={!editing}
-                                label="Boleh memakai saldo menurun"
-                                onActivate={() =>
-                                    enterEdit('allow_reducing_balance')
-                                }
-                            >
-                                <Switch
-                                    id="classification-reducing"
-                                    checked={reducingBalance}
-                                    onCheckedChange={(value) => {
-                                        if (editing && !saving) {
-                                            onDirtyChange(true);
-                                            setReducingBalance(value);
-                                        }
-                                    }}
-                                />
-                            </EditShield>
-                        </Field>
-                        {fields.map((field) => (
-                            <Field
-                                key={field.name}
-                                data-field-name={field.name}
-                            >
-                                <Input
-                                    name={field.name}
-                                    label={field.label}
-                                    type={field.type}
-                                    defaultValue={record[field.name] ?? ''}
-                                    readOnly={!editing || saving}
-                                    onFocus={() => enterEdit(field.name)}
-                                    required={field.required}
-                                    {...('max' in field
-                                        ? {
-                                              min: field.step,
-                                              max: field.max,
-                                              step: field.step,
-                                          }
-                                        : {})}
-                                    aria-invalid={!!errors[field.name]}
-                                />
-                                <FieldError>
-                                    {errors[field.name]?.join(' ')}
-                                </FieldError>
+            <CollapsibleSectionGroup defaultValue={['depreciation']}>
+                <CollapsibleSection
+                    value="depreciation"
+                    title="Aturan penyusutan"
+                    summary={`${depreciable ? 'Disusutkan' : 'Tidak disusutkan'} · ${active ? 'Aktif' : 'Tidak aktif'}`}
+                >
+                    <div className="space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Field data-field-name="depreciable">
+                                <FieldLabel htmlFor="classification-depreciable">
+                                    Disusutkan
+                                </FieldLabel>
+                                <EditShield
+                                    active={!editing}
+                                    label="Disusutkan"
+                                    onActivate={() => enterEdit('depreciable')}
+                                >
+                                    <Switch
+                                        id="classification-depreciable"
+                                        checked={depreciable}
+                                        onCheckedChange={(value) => {
+                                            if (editing && !saving) {
+                                                onDirtyChange(true);
+                                                setDepreciable(value);
+                                            }
+                                        }}
+                                    />
+                                </EditShield>
                             </Field>
-                        ))}
-                        <Field data-field-name="aktif">
-                            <FieldLabel htmlFor="classification-active">
-                                Aktif
-                            </FieldLabel>
-                            <EditShield
-                                active={!editing}
-                                label="Aktif"
-                                onActivate={() => enterEdit('aktif')}
-                            >
-                                <Switch
-                                    id="classification-active"
-                                    checked={active}
-                                    onCheckedChange={(value) => {
-                                        if (editing && !saving) {
-                                            onDirtyChange(true);
-                                            setActive(value);
+                            <Field data-field-name="allow_reducing_balance">
+                                <FieldLabel htmlFor="classification-reducing">
+                                    Boleh memakai saldo menurun
+                                </FieldLabel>
+                                <EditShield
+                                    active={!editing}
+                                    label="Boleh memakai saldo menurun"
+                                    onActivate={() =>
+                                        enterEdit('allow_reducing_balance')
+                                    }
+                                >
+                                    <Switch
+                                        id="classification-reducing"
+                                        checked={reducingBalance}
+                                        onCheckedChange={(value) => {
+                                            if (editing && !saving) {
+                                                onDirtyChange(true);
+                                                setReducingBalance(value);
+                                            }
+                                        }}
+                                    />
+                                </EditShield>
+                            </Field>
+                            <Field data-field-name="allow_straight_line">
+                                <FieldLabel htmlFor="classification-straight-line">
+                                    Boleh memakai garis lurus
+                                </FieldLabel>
+                                <EditShield
+                                    active={!editing}
+                                    label="Boleh memakai garis lurus"
+                                    onActivate={() =>
+                                        enterEdit('allow_straight_line')
+                                    }
+                                >
+                                    <Switch
+                                        id="classification-straight-line"
+                                        checked={straightLine}
+                                        onCheckedChange={(value) => {
+                                            if (editing && !saving) {
+                                                onDirtyChange(true);
+                                                setStraightLine(value);
+                                            }
+                                        }}
+                                    />
+                                </EditShield>
+                            </Field>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {fields.map((field) => (
+                                <Field
+                                    key={field.name}
+                                    data-field-name={field.name}
+                                >
+                                    <Input
+                                        name={field.name}
+                                        label={field.label}
+                                        type={field.type}
+                                        defaultValue={
+                                            record?.[field.name] ?? ''
                                         }
-                                    }}
-                                />
-                            </EditShield>
-                        </Field>
+                                        readOnly={!editing || saving}
+                                        onFocus={() => enterEdit(field.name)}
+                                        required={field.required}
+                                        {...('max' in field
+                                            ? {
+                                                  min: field.min,
+                                                  max: field.max,
+                                                  step: field.step,
+                                              }
+                                            : {})}
+                                        aria-invalid={!!errors[field.name]}
+                                    />
+                                    <FieldError>
+                                        {errors[field.name]?.join(' ')}
+                                    </FieldError>
+                                </Field>
+                            ))}
+                            <Field data-field-name="aktif">
+                                <FieldLabel htmlFor="classification-active">
+                                    Aktif
+                                </FieldLabel>
+                                <EditShield
+                                    active={!editing}
+                                    label="Aktif"
+                                    onActivate={() => enterEdit('aktif')}
+                                >
+                                    <Switch
+                                        id="classification-active"
+                                        checked={active}
+                                        onCheckedChange={(value) => {
+                                            if (editing && !saving) {
+                                                onDirtyChange(true);
+                                                setActive(value);
+                                            }
+                                        }}
+                                    />
+                                </EditShield>
+                            </Field>
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                            Perubahan di sini tidak otomatis mengubah metode
+                            penyusutan yang sudah dibuat. Periksa metode yang
+                            digunakan sebelum menghitung penyusutan.
+                        </p>
                     </div>
-                    <p className="text-muted-foreground text-sm">
-                        Perubahan di sini tidak otomatis mengubah profil
-                        penyusutan yang sudah dibuat. Periksa profil yang
-                        digunakan sebelum menghitung penyusutan.
-                    </p>
-                </CardContent>
-            </Card>
+                </CollapsibleSection>
+            </CollapsibleSectionGroup>
         </form>
     );
 }

@@ -58,27 +58,27 @@ ui:
           label: Lokasi aset
           permission: management-aset.lokasi-aset.read
         - id: tipe-atribut
-          label: Tipe atribut
+          label: Komponen Atribut Aset
           permission: management-aset.tipe-atribut.read
         - id: jenis-asuransi
           label: Jenis asuransi
           permission: management-aset.jenis-asuransi.read
         - id: buku-penyusutan
-          label: Buku penyusutan
+          label: Buku dan Metode Penyusutan
           permission: management-aset.buku-penyusutan.read
         - id: profil-penyusutan
-          label: Profil penyusutan
+          label: Metode Penyusutan
           permission: management-aset.profil-penyusutan.read
         - id: kelompok-harta
-          label: Kelompok harta
+          label: Kelompok Aset
           permission: management-aset.kelompok-harta.read
         - id: fixed-aset-parameters
           label: Parameter aset tetap
           permission: management-aset.fixed-asset-parameters.read
-        # Label memakai istilah Business Central (FA Posting Groups); kode izin tetap
+        # Pemetaan akun setara FA Posting Groups Business Central; kode izin tetap
         # `fixed-asset-posting-profiles` karena kode adalah kontrak, bukan label.
         - id: fixed-aset-posting-profiles
-          label: Posting group aset
+          label: Setup Akun/COA Aset
           permission: management-aset.fixed-asset-posting-profiles.read
       maintenance:
         # Urutan ini adalah alur setup awal: dasar pekerjaan, checklist dan

@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'classification_defaults' => ['jurisdiction' => 'ID'],
     /*
     |--------------------------------------------------------------------------
     | Starter template yang disediakan untuk tenant Indonesia

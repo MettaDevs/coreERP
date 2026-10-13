@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $straight_line_rate_percent
  * @property ?string $reducing_balance_rate_percent
  * @property bool $allow_reducing_balance
+ * @property bool $allow_straight_line
  * @property bool $depreciable
  * @property bool $aktif
  * @property ?Carbon $created_at
@@ -48,7 +49,7 @@ class KelompokHartaFiskal extends Model
         'tenant_id', 'template_key', 'jurisdiction', 'label', 'regulation_reference',
         'effective_from', 'effective_to', 'useful_life_years',
         'straight_line_rate_percent', 'reducing_balance_rate_percent',
-        'allow_reducing_balance', 'depreciable', 'aktif',
+        'allow_reducing_balance', 'allow_straight_line', 'depreciable', 'aktif',
     ];
 
     protected function casts(): array
@@ -60,6 +61,7 @@ class KelompokHartaFiskal extends Model
             'straight_line_rate_percent' => 'decimal:4',
             'reducing_balance_rate_percent' => 'decimal:4',
             'allow_reducing_balance' => 'boolean',
+            'allow_straight_line' => 'boolean',
             'depreciable' => 'boolean',
             'aktif' => 'boolean',
         ];
