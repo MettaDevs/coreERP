@@ -681,9 +681,11 @@ export default function MasterPage({
                     onClose={() => setEditing(undefined)}
                     key={editing?.id ?? 'baru'}
                     onSaved={(savedRecord, created) => {
-                        // Setelah POST, tetap buka record dengan respons lengkap agar kode
-                        // otomatis dan nama langsung terlihat tanpa membuka form dua kali.
-                        setEditing(created ? savedRecord : undefined);
+                        // Jenis asuransi selesai setelah disimpan; master lain tetap dibuka
+                        // untuk mengisi rincian lanjutannya dari record hasil POST.
+                        const keepOpen =
+                            created && config.resource !== 'jenis-asuransi';
+                        setEditing(keepOpen ? savedRecord : undefined);
                         void load();
                     }}
                     extraSection={
