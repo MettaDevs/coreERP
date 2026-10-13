@@ -3542,8 +3542,48 @@ components:
           description: '`posting_id` yang dikoreksi posting ini.'
         details:
           type: object
-          description: Informasi untuk pelacakan dan laporan, misalnya rincian per aset. Pembaca tidak
-            boleh menjurnal dari sini.
+          description: Metadata untuk pelacakan dan laporan. Akun, nilai, dan dimensi jurnal hanya dibaca
+            dari `journal_lines`.
+          properties:
+            journal_groups:
+              type: array
+              minItems: 1
+              description: |
+                Metadata opsional untuk `asset.depreciation`. Nomor baris hanya mengelompokkan baris jurnal;
+                akun, nilai, dan dimensi tetap dibaca dari `journal_lines`.
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - asset_group
+                - asset_group_name
+                - depreciation_expense_line_nos
+                - accumulated_depreciation_line_nos
+                properties:
+                  asset_group:
+                    type: string
+                    minLength: 1
+                    description: Kode group aset.
+                  asset_group_name:
+                    type: string
+                    minLength: 1
+                    description: Nama tampilan group aset.
+                  depreciation_expense_line_nos:
+                    type: array
+                    minItems: 1
+                    uniqueItems: true
+                    items:
+                      type: integer
+                      minimum: 1
+                      description: '`line_no` beban penyusutan pada `journal_lines`.'
+                  accumulated_depreciation_line_nos:
+                    type: array
+                    minItems: 1
+                    uniqueItems: true
+                    items:
+                      type: integer
+                      minimum: 1
+                      description: '`line_no` akumulasi penyusutan pada `journal_lines`.'
     FinancePostingAck:
       type: object
       required:

@@ -6,7 +6,7 @@ use App\Foundation\FinancePosting\Models\FinancePosting;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
-use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Organization\Models\OrganizationHierarchy;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -88,11 +88,17 @@ trait MenerbitkanJurnalPenerimaan
     /** @param  list<array{0: string, 1: string}>  $penempatan */
     private function hierarki(array $penempatan): void
     {
-        $this->actingAs($this->owner)->post('/settings/organization/hierarchies', [
+        $response = $this->actingAs($this->owner)->post('/settings/organization/hierarchies', [
             'name' => 'Struktur manajemen', 'purpose_codes' => ['management'],
             'root_organization_id' => $this->le, 'effective_from' => '2026-01-01',
-        ])->assertSessionHasNoErrors();
-        $versi = OrganizationHierarchyVersion::query()->whereHas('hierarchy', fn ($query) => $query->where('name', 'Struktur manajemen'))->firstOrFail();
+        ]);
+        $response->assertRedirect()->assertSessionHasNoErrors();
+        $hierarchy = OrganizationHierarchy::query()
+            ->where('tenant_id', $this->tenantId)
+            ->where('name', 'Struktur manajemen')
+            ->first();
+        $this->assertNotNull($hierarchy, 'Core tidak menyimpan hierarchy setelah form berhasil dikirim.');
+        $versi = $hierarchy->versions()->firstOrFail();
         foreach ($penempatan as [$anak, $induk]) {
             $this->post("/settings/organization/hierarchy-versions/{$versi->id}/placements", [
                 'version' => $versi->hierarchy()->value('version'),
