@@ -9,6 +9,7 @@ use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
 
 final class AssetConditionPolicy
 {
+    /** @return Builder<KondisiAset> */
     public static function choices(?string $assetTypeId): Builder
     {
         $query = KondisiAset::query();

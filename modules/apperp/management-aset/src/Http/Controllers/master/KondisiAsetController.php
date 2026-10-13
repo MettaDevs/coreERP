@@ -26,7 +26,7 @@ class KondisiAsetController extends MasterDataController
         if (! empty($data['aset_id'])) {
             $assets = Aset::query();
             app(OrganizationScope::class)->asetQuery($assets, $request);
-            $assetTypeId = $assets->findOrFail($data['aset_id'])->jenis_aset_id;
+            $assetTypeId = $assets->findOrFail((string) $data['aset_id'])->jenis_aset_id;
         } elseif ($assetTypeId !== null) {
             JenisAset::query()->findOrFail($assetTypeId);
         }

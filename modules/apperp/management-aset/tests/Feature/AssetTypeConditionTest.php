@@ -4,15 +4,15 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
-use Modules\Apperp\ManagementAset\Tests\Concerns\SeedsMaintenanceFixtures;
 use Tests\TestCase;
 
 class AssetTypeConditionTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase, SeedsMaintenanceFixtures;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -78,5 +78,17 @@ class AssetTypeConditionTest extends TestCase
         AssetConditionPolicy::validate($type, null);
         $this->expectException(ValidationException::class);
         AssetConditionPolicy::validate($type, $other);
+    }
+
+    private function seedMaster(string $table, string $name): string
+    {
+        $id = (string) Str::ulid();
+        DB::table($table)->insert([
+            'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
+            'kode' => strtoupper(Str::random(8)), 'nama' => $name, 'aktif' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
     }
 }
