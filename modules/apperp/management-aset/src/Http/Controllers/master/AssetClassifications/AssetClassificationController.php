@@ -3,12 +3,15 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master\AssetClassifications;
 
 use App\Platform\Modules\Contracts\RowVersion;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 
 final class AssetClassificationController extends Controller
 {
@@ -71,6 +74,29 @@ final class AssetClassificationController extends Controller
             $record->save();
 
             return response()->json(['data' => $this->present($record->refresh())]);
+        });
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $this->authorize($request, 'archive');
+        $expected = RowVersion::expected($request);
+        $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
+
+        return DB::transaction(function () use ($id, $expected, $tenantId): JsonResponse {
+            $record = KelompokHartaFiskal::query()->where('tenant_id', $tenantId)->findOrFail($id);
+            RowVersion::claim($record, $expected);
+            foreach ([GroupAset::class => 'group aset', Aset::class => 'aset'] as $model => $label) {
+                if ($model::query()->where('tenant_id', $tenantId)->where('kelompok_harta_fiskal_id', $id)->exists()) {
+                    throw new HttpResponseException(response()->json(['error' => [
+                        'code' => 'referenced_by_children',
+                        'message' => 'Kelompok harta ini masih dipakai '.$label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
+                    ]], 409));
+                }
+            }
+            $record->delete();
+
+            return response()->json(status: 204);
         });
     }
 

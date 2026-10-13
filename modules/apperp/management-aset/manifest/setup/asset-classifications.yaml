@@ -15,6 +15,10 @@ security:
       name: Ubah kelompok harta
       entry_point: management-aset.kelompok-harta.api
       access: update
+    - code: management-aset.kelompok-harta.archive
+      name: Arsipkan kelompok harta
+      entry_point: management-aset.kelompok-harta.api
+      access: delete
   privileges:
     - code: management-aset.kelompok-harta.view
       name: Lihat kelompok harta
@@ -25,6 +29,10 @@ security:
       permissions:
         - management-aset.kelompok-harta.read
         - management-aset.kelompok-harta.update
+    - code: management-aset.kelompok-harta.retire
+      name: Arsipkan kelompok harta
+      permissions:
+        - management-aset.kelompok-harta.archive
   duties:
     - code: management-aset.kelompok-harta.view
       name: Lihat kelompok harta
@@ -34,3 +42,4 @@ security:
       name: Kelola kelompok harta
       privileges:
         - management-aset.kelompok-harta.maintain
+        - management-aset.kelompok-harta.retire

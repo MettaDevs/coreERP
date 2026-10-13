@@ -2629,7 +2629,7 @@ paths:
         atau If-Match. ID, tenant, jurisdiction dan template_key tidak dapat diubah.
         Perubahan tidak menyalin ulang profil penyusutan, tidak mengganti ID yang disimpan
         group/aset, dan tidak membuat versi regulasi baru. Referensi lama yang menunjuk
-        ID ini tetap membaca baris yang sama. Tidak tersedia aksi tambah atau arsip.
+        ID ini tetap membaca baris yang sama. Tidak tersedia aksi tambah.
       parameters:
       - name: If-Match
         in: header
@@ -2713,6 +2713,41 @@ paths:
         '422':
           description: Tanggal
           masa manfaat atau tarif tidak valid: null
+        '428':
+          description: Versi baris tidak dikirim
+    delete:
+      tags:
+      - Master data
+      operationId: archiveAssetClassification
+      summary: Mengarsipkan kelompok harta
+      description: |
+        Memerlukan management-aset.kelompok-harta.archive. Mengisi deleted_at, tidak
+        menghapus baris fisik. Ditolak jika masih dipakai group aset atau aset yang belum
+        diarsipkan pada tenant ini. Penolakan membatalkan klaim versi. Kelompok terarsip
+        tidak tampil pada daftar maupun dropdown.
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '204':
+          description: Kelompok harta diarsipkan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Kelompok tidak ditemukan pada tenant ini
+        '409':
+          description: Versi basi atau kelompok masih dipakai data yang belum diarsipkan
         '428':
           description: Versi baris tidak dikirim
   /api/v1/maintenance-job-types:

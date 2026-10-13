@@ -28,10 +28,15 @@ Dropdown menampilkan nama saja. Tanggalnya tetap dikirim oleh endpoint referensi
 | --- | --- |
 | `GET /api/modules/management-aset/v1/kelompok-harta` | Daftar, pencarian nama dan pagination |
 | `PATCH /api/modules/management-aset/v1/kelompok-harta/{id}` | Mengubah referensi milik tenant yang sedang aktif |
+| `DELETE /api/modules/management-aset/v1/kelompok-harta/{id}` | Mengarsipkan referensi yang tidak dipakai data yang belum diarsipkan |
 
 ## Hak akses dan validasi
 
-`management-aset.kelompok-harta.read` dan `.update` terpisah dari izin Group aset. Duty `.view` memberikan baca; `.manage` memberikan baca dan ubah. Tidak ada workflow, aksi tambah atau arsip pada halaman ini.
+`management-aset.kelompok-harta.read`, `.update` dan `.archive` terpisah dari izin Group aset. Duty `.view` memberikan baca; `.manage` memberikan baca, ubah dan arsip lewat privilege yang berbeda. Tidak ada workflow atau aksi tambah pada halaman ini.
+
+Klik atau fokus pada field membuka mode edit, mengikuti Group aset. Pindah record tanpa perubahan langsung membuka record tujuan dalam mode baca. Jika perubahan belum disimpan, dialog menawarkan tetap di record sekarang atau membuang perubahan sebelum berpindah. Batal membuang perubahan; respons sukses mengembalikan form ke mode baca.
+
+Arsip mengisi `deleted_at` lewat model. Kelompok yang masih dipakai Group aset atau aset yang belum diarsipkan ditolak dengan 409, sehingga referensi yang sedang digunakan tetap tersedia. Arsip selalu meminta konfirmasi dan memakai versi baris, sama seperti edit.
 
 Penyimpanan memakai `RowVersion` di dalam transaksi. Versi tidak dikirim menjawab 428, versi basi menjawab 409, dan ID tenant lain menjawab 404. Penolakan validasi membatalkan klaim versi. Tanggal akhir tidak boleh mendahului tanggal mulai; kelompok yang disusutkan wajib memiliki masa manfaat dan tarif garis lurus; tarif saldo menurun wajib jika metode itu diperbolehkan. Persentase harus lebih dari nol dan paling tinggi 100.
 
