@@ -355,6 +355,18 @@ final class DepreciationPosting
             ->join('aset_tr_aset as aset', function ($join): void {
                 $join->on('aset.id', '=', 'book.aset_id')->on('aset.tenant_id', '=', 'book.tenant_id');
             })
+            ->leftJoin('aset_m_group_aset as asset_group', function ($join): void {
+                $join->on('asset_group.id', '=', 'aset.group_aset_id')->on('asset_group.tenant_id', '=', 'aset.tenant_id');
+            })
+            ->leftJoin('aset_m_kelompok_harta_fiskal as asset_category', function ($join): void {
+                $join->on('asset_category.id', '=', 'asset_group.kelompok_harta_fiskal_id')->on('asset_category.tenant_id', '=', 'asset_group.tenant_id');
+            })
+            ->leftJoin('aset_m_jenis_aset as asset_type', function ($join): void {
+                $join->on('asset_type.id', '=', 'aset.jenis_aset_id')->on('asset_type.tenant_id', '=', 'aset.tenant_id');
+            })
+            ->leftJoin('aset_m_profil_penyusutan as depreciation_profile', function ($join): void {
+                $join->on('depreciation_profile.id', '=', 'book.depreciation_profile_id')->on('depreciation_profile.tenant_id', '=', 'book.tenant_id');
+            })
             ->where('aset_tr_penyusutan_aset.legal_entity_id', $legalEntityId)
             ->where('aset_tr_penyusutan_aset.period_ends_on', $periodEndsOn)
             ->whereNull('aset_tr_penyusutan_aset.reverses_period_id')
@@ -368,7 +380,18 @@ final class DepreciationPosting
             'aset_tr_penyusutan_aset.usage_org_unit_id',
             'aset_tr_penyusutan_aset.posted_posting_id',
             'aset_tr_penyusutan_aset.period_starts_on',
+            'book.id as buku_aset_id',
             'aset.kode as aset_code',
+            'aset.nama as asset_name',
+            'aset.acquired_on',
+            'asset_group.nama as asset_group_name',
+            'asset_category.label as asset_category_name',
+            'asset_type.nama as asset_type_name',
+            'book.acquisition_value',
+            'book.accumulated_depreciation',
+            'book.net_book_value',
+            'book.elapsed_periods_offset',
+            DB::raw('coalesce(book.useful_life_periods, depreciation_profile.useful_life_periods) as useful_life_periods'),
             'aset.group_aset_id',
             'aset.currency_code',
             'book.book_code',
@@ -438,6 +461,22 @@ final class DepreciationPosting
         $grup = $this->groups(array_map(static fn (stdClass $row): string => (string) $row->group_aset_id, $rows));
         $unit = array_values(array_unique(array_map(static fn (stdClass $row): string => (string) $row->usage_org_unit_id, $rows)));
         $bisnis = $this->organizations->parentBusinessUnits($tenantId, $unit, $periodEndsOn);
+        $elapsedPeriods = [];
+        $bookAssetIds = array_values(array_unique(array_map(static fn (stdClass $row): string => (string) $row->buku_aset_id, $rows)));
+        foreach (array_chunk($bookAssetIds, self::CHUNK) as $bookIds) {
+            foreach (DepreciationPeriod::query()
+                ->whereIn('buku_aset_id', $bookIds)
+                ->whereNull('reverses_period_id')
+                ->whereNull('cancelled_at')
+                ->whereDate('period_ends_on', '<=', $periodEndsOn)
+                ->groupBy('buku_aset_id')
+                ->select('buku_aset_id')
+                ->selectRaw('count(*) as elapsed_periods')
+                ->toBase()
+                ->get() as $elapsedPeriod) {
+                $elapsedPeriods[(string) $elapsedPeriod->buku_aset_id] = (int) $elapsedPeriod->elapsed_periods;
+            }
+        }
 
         $beban = [];
         $akumulasi = [];
@@ -463,12 +502,59 @@ final class DepreciationPosting
 
         $label = Carbon::parse($periodEndsOn)->format('d/m/Y');
         $baris = [];
+        $journalGroups = [];
+        // PostingPublisher memberi nomor mulai 1 sesuai urutan `lines` ini.
+        $lineNo = 1;
         foreach ($beban as $bagian) {
+            $groupId = (string) $bagian['group'];
+            $groupCode = $grup[$groupId]->kode ?? $groupId;
+            $journalGroups[$groupId] ??= [
+                'asset_group' => $groupCode,
+                'asset_group_name' => $grup[$groupId]->nama ?? $groupCode,
+                'depreciation_expense_line_nos' => [],
+                'accumulated_depreciation_line_nos' => [],
+            ];
+            $journalGroups[$groupId]['depreciation_expense_line_nos'][] = $lineNo++;
             $baris[] = $this->line($bagian['group'], $bagian['unit'], 'depreciation_expense_account_id', (string) $bagian['amount']->toScale($desimal, RoundingMode::Unnecessary), '0', sprintf('Beban penyusutan s.d. %s · %s', $label, $grup[$bagian['group']]->nama ?? $bagian['group']), $periodEndsOn, $grup);
         }
         foreach ($akumulasi as $bagian) {
+            $groupId = (string) $bagian['group'];
+            $groupCode = $grup[$groupId]->kode ?? $groupId;
+            $journalGroups[$groupId] ??= [
+                'asset_group' => $groupCode,
+                'asset_group_name' => $grup[$groupId]->nama ?? $groupCode,
+                'depreciation_expense_line_nos' => [],
+                'accumulated_depreciation_line_nos' => [],
+            ];
+            $journalGroups[$groupId]['accumulated_depreciation_line_nos'][] = $lineNo++;
             $baris[] = $this->line($bagian['group'], $bagian['unit'], 'accumulated_depreciation_account_id', '0', (string) $bagian['amount']->toScale($desimal, RoundingMode::Unnecessary), sprintf('Akumulasi penyusutan s.d. %s · %s', $label, $grup[$bagian['group']]->nama ?? $bagian['group']), $periodEndsOn, $grup);
         }
+
+        $assetDetails = array_map(static function (stdClass $row) use ($grup, $elapsedPeriods, $periodEndsOn, $desimal): array {
+            $bookId = (string) $row->buku_aset_id;
+            $usefulLife = $row->useful_life_periods === null ? null : max(0, (int) $row->useful_life_periods);
+            $elapsed = (int) $row->elapsed_periods_offset + (int) ($elapsedPeriods[$bookId] ?? 0);
+            $remainingUsefulLife = $usefulLife === null ? null : max(0, $usefulLife - $elapsed);
+
+            return [
+                'asset_code' => (string) $row->aset_code,
+                'asset_name' => $row->asset_name === null ? null : (string) $row->asset_name,
+                'asset_group' => $grup[(string) $row->group_aset_id]->kode ?? null,
+                'asset_group_name' => $row->asset_group_name === null ? null : (string) $row->asset_group_name,
+                'asset_category_name' => $row->asset_category_name === null ? null : (string) $row->asset_category_name,
+                'asset_type_name' => $row->asset_type_name === null ? null : (string) $row->asset_type_name,
+                'acquired_on' => self::date($row->acquired_on),
+                'book' => (string) $row->book_code,
+                'period_starts_on' => self::date($row->period_starts_on),
+                'period_ends_on' => $periodEndsOn,
+                'useful_life_periods' => $usefulLife,
+                'remaining_useful_life_months' => $remainingUsefulLife,
+                'acquisition_value' => (string) BigDecimal::of((string) $row->acquisition_value)->toScale($desimal, RoundingMode::Unnecessary),
+                'depreciation_amount' => (string) BigDecimal::of((string) $row->amount)->toScale($desimal, RoundingMode::Unnecessary),
+                'accumulated_depreciation' => (string) BigDecimal::of((string) $row->accumulated_depreciation)->toScale($desimal, RoundingMode::Unnecessary),
+                'net_book_value' => (string) BigDecimal::of((string) $row->net_book_value)->toScale($desimal, RoundingMode::Unnecessary),
+            ];
+        }, $rows);
 
         return [
             'tenant_id' => $tenantId,
@@ -488,14 +574,10 @@ final class DepreciationPosting
                 'url' => self::SCREEN_URL,
             ],
             'lines' => $baris,
-            'details' => ['assets' => array_map(static fn (stdClass $row): array => [
-                'asset_code' => (string) $row->aset_code,
-                'asset_group' => $grup[(string) $row->group_aset_id]->kode ?? null,
-                'book' => (string) $row->book_code,
-                'period_starts_on' => self::date($row->period_starts_on),
-                'period_ends_on' => $periodEndsOn,
-                'depreciation_amount' => (string) BigDecimal::of((string) $row->amount)->toScale($desimal, RoundingMode::Unnecessary),
-            ], $rows)],
+            'details' => [
+                'assets' => $assetDetails,
+                'journal_groups' => array_values($journalGroups),
+            ],
         ];
     }
 

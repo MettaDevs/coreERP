@@ -16,6 +16,7 @@ use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Modules\Apperp\ManagementAset\Tests\Concerns\MenerbitkanJurnalPenerimaan;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Concerns\CocokDenganKontrak;
 use Tests\TestCase;
 
 /**
@@ -29,7 +30,7 @@ use Tests\TestCase;
  */
 class DepreciationPostingTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, MenerbitkanJurnalPenerimaan, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, CocokDenganKontrak, MenerbitkanJurnalPenerimaan, RefreshDatabase;
 
     private const MULAI = '2026-10-01';
 
@@ -84,6 +85,106 @@ class DepreciationPostingTest extends TestCase
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('posted_posting_id', $postingId)->count());
         // Buku fiskal menyusut di register, tetapi tidak pernah di-post.
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('status', 'final')->whereNull('posted_posting_id')->count());
+    }
+
+    public function test_depreciation_payload_maps_journal_lines_to_groups_and_excludes_cancelled_periods(): void
+    {
+        $groupA = $this->groupTanpaBuku('MAP-A', 'Group Mapping A');
+        $groupB = $this->groupTanpaBuku('MAP-B', 'Group Mapping B');
+        $book = $this->bukuBerprofil('KOM-MAP', 'Komersial Mapping', 'current', 48);
+
+        foreach ([$groupA, $groupB] as $group) {
+            $this->sebagaiPengguna($this->tenantId, $this->izin('group-aset'))
+                ->putJson(self::API.'group-aset/'.$group.'/buku-penyusutan', [
+                    'version' => DB::table('aset_m_group_aset')->where('id', $group)->value('version'),
+                    'rows' => [[
+                        'buku_id' => $book,
+                        'useful_life_periods' => 48,
+                        'convention' => 'full_month',
+                        'depreciate' => true,
+                    ]],
+                ])->assertOk();
+            $this->petakanPenyusutan($group);
+        }
+
+        $this->terima($groupA, $this->poli, 1, 48000000);
+        $this->terima($groupA, $this->ugd, 1, 48000000);
+        $this->terima($groupB, $this->poli, 1, 48000000);
+        $this->terima($groupB, $this->ugd, 1, 48000000);
+
+        $periods = $this->usulkan($book);
+        $this->finalkan($periods[0]);
+        $this->balikkan($periods[0])->assertCreated()->assertJsonPath('data.posting', null);
+        foreach ($this->usulkan($book) as $periodId) {
+            $this->finalkan($periodId);
+        }
+
+        $result = $this->jalankanPost($book)->assertCreated()->json('data');
+        $payload = FinancePosting::query()->where('posting_id', $result['posting']['posting_id'])->firstOrFail()->payload;
+        $this->assertCocokSkema($payload, 'FinancePosting');
+
+        $groupNames = DB::table('aset_m_group_aset')->whereIn('id', [$groupA, $groupB])->pluck('nama', 'kode')->all();
+        $expectedCodes = array_keys($groupNames);
+        sort($expectedCodes);
+        $journalGroups = $payload['details']['journal_groups'];
+        $actualCodes = array_column($journalGroups, 'asset_group');
+        sort($actualCodes);
+        $this->assertSame($expectedCodes, $actualCodes);
+        $this->assertCount(4, $payload['details']['assets']);
+
+        $linesByNumber = collect($payload['journal_lines'])->keyBy('line_no');
+        $mappedLineNumbers = [];
+        $assetTotalsByGroup = [];
+        foreach ($payload['details']['assets'] as $asset) {
+            $code = (string) $asset['asset_group'];
+            $assetTotalsByGroup[$code] = ($assetTotalsByGroup[$code] ?? BigDecimal::zero())
+                ->plus((string) $asset['depreciation_amount']);
+            $this->assertSame(48, $asset['useful_life_periods']);
+            $this->assertSame(47, $asset['remaining_useful_life_months']);
+        }
+
+        foreach ($journalGroups as $journalGroup) {
+            $code = $journalGroup['asset_group'];
+            $this->assertSame($groupNames[$code], $journalGroup['asset_group_name']);
+            $this->assertCount(2, $journalGroup['depreciation_expense_line_nos']);
+            $this->assertCount(1, $journalGroup['accumulated_depreciation_line_nos']);
+
+            $expenseTotal = BigDecimal::zero();
+            foreach ($journalGroup['depreciation_expense_line_nos'] as $expenseLineNumber) {
+                $expenseLine = $linesByNumber->get($expenseLineNumber);
+                $this->assertNotNull($expenseLine);
+                $this->assertSame('Beban penyusutan s.d. 31/10/2026 · '.$journalGroup['asset_group_name'], $expenseLine['description']);
+                $this->assertNotSame('0.00', $expenseLine['debit']);
+                $this->assertSame('0.00', $expenseLine['credit']);
+                $expenseTotal = $expenseTotal->plus($expenseLine['debit']);
+                $mappedLineNumbers[] = $expenseLineNumber;
+            }
+
+            $accumulatedLineNumber = $journalGroup['accumulated_depreciation_line_nos'][0];
+            $accumulatedLine = $linesByNumber->get($accumulatedLineNumber);
+            $this->assertNotNull($accumulatedLine);
+            $this->assertSame('Akumulasi penyusutan s.d. 31/10/2026 · '.$journalGroup['asset_group_name'], $accumulatedLine['description']);
+            $this->assertSame('0.00', $accumulatedLine['debit']);
+            $this->assertNotSame('0.00', $accumulatedLine['credit']);
+            $this->assertTrue($assetTotalsByGroup[$code]->isEqualTo($expenseTotal));
+            $this->assertTrue($assetTotalsByGroup[$code]->isEqualTo($accumulatedLine['credit']));
+
+            $mappedLineNumbers[] = $accumulatedLineNumber;
+        }
+
+        $journalLineNumbers = array_column($payload['journal_lines'], 'line_no');
+        sort($journalLineNumbers);
+        sort($mappedLineNumbers);
+        $this->assertSame($journalLineNumbers, $mappedLineNumbers);
+        $this->assertCount(count(array_unique($mappedLineNumbers)), $mappedLineNumbers);
+
+        $assetTotal = array_reduce(
+            $payload['details']['assets'],
+            static fn (BigDecimal $total, array $asset): BigDecimal => $total->plus((string) $asset['depreciation_amount']),
+            BigDecimal::of('0'),
+        );
+        $this->assertTrue($assetTotal->isEqualTo($payload['totals']['debit']));
+        $this->assertTrue($assetTotal->isEqualTo($payload['totals']['credit']));
     }
 
     public function test_a_second_run_is_empty_and_periods_finalised_later_get_the_next_sequence(): void
@@ -426,7 +527,7 @@ class DepreciationPostingTest extends TestCase
         return array_values(DB::table('aset_tr_penyusutan_aset as p')
             ->join('aset_tr_buku_aset as b', 'b.id', '=', 'p.buku_aset_id')
             ->join('aset_tr_aset as a', 'a.id', '=', 'b.aset_id')
-            ->where('b.buku_id', $bukuId)->whereNull('p.reverses_period_id')
+            ->where('b.buku_id', $bukuId)->whereNull('p.reverses_period_id')->whereNull('p.cancelled_at')
             ->orderBy('a.kode')->pluck('p.id')->map(static fn ($id): string => (string) $id)->all());
     }
 
