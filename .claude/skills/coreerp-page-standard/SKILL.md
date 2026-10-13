@@ -1,6 +1,6 @@
 ---
 name: coreerp-page-standard
-description: Build or review CoreERP and hosted-app pages with consistent typography, page hierarchy, cards, actions, hints, filters, tables, empty states, responsive behavior, and Shell navigation. Use whenever creating a new React page, adding a module screen, changing a list/detail/form page, translating a mockup into UI, or auditing visual consistency, even when the user only asks to add a page or CRUD screen.
+description: Build or review CoreERP and module pages with consistent typography, page hierarchy, cards, actions, hints, filters, tables, empty states, responsive behavior, and Shell navigation. Use whenever creating a new React page, adding a module screen, changing a list/detail/form page, translating a mockup into UI, or auditing visual consistency, even when the user only asks to add a page or CRUD screen.
 ---
 
 # CoreERP page standard
@@ -22,7 +22,7 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 - Use one content title. Do not add uppercase category eyebrows such as "MASTER DATA" unless the reference page has one for a real user need.
 - Match Core typography: ordinary page/card titles use `text-xl` or SDK `CardTitle`; never start a CRUD page at `text-3xl` or `text-4xl`.
 - Keep page/card descriptions optional and page-wide. Do not add a hover/info hint to every heading. Give complex or non-obvious fields optional help text attached to that field; use `FieldDescription` when the guidance must be visible before entry, and keep field-specific meaning out of the page/card header.
-- Keep the page container consistent with its host. An iframe app must not recreate Shell chrome.
+- Modules render in the Core Shell and inherit its React tree and theme. Do not recreate Shell chrome or iframe hosting.
 
 ## State the page does not own
 
@@ -39,7 +39,7 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 
 ## Cards and actions
 
-- A directory/list page uses one primary `Card`.
+- A full-height operational list uses SDK `ListPageLayout` with header/filter/footer slots and a DataTable child. The layout owns the height rules and automatically gives the table viewport scrolling. Card-based settings/list pages keep one primary `Card`; when their main table is bounded, use `scrollMode="viewport"` and keep the Card header/footer outside that scroll area.
 - Put its title in `CardHeader`. Add a hint there only when it explains the whole list, not an individual field.
 - Put the primary action in `CardAction`, not in a detached page header.
 - Put filters and data in `CardContent`; pagination belongs in `CardFooter`.
@@ -67,10 +67,10 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 - Do not invent placeholder dots or circles for items without meaningful icons. Text-only child navigation is valid.
 - Use a real icon only when it consistently communicates the destination.
 - Long labels may truncate, but retain the full accessible name.
-- Hosted apps must announce `coreerp.ready` after installing their context listener. Shell and app must validate `event.source`, exact origin, and app ID before exchanging context.
+- Navigation is declared in the module manifest and rendered by the Core Shell; modules do not announce readiness through an iframe/message handshake.
 
 ## Acceptance
 
 - Write everyday Indonesian that explains the action or consequence.
 - Never expose internal architecture terms on business screens.
-- Verify: one clear title; page-level hint is optional; field help is attached to its field; hover opens it after roughly one second and closes it when the pointer leaves; label/title click toggles a persistent open state; keyboard can perform the same toggle; action inside the card; desktop filters horizontal; no decorative navigation bullets; SDK font/theme inherited; context handshake completes; empty and error states readable.
+- Verify: one clear title; page-level hint is optional; field help is attached to its field; hover opens it after roughly one second and closes it when the pointer leaves; label/title click toggles a persistent open state; keyboard can perform the same toggle; action inside the card; desktop filters horizontal; no decorative navigation bullets; SDK font/theme inherited; Shell header stays visible; list scrollbars remain reachable without scrolling to the last record; empty and error states readable.
