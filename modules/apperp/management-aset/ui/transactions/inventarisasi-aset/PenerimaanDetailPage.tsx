@@ -1,3 +1,4 @@
+import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { usePage } from '@inertiajs/react';
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -1140,27 +1141,43 @@ export default function PenerimaanDetailPage({
                                                                         {
                                                                             jenis_aset_id:
                                                                                 id,
+                                                                            kondisi_aset_id:
+                                                                                '',
                                                                         },
                                                                     ),
                                                             )}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {pilihan(
-                                                                'Kondisi',
-                                                                kondisi,
-                                                                baris.kondisi_aset_id,
-                                                                (id) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            kondisi_aset_id:
-                                                                                id,
-                                                                        },
-                                                                    ),
-                                                                {
-                                                                    placeholder:
-                                                                        'Tanpa kondisi',
-                                                                },
+                                                            {readOnly ? (
+                                                                (kondisi.options.find(
+                                                                    (item) =>
+                                                                        item.id ===
+                                                                        baris.kondisi_aset_id,
+                                                                )?.nama ?? '—')
+                                                            ) : (
+                                                                <AssetConditionSelect
+                                                                    assetTypeId={
+                                                                        baris.jenis_aset_id
+                                                                    }
+                                                                    value={
+                                                                        baris.kondisi_aset_id
+                                                                    }
+                                                                    label="Kondisi"
+                                                                    portalContainer={
+                                                                        panelRef
+                                                                    }
+                                                                    onChange={(
+                                                                        value,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                kondisi_aset_id:
+                                                                                    value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
                                                             )}
                                                         </TableCell>
                                                         <TableCell>

@@ -16,6 +16,7 @@ import GroupBookMatrix from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
 import type { MasterConfig, MasterRecord, Permission } from '../masters';
 import { permission } from '../masters';
+import AssetTypeConditions from './AssetTypeConditions';
 import JenisAsetCounters from './JenisAsetCounters';
 import JenisAsetCounterTypes from './JenisAsetCounterTypes';
 import type { JenisAsetDetail } from './jenisAsetDetail';
@@ -487,6 +488,22 @@ export default function RecordDetailPane({
             ) : (
                 <p className="text-muted-foreground text-sm">
                     Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.
+                </p>
+            );
+        }
+
+        if (section.assetTypeConditions) {
+            return record ? (
+                <AssetTypeConditions
+                    key={record.id}
+                    assetTypeId={record.id}
+                    canEdit={!readOnly && canEdit}
+                    version={record.version}
+                    onVersionChange={onVersionChange}
+                />
+            ) : (
+                <p className="text-muted-foreground text-sm">
+                    Kondisi dapat dipilih setelah jenis aset disimpan.
                 </p>
             );
         }

@@ -75,3 +75,29 @@ Endpoint itu butuh **dua** permission sekaligus: `jenis-aset.update` karena yang
 - [Master data](/apps/management-aset/master/) — perilaku bersama
 - [Register aset](/apps/management-aset/transaction/register-aset/) — pemakai atribut
 - [Setup maintenance](/apps/management-aset/master/maintenance/) — pekerjaan yang dikaitkan ke jenis
+
+## Kondisi yang boleh dipilih
+
+`aset_m_jenis_aset_kondisi` mengaitkan jenis aset dengan master kondisi fisik. Satu kondisi
+boleh dipakai beberapa jenis. Relasi milik tenant, dengan foreign key gabungan tenant dan id,
+arsip lunak, serta indeks unik pasangan yang belum diarsipkan. Relasi tidak membutuhkan nomor,
+workflow, atau kebijakan organisasi karena berupa data acuan tenant.
+
+`GET /api/v1/jenis-aset/{id}/conditions` mengembalikan `remaining`, `selected`, dan versi jenis.
+`PUT` pada path yang sama mengganti pilihan melalui `condition_ids`; izin yang diperlukan adalah
+`jenis-aset.update` dan `kondisi-aset.read`. Penyimpanan mengklaim versi jenis agar edit serentak
+tidak saling menimpa. GET membutuhkan `jenis-aset.read` dan `kondisi-aset.read`.
+
+**Jenis tanpa relasi boleh memakai semua kondisi aktif.** Ini menjaga jenis yang belum diatur tetap
+bisa dicatat. Setelah ada relasi, hanya kondisi aktif yang dipilih boleh dipakai. Kondisi tidak
+aktif yang sudah terkait tetap tampil supaya dapat dilepas, tetapi tidak menjadi pilihan transaksi.
+Catatan kondisi pada aset lama tidak diubah saat daftar ini disunting.
+
+Dropdown `kondisi-aset` menerima `jenis_aset_id`, atau `aset_id` yang diperiksa terhadap akses
+organisasi. Register, penerimaan, mutasi, dan monitoring memakai filter itu. Validasi server melalui
+`src/Support/AssetConditionPolicy.php` menolak kondisi di luar pilihan, termasuk saat aset dibuat
+melalui `PembuatAset`. Mengganti jenis di form mengosongkan kondisi agar dipilih kembali.
+
+Ini adaptasi dari [Asset types Dynamics 365](https://learn.microsoft.com/en-us/dynamics365/supply-chain/asset-management/setup-for-objects/object-types).
+Dynamics mengaitkan template penilaian kondisi; CoreERP mengaitkan kondisi fisik, tanpa template
+pengukuran. Pengujian relasi, izin, tenant, arsip, dan filter ada pada `tests/Feature/AssetTypeConditionTest.php`.

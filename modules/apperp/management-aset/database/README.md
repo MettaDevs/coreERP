@@ -181,3 +181,5 @@ Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr
 # Dekomisioning dan event workflow
 
 `tr_dokumen_siklus_aset` menyimpan `workflow_instance_id` untuk usulan dekomisioning. `processed_core_events` adalah inbox idempoten: satu event keputusan Core hanya dapat mengubah status aset satu kali.
+
+`aset_m_jenis_aset_kondisi` menyimpan kondisi yang boleh dipakai per jenis aset; pasangan tenant, jenis, dan kondisi unik selama belum diarsipkan. Jenis tanpa relasi memakai semua kondisi aktif.

@@ -31,19 +31,23 @@ export const optionLabel = (option: MasterOption) =>
  * akses lihat pada master yang ditunjuknya, dan itu tidak boleh membuat seluruh form
  * gagal dibuka; yang muncul hanyalah pilihan kosong beserta alasannya.
  */
-export function useMasterOptions(resource: string | null | undefined) {
+export function useMasterOptions(
+    resource: string | null | undefined,
+    query = '',
+) {
     // Hasil selalu dicatat bersama master yang melahirkannya, lalu yang dikembalikan
     // hanyalah hasil yang masih milik master yang diminta sekarang. Dengan begitu ganti
     // master — atau tidak memilih master sama sekali — langsung memberi pilihan kosong
     // pada render yang sama, tanpa effect yang perlu mengosongkannya lebih dulu dan
     // tanpa satu frame pun yang memperlihatkan pilihan milik master sebelumnya.
+    const lookupKey = `${resource ?? ''}?${query}`;
     const [muatan, setMuatan] = useState<{
         resource: string;
         options: MasterOption[];
         error: string;
     } | null>(null);
     const termuat =
-        resource && muatan?.resource === resource ? muatan : undefined;
+        resource && muatan?.resource === lookupKey ? muatan : undefined;
 
     useEffect(() => {
         if (!resource) {
@@ -51,13 +55,19 @@ export function useMasterOptions(resource: string | null | undefined) {
         }
 
         let cancelled = false;
-        api<{ data: MasterOption[] }>(`/${resource}?per_page=100&aktif=true`)
+        api<{ data: MasterOption[] }>(
+            `/${resource}?per_page=100&aktif=true&${query}`,
+        )
             .then((result) => {
                 if (cancelled) {
                     return;
                 }
 
-                setMuatan({ resource, options: result.data, error: '' });
+                setMuatan({
+                    resource: lookupKey,
+                    options: result.data,
+                    error: '',
+                });
             })
             .catch(() => {
                 if (cancelled) {
@@ -65,7 +75,7 @@ export function useMasterOptions(resource: string | null | undefined) {
                 }
 
                 setMuatan({
-                    resource,
+                    resource: lookupKey,
                     options: [],
                     error: `Pilihan belum dapat dimuat. Anda memerlukan akses lihat pada ${resource}.`,
                 });
@@ -74,7 +84,7 @@ export function useMasterOptions(resource: string | null | undefined) {
         return () => {
             cancelled = true;
         };
-    }, [resource]);
+    }, [resource, query, lookupKey]);
 
     return {
         options: termuat?.options ?? TANPA_PILIHAN,

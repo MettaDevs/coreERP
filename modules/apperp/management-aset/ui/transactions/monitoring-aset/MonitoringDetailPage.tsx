@@ -1,3 +1,4 @@
+import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { router } from '@inertiajs/react';
 import { CheckCheck, ListPlus, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -114,7 +115,6 @@ export default function MonitoringDetailPage({
     const [aset, setAset] = useState<Aset[]>([]);
     const [asetGalat, setAsetGalat] = useState('');
     const lokasi = useMasterOptions('lokasi-aset');
-    const kondisi = useMasterOptions('kondisi-aset');
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const anggota = useMasterOptions('reference-data/anggota');
     const panelRef = useRef<HTMLDivElement>(null);
@@ -686,7 +686,6 @@ export default function MonitoringDetailPage({
                                                 ''
                                             }
                                             aset={aset}
-                                            kondisi={kondisi.options}
                                             permissions={permissions}
                                             panelRef={panelRef}
                                             onChange={(patch) =>
@@ -779,7 +778,6 @@ function MonitoringRow({
     readOnly,
     lokasiDokumen,
     aset,
-    kondisi,
     permissions,
     panelRef,
     onChange,
@@ -790,7 +788,6 @@ function MonitoringRow({
     readOnly: boolean;
     lokasiDokumen: string;
     aset: Aset[];
-    kondisi: ReturnType<typeof useMasterOptions>['options'];
     permissions: string[];
     panelRef: RefObject<HTMLDivElement | null>;
     onChange: (patch: Partial<MonitoringLine>) => void;
@@ -912,29 +909,13 @@ function MonitoringRow({
                 {readOnly ? (
                     (baris.kondisi_aset_nama ?? '—')
                 ) : (
-                    <Select
-                        items={kondisi.map(optionLabel)}
-                        value={
-                            kondisi
-                                .filter(
-                                    (option) =>
-                                        option.id === baris.kondisi_aset_id,
-                                )
-                                .map(optionLabel)[0] ?? null
-                        }
-                        placeholder="Tidak dicatat"
-                        searchPlaceholder="Cari kondisi"
-                        emptyMessage="Kondisi tidak ditemukan."
-                        ariaLabel={`Kondisi fisik baris ${index + 1}`}
+                    <AssetConditionSelect
+                        assetId={baris.aset_id}
+                        value={baris.kondisi_aset_id}
+                        label={`Kondisi baris ${index + 1}`}
                         portalContainer={panelRef}
-                        onValueChange={(item) =>
-                            onChange({
-                                kondisi_aset_id:
-                                    kondisi.find(
-                                        (option) =>
-                                            optionLabel(option) === item,
-                                    )?.id ?? '',
-                            })
+                        onChange={(value) =>
+                            onChange({ kondisi_aset_id: value })
                         }
                     />
                 )}
