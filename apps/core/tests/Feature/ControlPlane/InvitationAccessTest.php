@@ -130,6 +130,7 @@ class InvitationAccessTest extends TestCase
         ]);
         $unit = $this->createOrganization([
             'classification' => 'operating_unit', 'name' => 'Unit Scope', 'operating_unit_type' => 'department',
+            'operating_unit_number' => 'UNIT-SCOPE',
         ]);
 
         $this->actingAs($this->owner)->post('/settings/organization/hierarchies', [

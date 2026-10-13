@@ -868,6 +868,16 @@ class FinancePostingFeedTest extends TestCase
 
     private function operatingUnit(string $nama, string $tipe, ?string $nomor): Organization
     {
+        if ($nomor === null) {
+            // Data lama yang lahir sebelum kode diwajibkan.
+            $organization = Organization::create([
+                'tenant_id' => $this->owner->activeMembership()->tenant_id,
+                'classification' => 'operating_unit', 'name' => $nama, 'status' => 'active',
+            ]);
+            $organization->operatingUnit()->create(['tenant_id' => $organization->tenant_id, 'type' => $tipe, 'number' => null]);
+
+            return $organization;
+        }
         $this->actingAs($this->owner)->post('/settings/organization/organizations', array_filter([
             'classification' => 'operating_unit',
             'name' => $nama,
