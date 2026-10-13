@@ -147,3 +147,12 @@ Perintah yang berlaku untuk berkas di folder UI module, dijalankan dari `apps/co
 - [Dokumen cetak, layout, dan ekspor](23-document-rendering.md) — sisi shell dari permintaan cetak yang dikirim layar module
 - [CI/CD polyrepo](22-ci-cd.md) — tempat langkah build dan pemeriksaan bundel berjalan
 - [Jalur membangun modul baru](../apps/membangun-app-baru.md) — urutan mengerjakannya, dengan aturan di halaman ini sebagai isinya
+
+## Versi produk di sidebar
+
+Pojok kiri bawah sidebar menampilkan nomor image rilis yang sedang melayani permintaan.
+Perakit meneruskan nomor rilis melalui build arg `PRODUCT_VERSION`; tahap runtime image
+menyimpannya dalam `COREERP_PRODUCT_VERSION`. Core membacanya lewat `app.product_version`
+dan mengirim prop Inertia `productVersion`. Rilis SaaS maupun on-prem memakai image yang sama,
+jadi nomor mengikuti image saat upgrade atau rollback tanpa mengubah source secara manual.
+Image lokal tanpa metadata versi menampilkan `—`, bukan nomor rilis yang ditebak.

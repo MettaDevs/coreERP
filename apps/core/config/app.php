@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Diisi otomatis oleh perakit pada image rilis, sama untuk SaaS dan on-prem.
+    'product_version' => env('COREERP_PRODUCT_VERSION') ?: null,
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

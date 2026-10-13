@@ -12,6 +12,7 @@ declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
             name: string;
+            productVersion: string | null;
             auth: Auth;
             entitledProducts: EntitledProduct[];
             launchableProducts: LaunchableProduct[];

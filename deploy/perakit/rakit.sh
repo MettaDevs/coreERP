@@ -258,6 +258,7 @@ else
         -f "$FOLDER_SUMBER/deploy/perakit/Dockerfile" \
         --label "org.opencontainers.image.revision=$commit" \
         --label "org.opencontainers.image.version=$rilis" \
+        --build-arg "PRODUCT_VERSION=$rilis" \
         -t "$image_lokal" "$FOLDER_SUMBER" > "$kerja/build.id" \
         || gagal 'docker build gagal.'
     printf '    %s\n' "$(cat "$kerja/build.id")"

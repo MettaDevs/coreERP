@@ -191,6 +191,24 @@ export function AppSidebar() {
                             </Link>
                         ))}
                     </nav>
+                    <div
+                        className="w-full shrink-0 border-t border-sidebar-border px-1 py-2 text-center text-[10px] leading-tight text-muted-foreground"
+                        aria-label={
+                            props.productVersion
+                                ? `Versi produk ${props.productVersion}`
+                                : 'Versi produk belum tersedia'
+                        }
+                        title={
+                            props.productVersion
+                                ? `Versi produk ${props.productVersion}`
+                                : 'Versi produk belum tersedia'
+                        }
+                    >
+                        <span className="block">Versi</span>
+                        <span className="block font-medium break-all">
+                            {props.productVersion ?? '—'}
+                        </span>
+                    </div>
                 </aside>
 
                 {displayedItem && showChildren && (
