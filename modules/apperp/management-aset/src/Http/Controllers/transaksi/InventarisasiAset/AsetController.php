@@ -22,6 +22,7 @@ use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustment;
 use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustmentFailed;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
+use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -155,6 +156,9 @@ class AsetController extends Controller
                     );
                 }
 
+                if (array_intersect(array_keys($data), ['jenis_aset_id', 'kondisi_aset_id']) !== []) {
+                    AssetConditionPolicy::validate($data['jenis_aset_id'] ?? $asetTerkunci->jenis_aset_id, array_key_exists('kondisi_aset_id', $data) ? $data['kondisi_aset_id'] : $asetTerkunci->kondisi_aset_id);
+                }
                 $asetTerkunci->update(array_intersect_key($data, array_flip([
                     'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id',
                     'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value', 'keterangan',

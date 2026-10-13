@@ -15,6 +15,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AtributAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
+use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
 use Modules\Apperp\ManagementAset\Support\ValidasiAtributAset;
 use RuntimeException;
@@ -47,6 +48,7 @@ class PembuatAset
      */
     public function buat(string $tenantId, string $creationKey, string $kode, array $data): Aset
     {
+        AssetConditionPolicy::validate($data['jenis_aset_id'] ?? null, $data['kondisi_aset_id'] ?? null);
         $defaults = $this->bawaanGroup((string) $data['group_aset_id']);
         // Lokasi bawaan group hanya mengisi kekosongan. Begitu aset terbentuk, lokasinya
         // adalah miliknya sendiri: mengubah bawaan group kelak tidak memindahkan aset

@@ -36,6 +36,7 @@ use Modules\Apperp\ManagementAset\Services\OpeningBalance;
 use Modules\Apperp\ManagementAset\Services\OpeningBalanceImport;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Support\AcquisitionMethod;
+use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PenerimaanStatus;
 use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
@@ -872,6 +873,9 @@ class PenerimaanAsetController extends Controller
         }
         if ($pesan !== []) {
             throw ValidationException::withMessages($pesan);
+        }
+        foreach ($data['details'] as $index => $detail) {
+            AssetConditionPolicy::validate($detail['jenis_aset_id'] ?? null, $detail['kondisi_aset_id'] ?? null, 'details.'.$index.'.kondisi_aset_id');
         }
         $this->validasiSaldoAwal($request, $data);
 

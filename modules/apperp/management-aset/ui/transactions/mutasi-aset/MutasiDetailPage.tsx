@@ -35,6 +35,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
@@ -99,7 +100,6 @@ export default function MutasiDetailPage({
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
     const [aset, setAset] = useState<Aset[]>([]);
     const lokasi = useMasterOptions('lokasi-aset');
-    const kondisi = useMasterOptions('kondisi-aset');
     // Unit kerja dan orang milik Core. Keduanya dibaca lewat endpoint referensi module,
     // bukan diketik sebagai ULID: tidak ada pengguna yang mengenali rekannya dari ULID.
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
@@ -773,40 +773,19 @@ export default function MutasiDetailPage({
                                                     (baris.kondisi_aset_nama ??
                                                     '—')
                                                 ) : (
-                                                    <Select
-                                                        items={kondisi.options.map(
-                                                            optionLabel,
-                                                        )}
+                                                    <AssetConditionSelect
+                                                        assetId={baris.aset_id}
                                                         value={
-                                                            kondisi.options
-                                                                .filter(
-                                                                    (option) =>
-                                                                        option.id ===
-                                                                        baris.kondisi_aset_id,
-                                                                )
-                                                                .map(
-                                                                    optionLabel,
-                                                                )[0] ?? null
+                                                            baris.kondisi_aset_id
                                                         }
-                                                        placeholder="Tidak dicatat"
-                                                        searchPlaceholder="Cari kondisi"
-                                                        emptyMessage="Kondisi tidak ditemukan."
-                                                        ariaLabel={`Kondisi baris ${index + 1}`}
+                                                        label={`Kondisi baris ${index + 1}`}
                                                         portalContainer={
                                                             panelRef
                                                         }
-                                                        onValueChange={(item) =>
+                                                        onChange={(value) =>
                                                             ubahBaris(index, {
                                                                 kondisi_aset_id:
-                                                                    kondisi.options.find(
-                                                                        (
-                                                                            option,
-                                                                        ) =>
-                                                                            optionLabel(
-                                                                                option,
-                                                                            ) ===
-                                                                            item,
-                                                                    )?.id ?? '',
+                                                                    value,
                                                             })
                                                         }
                                                     />

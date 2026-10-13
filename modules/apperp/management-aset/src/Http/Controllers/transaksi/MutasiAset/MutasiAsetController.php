@@ -24,6 +24,7 @@ use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
 use Modules\Apperp\ManagementAset\Services\LocationDimension;
 use Modules\Apperp\ManagementAset\Services\LocationInheritance;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\MutasiStatus;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -408,6 +409,10 @@ class MutasiAsetController extends Controller
             }
         }
 
+        $assetTypes = Aset::query()->whereIn('id', $asetIds)->pluck('jenis_aset_id', 'id');
+        foreach ($details as $index => $detail) {
+            AssetConditionPolicy::validate($assetTypes[$detail['aset_id']] ?? null, $detail['kondisi_aset_id'] ?? null, 'details.'.$index.'.kondisi_aset_id');
+        }
         $kondisiIds = array_values(array_unique(array_filter(array_column($details, 'kondisi_aset_id'))));
         if ($kondisiIds !== [] && KondisiAset::query()->whereIn('id', $kondisiIds)->where('aktif', true)->count() !== count($kondisiIds)) {
             throw ValidationException::withMessages([

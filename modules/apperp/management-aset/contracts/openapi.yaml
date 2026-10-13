@@ -1272,11 +1272,21 @@ paths:
       - Master data
       operationId: listKondisiAset
       summary: Menampilkan kondisi aset
+      description: Filter jenis_aset_id atau aset_id membatasi pilihan menurut jenis. Tanpa relasi semua kondisi aktif berlaku.
+        aset_id diperiksa terhadap akses organisasi pengguna.
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PerPage'
+      - name: jenis_aset_id
+        in: query
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: aset_id
+        in: query
+        schema:
+          $ref: '#/components/schemas/Ulid'
       responses:
         '200':
           description: Daftar kondisi aset
@@ -2587,6 +2597,117 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/jenis-aset/{id}/conditions:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: listAssetTypeConditions
+      summary: Kondisi yang dapat dipilih untuk jenis aset
+      description: Memerlukan jenis-aset.read dan kondisi-aset.read. Daftar kosong berarti semua kondisi aktif berlaku.
+      responses:
+        '200':
+          description: Pilihan remaining dan selected dalam data, serta version jenis aset.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - version
+                properties:
+                  version:
+                    $ref: '#/components/schemas/RecordVersion'
+                  data:
+                    type: object
+                    required:
+                    - remaining
+                    - selected
+                    properties:
+                      remaining:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - id
+                          - kode
+                          - nama
+                          - aktif
+                          properties:
+                            id:
+                              $ref: '#/components/schemas/Ulid'
+                            kode:
+                              type: string
+                            nama:
+                              type: string
+                            aktif:
+                              type: boolean
+                      selected:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - id
+                          - kode
+                          - nama
+                          - aktif
+                          properties:
+                            id:
+                              $ref: '#/components/schemas/Ulid'
+                            kode:
+                              type: string
+                            nama:
+                              type: string
+                            aktif:
+                              type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Master data
+      operationId: replaceAssetTypeConditions
+      summary: Mengganti kondisi yang boleh dipakai pada jenis aset
+      description: |
+        Memerlukan management-aset.jenis-aset.update dan management-aset.kondisi-aset.read.
+        condition_ids mengganti seluruh pilihan. Relasi yang dilepas diarsipkan. Array kosong
+        mengizinkan semua kondisi aktif. Satu kondisi dapat dipakai beberapa jenis.
+        Kondisi tidak aktif yang sudah dipilih boleh dipertahankan, tetapi tidak boleh ditambahkan.
+        Catatan kondisi pada aset lama tidak berubah. Transaksi baru memeriksa kecocokan jenis dan kondisi.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - condition_ids
+              properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
+                condition_ids:
+                  type: array
+                  maxItems: 200
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Daftar remaining dan selected dalam data, serta version terbaru jenis aset.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/StaleVersion'
         '422':

@@ -31,6 +31,7 @@ export type DetailSection = {
     maintenanceJobTypes?: boolean;
     /** Seksi counter yang boleh dibaca pada aset jenis ini. */
     assetTypeCounters?: boolean;
+    assetTypeConditions?: boolean;
     /** Seksi baris rencana pemeliharaan. */
     maintenancePlanLines?: boolean;
     /** Seksi aset dan jenis aset yang dikenai rencana pemeliharaan. */
@@ -129,8 +130,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'kondisi-aset',
                 title: 'Kondisi aset',
                 fields: [],
-                placeholder:
-                    'Templat kondisi belum dapat dibatasi per jenis aset di sini. Kondisi aset yang ada masih berlaku untuk seluruh jenis; pembatasan per jenis menyusul saat relasinya dibangun.',
+                assetTypeConditions: true,
             },
         ];
     }

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
+use Modules\Apperp\ManagementAset\Http\Controllers\master\AssetTypeConditionController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\CounterTypeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\DowntimeReasonController;
@@ -96,6 +97,8 @@ Route::get('maintenance-checklist-templates/{id}/lines', [MaintenanceSetupLinkCo
 Route::put('maintenance-checklist-templates/{id}/lines', [MaintenanceSetupLinkController::class, 'replaceTemplateLines']);
 Route::post('maintenance-job-type-defaults/{id}/copy', [MaintenanceJobTypeDefaultController::class, 'copy']);
 Route::get('pabrikan-aset/{id}/detail', PabrikanAsetDetailController::class);
+Route::get('jenis-aset/{assetTypeId}/conditions', [AssetTypeConditionController::class, 'index']);
+Route::put('jenis-aset/{assetTypeId}/conditions', [AssetTypeConditionController::class, 'replace']);
 Route::put('jenis-aset/{id}/models', [JenisAsetModelController::class, 'replace']);
 Route::get('tipe-atribut/{id}/nilai', [TipeAtributNilaiController::class, 'index']);
 Route::put('tipe-atribut/{id}/nilai', [TipeAtributNilaiController::class, 'replace']);

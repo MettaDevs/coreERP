@@ -58,7 +58,9 @@ export default function DynamicField({
     portalContainer,
     readOnly = false,
     onRequestEdit,
+    referenceQuery,
 }: {
+    referenceQuery?: string;
     config: FieldConfig;
     value: FieldValue;
     onChange: (value: FieldValue) => void;
@@ -82,6 +84,7 @@ export default function DynamicField({
     // field selain `reference` sumbernya null sehingga tidak ada permintaan apa pun.
     const reference = useMasterOptions(
         config.type === 'reference' ? config.resource : null,
+        referenceQuery,
     );
 
     if (config.type === 'reference') {

@@ -270,8 +270,19 @@ export function ReferenceFields({
         <DynamicField
             key={field.name}
             config={field}
+            referenceQuery={
+                field.name === 'kondisi_aset_id'
+                    ? `jenis_aset_id=${references.jenis_aset_id ?? ''}`
+                    : undefined
+            }
             value={references[field.name]}
-            onChange={(next) => onChange(field.name, next)}
+            onChange={(next) => {
+                if (field.name === 'jenis_aset_id') {
+                    onChange('kondisi_aset_id', '');
+                }
+
+                onChange(field.name, next);
+            }}
             portalContainer={portal}
         />
     ));
