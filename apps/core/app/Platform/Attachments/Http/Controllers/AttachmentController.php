@@ -106,7 +106,10 @@ final class AttachmentController extends Controller
             : response()->json(['data' => $this->presentNote($note->refresh(), $this->userNames(collect([$note])))]);
     }
 
-    /** @param array<int, string> $names */
+    /**
+     * @param  array<int, string>  $names
+     * @return array<string, mixed>
+     */
     private function presentNote(DocumentNote $note, array $names): array
     {
         return [

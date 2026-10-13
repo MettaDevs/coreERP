@@ -1,0 +1,45 @@
+security:
+  entry_points:
+    - code: management-aset.kelompok-harta.form
+      name: Layar kelompok harta
+      type: form
+    - code: management-aset.kelompok-harta.api
+      name: API kelompok harta
+      type: api
+  permissions:
+    - code: management-aset.kelompok-harta.read
+      name: Lihat kelompok harta
+      entry_point: management-aset.kelompok-harta.form
+      access: read
+    - code: management-aset.kelompok-harta.update
+      name: Ubah kelompok harta
+      entry_point: management-aset.kelompok-harta.api
+      access: update
+    - code: management-aset.kelompok-harta.archive
+      name: Arsipkan kelompok harta
+      entry_point: management-aset.kelompok-harta.api
+      access: delete
+  privileges:
+    - code: management-aset.kelompok-harta.view
+      name: Lihat kelompok harta
+      permissions:
+        - management-aset.kelompok-harta.read
+    - code: management-aset.kelompok-harta.maintain
+      name: Pelihara kelompok harta
+      permissions:
+        - management-aset.kelompok-harta.read
+        - management-aset.kelompok-harta.update
+    - code: management-aset.kelompok-harta.retire
+      name: Arsipkan kelompok harta
+      permissions:
+        - management-aset.kelompok-harta.archive
+  duties:
+    - code: management-aset.kelompok-harta.view
+      name: Lihat kelompok harta
+      privileges:
+        - management-aset.kelompok-harta.view
+    - code: management-aset.kelompok-harta.manage
+      name: Kelola kelompok harta
+      privileges:
+        - management-aset.kelompok-harta.maintain
+        - management-aset.kelompok-harta.retire

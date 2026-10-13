@@ -132,7 +132,9 @@ class DepreciationPostingTest extends TestCase
         $this->assertSame($expectedCodes, $actualCodes);
         $this->assertCount(4, $payload['details']['assets']);
 
-        $linesByNumber = collect($payload['journal_lines'])->keyBy('line_no');
+        /** @var list<array<string, mixed>> $journalLines */
+        $journalLines = $payload['journal_lines'];
+        $linesByNumber = collect($journalLines)->keyBy('line_no');
         $mappedLineNumbers = [];
         $assetTotalsByGroup = [];
         foreach ($payload['details']['assets'] as $asset) {

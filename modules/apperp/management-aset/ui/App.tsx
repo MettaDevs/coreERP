@@ -1,16 +1,16 @@
-import { lazy, useMemo } from "react";
-import type { ComponentType, LazyExoticComponent } from "react";
-import { Card, CardContent } from "@apperp/ui/card";
+import { lazy, useMemo } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
+import { Card, CardContent } from '@apperp/ui/card';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
-import type { Permission } from "./master/masters";
-import { DETAIL_LAYOUT_RESOURCES, MASTERS, permission } from "./master/masters";
-import { config as dekomisioningAset } from "./transactions/dekomisioning-aset/config";
-import { config as permintaanPembelianAset } from "./transactions/permintaan-pembelian-aset/config";
+} from '@apperp/ui/empty';
+import type { Permission } from './master/masters';
+import { DETAIL_LAYOUT_RESOURCES, MASTERS, permission } from './master/masters';
+import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
+import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
 
 /**
  * Properti yang dikirim `HalamanModulController` pada setiap layar module ini.
@@ -45,58 +45,62 @@ export type PropsModul = {
  * membuat React membongkar dan memasang ulang layarnya pada setiap render — state layar
  * hilang, dan setiap permintaan datanya berjalan lagi.
  */
-const MasterPage = lazy(() => import("./master/MasterPage"));
-const MasterDetailPage = lazy(() => import("./master/detail/MasterDetailPage"));
+const MasterPage = lazy(() => import('./master/MasterPage'));
+const AssetClassificationPage = lazy(
+    () =>
+        import('./transactions/asset-classifications/AssetClassificationPage'),
+);
+const MasterDetailPage = lazy(() => import('./master/detail/MasterDetailPage'));
 const AsetPage = lazy(
-    () => import("./transactions/inventarisasi-aset/AsetPage"),
+    () => import('./transactions/inventarisasi-aset/AsetPage'),
 );
 const DepreciationPage = lazy(
-    () => import("./transactions/inventarisasi-aset/DepreciationPage"),
+    () => import('./transactions/inventarisasi-aset/DepreciationPage'),
 );
 const LifecycleDocumentPage = lazy(
-    () => import("./transactions/_shared/LifecycleDocumentPage"),
+    () => import('./transactions/_shared/LifecycleDocumentPage'),
 );
 const MutationPage = lazy(
-    () => import("./transactions/mutasi-aset/MutationPage"),
+    () => import('./transactions/mutasi-aset/MutationPage'),
 );
-const DisposalPage = lazy(() => import("./transactions/disposal/DisposalPage"));
+const DisposalPage = lazy(() => import('./transactions/disposal/DisposalPage'));
 const ValueAdjustmentPage = lazy(
-    () => import("./transactions/value-adjustment/ValueAdjustmentPage"),
+    () => import('./transactions/value-adjustment/ValueAdjustmentPage'),
 );
 const ReclassificationPage = lazy(
-    () => import("./transactions/reclassification/ReclassificationPage"),
+    () => import('./transactions/reclassification/ReclassificationPage'),
 );
 const MonitoringPage = lazy(
-    () => import("./transactions/monitoring-aset/MonitoringPage"),
+    () => import('./transactions/monitoring-aset/MonitoringPage'),
 );
 const PlanningPage = lazy(
-    () => import("./transactions/perencanaan-aset/PlanningPage"),
+    () => import('./transactions/perencanaan-aset/PlanningPage'),
 );
 const StatusValidationPage = lazy(
-    () => import("./transactions/pemeliharaan-aset/StatusValidationPage"),
+    () => import('./transactions/pemeliharaan-aset/StatusValidationPage'),
 );
 const WorkOrderPage = lazy(
-    () => import("./transactions/pemeliharaan-aset/WorkOrderPage"),
+    () => import('./transactions/pemeliharaan-aset/WorkOrderPage'),
 );
 const MaintenanceRequestPage = lazy(
-    () => import("./transactions/maintenance-requests/MaintenanceRequestPage"),
+    () => import('./transactions/maintenance-requests/MaintenanceRequestPage'),
 );
 const MaintenanceSchedulePage = lazy(
-    () => import("./transactions/maintenance-schedule/MaintenanceSchedulePage"),
+    () => import('./transactions/maintenance-schedule/MaintenanceSchedulePage'),
 );
 const CounterReadingPage = lazy(
-    () => import("./transactions/counter-readings/CounterReadingPage"),
+    () => import('./transactions/counter-readings/CounterReadingPage'),
 );
 const InsurancePage = lazy(
-    () => import("./transactions/insurance/InsurancePage"),
+    () => import('./transactions/insurance/InsurancePage'),
 );
-const WarrantyPage = lazy(() => import("./transactions/warranty/WarrantyPage"));
-const DowntimePage = lazy(() => import("./transactions/downtime/DowntimePage"));
+const WarrantyPage = lazy(() => import('./transactions/warranty/WarrantyPage'));
+const DowntimePage = lazy(() => import('./transactions/downtime/DowntimePage'));
 const PengaturanAsetTetapPage = lazy(
-    () => import("./pengaturan-aset-tetap/PengaturanAsetTetapPage"),
+    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPage'),
 );
 const AssetPostingGroupPage = lazy(
-    () => import("./asset-posting-group/AssetPostingGroupPage"),
+    () => import('./asset-posting-group/AssetPostingGroupPage'),
 );
 
 /**
@@ -112,57 +116,57 @@ const REPORT_PAGES: Record<
     {
         permission: string;
         Page: LazyExoticComponent<ComponentType>;
-        layout?: "flow";
+        layout?: 'flow';
     }
 > = {
-    "laporan-penyusutan-aset": {
-        permission: "management-aset.penyusutan.read",
-        Page: lazy(() => import("./laporan/LaporanPenyusutanAsetPage")),
+    'laporan-penyusutan-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanPenyusutanAsetPage')),
     },
-    "laporan-mutasi-aset": {
-        permission: "management-aset.mutasi-aset.read",
-        Page: lazy(() => import("./laporan/LaporanMutasiAsetPage")),
+    'laporan-mutasi-aset': {
+        permission: 'management-aset.mutasi-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMutasiAsetPage')),
     },
-    "laporan-monitoring-aset": {
-        permission: "management-aset.monitoring-aset.read",
-        Page: lazy(() => import("./laporan/LaporanMonitoringAsetPage")),
+    'laporan-monitoring-aset': {
+        permission: 'management-aset.monitoring-aset.read',
+        Page: lazy(() => import('./laporan/LaporanMonitoringAsetPage')),
     },
-    "laporan-pemeliharaan-aset": {
-        permission: "management-aset.pemeliharaan-aset.read",
-        Page: lazy(() => import("./laporan/LaporanPemeliharaanAsetPage")),
+    'laporan-pemeliharaan-aset': {
+        permission: 'management-aset.pemeliharaan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemeliharaanAsetPage')),
     },
-    "kpi-pemeliharaan": {
-        permission: "management-aset.kpi-pemeliharaan.read",
-        layout: "flow",
-        Page: lazy(() => import("./transactions/downtime/MaintenanceKpiPage")),
+    'kpi-pemeliharaan': {
+        permission: 'management-aset.kpi-pemeliharaan.read',
+        layout: 'flow',
+        Page: lazy(() => import('./transactions/downtime/MaintenanceKpiPage')),
     },
-    "laporan-penjualan-aset": {
-        permission: "management-aset.penjualan-aset.read",
-        Page: lazy(() => import("./laporan/LaporanPenjualanAsetPage")),
+    'laporan-penjualan-aset': {
+        permission: 'management-aset.penjualan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPenjualanAsetPage')),
     },
-    "laporan-pemusnahan-aset": {
-        permission: "management-aset.pemusnahan-aset.read",
-        Page: lazy(() => import("./laporan/LaporanPemusnahanAsetPage")),
+    'laporan-pemusnahan-aset': {
+        permission: 'management-aset.pemusnahan-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPemusnahanAsetPage')),
     },
-    "laporan-nilai-buku-aset": {
-        permission: "management-aset.penyusutan.read",
-        Page: lazy(() => import("./laporan/LaporanNilaiBukuAsetPage")),
+    'laporan-nilai-buku-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanNilaiBukuAsetPage')),
     },
-    "laporan-proyeksi-penyusutan-aset": {
-        permission: "management-aset.penyusutan.read",
-        Page: lazy(() => import("./laporan/LaporanProyeksiPenyusutanAsetPage")),
+    'laporan-proyeksi-penyusutan-aset': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanProyeksiPenyusutanAsetPage')),
     },
-    "laporan-perolehan-aset": {
-        permission: "management-aset.aset.read",
-        Page: lazy(() => import("./laporan/LaporanPerolehanAsetPage")),
+    'laporan-perolehan-aset': {
+        permission: 'management-aset.aset.read',
+        Page: lazy(() => import('./laporan/LaporanPerolehanAsetPage')),
     },
-    "laporan-rekonsiliasi-aset-buku-besar": {
-        permission: "management-aset.penyusutan.read",
-        Page: lazy(() => import("./laporan/LaporanRekonsiliasiAsetPage")),
+    'laporan-rekonsiliasi-aset-buku-besar': {
+        permission: 'management-aset.penyusutan.read',
+        Page: lazy(() => import('./laporan/LaporanRekonsiliasiAsetPage')),
     },
-    "laporan-pengadaan-aset": {
-        permission: "management-aset.permintaan-pembelian-aset.read",
-        Page: lazy(() => import("./laporan/LaporanPengadaanAsetPage")),
+    'laporan-pengadaan-aset': {
+        permission: 'management-aset.permintaan-pembelian-aset.read',
+        Page: lazy(() => import('./laporan/LaporanPengadaanAsetPage')),
     },
 };
 
@@ -193,7 +197,7 @@ export default function App({
             MASTERS.filter(
                 (master) =>
                     master.showInNavigation !== false &&
-                    permissions.includes(permission(master.resource, "read")),
+                    permissions.includes(permission(master.resource, 'read')),
             ),
         [permissions],
     );
@@ -202,8 +206,8 @@ export default function App({
 
     // Id view mengikuti nama prosesnya; permission tetap `aset` karena ia kontrak.
     if (
-        view === "inventarisasi-aset" &&
-        permissions.includes("management-aset.aset.read")
+        view === 'inventarisasi-aset' &&
+        permissions.includes('management-aset.aset.read')
     ) {
         return (
             <main
@@ -213,7 +217,7 @@ export default function App({
                 <AsetPage
                     context={konteks}
                     canUpdate={permissions.includes(
-                        "management-aset.aset.update",
+                        'management-aset.aset.update',
                     )}
                     permissions={permissions}
                     segments={segments}
@@ -223,21 +227,21 @@ export default function App({
     }
 
     if (
-        view === "penyusutan" &&
-        permissions.includes("management-aset.penyusutan.read")
+        view === 'penyusutan' &&
+        permissions.includes('management-aset.penyusutan.read')
     ) {
         return (
             <main>
                 <DepreciationPage
                     canCreate={permissions.includes(
-                        "management-aset.penyusutan.create",
+                        'management-aset.penyusutan.create',
                     )}
                     canFinalize={permissions.includes(
-                        "management-aset.penyusutan.finalize",
+                        'management-aset.penyusutan.finalize',
                     )}
                     permissions={permissions}
                     canPost={permissions.includes(
-                        "management-aset.penyusutan.post",
+                        'management-aset.penyusutan.post',
                     )}
                     context={konteks}
                 />
@@ -246,8 +250,22 @@ export default function App({
     }
 
     if (
-        view === "fixed-aset-parameters" &&
-        permissions.includes("management-aset.fixed-asset-parameters.read")
+        view === 'kelompok-harta' &&
+        permissions.includes('management-aset.kelompok-harta.read')
+    ) {
+        return (
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <AssetClassificationPage permissions={permissions} />
+            </main>
+        );
+    }
+
+    if (
+        view === 'fixed-aset-parameters' &&
+        permissions.includes('management-aset.fixed-asset-parameters.read')
     ) {
         return (
             <main
@@ -260,9 +278,9 @@ export default function App({
     }
 
     if (
-        view === "fixed-aset-posting-profiles" &&
+        view === 'fixed-aset-posting-profiles' &&
         permissions.includes(
-            "management-aset.fixed-asset-posting-profiles.read",
+            'management-aset.fixed-asset-posting-profiles.read',
         )
     ) {
         return (
@@ -276,8 +294,8 @@ export default function App({
     }
 
     if (
-        view === "mutasi-aset" &&
-        permissions.includes("management-aset.mutasi-aset.read")
+        view === 'mutasi-aset' &&
+        permissions.includes('management-aset.mutasi-aset.read')
     ) {
         return (
             <main
@@ -294,8 +312,8 @@ export default function App({
     }
 
     if (
-        view === "monitoring-aset" &&
-        permissions.includes("management-aset.monitoring-aset.read")
+        view === 'monitoring-aset' &&
+        permissions.includes('management-aset.monitoring-aset.read')
     ) {
         return (
             <main
@@ -312,7 +330,7 @@ export default function App({
     }
 
     if (
-        (view === "penjualan-aset" || view === "pemusnahan-aset") &&
+        (view === 'penjualan-aset' || view === 'pemusnahan-aset') &&
         permissions.includes(`management-aset.${view}.read`)
     ) {
         return (
@@ -330,8 +348,8 @@ export default function App({
     }
 
     if (
-        view === "penyesuaian-nilai-aset" &&
-        permissions.includes("management-aset.penyesuaian-nilai-aset.read")
+        view === 'penyesuaian-nilai-aset' &&
+        permissions.includes('management-aset.penyesuaian-nilai-aset.read')
     ) {
         return (
             <main
@@ -348,8 +366,8 @@ export default function App({
     }
 
     if (
-        view === "reklasifikasi-aset" &&
-        permissions.includes("management-aset.reklasifikasi-aset.read")
+        view === 'reklasifikasi-aset' &&
+        permissions.includes('management-aset.reklasifikasi-aset.read')
     ) {
         return (
             <main
@@ -366,8 +384,8 @@ export default function App({
     }
 
     if (
-        view === "perencanaan-aset" &&
-        permissions.includes("management-aset.perencanaan-aset.read")
+        view === 'perencanaan-aset' &&
+        permissions.includes('management-aset.perencanaan-aset.read')
     ) {
         return (
             <main>
@@ -377,8 +395,8 @@ export default function App({
     }
 
     if (
-        view === "validasi-status-work-order" &&
-        permissions.includes("management-aset.validasi-status-work-order.read")
+        view === 'validasi-status-work-order' &&
+        permissions.includes('management-aset.validasi-status-work-order.read')
     ) {
         return (
             <main>
@@ -390,8 +408,8 @@ export default function App({
     // Pemeliharaan aset tidak lagi memakai halaman dokumen siklus generik: ia kini work
     // order dengan baris pekerjaan, checklist, penugasan, dan status pengerjaan sendiri.
     if (
-        view === "pemeliharaan-aset" &&
-        permissions.includes("management-aset.pemeliharaan-aset.read")
+        view === 'pemeliharaan-aset' &&
+        permissions.includes('management-aset.pemeliharaan-aset.read')
     ) {
         return (
             <main
@@ -410,8 +428,8 @@ export default function App({
     // Tiga layar pemeliharaan preventif dan reaktif: permintaan dari unit, usulan jadwal dari
     // rencana, dan pembacaan counter yang menjadi dasar rencana berbasis pemakaian.
     if (
-        view === "permintaan-pemeliharaan" &&
-        permissions.includes("management-aset.permintaan-pemeliharaan.read")
+        view === 'permintaan-pemeliharaan' &&
+        permissions.includes('management-aset.permintaan-pemeliharaan.read')
     ) {
         return (
             <main
@@ -428,8 +446,8 @@ export default function App({
     }
 
     if (
-        view === "jadwal-pemeliharaan" &&
-        permissions.includes("management-aset.jadwal-pemeliharaan.read")
+        view === 'jadwal-pemeliharaan' &&
+        permissions.includes('management-aset.jadwal-pemeliharaan.read')
     ) {
         return (
             <main>
@@ -442,8 +460,8 @@ export default function App({
     }
 
     if (
-        view === "pembacaan-counter" &&
-        permissions.includes("management-aset.pembacaan-counter.read")
+        view === 'pembacaan-counter' &&
+        permissions.includes('management-aset.pembacaan-counter.read')
     ) {
         return (
             <main>
@@ -457,8 +475,8 @@ export default function App({
 
     // Asuransi, garansi dan kontrak servis, serta downtime: daftar dengan form di dialog.
     if (
-        view === "asuransi-aset" &&
-        permissions.includes("management-aset.polis-asuransi.read")
+        view === 'asuransi-aset' &&
+        permissions.includes('management-aset.polis-asuransi.read')
     ) {
         return (
             <main>
@@ -468,9 +486,9 @@ export default function App({
     }
 
     if (
-        view === "garansi-kontrak-servis" &&
-        (permissions.includes("management-aset.garansi-aset.read") ||
-            permissions.includes("management-aset.kontrak-servis.read"))
+        view === 'garansi-kontrak-servis' &&
+        (permissions.includes('management-aset.garansi-aset.read') ||
+            permissions.includes('management-aset.kontrak-servis.read'))
     ) {
         return (
             <main>
@@ -480,8 +498,8 @@ export default function App({
     }
 
     if (
-        view === "downtime-aset" &&
-        permissions.includes("management-aset.downtime-aset.read")
+        view === 'downtime-aset' &&
+        permissions.includes('management-aset.downtime-aset.read')
     ) {
         return (
             <main>
@@ -507,13 +525,13 @@ export default function App({
     const report = REPORT_PAGES[view];
 
     if (report && permissions.includes(report.permission)) {
-        const fullHeight = report.layout !== "flow";
+        const fullHeight = report.layout !== 'flow';
 
         return (
             <main
-                data-layout={fullHeight ? "full-height" : undefined}
+                data-layout={fullHeight ? 'full-height' : undefined}
                 className={
-                    fullHeight ? "h-full min-h-0 overflow-hidden" : undefined
+                    fullHeight ? 'h-full min-h-0 overflow-hidden' : undefined
                 }
             >
                 <report.Page />

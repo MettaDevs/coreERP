@@ -2564,6 +2564,192 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/modules/management-aset/v1/kelompok-harta:
+    get:
+      tags:
+      - Master data
+      operationId: listAssetClassifications
+      summary: Menampilkan kelompok harta milik tenant
+      description: Memerlukan management-aset.kelompok-harta.read. Referensi seluruh tenant, tanpa filter organisasi.
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar kelompok harta beserta versi baris
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                      - $ref: '#/components/schemas/FiscalClassification'
+                      - type: object
+                        required:
+                        - version
+                        properties:
+                          version:
+                            type: integer
+                            minimum: 1
+                  meta:
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                      last_page:
+                        type: integer
+                      total:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/kelompok-harta/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    patch:
+      tags:
+      - Master data
+      operationId: updateAssetClassification
+      summary: Mengubah kelompok harta yang sudah tersedia
+      description: |
+        Memerlukan management-aset.kelompok-harta.update dan versi baris melalui version
+        atau If-Match. ID, tenant, jurisdiction dan template_key tidak dapat diubah.
+        Perubahan tidak menyalin ulang profil penyusutan, tidak mengganti ID yang disimpan
+        group/aset, dan tidak membuat versi regulasi baru. Referensi lama yang menunjuk
+        ID ini tetap membaca baris yang sama. Tidak tersedia aksi tambah.
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                label:
+                  type: string
+                  minLength: 1
+                  maxLength: 150
+                regulation_reference:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 250
+                effective_from:
+                  type: string
+                  format: date
+                effective_to:
+                  type:
+                  - string
+                  - 'null'
+                  format: date
+                useful_life_years:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  maximum: 1000
+                straight_line_rate_percent:
+                  type:
+                  - number
+                  - 'null'
+                  exclusiveMinimum: 0
+                  maximum: 100
+                reducing_balance_rate_percent:
+                  type:
+                  - number
+                  - 'null'
+                  exclusiveMinimum: 0
+                  maximum: 100
+                allow_reducing_balance:
+                  type: boolean
+                depreciable:
+                  type: boolean
+                aktif:
+                  type: boolean
+      responses:
+        '200':
+          description: Record lengkap setelah perubahan, dengan versi terbaru
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                    - $ref: '#/components/schemas/FiscalClassification'
+                    - type: object
+                      required:
+                      - version
+                      properties:
+                        version:
+                          type: integer
+                          minimum: 1
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Kelompok tidak ditemukan pada tenant ini
+        '409':
+          description: Versi baris sudah berubah; tidak ada perubahan tersimpan
+        '422':
+          description: Tanggal
+          masa manfaat atau tarif tidak valid: null
+        '428':
+          description: Versi baris tidak dikirim
+    delete:
+      tags:
+      - Master data
+      operationId: archiveAssetClassification
+      summary: Mengarsipkan kelompok harta
+      description: |
+        Memerlukan management-aset.kelompok-harta.archive. Mengisi deleted_at, tidak
+        menghapus baris fisik. Ditolak jika masih dipakai group aset atau aset yang belum
+        diarsipkan pada tenant ini. Penolakan membatalkan klaim versi. Kelompok terarsip
+        tidak tampil pada daftar maupun dropdown.
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '204':
+          description: Kelompok harta diarsipkan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Kelompok tidak ditemukan pada tenant ini
+        '409':
+          description: Versi basi atau kelompok masih dipakai data yang belum diarsipkan
+        '428':
+          description: Versi baris tidak dikirim
   /api/v1/maintenance-job-types:
     get:
       tags:
@@ -9880,7 +10066,7 @@ components:
           maxLength: 150
         display_label:
           type: string
-          description: Label siap tampil yang membedakan versi berdasarkan tanggal berlaku.
+          description: Nama kelompok untuk dropdown, tanpa tanggal berlaku. Tanggal tetap tersedia pada effective_from.
         regulation_reference:
           type:
           - string
