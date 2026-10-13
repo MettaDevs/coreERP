@@ -105,6 +105,7 @@ final class AssetClassificationController extends Controller
         abort_unless(in_array('management-aset.kelompok-harta.'.$action, $request->attributes->get('coreerp.permissions', []), true), 403);
     }
 
+    /** @return array<string, mixed> */
     private function present(KelompokHartaFiskal $record): array
     {
         return [...$record->only([
