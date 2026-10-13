@@ -176,21 +176,21 @@ class GroupBukuPenyusutanController extends MasterLinkController
         }
         $profile = $profiles->get($id);
         if (! $profile) {
-            $errors[$key] = 'Profil penyusutan tidak aktif atau sudah diarsipkan. Pilih profil yang masih berlaku.';
+            $errors[$key] = 'Metode penyusutan tidak aktif atau sudah diarsipkan. Pilih metode yang masih berlaku.';
 
             return null;
         }
         if ($profile->effective_from !== null && $profile->effective_to !== null && (string) $profile->effective_to < (string) $profile->effective_from) {
-            $errors[$key] = 'Rentang tanggal berlaku profil penyusutan tidak valid.';
+            $errors[$key] = 'Rentang tanggal berlaku metode penyusutan tidak valid.';
         }
         if (! in_array($profile->method, ProfilPenyusutan::METHODS, true)) {
-            $errors[$key] = 'Metode profil penyusutan belum dapat dihitung oleh aplikasi.';
+            $errors[$key] = 'Cara perhitungan penyusutan belum dapat dihitung oleh aplikasi.';
         }
         if (! in_array($profile->frequency, ProfilPenyusutan::FREQUENCIES, true)) {
-            $errors[$key] = 'Frekuensi profil penyusutan belum dapat dihitung oleh aplikasi.';
+            $errors[$key] = 'Frekuensi metode penyusutan belum dapat dihitung oleh aplikasi.';
         }
         if ($profile->convention !== null && ! in_array($profile->convention, BukuPenyusutan::CONVENTIONS, true)) {
-            $errors[$key] = 'Konvensi profil penyusutan tidak dikenal.';
+            $errors[$key] = 'Konvensi metode penyusutan tidak dikenal.';
         }
 
         return $profile;

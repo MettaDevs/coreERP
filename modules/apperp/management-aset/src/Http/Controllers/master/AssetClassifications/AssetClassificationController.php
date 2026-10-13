@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master\AssetClassifications;
 
 use App\Platform\Modules\Contracts\RowVersion;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,21 +39,58 @@ final class AssetClassificationController extends Controller
         ]);
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $this->authorize($request, 'create');
+        $creationKey = (string) $request->header('Idempotency-Key');
+        validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
+        $rules = $this->writeRules();
+        $rules['label'] = ['required', 'string', 'max:150'];
+        unset($rules['effective_from'], $rules['effective_to']);
+        $data = $request->validate($rules);
+        $payload = [
+            'useful_life_years' => null, 'straight_line_rate_percent' => null,
+            'reducing_balance_rate_percent' => null, 'regulation_reference' => null,
+            'allow_straight_line' => true, 'allow_reducing_balance' => false,
+            'depreciable' => true, 'aktif' => true, ...$data,
+        ];
+        foreach (['allow_straight_line', 'allow_reducing_balance', 'depreciable', 'aktif'] as $field) {
+            $payload[$field] = (bool) $payload[$field];
+        }
+        $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
+        $templateKey = 'custom:'.$creationKey;
+        $findExisting = fn () => KelompokHartaFiskal::withTrashed()
+            ->where('tenant_id', $tenantId)->where('template_key', $templateKey)->first();
+        if ($existing = $findExisting()) {
+            return $this->replay($existing, $payload);
+        }
+        try {
+            $record = DB::transaction(function () use ($tenantId, $templateKey, $payload): KelompokHartaFiskal {
+                $record = new KelompokHartaFiskal([
+                    ...$payload, 'tenant_id' => $tenantId, 'template_key' => $templateKey,
+                    'jurisdiction' => config('modules.management-aset.classification_defaults.jurisdiction'),
+                    'effective_from' => today()->toDateString(),
+                ]);
+                $this->validateClassification($record);
+                $record->save();
+
+                return $record->refresh();
+            });
+        } catch (QueryException $exception) {
+            if (! ($existing = $findExisting())) {
+                throw $exception;
+            }
+
+            return $this->replay($existing, $payload);
+        }
+
+        return response()->json(['data' => $this->present($record)], 201, ['Location' => $request->url().'/'.$record->id]);
+    }
+
     public function update(Request $request, string $id): JsonResponse
     {
         $this->authorize($request, 'update');
-        $data = $request->validate([
-            'label' => ['sometimes', 'required', 'string', 'max:150'],
-            'regulation_reference' => ['sometimes', 'nullable', 'string', 'max:250'],
-            'effective_from' => ['sometimes', 'required', 'date_format:Y-m-d'],
-            'effective_to' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'useful_life_years' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000'],
-            'straight_line_rate_percent' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:100'],
-            'reducing_balance_rate_percent' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:100'],
-            'allow_reducing_balance' => ['sometimes', 'boolean'],
-            'depreciable' => ['sometimes', 'boolean'],
-            'aktif' => ['sometimes', 'boolean'],
-        ]);
+        $data = $request->validate($this->writeRules());
         $expected = RowVersion::expected($request);
 
         return DB::transaction(function () use ($request, $id, $data, $expected): JsonResponse {
@@ -60,17 +98,7 @@ final class AssetClassificationController extends Controller
                 ->where('tenant_id', $request->attributes->get('coreerp.tenant_id'))->findOrFail($id);
             RowVersion::claim($record, $expected);
             $record->refresh()->fill($data);
-            validator($record->only(['effective_from', 'effective_to', 'useful_life_years', 'straight_line_rate_percent', 'reducing_balance_rate_percent']), [
-                'effective_to' => ['nullable', 'after_or_equal:effective_from'],
-                'useful_life_years' => $record->depreciable ? ['required'] : ['nullable'],
-                'straight_line_rate_percent' => $record->depreciable ? ['required'] : ['nullable'],
-                'reducing_balance_rate_percent' => $record->depreciable && $record->allow_reducing_balance ? ['required'] : ['nullable'],
-            ], [
-                'effective_to.after_or_equal' => 'Tanggal akhir tidak boleh lebih awal dari tanggal mulai.',
-                'useful_life_years.required' => 'Isi masa manfaat untuk harta yang disusutkan.',
-                'straight_line_rate_percent.required' => 'Isi tarif garis lurus untuk harta yang disusutkan.',
-                'reducing_balance_rate_percent.required' => 'Isi tarif saldo menurun jika metode ini diperbolehkan.',
-            ])->validate();
+            $this->validateClassification($record);
             $record->save();
 
             return response()->json(['data' => $this->present($record->refresh())]);
@@ -90,7 +118,7 @@ final class AssetClassificationController extends Controller
                 if ($model::query()->where('tenant_id', $tenantId)->where('kelompok_harta_fiskal_id', $id)->exists()) {
                     throw new HttpResponseException(response()->json(['error' => [
                         'code' => 'referenced_by_children',
-                        'message' => 'Kelompok harta ini masih dipakai '.$label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
+                        'message' => 'Kelompok aset ini masih dipakai '.$label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
                     ]], 409));
                 }
             }
@@ -98,6 +126,59 @@ final class AssetClassificationController extends Controller
 
             return response()->json(status: 204);
         });
+    }
+
+    /** @return array<string, array<int, mixed>> */
+    private function writeRules(): array
+    {
+        return [
+            'label' => ['sometimes', 'required', 'string', 'max:150'],
+            'regulation_reference' => ['sometimes', 'nullable', 'string', 'max:250'],
+            'effective_from' => ['sometimes', 'required', 'date_format:Y-m-d'],
+            'effective_to' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'useful_life_years' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000'],
+            'straight_line_rate_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'reducing_balance_rate_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'allow_straight_line' => ['sometimes', 'boolean'],
+            'allow_reducing_balance' => ['sometimes', 'boolean'],
+            'depreciable' => ['sometimes', 'boolean'],
+            'aktif' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    private function validateClassification(KelompokHartaFiskal $record): void
+    {
+        validator($record->only(['effective_from', 'effective_to', 'useful_life_years', 'straight_line_rate_percent', 'reducing_balance_rate_percent']), [
+            'effective_to' => ['nullable', 'after_or_equal:effective_from'],
+            'useful_life_years' => $record->depreciable ? ['required', 'integer', 'min:1'] : ['nullable'],
+            'straight_line_rate_percent' => $record->depreciable && $record->allow_straight_line ? ['required'] : ['nullable'],
+            'reducing_balance_rate_percent' => $record->depreciable && $record->allow_reducing_balance ? ['required'] : ['nullable'],
+        ], [
+            'effective_to.after_or_equal' => 'Tanggal akhir tidak boleh lebih awal dari tanggal mulai.',
+            'useful_life_years.required' => 'Isi masa manfaat untuk aset yang disusutkan.',
+            'straight_line_rate_percent.required' => 'Isi tarif garis lurus jika metode ini diperbolehkan.',
+            'reducing_balance_rate_percent.required' => 'Isi tarif saldo menurun jika metode ini diperbolehkan.',
+        ])->validate();
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function replay(KelompokHartaFiskal $record, array $payload): JsonResponse
+    {
+        $numeric = ['useful_life_years', 'straight_line_rate_percent', 'reducing_balance_rate_percent'];
+        foreach ($payload as $field => $value) {
+            $stored = $record->{$field};
+            $matches = in_array($field, $numeric, true) && $stored !== null && $value !== null
+                ? round((float) $stored, 4) === round((float) $value, 4)
+                : $stored === $value;
+            if ($record->trashed() || ! $matches) {
+                return response()->json(['error' => [
+                    'code' => 'idempotency_conflict',
+                    'message' => 'Permintaan tambah ini sudah dipakai untuk data berbeda. Muat ulang sebelum menambah data baru.',
+                ]], 409);
+            }
+        }
+
+        return response()->json(['data' => $this->present($record)]);
     }
 
     private function authorize(Request $request, string $action): void
@@ -111,7 +192,7 @@ final class AssetClassificationController extends Controller
         return [...$record->only([
             'id', 'template_key', 'label', 'jurisdiction', 'regulation_reference', 'useful_life_years',
             'straight_line_rate_percent', 'reducing_balance_rate_percent',
-            'allow_reducing_balance', 'depreciable', 'aktif', 'version',
+            'allow_reducing_balance', 'allow_straight_line', 'depreciable', 'aktif', 'version',
         ]), 'effective_from' => $record->effective_from->toDateString(), 'effective_to' => $record->effective_to?->toDateString()];
     }
 }

@@ -1,6 +1,6 @@
 # Database
 
-`aset_m_kelompok_harta_fiskal` kini dapat dibaca dan diubah melalui halaman Kelompok harta. Tidak ada perubahan skema: tanggal tetap tersimpan, label dropdown hanya menampilkan nama, dan edit memakai `version` yang sudah tersedia. `tenant_id`, `template_key` dan yurisdiksi tidak dapat diubah oleh endpoint. Perubahan tidak menyalin ulang profil penyusutan.
+`aset_m_kelompok_harta_fiskal` dapat ditambah, dibaca, diubah, dan diarsipkan melalui halaman Kelompok Aset. Migration menambahkan `allow_straight_line` dengan default true untuk mempertahankan perilaku lama. Tarif boleh nol; masa manfaat minimal satu tahun bila disusutkan. Tanggal tetap tersimpan tetapi tidak tampil di form. Create memakai `template_key` dari Idempotency-Key, tenant tepercaya, tanggal server, dan yurisdiksi dari config module. Edit memakai `version`; metadata identitas tidak dapat diubah. Perubahan tidak menyalin ulang profil penyusutan.
 
 ## Dekomisioning dan keputusan workflow
 

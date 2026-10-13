@@ -67,6 +67,64 @@ class AssetClassificationTest extends TestCase
         }
     }
 
+    public function test_create_requires_its_permission_and_is_idempotent_per_tenant(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $path = '/api/modules/management-aset/v1/kelompok-harta';
+        $payload = [
+            'label' => 'Kelompok tambahan', 'useful_life_years' => 4,
+            'straight_line_rate_percent' => 0, 'reducing_balance_rate_percent' => 0,
+            'allow_reducing_balance' => true,
+            'tenant_id' => (string) Str::ulid(), 'template_key' => 'Tidak boleh dipakai',
+        ];
+        $this->sebagaiPengguna($tenantId, ['management-aset.kelompok-harta.update'])
+            ->postJson($path, $payload, ['Idempotency-Key' => 'classification-create'])->assertForbidden();
+        $this->sebagaiPengguna($tenantId, ['management-aset.kelompok-harta.create']);
+        $this->postJson($path, $payload)->assertUnprocessable();
+        $created = $this->postJson($path, $payload, ['Idempotency-Key' => 'classification-create'])
+            ->assertCreated()->assertJsonPath('data.aktif', true)->assertJsonPath('data.allow_straight_line', true)
+            ->assertJsonPath('data.straight_line_rate_percent', '0.0000')
+            ->assertJsonPath('data.effective_from', today()->toDateString());
+        $id = $created->json('data.id');
+        $created->assertHeader('Location', url($path.'/'.$id));
+        $this->postJson($path, $payload, ['Idempotency-Key' => 'classification-create'])
+            ->assertOk()->assertJsonPath('data.id', $id);
+        $this->postJson($path, [...$payload, 'label' => 'Berbeda'], ['Idempotency-Key' => 'classification-create'])->assertConflict();
+        $this->assertDatabaseHas('aset_m_kelompok_harta_fiskal', [
+            'id' => $id, 'tenant_id' => $tenantId, 'template_key' => 'custom:classification-create',
+        ]);
+        $otherTenant = $this->buatTenantUji();
+        $other = $this->sebagaiPengguna($otherTenant, ['management-aset.kelompok-harta.create'])
+            ->postJson($path, $payload, ['Idempotency-Key' => 'classification-create'])->assertCreated();
+        $this->assertNotSame($id, $other->json('data.id'));
+        $this->assertDatabaseHas('aset_m_kelompok_harta_fiskal', ['id' => $other->json('data.id'), 'tenant_id' => $otherTenant]);
+    }
+
+    public function test_zero_rates_and_method_permissions_preserve_dates_and_reject_invalid_life(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $id = $this->insertClassification($tenantId);
+        $path = '/api/modules/management-aset/v1/kelompok-harta/'.$id;
+        $this->sebagaiPengguna($tenantId, ['management-aset.kelompok-harta.update']);
+        $saved = $this->patchJson($path, [
+            'version' => 1, 'straight_line_rate_percent' => 0, 'reducing_balance_rate_percent' => 0,
+        ])->assertOk()->assertJsonPath('data.straight_line_rate_percent', '0.0000')
+            ->assertJsonPath('data.reducing_balance_rate_percent', '0.0000')
+            ->assertJsonPath('data.effective_from', '2023-07-17')->assertJsonPath('data.effective_to', null);
+        $version = $saved->json('data.version');
+        foreach ([['useful_life_years' => 0], ['straight_line_rate_percent' => -1], ['reducing_balance_rate_percent' => 101]] as $payload) {
+            $this->patchJson($path, [...$payload, 'version' => $version])->assertUnprocessable();
+            $this->assertDatabaseHas('aset_m_kelompok_harta_fiskal', ['id' => $id, 'version' => $version]);
+        }
+        $saved = $this->patchJson($path, [
+            'version' => $version, 'allow_straight_line' => false, 'straight_line_rate_percent' => null,
+            'allow_reducing_balance' => false, 'reducing_balance_rate_percent' => null,
+        ])->assertOk()->assertJsonPath('data.allow_straight_line', false);
+        $version = $saved->json('data.version');
+        $this->patchJson($path, ['version' => $version, 'allow_straight_line' => true])->assertUnprocessable();
+        $this->patchJson($path, ['version' => $version, 'allow_reducing_balance' => true])->assertUnprocessable();
+    }
+
     private function insertClassification(string $tenantId): string
     {
         $id = (string) Str::ulid();

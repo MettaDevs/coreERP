@@ -391,10 +391,6 @@ export default function RecordDetailPane({
             );
         }
 
-        if (section.counters) {
-            return <JenisAsetCounters detail={jenisAsetDetail} />;
-        }
-
         if (section.attributes) {
             return record ? (
                 <JenisAsetAtribut
@@ -553,25 +549,30 @@ export default function RecordDetailPane({
         }
 
         return (
-            <div className="grid gap-5 pt-1 sm:grid-cols-2">
-                {section.fields
-                    .filter((field) => isVisible(field, values))
-                    .map((field) => (
-                        <DynamicField
-                            key={field.name}
-                            config={field}
-                            value={values[field.name]}
-                            readOnly={readOnly}
-                            onRequestEdit={enterEdit}
-                            onChange={(next) => {
-                                markDirty();
-                                setValues((current) => ({
-                                    ...current,
-                                    [field.name]: next,
-                                }));
-                            }}
-                        />
-                    ))}
+            <div className="space-y-5">
+                {section.counters && (
+                    <JenisAsetCounters detail={jenisAsetDetail} />
+                )}
+                <div className="grid gap-5 pt-1 sm:grid-cols-2">
+                    {section.fields
+                        .filter((field) => isVisible(field, values))
+                        .map((field) => (
+                            <DynamicField
+                                key={field.name}
+                                config={field}
+                                value={values[field.name]}
+                                readOnly={readOnly}
+                                onRequestEdit={enterEdit}
+                                onChange={(next) => {
+                                    markDirty();
+                                    setValues((current) => ({
+                                        ...current,
+                                        [field.name]: next,
+                                    }));
+                                }}
+                            />
+                        ))}
+                </div>
             </div>
         );
     }

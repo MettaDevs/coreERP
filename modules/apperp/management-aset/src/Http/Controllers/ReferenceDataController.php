@@ -167,6 +167,7 @@ final class ReferenceDataController extends Controller
                 'straight_line_rate_percent' => $record->straight_line_rate_percent,
                 'reducing_balance_rate_percent' => $record->reducing_balance_rate_percent,
                 'allow_reducing_balance' => $record->allow_reducing_balance,
+                'allow_straight_line' => $record->allow_straight_line,
                 'depreciable' => $record->depreciable,
                 'aktif' => $record->aktif,
             ])->values(),

@@ -36,7 +36,7 @@ const CONVENTIONS: { value: string; label: string }[] = [
     },
 ];
 
-/** Berapa periode dalam satu tahun, per frekuensi profil penyusutan. */
+/** Berapa periode dalam satu tahun, per frekuensi metode penyusutan. */
 const PERIODS_PER_YEAR: Record<string, number> = {
     monthly: 12,
     quarterly: 4,
@@ -59,7 +59,7 @@ function serviceLifeHint(periods: string, frequency: unknown): string | null {
     }
 
     if (!perYear) {
-        return 'Setara berapa tahun baru terlihat setelah profil dipilih.';
+        return 'Setara berapa tahun baru terlihat setelah metode dipilih.';
     }
 
     const years = count / perYear;
@@ -218,7 +218,7 @@ export default function GroupBookMatrix({
     return (
         <div ref={containerRef} className="space-y-4 border-t px-5 py-4">
             <div>
-                <p className="font-semibold">Buku penyusutan</p>
+                <p className="font-semibold">Buku dan Metode Penyusutan</p>
                 <p className="text-muted-foreground text-sm">
                     Aset dari group ini akan mendapat satu buku untuk tiap baris
                     di bawah. Buku komersial dan fiskal boleh memakai metode,
@@ -229,7 +229,7 @@ export default function GroupBookMatrix({
             {rows.length === 0 && (
                 <p className="text-muted-foreground text-sm">
                     Belum ada buku. Aset dari group ini belum dapat ditempatkan
-                    sampai matriks memiliki buku dan profil yang bisa dihitung.
+                    sampai matriks memiliki buku dan metode yang bisa dihitung.
                 </p>
             )}
 
@@ -258,7 +258,7 @@ export default function GroupBookMatrix({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Field>
                             <Select
-                                label="Profil utama untuk group ini"
+                                label="Metode utama untuk group ini"
                                 items={profiles.options.map(optionLabel)}
                                 value={
                                     profiles.options
@@ -269,10 +269,10 @@ export default function GroupBookMatrix({
                                         )
                                         .map(optionLabel)[0]
                                 }
-                                placeholder="Ikuti profil utama buku"
-                                searchPlaceholder="Cari profil penyusutan"
-                                emptyMessage="Profil penyusutan tidak ditemukan."
-                                ariaLabel="Pilih profil utama untuk group ini"
+                                placeholder="Ikuti metode utama buku"
+                                searchPlaceholder="Cari metode penyusutan"
+                                emptyMessage="Metode Penyusutan tidak ditemukan."
+                                ariaLabel="Pilih metode utama untuk group ini"
                                 portalContainer={containerRef}
                                 onValueChange={(item) =>
                                     patch(index, {
@@ -287,12 +287,12 @@ export default function GroupBookMatrix({
                             />
                             <FieldDescription>
                                 {profiles.error ||
-                                    'Kosong berarti memakai profil utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
+                                    'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
                             </FieldDescription>
                         </Field>
                         <Field>
                             <Select
-                                label="Profil pengganti (opsional)"
+                                label="Metode pengganti (opsional)"
                                 items={profiles.options.map(optionLabel)}
                                 value={
                                     profiles.options
@@ -304,9 +304,9 @@ export default function GroupBookMatrix({
                                         .map(optionLabel)[0]
                                 }
                                 placeholder="Tanpa pengganti"
-                                searchPlaceholder="Cari profil pengganti"
-                                emptyMessage="Profil penyusutan tidak ditemukan."
-                                ariaLabel="Pilih profil pengganti"
+                                searchPlaceholder="Cari metode pengganti"
+                                emptyMessage="Metode Penyusutan tidak ditemukan."
+                                ariaLabel="Pilih metode pengganti"
                                 portalContainer={containerRef}
                                 onValueChange={(item) =>
                                     patch(index, {
@@ -348,7 +348,7 @@ export default function GroupBookMatrix({
                                             row.depreciation_profile_id,
                                     )?.frequency,
                                 ) ??
-                                    'Kosong berarti memakai masa manfaat pada profil penyusutan.'}
+                                    'Kosong berarti memakai masa manfaat pada metode penyusutan.'}
                             </FieldDescription>
                         </Field>
                         <Field>

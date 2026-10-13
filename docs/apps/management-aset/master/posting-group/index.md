@@ -1,4 +1,4 @@
-# Posting group aset
+# Setup Akun/COA Aset
 
 Halaman ini untuk developer. Perilaku dasar master ada di [Master data](/apps/management-aset/master/), dan feed yang memakai akun-akun ini ada di [Feed posting finance](/dev/34-feed-posting-finance).
 

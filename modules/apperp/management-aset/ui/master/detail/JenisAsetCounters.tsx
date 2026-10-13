@@ -32,7 +32,7 @@ export default function JenisAsetCounters({
     const boxes: { key: string; label: string; count: number | null }[] = [
         {
             key: 'atribut',
-            label: 'Tipe atribut',
+            label: 'Komponen Atribut Aset',
             count: detail?.atribut_count ?? null,
         },
         {

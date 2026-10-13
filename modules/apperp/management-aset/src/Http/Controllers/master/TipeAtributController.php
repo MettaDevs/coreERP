@@ -95,7 +95,7 @@ class TipeAtributController extends MasterDataController
             if ($record->data_type_locked) {
                 abort(response()->json(['error' => [
                     'code' => 'data_type_locked',
-                    'message' => 'Tipe data tidak dapat diubah karena atribut ini sudah pernah diisi pada aset. Buat tipe atribut baru bila bentuk datanya berbeda.',
+                    'message' => 'Tipe data tidak dapat diubah karena atribut ini sudah pernah diisi pada aset. Buat komponen atribut aset baru bila bentuk datanya berbeda.',
                 ]], 409));
             }
             if ($record->data_type === 'string' && TipeAtributNilai::query()

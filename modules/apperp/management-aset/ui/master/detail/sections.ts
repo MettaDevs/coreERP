@@ -75,7 +75,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                     'kelompok_harta_fiskal_id',
                     'property_type',
                     'capitalization_threshold',
-                ),
+                ).concat(KETERANGAN, AKTIF),
             },
             {
                 id: 'bawaan',
@@ -83,8 +83,12 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 defaultOpen: true,
                 fields: pick('lokasi_aset_id'),
             },
-            { id: 'buku', title: 'Buku penyusutan', books: true, fields: [] },
-            { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
+            {
+                id: 'buku',
+                title: 'Buku dan Metode Penyusutan',
+                books: true,
+                fields: [],
+            },
         ];
     }
 
@@ -95,7 +99,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 title: 'Umum',
                 defaultOpen: true,
                 counters: true,
-                fields: [],
+                fields: [KETERANGAN, AKTIF],
             },
             {
                 id: 'job-maintenance',
@@ -111,7 +115,7 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
             },
             {
                 id: 'atribut',
-                title: 'Tipe atribut',
+                title: 'Komponen Atribut Aset',
                 attributes: true,
                 fields: [],
             },
@@ -128,7 +132,6 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 placeholder:
                     'Templat kondisi belum dapat dibatasi per jenis aset di sini. Kondisi aset yang ada masih berlaku untuk seluruh jenis; pembatasan per jenis menyusul saat relasinya dibangun.',
             },
-            { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
         ];
     }
 
@@ -242,9 +245,8 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
             id: 'umum',
             title: 'Umum',
             defaultOpen: true,
-            fields: [...(config.extraFields ?? [])],
+            fields: [...(config.extraFields ?? []), KETERANGAN, AKTIF],
         },
-        { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
     ];
 }
 

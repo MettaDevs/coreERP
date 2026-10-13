@@ -153,7 +153,10 @@ export default function AssetPostingGroupPage({
                 }
 
                 setLoadError(
-                    errorMessage(caught, 'Posting group belum dapat dimuat.'),
+                    errorMessage(
+                        caught,
+                        'Setup akun/COA aset belum dapat dimuat.',
+                    ),
                 );
             }
         };
@@ -168,7 +171,7 @@ export default function AssetPostingGroupPage({
     return (
         <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
             <CardHeader className="shrink-0 border-b px-5 py-4">
-                <CardTitle>Posting group aset</CardTitle>
+                <CardTitle>Setup Akun/COA Aset</CardTitle>
                 <p className="text-muted-foreground mt-1 text-sm">
                     Akun jurnal untuk setiap group aset. Posting memakai baris
                     yang tanggal berlakunya paling akhir, tetapi tidak melewati
@@ -421,7 +424,7 @@ function PostingGroupSheet({
             >
                 <SheetHeader className="border-b px-6 py-5 pr-12">
                     <SheetTitle>
-                        Posting group {group.kode} · {group.nama}
+                        Setup akun/COA aset {group.kode} · {group.nama}
                     </SheetTitle>
                 </SheetHeader>
                 {/* Ber-key per tanggal: berpindah tanggal memulai form baru dari barisnya sendiri. */}
@@ -577,7 +580,7 @@ function RowEditor({
                         : values,
                 ),
             });
-            toast.success(`Posting group ${group.kode} disimpan.`);
+            toast.success(`Setup akun/COA aset ${group.kode} disimpan.`);
             onSaved();
             onClose();
         } catch (caught) {
@@ -591,7 +594,7 @@ function RowEditor({
                 );
             }
 
-            toastSaveError(caught, 'Posting group belum tersimpan.');
+            toastSaveError(caught, 'Setup akun/COA aset belum tersimpan.');
         } finally {
             setSaving(false);
         }

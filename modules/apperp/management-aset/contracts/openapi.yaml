@@ -2612,6 +2612,101 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createAssetClassification
+      summary: Menambah kelompok aset milik tenant
+      description: |
+        Memerlukan management-aset.kelompok-harta.create. Tenant berasal dari konteks tepercaya.
+        template_key dibentuk dari Idempotency-Key; key sama dan payload sama mengembalikan
+        record yang sama, sedangkan payload berbeda atau record terarsip menjawab 409.
+        Tanggal mulai diisi hari ini oleh server dan yurisdiksi berasal dari config module.
+        Aktif dan boleh garis lurus bawaannya true; boleh saldo menurun bawaannya false.
+        Tarif boleh nol. Masa manfaat wajib minimal satu bila disusutkan. Tarif wajib hanya
+        ketika disusutkan dan metode terkait diperbolehkan. Tidak membuat profil penyusutan otomatis.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          maxLength: 133
+          pattern: ^[A-Za-z0-9._:-]+$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - label
+              properties:
+                label:
+                  type: string
+                  minLength: 1
+                  maxLength: 150
+                regulation_reference:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 250
+                useful_life_years:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  maximum: 1000
+                straight_line_rate_percent:
+                  type:
+                  - number
+                  - 'null'
+                  minimum: 0
+                  maximum: 100
+                reducing_balance_rate_percent:
+                  type:
+                  - number
+                  - 'null'
+                  minimum: 0
+                  maximum: 100
+                allow_straight_line:
+                  type: boolean
+                  default: true
+                allow_reducing_balance:
+                  type: boolean
+                  default: false
+                depreciable:
+                  type: boolean
+                  default: true
+                aktif:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Kelompok dibuat; Location menunjuk record baru
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                    - $ref: '#/components/schemas/FiscalClassification'
+                    - type: object
+                      properties:
+                        version:
+                          type: integer
+                          minimum: 1
+        '200':
+          description: Pengulangan permintaan mengembalikan record yang sudah dibuat
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Key sudah dipakai untuk payload berbeda atau record terarsip
+        '422':
+          description: Input atau Idempotency-Key tidak valid
   /api/modules/management-aset/v1/kelompok-harta/{id}:
     parameters:
     - name: id
@@ -2629,7 +2724,8 @@ paths:
         atau If-Match. ID, tenant, jurisdiction dan template_key tidak dapat diubah.
         Perubahan tidak menyalin ulang profil penyusutan, tidak mengganti ID yang disimpan
         group/aset, dan tidak membuat versi regulasi baru. Referensi lama yang menunjuk
-        ID ini tetap membaca baris yang sama. Tidak tersedia aksi tambah.
+        ID ini tetap membaca baris yang sama. Tarif boleh nol; masa manfaat tetap minimal satu jika disusutkan.
+        Tarif wajib hanya ketika disusutkan dan metode terkait diperbolehkan.
       parameters:
       - name: If-Match
         in: header
@@ -2672,14 +2768,16 @@ paths:
                   type:
                   - number
                   - 'null'
-                  exclusiveMinimum: 0
+                  minimum: 0
                   maximum: 100
                 reducing_balance_rate_percent:
                   type:
                   - number
                   - 'null'
-                  exclusiveMinimum: 0
+                  minimum: 0
                   maximum: 100
+                allow_straight_line:
+                  type: boolean
                 allow_reducing_balance:
                   type: boolean
                 depreciable:
@@ -10049,6 +10147,7 @@ components:
       - jurisdiction
       - label
       - effective_from
+      - allow_straight_line
       - allow_reducing_balance
       - depreciable
       - aktif
@@ -10095,6 +10194,8 @@ components:
           - string
           - 'null'
           format: decimal
+        allow_straight_line:
+          type: boolean
         allow_reducing_balance:
           type: boolean
         depreciable:
