@@ -16,6 +16,9 @@ final class FixedAssetLedgerEntry extends Model
     use BelongsToTenant;
     use SoftDeletes;
 
+    /** Nama aset adalah identitas barang, bukan nama orang. */
+    public const COLUMN_CLASSIFICATION = ['asset_name' => DataClass::CustomerContent];
+
     /** @var array<string, string> */
     public const FIELD_LOOKUPS = ['group_aset_id' => 'group-aset'];
 
