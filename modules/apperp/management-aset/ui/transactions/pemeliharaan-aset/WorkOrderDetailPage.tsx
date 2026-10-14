@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
@@ -1289,299 +1293,381 @@ export default function WorkOrderDetailPage({
                         Entitas legal dan unit penanggung jawab mengikuti
                         konteks aktif Anda.
                     </p>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field>
-                            <EditShield
-                                active={readOnly}
-                                label="tipe work order"
-                                onActivate={mintaSunting}
-                            >
-                                <Select
-                                    label="Tipe work order"
-                                    required
-                                    items={tipe.map(
-                                        (option) => labelDari(option) ?? '',
-                                    )}
-                                    value={labelDari(
-                                        tipe.find(
-                                            (option) =>
-                                                option.id ===
-                                                record.tipe_work_order_id,
-                                        ),
-                                    )}
-                                    placeholder="Pilih tipe work order"
-                                    searchPlaceholder="Cari tipe work order"
-                                    ariaLabel="Tipe work order"
-                                    onValueChange={(value) =>
-                                        setRecord({
-                                            ...record,
-                                            tipe_work_order_id: idDari(
-                                                tipe,
-                                                value,
-                                            ),
-                                        })
-                                    }
-                                />
-                            </EditShield>
-                            <FieldDescription>
-                                Tipe menentukan apa yang wajib diisi sebelum
-                                pekerjaan boleh dinyatakan selesai.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <EditShield
-                                active={readOnly}
-                                label="tingkat layanan"
-                                onActivate={mintaSunting}
-                            >
-                                <Select
-                                    label="Tingkat layanan"
-                                    items={layanan.map(
-                                        (option) => labelDari(option) ?? '',
-                                    )}
-                                    value={labelDari(
-                                        layanan.find(
-                                            (option) =>
-                                                option.id ===
-                                                record.tingkat_layanan_id,
-                                        ),
-                                    )}
-                                    placeholder="Pilih tingkat layanan"
-                                    searchPlaceholder="Cari tingkat layanan"
-                                    ariaLabel="Tingkat layanan"
-                                    onValueChange={(value) =>
-                                        setRecord({
-                                            ...record,
-                                            tingkat_layanan_id: idDari(
-                                                layanan,
-                                                value,
-                                            ),
-                                        })
-                                    }
-                                />
-                            </EditShield>
-                        </Field>
-                        <Field>
-                            <Input
-                                label="Diharapkan mulai"
-                                type="datetime-local"
-                                readOnly={readOnly}
-                                onFocus={readOnly ? mintaSunting : undefined}
-                                value={
-                                    record.diharapkan_mulai
-                                        ?.replace(' ', 'T')
-                                        .slice(0, 16) ?? ''
-                                }
-                                onChange={(event) =>
-                                    setRecord({
-                                        ...record,
-                                        diharapkan_mulai: event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Batas waktu yang diharapkan untuk memulai
-                                pekerjaan.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Input
-                                label="Diharapkan selesai"
-                                type="datetime-local"
-                                readOnly={readOnly}
-                                onFocus={readOnly ? mintaSunting : undefined}
-                                value={
-                                    record.diharapkan_selesai
-                                        ?.replace(' ', 'T')
-                                        .slice(0, 16) ?? ''
-                                }
-                                onChange={(event) =>
-                                    setRecord({
-                                        ...record,
-                                        diharapkan_selesai: event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Batas waktu yang diharapkan untuk menyelesaikan
-                                pekerjaan.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Input
-                                label="Dijadwalkan mulai"
-                                type="datetime-local"
-                                readOnly={readOnly}
-                                onFocus={readOnly ? mintaSunting : undefined}
-                                value={
-                                    record.dijadwalkan_mulai
-                                        ?.replace(' ', 'T')
-                                        .slice(0, 16) ?? ''
-                                }
-                                onChange={(event) =>
-                                    setRecord({
-                                        ...record,
-                                        dijadwalkan_mulai: event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Harus diisi sebelum work order dapat
-                                dijadwalkan.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Input
-                                label="Dijadwalkan selesai"
-                                type="datetime-local"
-                                readOnly={readOnly}
-                                onFocus={readOnly ? mintaSunting : undefined}
-                                value={
-                                    record.dijadwalkan_selesai
-                                        ?.replace(' ', 'T')
-                                        .slice(0, 16) ?? ''
-                                }
-                                onChange={(event) =>
-                                    setRecord({
-                                        ...record,
-                                        dijadwalkan_selesai: event.target.value,
-                                    })
-                                }
-                            />
-                        </Field>
-                    </div>
-                    <Field>
-                        <FieldLabel htmlFor="work-order-keterangan">
-                            Keterangan
-                        </FieldLabel>
-                        <Textarea
-                            id="work-order-keterangan"
-                            rows={4}
-                            readOnly={readOnly}
-                            onFocus={readOnly ? mintaSunting : undefined}
-                            value={record.keterangan ?? ''}
-                            onChange={(event) =>
-                                setRecord({
-                                    ...record,
-                                    keterangan: event.target.value,
-                                })
+                    <CollapsibleSectionGroup
+                        defaultValue={['general', 'lines']}
+                    >
+                        <CollapsibleSection
+                            value="general"
+                            title="Umum"
+                            summary={
+                                record.tipe_work_order_nama ??
+                                tipe.find(
+                                    (option) =>
+                                        option.id === record.tipe_work_order_id,
+                                )?.nama ??
+                                'Tipe work order belum dipilih'
                             }
-                        />
-                    </Field>
-                    <div className="space-y-3">
-                        {/* Pemberitahuan garansi dan kontrak servis pada tanggal mulai work
+                        >
+                            <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field>
+                                        <EditShield
+                                            active={readOnly}
+                                            label="tipe work order"
+                                            onActivate={mintaSunting}
+                                        >
+                                            <Select
+                                                label="Tipe work order"
+                                                required
+                                                items={tipe.map(
+                                                    (option) =>
+                                                        labelDari(option) ?? '',
+                                                )}
+                                                value={labelDari(
+                                                    tipe.find(
+                                                        (option) =>
+                                                            option.id ===
+                                                            record.tipe_work_order_id,
+                                                    ),
+                                                )}
+                                                placeholder="Pilih tipe work order"
+                                                searchPlaceholder="Cari tipe work order"
+                                                ariaLabel="Tipe work order"
+                                                onValueChange={(value) =>
+                                                    setRecord({
+                                                        ...record,
+                                                        tipe_work_order_id:
+                                                            idDari(tipe, value),
+                                                    })
+                                                }
+                                            />
+                                        </EditShield>
+                                        <FieldDescription>
+                                            Tipe menentukan apa yang wajib diisi
+                                            sebelum pekerjaan boleh dinyatakan
+                                            selesai.
+                                        </FieldDescription>
+                                    </Field>
+                                    <Field>
+                                        <EditShield
+                                            active={readOnly}
+                                            label="tingkat layanan"
+                                            onActivate={mintaSunting}
+                                        >
+                                            <Select
+                                                label="Tingkat layanan"
+                                                items={layanan.map(
+                                                    (option) =>
+                                                        labelDari(option) ?? '',
+                                                )}
+                                                value={labelDari(
+                                                    layanan.find(
+                                                        (option) =>
+                                                            option.id ===
+                                                            record.tingkat_layanan_id,
+                                                    ),
+                                                )}
+                                                placeholder="Pilih tingkat layanan"
+                                                searchPlaceholder="Cari tingkat layanan"
+                                                ariaLabel="Tingkat layanan"
+                                                onValueChange={(value) =>
+                                                    setRecord({
+                                                        ...record,
+                                                        tingkat_layanan_id:
+                                                            idDari(
+                                                                layanan,
+                                                                value,
+                                                            ),
+                                                    })
+                                                }
+                                            />
+                                        </EditShield>
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Diharapkan mulai"
+                                            type="datetime-local"
+                                            readOnly={readOnly}
+                                            onFocus={
+                                                readOnly
+                                                    ? mintaSunting
+                                                    : undefined
+                                            }
+                                            value={
+                                                record.diharapkan_mulai
+                                                    ?.replace(' ', 'T')
+                                                    .slice(0, 16) ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    diharapkan_mulai:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <FieldDescription>
+                                            Batas waktu yang diharapkan untuk
+                                            memulai pekerjaan.
+                                        </FieldDescription>
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Diharapkan selesai"
+                                            type="datetime-local"
+                                            readOnly={readOnly}
+                                            onFocus={
+                                                readOnly
+                                                    ? mintaSunting
+                                                    : undefined
+                                            }
+                                            value={
+                                                record.diharapkan_selesai
+                                                    ?.replace(' ', 'T')
+                                                    .slice(0, 16) ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    diharapkan_selesai:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <FieldDescription>
+                                            Batas waktu yang diharapkan untuk
+                                            menyelesaikan pekerjaan.
+                                        </FieldDescription>
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Dijadwalkan mulai"
+                                            type="datetime-local"
+                                            readOnly={readOnly}
+                                            onFocus={
+                                                readOnly
+                                                    ? mintaSunting
+                                                    : undefined
+                                            }
+                                            value={
+                                                record.dijadwalkan_mulai
+                                                    ?.replace(' ', 'T')
+                                                    .slice(0, 16) ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    dijadwalkan_mulai:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <FieldDescription>
+                                            Harus diisi sebelum work order dapat
+                                            dijadwalkan.
+                                        </FieldDescription>
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Dijadwalkan selesai"
+                                            type="datetime-local"
+                                            readOnly={readOnly}
+                                            onFocus={
+                                                readOnly
+                                                    ? mintaSunting
+                                                    : undefined
+                                            }
+                                            value={
+                                                record.dijadwalkan_selesai
+                                                    ?.replace(' ', 'T')
+                                                    .slice(0, 16) ?? ''
+                                            }
+                                            onChange={(event) =>
+                                                setRecord({
+                                                    ...record,
+                                                    dijadwalkan_selesai:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="lines"
+                            title="Baris pekerjaan"
+                            summary={`${record.details.length} baris`}
+                        >
+                            <div className="space-y-4">
+                                <div className="space-y-3">
+                                    {/* Pemberitahuan garansi dan kontrak servis pada tanggal mulai work
                             order; informasi saja, tidak menahan apa pun. */}
-                        <WarrantyNotice
-                            asetIds={record.details.map((job) => job.aset_id)}
-                            date={(
-                                record.dijadwalkan_mulai ||
-                                record.diharapkan_mulai ||
-                                ''
-                            ).slice(0, 10)}
-                            labelOf={(asetId) =>
-                                labelDari(
-                                    aset.find((option) => option.id === asetId),
-                                ) ??
-                                record.details.find(
-                                    (job) => job.aset_id === asetId,
-                                )?.aset_kode ??
-                                'Aset'
-                            }
-                        />
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-medium">Baris pekerjaan</h3>
-                            {draft && editing && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setRecord({
-                                            ...record,
-                                            details: [
-                                                ...record.details,
-                                                emptyJob(),
-                                            ],
-                                        })
-                                    }
-                                >
-                                    Tambah baris
-                                </Button>
-                            )}
-                        </div>
-                        {!draft ? (
-                            <DataTable
-                                columns={jobColumns}
-                                data={record.details}
-                                getRowKey={(job) => String(job.id)}
-                                getRowLabel={(job) =>
-                                    job.aset_kode ?? 'baris pekerjaan'
-                                }
-                                actions={[
-                                    {
-                                        id: 'checklist',
-                                        label: 'Buka checklist',
-                                    },
-                                ]}
-                                onRowAction={(action, job) => {
-                                    if (action === 'checklist' && record.id) {
-                                        bukaChecklistJob(
-                                            record.id,
-                                            String(job.id),
-                                        );
-                                    }
-                                }}
-                            />
-                        ) : (
-                            record.details.map((job, index) => (
-                                <JobRow
-                                    key={index}
-                                    job={job}
-                                    index={index}
-                                    canRemove={record.details.length > 1}
-                                    readOnly={readOnly}
-                                    onRequestEdit={mintaSunting}
-                                    aset={aset}
-                                    asetItems={asetTersaring}
-                                    jobTypes={jobTypesByAset[job.aset_id] ?? []}
-                                    trades={trades}
-                                    onAsetSearch={setAsetSearch}
-                                    onChange={(change) => {
-                                        if (
-                                            'aset_id' in change &&
-                                            change.aset_id
-                                        ) {
-                                            void loadJobTypesForAset(
-                                                change.aset_id,
-                                            );
+                                    <WarrantyNotice
+                                        asetIds={record.details.map(
+                                            (job) => job.aset_id,
+                                        )}
+                                        date={(
+                                            record.dijadwalkan_mulai ||
+                                            record.diharapkan_mulai ||
+                                            ''
+                                        ).slice(0, 10)}
+                                        labelOf={(asetId) =>
+                                            labelDari(
+                                                aset.find(
+                                                    (option) =>
+                                                        option.id === asetId,
+                                                ),
+                                            ) ??
+                                            record.details.find(
+                                                (job) => job.aset_id === asetId,
+                                            )?.aset_kode ??
+                                            'Aset'
                                         }
+                                    />
+                                    <div className="flex items-center justify-end">
+                                        {draft && editing && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setRecord({
+                                                        ...record,
+                                                        details: [
+                                                            ...record.details,
+                                                            emptyJob(),
+                                                        ],
+                                                    })
+                                                }
+                                            >
+                                                Tambah baris
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {!draft ? (
+                                        <DataTable
+                                            columns={jobColumns}
+                                            data={record.details}
+                                            getRowKey={(job) => String(job.id)}
+                                            getRowLabel={(job) =>
+                                                job.aset_kode ??
+                                                'baris pekerjaan'
+                                            }
+                                            actions={[
+                                                {
+                                                    id: 'checklist',
+                                                    label: 'Buka checklist',
+                                                },
+                                            ]}
+                                            onRowAction={(action, job) => {
+                                                if (
+                                                    action === 'checklist' &&
+                                                    record.id
+                                                ) {
+                                                    bukaChecklistJob(
+                                                        record.id,
+                                                        String(job.id),
+                                                    );
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        record.details.map((job, index) => (
+                                            <JobRow
+                                                key={index}
+                                                job={job}
+                                                index={index}
+                                                canRemove={
+                                                    record.details.length > 1
+                                                }
+                                                readOnly={readOnly}
+                                                onRequestEdit={mintaSunting}
+                                                aset={aset}
+                                                asetItems={asetTersaring}
+                                                jobTypes={
+                                                    jobTypesByAset[
+                                                        job.aset_id
+                                                    ] ?? []
+                                                }
+                                                trades={trades}
+                                                onAsetSearch={setAsetSearch}
+                                                onChange={(change) => {
+                                                    if (
+                                                        'aset_id' in change &&
+                                                        change.aset_id
+                                                    ) {
+                                                        void loadJobTypesForAset(
+                                                            change.aset_id,
+                                                        );
+                                                    }
 
-                                        setRecord({
-                                            ...record,
-                                            details: record.details.map(
-                                                (current, position) =>
-                                                    position === index
-                                                        ? {
-                                                              ...current,
-                                                              ...change,
-                                                          }
-                                                        : current,
-                                            ),
-                                        });
-                                    }}
-                                    onRemove={() =>
-                                        setRecord({
-                                            ...record,
-                                            details: record.details.filter(
-                                                (_, position) =>
-                                                    position !== index,
-                                            ),
-                                        })
-                                    }
-                                />
-                            ))
-                        )}
-                    </div>
+                                                    setRecord({
+                                                        ...record,
+                                                        details:
+                                                            record.details.map(
+                                                                (
+                                                                    current,
+                                                                    position,
+                                                                ) =>
+                                                                    position ===
+                                                                    index
+                                                                        ? {
+                                                                              ...current,
+                                                                              ...change,
+                                                                          }
+                                                                        : current,
+                                                            ),
+                                                    });
+                                                }}
+                                                onRemove={() =>
+                                                    setRecord({
+                                                        ...record,
+                                                        details:
+                                                            record.details.filter(
+                                                                (_, position) =>
+                                                                    position !==
+                                                                    index,
+                                                            ),
+                                                    })
+                                                }
+                                            />
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="notes"
+                            title="Keterangan"
+                            summary={
+                                record.keterangan || 'Belum ada keterangan'
+                            }
+                        >
+                            <div className="space-y-4">
+                                <Field>
+                                    <FieldLabel htmlFor="work-order-keterangan">
+                                        Keterangan
+                                    </FieldLabel>
+                                    <Textarea
+                                        id="work-order-keterangan"
+                                        rows={4}
+                                        readOnly={readOnly}
+                                        onFocus={
+                                            readOnly ? mintaSunting : undefined
+                                        }
+                                        value={record.keterangan ?? ''}
+                                        onChange={(event) =>
+                                            setRecord({
+                                                ...record,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                            </div>
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
                 </div>
 
                 {checklist && (

@@ -15,6 +15,10 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
 import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import {
     Dialog,
     DialogAction,
     DialogBody,
@@ -407,225 +411,291 @@ export default function MaintenanceRequestDetailPage({
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">
-                    {readOnly && saved ? (
-                        <>
-                            {status === 'ditolak' && saved.alasan_penolakan && (
-                                <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3 text-sm">
-                                    <div className="font-medium">
-                                        Ditolak
-                                        {saved.diputuskan_oleh_nama
-                                            ? ` oleh ${saved.diputuskan_oleh_nama}`
-                                            : ''}
-                                    </div>
-                                    <div>{saved.alasan_penolakan}</div>
-                                </div>
-                            )}
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                <Info label="Jenis permintaan">
-                                    {saved.jenis_permintaan_nama ?? '—'}
-                                </Info>
-                                <Info label="Unit pelapor">
-                                    {saved.unit_nama ?? '—'}
-                                </Info>
-                                <Info label="Dilaporkan oleh">
-                                    {saved.dilaporkan_oleh_nama ?? '—'}
-                                </Info>
-                                <Info label="Aset">
-                                    {saved.aset_id
-                                        ? codeName(
-                                              saved.aset_kode,
-                                              saved.aset_nama,
-                                          )
-                                        : 'Belum dipilih'}
-                                </Info>
-                                <Info label="Lokasi">
-                                    {saved.lokasi_nama ?? '—'}
-                                </Info>
-                                <Info label="Tingkat layanan">
-                                    {saved.tingkat_layanan_nama ?? '—'}
-                                </Info>
-                                <Info label="Sebab kerusakan">
-                                    {saved.sebab_kerusakan_nama ?? '—'}
-                                </Info>
-                                <Info label="Diajukan">
-                                    {formatDateTime(saved.diajukan_pada)}
-                                </Info>
-                                <Info label="Diputuskan">
-                                    {saved.diputuskan_pada
-                                        ? `${formatDateTime(saved.diputuskan_pada)}${saved.diputuskan_oleh_nama ? ` · ${saved.diputuskan_oleh_nama}` : ''}`
-                                        : '—'}
-                                </Info>
-                                <Info label="Work order">
-                                    {saved.pemeliharaan_aset_id ? (
-                                        <a
-                                            className="text-primary font-medium hover:underline"
-                                            href={workOrderPath(
-                                                saved.pemeliharaan_aset_id,
+                    <CollapsibleSectionGroup defaultValue={['general']}>
+                        <CollapsibleSection
+                            value="general"
+                            title="Umum"
+                            summary={
+                                saved?.jenis_permintaan_nama ??
+                                types.options.find(
+                                    (option) =>
+                                        option.id === form.jenis_permintaan_id,
+                                )?.nama ??
+                                'Jenis permintaan belum dipilih'
+                            }
+                        >
+                            <div className="space-y-4">
+                                {readOnly && saved ? (
+                                    <>
+                                        {status === 'ditolak' &&
+                                            saved.alasan_penolakan && (
+                                                <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3 text-sm">
+                                                    <div className="font-medium">
+                                                        Ditolak
+                                                        {saved.diputuskan_oleh_nama
+                                                            ? ` oleh ${saved.diputuskan_oleh_nama}`
+                                                            : ''}
+                                                    </div>
+                                                    <div>
+                                                        {saved.alasan_penolakan}
+                                                    </div>
+                                                </div>
                                             )}
-                                        >
-                                            {saved.work_order_kode}
-                                        </a>
-                                    ) : (
-                                        '—'
-                                    )}
-                                </Info>
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            <Info label="Jenis permintaan">
+                                                {saved.jenis_permintaan_nama ??
+                                                    '—'}
+                                            </Info>
+                                            <Info label="Unit pelapor">
+                                                {saved.unit_nama ?? '—'}
+                                            </Info>
+                                            <Info label="Dilaporkan oleh">
+                                                {saved.dilaporkan_oleh_nama ??
+                                                    '—'}
+                                            </Info>
+                                            <Info label="Aset">
+                                                {saved.aset_id
+                                                    ? codeName(
+                                                          saved.aset_kode,
+                                                          saved.aset_nama,
+                                                      )
+                                                    : 'Belum dipilih'}
+                                            </Info>
+                                            <Info label="Lokasi">
+                                                {saved.lokasi_nama ?? '—'}
+                                            </Info>
+                                            <Info label="Tingkat layanan">
+                                                {saved.tingkat_layanan_nama ??
+                                                    '—'}
+                                            </Info>
+                                            <Info label="Sebab kerusakan">
+                                                {saved.sebab_kerusakan_nama ??
+                                                    '—'}
+                                            </Info>
+                                            <Info label="Diajukan">
+                                                {formatDateTime(
+                                                    saved.diajukan_pada,
+                                                )}
+                                            </Info>
+                                            <Info label="Diputuskan">
+                                                {saved.diputuskan_pada
+                                                    ? `${formatDateTime(saved.diputuskan_pada)}${saved.diputuskan_oleh_nama ? ` · ${saved.diputuskan_oleh_nama}` : ''}`
+                                                    : '—'}
+                                            </Info>
+                                            <Info label="Work order">
+                                                {saved.pemeliharaan_aset_id ? (
+                                                    <a
+                                                        className="text-primary font-medium hover:underline"
+                                                        href={workOrderPath(
+                                                            saved.pemeliharaan_aset_id,
+                                                        )}
+                                                    >
+                                                        {saved.work_order_kode}
+                                                    </a>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </Info>
+                                        </div>
+                                        <Info label="Deskripsi">
+                                            <p className="whitespace-pre-line">
+                                                {saved.deskripsi}
+                                            </p>
+                                        </Info>
+                                    </>
+                                ) : (
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <Field>
+                                            <Select
+                                                label="Jenis permintaan"
+                                                required
+                                                items={choices(types.options)}
+                                                value={
+                                                    form.jenis_permintaan_id ||
+                                                    null
+                                                }
+                                                placeholder="Pilih jenis permintaan"
+                                                ariaLabel="Jenis permintaan"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        jenis_permintaan_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                            {(message('jenis_permintaan_id') ||
+                                                types.error) && (
+                                                <FieldDescription>
+                                                    {message(
+                                                        'jenis_permintaan_id',
+                                                    ) || types.error}
+                                                </FieldDescription>
+                                            )}
+                                        </Field>
+                                        <Field>
+                                            <Select
+                                                label="Unit pelapor"
+                                                required
+                                                items={choices(units.options)}
+                                                value={
+                                                    form.responsible_org_unit_id ||
+                                                    null
+                                                }
+                                                placeholder="Pilih unit kerja"
+                                                ariaLabel="Unit pelapor"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        responsible_org_unit_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                            {(message(
+                                                'responsible_org_unit_id',
+                                            ) ||
+                                                units.error) && (
+                                                <FieldDescription>
+                                                    {message(
+                                                        'responsible_org_unit_id',
+                                                    ) || units.error}
+                                                </FieldDescription>
+                                            )}
+                                        </Field>
+                                        <Field>
+                                            <Select
+                                                label="Aset"
+                                                items={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Tidak ada aset tertentu',
+                                                    },
+                                                    ...choices(assets.options),
+                                                ]}
+                                                value={form.aset_id || null}
+                                                placeholder="Pilih aset yang rusak"
+                                                searchPlaceholder="Cari kode atau nama aset"
+                                                ariaLabel="Aset"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        aset_id: value ?? '',
+                                                    })
+                                                }
+                                            />
+                                            {(message('aset_id') ||
+                                                assets.error) && (
+                                                <FieldDescription>
+                                                    {message('aset_id') ||
+                                                        assets.error}
+                                                </FieldDescription>
+                                            )}
+                                        </Field>
+                                        <Field>
+                                            <Select
+                                                label="Lokasi"
+                                                items={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Ikuti lokasi aset',
+                                                    },
+                                                    ...choices(
+                                                        locations.options,
+                                                    ),
+                                                ]}
+                                                value={
+                                                    form.lokasi_aset_id || null
+                                                }
+                                                placeholder="Ikuti lokasi aset"
+                                                ariaLabel="Lokasi"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        lokasi_aset_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                            <FieldDescription>
+                                                {message('lokasi_aset_id') ||
+                                                    'Isi bila yang rusak bukan satu aset tertentu, misalnya ruangan.'}
+                                            </FieldDescription>
+                                        </Field>
+                                        <Field>
+                                            <Select
+                                                label="Tingkat layanan"
+                                                items={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Tidak ditentukan',
+                                                    },
+                                                    ...choices(levels.options),
+                                                ]}
+                                                value={
+                                                    form.tingkat_layanan_id ||
+                                                    null
+                                                }
+                                                placeholder="Tidak ditentukan"
+                                                ariaLabel="Tingkat layanan"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        tingkat_layanan_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </Field>
+                                        <Field>
+                                            <Select
+                                                label="Sebab kerusakan"
+                                                items={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Belum diketahui',
+                                                    },
+                                                    ...choices(causes.options),
+                                                ]}
+                                                value={
+                                                    form.sebab_kerusakan_id ||
+                                                    null
+                                                }
+                                                placeholder="Belum diketahui"
+                                                ariaLabel="Sebab kerusakan"
+                                                portalContainer={panelRef}
+                                                onValueChange={(value) =>
+                                                    set({
+                                                        sebab_kerusakan_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </Field>
+                                        <Field className="sm:col-span-2">
+                                            <Textarea
+                                                label="Deskripsi"
+                                                required
+                                                maxLength={4000}
+                                                value={form.deskripsi}
+                                                onChange={(event) =>
+                                                    set({
+                                                        deskripsi:
+                                                            event.target.value,
+                                                    })
+                                                }
+                                            />
+                                            {message('deskripsi') && (
+                                                <FieldDescription>
+                                                    {message('deskripsi')}
+                                                </FieldDescription>
+                                            )}
+                                        </Field>
+                                    </div>
+                                )}
                             </div>
-                            <Info label="Deskripsi">
-                                <p className="whitespace-pre-line">
-                                    {saved.deskripsi}
-                                </p>
-                            </Info>
-                        </>
-                    ) : (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field>
-                                <Select
-                                    label="Jenis permintaan"
-                                    required
-                                    items={choices(types.options)}
-                                    value={form.jenis_permintaan_id || null}
-                                    placeholder="Pilih jenis permintaan"
-                                    ariaLabel="Jenis permintaan"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({
-                                            jenis_permintaan_id: value ?? '',
-                                        })
-                                    }
-                                />
-                                {(message('jenis_permintaan_id') ||
-                                    types.error) && (
-                                    <FieldDescription>
-                                        {message('jenis_permintaan_id') ||
-                                            types.error}
-                                    </FieldDescription>
-                                )}
-                            </Field>
-                            <Field>
-                                <Select
-                                    label="Unit pelapor"
-                                    required
-                                    items={choices(units.options)}
-                                    value={form.responsible_org_unit_id || null}
-                                    placeholder="Pilih unit kerja"
-                                    ariaLabel="Unit pelapor"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({
-                                            responsible_org_unit_id:
-                                                value ?? '',
-                                        })
-                                    }
-                                />
-                                {(message('responsible_org_unit_id') ||
-                                    units.error) && (
-                                    <FieldDescription>
-                                        {message('responsible_org_unit_id') ||
-                                            units.error}
-                                    </FieldDescription>
-                                )}
-                            </Field>
-                            <Field>
-                                <Select
-                                    label="Aset"
-                                    items={[
-                                        {
-                                            value: '',
-                                            label: 'Tidak ada aset tertentu',
-                                        },
-                                        ...choices(assets.options),
-                                    ]}
-                                    value={form.aset_id || null}
-                                    placeholder="Pilih aset yang rusak"
-                                    searchPlaceholder="Cari kode atau nama aset"
-                                    ariaLabel="Aset"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({ aset_id: value ?? '' })
-                                    }
-                                />
-                                {(message('aset_id') || assets.error) && (
-                                    <FieldDescription>
-                                        {message('aset_id') || assets.error}
-                                    </FieldDescription>
-                                )}
-                            </Field>
-                            <Field>
-                                <Select
-                                    label="Lokasi"
-                                    items={[
-                                        {
-                                            value: '',
-                                            label: 'Ikuti lokasi aset',
-                                        },
-                                        ...choices(locations.options),
-                                    ]}
-                                    value={form.lokasi_aset_id || null}
-                                    placeholder="Ikuti lokasi aset"
-                                    ariaLabel="Lokasi"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({ lokasi_aset_id: value ?? '' })
-                                    }
-                                />
-                                <FieldDescription>
-                                    {message('lokasi_aset_id') ||
-                                        'Isi bila yang rusak bukan satu aset tertentu, misalnya ruangan.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Select
-                                    label="Tingkat layanan"
-                                    items={[
-                                        {
-                                            value: '',
-                                            label: 'Tidak ditentukan',
-                                        },
-                                        ...choices(levels.options),
-                                    ]}
-                                    value={form.tingkat_layanan_id || null}
-                                    placeholder="Tidak ditentukan"
-                                    ariaLabel="Tingkat layanan"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({ tingkat_layanan_id: value ?? '' })
-                                    }
-                                />
-                            </Field>
-                            <Field>
-                                <Select
-                                    label="Sebab kerusakan"
-                                    items={[
-                                        { value: '', label: 'Belum diketahui' },
-                                        ...choices(causes.options),
-                                    ]}
-                                    value={form.sebab_kerusakan_id || null}
-                                    placeholder="Belum diketahui"
-                                    ariaLabel="Sebab kerusakan"
-                                    portalContainer={panelRef}
-                                    onValueChange={(value) =>
-                                        set({ sebab_kerusakan_id: value ?? '' })
-                                    }
-                                />
-                            </Field>
-                            <Field className="sm:col-span-2">
-                                <Textarea
-                                    label="Deskripsi"
-                                    required
-                                    maxLength={4000}
-                                    value={form.deskripsi}
-                                    onChange={(event) =>
-                                        set({ deskripsi: event.target.value })
-                                    }
-                                />
-                                {message('deskripsi') && (
-                                    <FieldDescription>
-                                        {message('deskripsi')}
-                                    </FieldDescription>
-                                )}
-                            </Field>
-                        </div>
-                    )}
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
                 </div>
             </div>
 

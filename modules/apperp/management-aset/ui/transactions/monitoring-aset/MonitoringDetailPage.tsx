@@ -16,6 +16,10 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -418,297 +422,357 @@ export default function MonitoringDetailPage({
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field>
-                            <Input
-                                label="Tanggal monitoring"
-                                type="date"
-                                required
-                                readOnly={readOnly}
-                                value={record.tanggal ?? ''}
-                                onChange={(event) =>
-                                    setRecord({
-                                        ...record,
-                                        tanggal: event.target.value,
-                                    })
-                                }
-                            />
-                            {pesan('tanggal') && (
-                                <FieldDescription>
-                                    {pesan('tanggal')}
-                                </FieldDescription>
-                            )}
-                        </Field>
-
-                        <Field>
-                            <EditShield
-                                active={readOnly && !selesai}
-                                label="lokasi aset"
-                                onActivate={ubah}
-                            >
-                                <Select
-                                    label="Lokasi aset"
-                                    required
-                                    items={lokasi.options.map(optionLabel)}
-                                    value={pilihDari(
-                                        lokasi.options,
-                                        record.lokasi_aset_id,
-                                    )}
-                                    placeholder="Pilih lokasi yang diperiksa"
-                                    searchPlaceholder="Cari lokasi aset"
-                                    emptyMessage="Lokasi aset tidak ditemukan."
-                                    ariaLabel="Lokasi aset"
-                                    portalContainer={panelRef}
-                                    onValueChange={(item) =>
-                                        setRecord({
-                                            ...record,
-                                            lokasi_aset_id:
-                                                lokasi.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
-                                        })
-                                    }
-                                />
-                            </EditShield>
-                            <FieldDescription>
-                                {pesan('lokasi_aset_id') ||
-                                    lokasi.error ||
-                                    (readOnly && tersimpan?.lokasi_aset_nama
-                                        ? tersimpan.lokasi_aset_nama
-                                        : 'Satu monitoring memeriksa satu lokasi.')}
-                            </FieldDescription>
-                        </Field>
-
-                        <Field>
-                            <EditShield
-                                active={readOnly && !selesai}
-                                label="unit organisasi"
-                                onActivate={ubah}
-                            >
-                                <Select
-                                    label="Unit organisasi"
-                                    items={unitKerja.options.map(optionLabel)}
-                                    value={pilihDari(
-                                        unitKerja.options,
-                                        record.responsible_org_unit_id,
-                                    )}
-                                    placeholder="Semua unit"
-                                    searchPlaceholder="Cari unit kerja"
-                                    emptyMessage="Unit kerja tidak ditemukan."
-                                    ariaLabel="Unit organisasi"
-                                    portalContainer={panelRef}
-                                    onValueChange={(item) =>
-                                        setRecord({
-                                            ...record,
-                                            responsible_org_unit_id:
-                                                unitKerja.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
-                                        })
-                                    }
-                                />
-                            </EditShield>
-                            <FieldDescription>
-                                {pesan('responsible_org_unit_id') ||
-                                    unitKerja.error ||
-                                    'Bila diisi, Isi otomatis hanya mengambil aset milik unit ini.'}
-                            </FieldDescription>
-                        </Field>
-
-                        <Field>
-                            <EditShield
-                                active={readOnly && !selesai}
-                                label="penanggung jawab"
-                                onActivate={ubah}
-                            >
-                                <Select
-                                    label="Penanggung jawab"
-                                    items={anggota.options.map(optionLabel)}
-                                    value={pilihDari(
-                                        anggota.options,
-                                        record.penanggung_jawab_user_id,
-                                    )}
-                                    placeholder="Semua orang"
-                                    searchPlaceholder="Cari nama"
-                                    emptyMessage="Orang tidak ditemukan."
-                                    ariaLabel="Penanggung jawab"
-                                    portalContainer={panelRef}
-                                    onValueChange={(item) =>
-                                        setRecord({
-                                            ...record,
-                                            penanggung_jawab_user_id:
-                                                anggota.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
-                                        })
-                                    }
-                                />
-                            </EditShield>
-                            <FieldDescription>
-                                {anggota.error ||
-                                    'Bila diisi, Isi otomatis hanya mengambil aset yang dipegang orang ini.'}
-                            </FieldDescription>
-                        </Field>
-                    </div>
-
-                    <Field>
-                        <Textarea
-                            label="Keterangan"
-                            rows={2}
-                            readOnly={readOnly}
-                            value={record.keterangan ?? ''}
-                            onChange={(event) =>
-                                setRecord({
-                                    ...record,
-                                    keterangan: event.target.value,
-                                })
-                            }
-                        />
-                    </Field>
-
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h2 className="text-base font-medium">
-                                Aset yang diperiksa
-                                {record.details.length > 0 && (
-                                    <span className="text-muted-foreground ml-2 text-sm font-normal">
-                                        {record.details.length} aset
-                                        {belumDiperiksa > 0 &&
-                                            `, ${belumDiperiksa} belum diperiksa`}
-                                        {tidakSesuai > 0 &&
-                                            `, ${tidakSesuai} tidak sesuai`}
-                                    </span>
-                                )}
-                            </h2>
-                            {!readOnly && (
-                                <div className="flex flex-wrap gap-2">
-                                    {belumDiperiksa > 0 && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setRecord({
-                                                    ...record,
-                                                    details: record.details.map(
-                                                        (baris) =>
-                                                            baris.ada === null
-                                                                ? {
-                                                                      ...baris,
-                                                                      ada: true,
-                                                                  }
-                                                                : baris,
-                                                    ),
-                                                })
-                                            }
-                                        >
-                                            <CheckCheck />
-                                            Tandai yang belum sebagai ada
-                                        </Button>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            setRecord({
-                                                ...record,
-                                                details: [
-                                                    ...record.details,
-                                                    emptyLine(),
-                                                ],
-                                            })
-                                        }
-                                    >
-                                        <Plus />
-                                        Tambah aset
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        {pesan('details') && (
-                            <p className="text-destructive text-sm">
-                                {pesan('details')}
-                            </p>
-                        )}
-                        {!readOnly && asetGalat && (
-                            <p className="text-muted-foreground text-sm">
-                                {asetGalat}
-                            </p>
-                        )}
-
-                        {record.details.length === 0 ? (
-                            <p className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
-                                {mode === 'create'
-                                    ? 'Simpan draf dulu, lalu pakai Isi otomatis untuk memasukkan semua aset yang tercatat di lokasi ini. Aset juga bisa ditambahkan satu per satu.'
-                                    : 'Belum ada aset di daftar periksa. Pakai Isi otomatis untuk memasukkan semua aset yang tercatat di lokasi ini.'}
-                            </p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-12">
-                                            No
-                                        </TableHead>
-                                        <TableHead>Aset</TableHead>
-                                        <TableHead>Di catatan aset</TableHead>
-                                        <TableHead>Keberadaan</TableHead>
-                                        <TableHead>Kondisi fisik</TableHead>
-                                        <TableHead>Hasil</TableHead>
-                                        <TableHead>Keterangan</TableHead>
-                                        <TableHead className="text-right">
-                                            Nilai buku
-                                        </TableHead>
-                                        {readOnly && (
-                                            <TableHead>Tindak lanjut</TableHead>
-                                        )}
-                                        {!readOnly && (
-                                            <TableHead className="w-12" />
-                                        )}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {record.details.map((baris, index) => (
-                                        <MonitoringRow
-                                            key={baris.id ?? `baru-${index}`}
-                                            baris={baris}
-                                            index={index}
+                    <CollapsibleSectionGroup
+                        defaultValue={['general', 'lines']}
+                    >
+                        <CollapsibleSection
+                            value="general"
+                            title="Umum"
+                            summary={tanggalTampil(record.tanggal)}
+                        >
+                            <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field>
+                                        <Input
+                                            label="Tanggal monitoring"
+                                            type="date"
+                                            required
                                             readOnly={readOnly}
-                                            lokasiDokumen={
-                                                tersimpan?.lokasi_aset_id ??
-                                                record.lokasi_aset_id ??
-                                                ''
-                                            }
-                                            aset={aset}
-                                            permissions={permissions}
-                                            panelRef={panelRef}
-                                            onChange={(patch) =>
-                                                ubahBaris(index, patch)
-                                            }
-                                            onRemove={() =>
+                                            value={record.tanggal ?? ''}
+                                            onChange={(event) =>
                                                 setRecord({
                                                     ...record,
-                                                    details:
-                                                        record.details.filter(
-                                                            (_, posisi) =>
-                                                                posisi !==
-                                                                index,
-                                                        ),
+                                                    tanggal: event.target.value,
                                                 })
                                             }
                                         />
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </div>
+                                        {pesan('tanggal') && (
+                                            <FieldDescription>
+                                                {pesan('tanggal')}
+                                            </FieldDescription>
+                                        )}
+                                    </Field>
 
+                                    <Field>
+                                        <EditShield
+                                            active={readOnly && !selesai}
+                                            label="lokasi aset"
+                                            onActivate={ubah}
+                                        >
+                                            <Select
+                                                label="Lokasi aset"
+                                                required
+                                                items={lokasi.options.map(
+                                                    optionLabel,
+                                                )}
+                                                value={pilihDari(
+                                                    lokasi.options,
+                                                    record.lokasi_aset_id,
+                                                )}
+                                                placeholder="Pilih lokasi yang diperiksa"
+                                                searchPlaceholder="Cari lokasi aset"
+                                                emptyMessage="Lokasi aset tidak ditemukan."
+                                                ariaLabel="Lokasi aset"
+                                                portalContainer={panelRef}
+                                                onValueChange={(item) =>
+                                                    setRecord({
+                                                        ...record,
+                                                        lokasi_aset_id:
+                                                            lokasi.options.find(
+                                                                (option) =>
+                                                                    optionLabel(
+                                                                        option,
+                                                                    ) === item,
+                                                            )?.id ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </EditShield>
+                                        <FieldDescription>
+                                            {pesan('lokasi_aset_id') ||
+                                                lokasi.error ||
+                                                (readOnly &&
+                                                tersimpan?.lokasi_aset_nama
+                                                    ? tersimpan.lokasi_aset_nama
+                                                    : 'Satu monitoring memeriksa satu lokasi.')}
+                                        </FieldDescription>
+                                    </Field>
+
+                                    <Field>
+                                        <EditShield
+                                            active={readOnly && !selesai}
+                                            label="unit organisasi"
+                                            onActivate={ubah}
+                                        >
+                                            <Select
+                                                label="Unit organisasi"
+                                                items={unitKerja.options.map(
+                                                    optionLabel,
+                                                )}
+                                                value={pilihDari(
+                                                    unitKerja.options,
+                                                    record.responsible_org_unit_id,
+                                                )}
+                                                placeholder="Semua unit"
+                                                searchPlaceholder="Cari unit kerja"
+                                                emptyMessage="Unit kerja tidak ditemukan."
+                                                ariaLabel="Unit organisasi"
+                                                portalContainer={panelRef}
+                                                onValueChange={(item) =>
+                                                    setRecord({
+                                                        ...record,
+                                                        responsible_org_unit_id:
+                                                            unitKerja.options.find(
+                                                                (option) =>
+                                                                    optionLabel(
+                                                                        option,
+                                                                    ) === item,
+                                                            )?.id ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </EditShield>
+                                        <FieldDescription>
+                                            {pesan('responsible_org_unit_id') ||
+                                                unitKerja.error ||
+                                                'Bila diisi, Isi otomatis hanya mengambil aset milik unit ini.'}
+                                        </FieldDescription>
+                                    </Field>
+
+                                    <Field>
+                                        <EditShield
+                                            active={readOnly && !selesai}
+                                            label="penanggung jawab"
+                                            onActivate={ubah}
+                                        >
+                                            <Select
+                                                label="Penanggung jawab"
+                                                items={anggota.options.map(
+                                                    optionLabel,
+                                                )}
+                                                value={pilihDari(
+                                                    anggota.options,
+                                                    record.penanggung_jawab_user_id,
+                                                )}
+                                                placeholder="Semua orang"
+                                                searchPlaceholder="Cari nama"
+                                                emptyMessage="Orang tidak ditemukan."
+                                                ariaLabel="Penanggung jawab"
+                                                portalContainer={panelRef}
+                                                onValueChange={(item) =>
+                                                    setRecord({
+                                                        ...record,
+                                                        penanggung_jawab_user_id:
+                                                            anggota.options.find(
+                                                                (option) =>
+                                                                    optionLabel(
+                                                                        option,
+                                                                    ) === item,
+                                                            )?.id ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </EditShield>
+                                        <FieldDescription>
+                                            {anggota.error ||
+                                                'Bila diisi, Isi otomatis hanya mengambil aset yang dipegang orang ini.'}
+                                        </FieldDescription>
+                                    </Field>
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="lines"
+                            title="Aset yang diperiksa"
+                            summary={`${record.details.length} aset, ${belumDiperiksa} belum diperiksa, ${tidakSesuai} tidak sesuai`}
+                        >
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-muted-foreground text-sm">
+                                            {record.details.length} aset
+                                            {belumDiperiksa > 0 &&
+                                                `, ${belumDiperiksa} belum diperiksa`}
+                                            {tidakSesuai > 0 &&
+                                                `, ${tidakSesuai} tidak sesuai`}
+                                        </p>
+                                        {!readOnly && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {belumDiperiksa > 0 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setRecord({
+                                                                ...record,
+                                                                details:
+                                                                    record.details.map(
+                                                                        (
+                                                                            baris,
+                                                                        ) =>
+                                                                            baris.ada ===
+                                                                            null
+                                                                                ? {
+                                                                                      ...baris,
+                                                                                      ada: true,
+                                                                                  }
+                                                                                : baris,
+                                                                    ),
+                                                            })
+                                                        }
+                                                    >
+                                                        <CheckCheck />
+                                                        Tandai yang belum
+                                                        sebagai ada
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setRecord({
+                                                            ...record,
+                                                            details: [
+                                                                ...record.details,
+                                                                emptyLine(),
+                                                            ],
+                                                        })
+                                                    }
+                                                >
+                                                    <Plus />
+                                                    Tambah aset
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {pesan('details') && (
+                                        <p className="text-destructive text-sm">
+                                            {pesan('details')}
+                                        </p>
+                                    )}
+                                    {!readOnly && asetGalat && (
+                                        <p className="text-muted-foreground text-sm">
+                                            {asetGalat}
+                                        </p>
+                                    )}
+
+                                    {record.details.length === 0 ? (
+                                        <p className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+                                            {mode === 'create'
+                                                ? 'Simpan draf dulu, lalu pakai Isi otomatis untuk memasukkan semua aset yang tercatat di lokasi ini. Aset juga bisa ditambahkan satu per satu.'
+                                                : 'Belum ada aset di daftar periksa. Pakai Isi otomatis untuk memasukkan semua aset yang tercatat di lokasi ini.'}
+                                        </p>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead className="w-12">
+                                                        No
+                                                    </TableHead>
+                                                    <TableHead>Aset</TableHead>
+                                                    <TableHead>
+                                                        Di catatan aset
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Keberadaan
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Kondisi fisik
+                                                    </TableHead>
+                                                    <TableHead>Hasil</TableHead>
+                                                    <TableHead>
+                                                        Keterangan
+                                                    </TableHead>
+                                                    <TableHead className="text-right">
+                                                        Nilai buku
+                                                    </TableHead>
+                                                    {readOnly && (
+                                                        <TableHead>
+                                                            Tindak lanjut
+                                                        </TableHead>
+                                                    )}
+                                                    {!readOnly && (
+                                                        <TableHead className="w-12" />
+                                                    )}
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {record.details.map(
+                                                    (baris, index) => (
+                                                        <MonitoringRow
+                                                            key={
+                                                                baris.id ??
+                                                                `baru-${index}`
+                                                            }
+                                                            baris={baris}
+                                                            index={index}
+                                                            readOnly={readOnly}
+                                                            lokasiDokumen={
+                                                                tersimpan?.lokasi_aset_id ??
+                                                                record.lokasi_aset_id ??
+                                                                ''
+                                                            }
+                                                            aset={aset}
+                                                            permissions={
+                                                                permissions
+                                                            }
+                                                            panelRef={panelRef}
+                                                            onChange={(patch) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    patch,
+                                                                )
+                                                            }
+                                                            onRemove={() =>
+                                                                setRecord({
+                                                                    ...record,
+                                                                    details:
+                                                                        record.details.filter(
+                                                                            (
+                                                                                _,
+                                                                                posisi,
+                                                                            ) =>
+                                                                                posisi !==
+                                                                                index,
+                                                                        ),
+                                                                })
+                                                            }
+                                                        />
+                                                    ),
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    )}
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="notes"
+                            title="Keterangan"
+                            summary={
+                                record.keterangan || 'Belum ada keterangan'
+                            }
+                        >
+                            <div className="space-y-4">
+                                <Field>
+                                    <Textarea
+                                        label="Keterangan"
+                                        rows={2}
+                                        readOnly={readOnly}
+                                        value={record.keterangan ?? ''}
+                                        onChange={(event) =>
+                                            setRecord({
+                                                ...record,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                            </div>
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
                     {selesai && (
                         <p className="text-muted-foreground text-sm">
                             Monitoring ini sudah diselesaikan pada{' '}
