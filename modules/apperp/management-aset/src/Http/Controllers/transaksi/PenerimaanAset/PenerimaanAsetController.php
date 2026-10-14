@@ -24,6 +24,7 @@ use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAsetDetail;
+use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPosting;
 use Modules\Apperp\ManagementAset\Services\AcquisitionPostingFailed;
@@ -163,6 +164,7 @@ class PenerimaanAsetController extends Controller
 
         try {
             $id = DB::transaction(function () use ($request, $data, $key, $kode): string {
+                $this->validateRequestLinks($request, $data);
                 $record = $this->header($request, $data, $key, $kode);
                 (new PenerimaanAset)->forceFill($record)->save();
                 $this->gantiBaris((string) $record['id'], $data['details']);
@@ -205,6 +207,7 @@ class PenerimaanAsetController extends Controller
         $this->validateVendor($request, $data);
 
         DB::transaction(function () use ($request, $id, $version, $data): void {
+            $this->validateRequestLinks($request, $data);
             RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
             $updated = PenerimaanAset::query()
                 ->where(['id' => $id, 'status' => PenerimaanStatus::DRAFT])
@@ -544,7 +547,7 @@ class PenerimaanAsetController extends Controller
         if ($lines->isEmpty()) {
             throw ValidationException::withMessages(['details' => 'Penerimaan tanpa baris barang tidak dapat diselesaikan.']);
         }
-        $this->assertSisaPermintaan($lines, $id);
+        $this->assertSisaPermintaan($lines, $id, false);
         $perolehan = app(AcquisitionPosting::class);
         $penghalang = $perolehan->blockers($penerimaan, $lines);
         if ($penghalang !== []) {
@@ -577,6 +580,7 @@ class PenerimaanAsetController extends Controller
 
         try {
             DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover, $numbers): void {
+                $this->assertSisaPermintaan($lines, $id);
                 // Versi diklaim lebih dahulu, lalu status dipindahkan dengan status draf sebagai
                 // syarat. Dua penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan
                 // tidak ada cara mengetahui mana yang berlebih. Yang kalah ditolak klaimnya dan
@@ -686,38 +690,60 @@ class PenerimaanAsetController extends Controller
     /**
      * Sisa permintaan pembelian dihitung, bukan disimpan.
      *
-     * Kolom sisa akan menjadi salah pada kegagalan pertama yang membuat aset lahir tetapi
-     * kolomnya tidak sempat berkurang. Menghitungnya dari jumlah aset yang benar-benar
-     * ada membuat jawabannya selalu sama dengan kenyataan.
+     * Jumlahnya berasal dari penerimaan selesai, sehingga pengarsipan aset tidak
+     * mengembalikan jumlah yang sudah diterima. Kunci permintaan menahan dua penyelesaian
+     * bersamaan sampai penerimaan pertama selesai disimpan.
      *
      * @param  Collection<int, stdClass>  $lines
      */
-    private function assertSisaPermintaan(Collection $lines, string $penerimaanId): void
+    private function assertSisaPermintaan(Collection $lines, string $penerimaanId, bool $lock = true): void
     {
-        foreach ($lines as $line) {
-            if (! $line->permintaan_pembelian_detail_id) {
-                continue;
-            }
+        $linked = $lines->filter(fn ($line) => $line->permintaan_pembelian_detail_id);
+        $requestLines = PermintaanPengadaanAsetDetail::query()->whereIn('id', $linked->pluck('permintaan_pembelian_detail_id'))->get()->keyBy('id');
+        $requests = PermintaanPengadaanAset::query()->whereIn('id', $requestLines->pluck('request_id'))->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()->keyBy('id');
+        foreach ($linked->groupBy('permintaan_pembelian_detail_id') as $requestLineId => $receiptLines) {
+            $line = $receiptLines->first();
+            $requestLine = $requestLines->get($requestLineId);
+            $purchaseRequest = $requestLine === null ? null : $requests->get($requestLine->request_id);
+            abort_unless($purchaseRequest !== null && $purchaseRequest->status !== 'cancelled', 422, 'Permintaan pembelian sudah dibatalkan atau tidak tersedia.');
             // Lewat model, bukan query builder mentah: yang mentah melewati global scope
             // tenant, dan baris permintaan pembelian milik tenant lain akan terbaca tanpa
             // ada yang memberi tahu. Penjaganya `TenantScopeBoundaryTest`.
-            $diminta = (float) PermintaanPengadaanAsetDetail::query()
-                ->where('id', $line->permintaan_pembelian_detail_id)
-                ->toBase()
-                ->value('quantity');
+            $diminta = (float) $requestLine->quantity;
             // Aset milik dokumen ini belum ada saat pemeriksaan berjalan, jadi yang
             // dihitung adalah penerimaan sebelumnya; baris ini ditambahkan sendiri.
-            $sudah = Aset::query()
-                ->whereIn('penerimaan_aset_detail_id', PenerimaanAsetDetail::query()
-                    ->where('permintaan_pembelian_detail_id', $line->permintaan_pembelian_detail_id)
-                    ->where('penerimaan_aset_id', '!=', $penerimaanId)
-                    ->toBase()->pluck('id')->all())
-                ->toBase()->count();
-            if ($sudah + (int) $line->jumlah > $diminta) {
+            $sudah = (int) PenerimaanAsetDetail::query()
+                ->where('permintaan_pembelian_detail_id', $requestLineId)
+                ->where('penerimaan_aset_id', '!=', $penerimaanId)
+                ->whereHas('penerimaan', fn ($query) => $query->where('status', PenerimaanStatus::SELESAI))
+                ->sum('jumlah');
+            if ($sudah + (int) $receiptLines->sum('jumlah') > $diminta) {
                 $sisa = max(0, (int) $diminta - $sudah);
                 throw ValidationException::withMessages([
                     'details' => 'Baris "'.$line->nama.'" melebihi permintaan pembelian. Sisa yang belum diterima tinggal '.$sisa.'.',
                 ]);
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function validateRequestLinks(Request $request, array $data): void
+    {
+        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', array_filter(array_column($data['details'], 'permintaan_pembelian_detail_id')))->get()->keyBy('id');
+        $requests = PermintaanPengadaanAset::query()->whereIn('id', $lines->pluck('request_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', array_filter(array_column($data['details'], 'permintaan_pembelian_detail_id')))->get()->keyBy('id');
+        foreach ($data['details'] as $index => $detail) {
+            if (empty($detail['permintaan_pembelian_detail_id'])) {
+                continue;
+            }
+            $line = $lines->get($detail['permintaan_pembelian_detail_id']);
+            $purchaseRequest = $line === null ? null : $requests->get($line->request_id);
+            if ($purchaseRequest === null || $purchaseRequest->status === 'cancelled' || $purchaseRequest->legal_entity_id !== $data['legal_entity_id']) {
+                throw ValidationException::withMessages(['details.'.$index.'.permintaan_pembelian_detail_id' => 'Pilih permintaan yang belum dibatalkan dari perusahaan yang sama.']);
+            }
+            app(OrganizationScope::class)->require($request, $purchaseRequest->legal_entity_id, $purchaseRequest->requesting_org_unit_id);
+            if ($data['cara_perolehan'] !== AcquisitionMethod::PURCHASE || $line->jenis_aset_id !== $detail['jenis_aset_id']) {
+                throw ValidationException::withMessages(['details.'.$index.'.permintaan_pembelian_detail_id' => 'Penerimaan pembelian harus memakai jenis aset yang sama dengan permintaan.']);
             }
         }
     }
@@ -1227,6 +1253,12 @@ class PenerimaanAsetController extends Controller
     private function baris(string $penerimaanId): Collection
     {
         return PenerimaanAsetDetail::query()
+            ->leftJoin('aset_tr_permintaan_pengadaan_aset_details as request_line', function ($join): void {
+                $join->on('request_line.id', '=', self::TABEL_BARIS.'.permintaan_pembelian_detail_id')->on('request_line.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
+            })
+            ->leftJoin('aset_tr_permintaan_pengadaan_aset as purchase_request', function ($join): void {
+                $join->on('purchase_request.id', '=', 'request_line.request_id')->on('purchase_request.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
+            })
             ->leftJoin('aset_m_group_aset as grup', function ($join): void {
                 $join->on('grup.id', '=', self::TABEL_BARIS.'.group_aset_id')
                     ->on('grup.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
@@ -1254,6 +1286,8 @@ class PenerimaanAsetController extends Controller
                 'kondisi.nama as kondisi_aset_nama',
                 'pabrikan.nama as pabrikan_aset_nama',
                 'model.nama as model_aset_nama',
+                'purchase_request.id as purchase_request_id',
+                'purchase_request.kode as purchase_request_code',
             ])
             ->where(self::TABEL_BARIS.'.penerimaan_aset_id', $penerimaanId)
             ->orderBy(self::TABEL_BARIS.'.line_number')
@@ -1263,6 +1297,7 @@ class PenerimaanAsetController extends Controller
             // yang sama dengan yang diterima permintaan.
             ->each(static function (stdClass $baris): void {
                 $baris->saldo_awal_buku = $baris->saldo_awal_buku === null ? null : OpeningBalance::overrides($baris->saldo_awal_buku);
+                $baris->atribut = is_string($baris->atribut) ? json_decode($baris->atribut, true, flags: JSON_THROW_ON_ERROR) : ($baris->atribut ?? []);
             });
     }
 

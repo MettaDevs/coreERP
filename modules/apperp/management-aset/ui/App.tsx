@@ -10,7 +10,6 @@ import {
 import type { Permission } from './master/masters';
 import { DETAIL_LAYOUT_RESOURCES, MASTERS, permission } from './master/masters';
 import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
-import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
 
 /**
  * Properti yang dikirim `HalamanModulController` pada setiap layar module ini.
@@ -78,6 +77,10 @@ const MonitoringPage = lazy(
 );
 const PlanningPage = lazy(
     () => import('./transactions/perencanaan-aset/PlanningPage'),
+);
+const PurchaseRequestPage = lazy(
+    () =>
+        import('./transactions/permintaan-pembelian-aset/PurchaseRequestPage'),
 );
 const StatusValidationPage = lazy(
     () => import('./transactions/pemeliharaan-aset/StatusValidationPage'),
@@ -182,10 +185,7 @@ const REPORT_PAGES: Record<
  * menyebutnya di sini tidak menarik `LifecycleDocumentPage` keluar dari potongannya.
  */
 const LIFECYCLE = Object.fromEntries(
-    [permintaanPembelianAset, dekomisioningAset].map((config) => [
-        config.resource,
-        config,
-    ]),
+    [dekomisioningAset].map((config) => [config.resource, config]),
 );
 
 export default function App({
@@ -514,6 +514,20 @@ export default function App({
         return (
             <main>
                 <DowntimePage permissions={permissions} />
+            </main>
+        );
+    }
+
+    if (
+        view === 'permintaan-pembelian-aset' &&
+        permissions.includes('management-aset.permintaan-pembelian-aset.read')
+    ) {
+        return (
+            <main className="h-full min-h-0">
+                <PurchaseRequestPage
+                    context={konteks}
+                    permissions={permissions}
+                />
             </main>
         );
     }

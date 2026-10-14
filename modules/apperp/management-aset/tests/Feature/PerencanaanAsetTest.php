@@ -41,6 +41,48 @@ class PerencanaanAsetTest extends TestCase
         });
     }
 
+    private function configurePlanningSequence(bool $allowManual, bool $allowAutomatic): void
+    {
+        $referenceId = DB::table('app_number_sequence_references')->where('code', 'management-aset.perencanaan-aset')->value('id');
+        DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)->where('reference_id', $referenceId)->update([
+            'allow_manual' => $allowManual, 'allow_automatic' => $allowAutomatic,
+        ]);
+    }
+
+    public function test_manual_planning_code_is_saved_and_replayed_without_another_number(): void
+    {
+        $this->configurePlanningSequence(true, true);
+        $payload = [...$this->payload($this->jenis($this->tenantId)), 'kode' => 'RENCANA-KANTOR'];
+        $this->headers(['management-aset.perencanaan-aset.create'])->withHeader('Idempotency-Key', 'manual-plan');
+        $created = $this->postJson('/api/modules/management-aset/v1/perencanaan-aset', $payload)->assertCreated()->assertJsonPath('data.kode', 'RENCANA-KANTOR');
+        $this->postJson('/api/modules/management-aset/v1/perencanaan-aset', $payload)->assertOk()->assertJsonPath('data.id', $created->json('data.id'));
+        $this->assertSame(1, $this->jumlahNomorTerbit());
+    }
+
+    public function test_manual_only_planning_requires_a_code_and_reports_its_policy(): void
+    {
+        $this->configurePlanningSequence(true, false);
+        $this->headers(['management-aset.perencanaan-aset.create'])
+            ->getJson('/api/modules/management-aset/v1/perencanaan-aset/number-policy')->assertOk()
+            ->assertJsonPath('data.allow_manual', true)->assertJsonPath('data.allow_automatic', false);
+        $this->create($this->jenis($this->tenantId))->assertUnprocessable();
+        $this->assertSame(0, $this->jumlahNomorTerbit());
+    }
+
+    public function test_automatic_only_planning_rejects_manual_codes(): void
+    {
+        $this->configurePlanningSequence(false, true);
+        $this->headers(['management-aset.perencanaan-aset.create'])->withHeader('Idempotency-Key', 'rejected-manual')
+            ->postJson('/api/modules/management-aset/v1/perencanaan-aset', [...$this->payload($this->jenis($this->tenantId)), 'kode' => 'RENCANA-KANTOR'])->assertUnprocessable();
+        $this->assertSame(0, $this->jumlahNomorTerbit());
+    }
+
+    public function test_planning_number_policy_requires_create_permission(): void
+    {
+        $this->headers(['management-aset.perencanaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/perencanaan-aset/number-policy')->assertForbidden();
+    }
+
     public function test_planning_numbers_can_repeat_in_another_legal_entity(): void
     {
         $typeId = $this->jenis($this->tenantId);

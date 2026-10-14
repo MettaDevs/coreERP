@@ -567,6 +567,19 @@ class AtributAsetTest extends TestCase
             ->json('data.version');
     }
 
+    public function test_receipt_attributes_are_returned_as_rows_for_reopening_the_form(): void
+    {
+        $typeId = $this->master('jenis-aset', ['nama' => 'Komputer uji']);
+        $attributeId = $this->master('tipe-atribut', ['nama' => 'Prosesor uji', 'data_type' => 'string']);
+        $this->attach($typeId, [['tipe_atribut_id' => $attributeId, 'wajib' => true]])->assertOk();
+        $receipt = $this->receiveRaw($typeId, [['tipe_atribut_id' => $attributeId, 'nilai' => 'CPU uji']])
+            ->assertCreated()->assertJsonPath('data.details.0.atribut.0.nilai', 'CPU uji')->json('data.id');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/penerimaan-aset/'.$receipt)
+            ->assertOk()->assertJsonPath('data.details.0.atribut.0.tipe_atribut_id', $attributeId)
+            ->assertJsonPath('data.details.0.atribut.0.nilai', 'CPU uji');
+    }
+
     /** @param list<array<string, mixed>> $atribut */
     private function receive(string $jenisId, array $atribut): string
     {

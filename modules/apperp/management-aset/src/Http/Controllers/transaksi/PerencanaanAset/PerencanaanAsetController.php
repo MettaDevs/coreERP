@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset;
 
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAsetDetail;
+use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
@@ -45,6 +47,18 @@ class PerencanaanAsetController extends Controller
             ->toBase()
             ->latest('planned_on')->latest('created_at')
             ->get()]);
+    }
+
+    public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse
+    {
+        $this->guard($request, 'create');
+        $tenantId = $this->tenant($request);
+        $reference = 'management-aset.perencanaan-aset';
+
+        return response()->json(['data' => [
+            'allow_manual' => $numbers->allowsManual($tenantId, 'management-aset', $reference),
+            'allow_automatic' => $numbers->allowsAutomatic($tenantId, 'management-aset', $reference),
+        ]]);
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -78,20 +92,20 @@ class PerencanaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['planning_org_unit_id']);
         $unitMap = $this->validateLookupMasters($tenant, $data['details'], $units);
         try {
-            $kode = $numbers->issue('management-aset.perencanaan-aset', $tenant, 'perencanaan-aset:'.$key, $data['legal_entity_id']);
-        } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
-        }
-
-        try {
-            DB::transaction(function () use ($request, $data, $key, $kode, $unitMap): void {
-                $record = $this->header($request, $data, $key, $kode);
+            DB::transaction(function () use ($request, $data, $key, $tenant, $numbers, $unitMap): void {
+                $code = $numbers->issue('management-aset.perencanaan-aset', $tenant, 'perencanaan-aset:'.$key, $data['legal_entity_id'], manualValue: filled($data['kode'] ?? null) ? trim($data['kode']) : null);
+                $record = $this->header($request, $data, $key, $code);
                 (new PerencanaanAset)->forceFill($record)->save();
                 $this->replaceDetails($record['id'], $data['details'], $unitMap);
             });
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (QueryException $exception) {
             $existing = $this->replay($key);
             if (! $existing) {
+                if ($exception->getCode() === '23505') {
+                    throw ValidationException::withMessages(['kode' => 'Kode perencanaan sudah digunakan.']);
+                }
                 throw $exception;
             }
 
@@ -115,6 +129,7 @@ class PerencanaanAsetController extends Controller
 
         DB::transaction(function () use ($request, $id, $version, $data, $unitMap): void {
             RowVersion::claim(PerencanaanAset::query()->whereKey($id), $version);
+            $this->assertNotRequested($id);
             $changes = $this->header($request, $data, '', '', false);
             unset($changes['responsible_user_id']);
             PerencanaanAset::query()->whereKey($id)->update([
@@ -137,10 +152,18 @@ class PerencanaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
         DB::transaction(function () use ($id, $version): void {
             RowVersion::claim(PerencanaanAset::query()->whereKey($id), $version);
+            $this->assertNotRequested($id);
             PerencanaanAset::query()->whereKey($id)->update(['deleted_at' => now(), 'updated_at' => now()]);
         });
 
         return response()->json(status: 204);
+    }
+
+    private function assertNotRequested(string $id): void
+    {
+        abort_if(PermintaanPengadaanAsetDetail::query()
+            ->whereIn('planning_detail_id', PerencanaanAsetDetail::query()->where('planning_id', $id)->select('id'))
+            ->exists(), 422, 'Perencanaan sudah menjadi dasar permintaan dan tidak dapat diubah atau diarsipkan.');
     }
 
     /**
@@ -158,6 +181,7 @@ class PerencanaanAsetController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
+            'kode' => ['nullable', 'string', 'max:255'],
             'legal_entity_id' => ['required', 'ulid'],
             'planning_org_unit_id' => ['required', 'ulid'],
             'planned_on' => ['required', 'date'],

@@ -78,6 +78,8 @@ import {
     penerimaanKosong,
     tanggalTampil,
 } from './penerimaan';
+import PurchaseRequestPicker from './PurchaseRequestPicker';
+import ReceiptAttributes from './ReceiptAttributes';
 
 type Mode = 'create' | 'view' | 'edit';
 
@@ -400,6 +402,7 @@ export default function PenerimaanDetailPage({
                         : [],
                     permintaan_pembelian_detail_id:
                         baris.permintaan_pembelian_detail_id || null,
+                    atribut: baris.atribut ?? [],
                     keterangan: baris.keterangan || null,
                 })),
         };
@@ -708,6 +711,7 @@ export default function PenerimaanDetailPage({
                             'kedatangan',
                             'vendor',
                             'barang',
+                            'atribut',
                             'jurnal',
                         ]}
                     >
@@ -1066,6 +1070,12 @@ export default function PenerimaanDetailPage({
                                                 <TableHead className="w-10">
                                                     #
                                                 </TableHead>
+                                                {record.cara_perolehan ===
+                                                    'pembelian' && (
+                                                    <TableHead className="min-w-64">
+                                                        Permintaan asal
+                                                    </TableHead>
+                                                )}
                                                 <TableHead className="min-w-52">
                                                     Nama barang
                                                 </TableHead>
@@ -1113,12 +1123,85 @@ export default function PenerimaanDetailPage({
                                                     <TableRow
                                                         key={
                                                             baris.id ??
+                                                            baris.clientKey ??
                                                             `baris-${index}`
                                                         }
                                                     >
                                                         <TableCell className="text-muted-foreground">
                                                             {index + 1}
                                                         </TableCell>
+                                                        {record.cara_perolehan ===
+                                                            'pembelian' && (
+                                                            <TableCell>
+                                                                {readOnly ? (
+                                                                    <span>
+                                                                        {baris.purchase_request_code ??
+                                                                            '—'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <PurchaseRequestPicker
+                                                                        companyId={
+                                                                            record.legal_entity_id ??
+                                                                            context.legal_entity_id ??
+                                                                            undefined
+                                                                        }
+                                                                        initialRequestId={
+                                                                            baris.purchase_request_id
+                                                                        }
+                                                                        value={
+                                                                            baris.permintaan_pembelian_detail_id
+                                                                        }
+                                                                        readOnly={
+                                                                            readOnly
+                                                                        }
+                                                                        portalContainer={
+                                                                            panelRef
+                                                                        }
+                                                                        onChange={(
+                                                                            line,
+                                                                        ) =>
+                                                                            ubahBaris(
+                                                                                index,
+                                                                                line
+                                                                                    ? {
+                                                                                          permintaan_pembelian_detail_id:
+                                                                                              line.id ??
+                                                                                              '',
+                                                                                          nama: line.nama_aset,
+                                                                                          jenis_aset_id:
+                                                                                              line.jenis_aset_id,
+                                                                                          atribut:
+                                                                                              line.jenis_aset_id ===
+                                                                                              baris.jenis_aset_id
+                                                                                                  ? baris.atribut
+                                                                                                  : [],
+                                                                                          kondisi_aset_id:
+                                                                                              '',
+                                                                                          model_aset_id:
+                                                                                              '',
+                                                                                          model_number:
+                                                                                              '',
+                                                                                          jumlah: Math.max(
+                                                                                              1,
+                                                                                              Math.floor(
+                                                                                                  Number(
+                                                                                                      line.remaining_quantity,
+                                                                                                  ),
+                                                                                              ),
+                                                                                          ),
+                                                                                          keterangan:
+                                                                                              line.specification,
+                                                                                      }
+                                                                                    : {
+                                                                                          permintaan_pembelian_detail_id:
+                                                                                              '',
+                                                                                      },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            </TableCell>
+                                                        )}
                                                         <TableCell>
                                                             <Input
                                                                 aria-label="Nama barang"
@@ -1169,7 +1252,16 @@ export default function PenerimaanDetailPage({
                                                                         {
                                                                             jenis_aset_id:
                                                                                 id,
+                                                                            atribut:
+                                                                                id ===
+                                                                                baris.jenis_aset_id
+                                                                                    ? baris.atribut
+                                                                                    : [],
                                                                             kondisi_aset_id:
+                                                                                '',
+                                                                            model_aset_id:
+                                                                                '',
+                                                                            model_number:
                                                                                 '',
                                                                         },
                                                                     ),
@@ -1438,6 +1530,44 @@ export default function PenerimaanDetailPage({
                                     lima ratus ribu tidak melewati ambang
                                     sepuluh juta hanya karena datang bersamaan.
                                 </FieldDescription>
+                            </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection
+                            value="atribut"
+                            title="Isian tambahan barang"
+                        >
+                            <div className="space-y-4">
+                                {record.details.map(
+                                    (line, index) =>
+                                        line.jenis_aset_id && (
+                                            <div
+                                                key={`${line.id ?? line.clientKey ?? index}-${line.jenis_aset_id}`}
+                                                className="space-y-3"
+                                            >
+                                                <p className="text-sm font-medium">
+                                                    Baris {index + 1}:{' '}
+                                                    {line.nama || 'Barang'}
+                                                </p>
+                                                <ReceiptAttributes
+                                                    rowKey={
+                                                        line.id ??
+                                                        line.clientKey ??
+                                                        String(index)
+                                                    }
+                                                    typeId={line.jenis_aset_id}
+                                                    values={line.atribut ?? []}
+                                                    readOnly={readOnly}
+                                                    portalContainer={panelRef}
+                                                    onChange={(values) =>
+                                                        ubahBaris(index, {
+                                                            atribut: values,
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                        ),
+                                )}
                             </div>
                         </CollapsibleSection>
 

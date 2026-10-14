@@ -1,0 +1,77 @@
+/api/modules/management-aset/v1/permintaan-pembelian-aset:
+  get:
+    tags: [Lifecycle aset]
+    operationId: listAssetPurchaseRequests
+    summary: Daftar permintaan pada perusahaan aktif dan unit yang diizinkan
+    responses:
+      '200':
+        description: Daftar permintaan, termasuk status draf dan dibatalkan
+  post:
+    tags: [Lifecycle aset]
+    operationId: createAssetPurchaseRequest
+    summary: Membuat permintaan wajib dari baris perencanaan
+    description: Jenis aset dan satuan harus sama dengan rencana, pada perusahaan yang sama. Dokumen dapat dicetak; persetujuan di luar aplikasi tidak mengubah status dan tidak menjadi syarat penerimaan.
+    parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetPurchaseRequestInput'
+    responses:
+      '201': {description: Permintaan dibuat sebagai draf}
+      '200': {description: Replay permintaan dengan kunci yang sama}
+      '422': {description: Rencana tidak tersedia, berbeda perusahaan, atau jenis dan satuan tidak sesuai}
+/api/modules/management-aset/v1/permintaan-pembelian-aset/{id}:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema: {type: string, format: ulid}
+  get:
+    tags: [Lifecycle aset]
+    operationId: showAssetPurchaseRequest
+    summary: Rincian permintaan beserta perencanaan asal dan sisa penerimaan
+    responses:
+      '200':
+        description: details memuat planning_code, unit, received_quantity, dan remaining_quantity. Jumlah diterima dihitung dari penerimaan selesai; draf dan penerimaan dibatalkan tidak dihitung.
+      '404': {description: Permintaan tidak tersedia dalam konteks pengguna}
+  patch:
+    tags: [Lifecycle aset]
+    operationId: updateAssetPurchaseRequest
+    summary: Mengubah draf yang belum dipakai pada penerimaan
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AssetPurchaseRequestInput'
+              - $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200': {description: Permintaan diperbarui}
+      '409': {description: Versi sudah berubah}
+      '422': {description: Permintaan sudah dipakai pada penerimaan atau rencana tidak sesuai}
+      '428': {description: Versi tidak dikirim}
+/api/modules/management-aset/v1/permintaan-pembelian-aset/{id}/batal:
+  post:
+    tags: [Lifecycle aset]
+    operationId: cancelAssetPurchaseRequest
+    summary: Membatalkan permintaan yang belum dipakai pada penerimaan
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: ulid}
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200': {description: Permintaan dibatalkan}
+      '409': {description: Versi sudah berubah}
+      '422': {description: Sudah dipakai pada penerimaan atau tidak dapat dibatalkan}
+      '428': {description: Versi tidak dikirim}

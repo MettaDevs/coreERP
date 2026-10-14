@@ -173,7 +173,9 @@ export function setup() {
 
     // Kunci seed stabil per RUN_ID: menjalankan ulang pada database yang sama memakai kembali
     // record yang sama, bukan menumbuhkan data seed.
-    const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
+    const fiscalIds = tahap('kelompok aset', semua((tenant, index) => ['POST', ASET('kelompok-harta'), JSON.stringify({ kode: 'LT', label: `Kelompok seed ${index}`, useful_life_years: 5, straight_line_rate_percent: 20 }), params(tenant, `seed-${RUN_ID}-classification-${index}`)]));
+    const locationIds = tahap('lokasi-aset', semua((tenant, index) => ['POST', ASET('lokasi-aset'), JSON.stringify({ kode: `LOCA-${RUN_ID}-${index}`, nama: `Lokasi seed ${index}` }), params(tenant, `seed-${RUN_ID}-location-${index}`)]));
+    const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: `GRPA-${RUN_ID}-S${index}`, kelompok_harta_fiskal_id: fiscalIds[index], lokasi_aset_id: locationIds[index], nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
     const groupIds = groupResponses.map((response) => response.json('data.id'));
     const jenisResponses = tahapRespons('jenis-aset', semua((tenant, index) => ['POST', ASET('jenis-aset'), JSON.stringify({ nama: `Jenis seed ${index}` }), params(tenant, `seed-${RUN_ID}-jenis-${index}`)]));
     const jenisIds = jenisResponses.map((response) => response.json('data.id'));
@@ -295,6 +297,10 @@ function createMaster(tenant) {
     const kunci = `${RUN_ID}-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}-${resource}`;
     const body = { nama: `${resource} ${kunci}`, keterangan: 'load test' };
 
+    if (resource === 'group-aset') {
+        body.kode = `GRPA-${RUN_ID}-M${exec.vu.idInTest}-${exec.scenario.iterationInTest}`;
+    }
+
     if (chained) {
         body[chained.parentField] = tenant[chained.seed];
     }
@@ -362,7 +368,7 @@ function updateMaster(tenant) {
 /** Dua permintaan identik berbarengan harus menghasilkan tepat satu record. */
 function idempotencyRace(tenant) {
     const kunci = `race-${RUN_ID}-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`;
-    const body = JSON.stringify({ nama: `race ${kunci}` });
+    const body = JSON.stringify({ kode: `GRPA-${RUN_ID}-R${exec.vu.idInTest}-${exec.scenario.iterationInTest}`, nama: `race ${kunci}` });
     const params = paramsUntuk(tenant, { tags: { op: 'race', resource: 'group-aset' } }, { 'Idempotency-Key': kunci });
 
     const [first, second] = http.batch([

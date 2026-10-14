@@ -13,8 +13,8 @@ use Illuminate\Support\Carbon;
 /**
  * Baris permintaan pengadaan aset.
  *
- * `planning_detail_id` menunjuk baris rencana yang melahirkan permintaan ini dan boleh
- * kosong: permintaan di luar rencana tetap sah. `satuan_id` menunjuk satuan milik Core dan
+ * `planning_detail_id` wajib menunjuk baris rencana yang melahirkan permintaan baru.
+ * Baris lama mungkin belum punya rujukan. `satuan_id` menunjuk satuan milik Core dan
  * tidak berpasangan dengan kolom kode satuan di tabel ini.
  *
  * `quantity` di-cast `decimal:4`, jadi Eloquent memulangkannya sebagai string, bukan float.

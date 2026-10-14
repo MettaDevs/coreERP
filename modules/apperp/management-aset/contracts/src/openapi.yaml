@@ -91,6 +91,7 @@ x-bundle:
   - paths/asset-classifications.yaml
   - paths/maintenance.yaml
   - paths/aset.yaml
+  - paths/purchase-requests.yaml
   - paths/penerimaan-aset.yaml
   - paths/mutasi-aset.yaml
   - paths/monitoring-aset.yaml
