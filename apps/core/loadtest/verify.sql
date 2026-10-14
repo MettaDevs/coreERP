@@ -9,7 +9,7 @@
 -- runtime Core memang hanya ada satu database.
 --
 -- Lingkupnya seluruh pengguna fixture (`@example.test`). Beri `-v run_id=<RUN_ID>` untuk
--- mempersempit ke satu run yang emailnya berpola `core-load-<run_id>-%`.
+-- mempersempit ke RUN_ID skenario Core atau FIXTURE skenario module.
 
 \pset pager off
 \pset format aligned
@@ -17,15 +17,23 @@
 
 \if :{?run_id}
     \set pola 'core-load-' :'run_id' '-%@example.test'
+    \set pola_module 'load-' :'run_id' '%@example.test'
 \else
     \set pola '%@example.test'
+    \set pola_module '%@example.test'
 \endif
 
 create temporary view pengguna_run as
 select u.id as user_id, m.id as membership_id, m.tenant_id
 from users u
 join tenant_memberships m on m.user_id = u.id
-where u.email like :'pola';
+where u.email like :'pola' or u.email like :'pola_module';
+
+do $$ begin
+    if not exists (select 1 from pengguna_run) then
+        raise exception 'Fixture tidak ditemukan; oracle tidak dapat memeriksa run kosong.';
+    end if;
+end $$;
 
 create temporary table hasil_core (
     pemeriksaan text primary key,
@@ -91,33 +99,39 @@ where ref.app_id <> 'core'
     where e.tenant_id = s.tenant_id and e.app_id = ref.app_id and e.status = 'active'
 );
 
--- Bawaan sebuah sequence yang baru dimaterialisasi: aktif, rentang 0-19999, tidak kontinu,
--- tidak boleh diisi manual. Scope-nya TIDAK dipatok 'tenant': reference transaksi memang
--- ber-scope legal entity, dan yang benar adalah scope yang diizinkan reference itu sendiri.
+-- Bawaan materialisasi mengikuti profile dan pengaturan reference yang dinyatakan module.
+-- Scope tetap diperiksa terhadap pilihan yang diizinkan reference.
 insert into hasil_core
-select 'default sequence bukan aktif 0-19999', count(*)
+select 'default sequence tidak sesuai profile dan reference', count(*)
 from tenant_number_sequences s
 join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_id
 join app_number_sequence_references ref on ref.id = s.reference_id
+left join number_sequence_profiles p on p.code = s.profile_code
 where ref.app_id <> 'core' and (
       s.status <> 'active'
-   or s.minimum_number <> 0
+   or s.minimum_number <> 1
    or s.maximum_number <> 19999
    or not (ref.allowed_scopes::jsonb ? s.scope_type)
-   or s.is_continuous
-   or s.allow_manual);
+   or p.code is null
+   or s.is_continuous is distinct from coalesce((ref.default_settings->>'is_continuous')::boolean, p.is_continuous)
+   or s.allow_manual is distinct from coalesce((ref.default_settings->>'allow_manual')::boolean, p.allow_manual)
+   or s.allow_automatic is distinct from coalesce((ref.default_settings->>'allow_automatic')::boolean, true)
+   or s.preallocation_enabled is distinct from coalesce((ref.default_settings->>'preallocation_enabled')::boolean, p.preallocation_enabled)
+   or s.preallocation_quantity is distinct from coalesce((ref.default_settings->>'preallocation_quantity')::integer, p.preallocation_quantity));
 
 insert into hasil_core
-select 'prefix sequence tidak sesuai reference', count(*)
+select 'format sequence tidak sesuai reference', count(*)
 from tenant_number_sequences s
 join (select distinct tenant_id from pengguna_run) r on r.tenant_id = s.tenant_id
 join app_number_sequence_references ref on ref.id = s.reference_id
-where ref.app_id <> 'core' and (
-      (ref.default_prefix is not null and (
+where ref.app_id <> 'core' and case
+    when ref.default_settings->'segments' is not null
+        then s.segments::jsonb is distinct from ref.default_settings->'segments'
+    else (ref.default_prefix is not null and (
            s.segments->0->>'type' <> 'constant'
         or s.segments->0->>'value' <> ref.default_prefix
-      ))
-   or (ref.default_prefix is null and json_array_length(s.segments) <> 1));
+      )) or (ref.default_prefix is null and json_array_length(s.segments) <> 1)
+end;
 
 insert into hasil_core
 select 'tenant-reference ganda', count(*)
