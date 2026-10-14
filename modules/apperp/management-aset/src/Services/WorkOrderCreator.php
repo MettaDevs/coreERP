@@ -43,9 +43,14 @@ final class WorkOrderCreator
      * `withTrashed` karena replay idempoten harus tetap menemukan dokumen yang sudah diarsipkan;
      * tanpa itu permintaan ulang mencoba menyisipkan baris kembar.
      */
-    public function replay(string $key): ?stdClass
+    public function replay(Request $request, string $key): ?stdClass
     {
-        return PemeliharaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        $record = PemeliharaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     /**
@@ -72,7 +77,7 @@ final class WorkOrderCreator
                 $this->replaceJobLines($record['id'], $data['details'], $locations);
             });
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -81,7 +86,7 @@ final class WorkOrderCreator
         }
 
         // Dibaca ulang supaya `version` yang dipulangkan adalah nilai di database.
-        return ['record' => $this->replay($key) ?? throw new \LogicException('Work order yang baru dibuat tidak ditemukan.'), 'replayed' => false];
+        return ['record' => $this->replay($request, $key) ?? throw new \LogicException('Work order yang baru dibuat tidak ditemukan.'), 'replayed' => false];
     }
 
     /**

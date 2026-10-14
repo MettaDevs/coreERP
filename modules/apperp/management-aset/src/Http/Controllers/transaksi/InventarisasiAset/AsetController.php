@@ -80,7 +80,7 @@ class AsetController extends Controller
             'Aset yang sudah dilepas tidak dapat diubah.'
         );
 
-        $rules = $this->rules($tenantId);
+        $rules = $this->rules($tenantId, $aset->legal_entity_id);
         $editable = [
             'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id',
             'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value',
@@ -217,7 +217,7 @@ class AsetController extends Controller
     {
         $this->requirePermission($request, 'update');
         $aset = app(OrganizationScope::class)->asetQuery(Aset::query(), $request)->findOrFail($id);
-        $rules = $this->rules($this->tenantId($request));
+        $rules = $this->rules($this->tenantId($request), $aset->legal_entity_id);
         $data = $request->validate([
             'acquisition_value' => $rules['acquisition_value'],
             'adjustment_date' => ['nullable', 'date_format:Y-m-d'],
@@ -300,7 +300,7 @@ class AsetController extends Controller
      *
      * @return array<string, array<int, mixed>>
      */
-    private function rules(string $tenantId): array
+    private function rules(string $tenantId, string $legalEntityId): array
     {
         $sameTenant = fn (string $table) => Rule::exists($table, 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at');
 
@@ -310,7 +310,7 @@ class AsetController extends Controller
             'kondisi_aset_id' => ['nullable', 'ulid', $sameTenant('aset_m_kondisi_aset')],
             'pabrikan_aset_id' => ['nullable', 'ulid', $sameTenant('aset_m_pabrikan_aset')],
             'model_aset_id' => ['nullable', 'ulid', $sameTenant('aset_m_model_aset')],
-            'induk_aset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'induk_aset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenantId)->where('legal_entity_id', $legalEntityId)->whereNull('deleted_at')],
             'serial_number' => ['nullable', 'string', 'max:150'], 'model_number' => ['nullable', 'string', 'max:150'],
             'placed_in_service_on' => ['nullable', 'date'],
             // Kolomnya berpresisi dua desimal: nilai yang lebih halus akan dibulatkan database tanpa kabar,

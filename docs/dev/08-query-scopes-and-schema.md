@@ -254,8 +254,8 @@ Ini adalah query reporting eventually consistent, bukan query operasional lintas
 2. Validasi entitlement dan installation readiness secara terpisah.
 3. Resolve permission melalui role → duty → privilege → permission.
 4. Resolve claim data policy yang relevan dengan resource/proses, termasuk hierarchy version yang sudah efektif.
-5. Terapkan `tenant_id` lalu predicate `legal_entity_id`/`org_unit_id` milik policy itu pada setiap query dan command module.
-6. Gunakan local hierarchy projection atau daftar unit hasil claim bila descendants diperlukan. Workspace hanya boleh memberi filter awal; ia bukan claim otorisasi.
+5. Terapkan `tenant_id`, konteks perusahaan aktif untuk resource milik perusahaan pada jalur biasa, lalu predicate `legal_entity_id`/`org_unit_id` milik policy itu pada setiap query dan command module. Ketiganya digabung dengan AND; grant perusahaan lain tidak melepas konteks perusahaan aktif.
+6. Gunakan local hierarchy projection atau daftar unit hasil claim bila descendants diperlukan. Perusahaan aktif adalah konteks kerja, bukan claim otorisasi. Unit aktif tetap nilai awal/filter opsional. Resource bersama dan jalur lintas perusahaan eksplisit mengikuti keputusan per resource; detail mewarisi batas induknya.
 
 ## Konteks permintaan dihitung sekali, dan dibuang di batas permintaan
 

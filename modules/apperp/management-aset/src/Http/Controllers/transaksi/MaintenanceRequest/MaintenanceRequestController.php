@@ -80,7 +80,7 @@ final class MaintenanceRequestController extends Controller
             ['key' => $request->header('Idempotency-Key')],
             ['key' => ['required', 'string', 'max:'.self::MAX_CREATION_KEY, 'regex:/^[A-Za-z0-9._:-]+$/']],
         )->validate()['key'];
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -102,7 +102,7 @@ final class MaintenanceRequestController extends Controller
         } catch (NumberSequenceException $exception) {
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -110,7 +110,7 @@ final class MaintenanceRequestController extends Controller
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
-        $created = $this->replay($key);
+        $created = $this->replay($request, $key);
 
         return response()->json(['data' => $created], 201, ['Location' => $request->url().'/'.$created?->id]);
     }
@@ -347,9 +347,14 @@ final class MaintenanceRequestController extends Controller
         return $query->toBase()->first() ?? abort(404);
     }
 
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return $this->withLookups(MaintenanceRequest::withTrashed())->where(self::TABLE.'.creation_key', $key)->toBase()->first();
+        $record = $this->withLookups(MaintenanceRequest::withTrashed())->where(self::TABLE.'.creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     /** @param  Builder<MaintenanceRequest>  $query */

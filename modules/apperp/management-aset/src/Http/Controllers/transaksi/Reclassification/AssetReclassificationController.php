@@ -95,7 +95,7 @@ class AssetReclassificationController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -128,7 +128,7 @@ class AssetReclassificationController extends Controller
                 return $id;
             });
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -538,9 +538,14 @@ class AssetReclassificationController extends Controller
         return $query->firstOrFail();
     }
 
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return AssetReclassification::withTrashed()->where('creation_key', $key)->toBase()->first();
+        $record = AssetReclassification::withTrashed()->where('creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     private function withNames(string $tenantId, stdClass $row): stdClass

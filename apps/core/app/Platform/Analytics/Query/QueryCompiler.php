@@ -321,10 +321,15 @@ final class QueryCompiler
     private function filterColumns(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): array
     {
         $columns = [];
+        if ($dataset->companyColumn !== null) {
+            $columns[] = $dataset->qualifiedColumn($dataset->companyColumn);
+        }
         if ($dataset->policy !== null) {
-            $columns[] = $dataset->qualified($dataset->policy['legal_entity']);
+            if ($dataset->policy['legal_entity'] !== null) {
+                $columns[] = $dataset->qualifiedColumn($dataset->policy['legal_entity']);
+            }
             if ($dataset->policy['operating_unit'] !== null) {
-                $columns[] = $dataset->qualified($dataset->policy['operating_unit']);
+                $columns[] = $dataset->qualifiedColumn($dataset->policy['operating_unit']);
             }
         }
         foreach (array_keys($principal->lockedFilters($dataset->code)) as $key) {

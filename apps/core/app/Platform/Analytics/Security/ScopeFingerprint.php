@@ -20,17 +20,22 @@ namespace App\Platform\Analytics\Security;
 final class ScopeFingerprint
 {
     /** Versi bentuk masukan hash; naikkan bila isinya berubah, supaya sidik jari lama tidak pernah cocok. */
-    private const VERSION = 1;
+    private const VERSION = 4;
 
     /**
      * `$policyCode` adalah kebijakan data yang dinyatakan dataset, atau null bila dataset tidak dibatasi
      * kebijakan — hibah principal lalu tidak memengaruhi baris, jadi tidak ikut dihitung.
      */
-    public static function of(AnalyticsPrincipal $principal, string $dataset, ?string $policyCode): string
+    public static function of(AnalyticsPrincipal $principal, string $dataset, ?string $policyCode, ?string $companyColumn = null): string
     {
         return 'sha256:'.hash('sha256', json_encode([
             'v' => self::VERSION,
             'tenant' => $principal->tenantId(),
+            'company' => $companyColumn === null ? null : [$companyColumn, match (true) {
+                $principal instanceof CompanyContextPrincipal => ['active', $principal->activeLegalEntityId()],
+                $principal instanceof CrossCompanyPrincipal => ['cross-company'],
+                default => ['unspecified'],
+            }],
             'policy' => $policyCode === null ? null : [$policyCode, self::grants($principal->policyScope($policyCode))],
             'personal_data' => $principal->mayUsePersonalData(),
             'locked' => self::lockedFilters($principal->lockedFilters($dataset)),

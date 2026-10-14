@@ -12,6 +12,7 @@ dijelaskan di sini hanya yang khas modul ini.
 | Berkas | Apa | Status |
 | --- | --- | --- |
 | `k6/master-data.js` | Penjenuhan master + transaksi: CRUD, idempotency, batas tenant, eskalasi hak | dijalankan pada runtime baru |
+| `k6/company-context.js` | Dua sesi tetap A/B per tenant: list/detail milik sendiri, penolakan baca/ubah/buat perusahaan lain, master bersama | gate konteks perusahaan; hasil disimpan di `apps/core/loadtest/results/` |
 | `k6/maintenance.js` | Setup maintenance, dan perlombaan penggantian kaitan | dijalankan pada runtime baru |
 | `k6/depreciation.js` | Proposal, finalisasi, "Post penyusutan", dan saldo penyusutan; perlombaan finalisasi dan perlombaan post | dijalankan pada runtime baru |
 | `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
@@ -60,6 +61,28 @@ menemukan tabel, dan gate-nya lolos secara palsu. Itu sebabnya seluruh `verify.s
 **Versi baris dibaca dan dikirim.** Setiap penyimpanan atas record yang sudah ada membawa versi yang terakhir dibaca skenario (field `version` atau header `If-Match`), diambil dari jawaban pembuatan atau dari pembacaan ulang, tidak pernah ditebak atau ditambah satu. Pada profil balapan beberapa VU menyimpan record yang sama, jadi 409 `stale_version` adalah hasil yang sah: ia masuk `http.expectedStatuses` dan tidak dihitung sebagai pelanggaran. Yang tetap dihitung pelanggaran adalah 5xx, himpunan campuran, dan tulis lintas tenant.
 
 ## Menjalankan skenario modul
+
+### Konteks perusahaan A/B
+
+`company-context.js` menyiapkan dua sesi login per tenant, masing-masing menetap pada satu
+perusahaan. Jangan mengganti perusahaan pada sesi yang dibagi beberapa VU: perpindahan
+oleh satu VU memang mengubah konteks VU lain yang memakai sesi tersebut.
+
+Jalankan smoke dengan fixture terpisah, lalu gate `TENANTS=128`, `VUS=1000`, `DURATION=90s`.
+Gunakan mount dan jaringan contoh di bawah dengan path `/scripts/aset/company-context.js`.
+Satu iterasi dihitung selesai setelah semua enam probe berhasil. Threshold mewajibkan hasil
+berhasil pada setiap pasangan tenant dan perusahaan A/B; timeout tidak dapat membuat run
+yang kosong terlihat hijau. Pembagian VU sudah mencakup A dan B sejak gelombang pertama.
+
+Sesudah gate, jalankan `company-context-verify.sql` langsung pada database loadtest dengan
+`-v fixture=<FIXTURE> -v tenants=<TENANTS>`. Oracle ini memeriksa perusahaan pemilik dokumen
+serta memastikan penolakan buat lintas perusahaan tidak meninggalkan record. Tambahkan
+`-v selftest=1` untuk sengaja merusak ekspektasi sementara dan membuktikan oracle gagal,
+tanpa mengubah record bisnis. Oracle tenant, nomor, dan akuntansi yang lama tetap dijalankan.
+Gate A/B ini menguji perencanaan aset; regresi lifecycle dan posting tetap memakai skenario
+masing-masing. Hasil dari branch lama harus diulang setelah integrasi dengan runtime terbaru.
+
+### Skenario lainnya
 
 Dari `apps/core/loadtest/`, dengan stack sudah menyala:
 

@@ -43,7 +43,7 @@ class InsurancePoliciesDatasetTest extends TestCase
     /** Hibah unit A dan unit B sama-sama menjangkau dua polis entitas legal itu; yang ketiga milik entitas lain. */
     protected function expectedRows(): array
     {
-        return ['all' => 3, 'unitA' => 2, 'unitB' => 2];
+        return ['all' => 2, 'unitA' => 2, 'unitB' => 2];
     }
 
     protected function seedRows(string $tenant, string $legalEntity, string $unitA, string $unitB, string $tag): void
@@ -76,7 +76,7 @@ class InsurancePoliciesDatasetTest extends TestCase
     public function test_blocked_policies_are_counted_apart_and_only_where_the_user_may_see_them(): void
     {
         $this->analyze($this->owner, ['dataset' => $this->datasetCode(), 'measures' => ['count', 'blocked']])
-            ->assertOk()->assertJsonPath('rows.0.count', 3)->assertJsonPath('rows.0.blocked', 1);
+            ->assertOk()->assertJsonPath('rows.0.count', 2)->assertJsonPath('rows.0.blocked', 1);
 
         // Polis yang diblokir ada di entitas legal pengguna ini, jadi terlihat; tanpa hibah tidak terlihat.
         $grantee = $this->member($this->readPermission(), [[$this->legalEntity, $this->unitA]]);
@@ -89,7 +89,25 @@ class InsurancePoliciesDatasetTest extends TestCase
     {
         $this->analyze($this->owner, [
             'dataset' => $this->datasetCode(), 'measures' => ['count'], 'time_range' => ['field' => 'berlaku_sampai', 'range' => '31/12/2026'],
-        ])->assertOk()->assertJsonPath('rows.0.count', 2);
+        ])->assertOk()->assertJsonPath('rows.0.count', 1);
+    }
+
+    public function test_switching_company_changes_both_the_policy_list_and_analytics_without_widening_filters(): void
+    {
+        $otherLegalEntity = (string) DB::table('aset_m_polis_asuransi')
+            ->where('tenant_id', $this->tenantId)->where('kode', 'A-POL3')->value('legal_entity_id');
+        $query = ['dataset' => $this->datasetCode(), 'measures' => ['count', 'blocked']];
+
+        $this->actingAs($this->owner)->withSession(['workspace.legal_entity_id' => $this->legalEntity])
+            ->postJson('/api/v1/analytics/query', $query)->assertOk()->assertJsonPath('rows.0.count', 2);
+        $this->postJson('/api/v1/analytics/query', $query + ['filters' => ['kode' => 'A-POL3']])
+            ->assertOk()->assertJsonPath('rows.0.count', 0);
+
+        $this->withSession(['workspace.legal_entity_id' => $otherLegalEntity])
+            ->postJson('/api/v1/analytics/query', $query)->assertOk()
+            ->assertJsonPath('rows.0.count', 1)->assertJsonPath('rows.0.blocked', 0);
+        $this->getJson('/api/modules/management-aset/v1/'.$this->listResource())
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.kode', 'A-POL3');
     }
 
     private function policy(string $tenant, string $legalEntity, string $code, string $from, string $until, bool $blocked = false): void

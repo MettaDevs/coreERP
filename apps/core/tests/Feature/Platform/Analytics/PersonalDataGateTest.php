@@ -14,6 +14,7 @@ use App\Platform\Analytics\Query\QueryNormalizer;
 use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\CrossCompanyPrincipal;
 use App\Platform\Analytics\Security\PersonalDataGate;
 use App\Platform\Analytics\Security\ScopeFingerprint;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
@@ -169,7 +170,7 @@ class PersonalDataGateTest extends TestCase
     /** Dataset penjualan yang sama dengan satu measure tambahan yang memulangkan nama pembeli. */
     private function datasetWithMeasureOverName(): CompiledDataset
     {
-        $definition = DatasetDefinition::make('contoh-a.pembeli', 'Pembeli')
+        $definition = DatasetDefinition::make('contoh-a.pembeli', 'Pembeli')->tenantWide()
             ->model(Penjualan::class)
             ->permission('contoh-a.penjualan.read')
             ->dataPolicy('contoh-a.penjualan-unit', legalEntity: 'legal_entity_id', operatingUnit: 'org_unit_id')
@@ -208,7 +209,7 @@ class PersonalDataGateTest extends TestCase
 
     private function principal(bool $mayUsePersonalData, string $tenantId = 'tenant-gerbang'): AnalyticsPrincipal
     {
-        return new readonly class($mayUsePersonalData, $tenantId) implements AnalyticsPrincipal
+        return new readonly class($mayUsePersonalData, $tenantId) implements CrossCompanyPrincipal
         {
             public function __construct(private bool $personalData, private string $tenant) {}
 
@@ -259,7 +260,7 @@ class PersonalDataGateTest extends TestCase
 
             public function fingerprint(CompiledDataset $dataset): string
             {
-                return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
+                return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null, $dataset->companyColumn);
             }
 
             public function describe(): string

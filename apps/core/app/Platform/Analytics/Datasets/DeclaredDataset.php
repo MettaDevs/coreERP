@@ -24,7 +24,7 @@ final readonly class DeclaredDataset
     /**
      * @param  class-string<Model>  $model  model dasar; untuk dataset bersumber query, model query sumbernya
      * @param  (Closure(): Builder<Model>)|null  $source
-     * @param  array{code: string, legal_entity: string, operating_unit: ?string}|null  $policy
+     * @param  array{code: string, legal_entity: ?string, operating_unit: ?string}|null  $policy
      * @param  array{only: list<string>, except: list<string>}|null  $fromModel
      * @param  array<string, array{caption: string, type: FieldType, column: ?string, options: array<string, string>, classification: ?DataClass}>  $fields
      * @param  array<string, array{model: class-string<Model>, local: string, foreign: string, include_archived: bool}>  $joins
@@ -56,5 +56,6 @@ final readonly class DeclaredDataset
         public int $version,
         public array $renamed,
         public array $partitions = [],
+        public ?string $companyColumn = null,
     ) {}
 }

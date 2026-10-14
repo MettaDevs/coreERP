@@ -71,6 +71,7 @@ final class PhysicalChecksDataset implements Dataset
                     $lines.'.nilai_buku as book_value',
                 ]))
             ->permission('management-aset.monitoring-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('document_number', 'Nomor pemeriksaan', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)

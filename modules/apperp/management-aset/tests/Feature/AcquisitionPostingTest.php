@@ -255,6 +255,8 @@ class AcquisitionPostingTest extends TestCase
         $lain = $this->organisasi(['classification' => 'legal_entity', 'name' => 'PT Metta Lain', 'company_code' => 'LAIN', 'country_code' => 'ID']);
         $vendorLain = (string) $this->actingAs($this->owner)->postJson('/api/v1/vendors', ['legal_entity_id' => $lain, 'party_name' => 'CV Lain'])
             ->assertCreated()->json('data.id');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create']);
+        $this->selectCompany($this->tenantId, $this->le);
         $this->kirimDraf(['vendor_id' => $vendorLain], [$this->baris($group, 1, 1_000_000)])
             ->assertStatus(422)->assertJsonValidationErrors(['vendor_id' => 'Pilih vendor milik entitas legal penerimaan ini.']);
 

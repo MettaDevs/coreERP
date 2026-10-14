@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Support;
 
+use App\Platform\Modules\Contracts\CompanyContextFilter;
+use App\Platform\Modules\Contracts\DataPolicyFilter;
 use Illuminate\Http\Request;
 
 final class OrganizationScope
@@ -19,6 +21,10 @@ final class OrganizationScope
 
     public function allows(Request $request, ?string $legalEntityId, ?string $operatingUnitId): bool
     {
+        if ($legalEntityId !== null && $legalEntityId !== $request->attributes->get('coreerp.legal_entity_id')) {
+            return false;
+        }
+
         $scope = $this->scope($request);
 
         return $scope['all'] || collect($scope['scope_grants'])->contains(
@@ -40,6 +46,7 @@ final class OrganizationScope
 
     public function require(Request $request, ?string $legalEntityId, ?string $operatingUnitId): void
     {
+        CompanyContextFilter::require($request->attributes->get('coreerp.legal_entity_id'), $legalEntityId);
         abort_unless($this->allows($request, $legalEntityId, $operatingUnitId), 403, 'Data ini berada di luar unit kerja yang dapat Anda akses.');
     }
 
@@ -50,26 +57,9 @@ final class OrganizationScope
 
     public function query(mixed $query, Request $request, string $legalEntityColumn, string $operatingUnitColumn): mixed
     {
-        $scope = $this->scope($request);
-        if ($scope['all']) {
-            return $query;
-        }
-        if ($scope['scope_grants'] === []) {
-            return $query->whereRaw('1 = 0');
-        }
+        CompanyContextFilter::apply($query, $legalEntityColumn, $request->attributes->get('coreerp.legal_entity_id'));
 
-        return $query->where(function ($query) use ($scope, $legalEntityColumn, $operatingUnitColumn): void {
-            foreach ($scope['scope_grants'] as $grant) {
-                $query->orWhere(function ($query) use ($grant, $legalEntityColumn, $operatingUnitColumn): void {
-                    if ($grant['legal_entity_id'] === null || $grant['operating_unit_ids'] === []) {
-                        $query->whereRaw('1 = 0');
-
-                        return;
-                    }
-                    $query->where($legalEntityColumn, $grant['legal_entity_id'])->whereIn($operatingUnitColumn, $grant['operating_unit_ids']);
-                });
-            }
-        });
+        return DataPolicyFilter::apply($query, $this->scope($request), $legalEntityColumn, $operatingUnitColumn);
     }
 
     /**
@@ -79,14 +69,9 @@ final class OrganizationScope
      */
     public function legalEntityQuery(mixed $query, Request $request, string $legalEntityColumn): mixed
     {
-        $scope = $this->scope($request);
-        if ($scope['all']) {
-            return $query;
-        }
+        CompanyContextFilter::apply($query, $legalEntityColumn, $request->attributes->get('coreerp.legal_entity_id'));
 
-        $legalEntities = array_values(array_unique(array_filter(array_column($scope['scope_grants'], 'legal_entity_id'))));
-
-        return $legalEntities === [] ? $query->whereRaw('1 = 0') : $query->whereIn($legalEntityColumn, $legalEntities);
+        return DataPolicyFilter::apply($query, $this->scope($request), $legalEntityColumn, null);
     }
 
     /** @return array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>} */

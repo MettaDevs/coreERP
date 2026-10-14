@@ -520,6 +520,16 @@ trait BerinteraksiDenganKonteksCore
         return $this->sebagaiPengguna($tenantId, $izin, $kebijakanData, $nama);
     }
 
+    /** Memilih perusahaan lewat jalur session yang sama dengan pengguna, bukan dari body transaksi. */
+    protected function selectCompany(string $tenantId, string $legalEntityId, ?string $unitId = null): void
+    {
+        $membership = TenantMembership::query()->where('tenant_id', $tenantId)
+            ->where('user_id', auth()->id())->firstOrFail();
+        $this->putJson('/api/v1/workspace-context', [
+            'membership_id' => $membership->id, 'legal_entity_id' => $legalEntityId, 'org_unit_id' => $unitId,
+        ])->assertOk()->assertJsonPath('data.legal_entity_id', $legalEntityId);
+    }
+
     /**
      * Id pengguna yang dibuat untuk sebuah nama panggilan.
      *

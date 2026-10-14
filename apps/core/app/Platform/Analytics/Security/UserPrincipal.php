@@ -8,6 +8,7 @@ use App\Platform\Access\Support\CorePermissions;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
@@ -24,7 +25,7 @@ use Carbon\CarbonImmutable;
  * analitik*), dibaca lewat `CorePermissions` yang sama dengan gate rute, sehingga tidak menambah query.
  * Pengguna tidak pernah punya saringan terkunci; batas baris dan waktu dari `config/analytics.php`.
  */
-final class UserPrincipal implements AnalyticsPrincipal
+final class UserPrincipal implements CompanyContextPrincipal
 {
     /** @var array<string, list<string>> permission per module, dibaca sekali per principal */
     private array $permissions = [];
@@ -35,15 +36,23 @@ final class UserPrincipal implements AnalyticsPrincipal
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $policies,
         private readonly CorePermissions $corePermissions,
+        private readonly ?string $legalEntityId = null,
     ) {}
 
     /**
      * Principal dari keanggotaan sesi. Zonanya dari `UserClock`, layanan yang sama dengan yang dipakai
      * laporan (`ReportSource::forModule()`): zona My Profile, lalu zona entitas legal aktif.
      */
-    public static function fromMembership(TenantMembership $membership, string $timezone): self
+    public static function fromMembership(TenantMembership $membership, string $timezone, ?string $trustedLegalEntityId = null): self
     {
-        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class), app(CorePermissions::class));
+        $legalEntity = request()->hasSession() ? app(CurrentWorkspace::class)->legalEntity(request(), $membership) : null;
+
+        return new self($membership, $timezone, app(LaunchableAppCatalog::class), app(DataPolicyAccessResolver::class), app(CorePermissions::class), $trustedLegalEntityId ?? $legalEntity?->id);
+    }
+
+    public function activeLegalEntityId(): ?string
+    {
+        return $this->legalEntityId;
     }
 
     public function tenantId(): string
@@ -95,7 +104,7 @@ final class UserPrincipal implements AnalyticsPrincipal
 
     public function fingerprint(CompiledDataset $dataset): string
     {
-        return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
+        return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null, $dataset->companyColumn);
     }
 
     public function describe(): string

@@ -15,10 +15,14 @@ class ModelAsetTest extends TestCase
 
     private string $tenantId;
 
+    private string $legalEntityId;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
     }
 
     public function test_crud_uses_core_number_sequence_and_archives_instead_of_deleting(): void
@@ -86,7 +90,7 @@ class ModelAsetTest extends TestCase
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $this->aset($pabrikan, $model, $this->legalEntityId, (string) Str::ulid());
 
         $permissions = [
             'management-aset.pabrikan-aset.read',
@@ -159,9 +163,9 @@ class ModelAsetTest extends TestCase
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $active = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        $decommissioned = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        $disposed = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $active = $this->aset($pabrikan, $model, $this->legalEntityId, (string) Str::ulid());
+        $decommissioned = $this->aset($pabrikan, $model, $this->legalEntityId, (string) Str::ulid());
+        $disposed = $this->aset($pabrikan, $model, $this->legalEntityId, (string) Str::ulid());
         DB::table('aset_tr_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
         DB::table('aset_tr_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
 

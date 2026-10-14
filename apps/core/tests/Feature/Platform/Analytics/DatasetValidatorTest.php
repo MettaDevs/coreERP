@@ -123,7 +123,7 @@ class DatasetValidatorTest extends TestCase
 
     public function test_a_query_source_dataset_reads_its_columns_and_types_from_the_source(): void
     {
-        $dataset = $this->compile('contoh-a', DatasetDefinition::make('contoh-a.barang-per-status', 'Barang per status')
+        $dataset = $this->compile('contoh-a', DatasetDefinition::make('contoh-a.barang-per-status', 'Barang per status')->tenantWide()
             ->fromQuery(static fn () => Barang::query()->select(['tenant_id', 'bawaan'])->selectRaw('count(*) as jumlah')->groupBy('tenant_id', 'bawaan'))
             ->permission('contoh-a.barang.read')
             ->field('bawaan', 'Barang bawaan', FieldType::Boolean, classification: DataClass::CustomerContent)
@@ -157,17 +157,17 @@ class DatasetValidatorTest extends TestCase
     /** @return array<string, array{0: Closure(): DatasetDefinition, 1: string, 2?: string}> */
     public static function brokenDefinitions(): array
     {
-        $sale = static fn (string $code = 'contoh-a.penjualan'): DatasetDefinition => DatasetDefinition::make($code, 'Penjualan')
+        $sale = static fn (string $code = 'contoh-a.penjualan'): DatasetDefinition => DatasetDefinition::make($code, 'Penjualan')->tenantWide()
             ->model(Penjualan::class)
             ->permission('contoh-a.penjualan.read')
             ->dataPolicy('contoh-a.penjualan-unit', legalEntity: 'legal_entity_id', operatingUnit: 'org_unit_id')
             ->fieldsFromModel()
             ->measure('count', 'Jumlah', Aggregate::Count);
-        $item = static fn (): DatasetDefinition => DatasetDefinition::make('contoh-a.barang', 'Barang')
+        $item = static fn (): DatasetDefinition => DatasetDefinition::make('contoh-a.barang', 'Barang')->tenantWide()
             ->model(Barang::class)
             ->permission('contoh-a.barang.read')
             ->measure('count', 'Jumlah', Aggregate::Count);
-        $source = static fn (Closure $query): DatasetDefinition => DatasetDefinition::make('contoh-a.sumber', 'Sumber')
+        $source = static fn (Closure $query): DatasetDefinition => DatasetDefinition::make('contoh-a.sumber', 'Sumber')->tenantWide()
             ->fromQuery($query)
             ->permission('contoh-a.barang.read')
             ->measure('count', 'Jumlah', Aggregate::Count);
@@ -176,10 +176,10 @@ class DatasetValidatorTest extends TestCase
             // Kode dan sumber
             'kode tanpa awalan module' => [static fn () => $sale('contoh-b.penjualan'), 'berawalan id module'],
             'kode berhuruf besar' => [static fn () => $sale('contoh-a.Penjualan'), 'berawalan id module'],
-            'tanpa sumber' => [static fn () => DatasetDefinition::make('contoh-a.kosong', 'Kosong')->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tepat satu sumber'],
+            'tanpa sumber' => [static fn () => DatasetDefinition::make('contoh-a.kosong', 'Kosong')->tenantWide()->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tepat satu sumber'],
             'dua sumber' => [static fn () => $item()->fromQuery(static fn () => Barang::query()), 'tepat satu sumber'],
             'model tanpa BelongsToTenant' => [static fn () => $item()->model(ModuleInstallation::class), 'BelongsToTenant'],
-            'module tidak dikenal' => [static fn () => DatasetDefinition::make('tidak-ada.barang', 'Barang')->model(Barang::class)->permission('tidak-ada.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tidak dikenal', 'tidak-ada'],
+            'module tidak dikenal' => [static fn () => DatasetDefinition::make('tidak-ada.barang', 'Barang')->tenantWide()->model(Barang::class)->permission('tidak-ada.barang.read')->measure('count', 'Jumlah', Aggregate::Count), 'tidak dikenal', 'tidak-ada'],
 
             // Namespace module sendiri
             'model module lain' => [static fn () => $item()->model(Rak::class), 'bukan milik module contoh-a'],
@@ -189,7 +189,7 @@ class DatasetValidatorTest extends TestCase
             // Permission dan kebijakan dari manifest module
             'permission tidak ada' => [static fn () => $item()->permission('contoh-a.barang.export'), 'tidak ada di manifest'],
             'permission bukan baca' => [static fn () => $sale()->permission('contoh-a.penjualan.create'), 'access read'],
-            'resource berkebijakan tanpa dataPolicy' => [static fn () => DatasetDefinition::make('contoh-a.penjualan', 'Penjualan')->model(Penjualan::class)->permission('contoh-a.penjualan.read')->measure('count', 'Jumlah', Aggregate::Count), 'dibatasi kebijakan contoh-a.penjualan-unit'],
+            'resource berkebijakan tanpa dataPolicy' => [static fn () => DatasetDefinition::make('contoh-a.penjualan', 'Penjualan')->tenantWide()->model(Penjualan::class)->permission('contoh-a.penjualan.read')->measure('count', 'Jumlah', Aggregate::Count), 'dibatasi kebijakan contoh-a.penjualan-unit'],
             'kebijakan tidak ada' => [static fn () => $sale()->dataPolicy('contoh-a.tidak-ada', 'legal_entity_id', 'org_unit_id'), 'kebijakan data contoh-a.tidak-ada tidak ada'],
             'kolom kebijakan tidak ada' => [static fn () => $sale()->dataPolicy('contoh-a.penjualan-unit', 'legal_entity_id', 'unit_kerja_id'), 'kolom unit_kerja_id tidak ada di tabel contoh_a_tr_penjualan'],
             'kolom kebijakan lewat alias tak dikenal' => [static fn () => $sale()->dataPolicy('contoh-a.penjualan-unit', 'aset.legal_entity_id'), 'aset bukan alias join'],
@@ -210,7 +210,7 @@ class DatasetValidatorTest extends TestCase
             'field sumber query tanpa klasifikasi' => [static fn () => $source(static fn () => Barang::query()->select(['tenant_id', 'bawaan']))->field('bawaan', 'Bawaan', FieldType::Boolean), 'belum diklasifikasi'],
 
             // Measure
-            'tanpa measure' => [static fn () => DatasetDefinition::make('contoh-a.barang', 'Barang')->model(Barang::class)->permission('contoh-a.barang.read'), 'sedikitnya satu measure'],
+            'tanpa measure' => [static fn () => DatasetDefinition::make('contoh-a.barang', 'Barang')->tenantWide()->model(Barang::class)->permission('contoh-a.barang.read'), 'sedikitnya satu measure'],
             'uang tanpa mata uang' => [static fn () => $sale()->measure('nilai', 'Nilai', Aggregate::Sum, field: 'nilai', format: MeasureFormat::Money), 'kolom mata uang'],
             'kuantitas tanpa satuan' => [static fn () => $sale()->measure('banyak', 'Banyak', Aggregate::Sum, field: 'nilai', format: MeasureFormat::Quantity), 'kolom satuan'],
             'agregat tanpa kolom' => [static fn () => $sale()->measure('total', 'Total', Aggregate::Sum), 'butuh kolom yang dihitung'],

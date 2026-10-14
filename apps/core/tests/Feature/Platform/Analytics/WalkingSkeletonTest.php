@@ -12,6 +12,7 @@ use App\Platform\Analytics\Query\AnalyticsQuery;
 use App\Platform\Analytics\Query\QueryCompiler;
 use App\Platform\Analytics\Query\QueryExecutor;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\CrossCompanyPrincipal;
 use App\Platform\Analytics\Security\DataPolicyScope;
 use App\Platform\Analytics\Security\ScopeFingerprint;
 use App\Platform\Analytics\Security\UserPrincipal;
@@ -23,6 +24,7 @@ use App\Platform\Tenant\Models\TenantMembership;
 use Carbon\CarbonImmutable;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
@@ -214,7 +216,7 @@ class WalkingSkeletonTest extends TestCase
     {
         $dataset = app(DatasetRegistry::class)->find(self::DATASET);
         $this->assertNotNull($dataset);
-        $principal = UserPrincipal::fromMembership($this->membership, 'UTC');
+        $principal = UserPrincipal::fromMembership($this->membership, 'UTC', $this->legalEntity);
         $query = new AnalyticsQuery(self::DATASET, [], ['count'], [], null, [], null, false, false);
         $level = DB::transactionLevel();
 
@@ -382,6 +384,22 @@ class WalkingSkeletonTest extends TestCase
         $this->assertNotSame($fingerprint($everything), $fingerprint($this->member(['management-aset.aset.manage', 'core.analytics.personal-data'], [[null, null]])));
     }
 
+    public function test_active_company_narrows_a_multi_company_grant_and_separates_cached_results(): void
+    {
+        $otherCompany = $this->organization((string) $this->membership->tenant_id, 'legal_entity', 'CV Company B');
+        DB::table('aset_tr_aset')->where('kode', 'AST-B2')->update(['legal_entity_id' => $otherCompany]);
+        $user = $this->member(['management-aset.aset.manage'], [[$this->legalEntity, $this->unitA], [$this->legalEntity, $this->unitB], [$otherCompany, $this->unitB]]);
+        $query = ['dataset' => self::DATASET, 'measures' => ['count']];
+
+        $this->actingAs($user)->withSession(['workspace.legal_entity_id' => $this->legalEntity])
+            ->postJson('/api/v1/analytics/query', $query)->assertOk()->assertJsonPath('rows', [['count' => 4]]);
+        $this->withSession(['workspace.legal_entity_id' => $otherCompany])
+            ->postJson('/api/v1/analytics/query', $query)->assertOk()->assertJsonPath('rows', [['count' => 1]])->assertJsonPath('meta.cached', false);
+        $this->postJson('/api/v1/analytics/query', $query)->assertOk()->assertJsonPath('rows', [['count' => 1]])->assertJsonPath('meta.cached', true);
+        $this->postJson('/api/v1/analytics/query', $query + ['filters' => ['legal_entity_id' => [$this->legalEntity]]])
+            ->assertOk()->assertJsonPath('rows', [['count' => 0]]);
+    }
+
     public function test_locked_filters_only_narrow_and_an_empty_or_unknown_one_reads_nothing(): void
     {
         /**
@@ -440,15 +458,17 @@ class WalkingSkeletonTest extends TestCase
         $options = [
             '--query' => (string) json_encode(['dataset' => self::DATASET, 'dimensions' => ['group_aset_id'], 'measures' => ['acquisition_value'], 'totals' => true]),
             '--tenant' => (string) $this->membership->tenant_id,
+            '--company' => $this->legalEntity,
             '--user' => 'owner-a@analitik.test',
         ];
 
-        $this->artisan('analytics:explain', $options)
-            ->expectsOutputToContain('Dataset '.self::DATASET.' versi 1')
-            ->expectsOutputToContain('from "aset_tr_aset" where "aset_tr_aset"."tenant_id" = ')
-            ->expectsOutputToContain('Rencana (EXPLAIN, tanpa ANALYZE)')
-            ->expectsOutputToContain('Rencana total')
-            ->assertSuccessful();
+        $this->assertSame(0, Artisan::call('analytics:explain', $options));
+        $output = Artisan::output();
+        $this->assertStringContainsString('Dataset '.self::DATASET.' versi 1', $output);
+        $this->assertStringContainsString('"aset_tr_aset"."tenant_id" = '."'{$this->membership->tenant_id}'", $output);
+        $this->assertStringContainsString('"aset_tr_aset"."legal_entity_id" = '."'{$this->legalEntity}'", $output);
+        $this->assertStringContainsString('Rencana (EXPLAIN, tanpa ANALYZE)', $output);
+        $this->assertStringContainsString('Rencana total', $output);
 
         $this->artisan('analytics:explain', [...$options, '--user' => 'bukan-anggota@analitik.test'])
             ->expectsOutputToContain('bukan anggota aktif')->assertFailed();
@@ -508,7 +528,7 @@ class WalkingSkeletonTest extends TestCase
      */
     private function lockedTo(array $locked): AnalyticsPrincipal
     {
-        return new readonly class(UserPrincipal::fromMembership($this->membership, 'UTC'), $locked) implements AnalyticsPrincipal
+        return new readonly class(UserPrincipal::fromMembership($this->membership, 'UTC'), $locked) implements CrossCompanyPrincipal
         {
             /** @param array<string, string|list<string>> $locked */
             public function __construct(private UserPrincipal $user, private array $locked) {}
@@ -560,7 +580,7 @@ class WalkingSkeletonTest extends TestCase
 
             public function fingerprint(CompiledDataset $dataset): string
             {
-                return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
+                return ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null, $dataset->companyColumn);
             }
 
             public function describe(): string

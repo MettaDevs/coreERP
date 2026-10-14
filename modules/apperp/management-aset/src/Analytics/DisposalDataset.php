@@ -81,6 +81,7 @@ abstract class DisposalDataset implements Dataset
                     'aset.acquisition_value',
                 ]))
             ->permission($this->permission())
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('document_number', 'Nomor dokumen', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)

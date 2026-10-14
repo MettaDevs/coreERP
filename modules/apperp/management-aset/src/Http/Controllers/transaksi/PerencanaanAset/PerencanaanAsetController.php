@@ -84,7 +84,7 @@ class PerencanaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -101,7 +101,7 @@ class PerencanaanAsetController extends Controller
         } catch (NumberSequenceException $exception) {
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 if ($exception->getCode() === '23505') {
                     throw ValidationException::withMessages(['kode' => 'Kode perencanaan sudah digunakan.']);
@@ -113,7 +113,7 @@ class PerencanaanAsetController extends Controller
         }
 
         // Dibaca ulang supaya `version` yang dipulangkan adalah nilai di database.
-        return response()->json(['data' => $this->replay($key)], 201);
+        return response()->json(['data' => $this->replay($request, $key)], 201);
     }
 
     public function update(Request $request, string $id, AssetUnitOfMeasureDirectory $units): JsonResponse
@@ -172,9 +172,14 @@ class PerencanaanAsetController extends Controller
      * `withTrashed` karena replay idempoten harus tetap menemukan rencana yang sudah
      * diarsipkan; tanpa itu permintaan ulang mencoba menyisipkan baris kembar.
      */
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return PerencanaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        $record = PerencanaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->planning_org_unit_id);
+        }
+
+        return $record;
     }
 
     /** @return array<string, mixed> */

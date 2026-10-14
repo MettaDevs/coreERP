@@ -46,6 +46,7 @@ final class AssetRegisterDataset implements Dataset
             ->description('Satu baris per aset tercatat, termasuk komponen.')
             ->model(Aset::class)
             ->permission('management-aset.aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->fieldsFromModel(except: ['keterangan', 'serial_number', 'model_number'])
             ->reference('group_aset_id', GroupAset::class)

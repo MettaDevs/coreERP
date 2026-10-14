@@ -129,7 +129,7 @@ class PemeliharaanAsetController extends Controller
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
-        if ($existing = $creator->replay($key)) {
+        if ($existing = $creator->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 

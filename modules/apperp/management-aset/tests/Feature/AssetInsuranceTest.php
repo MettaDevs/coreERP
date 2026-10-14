@@ -163,7 +163,8 @@ class AssetInsuranceTest extends TestCase
         $this->sebagaiPenggunaBernama('Unit sendiri', $this->tenantId, self::MANAGER, [[
             'policy_code' => self::KEBIJAKAN_TANGGUNG_JAWAB, 'legal_entity_id' => $this->legalEntityId, 'organization_id' => $this->unitId,
         ]])->getJson(self::URL.'/'.$id)->assertOk();
-        $other()->withHeader('Idempotency-Key', 'polis-'.Str::ulid())->postJson(self::URL, $this->policyPayload([]))->assertForbidden();
+        $other()->withHeader('Idempotency-Key', 'polis-'.Str::ulid())->postJson(self::URL, $this->policyPayload([]))
+            ->assertUnprocessable()->assertJsonValidationErrors('legal_entity_id');
     }
 
     public function test_insurance_types_are_a_master_and_the_real_duty_grants_the_screen(): void

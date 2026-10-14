@@ -110,8 +110,15 @@ class RegisterAsetTest extends TestCase
             ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
             ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
         ];
-        $data = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'], $lingkup)->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
-        $this->assertEqualsCanonicalizing([$first, $second], array_column($data, 'id'));
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'], $lingkup);
+        $this->selectCompany($this->tenantId, $firstLegalEntity, $firstUnit);
+        $data = $this->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
+        $this->assertSame([$first], array_column($data, 'id'));
+        $this->assertNotContains($crossFirst, array_column($data, 'id'));
+        $this->assertNotContains($crossSecond, array_column($data, 'id'));
+        $this->selectCompany($this->tenantId, $secondLegalEntity, $secondUnit);
+        $data = $this->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
+        $this->assertSame([$second], array_column($data, 'id'));
         $this->assertNotContains($crossFirst, array_column($data, 'id'));
         $this->assertNotContains($crossSecond, array_column($data, 'id'));
     }

@@ -47,10 +47,14 @@ describe what is intended, and a plan sentence is never evidence that code exist
   models plus `App\Platform\Modules\Contracts`. `DatasetValidator` rejects other modules' models,
   joins, and references. Cross-module analysis goes through shared dimensions (phase 2 drill-across:
   aggregate each dataset by the same shared dimension, merge on its values), never a row join.
-- **Every read is tenant-filtered, then policy-filtered, then user-filtered, in that order.** Tenant comes
+- **Every read is tenant-filtered, then declared working-company-filtered for interactive users, then policy-filtered, then user-filtered.** Tenant comes
   from the model's `BelongsToTenant` scope, which fails closed, so queries run inside
   `TenantRunner::runFor()` — Core routes do not pass `ResolveModuleContext`. Data policy goes through
-  `DataPolicyFilter::apply()` on the columns the dataset declared; no grant means zero rows. User filters
+  `DataPolicyFilter::apply()` on the columns the dataset declared; no grant means zero rows. Company-owned
+  datasets explicitly declare `company(column)` independently of `dataPolicy`; do not infer it from policy,
+  field names, or the module. `CompanyContextFilter` uses the trusted UserPrincipal company; missing company
+  means zero rows, even with unrestricted grants. Shared datasets explicitly declare `tenantWide()`. Non-session principals
+  declare their company mode and keep their explicit policy/locked-filter context. Company context is included in the cache fingerprint. User filters
   only narrow. A locked filter (publication, embed) that is empty or names an unknown field means zero
   rows, because `FieldFilterExpression` reads an empty value as "no filter".
 - **Rights are checked before the query is validated against the dataset.** (`QueryParser`, shape only and
@@ -95,7 +99,17 @@ describe what is intended, and a plan sentence is never evidence that code exist
 
 ## Declaring a dataset
 
-1. Read the module's list controller for the resource. The permission it checks and the way it calls
+1. For a company-owned resource, declare `company('legal_entity_id')` with the actual ownership column,
+   independently of `dataPolicy()`. Interactive `UserPrincipal` queries narrow to the trusted active
+   company (no company means zero rows); shared datasets explicitly call `tenantWide()`. Missing either
+   scope choice is rejected at registration, never silently treated as shared. A cross-company
+   principal must explicitly implement `CrossCompanyPrincipal` and carry its own trusted policy/locked
+   filters, never infer context from a browser session. A principal declaring neither company mode fails
+   closed for company-owned datasets; the mode is part of its cache fingerprint.
+   A unit-only resource uses `tenantWide()->dataPolicy(code, operatingUnit: column)` without inventing a
+   legal-entity dimension; the validator checks the existing manifest's required dimensions. Company-only
+   resources without a unit may project the company part of a company-and-unit grant (insurance policies).
+   Read the module's list controller for the resource. The permission it checks and the way it calls
    `OrganizationScope` (`asetQuery`, `query` with which columns, or `legalEntityQuery`) decide
    `permission()` and `dataPolicy()`. Never infer policy columns from names. Use the module's exact
    policy code (the asset policy is spelled `asset-responsibility` on purpose; renaming it silently drops
@@ -109,6 +123,7 @@ describe what is intended, and a plan sentence is never evidence that code exist
    return DatasetDefinition::make('management-aset.asset-register', 'Register aset')
        ->model(Aset::class)
        ->permission('management-aset.aset.read')
+       ->company('legal_entity_id')
        ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
        ->fieldsFromModel(except: ['keterangan'])
        ->reference('group_aset_id', GroupAset::class)
@@ -306,7 +321,7 @@ PowerShell, one test run at a time per database):
   `composer types:check`
 - Screens: `npm run format:check`, `npm run types:check`, `npm run lint:check`, `npm run build`, `npm run bundle:check`
 - Datasets and plans: `php artisan analytics:datasets`;
-  `php artisan analytics:explain --query='<json>' --tenant=<id> --user=<email>` prints the compiled SQL and
+  `php artisan analytics:explain --query='<json>' --tenant=<id> --user=<email> --company=<id>` prints the compiled SQL and
   `EXPLAIN` (no `ANALYZE`) as that user. It takes no widget argument yet: paste the widget's stored `query`.
 - Docs and skills: `npm run docs:build` from `docs/`, `python .github/scripts/check-skill-copies.py` from the
   repo root (both skill copies must match).

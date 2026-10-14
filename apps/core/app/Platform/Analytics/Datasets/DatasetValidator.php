@@ -59,7 +59,7 @@ final class DatasetValidator
 
     private const TIME = ['date', 'timestamp', 'timestamptz'];
 
-    /** @var array<string, array{permissions: array<string, string>, policies: array<string, list<string>>}> per id module */
+    /** @var array<string, array{permissions: array<string, string>, policies: array<string, array{permissions: list<string>, requires_legal_entity: bool, requires_operating_unit: bool}>}> per id module */
     private array $manifests = [];
 
     public function __construct(private readonly ModuleRegistry $modules) {}
@@ -114,8 +114,15 @@ final class DatasetValidator
         }
 
         $joins = $this->joins($raw['joins'] ?? [], $module, $source !== null);
+        if (($raw['dataScopeDeclared'] ?? false) !== true) {
+            throw new InvalidDatasetDefinition('nyatakan scope data secara eksplisit lewat company(kolom) atau tenantWide().');
+        }
         $policy = $this->policy($raw['policy'] ?? null, $manifest, $joins);
-        $protectors = array_keys(array_filter($manifest['policies'], static fn (array $protected): bool => in_array($permission, $protected, true)));
+        $companyColumn = $raw['companyColumn'] ?? null;
+        if ($companyColumn !== null) {
+            $companyColumn = $this->columnRef($companyColumn, 'kolom perusahaan aktif', $joins);
+        }
+        $protectors = array_keys(array_filter($manifest['policies'], static fn (array $protected): bool => in_array($permission, $protected['permissions'], true)));
         if ($protectors !== [] && ($policy === null || ! in_array($policy['code'], $protectors, true))) {
             throw new InvalidDatasetDefinition('resource ini dibatasi kebijakan '.implode(', ', $protectors).'; nyatakan kolom kebijakannya lewat dataPolicy().');
         }
@@ -153,6 +160,7 @@ final class DatasetValidator
             source: $source instanceof Closure ? $source : null,
             permission: $permission,
             policy: $policy,
+            companyColumn: $companyColumn,
             fromModel: $fromModel === null ? null : [
                 'only' => $this->names(is_array($fromModel) ? ($fromModel['only'] ?? []) : null, 'kolom fieldsFromModel'),
                 'except' => $this->names(is_array($fromModel) ? ($fromModel['except'] ?? []) : null, 'kolom fieldsFromModel'),
@@ -367,10 +375,16 @@ final class DatasetValidator
         }
 
         if ($declared->policy !== null) {
-            $this->resolve($declared->policy['legal_entity'], $tables, 'kolom legal entity kebijakan');
+            if ($declared->policy['legal_entity'] !== null) {
+                $this->resolve($declared->policy['legal_entity'], $tables, 'kolom legal entity kebijakan');
+            }
             if ($declared->policy['operating_unit'] !== null) {
                 $this->resolve($declared->policy['operating_unit'], $tables, 'kolom unit kerja kebijakan');
             }
+        }
+
+        if ($declared->companyColumn !== null) {
+            $this->resolve($declared->companyColumn, $tables, 'kolom perusahaan aktif');
         }
 
         foreach ($declared->times as $time) {
@@ -397,6 +411,7 @@ final class DatasetValidator
             }
         }
         $hash = hash('sha256', json_encode([
+            $declared->companyColumn,
             $declared->partitions,
             $declared->code, $declared->version, $declared->model, $table, $sourceSql, $declared->permission, $declared->policy,
             $fields, $classifications, $types, $references, $declared->shared, $joins, $declared->measures,
@@ -413,6 +428,7 @@ final class DatasetValidator
             table: $table,
             permission: $declared->permission,
             policy: $declared->policy,
+            companyColumn: $declared->companyColumn,
             fields: $fields,
             measures: $declared->measures,
             times: $declared->times,
@@ -469,7 +485,7 @@ final class DatasetValidator
      * Permission dan kebijakan data dari manifest gabungan module (`app.yaml` + `manifest/`), bukan dari
      * database: aturannya harus sama di CI, di test, dan di server yang katalognya belum didaftarkan.
      *
-     * @return array{permissions: array<string, string>, policies: array<string, list<string>>}
+     * @return array{permissions: array<string, string>, policies: array<string, array{permissions: list<string>, requires_legal_entity: bool, requires_operating_unit: bool}>}
      */
     private function manifest(ModuleManifest $module): array
     {
@@ -493,7 +509,11 @@ final class DatasetValidator
         $policies = [];
         foreach (is_array($security['data_policies'] ?? null) ? $security['data_policies'] : [] as $policy) {
             if (is_array($policy) && is_string($policy['code'] ?? null)) {
-                $policies[$policy['code']] = array_values(array_filter(is_array($policy['protected_permissions'] ?? null) ? $policy['protected_permissions'] : [], 'is_string'));
+                $policies[$policy['code']] = [
+                    'permissions' => array_values(array_filter(is_array($policy['protected_permissions'] ?? null) ? $policy['protected_permissions'] : [], 'is_string')),
+                    'requires_legal_entity' => ($policy['requires_legal_entity'] ?? false) === true,
+                    'requires_operating_unit' => ($policy['requires_operating_unit'] ?? false) === true,
+                ];
             }
         }
 
@@ -502,26 +522,37 @@ final class DatasetValidator
 
     /**
      * @param  array<string, array{model: class-string<Model>, local: string, foreign: string, include_archived: bool}>  $joins
-     * @param  array{permissions: array<string, string>, policies: array<string, list<string>>}  $manifest
-     * @return array{code: string, legal_entity: string, operating_unit: ?string}|null
+     * @param  array{permissions: array<string, string>, policies: array<string, array{permissions: list<string>, requires_legal_entity: bool, requires_operating_unit: bool}>}  $manifest
+     * @return array{code: string, legal_entity: ?string, operating_unit: ?string}|null
      */
     private function policy(mixed $policy, array $manifest, array $joins): ?array
     {
         if ($policy === null) {
             return null;
         }
-        if (! is_array($policy) || ! is_string($policy['code'] ?? null) || ! is_string($policy['legal_entity'] ?? null)) {
-            throw new InvalidDatasetDefinition('kebijakan data butuh kode dan kolom legal entity.');
+        if (! is_array($policy) || ! is_string($policy['code'] ?? null)) {
+            throw new InvalidDatasetDefinition('kebijakan data butuh kode.');
         }
         if (! isset($manifest['policies'][$policy['code']])) {
             throw new InvalidDatasetDefinition('kebijakan data '.$policy['code'].' tidak ada di manifest module.');
         }
 
+        $legalEntity = $policy['legal_entity'] ?? null;
         $operatingUnit = $policy['operating_unit'] ?? null;
+        $requirements = $manifest['policies'][$policy['code']];
+        if ($legalEntity === null && $operatingUnit === null) {
+            throw new InvalidDatasetDefinition('kebijakan data butuh kolom legal entity atau unit kerja.');
+        }
+        if ($requirements['requires_legal_entity'] && $legalEntity === null) {
+            throw new InvalidDatasetDefinition('kebijakan data ini mewajibkan kolom legal entity sesuai manifest.');
+        }
+        if (! $requirements['requires_legal_entity'] && $requirements['requires_operating_unit'] && $operatingUnit === null) {
+            throw new InvalidDatasetDefinition('kebijakan data ini mewajibkan kolom unit kerja sesuai manifest.');
+        }
 
         return [
             'code' => $policy['code'],
-            'legal_entity' => $this->columnRef($policy['legal_entity'], 'kolom legal entity kebijakan', $joins),
+            'legal_entity' => $legalEntity === null ? null : $this->columnRef($legalEntity, 'kolom legal entity kebijakan', $joins),
             'operating_unit' => $operatingUnit === null ? null : $this->columnRef($operatingUnit, 'kolom unit kerja kebijakan', $joins),
         ];
     }

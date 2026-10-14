@@ -51,6 +51,7 @@ class PermintaanPembelianAsetTest extends TestCase
             ->postJson(rtrim(self::API, '/'), $this->payload('Permintaan uji', 1))->assertCreated()->json('data');
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $second = $this->sebagaiPengguna($this->tenantId, $permission)
             ->withHeader('Idempotency-Key', 'request-'.Str::ulid())
             ->postJson(rtrim(self::API, '/'), $this->payload('Permintaan uji', 1))->assertCreated()->json('data');

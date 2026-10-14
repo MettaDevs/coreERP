@@ -303,7 +303,7 @@ class DepreciationController extends Controller
      */
     public function reverse(Request $request, string $id): JsonResponse
     {
-        $period = DepreciationPeriod::query()->findOrFail($id);
+        $period = app(OrganizationScope::class)->query(DepreciationPeriod::query(), $request, 'legal_entity_id', 'usage_org_unit_id')->findOrFail($id);
         abort_unless($period->status === 'final' && $period->cancelled_at === null && $period->reverses_period_id === null, 409, 'Hanya penyusutan final yang belum dibatalkan yang dapat dibalik.');
         $request->merge(['posting_date' => $request->input('posting_date', $period->period_ends_on->toDateString()), 'version' => $request->input('version', $period->version)]);
         $cancellation = app(AssetCancellationEngine::class)->start($request, 'penyusutan', $id, false);

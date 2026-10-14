@@ -175,9 +175,15 @@ records:
    context claims. The app owns enforcement on every list, search, detail,
    create, update, delete, and sensitive action endpoint it serves; Core owns
    enforcement on every read it performs itself.
-5. A workspace selection may default a filter or new-record value only. It is
-   never authorization, and browser-supplied organization IDs are never proof
-   of access.
+5. Keep working context separate from authorization. For a declared company-owned
+   resource, ordinary reads/writes use the trusted active legal entity in addition
+   to tenant and policy predicates. The selected operating unit remains a default
+   or optional filter unless the approved resource design says otherwise. Shared
+   resources stay shared; children inherit their owner's boundary. Explicit
+   cross-company reports/integrations retain tenant and policy enforcement and
+   use their declared trusted context. Neither workspace selection nor a
+   browser-supplied organization ID grants access. Do not narrow the grant resolver
+   to the active company: users still need their other companies when switching.
 6. Define and test the combination rule before implementation when more than
    one role, policy, grant, automatic source, or temporary source can apply.
    Do not silently assume union; XDS policies may intersect, while a process

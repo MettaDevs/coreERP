@@ -189,6 +189,31 @@ User dapat memilih satu tenant aktif, legal entity aktif, dan operating unit akt
 
 Endpoint first-party untuk mengganti konteks session tetap `PUT /api/v1/workspace-context`.
 
+### Perusahaan aktif dan hak akses berbeda
+
+Keputusan pemilik produk, 13 Oktober 2026: transaksi bekerja pada perusahaan aktif secara default,
+seperti current company F&O. Master bersama tetap bersama pada tahap ini, termasuk konfigurasi
+group aset, buku, dan profil penyusutan. Unit aktif tetap nilai awal/filter opsional; pembatasan
+unit berasal dari policy dan grant yang sah, bukan otomatis dari pilihan unit.
+
+Untuk resource milik perusahaan, query biasa memakai tenant aktif **dan** perusahaan aktif **dan**
+policy resource. Grant A+B tetap memberi hak berpindah ke B; saat sedang bekerja di A, grant itu
+tidak mengubah query biasa menjadi A+B. Grant seluruh organisasi juga tidak melepas konteks kerja
+perusahaan. Tanpa perusahaan aktif, query resource perusahaan tidak mengembalikan baris dan
+penulisan ditolak. Perusahaan dari body yang berbeda dengan konteks aktif ditolak.
+
+Pemilik resource menyatakan field perusahaan atau relasi induknya. Tidak ada tebakan dari nama
+tabel atau satu pilihan scope untuk seluruh module. Detail dan lampiran mengikuti dokumen/aset
+pemiliknya. `CompanyContextFilter` adalah primitive Core yang dipakai module untuk konteks kerja;
+data policy tetap dijalankan terpisah. Pada Management Aset, `OrganizationScope` memasang keduanya.
+
+Analitik interaktif mengikuti deklarasi `DatasetDefinition::company()` dan perusahaan aktif
+pengguna; kunci cache membedakan perusahaan. Publikasi, embed, dan integrasi memakai konteks
+principal dan saringan tersimpan yang memang dideklarasikan lintas perusahaan, bukan session
+browser. Pekerjaan laporan membawa konteks perusahaan permintaan yang disimpan; callback bisnis
+memakai perusahaan dokumen yang diproses. Perusahaan aktif browser yang berubah kemudian tidak
+boleh mengubah perusahaan pekerjaan tersebut.
+
 ## Tenant terpisah atau organization?
 
 | Kebutuhan | Model |

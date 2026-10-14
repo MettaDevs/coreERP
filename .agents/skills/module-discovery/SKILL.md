@@ -19,6 +19,25 @@ description: Discover and propose a CoreERP app, master, transaction, or busines
 | Workflow and SoD | | | |
 | REST, event, reporting, attachment/audit | | | |
 
+## Data scope decision per resource
+
+Ask these questions for each business resource, not once for the whole module. Present the closest official F&O behavior as a recommendation, its direct source, and whether the mapping is direct, adapted, or absent. Let the user select another supported business design and record the reason; do not silently settle an unanswered choice.
+
+| Question for the user | Decision to record |
+| --- | --- |
+| Is this one shared identity/definition, a company's record, an operating unit's record, or a child of another document? | Data ownership: tenant, legal entity, operating unit, or inherited from the named parent. Foundation/module code ownership is a separate decision. |
+| Does it carry accounting, tax, contractual, ledger, or statutory consequences? | Retain the responsible legal entity. Unit security may also apply; it does not replace the legal entity. |
+| Should a user allowed companies A and B see only A while working in A? | Normal read/write context. Recommend active-company context for company-owned resources, shared access for shared resources, and explicit cross-company processing where needed. |
+| Does access also need to follow a responsible/using unit and its hierarchy? | The policy, business fields, descendants rule, and grant combination. Do not make the selected unit a universal filter. |
+| May reports, analytics, integrations, or background processes work across companies? | The explicit mode and trusted company source for each path. Jobs retain the document/request company; they never infer it from a later browser session. |
+| Do you want the F&O recommendation or a different design? | Approved choice, reason, impact on related records/numbering, and any unresolved decision. |
+
+For each proposal row, name the model/table or parent relation, company/unit fields, normal context, policy, and cross-company paths. A child inherits its owner's boundary; merely lacking a company column does not make it shared. A reference's code layer, table name, or existing company column does not prove its business scope.
+
+Keep ownership, working context, and authorization separate. An unrestricted policy grant does not itself mean cross-company working context; selecting a company never grants access. The existing `security.data_policies` fields describe access dimensions, not a declaration of automatic company filtering. Check the current implementation before claiming the proposal is enforced.
+
+The scope verification matrix must cover an A+B user working in A and then B, shared records, list/search/detail, create/update/archive/post, child relations, replay/idempotency, reports/exports/analytics, and queued work where applicable. Include denied tenant/company/unit cases and numbering/unique-index scope. Treat missing enforcement on a reachable path as an implementation gap.
+
 ## Handoff after approval
 
 Run these skills in order; do not duplicate their detailed rules here:

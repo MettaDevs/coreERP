@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Analytics\Security;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Modules\Contracts\CompanyContextFilter;
 use App\Platform\Modules\Contracts\DataPolicyFilter;
 use App\Platform\Modules\Contracts\FieldFilterExpression;
 use Illuminate\Contracts\Database\Query\Builder;
@@ -29,12 +30,20 @@ final class DataPolicyScope
 {
     public function apply(Builder $builder, CompiledDataset $dataset, AnalyticsPrincipal $principal): void
     {
+        if ($dataset->companyColumn !== null) {
+            if ($principal instanceof CompanyContextPrincipal) {
+                CompanyContextFilter::apply($builder, $dataset->qualifiedColumn($dataset->companyColumn), $principal->activeLegalEntityId());
+            } elseif (! $principal instanceof CrossCompanyPrincipal) {
+                $builder->whereRaw('1 = 0');
+            }
+        }
+
         if ($dataset->policy !== null) {
             DataPolicyFilter::apply(
                 $builder,
                 $principal->policyScope($dataset->policy['code']),
-                $dataset->qualified($dataset->policy['legal_entity']),
-                $dataset->policy['operating_unit'] === null ? null : $dataset->qualified($dataset->policy['operating_unit']),
+                $dataset->policy['legal_entity'] === null ? null : $dataset->qualifiedColumn($dataset->policy['legal_entity']),
+                $dataset->policy['operating_unit'] === null ? null : $dataset->qualifiedColumn($dataset->policy['operating_unit']),
             );
         }
 

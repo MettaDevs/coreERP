@@ -41,6 +41,7 @@ final class MaintenanceRequestsDataset implements Dataset
             ->description('Satu baris per permintaan pemeliharaan: status, jenis, aset atau lokasi, dan waktu pengajuannya.')
             ->model(MaintenanceRequest::class)
             ->permission('management-aset.permintaan-pemeliharaan.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('kode', 'Nomor permintaan', FieldType::Text)
             ->field('status', 'Status permintaan', FieldType::Option, options: MaintenanceRequestStatus::LABELS)
