@@ -8,11 +8,14 @@ use App\Foundation\FinancePosting\Models\FinancePostingSetting;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Foundation\FinancePosting\Support\PostingPublisher;
 use App\Foundation\FinancePosting\Support\PostingPusher;
+use App\Platform\Attachments\Models\DocumentAttachment;
+use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
+use App\Platform\Modules\Contracts\FinanceEvidenceRecordType;
 use App\Platform\Modules\Contracts\InvalidPosting;
 use App\Platform\Modules\Contracts\PostingAccountResolver;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
@@ -27,6 +30,7 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use RuntimeException;
@@ -784,6 +788,63 @@ class FinancePostingFeedTest extends TestCase
             ],
             'details' => ['assets' => [['asset_code' => 'KEND-0012', 'acquisition_value' => $nilai]]],
         ];
+    }
+
+    public function test_evidence_requires_posting_receipt_parent_and_client_access(): void
+    {
+        $receiptId = (string) Str::ulid();
+        $input = $this->perolehan();
+        $input['details']['receipt'] = ['id' => $receiptId, 'attachment_record_type' => 'test_finance_receipt'];
+        $this->terbitkan($input);
+        $posting = FinancePosting::query()->where('posting_id', $input['posting_id'])->firstOrFail();
+        $parentReadable = true;
+        $type = \Mockery::mock(FinanceEvidenceRecordType::class);
+        $type->shouldReceive('recordType')->andReturn('test_finance_receipt');
+        $type->shouldReceive('belongsToFinanceEntity')->andReturnUsing(function ($tenant, $entity, $record) use ($receiptId, &$parentReadable): bool {
+            $this->assertSame($this->membership->tenant_id, $tenant);
+            $this->assertSame($this->le->id, $entity);
+            $this->assertSame($receiptId, $record);
+
+            return $parentReadable;
+        });
+        $registry = new AttachmentRecordTypeRegistry;
+        $registry->register($type);
+        app()->instance(AttachmentRecordTypeRegistry::class, $registry);
+        Storage::fake('local');
+        config(['coreerp.attachments.disk' => 'local']);
+        $content = '%PDF-1.4 evidence';
+        Storage::disk('local')->put('evidence-test.pdf', $content);
+        $file = DocumentAttachment::create([
+            'tenant_id' => $this->membership->tenant_id, 'record_type' => 'test_finance_receipt',
+            'record_id' => $receiptId, 'kind' => 'document', 'file_name' => 'bukti.pdf',
+            'mime_type' => 'application/pdf', 'size_bytes' => strlen($content),
+            'storage_path' => 'evidence-test.pdf', 'content_hash' => hash('sha256', $content),
+            'data_class' => 'CustomerContent',
+        ]);
+        $url = '/api/internal/v1/finance-postings/'.$input['posting_id'].'/receipts/'.$receiptId.'/attachments';
+        $token = $this->token();
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])->getJson($url)->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.file_name', 'bukti.pdf')
+            ->assertJsonMissingPath('data.0.storage_path')->assertJsonMissingPath('data.0.content_hash');
+        $this->getJson($url.'/'.$file->id)->assertOk()->assertStreamedContent($content);
+        $this->getJson($url.'/'.Str::ulid())->assertNotFound();
+        $this->getJson(str_replace($receiptId, (string) Str::ulid(), $url))->assertNotFound();
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->token(['finance-postings.ack'])])->getJson($url)->assertForbidden();
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->token(['finance-postings.read'], ['cashier.'])])->getJson($url)->assertNotFound();
+        $this->withHeaders(['Authorization' => 'Bearer '.$token]);
+        $parentReadable = false;
+        $this->getJson($url)->assertNotFound();
+        $parentReadable = true;
+        $posting->update(['status' => FinancePosting::POSTED, 'external_reference' => 'JV-UJI-BUKTI-001']);
+        $this->getJson($url)->assertOk();
+        Storage::disk('local')->put('evidence-test.pdf', 'corrupted');
+        $this->getJson($url.'/'.$file->id)->assertStatus(503);
+        $file->delete();
+        $this->getJson($url)->assertOk()->assertJsonCount(0, 'data');
+        $posting->refresh();
+        $this->assertSame(FinancePosting::POSTED, $posting->status);
+        $this->assertSame(0, $posting->served_count);
+        $this->assertNull($posting->acknowledged_at);
     }
 
     /** @return array<string, mixed> */

@@ -4586,7 +4586,10 @@ paths:
       description: |
         Kepala dokumen membawa `cara_perolehan` (`pembelian`, `hibah`, atau `saldo_awal`; bawaan
         `pembelian`), `vendor_id` (vendor Core milik entitas legal yang sama),
-        `vendor_invoice_reference`, dan `vendor_invoice_date`. Baris membawa `nilai_per_unit` dan
+        `vendor_invoice_reference`, dan `vendor_invoice_date`. `purchase_order_reference` adalah
+        nomor PO manual opsional (maksimal 80 karakter); bukan nomor permintaan pembelian.
+        Nilai kosong tersimpan sebagai null, dan hanya draf yang dapat mengubahnya.
+        Baris membawa `nilai_per_unit` dan
         `ppn_per_unit`, keduanya boleh memakai presisi harga satuan mata uangnya (IDR bawaan 3
         desimal), tidak lebih halus.
 
@@ -4750,6 +4753,10 @@ paths:
         `penanggung_jawab_nama`), dan tiap baris membawa nama master yang dirujuknya. Nama
         dibaca dari Core saat permintaan dilayani, bukan disimpan sebagai snapshot. Nama
         bernilai `null` berarti unit atau keanggotaannya sudah tidak ada di Core.
+
+        `purchase_order_reference` berisi nomor PO manual atau null. Lampiran dokumen memakai
+        record Core `aset_tr_penerimaan_aset` dengan ID penerimaan, mengikuti izin baca/ubah
+        Penerimaan dan lingkup organisasi yang sama. Lampiran tidak disalin per aset atau bulan.
 
         `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
         keadaan jurnalnya di feed posting finance sesudah diselesaikan — jurnal perolehan, atau

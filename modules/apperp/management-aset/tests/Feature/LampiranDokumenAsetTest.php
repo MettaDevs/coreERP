@@ -43,7 +43,7 @@ class LampiranDokumenAsetTest extends TestCase
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unitId = (string) Str::ulid();
-        Storage::fake('s3');
+        Storage::fake(config('coreerp.attachments.disk'));
         Http::preventStrayRequests();
     }
 

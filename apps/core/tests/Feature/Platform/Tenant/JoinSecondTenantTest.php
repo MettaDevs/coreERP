@@ -167,6 +167,8 @@ class JoinSecondTenantTest extends TestCase
     public function test_a_revoked_membership_is_brought_back_rather_than_duplicated(): void
     {
         $code = $this->invitationFrom($this->ownerDua);
+        $tenantId = $this->ownerDua->activeMembership()?->tenant_id;
+        $this->assertNotNull($tenantId);
 
         $this->actingAs($this->ownerSatu)
             ->postJson('/api/v1/invitation-redemptions', ['code' => $code])
@@ -174,7 +176,7 @@ class JoinSecondTenantTest extends TestCase
 
         $keanggotaan = TenantMembership::query()
             ->where('user_id', $this->ownerSatu->id)
-            ->where('tenant_id', '!=', $this->ownerSatu->memberships()->first()?->tenant_id)
+            ->where('tenant_id', $tenantId)
             ->firstOrFail();
         $keanggotaan->update(['status' => 'revoked']);
 

@@ -450,6 +450,47 @@ tiruan HTTP:
 10. Group aset tanpa pemetaan akun menampilkan masalahnya di pratinjau, lengkap dengan jalan pintas
     ke posting group, sebelum penerimaan dikonfirmasi.
 
+## Hasil uji E2E TODO 16.2–16.5 — 30 September 2026
+
+### Tambahan hasil 16.1 — dev remote PTDI, 6 Oktober 2026
+
+D18/PNRA00018 menerbitkan satu ambulans uji ASTA00029, harga Rp500.000.000 + PPN
+Rp55.000.000, hutang Rp555.000.000. Posting `AST-ACQ-01M47R430R6P8M9PYWKGNB4VM2`
+dibukukan BO pada 12.46.03 WITA sebagai `2026/10/FAP/013`, ack posted/sent HTTP 200.
+Audit SELECT pada WIN-LOBQ0DEAO40 / metta-demo-bo-penta menemukan tepat satu AP,
+satu voucher GL tiga ayat seimbang (Dr aset Rp500 juta, Dr PPN Rp55 juta, Cr hutang
+Rp555 juta), dan satu kartu hutang. Pencarian sumber hanya menemukan FAP/013,
+tanpa jurnal kedua; CoreERP setelah reload/Cari menunjukkan Sudah dibukukan.
+Master yang dipakai adalah KENDARAAN-UJI dan VND-000001/Test → TDO0001/Supplier_ID 1210.
+**16.1 lulus** sesuai kriteria instance dev di atas. Belum ada audit satu siklus jadwal
+tambahan; ketunggalan dokumen telah diaudit berdasarkan sumber sesudah pemrosesan pertama.
+Hasil dan bukti D18 tercatat pada repo BO: `docs/integrasi-bo-coreerp/E2E_PROGRESS.md`, bagian §4.10.
+
+### Tambahan hasil 16.2 — dev remote PTDI, 6 Oktober 2026
+
+D19: ASTA00014 dipindahkan ke Poli Umum sebelum proposal penyusutan KOMERSIAL Oktober.
+Preview 1 aset / 2 ayat / 0 masalah, debit=kredit Rp5.208.333,33. CoreERP menerbitkan
+`AST-DEP-01m343swf0b6mcvy4ns1ehg37n-01M3410Q8Z4SV68WMMT7ZFPZ6M-20261031-4`; old-finance
+mengakui satu GL `2026/10/JUM/0007`, ack posted/sent HTTP 200. Audit baca-saja menemukan
+Dr 80103 Rp5.208.333,33 pada UnitBisnisID 2/SectionID SEC001 dan Cr 103010402
+Rp5.208.333,33 pada UnitBisnisID 2/SectionID SEC097, tanpa AP atau kartu hutang.
+CoreERP setelah refresh menunjukkan Sudah dibukukan. **16.2 remote lulus untuk satu poli**;
+agregasi beberapa poli berbeda belum diuji. Detail dan screenshot ada di
+Register E2E BO untuk D19 ada di repo BO: `docs/integrasi-bo-coreerp/E2E_PROGRESS.md`, bagian §4.11.
+
+### Hasil 30 September
+
+- **16.2 — penyusutan:** `ASTA00001/KOMERSIAL` menghasilkan jurnal BO `2026/09/JUM/0002` senilai Rp208.333,33, seimbang, tanpa faktur AP. CoreERP menerima ack `posted` HTTP 200.
+- **16.3 — reversal:** pembalikan mengacu ke posting penyusutan asal. BO membuat jurnal balik seimbang `2026/09/JUM/0003`, tanpa AP; CoreERP menerima ack HTTP 200 dan nilai buku kembali ke Rp10.000.000.
+- **16.5 — saldo awal:** `PNRA00003` menghasilkan `asset.opening_balance` Rp10.000.000, terbukukan di `2026/09/JUM/0005`. Aset `ASTA00003` memakai offset 47; penyusutan September Rp500.000 terbukukan di `2026/09/JUM/0006` dan di-ack. Preview seimbang tanpa masalah.
+- **16.4 — periode tertutup:**
+
+  - GL BO untuk September 2026 ditutup lewat proses normal; halaman tutup buku setelah dimuat ulang menunjukkan penutupan terakhir `2026-09`.
+  - CoreERP memfinalisasi penyusutan `ASTA00000/KOMERSIAL` untuk 1–30 September sebesar Rp208.333,33. Preview seimbang (2 baris) dan tanpa masalah.
+  - Posting `AST-DEP-01m3bxqhezkx2xv31c1q76fy8f-01M3BXCYBNE2QEXR7SJG2D3RJT-20260930-3` tampil di Pantau posting sebagai `Ditolak`, alasan `PERIOD_CLOSED`. Detail mencatat posting di-pull sekali dan konfirmasi aplikasi finance diterima pada 30 September 2026 pukul 15.36.
+  - BO menjalankan validasi periode sebelum mengalokasikan nomor dokumen dan sebelum jalur insert GL/AP. Untuk posting yang ditolak ini, alur rejection menyimpan `rejected/PERIOD_CLOSED` lalu kembali; jurnal GL dan faktur AP tidak dibuat.
+  - Periode penyusutan lokal CoreERP tetap final dan nilai buku ASTA00000 menjadi Rp9.791.666,67. Posting yang sudah `rejected` tidak dikirim ulang otomatis.
+
 ## Keadaan kode per 21 September 2026
 
 | Temuan | Bukti |
@@ -495,3 +536,10 @@ tiruan HTTP:
 - [Working with webhooks (Business Central)](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/api-reference/v2.0/dynamics-subscriptions)
 - [Set up fixed assets (F&O)](https://learn.microsoft.com/en-us/dynamics365/finance/fixed-assets/set-up-fixed-assets)
 - [Derived dimensions (F&O)](https://learn.microsoft.com/en-us/dynamics365/finance/general-ledger/derived-dimensions)
+
+## Retest setelah pull CoreERP `main` — 2 Oktober 2026
+
+- **16.2, lulus ulang:** `ASTA00000/KOMERSIAL`, periode 1–31 Oktober, register Rp208.333,33. CoreERP menerbitkan `AST-DEP-01m3bxqhezkx2xv31c1q76fy8f-01M3BXCYBNE2QEXR7SJG2D3RJT-20261031-3`; BO menariknya sekali dan membukukan jurnal `2026/10/JUM/0004`. Jurnal berimbang: debit `80103` Rp208.333,33 untuk Poli Umum (`PUMU`), kredit `103010402` Rp208.333,33 untuk unit Penta Medica. Pencarian nomor jurnal pada daftar faktur hutang tidak menghasilkan faktur.
+- **16.3, lulus ulang:** pembalikan ASTA00000 Oktober merujuk periode penyusutan yang baru diposting. CoreERP menerbitkan `AST-DRV-01M3XQZ69ES0Y9ZE66KSNP3CQW`; BO menariknya sekali dan membukukan `2026/10/JUM/0005`, Dr `103010402` / Cr `80103` Rp208.333,33, seimbang, tanpa faktur hutang. Nilai buku kembali ke Rp9.791.666,67, sama dengan sebelum penyusutan Oktober.
+- **16.8, sisi CoreERP sesuai; E2E masih terbuka:** koreksi ASTA00022 dari Rp500.000.000 menjadi Rp510.000.000 pada 2 Oktober menerbitkan `AST-ADJ-01m3x3qrbef75wxz9cq5a1t3ty-1` sebesar Rp10.000.000. Meski mode hari itu `clearing`, preview memakai akun aset dan hutang pemasok sesuai mode langsung ke hutang pada perolehan asal. BO menarik posting sekali lalu meng-ack `rejected/INVALID`: jenis koreksi nilai aset belum didukung BO. Mode langsung ke hutang dipulihkan untuk transaksi mulai 3 Oktober.
+- **15.7, sebagian lulus:** N5 unit (PNRA00018) dan N6 (PNRA00019) ditolak `UNKNOWN_DIMENSION` sesudah sync yang lebih baru/selesai penuh, ack HTTP 200, tanpa AP/GL. N2 BU dev remote lulus melalui D14; bukti lokalnya masih sebagian. Pada D16, mismatch tipe BU → Department setelah Sync baru ditolak tanpa dokumen BO, tetapi mismatch nomor pada D15 tetap posted sebagai FAP/010. Karena cabang nomor belum ditolak, N7 belum lengkap; N8 juga belum diuji. Pemulihan fixture N7 sudah selesai dan mapping UAT-N2-BU kembali ke UnitBisnisID 2. Lihat checklist 15.7 dan register E2E BO.

@@ -805,6 +805,7 @@ class PenerimaanAsetController extends Controller
             'cara_perolehan' => ['sometimes', Rule::in(AcquisitionMethod::ALL)],
             'vendor_id' => ['nullable', 'ulid'],
             'vendor_invoice_reference' => ['nullable', 'string', 'max:80'],
+            'purchase_order_reference' => ['nullable', 'string', 'max:80'],
             'vendor_invoice_date' => ['nullable', 'date_format:Y-m-d'],
             'details' => ['required', 'array', 'min:1'],
             'details.*.nama' => ['required', 'string', 'max:150'],
@@ -1115,6 +1116,7 @@ class PenerimaanAsetController extends Controller
             'keterangan' => $data['keterangan'] ?? null,
             'vendor_id' => $data['vendor_id'] ?? null,
             'vendor_invoice_reference' => $data['vendor_invoice_reference'] ?? null,
+            'purchase_order_reference' => trim((string) ($data['purchase_order_reference'] ?? '')) !== '' ? trim((string) $data['purchase_order_reference']) : null,
             'vendor_invoice_date' => $data['vendor_invoice_date'] ?? null,
         ];
     }

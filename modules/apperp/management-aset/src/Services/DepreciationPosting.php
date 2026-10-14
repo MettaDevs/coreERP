@@ -367,6 +367,12 @@ final class DepreciationPosting
             ->leftJoin('aset_m_profil_penyusutan as depreciation_profile', function ($join): void {
                 $join->on('depreciation_profile.id', '=', 'book.depreciation_profile_id')->on('depreciation_profile.tenant_id', '=', 'book.tenant_id');
             })
+            ->leftJoin('aset_tr_penerimaan_aset as receipt', function ($join): void {
+                $join->on('receipt.id', '=', 'aset.penerimaan_aset_id')
+                    ->on('receipt.tenant_id', '=', 'aset.tenant_id')
+                    ->on('receipt.legal_entity_id', '=', 'aset.legal_entity_id')
+                    ->whereNull('receipt.deleted_at');
+            })
             ->where('aset_tr_penyusutan_aset.legal_entity_id', $legalEntityId)
             ->where('aset_tr_penyusutan_aset.period_ends_on', $periodEndsOn)
             ->whereNull('aset_tr_penyusutan_aset.reverses_period_id')
@@ -382,6 +388,9 @@ final class DepreciationPosting
             'aset_tr_penyusutan_aset.period_starts_on',
             'book.id as buku_aset_id',
             'aset.kode as aset_code',
+            'receipt.id as receipt_id',
+            'receipt.kode as receipt_number',
+            'receipt.purchase_order_reference',
             'aset.nama as asset_name',
             'aset.acquired_on',
             'asset_group.nama as asset_group_name',
@@ -538,6 +547,12 @@ final class DepreciationPosting
 
             return [
                 'asset_code' => (string) $row->aset_code,
+                'receipt' => $row->receipt_id === null ? null : [
+                    'id' => (string) $row->receipt_id,
+                    'number' => (string) $row->receipt_number,
+                    'purchase_order_reference' => $row->purchase_order_reference,
+                    'attachment_record_type' => 'aset_tr_penerimaan_aset',
+                ],
                 'asset_name' => $row->asset_name === null ? null : (string) $row->asset_name,
                 'asset_group' => $grup[(string) $row->group_aset_id]->kode ?? null,
                 'asset_group_name' => $row->asset_group_name === null ? null : (string) $row->asset_group_name,

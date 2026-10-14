@@ -36,7 +36,12 @@ class DocsPortalTest extends TestCase
         $this->assertStringStartsWith('application/yaml', (string) $jawaban->headers->get('Content-Type'));
         $spesifikasi = Yaml::parse((string) $jawaban->getContent());
         $this->assertSame(
-            ['/finance-postings', '/finance-postings/{posting_id}/ack', '/legal-entities', '/operating-units', '/vendors'],
+            [
+                '/finance-postings', '/finance-postings/{posting_id}/ack',
+                '/finance-postings/{posting_id}/receipts/{receipt}/attachments',
+                '/finance-postings/{posting_id}/receipts/{receipt}/attachments/{attachment}',
+                '/legal-entities', '/operating-units', '/vendors',
+            ],
             collect(array_keys($spesifikasi['paths']))->sort()->values()->all(),
         );
         $this->assertSame(['integrationClient'], array_keys($spesifikasi['components']['securitySchemes']));

@@ -53,6 +53,7 @@ import AssetPicture from './AssetPicture';
 import type { AttributeDefinition } from './attributes';
 import { toFieldConfig } from './attributes';
 import { printAssetLabels } from './labels';
+import { bukaPenerimaan } from './penerimaan';
 
 type Mode = 'view' | 'edit';
 
@@ -528,6 +529,38 @@ export default function AsetDetailPage({
                                 {textField('model_number', 'Nomor model')}
                             </div>
                         </CollapsibleSection>
+
+                        {detail?.penerimaan_aset_id &&
+                            permissions.includes(
+                                'management-aset.penerimaan-aset.read',
+                            ) && (
+                                <CollapsibleSection
+                                    value="bukti-perolehan"
+                                    title="Bukti perolehan"
+                                    summary="Dokumen penerimaan asal"
+                                >
+                                    <div className="space-y-3">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                bukaPenerimaan(
+                                                    String(
+                                                        detail.penerimaan_aset_id,
+                                                    ),
+                                                )
+                                            }
+                                        >
+                                            Buka penerimaan asal
+                                        </Button>
+                                        <p className="text-muted-foreground text-sm">
+                                            Buka penerimaan untuk melihat nomor
+                                            PO dan dokumen pendukung perolehan
+                                            aset ini.
+                                        </p>
+                                    </div>
+                                </CollapsibleSection>
+                            )}
 
                         {attributes.length > 0 && (
                             <CollapsibleSection

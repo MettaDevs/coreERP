@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use App\Platform\Modules\Contracts\AttachmentRecordType;
 use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\FinanceEvidenceRecordType;
 use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
@@ -43,7 +43,7 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * Status dokumen tidak ikut menentukan: lampiran boleh ditambah pada dokumen yang sudah selesai, seperti
  * lampiran pada dokumen terposting di BC.
  */
-final class AssetAttachments implements AttachmentRecordType
+final class AssetAttachments implements FinanceEvidenceRecordType
 {
     private const MODULE = 'management-aset';
 
@@ -111,6 +111,18 @@ final class AssetAttachments implements AttachmentRecordType
         $resource = $this->resourceOf($recordId);
 
         return $resource !== null && $this->allows($resource, 'read');
+    }
+
+    public function belongsToFinanceEntity(string $tenantId, string $legalEntityId, string $recordId): bool
+    {
+        // Akses integrasi hanya bukti Penerimaan yang disebut snapshot posting, bukan semua dokumen aset.
+        return $this->model === PenerimaanAset::class
+            && $this->model::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('legal_entity_id', $legalEntityId)
+                ->whereKey($recordId)
+                ->whereNull('deleted_at')
+                ->exists();
     }
 
     public function canChange(string $tenantId, string $recordId): bool

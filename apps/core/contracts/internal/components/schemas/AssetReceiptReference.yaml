@@ -1,0 +1,13 @@
+type: [object, 'null']
+additionalProperties: false
+description: |
+  Referensi opsional ke dokumen perolehan aset. Nomor PO diisi manual, bukan nomor permintaan
+  pembelian. Identitas record digunakan untuk menelusuri lampiran; bukan URL unduh publik.
+  Snapshot ini tetap sesuai saat posting terbit. Akses lampiran untuk klien integrasi memerlukan
+  contract akses tersendiri; metadata ini tidak memberikan izin unduh.
+required: [id, number, purchase_order_reference, attachment_record_type]
+properties:
+  id: { type: string, minLength: 26, maxLength: 26 }
+  number: { type: string }
+  purchase_order_reference: { type: [string, 'null'], maxLength: 80 }
+  attachment_record_type: { type: string, const: aset_tr_penerimaan_aset }

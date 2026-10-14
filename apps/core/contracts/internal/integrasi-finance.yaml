@@ -374,6 +374,8 @@ tags:
 paths:
   /legal-entities: { $ref: 'paths/legal-entities.yaml' }
   /finance-postings: { $ref: 'paths/finance-postings.yaml' }
+  /finance-postings/{posting_id}/receipts/{receipt}/attachments: { $ref: 'paths/finance-postings_posting_id_receipts_receipt_attachments.yaml' }
+  /finance-postings/{posting_id}/receipts/{receipt}/attachments/{attachment}: { $ref: 'paths/finance-postings_posting_id_receipts_receipt_attachments_attachment.yaml' }
   /finance-postings/{posting_id}/ack: { $ref: 'paths/finance-postings_posting_id_ack.yaml' }
   /vendors: { $ref: 'paths/vendors.yaml' }
   /operating-units: { $ref: 'paths/operating-units.yaml' }
