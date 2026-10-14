@@ -21,6 +21,7 @@ const capacityErrors = new Counter('capacity_errors');
 const completed = new Counter('company_context_completed');
 const ASET = (path) => urlModule('management-aset', path);
 const completionThresholds = {};
+
 for (let index = 0; index < TENANTS; index++) {
     for (const company of ['A', 'B']) {
         completionThresholds[
@@ -56,6 +57,7 @@ function required(response, statuses, label) {
             `setup ${label}: ${response.status} ${String(response.body).slice(0, 300)}`,
         );
     }
+
     return response;
 }
 
@@ -102,9 +104,11 @@ function activate(tenants) {
             .find('script[data-page="app"][type="application/json"]')
             .text();
         const membershipId = JSON.parse(payload).props?.auth?.membership?.id;
+
         if (!membershipId) {
             fail('setup membership tidak ditemukan pada halaman dashboard');
         }
+
         return membershipId;
     });
     batch(
@@ -232,6 +236,7 @@ export function setup() {
         ]),
         [200, 201],
     );
+
     return companyA.map((tenant, index) => ({
         a: ownersToData(tenant),
         b: ownersToData(companyB[index]),
@@ -243,7 +248,9 @@ export function setup() {
 }
 
 function ownersToData(tenant) {
-    const { jar, ...data } = tenant;
+    const data = { ...tenant };
+    delete data.jar;
+
     return data;
 }
 
@@ -254,19 +261,24 @@ function expect(response, status, label, predicate = () => true) {
         response.status === 504
     ) {
         capacityErrors.add(1);
+
         return false;
     }
+
     if (response.status >= 500) {
         serverErrors.add(1);
     }
+
     if (
         !check(response, {
             [label]: (result) => result.status === status && predicate(result),
         })
     ) {
         violations.add(1, { label, status: response.status });
+
         return false;
     }
+
     return true;
 }
 
@@ -283,6 +295,7 @@ export default function (data) {
             b: bangunJar(fixture.b),
         };
     }
+
     const current = cached;
     const own = iteration++ % 2 === 0 ? current.a : current.b;
     const other = own === current.a ? current.b : current.a;
@@ -348,6 +361,7 @@ export default function (data) {
             'list limited to active company',
             (response) => {
                 const rows = response.json('data') || [];
+
                 return (
                     rows.some((row) => row.id === ownId) &&
                     rows.every(
@@ -365,6 +379,7 @@ export default function (data) {
         expect(responses[4], 404, 'other company update rejected'),
         expect(responses[5], 422, 'other company create rejected'),
     ];
+
     if (outcomes.every(Boolean)) {
         completed.add(1, {
             tenant_index: own.index,
