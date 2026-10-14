@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $template_key
  * @property string $jurisdiction
  * @property string $label
+ * @property ?string $kode
  * @property ?string $regulation_reference
  * @property Carbon $effective_from
  * @property ?Carbon $effective_to
@@ -46,7 +47,7 @@ class KelompokHartaFiskal extends Model
     protected $table = 'aset_m_kelompok_harta_fiskal';
 
     protected $fillable = [
-        'tenant_id', 'template_key', 'jurisdiction', 'label', 'regulation_reference',
+        'tenant_id', 'template_key', 'jurisdiction', 'label', 'kode', 'regulation_reference',
         'effective_from', 'effective_to', 'useful_life_years',
         'straight_line_rate_percent', 'reducing_balance_rate_percent',
         'allow_reducing_balance', 'allow_straight_line', 'depreciable', 'aktif',

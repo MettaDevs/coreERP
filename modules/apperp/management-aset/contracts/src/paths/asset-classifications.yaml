@@ -60,9 +60,10 @@
         application/json:
           schema:
             type: object
-            required: [label]
+            required: [kode, label]
             properties:
               label: {type: string, minLength: 1, maxLength: 150}
+              kode: {type: string, maxLength: 10, pattern: '^[A-Za-z0-9_-]+$'}
               regulation_reference: {type: [string, 'null'], maxLength: 250}
               useful_life_years: {type: [integer, 'null'], minimum: 1, maximum: 1000}
               straight_line_rate_percent: {type: [number, 'null'], minimum: 0, maximum: 100}
@@ -123,6 +124,7 @@
             properties:
               version: {type: integer, minimum: 1}
               label: {type: string, minLength: 1, maxLength: 150}
+              kode: {type: string, maxLength: 10, pattern: '^[A-Za-z0-9_-]+$'}
               regulation_reference: {type: [string, 'null'], maxLength: 250}
               effective_from: {type: string, format: date}
               effective_to: {type: [string, 'null'], format: date}

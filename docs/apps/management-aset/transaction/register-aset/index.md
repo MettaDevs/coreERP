@@ -2,6 +2,14 @@
 
 Lampiran Penerimaan yang dirujuk snapshot posting finance dapat dibaca sistem finance melalui GET `/api/internal/v1/finance-postings/{posting_id}/receipts/{receipt}/attachments` dan endpoint berkasnya. Core memeriksa token tenant, prefix jenis dan status pending/posted; module menjawab apakah parent Penerimaan aktif masih milik tenant/entitas posting melalui `FinanceEvidenceRecordType`. Ini hak integrasi atas bukti posting, terpisah dari izin sesi pengguna CoreERP. Pembaca BO memeriksa role/unit penggunanya sendiri. File tetap pada storage CoreERP, daftar mengirim metadata publik, dan unduh memeriksa hash/ukuran25MiB. Snapshot jurnal dan ACK tidak berubah saat bukti dibuka. Tidak berlaku bagi semua jenis dokumen aset; kiriman lama tanpa receipt tidak mendapat akses lewat tebakan.
 
+## Nomenklatur kode aset
+
+Reference `management-aset.asset-code` membentuk kode dari kode kelompok harta fiskal pada grup, kode grup, kode lokasi pertama, tahun tanggal perolehan, dan nomor urut empat digit. Contoh `01.00A.UGD.2026.0001`. Semua kode master berasal dari database tenant; nama lokasi atau kelompok tidak ditulis mati pada Core. Tahun perolehan tetap berlaku untuk impor aset lama, bukan tahun ketika impor dijalankan.
+
+Counter terpisah per perusahaan dan kombinasi nilai yang tercetak. Kombinasi lain mulai dari 0001, maksimum 9999. Dua record kelompok fiskal berversi dengan kode yang sama dan kombinasi lain yang sama memakai satu counter; versi record tidak boleh membuat dua kode aset identik.
+
+Kode tidak berubah saat aset pindah lokasi atau grup. Penerimaan dan pemecahan aset meminta nomor lewat `AssetNumberSequenceIssuer::issueAssets()` di dalam transaksi dokumennya. Permintaan nomor diurutkan berdasarkan kombinasi nilai agar dokumen yang memuat baris terbalik tidak saling menunggu counter. Data master dibaca dengan shared lock supaya perubahan grup atau lokasi tidak membuat kode berbeda dari data awal aset. Lokasi dokumen yang kosong memakai lokasi bawaan grup; tanpa kode kelompok atau lokasi yang diperlukan, penyelesaian ditolak dan nomor tidak terpakai. Format baru memakai reference baru; nomor lama dan riwayatnya tidak ditulis ulang.
+
 Halaman ini untuk developer. Isinya bukan cara memakai layar, melainkan cara kerja register aset di dalam: data apa yang disimpan, aturan mana yang dijaga kode, dan kenapa aturannya begitu.
 
 Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management-aset/inventarisasi-aset` — id entri menu pada `app.yaml` sekaligus jalur rutenya. Nama "register aset" dipakai di sini dan di kode untuk datanya, bukan untuk layarnya.

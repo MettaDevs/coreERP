@@ -247,19 +247,8 @@ class AssetReclassificationController extends Controller
             throw ValidationException::withMessages($masalah);
         }
 
-        $codes = [];
-        if ($dokumen->jenis === AssetReclassification::SPLIT) {
-            try {
-                foreach ($rows as $row) {
-                    $codes[(string) $row->id] = $numbers->issue('management-aset.aset', $this->tenant($request), 'aset:reklasifikasi:'.$row->id, $dokumen->legal_entity_id);
-                }
-            } catch (NumberSequenceException $exception) {
-                return $this->numberFailed($exception);
-            }
-        }
-
         try {
-            DB::transaction(function () use ($id, $version, $codes, $layanan): void {
+            DB::transaction(function () use ($id, $version, $layanan, $numbers, $request): void {
                 // Versi diklaim lebih dulu, baru barisnya dibaca dan buku asetnya dikunci: dua reklasifikasi
                 // serentak atas aset yang sama tidak boleh memindah saldo yang sama.
                 RowVersion::claim(AssetReclassification::query()->whereKey($id), $version);
@@ -270,8 +259,25 @@ class AssetReclassificationController extends Controller
                 if ($masalah !== []) {
                     throw ValidationException::withMessages($masalah);
                 }
-                if (array_diff(array_map(static fn (stdClass $row): string => (string) $row->id, $dokumen->jenis === AssetReclassification::SPLIT ? $rows : []), array_keys($codes)) !== []) {
-                    throw ValidationException::withMessages(['details' => 'Baris reklasifikasi berubah saat diposting. Muat ulang lalu posting lagi.']);
+                $codes = [];
+                if ($dokumen->jenis === AssetReclassification::SPLIT) {
+                    $sourceAssets = Aset::query()->where('tenant_id', $this->tenant($request))
+                        ->whereIn('id', array_map(static fn (stdClass $row): string => (string) $row->aset_id, $rows))
+                        ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                    $numberRequests = [];
+                    foreach ($rows as $row) {
+                        $sourceAsset = $sourceAssets->get((string) $row->aset_id);
+                        abort_unless($sourceAsset !== null, 422, 'Aset sumber sudah tidak tersedia. Muat ulang dokumen.');
+                        $numberRequests[] = [
+                            'key' => 'aset:reklasifikasi:'.$row->id,
+                            'group_id' => (string) ($row->group_aset_tujuan_id ?? $sourceAsset->group_aset_id),
+                            'location_id' => $sourceAsset->lokasi_aset_id, 'acquired_on' => $sourceAsset->acquired_on->toDateString(),
+                        ];
+                    }
+                    $issued = $numbers->issueAssets($this->tenant($request), $dokumen->legal_entity_id, $numberRequests);
+                    foreach ($rows as $row) {
+                        $codes[(string) $row->id] = $issued['aset:reklasifikasi:'.$row->id];
+                    }
                 }
 
                 $hasil = $layanan->post($dokumen, $layanan->plan($dokumen, $rows), $codes);
@@ -282,6 +288,8 @@ class AssetReclassificationController extends Controller
                     'updated_at' => now(),
                 ]);
             });
+        } catch (NumberSequenceException $exception) {
+            return $this->numberFailed($exception);
         } catch (ReclassificationPostingFailed $kegagalan) {
             return $this->postingFailed($kegagalan);
         }

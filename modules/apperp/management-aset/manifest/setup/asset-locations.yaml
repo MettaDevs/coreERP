@@ -47,3 +47,6 @@ number_sequences:
       default_prefix: LOCA
       allowed_scopes:
         - tenant
+      default_settings:
+        allow_automatic: false
+        allow_manual: true

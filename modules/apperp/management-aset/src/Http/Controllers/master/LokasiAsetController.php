@@ -3,8 +3,6 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\AddressDirectory;
-use App\Platform\Modules\Contracts\NumberSequenceIssuer;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
@@ -38,15 +36,6 @@ class LokasiAsetController extends MasterDataController
     protected function model(): string
     {
         return LokasiAset::class;
-    }
-
-    public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse
-    {
-        $this->requirePermission($request, 'create');
-
-        return response()->json(['data' => ['allow_manual' => $numbers->allowsManual(
-            $this->tenantId($request), static::APP_ID, static::APP_ID.'.'.$this->resource(),
-        )]]);
     }
 
     protected function parentMasters(): array

@@ -12,7 +12,7 @@ namespace App\Platform\Modules\Events;
  */
 final class AppNumberSequenceReferencesDeclared
 {
-    /** @param  list<array{code:string,name:string,default_prefix:?string,allowed_scopes:list<string>}>  $references */
+    /** @param  list<array{code:string,name:string,default_prefix:?string,allowed_scopes:list<string>,default_settings?:array{allow_automatic?:bool,allow_manual?:bool,minimum_number?:int,maximum_number?:int,segments?:list<array<string,mixed>>}|null}>  $references */
     public function __construct(
         public readonly string $appId,
         public readonly array $references,

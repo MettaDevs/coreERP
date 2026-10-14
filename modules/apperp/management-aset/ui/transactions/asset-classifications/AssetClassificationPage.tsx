@@ -28,6 +28,7 @@ import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
 type Classification = {
     id: string;
     label: string;
+    kode: string | null;
     jurisdiction: string;
     effective_from: string;
     effective_to: string | null;
@@ -532,9 +533,11 @@ function ClassificationForm({
                         : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify({
                         ...Object.fromEntries(
-                            ['label', ...fields.map((field) => field.name)].map(
-                                (name) => [name, values.get(name) || null],
-                            ),
+                            [
+                                'kode',
+                                'label',
+                                ...fields.map((field) => field.name),
+                            ].map((name) => [name, values.get(name) || null]),
                         ),
                         aktif: active,
                         depreciable,
@@ -567,6 +570,19 @@ function ClassificationForm({
             className="space-y-4"
             onChange={() => editing && onDirtyChange(true)}
         >
+            <Field data-field-name="kode">
+                <Input
+                    name="kode"
+                    label="Kode kelompok aset"
+                    defaultValue={record?.kode ?? ''}
+                    readOnly={!editing || saving}
+                    onFocus={() => enterEdit('kode')}
+                    required
+                    maxLength={10}
+                    aria-invalid={!!errors.kode}
+                />
+                <FieldError>{errors.kode?.join(' ')}</FieldError>
+            </Field>
             <div className="flex items-center gap-3">
                 <Field className="flex-1" data-field-name="label">
                     <Input

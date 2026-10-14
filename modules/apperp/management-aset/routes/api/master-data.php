@@ -73,7 +73,6 @@ $masters = [
     'alasan-downtime' => DowntimeReasonController::class,
 ];
 
-Route::get('lokasi-aset/number-policy', [LokasiAsetController::class, 'numberPolicy']);
 
 // Matriks group x buku disunting di dalam form group, jadi ia memakai permission
 // group dan tidak berdiri sendiri sebagai master.
@@ -106,6 +105,7 @@ Route::get('group-aset/{id}/buku-penyusutan', [GroupBukuPenyusutanController::cl
 Route::put('group-aset/{id}/buku-penyusutan', [GroupBukuPenyusutanController::class, 'replace']);
 
 foreach ($masters as $slug => $controller) {
+    Route::get($slug.'/number-policy', [$controller, 'numberPolicy']);
     Route::get($slug, [$controller, 'index']);
     Route::post($slug, [$controller, 'store']);
     Route::get($slug.'/{id}', [$controller, 'show']);

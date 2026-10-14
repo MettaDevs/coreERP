@@ -15,7 +15,7 @@ Lokasi bisa bersarang: gedung berisi lantai, lantai berisi ruang. Karena itu ia 
 
 ## Kode lokasi
 
-Kode lokasi diterbitkan Number Sequence Core dalam transaksi yang sama dengan penyimpanan lokasi. Saat `allow_manual` aktif, `POST lokasi-aset` menerima `kode` sesuai format nomor dan unik dalam tenant. Nilai kosong atau `null` tetap meminta nomor otomatis; nomor manual tidak memajukan counter. Core menolak kode manual ketika pengaturan tidak mengizinkannya. Kode yang sudah tersimpan tidak dapat diubah lewat `PATCH`.
+Kode lokasi dicatat lewat Number Sequence Core dalam transaksi yang sama dengan penyimpanan lokasi. Bawaannya manual saja: kode seperti `UGD` atau `POLI` ditentukan pengguna dan unik dalam tenant, tanpa wajib mengikuti format nomor otomatis. `allow_automatic` dan `allow_manual` diatur terpisah; nilai kosong atau `null` hanya meminta nomor otomatis bila otomatis diizinkan. Nomor manual tidak memajukan counter. Kode yang sudah tersimpan tidak dapat diubah lewat `PATCH`.
 
 Form membaca izin tersebut lewat `GET /api/modules/management-aset/v1/lokasi-aset/number-policy`, dengan permission `management-aset.lokasi-aset.create`. Pembacaan ini tidak menerbitkan nomor atau mengubah konfigurasi. Retry dengan idempotency key dan data yang sama mengembalikan lokasi sebelumnya; kode manual berbeda dengan key yang sama ditolak 409.
 

@@ -72,7 +72,7 @@ class AssetClassificationTest extends TestCase
         $tenantId = $this->buatTenantUji();
         $path = '/api/modules/management-aset/v1/kelompok-harta';
         $payload = [
-            'label' => 'Kelompok tambahan', 'useful_life_years' => 4,
+            'kode' => '05', 'label' => 'Kelompok tambahan', 'useful_life_years' => 4,
             'straight_line_rate_percent' => 0, 'reducing_balance_rate_percent' => 0,
             'allow_reducing_balance' => true,
             'tenant_id' => (string) Str::ulid(), 'template_key' => 'Tidak boleh dipakai',

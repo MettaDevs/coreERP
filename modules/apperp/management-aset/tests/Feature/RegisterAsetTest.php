@@ -47,10 +47,10 @@ class RegisterAsetTest extends TestCase
             'custodian_user_id' => $custodian,
         ]);
 
-        // Kode aset tetap dari number sequence `management-aset.aset`, bukan diturunkan
+        // Kode aset tetap dari number sequence `management-aset.asset-code`, bukan diturunkan
         // dari nomor dokumennya: ia kunci alami yang dipakai seumur hidup aset.
         $this->assertDatabaseHas('aset_tr_aset', [
-            'id' => $asetId, 'kode' => $this->awalanNomor('management-aset.aset').'-000001',
+            'id' => $asetId, 'kode' => $this->awalanNomor('management-aset.asset-code').'-000001',
         ]);
         $this->assertDatabaseHas('aset_tr_penempatan_aset', [
             'tenant_id' => $this->tenantId, 'aset_id' => $asetId,

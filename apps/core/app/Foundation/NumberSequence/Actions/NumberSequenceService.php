@@ -10,6 +10,7 @@ use App\Foundation\NumberSequence\Models\NumberSequenceProfile;
 use App\Foundation\NumberSequence\Models\NumberSequenceReservation;
 use App\Foundation\NumberSequence\Models\NumberSequenceReusableNumber;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Platform\Modules\Contracts\NumberSequenceFormat;
 use App\Platform\Organization\Models\LegalEntity;
 use App\Platform\Organization\Models\Organization;
 use Illuminate\Database\QueryException;
@@ -23,7 +24,7 @@ class NumberSequenceService
     public const RESET_PERIODS = ['never', 'calendar_year', 'fiscal_year', 'fiscal_period'];
 
     /** Segment types a format may contain. */
-    public const SEGMENT_TYPES = ['constant', 'number', 'year', 'scope', 'fiscal_year', 'fiscal_period'];
+    public const SEGMENT_TYPES = NumberSequenceFormat::SEGMENT_TYPES;
 
     /** The reset period each segment type discriminates, so a reset can never collide across periods. */
     private const PERIOD_DISCRIMINATORS = [
@@ -35,7 +36,7 @@ class NumberSequenceService
     public function __construct(private readonly FiscalCalendarService $fiscalCalendar) {}
 
     /**
-     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
+     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
      * @return array{id:string,number:string,status:string}
      */
     public function issue(array $context, string $referenceCode, string $idempotencyKey, ?string $manualValue = null): array
@@ -58,6 +59,9 @@ class NumberSequenceService
                     }
 
                     $isManual = $manualValue !== null;
+                    if (! $isManual && ! $sequence->allow_automatic) {
+                        $this->fail('manual_value', 'Isi kode secara manual. Pembuatan nomor otomatis tidak diizinkan.');
+                    }
                     if ($isManual && ! $sequence->allow_manual) {
                         $this->fail('manual_value', 'Nomor manual tidak diizinkan untuk sequence ini.');
                     }
@@ -65,8 +69,8 @@ class NumberSequenceService
                     $numeric = null;
                     $formatted = $manualValue;
                     if ($isManual) {
-                        if (! $this->matchesFormat($sequence, $scope, $manualValue)) {
-                            $this->fail('manual_value', 'Nomor manual tidak mengikuti format yang dipilih.');
+                        if (trim($manualValue) === '' || mb_strlen($manualValue) > 255 || preg_match('/[\x00-\x1F\x7F]/u', $manualValue)) {
+                            $this->fail('manual_value', 'Nomor manual harus diisi, maksimal 255 karakter, dan tidak boleh memuat karakter kontrol.');
                         }
                         if ($this->formattedValueExists($sequence, $scope, $manualValue)) {
                             $this->fail('manual_value', 'Nomor tersebut sudah digunakan.');
@@ -114,9 +118,9 @@ class NumberSequenceService
         throw new \LogicException('Penerbitan nomor gagal setelah retry.');
     }
 
-    /** @param array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string} $context */
+    /** @param array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>} $context */
     /**
-     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
+     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
      * @return array{id:string,number:string,status:string,expires_at:string|null}
      */
     public function reserve(array $context, string $referenceCode, string $idempotencyKey): array
@@ -124,6 +128,9 @@ class NumberSequenceService
         try {
             return DB::transaction(function () use ($context, $referenceCode, $idempotencyKey): array {
                 [$sequence, $scope] = $this->activeSequence($context, $referenceCode);
+                if (! $sequence->allow_automatic) {
+                    $this->fail('reference', 'Pembuatan nomor otomatis tidak diizinkan.');
+                }
                 if (! $sequence->is_continuous) {
                     $this->fail('reference', 'Sequence ini tidak memakai reservation.');
                 }
@@ -304,11 +311,12 @@ class NumberSequenceService
         });
     }
 
-    /** @param array{scope_type:string,status:string,is_continuous:bool,allow_manual:bool,reset_period:string,preallocation_enabled:bool,preallocation_quantity:int,minimum_number:int,maximum_number:?int,segments:list<array<string,mixed>>,profile_code:string} $settings */
+    /** @param array{scope_type:string,status:string,is_continuous:bool,allow_manual:bool,allow_automatic?:bool,reset_period:string,preallocation_enabled:bool,preallocation_quantity:int,minimum_number:int,maximum_number:?int,segments:list<array<string,mixed>>,profile_code:string} $settings */
     public function configure(TenantNumberSequence $sequence, array $settings, ?int $userId): TenantNumberSequence
     {
         return DB::transaction(function () use ($sequence, $settings, $userId): TenantNumberSequence {
             $sequence = TenantNumberSequence::query()->with('reference')->lockForUpdate()->findOrFail($sequence->id);
+            $settings['allow_automatic'] ??= (bool) $sequence->allow_automatic;
             if ($settings['profile_code'] !== $sequence->profile_code) {
                 $profile = NumberSequenceProfile::query()->findOrFail($settings['profile_code']);
                 $settings = [
@@ -322,6 +330,9 @@ class NumberSequenceService
             }
             if (! in_array($settings['scope_type'], $sequence->reference->allowed_scopes, true)) {
                 $this->fail('scope_type', 'Scope ini tidak tersedia untuk reference tersebut.');
+            }
+            if (! $settings['allow_automatic'] && (! $settings['allow_manual'] || $settings['is_continuous'])) {
+                $this->fail('allow_automatic', 'Jika nomor otomatis dimatikan, izinkan nomor manual dan matikan nomor berkelanjutan.');
             }
             if ($settings['is_continuous'] && $settings['allow_manual']) {
                 $this->fail('allow_manual', 'Nomor manual tidak dapat digabung dengan nomor berkelanjutan.');
@@ -339,6 +350,12 @@ class NumberSequenceService
                 $this->fail('reset_period', 'Reset fiskal memerlukan scope legal entity atau operating unit; scope tenant tidak memiliki kalender fiskal.');
             }
             $this->validateSegments($settings['segments'], $settings['scope_type'], $settings['reset_period']);
+            $declaredFields = array_column(array_filter($sequence->reference->default_settings['segments'] ?? [], fn (array $segment): bool => $segment['type'] === 'context'), 'value');
+            foreach ($settings['segments'] as $segment) {
+                if ($segment['type'] === 'context' && ! in_array($segment['value'], $declaredFields, true)) {
+                    $this->fail('segments', 'Pilihan bagian kode tidak tersedia untuk dokumen ini.');
+                }
+            }
             if ($this->hasNumberingState($sequence) && $this->structuralSettingsChanged($sequence, $settings)) {
                 $this->fail('profile_code', 'Mode, scope, periode, nomor awal, dan format tidak dapat diubah setelah nomor digunakan.');
             }
@@ -350,7 +367,7 @@ class NumberSequenceService
         });
     }
 
-    /** @param array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string} $context */
+    /** @param array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>} $context */
     public function advance(TenantNumberSequence $sequence, array $context, int $nextNumber, ?int $userId): void
     {
         DB::transaction(function () use ($sequence, $context, $nextNumber, $userId): void {
@@ -387,8 +404,8 @@ class NumberSequenceService
     }
 
     /**
-     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
-     * @return array{0:TenantNumberSequence,1:array{key:string,period:string,code:?string}}
+     * @param  array{tenant_id:string,app_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
+     * @return array{0:TenantNumberSequence,1:array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int}}
      */
     private function activeSequence(array $context, string $referenceCode): array
     {
@@ -407,8 +424,8 @@ class NumberSequenceService
     }
 
     /**
-     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
-     * @return array{key:string,period:string,code:?string}
+     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
+     * @return array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int}
      */
     private function scope(TenantNumberSequence $sequence, array $context): array
     {
@@ -449,8 +466,28 @@ class NumberSequenceService
             $fiscal = $this->fiscalCalendar->resolve($legalEntity, now());
         }
 
+        $values = [];
+        foreach ($sequence->segments as $segment) {
+            if ($segment['type'] !== 'context') {
+                continue;
+            }
+            $key = $segment['value'];
+            $value = $context['values'][$key] ?? null;
+            if (! is_string($value) || ! preg_match('/\A[A-Za-z0-9_-]+\z/', $value) || strlen($value) > (int) $segment['length']) {
+                $this->fail('values', 'Lengkapi kode untuk '.($segment['name'] ?? $key).' sebelum menerbitkan nomor.');
+            }
+            $values[$key] = $value;
+        }
+        ksort($values);
+        $key = $this->scopeKey($sequence, $context, $organization, $fiscalLegalEntityId);
+        if ($values !== []) {
+            // Nilai yang tercetak memisahkan counter; nama field dan urutannya tidak boleh membuat namespace berbeda.
+            $key .= '|values:'.hash('sha256', json_encode($values, JSON_THROW_ON_ERROR));
+        }
+
         return [
-            'key' => $this->scopeKey($sequence, $context, $organization, $fiscalLegalEntityId),
+            'key' => $key,
+            'values' => $values,
             'period' => $this->periodKey($sequence, $fiscal),
             'code' => $scopeCode,
             'year' => now()->format('Y'),
@@ -468,7 +505,7 @@ class NumberSequenceService
      * CoreERP has no ambient company, so an operating-unit scoped sequence must be told which legal entity the
      * document belongs to.
      *
-     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
+     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
      */
     private function fiscalLegalEntity(TenantNumberSequence $sequence, array $context, ?Organization $organization): LegalEntity
     {
@@ -511,7 +548,7 @@ class NumberSequenceService
      * out would let both streams claim one scope, and because the uniqueness index is bounded by period_key the
      * database would happily store the same document number twice.
      *
-     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string}  $context
+     * @param  array{tenant_id:string,legal_entity_id?:?string,org_unit_id?:?string,values?:array<string,string>}  $context
      */
     private function scopeKey(TenantNumberSequence $sequence, array $context, ?Organization $organization, ?string $fiscalLegalEntityId): string
     {
@@ -543,7 +580,7 @@ class NumberSequenceService
         };
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function nextPreallocatedNumber(TenantNumberSequence $sequence, array $scope): int
     {
         if (! $sequence->preallocation_enabled) {
@@ -594,7 +631,7 @@ class NumberSequenceService
         return $numeric;
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function nextContinuousNumber(TenantNumberSequence $sequence, array $scope, string $reservationId): int
     {
         if (! $sequence->preallocation_enabled) {
@@ -642,7 +679,7 @@ class NumberSequenceService
         return $numeric;
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function availableContinuousNumber(TenantNumberSequence $sequence, array $scope): ?int
     {
         $number = DB::table('number_sequence_continuous_pool')->where([
@@ -655,7 +692,7 @@ class NumberSequenceService
         return $number === null ? null : (int) $number;
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function nextDirectNumber(TenantNumberSequence $sequence, array $scope): int
     {
         $reusable = NumberSequenceReusableNumber::query()
@@ -679,7 +716,7 @@ class NumberSequenceService
         return $numeric;
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function counter(TenantNumberSequence $sequence, array $scope): NumberSequenceCounter
     {
         $counter = NumberSequenceCounter::query()->where([
@@ -704,7 +741,7 @@ class NumberSequenceService
         ])->lockForUpdate()->firstOrFail();
     }
 
-    /** @param array{key:string,period:string,code:?string,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function format(TenantNumberSequence $sequence, array $scope, int $numeric): string
     {
         return collect($sequence->segments)->map(function (array $segment) use ($scope, $numeric): string {
@@ -715,6 +752,7 @@ class NumberSequenceService
                 'scope' => (string) $scope['code'],
                 'fiscal_year' => (string) $scope['fiscal_year'],
                 'fiscal_period' => $this->padded((string) $scope['fiscal_period'], (int) ($segment['length'] ?? 2)),
+                'context' => $scope['values'][$segment['value']],
                 default => throw new \LogicException('Tipe segmen tidak dikenal.'),
             };
         })->join('');
@@ -733,32 +771,16 @@ class NumberSequenceService
         return str_pad($value, $length, '0', STR_PAD_LEFT);
     }
 
-    /** @param array{key:string,period:string,code:?string,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
-    private function matchesFormat(TenantNumberSequence $sequence, array $scope, string $value): bool
-    {
-        $pattern = collect($sequence->segments)->map(function (array $segment) use ($scope): string {
-            return match ($segment['type'] ?? null) {
-                'constant' => preg_quote((string) ($segment['value'] ?? ''), '/'),
-                'number' => '[0-9]{'.(int) ($segment['length'] ?? 0).'}',
-                'year' => preg_quote($scope['year'], '/'),
-                'scope' => preg_quote((string) $scope['code'], '/'),
-                'fiscal_year' => preg_quote((string) $scope['fiscal_year'], '/'),
-                'fiscal_period' => '[0-9]{'.(int) ($segment['length'] ?? 2).'}',
-                default => throw new \LogicException('Tipe segmen tidak dikenal.'),
-            };
-        })->join('');
-
-        // \z rather than $, otherwise a trailing newline passes the format check.
-        return preg_match('/^'.$pattern.'\z/', $value) === 1;
-    }
-
     /** @param list<array<string, mixed>> $segments */
-    private function validateSegments(array $segments, string $scopeType, string $resetPeriod): void
+    public function validateSegments(array $segments, string $scopeType, string $resetPeriod): void
     {
         if ($segments === [] || count($segments) > 10 || count(array_filter($segments, fn (array $segment): bool => ($segment['type'] ?? null) === 'number')) !== 1) {
             $this->fail('segments', 'Format harus memiliki tepat satu segmen nomor.');
         }
         foreach ($segments as $segment) {
+            if ($segment['type'] === 'context' && (! is_string($segment['value'] ?? null) || ! preg_match('/\A[a-z][a-z0-9_]*\z/', $segment['value']) || ! is_int($segment['length'] ?? null) || $segment['length'] < 1 || $segment['length'] > 50)) {
+                $this->fail('segments', 'Bagian dari data memerlukan nama field dan panjang 1 sampai 50 karakter.');
+            }
             if (! isset($segment['type']) || ! in_array($segment['type'], self::SEGMENT_TYPES, true)) {
                 $this->fail('segments', 'Tipe segmen tidak dikenal.');
             }
@@ -812,6 +834,7 @@ class NumberSequenceService
             $length += match ($segment['type']) {
                 'constant' => strlen((string) ($segment['value'] ?? '')),
                 'number' => (int) ($segment['length'] ?? 0),
+                'context' => (int) $segment['length'],
                 'year' => 4,
                 'scope' => 50,
                 'fiscal_year' => 40,
@@ -840,13 +863,12 @@ class NumberSequenceService
         return $sequence->maximum_number === null ? $last : min($last, $sequence->maximum_number);
     }
 
-    /** @param array{key:string,period:string,code:?string} $scope */
+    /** @param array{key:string,period:string,code:?string,values:array<string,string>,year:string,fiscal_year:?string,fiscal_period:?int} $scope */
     private function formattedValueExists(TenantNumberSequence $sequence, array $scope, string $formattedValue): bool
     {
         return NumberSequenceIssue::query()
             ->where('sequence_id', $sequence->id)
             ->where('scope_key', $scope['key'])
-            ->where('period_key', $scope['period'])
             ->where('formatted_value', $formattedValue)
             ->exists();
     }

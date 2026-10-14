@@ -137,6 +137,8 @@ trait MenyiapkanNilaiBukuAset
     /** @param  array<string, mixed>  $payload */
     private function masterUji(string $resource, array $payload): string
     {
+        unset($payload['kode']);
+
         return (string) $this->sebagaiPengguna($this->tenantId, $this->izinMaster($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
             ->postJson(self::API.$resource, $payload)

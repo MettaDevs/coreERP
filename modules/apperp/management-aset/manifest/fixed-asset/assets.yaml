@@ -58,8 +58,21 @@ security:
         - management-aset.penerimaan-aset.retire
 number_sequences:
   references:
-    - code: management-aset.aset
-      name: Nomor aset
+    - code: management-aset.asset-code
+      name: Kode aset gabungan
       default_prefix: ASTA
       allowed_scopes:
         - legal_entity
+      default_settings:
+        minimum_number: 1
+        maximum_number: 9999
+        segments:
+          - { type: context, value: asset_classification, name: Kelompok aset, length: 10 }
+          - { type: constant, value: '.' }
+          - { type: context, value: asset_group, name: Grup aset, length: 50 }
+          - { type: constant, value: '.' }
+          - { type: context, value: asset_location, name: Lokasi awal aset, length: 50 }
+          - { type: constant, value: '.' }
+          - { type: context, value: acquisition_year, name: Tahun perolehan, length: 4 }
+          - { type: constant, value: '.' }
+          - { type: number, length: 4 }

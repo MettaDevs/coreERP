@@ -45,6 +45,7 @@ class InternalNumberSequenceController extends Controller
             'app_id' => (string) $request->attributes->get('coreerp.app_id'),
             'legal_entity_id' => $request->string('legal_entity_id')->toString() ?: null,
             'org_unit_id' => $request->string('org_unit_id')->toString() ?: null,
+            'values' => $request->input('values', []),
         ];
     }
 }
