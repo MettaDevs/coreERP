@@ -857,7 +857,7 @@ class PenerimaanAsetController extends Controller
             'details.*.saldo_awal_buku.*.akumulasi_per_unit' => ['required', 'numeric', 'min:0'],
             'details.*.saldo_awal_buku.*.periode_berjalan' => ['required', 'integer', 'min:0', 'max:'.self::MAX_PERIODE_BERJALAN],
             'details.*.permintaan_pembelian_detail_id' => ['nullable', 'ulid', Rule::exists('aset_tr_permintaan_pengadaan_aset_details', 'id')->where(function (QueryBuilder $query) use ($request, $tenant): void {
-                $requests = DB::table('aset_tr_permintaan_pengadaan_aset')->where('tenant_id', $tenant)->whereNull('deleted_at');
+                $requests = PermintaanPengadaanAset::query();
                 app(OrganizationScope::class)->query($requests, $request, 'legal_entity_id', 'requesting_org_unit_id');
                 $query->where('tenant_id', $tenant)->whereIn('request_id', $requests->select('id'));
             })],
