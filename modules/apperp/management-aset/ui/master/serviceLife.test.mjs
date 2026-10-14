@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
+import test from 'node:test';
 import ts from 'typescript';
 
 const source = await readFile(
@@ -24,6 +25,7 @@ const {
 
 test('four years stays four years across every posting frequency', () => {
     let values = { frequency: 'monthly', useful_life_periods: 48 };
+
     for (const [frequency, periods] of [
         ['quarterly', 16],
         ['half_yearly', 8],
