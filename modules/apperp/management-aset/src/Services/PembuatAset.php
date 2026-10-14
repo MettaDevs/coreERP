@@ -15,6 +15,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AtributAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset;
 use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
 use Modules\Apperp\ManagementAset\Support\ValidasiAtributAset;
@@ -103,6 +104,11 @@ class PembuatAset
             'updated_at' => now(),
         ])->save();
 
+        if (DB::transactionLevel() > 0) {
+            $receiptId = $data['penerimaan_aset_id'] ?? null;
+            $receiptCode = $receiptId === null ? null : PenerimaanAset::query()->whereKey($receiptId)->value('kode');
+            FixedAssetLedgerContext::set(isset($data['opening_balance']) ? 'opening_balance' : 'acquisition', substr((string) $data['acquired_on'], 0, 10), $receiptId === null ? 'asset' : 'penerimaan-aset', (string) ($receiptId ?? $aset->id), (string) ($receiptCode ?? $kode), 'Perolehan aset');
+        }
         $this->buatBuku($aset, $data, $tenantId);
         $this->simpanAtribut($aset, $data, $tenantId);
 

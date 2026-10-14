@@ -62,7 +62,8 @@ class DatasetValidatorTest extends TestCase
         $this->assertSame('Satu baris per penjualan barang.', $dataset->description);
         $this->assertSame([
             'barang_id', 'org_unit_id', 'status', 'nilai', 'currency_code', 'tanggal', 'dicatat_pada', 'dibayar_pada',
-            'nama_pembeli', 'created_at', 'updated_at', 'barang_bawaan', 'dicatat_oleh_user_id', 'legal_entity_id',
+            'nama_pembeli', 'created_at', 'updated_at', 'barang_bawaan', 'dicatat_oleh_user_id',
+            $dataset->reference('barang_id')->filterKey(), 'legal_entity_id',
         ], array_keys($dataset->fields()), 'Katalog model lebih dulu (tanpa kolom tersembunyi), lalu field yang dinyatakan, lalu kolom dimensi bersama yang tersembunyi.');
 
         // Kolom tersembunyi yang dinyatakan ulang sebagai dimensi bersama mendapat nama tampilan dimensinya.

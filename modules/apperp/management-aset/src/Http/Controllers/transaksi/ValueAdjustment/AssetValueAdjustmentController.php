@@ -21,6 +21,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\ValueAdjustment\AssetValueAdj
 use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
+use Modules\Apperp\ManagementAset\Services\FixedAssetLedgerContext;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\ValueAdjustmentPosting;
 use Modules\Apperp\ManagementAset\Services\ValueAdjustmentPostingFailed;
@@ -260,6 +261,7 @@ class AssetValueAdjustmentController extends Controller
                 $hasil = $layanan->publish($dokumen, $rows);
 
                 $turun = $dokumen->jenis === AssetValueAdjustment::WRITE_DOWN;
+                FixedAssetLedgerContext::set($turun ? 'write_down' : 'appreciation', $dokumen->tanggal->toDateString(), 'value-adjustment', (string) $dokumen->id, (string) $dokumen->kode);
                 foreach ($rows as $row) {
                     $nilai = BigDecimal::of((string) $row->nilai);
                     $sebelum = BigDecimal::of((string) $row->book->net_book_value);

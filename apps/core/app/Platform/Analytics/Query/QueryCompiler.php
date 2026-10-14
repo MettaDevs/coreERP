@@ -58,6 +58,9 @@ final class QueryCompiler
     /** @throws AnalyticsQueryException */
     public function compile(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
     {
+        if ($query->records) {
+            return $this->records($dataset, $query, $principal);
+        }
         $references = [];
         foreach ($query->dimensions as $dimension) {
             if ($dimension->granularity === null && $dataset->reference($dimension->field) !== null) {
@@ -142,6 +145,10 @@ final class QueryCompiler
         $this->joins->apply($builder, $dataset, $columns, $references);
 
         $this->scope->apply($builder, $dataset, $principal);
+        foreach ($query->drill as $key => $value) {
+            $column = $dataset->qualified($key);
+            $value === null ? $builder->whereNull($column) : $builder->where($column, $value);
+        }
 
         foreach ($query->filters as $key => $value) {
             try {
@@ -162,6 +169,33 @@ final class QueryCompiler
         }
 
         return $builder;
+    }
+
+    /** Daftar mentah memakai gerbang dan query dasar yang sama; tidak mengelompokkan baris identik. */
+    private function records(CompiledDataset $dataset, AnalyticsQuery $query, AnalyticsPrincipal $principal): CompiledQuery
+    {
+        $fields = array_map(static fn (Dimension $dimension): string => $dimension->field, $query->dimensions);
+        $references = array_values(array_filter($fields, static fn (string $field): bool => $dataset->reference($field) !== null));
+        $builder = $this->filtered($dataset, $query, $principal, [...array_map($dataset->qualified(...), $fields), ...$this->filterColumns($dataset, $query, $principal)], $references);
+        $columns = [];
+        $sortSubjects = [];
+        foreach ($query->dimensions as $index => $dimension) {
+            $alias = 'd'.$index;
+            $column = $dataset->qualified($dimension->field);
+            $builder->addSelect($column.' as '.$alias);
+            $result = ResultColumn::dimension($alias, $dimension, $dataset);
+            if ($result->labelAlias !== null) {
+                $label = $dataset->labelColumnsFor($dimension->field)['label'] ?? throw new LogicException('Rujukan tanpa label.');
+                $builder->addSelect($label.' as '.$result->labelAlias);
+            }
+            $columns[] = $result;
+            $sortSubjects[$alias] = $column;
+        }
+        $this->order($builder, $query, $columns, $sortSubjects);
+        $limit = $query->limit ?? $principal->rowLimit();
+        $builder->limit($limit + 1);
+
+        return new CompiledQuery($builder, null, $columns, $limit);
     }
 
     /**
@@ -215,7 +249,7 @@ final class QueryCompiler
             }
         }
         if ($sorts === []) {
-            $sorts = [['key' => $query->measures[0], 'direction' => 'desc']];
+            $sorts = [['key' => $query->records ? $columns[0]->key : $query->measures[0], 'direction' => $query->records ? 'asc' : 'desc']];
         }
 
         $ordered = [];
@@ -301,6 +335,9 @@ final class QueryCompiler
         foreach (array_keys($query->filters) as $key) {
             $columns[] = $dataset->filterField($key)->column;
         }
+        foreach (array_keys($query->drill) as $key) {
+            $columns[] = $dataset->filterField($key)->column;
+        }
         if ($query->timeRange !== null) {
             $columns[] = $dataset->filterField($this->timeRangeField($dataset, $query->timeRange))->column;
         }
@@ -322,6 +359,9 @@ final class QueryCompiler
     private function currencyColumns(CompiledDataset $dataset, AnalyticsQuery $query): array
     {
         $columns = [];
+        foreach ($dataset->partitions as $key) {
+            $columns[$dataset->qualified($key)] = [$key, $dataset->filterField($key)->caption];
+        }
         foreach ($query->measures as $key) {
             $measure = $dataset->measure($key);
             foreach ([[$measure->currency, 'Mata uang'], [$measure->unit, 'Satuan']] as [$column, $caption]) {

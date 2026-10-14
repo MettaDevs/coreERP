@@ -35,6 +35,8 @@ final class QueryNormalizer
             totals: $query->totals,
             // Celah hanya ada di deret waktu; tanpa pengelompokan menurut waktu isian ini tidak berarti apa-apa.
             fillGaps: $query->fillGaps && $hasBucket,
+            records: $query->records,
+            drill: $query->drill,
         );
     }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { runQuery, widgetFailure } from '@/lib/analytics/api';
 import type { AnalyticsQuery, ResultSet } from '@/lib/analytics/types';
 import { CoreApiError } from '@/lib/core-api';
+import { useAnalyticsScope } from './use-analytics-scope';
 
 /** Jeda sejak isian terakhir berubah sebelum query dijalankan. */
 export const PREVIEW_DELAY_MS = 500;
@@ -21,13 +22,17 @@ type Loaded = {
  * berhasil, untuk ditampilkan redup selama perhitungan berikutnya berjalan. Membuka layar dan Muat ulang tidak
  * menunggu jeda. `null` berarti query belum lengkap; tidak ada yang dikirim.
  */
-export function useQueryPreview(query: AnalyticsQuery | null) {
+export function useQueryPreview(query: AnalyticsQuery | null, refresh = false) {
+    const scope = useAnalyticsScope();
     const body = query === null ? null : JSON.stringify(query);
     const [attempt, setAttempt] = useState(0);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
-    const [previous, setPrevious] = useState<ResultSet | null>(null);
+    const [previous, setPrevious] = useState<{
+        scope: string;
+        result: ResultSet;
+    } | null>(null);
     const lastBody = useRef<string | null | undefined>(undefined);
-    const key = body === null ? null : `${attempt}:${body}`;
+    const key = body === null ? null : `${scope}:${attempt}:${body}`;
 
     useEffect(() => {
         if (body === null || key === null) {
@@ -42,10 +47,10 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
         lastBody.current = body;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            runQuery(body, controller.signal)
+            runQuery(body, controller.signal, refresh || attempt > 0)
                 .then((result) => {
                     setLoaded({ key, result, error: null });
-                    setPrevious(result);
+                    setPrevious({ scope, result });
                 })
                 .catch((caught: unknown) => {
                     if (!controller.signal.aborted) {
@@ -58,7 +63,7 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [body, key]);
+    }, [body, key, refresh, attempt, scope]);
 
     const current = key !== null && loaded?.key === key ? loaded : null;
 
@@ -66,7 +71,8 @@ export function useQueryPreview(query: AnalyticsQuery | null) {
         loading: key !== null && current === null,
         result: current?.result ?? null,
         error: current?.error ?? null,
-        previous: key === null ? null : previous,
+        previous:
+            key !== null && previous?.scope === scope ? previous.result : null,
         reload: () => setAttempt((value) => value + 1),
     };
 }

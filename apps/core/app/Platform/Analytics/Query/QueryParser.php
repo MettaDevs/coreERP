@@ -22,7 +22,7 @@ use App\Platform\Modules\Contracts\FieldFilterExpression;
 final class QueryParser
 {
     /** @var list<string> */
-    public const KEYS = ['dataset', 'dimensions', 'measures', 'filters', 'time_range', 'sort', 'limit', 'totals', 'fill_gaps'];
+    public const KEYS = ['dataset', 'dimensions', 'measures', 'filters', 'time_range', 'sort', 'limit', 'totals', 'fill_gaps', 'records', 'drill'];
 
     /** Kunci fase 2 yang sudah ada di bentuk query tetapi belum dibaca engine. */
     public const FUTURE_KEYS = ['compare', 'formulas'];
@@ -53,12 +53,13 @@ final class QueryParser
         $this->assertKnownKeys($input, self::KEYS, '');
 
         $dimensions = $this->dimensions($input['dimensions'] ?? []);
+        $records = $this->flag($input['records'] ?? null, 'records', 'Mode daftar harus berupa true atau false.') ?? false;
         $buckets = array_filter($dimensions, static fn (Dimension $dimension): bool => $dimension->granularity !== null) !== [];
 
         return new AnalyticsQuery(
             dataset: $this->dataset($input['dataset'] ?? null),
             dimensions: $dimensions,
-            measures: $this->measures($input['measures'] ?? null),
+            measures: $records && ($input['measures'] ?? null) === [] ? [] : $this->measures($input['measures'] ?? null),
             filters: $this->filters($input['filters'] ?? []),
             timeRange: $this->timeRange($input['time_range'] ?? null),
             sort: $this->sort($input['sort'] ?? []),
@@ -66,6 +67,8 @@ final class QueryParser
             totals: $this->flag($input['totals'] ?? null, 'totals', 'Total harus berupa true atau false.') ?? false,
             // Bawaannya mengikuti ada tidaknya pengelompokan menurut waktu: celah hanya ada di deret waktu.
             fillGaps: $this->flag($input['fill_gaps'] ?? null, 'fill_gaps', 'Isian celah waktu harus berupa true atau false.') ?? $buckets,
+            records: $records,
+            drill: $this->drill($input['drill'] ?? []),
         );
     }
 
@@ -76,6 +79,27 @@ final class QueryParser
         }
 
         return $value;
+    }
+
+    /**
+     * Batas detail adalah kesamaan tambahan, tidak pernah mengganti saringan pengguna.
+     *
+     * @return array<string, string|int|bool|null>
+     */
+    private function drill(mixed $value): array
+    {
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
+            throw AnalyticsQueryException::invalidQuery('drill', 'Batas detail harus berisi kolom dan nilai.');
+        }
+        $out = [];
+        foreach ($value as $key => $item) {
+            if ($item !== null && ! is_string($item) && ! is_int($item) && ! is_bool($item)) {
+                throw AnalyticsQueryException::invalidQuery('drill', 'Nilai detail tidak dapat dibaca.');
+            }
+            $out[$this->key($key, 'drill', 'Kolom detail tidak dapat dibaca.')] = $item;
+        }
+
+        return $out;
     }
 
     /** @return list<Dimension> */

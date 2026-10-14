@@ -167,6 +167,17 @@ class TenantScopeBoundaryTest extends TestCase
 
         $this->assertGreaterThan(0, $moduleDiperiksa, 'Tidak ada module yang diperiksa; penjaga ini akan lulus tanpa menguji apa pun.');
         $this->assertGreaterThan(0, $berkasDiperiksa, 'Tidak ada berkas module yang dibaca; penjaga ini tidak menguji apa pun.');
+        // Migration rekonstruksi melintasi tenant, tetapi semua bacaan sumber per buku dan insert
+        // memakai tenant buku tersebut. Setter context hanya mengisi variabel lokal transaksi,
+        // tanpa membaca tabel. Pengecualian dibatasi pada berkas DAN jenis panggilan berikut.
+        $allowedRawQueries = [
+            'modules/apperp/management-aset/src/Services/FixedAssetLedgerBackfill.php memakai DB::table(',
+            'modules/apperp/management-aset/src/Services/FixedAssetLedgerContext.php memakai DB::select(',
+        ];
+        foreach ($allowedRawQueries as $allowed) {
+            $this->assertContains($allowed, $pelanggaran, 'Pengecualian query mentah sudah tidak dipakai; hapus dari penjaga.');
+        }
+        $pelanggaran = array_values(array_diff($pelanggaran, $allowedRawQueries));
         $this->assertSame([], $pelanggaran, implode("\n", [
             'Kode module memakai query builder mentah pada tabelnya sendiri.',
             'Query mentah melewati global scope tenant, jadi ia tidak tersaring dan tidak ada yang memberi tahu.',

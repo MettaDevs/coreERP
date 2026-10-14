@@ -239,8 +239,9 @@ export async function fetchDataset(
 export function runQuery(
     query: AnalyticsQuery | string,
     signal?: AbortSignal,
+    refresh = false,
 ): Promise<ResultSet> {
-    return apiJson<ResultSet>(`${BASE}/query`, {
+    return apiJson<ResultSet>(`${BASE}/query${refresh ? '?refresh=1' : ''}`, {
         method: 'POST',
         body: typeof query === 'string' ? query : JSON.stringify(query),
         signal,

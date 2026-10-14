@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchDataset, widgetFailure } from '@/lib/analytics/api';
 import type { DatasetDescription } from '@/lib/analytics/types';
+import { useAnalyticsScope } from './use-analytics-scope';
 
 /**
  * Isi satu data dari katalog yang sama dengan pemilih nilai, kolom, dan saringan selama halaman terbuka. Kolom data
@@ -19,11 +20,13 @@ type Fetched = {
  * bersama kodenya, jadi isi data sebelumnya tidak pernah tampil sebagai isi data yang baru dipilih.
  */
 export function useDatasetDescription(code: string | null) {
+    const scope = useAnalyticsScope();
+    const key = code === null ? null : `${scope}:${code}`;
     const [fetched, setFetched] = useState<Fetched | null>(null);
-    const known = code === null ? undefined : loaded.get(code);
+    const known = key === null ? undefined : loaded.get(key);
 
     useEffect(() => {
-        if (code === null || code === '' || loaded.has(code)) {
+        if (code === null || code === '' || key === null || loaded.has(key)) {
             return;
         }
 
@@ -31,13 +34,13 @@ export function useDatasetDescription(code: string | null) {
 
         fetchDataset(code, controller.signal)
             .then((description) => {
-                loaded.set(code, description);
-                setFetched({ code, description, failure: null });
+                loaded.set(key, description);
+                setFetched({ code: key, description, failure: null });
             })
             .catch((caught: unknown) => {
                 if (!controller.signal.aborted) {
                     setFetched({
-                        code,
+                        code: key,
                         description: null,
                         failure: widgetFailure(caught).message,
                     });
@@ -45,7 +48,7 @@ export function useDatasetDescription(code: string | null) {
             });
 
         return () => controller.abort();
-    }, [code]);
+    }, [code, key]);
 
     if (code === null || code === '') {
         return { description: null, loading: false, failure: null };
@@ -55,7 +58,7 @@ export function useDatasetDescription(code: string | null) {
         return { description: known, loading: false, failure: null };
     }
 
-    const current = fetched !== null && fetched.code === code ? fetched : null;
+    const current = fetched !== null && fetched.code === key ? fetched : null;
 
     return {
         description: current?.description ?? null,

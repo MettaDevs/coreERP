@@ -173,7 +173,7 @@ export function DepreciationPostingSheet({
                 className="w-full gap-0 p-0 sm:max-w-3xl"
             >
                 <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>Post penyusutan</SheetTitle>
+                    <SheetTitle>Jurnal penyusutan untuk Finance</SheetTitle>
                     <SheetDescription>
                         Mengirim penyusutan final satu buku dan satu periode ke
                         aplikasi finance sebagai satu jurnal ringkas, bertanggal
@@ -318,7 +318,7 @@ export function DepreciationPostingSheet({
                         disabled={sibuk || !siapPost}
                         onClick={() => void post()}
                     >
-                        {sibuk ? 'Memproses…' : 'Post'}
+                        {sibuk ? 'Memproses…' : 'Siapkan jurnal'}
                     </Button>
                 </SheetFooter>
             </SheetContent>

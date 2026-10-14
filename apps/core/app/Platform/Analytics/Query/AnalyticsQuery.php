@@ -19,6 +19,7 @@ final readonly class AnalyticsQuery
      * @param  list<string>  $measures
      * @param  array<string, string|list<string>>  $filters
      * @param  list<array{key: string, direction: 'asc'|'desc'}>  $sort
+     * @param  array<string, string|int|bool|null>  $drill
      */
     public function __construct(
         public string $dataset,
@@ -30,6 +31,8 @@ final readonly class AnalyticsQuery
         public ?int $limit,
         public bool $totals,
         public bool $fillGaps,
+        public bool $records = false,
+        public array $drill = [],
     ) {}
 
     /**
@@ -47,6 +50,8 @@ final readonly class AnalyticsQuery
             }
         }
         unset($value);
+        $drill = $this->drill;
+        ksort($drill);
 
         return [
             'dataset' => $this->dataset,
@@ -58,6 +63,8 @@ final readonly class AnalyticsQuery
             'limit' => $this->limit,
             'totals' => $this->totals,
             'fill_gaps' => $this->fillGaps,
+            'records' => $this->records,
+            'drill' => $drill,
         ];
     }
 }

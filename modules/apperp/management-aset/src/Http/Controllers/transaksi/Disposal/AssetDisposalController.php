@@ -14,6 +14,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\DisposalPosting;
 use Modules\Apperp\ManagementAset\Services\DisposalPostingFailed;
+use Modules\Apperp\ManagementAset\Services\FixedAssetLedgerContext;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
@@ -170,6 +171,7 @@ class AssetDisposalController extends Controller
                     'id' => (string) $dokumen->id, 'kode' => (string) $dokumen->kode, 'keterangan' => $dokumen->keterangan,
                 ]);
                 Aset::query()->whereKey($aset->id)->update(['lifecycle_state' => StatusAset::DILEPAS, 'updated_at' => now()]);
+                FixedAssetLedgerContext::set('disposal', $this->date($dokumen), $type, (string) $dokumen->id, (string) $dokumen->kode);
                 BukuAset::query()
                     ->where(['aset_id' => $aset->id, 'status' => 'active'])
                     ->update(['status' => 'closed', 'closed_on' => $this->date($dokumen), 'updated_at' => now()]);

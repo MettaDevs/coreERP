@@ -45,6 +45,14 @@ final class JoinPlanner
         $joins = $dataset->joins();
         $base = $dataset->table;
 
+        foreach ($dataset->fields() as $key => $field) {
+            $reference = $dataset->reference($key);
+            if ($reference !== null && in_array($reference->labelColumn, $columns, true)) {
+                $references[] = $key;
+            }
+        }
+        $references = array_values(array_unique($references));
+
         $labels = [];
         foreach ($references as $key) {
             $labels[$key] = $dataset->reference($key) ?? throw new LogicException("Field `{$key}` bukan rujukan dataset `{$dataset->code}`.");

@@ -1,5 +1,8 @@
 # Dataset analitik
 
+[Ledger aset dan engine analisis bersama](./ledger-aset) menjelaskan transaksi nilai aset, daftar mentah,
+group bertingkat, detail, pivot, serta pemisahan buku dan mata uang.
+
 Management Aset menyatakan **dataset** supaya [engine analitik](/dev/35-analitik) Core dapat menghitung tabel aset menjadi dasbor: berapa aset per group, berapa nilai buku per unit, berapa jam downtime per bulan. Satu dataset adalah pernyataan dari module tentang satu tabel atau gabungan tabel — kolom mana yang boleh dikelompokkan, nilai mana yang sah dijumlah, siapa yang boleh membacanya, dan kolom mana yang menentukan unit kerja pemiliknya. Satu **baris** dalam dataset mewakili satu hal di dunia nyata; apa persisnya berbeda per dataset, dan kolom "Satu baris mewakili" di bawah menyebutnya.
 
 Halaman ini untuk developer yang akan menambah atau mengubah dataset aset. Cara kerja engine, aturan keamanannya, dan cara menyatakan dataset secara umum ada di [engine analitik](/dev/35-analitik); yang ditulis di sini hanya bagian yang dimiliki module aset.

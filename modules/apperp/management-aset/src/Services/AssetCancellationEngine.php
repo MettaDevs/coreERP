@@ -264,6 +264,7 @@ final class AssetCancellationEngine
         if (($problems = $this->blockers($cancellation->resource, $document, $cancellation->posting_date->toDateString())) !== []) {
             throw ValidationException::withMessages($problems);
         }
+        FixedAssetLedgerContext::set('reversal', $cancellation->posting_date->toDateString(), 'asset-cancellation', (string) $cancellation->id, '', $cancellation->reason);
         $postings = match (true) {
             $document instanceof DepreciationPeriod => $this->cancelDepreciation($document, $cancellation),
             $document instanceof AssetValueAdjustment => $this->cancelValueAdjustment($document, $cancellation),

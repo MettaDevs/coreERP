@@ -21,6 +21,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\PenempatanA
 use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustment;
 use Modules\Apperp\ManagementAset\Services\AcquisitionAdjustmentFailed;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
+use Modules\Apperp\ManagementAset\Services\FixedAssetLedgerContext;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
 use Modules\Apperp\ManagementAset\Support\AssetConditionPolicy;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
@@ -491,6 +492,7 @@ class AsetController extends Controller
      */
     private function applyValueChange(Aset $aset, array $data): void
     {
+        FixedAssetLedgerContext::set('acquisition_correction', (string) ($data['adjustment_date'] ?? now()->toDateString()), 'asset', (string) $aset->id, (string) $aset->kode, (string) ($data['reason'] ?? 'Koreksi nilai perolehan'));
         $changes = ['updated_at' => now()];
         if (array_key_exists('acquisition_value', $data)) {
             $changes['acquisition_value'] = $data['acquisition_value'];

@@ -41,6 +41,7 @@ final readonly class CompiledDataset
      * @param  array<string, FilterField>  $fields
      * @param  array<string, CompiledMeasure>  $measures
      * @param  list<string>  $times
+     * @param  list<string>  $partitions
      * @param  array<string, string>  $renamed  kunci lama => kunci baru
      * @param  array<string, DataClass>  $classifications  per kunci field
      * @param  array<string, string>  $columnTypes  nama tipe PostgreSQL kolom tiap field (`int4`, `date`, …)
@@ -72,6 +73,7 @@ final readonly class CompiledDataset
         private array $joins = [],
         private ?Closure $source = null,
         private string $hash = '',
+        public array $partitions = [],
     ) {}
 
     /**

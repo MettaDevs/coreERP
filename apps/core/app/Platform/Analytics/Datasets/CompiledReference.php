@@ -16,6 +16,11 @@ use Illuminate\Database\Eloquent\Model;
  */
 final readonly class CompiledReference
 {
+    public function filterKey(): string
+    {
+        return 'reference_label_'.substr(hash('sha256', $this->key), 0, 16);
+    }
+
     /**
      * @param  class-string<Model>  $model
      */

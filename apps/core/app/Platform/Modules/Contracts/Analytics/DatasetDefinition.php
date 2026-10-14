@@ -23,6 +23,16 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class DatasetDefinition
 {
+    /** @var list<string> Dimensi yang selalu memisahkan nilai, termasuk total. */
+    private array $partitions = [];
+
+    public function partition(string $field): self
+    {
+        $this->partitions[] = $field;
+
+        return $this;
+    }
+
     /** @var array<string, array{caption: string, aggregate: Aggregate, field: ?string, format: MeasureFormat, currency: ?string, unit: ?string, where: array<string, list<string|int|bool|null>|string|int|bool|null>}> */
     private array $measures = [];
 
@@ -48,7 +58,7 @@ final class DatasetDefinition
     /** @var array<string, array{model: class-string, localColumn: string, foreignColumn: string, includeArchived: bool}> */
     private array $joins = [];
 
-    /** @var array<string, array{model: class-string, label: string, code: ?string}> */
+    /** @var array<string, array{model: class-string, label: string, code: ?string, localColumn: ?string}> */
     private array $references = [];
 
     /** @var array<string, SharedDimension> */
@@ -174,9 +184,9 @@ final class DatasetDefinition
      *
      * @param  class-string  $model
      */
-    public function reference(string $key, string $model, string $label = 'nama', ?string $code = 'kode'): self
+    public function reference(string $key, string $model, string $label = 'nama', ?string $code = 'kode', ?string $localColumn = null): self
     {
-        $this->references[$key] = compact('model', 'label', 'code');
+        $this->references[$key] = compact('model', 'label', 'code', 'localColumn');
 
         return $this;
     }

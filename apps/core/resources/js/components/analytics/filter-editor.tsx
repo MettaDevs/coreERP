@@ -8,14 +8,15 @@ import type { RefObject } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { DatasetField } from '@/lib/analytics/types';
 import { apiJson } from '@/lib/core-api';
+import { useAnalyticsScope } from './use-analytics-scope';
 
 /**
- * Saringan pengguna pada kolom data analitik: versi Core dari pola filter tambahan laporan K-30
+ * Filter pengguna pada kolom data analitik: versi Core dari pola filter tambahan laporan K-30
  * (`AdditionalFilters` di UI module aset, padanan "+ Filter" request page Business Central), dengan sintaks yang
  * sama karena server menjalankannya lewat `FieldFilterExpression` yang sama (KA-08).
  *
- * - Data analitik tidak menyatakan kolom saringan bawaan, jadi yang tampil adalah kolom yang sudah berisi (dari
- *   tautan atau bagian yang diubah) lalu kolom yang ditambahkan lewat "Tambah saringan".
+ * - Data analitik tidak menyatakan kolom filter bawaan, jadi yang tampil adalah kolom yang sudah berisi (dari
+ *   tautan atau bagian yang diubah) lalu kolom yang ditambahkan lewat "Tambah filter".
  * - Teks, angka, dan tanggal memakai ekspresi dengan contoh sintaks di bawah isian; nilainya baru dipakai saat
  *   Enter atau saat isian ditinggalkan, supaya ekspresi yang belum selesai ("100..") tidak dijalankan.
  * - Pilihan dan ya/tidak memakai daftar nilainya. Rujukan memakai daftar dari endpoint lookup module yang disebut
@@ -114,7 +115,9 @@ function referenceSource(
 }
 
 function useReferenceOptions(field: DatasetField, moduleId: string) {
-    const key = referenceSource(field, moduleId)?.key ?? null;
+    const scope = useAnalyticsScope();
+    const sourceKey = referenceSource(field, moduleId)?.key;
+    const key = sourceKey === undefined ? null : `${scope}:${sourceKey}`;
     const [loaded, setLoaded] = useState<{
         key: string;
         options: Option[];
@@ -124,36 +127,36 @@ function useReferenceOptions(field: DatasetField, moduleId: string) {
     useEffect(() => {
         const source = referenceSource(field, moduleId);
 
-        if (source === null) {
+        if (source === null || key === null) {
             return;
         }
 
         let cancelled = false;
-        let pending = optionSources.get(source.key);
+        let pending = optionSources.get(key);
 
         if (pending === undefined) {
             pending = source.load();
-            optionSources.set(source.key, pending);
+            optionSources.set(key, pending);
             // Kegagalan tidak disimpan: membuka ulang isian mencoba lagi.
-            pending.catch(() => optionSources.delete(source.key));
+            pending.catch(() => optionSources.delete(key));
         }
 
         pending
             .then((options) => {
                 if (!cancelled) {
-                    setLoaded({ key: source.key, options, failed: false });
+                    setLoaded({ key, options, failed: false });
                 }
             })
             .catch(() => {
                 if (!cancelled) {
-                    setLoaded({ key: source.key, options: [], failed: true });
+                    setLoaded({ key, options: [], failed: true });
                 }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [field, moduleId]);
+    }, [field, moduleId, key]);
 
     const current = loaded !== null && loaded.key === key ? loaded : null;
 
@@ -395,8 +398,8 @@ export function FilterEditor({
                             variant="ghost"
                             size="icon"
                             className="mt-0.5"
-                            aria-label={`Hapus saringan ${field.caption}`}
-                            title={`Hapus saringan ${field.caption}`}
+                            aria-label={`Hapus filter ${field.caption}`}
+                            title={`Hapus filter ${field.caption}`}
                             onClick={() => remove(key)}
                         >
                             <X />
@@ -411,7 +414,7 @@ export function FilterEditor({
                         aria-hidden
                     />
                     <Select
-                        label="Tambah saringan"
+                        label="Tambah filter"
                         items={remaining}
                         value={null}
                         onValueChange={(next) => {
