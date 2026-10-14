@@ -101,6 +101,7 @@ class PenerimaanAsetTest extends TestCase
 
     public function test_penerimaan_dapat_menyimpan_lampiran_ke_disk_lokal_yang_dikonfigurasi(): void
     {
+        config(['coreerp.attachments.disk' => 'local']);
         $id = $this->draf([$this->baris(1)]);
         $path = '/api/v1/records/aset_tr_penerimaan_aset/'.$id.'/attachments';
         $pdf = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";

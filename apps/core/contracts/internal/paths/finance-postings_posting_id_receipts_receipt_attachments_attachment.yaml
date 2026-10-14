@@ -23,7 +23,7 @@ get:
           schema: { type: string, format: binary }
     '401': { description: Token tidak sah }
     '403': { description: Scope atau IP tidak diizinkan }
-    '404': { description: Posting, parent atau lampiran tidak tersedia }
+    '404': { description: 'Posting, parent atau lampiran tidak tersedia' }
     '413': { description: Berkas lebih dari 25 MiB }
     '429': { description: Batas permintaan tercapai }
     '503': { description: Lingkungan atau berkas tidak dapat dilayani }

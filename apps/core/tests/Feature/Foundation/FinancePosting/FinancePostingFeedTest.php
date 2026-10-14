@@ -835,7 +835,7 @@ class FinancePostingFeedTest extends TestCase
         $parentReadable = false;
         $this->getJson($url)->assertNotFound();
         $parentReadable = true;
-        $posting->update(['status' => FinancePosting::POSTED]);
+        $posting->update(['status' => FinancePosting::POSTED, 'external_reference' => 'JV-UJI-BUKTI-001']);
         $this->getJson($url)->assertOk();
         Storage::disk('local')->put('evidence-test.pdf', 'corrupted');
         $this->getJson($url.'/'.$file->id)->assertStatus(503);

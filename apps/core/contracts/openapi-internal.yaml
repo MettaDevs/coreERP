@@ -1586,8 +1586,7 @@ paths:
         '403':
           description: Scope atau IP tidak diizinkan
         '404':
-          description: Posting
-          parent atau lampiran tidak tersedia: null
+          description: Posting, parent atau lampiran tidak tersedia
         '413':
           description: Berkas lebih dari 25 MiB
         '429':
