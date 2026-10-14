@@ -64,7 +64,8 @@ final class FinancePostingEvidenceController extends Controller
     /** @return Builder<DocumentAttachment> */
     private function attachments(Request $request, string $postingId, string $receiptId): Builder
     {
-        $client = IntegrationClient::query()->findOrFail($request->attributes->get(AuthenticateIntegrationClient::ATTRIBUTE));
+        $clientId = (string) $request->attributes->get(AuthenticateIntegrationClient::ATTRIBUTE);
+        $client = IntegrationClient::query()->findOrFail($clientId);
         $query = FinancePosting::query()->where('tenant_id', $client->tenant_id)->where('posting_id', $postingId)
             ->whereIn('status', [FinancePosting::PENDING, FinancePosting::POSTED]);
         FinancePosting::restrictToClient($query, $client);
