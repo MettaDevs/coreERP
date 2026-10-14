@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Foundation\Vendor;
 
+use App\Foundation\Vendor\Models\Vendor;
 use App\Foundation\Vendor\ModuleServices\VendorDirectoryCore;
 use App\Foundation\Vendor\Support\VendorAttachments;
 use App\Foundation\Vendor\Support\VendorLabels;
+use App\Platform\AddressBook\Events\PartyNameChanged;
 use App\Platform\Modules\Contracts\Analytics\SharedDimensions;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\VendorDirectory;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -27,6 +30,9 @@ final class VendorServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(PartyNameChanged::class, function (PartyNameChanged $event): void {
+            Vendor::query()->where('tenant_id', $event->tenantId)->where('party_id', $event->partyId)->update(['updated_at' => now()]);
+        });
         // Lampiran dokumen (gap 7): vendor adalah record milik Core yang boleh diberi lampiran. Module
         // mendaftarkan record miliknya dari penyedia layanannya sendiri.
         $this->app->make(AttachmentRecordTypes::class)->register(new VendorAttachments);

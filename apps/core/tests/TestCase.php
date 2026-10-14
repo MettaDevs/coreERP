@@ -309,6 +309,7 @@ abstract class TestCase extends BaseTestCase
         foreach ([
             ...(glob(database_path('migrations/*_security_catalog.php')) ?: []),
             ...(glob(database_path('migrations/*_integration_scopes.php')) ?: []),
+            ...(glob(database_path('migrations/*_party_directory_reference_data.php')) ?: []),
         ] as $migration) {
             (require $migration)->up();
         }

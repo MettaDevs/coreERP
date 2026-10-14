@@ -45,21 +45,6 @@ return new class extends Migration
             $table->string('name', 120);
             $table->primary(['category', 'code']);
         });
-        foreach ([
-            'gender' => ['female' => 'Perempuan', 'male' => 'Laki-laki', 'unspecified' => 'Tidak disebutkan'],
-            'marital_status' => ['single' => 'Belum menikah', 'married' => 'Menikah', 'divorced' => 'Cerai', 'widowed' => 'Pasangan meninggal'],
-            'abc_code' => ['A' => 'A', 'B' => 'B', 'C' => 'C'],
-            'language' => ['id' => 'Bahasa Indonesia', 'en' => 'English'],
-            'role' => ['vendor' => 'Vendor', 'customer' => 'Pelanggan', 'worker' => 'Pegawai', 'contact' => 'Kontak', 'prospect' => 'Calon pelanggan', 'competitor' => 'Pesaing', 'applicant' => 'Pelamar'],
-        ] as $category => $values) {
-            foreach ($values as $code => $name) {
-                DB::table('party_reference_values')->insert(['category' => $category, 'code' => $code, 'name' => $name]);
-            }
-        }
-        foreach (['person' => 'Perorangan', 'organization' => 'Organisasi', 'legal_entity' => 'Entitas legal', 'operating_unit' => 'Unit operasional', 'team' => 'Tim'] as $code => $name) {
-            DB::table('party_types')->where('code', $code)->update(['name' => $name]);
-        }
-
         Schema::create('address_books', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->ulid('tenant_id');
@@ -95,13 +80,6 @@ return new class extends Migration
             $table->string('from_type', 20);
             $table->string('to_type', 20);
         });
-        foreach ([
-            ['contact', 'Kontak dari', 'Memiliki kontak', 'person', 'organization'],
-            ['subsidiary', 'Anak perusahaan dari', 'Induk perusahaan dari', 'organization', 'organization'],
-            ['branch', 'Cabang dari', 'Memiliki cabang', 'organization', 'organization'],
-        ] as [$code, $name, $inverse, $from, $to]) {
-            DB::table('party_relationship_types')->insert(['code' => $code, 'name' => $name, 'inverse_name' => $inverse, 'from_type' => $from, 'to_type' => $to]);
-        }
         Schema::create('party_relationships', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->ulid('tenant_id');

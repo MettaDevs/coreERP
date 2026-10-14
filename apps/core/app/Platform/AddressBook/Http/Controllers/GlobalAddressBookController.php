@@ -2,11 +2,11 @@
 
 namespace App\Platform\AddressBook\Http\Controllers;
 
-use App\Foundation\NumberSequence\Support\CoreNumberSequences;
-use App\Foundation\Vendor\Models\Vendor;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Actions\SaveParty;
+use App\Platform\AddressBook\Contracts\PartyNumbers;
+use App\Platform\AddressBook\Events\PartyNameChanged;
 use App\Platform\AddressBook\Models\AddressBook;
 use App\Platform\AddressBook\Models\ElectronicAddress;
 use App\Platform\AddressBook\Models\LocationPurpose;
@@ -17,6 +17,7 @@ use App\Platform\AddressBook\Models\PartyType;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Organization\Models\OrganizationParty;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -91,8 +92,7 @@ final class GlobalAddressBookController extends Controller
             'address_book_ids' => PartyAddressBook::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->pluck('address_book_id'),
             'organization_id' => OrganizationParty::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->value('organization_id'),
             'relationships' => $relationships->map(fn ($row) => [...$row->toArray(), 'from_name' => $names[$row->from_party_id] ?? 'Pihak terarsip', 'to_name' => $names[$row->to_party_id] ?? 'Pihak terarsip']),
-            'vendors' => $canReadVendors ? Vendor::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->with('legalEntity')->get()
-                ->map(fn ($vendor) => ['id' => $vendor->id, 'number' => $vendor->number, 'status' => $vendor->status, 'legal_entity_id' => $vendor->legal_entity_id, 'company' => $vendor->legalEntity?->name]) : [],
+            'vendors' => $canReadVendors ? app(VendorDirectory::class)->forParty($tenant, $party->id) : [],
         ]]);
     }
 
@@ -116,7 +116,7 @@ final class GlobalAddressBookController extends Controller
         $key = $request->header('Idempotency-Key');
         $key = is_string($key) && preg_match('/^[A-Za-z0-9._:-]{8,120}$/D', $key) ? $key : (string) Str::ulid();
         $key = 'directory:'.$key;
-        app(CoreNumberSequences::class)->ensure($membership->tenant_id, 'core.party');
+        app(PartyNumbers::class)->prepare($membership->tenant_id);
         $party = DB::transaction(function () use ($membership, $data, $key): Party {
             $party = $this->saveParty->create($membership->tenant_id, array_diff_key($data, ['address_book_ids' => true]), $key);
             if ($party->wasRecentlyCreated) {
@@ -150,7 +150,9 @@ final class GlobalAddressBookController extends Controller
                 $this->syncBooks($party, $data['address_book_ids']);
             }
             // Pembaca vendor yang lama juga menyaring lewat waktu perubahan akun vendor.
-            Vendor::query()->where('tenant_id', $party->tenant_id)->where('party_id', $party->id)->update(['updated_at' => now()]);
+            if ($party->wasChanged('name')) {
+                event(new PartyNameChanged($party->tenant_id, $party->id));
+            }
 
             return $party->refresh();
         });

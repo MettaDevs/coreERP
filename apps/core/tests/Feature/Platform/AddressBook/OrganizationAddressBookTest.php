@@ -52,7 +52,7 @@ class OrganizationAddressBookTest extends TestCase
 
         // Organisasi kini punya party dengan nama yang sama.
         $this->assertDatabaseHas('organization_parties', ['organization_id' => $organization]);
-        $this->assertDatabaseHas('parties', ['tenant_id' => $this->membership->tenant_id, 'name' => 'PT Alamat Jaya', 'type' => 'organization']);
+        $this->assertDatabaseHas('parties', ['tenant_id' => $this->membership->tenant_id, 'name' => 'PT Alamat Jaya', 'type' => 'legal_entity']);
 
         // Alamat kedua tidak merebut status utama; di luar negeri nama negaranya ikut tercetak.
         $second = $this->actingAs($this->owner)

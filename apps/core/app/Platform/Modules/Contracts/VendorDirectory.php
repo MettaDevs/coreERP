@@ -28,4 +28,7 @@ interface VendorDirectory
      * @return array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}|null
      */
     public function find(string $tenantId, string $vendorId): ?array;
+
+    /** @return list<array{id: string, number: string, status: string, legal_entity_id: string, company: ?string}> */
+    public function forParty(string $tenantId, string $partyId): array;
 }

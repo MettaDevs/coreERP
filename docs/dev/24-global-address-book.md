@@ -125,7 +125,12 @@ dibuka melalui token integrasi oleh revamp ini.
 Kode utama: `GlobalAddressBookController`, `SaveParty`, dan
 `apps/core/resources/js/pages/platform/address-book/index.tsx` beserta komponen dan `types.ts`.
 Migration `2026_10_14_190000_complete_party_directory` menambah kolom profil/nomor, kelompok,
-hubungan, dan rincian alamat Indonesia. Pengguna meminta rebuild runtime serta pengujian
+hubungan, dan rincian alamat Indonesia. Data acuan berada pada migration idempoten
+`2026_10_14_190100_seed_party_directory_reference_data`, sehingga fixture test yang dikosongkan
+dapat dipulihkan tanpa membuat ulang skema. Platform memakai kontrak `PartyNumbers` yang
+implementasinya didaftarkan Foundation; akun vendor dibaca lewat `VendorDirectory`, dan
+Foundation mendengarkan event dalam runtime `PartyNameChanged` untuk memperbarui waktu akun.
+Pengguna meminta rebuild runtime serta pengujian
 akhir dilakukan sendiri; perubahan ini belum diverifikasi di container sesudah revamp.
 
 ## Akun vendor per entitas legal

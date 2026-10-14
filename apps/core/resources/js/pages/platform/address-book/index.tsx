@@ -56,7 +56,10 @@ export default function GlobalAddressBook(props: Props) {
             { preserveState: true, replace: true },
         );
     const openParty = (party: Party) => {
-        if (party.deleted_at) return;
+        if (party.deleted_at) {
+            return;
+        }
+
         router.get(
             '/settings/global-address-book',
             {
@@ -69,9 +72,13 @@ export default function GlobalAddressBook(props: Props) {
         );
     };
     async function restoreParty(party: Party) {
-        if (restoringId) return;
+        if (restoringId) {
+            return;
+        }
+
         setRestoringId(party.id);
         setError('');
+
         try {
             await apiJson(`/api/v1/parties/${party.id}/restore`, {
                 method: 'POST',
@@ -88,6 +95,7 @@ export default function GlobalAddressBook(props: Props) {
     async function assignNumbers() {
         setNumbering(true);
         setError('');
+
         try {
             await apiJson('/api/v1/parties/assign-numbers', { method: 'POST' });
             router.reload({ only: ['parties'] });
@@ -97,6 +105,7 @@ export default function GlobalAddressBook(props: Props) {
             setNumbering(false);
         }
     }
+
     return (
         <>
             <Head title="Buku alamat global" />

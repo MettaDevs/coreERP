@@ -113,6 +113,7 @@ export function PartyForm({
                     : value,
             ]),
         );
+
         try {
             const result = await apiJson<{ data: Party }>(
                 party ? `/api/v1/parties/${party.id}` : '/api/v1/parties',
@@ -132,7 +133,10 @@ export function PartyForm({
             onSaved(result.data);
         } catch (caught) {
             setError(errorText(caught, 'Pihak belum dapat disimpan.'));
-            if (caught instanceof CoreApiError) setErrors(caught.errors);
+
+            if (caught instanceof CoreApiError) {
+                setErrors(caught.errors);
+            }
         } finally {
             setBusy(false);
         }
@@ -193,7 +197,9 @@ export function PartyForm({
         <Sheet
             open
             onOpenChange={(open) => {
-                if (!open && !busy) onClose();
+                if (!open && !busy) {
+                    onClose();
+                }
             }}
         >
             <SheetContent

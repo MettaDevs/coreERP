@@ -2,8 +2,8 @@
 
 namespace App\Platform\AddressBook\Support;
 
-use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Platform\AddressBook\Actions\SaveParty;
+use App\Platform\AddressBook\Contracts\PartyNumbers;
 use App\Platform\AddressBook\Models\ElectronicAddress;
 use App\Platform\AddressBook\Models\Location;
 use App\Platform\AddressBook\Models\LocationPurpose;
@@ -58,7 +58,7 @@ final class OrganizationAddressBook
             return $party;
         }
 
-        app(CoreNumberSequences::class)->ensure($organization->tenant_id, 'core.party');
+        app(PartyNumbers::class)->prepare($organization->tenant_id);
 
         return DB::transaction(function () use ($organization): Party {
             Organization::query()->where('tenant_id', $organization->tenant_id)->whereKey($organization->id)->lockForUpdate()->firstOrFail();

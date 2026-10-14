@@ -41,6 +41,7 @@ export function AddressBookManager({
         event.preventDefault();
         setBusy(true);
         setError('');
+
         try {
             const result = await apiJson<{ data: AddressBook }>(
                 editing
@@ -69,9 +70,13 @@ export function AddressBookManager({
         }
     }
     async function archive() {
-        if (!archiving) return;
+        if (!archiving) {
+            return;
+        }
+
         setBusy(true);
         setError('');
+
         try {
             await apiRequest(`/api/v1/address-books/${archiving.id}`, {
                 method: 'DELETE',
@@ -82,10 +87,12 @@ export function AddressBookManager({
                 current.filter((item) => item.id !== archiving.id),
             );
             setArchiving(null);
+
             if (editing?.id === archiving.id) {
                 setEditing(null);
                 setName('');
             }
+
             router.reload({ only: ['addressBooks'] });
         } catch (caught) {
             setError(errorText(caught, 'Buku alamat belum dapat diarsipkan.'));
@@ -93,11 +100,14 @@ export function AddressBookManager({
             setBusy(false);
         }
     }
+
     return (
         <Dialog
             open
             onOpenChange={(open) => {
-                if (!open && !busy) onClose();
+                if (!open && !busy) {
+                    onClose();
+                }
             }}
         >
             <DialogContent>
@@ -160,18 +170,25 @@ export function AddressBookManager({
                         ]}
                         actionsPlacement="inline"
                         onRowAction={(action, book) => {
-                            if (busy) return;
+                            if (busy) {
+                                return;
+                            }
+
                             if (action === 'edit') {
                                 setEditing(book);
                                 setName(book.name);
-                            } else setArchiving(book);
+                            } else {
+                                setArchiving(book);
+                            }
                         }}
                     />
                 </div>
                 <AlertDialog
                     open={archiving !== null}
                     onOpenChange={(open) => {
-                        if (!open && !busy) setArchiving(null);
+                        if (!open && !busy) {
+                            setArchiving(null);
+                        }
                     }}
                 >
                     <AlertDialogContent>

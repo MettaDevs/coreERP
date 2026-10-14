@@ -67,7 +67,10 @@ export function PartyRelationships({
     const [error, setError] = useState('');
     const contentRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        if (!editing) return;
+        if (!editing) {
+            return;
+        }
+
         const controller = new AbortController();
         apiJson<{ data: typeof options }>(
             `/api/v1/parties/options?q=${encodeURIComponent(query)}`,
@@ -77,11 +80,13 @@ export function PartyRelationships({
                 setOptions(result.data.filter((item) => item.id !== party.id)),
             )
             .catch((caught) => {
-                if (!controller.signal.aborted)
+                if (!controller.signal.aborted) {
                     setError(
                         errorText(caught, 'Daftar pihak belum dapat dimuat.'),
                     );
+                }
             });
+
         return () => controller.abort();
     }, [editing, query, party.id]);
     const open = (row: PartyRelationship | 'new') => {
@@ -111,9 +116,14 @@ export function PartyRelationships({
     };
     async function save(event: React.FormEvent) {
         event.preventDefault();
-        if (!editing) return;
+
+        if (!editing) {
+            return;
+        }
+
         setBusy(true);
         setError('');
+
         try {
             await apiJson(
                 `/api/v1/parties/${party.id}/relationships${editing === 'new' ? '' : `/${editing.id}`}`,
@@ -147,9 +157,13 @@ export function PartyRelationships({
         }
     }
     async function archive() {
-        if (!archiving) return;
+        if (!archiving) {
+            return;
+        }
+
         setBusy(true);
         setError('');
+
         try {
             await apiRequest(
                 `/api/v1/parties/${party.id}/relationships/${archiving.id}`,
@@ -181,11 +195,14 @@ export function PartyRelationships({
         value: item.id,
         label: item.name,
     }));
+
     if (
         currentOther &&
         !choices.some((choice) => choice.value === currentOther.value)
-    )
+    ) {
         choices.unshift(currentOther);
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -244,6 +261,7 @@ export function PartyRelationships({
                                         type.code ===
                                         row.relationship_type_code,
                                 );
+
                                 return (
                                     <DataTableText>
                                         {row.from_party_id === party.id
@@ -288,7 +306,9 @@ export function PartyRelationships({
                 <Dialog
                     open={editing !== null}
                     onOpenChange={(open) => {
-                        if (!open && !busy) setEditing(null);
+                        if (!open && !busy) {
+                            setEditing(null);
+                        }
                     }}
                 >
                     <DialogContent ref={contentRef} size="panel">
@@ -424,7 +444,9 @@ export function PartyRelationships({
                 <AlertDialog
                     open={archiving !== null}
                     onOpenChange={(open) => {
-                        if (!open && !busy) setArchiving(null);
+                        if (!open && !busy) {
+                            setArchiving(null);
+                        }
                     }}
                 >
                     <AlertDialogContent>

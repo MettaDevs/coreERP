@@ -59,19 +59,29 @@ export function PartyCard({
                 setError('');
             })
             .catch((caught) => {
-                if (!controller.signal.aborted)
+                if (!controller.signal.aborted) {
                     setError(errorText(caught, 'Pihak belum dapat dimuat.'));
+                }
             });
+
         return () => controller.abort();
     }, [partyId, reload]);
+    const loadedPartyId = party?.id;
     useEffect(() => {
-        if (!party) return;
+        if (!loadedPartyId) {
+            return;
+        }
+
         document.getElementById(section)?.scrollIntoView({ block: 'start' });
-    }, [section, party?.id]);
+    }, [section, loadedPartyId]);
     async function archive() {
-        if (!party) return;
+        if (!party) {
+            return;
+        }
+
         setBusy(true);
         setError('');
+
         try {
             await apiRequest(`/api/v1/parties/${party.id}`, {
                 method: 'DELETE',
@@ -86,7 +96,8 @@ export function PartyCard({
             setConfirmArchive(false);
         }
     }
-    if (!party)
+
+    if (!party) {
         return (
             <div className="space-y-3 p-4">
                 <Button variant="outline" onClick={onBack}>
@@ -112,6 +123,8 @@ export function PartyCard({
                 )}
             </div>
         );
+    }
+
     const profileFields = [
         ...commonProfileFields,
         ...(party.type === 'person'
@@ -121,6 +134,7 @@ export function PartyCard({
     const roleLabel = (code: string) =>
         metadata.referenceValues.role?.find((value) => value.code === code)
             ?.name ?? code;
+
     return (
         <>
             <RecordActionBar
