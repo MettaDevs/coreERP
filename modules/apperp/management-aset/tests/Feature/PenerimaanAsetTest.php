@@ -130,7 +130,7 @@ class PenerimaanAsetTest extends TestCase
     {
         $this->pastikanNomorUrutSiap($this->tenantId);
         $referenceIds = DB::table('app_number_sequence_references')
-            ->whereIn('code', ['management-aset.penerimaan-aset', 'management-aset.aset'])->pluck('id');
+            ->whereIn('code', ['management-aset.penerimaan-aset', 'management-aset.asset-code'])->pluck('id');
         DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)
             ->whereIn('reference_id', $referenceIds)->update(['scope_type' => 'legal_entity']);
 

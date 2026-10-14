@@ -471,9 +471,10 @@ class MasterDataAsetTest extends TestCase
         $this->assertSame(1, DB::table('aset_m_group_aset')->where('tenant_id', $this->tenantId)->count(), 'Kiriman ulang tidak boleh membuat record kedua.');
     }
 
-    public function test_kode_dari_klien_diabaikan_dan_selalu_berasal_dari_core(): void
+    public function test_manual_code_is_rejected_when_only_automatic_numbering_is_allowed(): void
     {
-        $this->createRecord('kondisi-aset', ['nama' => 'Baik', 'kode' => 'DIPAKSA-01'])
+        $this->createRecord('kondisi-aset', ['nama' => 'Baik', 'kode' => 'DIPAKSA-01'])->assertUnprocessable();
+        $this->createRecord('kondisi-aset', ['nama' => 'Baik'])
             ->assertCreated()
             ->assertJsonPath('data.kode', $this->awalanNomor('management-aset.kondisi-aset').'-000001');
     }

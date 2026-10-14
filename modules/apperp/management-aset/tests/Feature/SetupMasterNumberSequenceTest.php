@@ -33,7 +33,7 @@ class SetupMasterNumberSequenceTest extends TestCase
     }
 
     #[DataProvider('setupMasters')]
-    public function test_new_codes_follow_the_configured_sequence_and_ignore_client_codes(string $resource, string $table): void
+    public function test_automatic_codes_follow_the_sequence_and_unapproved_manual_codes_are_rejected(string $resource, string $table): void
     {
         $referenceId = DB::table('app_number_sequence_references')->where('code', 'management-aset.'.$resource)->value('id');
         DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)->where('reference_id', $referenceId)->update([
@@ -51,6 +51,8 @@ class SetupMasterNumberSequenceTest extends TestCase
         $client->withHeader('Idempotency-Key', $key)->postJson($url, ['nama' => 'Master uji'])
             ->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.kode', 'TEST00042');
         $client->withHeader('Idempotency-Key', 'setup:'.Str::ulid())->postJson($url, ['nama' => 'Master berikutnya', 'kode' => 'BYPASS'])
+            ->assertUnprocessable();
+        $client->withHeader('Idempotency-Key', 'setup:'.Str::ulid())->postJson($url, ['nama' => 'Master berikutnya'])
             ->assertCreated()->assertJsonPath('data.kode', 'TEST00043');
         $client->patchJson($url.'/'.$id, ['kode' => 'BYPASS', 'nama' => 'Nama baru', 'version' => $created->json('data.version')])
             ->assertOk()->assertJsonPath('data.kode', 'TEST00042');

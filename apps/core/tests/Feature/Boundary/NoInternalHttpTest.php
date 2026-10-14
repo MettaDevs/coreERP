@@ -317,7 +317,7 @@ class NoInternalHttpTest extends TestCase
         $aset['responsible_org_unit_id'] = $penerimaan['responsible_org_unit_id'];
 
         $this->assertSame(
-            $this->awalanNomor('management-aset.aset').'-000001',
+            $this->awalanNomor('management-aset.asset-code').'-000001',
             $aset['kode'],
             'Nomor aset tidak diterbitkan Core lewat kontrak. Nomor yang dipalsukan tidak pernah memajukan penghitung mana pun, jadi kode inilah bukti bahwa penerbitannya sungguhan.',
         );

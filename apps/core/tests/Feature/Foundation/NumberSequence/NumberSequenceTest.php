@@ -11,6 +11,7 @@ use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\AppServiceCredential;
 use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -25,6 +26,17 @@ class NumberSequenceTest extends TestCase
 {
     use GrantsCoreRoles;
     use RefreshDatabase;
+
+    public function test_empty_number_policy_migration_does_not_require_a_module_registry(): void
+    {
+        $this->app->bind(ModuleRegistry::class, static function (): never {
+            throw new \LogicException('Registry module tidak tersedia pada pembangun skema.');
+        });
+        $migration = require database_path('migrations/2026_10_14_100100_apply_declared_number_sequence_input_policies.php');
+        $migration->up();
+
+        $this->assertDatabaseCount('tenant_number_sequences', 0);
+    }
 
     public function test_non_continuous_sequence_uses_a_durable_preallocated_block_and_is_idempotent(): void
     {
@@ -81,7 +93,7 @@ class NumberSequenceTest extends TestCase
         $this->assertDatabaseCount('number_sequence_counters', 2);
     }
 
-    public function test_manual_number_must_match_format_and_does_not_move_counter(): void
+    public function test_manual_number_is_independent_of_the_automatic_format_and_does_not_move_counter(): void
     {
         [$sequence, $context] = $this->sequence([
             'allow_manual' => true,
@@ -89,12 +101,87 @@ class NumberSequenceTest extends TestCase
         ]);
         $service = app(NumberSequenceService::class);
 
-        $service->issue($context, 'sample-app.document', 'manual', 'DOC-000500');
+        $manual = $service->issue($context, 'sample-app.document', 'manual', 'UGD');
+        $this->assertSame('UGD', $manual['number']);
+        $this->assertSame($manual, $service->issue($context, 'sample-app.document', 'manual', 'UGD'));
         $automatic = $service->issue($context, 'sample-app.document', 'automatic');
 
         $this->assertSame('DOC-000001', $automatic['number']);
         $this->expectException(ValidationException::class);
-        $service->issue($context, 'sample-app.document', 'bad-manual', 'DOC-X');
+        $service->issue($context, 'sample-app.document', 'duplicate-manual', 'UGD');
+    }
+
+    public function test_manual_only_policy_rejects_automatic_issue_and_reserve(): void
+    {
+        [$sequence, $context] = $this->sequence(['allow_manual' => true, 'allow_automatic' => false]);
+        $service = app(NumberSequenceService::class);
+        $this->assertSame('POLI', $service->issue($context, 'sample-app.document', 'manual-only', 'POLI')['number']);
+        foreach (['issue', 'reserve'] as $method) {
+            try {
+                $service->$method($context, 'sample-app.document', 'automatic-'.$method);
+                $this->fail('Nomor otomatis seharusnya ditolak.');
+            } catch (ValidationException) {
+                $this->assertDatabaseMissing('number_sequence_counters', ['sequence_id' => $sequence->id]);
+            }
+        }
+    }
+
+    public function test_reference_defaults_materialize_a_manual_only_sequence(): void
+    {
+        [, $context] = $this->sequence();
+        $reference = NumberSequenceReference::query()->create([
+            'app_id' => $context['app_id'], 'code' => 'sample-app.location', 'name' => 'Kode lokasi',
+            'default_prefix' => 'LOCA', 'allowed_scopes' => ['tenant'],
+            'default_settings' => ['allow_automatic' => false, 'allow_manual' => true],
+        ]);
+        app(EnsureNumberSequenceDrafts::class)->forTenantAndApp($context['tenant_id'], $context['app_id']);
+        $sequence = TenantNumberSequence::query()->where('reference_id', $reference->id)->sole();
+        $this->assertFalse($sequence->allow_automatic);
+        $this->assertTrue($sequence->allow_manual);
+        $this->assertSame('UGD', app(NumberSequenceService::class)->issue($context, 'sample-app.location', 'location-1', 'UGD')['number']);
+    }
+
+    public function test_context_fields_must_be_declared_by_the_reference(): void
+    {
+        [$sequence] = $this->sequence();
+        $this->expectException(ValidationException::class);
+        app(NumberSequenceService::class)->configure($sequence, $this->settings(['segments' => [
+            ['type' => 'context', 'value' => 'unknown_field', 'length' => 10], ['type' => 'number', 'length' => 6],
+        ]]), null);
+    }
+
+    public function test_context_values_partition_counters_and_missing_values_do_not_allocate(): void
+    {
+        [$sequence, $context] = $this->sequence(['maximum_number' => 9999, 'segments' => [
+            ['type' => 'context', 'value' => 'classification', 'length' => 2], ['type' => 'constant', 'value' => '.'],
+            ['type' => 'context', 'value' => 'group', 'length' => 3], ['type' => 'constant', 'value' => '.'],
+            ['type' => 'context', 'value' => 'location', 'length' => 10], ['type' => 'constant', 'value' => '.'],
+            ['type' => 'context', 'value' => 'acquired_year', 'length' => 4], ['type' => 'constant', 'value' => '.'],
+            ['type' => 'number', 'length' => 4],
+        ]]);
+        $service = app(NumberSequenceService::class);
+        $values = ['classification' => '01', 'group' => '00A', 'location' => 'UGD', 'acquired_year' => '2026'];
+        $first = $service->issue([...$context, 'values' => $values], 'sample-app.document', 'asset-1');
+        $this->assertSame('01.00A.UGD.2026.0001', $first['number']);
+        $this->assertSame($first, $service->issue([...$context, 'values' => $values], 'sample-app.document', 'asset-1'));
+        $this->assertSame('01.00A.UGD.2026.0002', $service->issue([...$context, 'values' => $values], 'sample-app.document', 'asset-2')['number']);
+        $this->assertSame('01.00A.POLI.2026.0001', $service->issue([...$context, 'values' => [...$values, 'location' => 'POLI']], 'sample-app.document', 'asset-3')['number']);
+        $this->assertSame('01.00A.UGD.2027.0001', $service->issue([...$context, 'values' => [...$values, 'acquired_year' => '2027']], 'sample-app.document', 'asset-4')['number']);
+        $this->assertDatabaseCount('number_sequence_counters', 3);
+        $this->expectException(ValidationException::class);
+        $service->issue($context, 'sample-app.document', 'missing-values');
+    }
+
+    public function test_manual_number_cannot_repeat_after_the_calendar_year_changes(): void
+    {
+        [, $context] = $this->sequence(['allow_manual' => true, 'reset_period' => 'calendar_year', 'segments' => [
+            ['type' => 'year'], ['type' => 'constant', 'value' => '-'], ['type' => 'number', 'length' => 6],
+        ]]);
+        Carbon::setTestNow('2026-01-01');
+        app(NumberSequenceService::class)->issue($context, 'sample-app.document', 'year-1', 'MANUAL');
+        Carbon::setTestNow('2027-01-01');
+        $this->expectException(ValidationException::class);
+        app(NumberSequenceService::class)->issue($context, 'sample-app.document', 'year-2', 'MANUAL');
     }
 
     public function test_automatic_number_skips_a_manual_number_with_the_same_format(): void
@@ -678,7 +765,7 @@ class NumberSequenceTest extends TestCase
             'scope_type' => 'tenant',
             'status' => 'active',
             'is_continuous' => false,
-            'allow_manual' => false,
+            'allow_manual' => false, 'allow_automatic' => true,
             'reset_period' => 'never',
             'preallocation_enabled' => true,
             'preallocation_quantity' => 20,

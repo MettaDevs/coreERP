@@ -17,6 +17,7 @@ Tabelnya tetap `aset_m_kelompok_harta_fiskal`. `template_key` mengenali data awa
 | Field | Isi |
 | --- | --- |
 | `label` | Nama yang tampil di dropdown dan halaman detail |
+| `kode` | Kode manual untuk bagian kelompok pada nomenklatur aset; maksimal 10 karakter huruf, angka, strip, atau underscore |
 | `effective_from`, `effective_to` | Rentang tanggal berlaku; tanggal mulai tetap wajib |
 | `useful_life_years` | Masa manfaat dalam tahun |
 | `straight_line_rate_percent`, `reducing_balance_rate_percent` | Tarif acuan dalam persen |

@@ -16,8 +16,8 @@ info:
     bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.
     Path pembatalan sudah memakai alamat runtime tersebut.
 
-    Kode setiap master diterbitkan Number Sequence Core. Lokasi aset menerima kode manual
-    bila konfigurasi tenant mengizinkannya; kode kosong tetap otomatis. Master lain mengabaikan kode klien.
+    Kode setiap master diterbitkan Number Sequence Core. Master menerima kode manual
+    bila konfigurasi tenant mengizinkannya; kode kosong hanya otomatis jika diizinkan. Grup dan lokasi dibawakan ke manual saja.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
     Penerbitan nomor berjalan di dalam proses Core. Penolakan konfigurasi atau scope menjawab
@@ -1449,8 +1449,11 @@ paths:
                     type: object
                     required:
                     - allow_manual
+                    - allow_automatic
                     properties:
                       allow_manual:
+                        type: boolean
+                      allow_automatic:
                         type: boolean
         '401':
           $ref: '#/components/responses/Unauthenticated'
@@ -2792,12 +2795,17 @@ paths:
             schema:
               type: object
               required:
+              - kode
               - label
               properties:
                 label:
                   type: string
                   minLength: 1
                   maxLength: 150
+                kode:
+                  type: string
+                  maxLength: 10
+                  pattern: ^[A-Za-z0-9_-]+$
                 regulation_reference:
                   type:
                   - string
@@ -2897,6 +2905,10 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 150
+                kode:
+                  type: string
+                  maxLength: 10
+                  pattern: ^[A-Za-z0-9_-]+$
                 regulation_reference:
                   type:
                   - string
@@ -10311,6 +10323,13 @@ components:
       - depreciable
       - aktif
       properties:
+        kode:
+          type:
+          - string
+          - 'null'
+          maxLength: 10
+          description: Kode manual yang dipakai nomenklatur aset; data acuan lama dapat belum diisi. Versi regulasi boleh
+            memakai kode yang sama dan berbagi counter kombinasi.
         id:
           $ref: '#/components/schemas/Ulid'
         template_key:
@@ -10473,6 +10492,13 @@ components:
       required:
       - nama
       properties:
+        kode:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+          description: Kode manual bila konfigurasi reference mengizinkannya. Tidak wajib mengikuti format otomatis; kosong
+            hanya sah bila otomatis diizinkan. Kode tersimpan tidak dapat diubah.
         nama:
           type: string
           minLength: 1
@@ -11601,8 +11627,9 @@ components:
             - string
             - 'null'
             maxLength: 50
-            description: Kode manual hanya diterima bila diizinkan oleh Number Sequence Core; harus mengikuti format dan unik
-              dalam tenant. Kosong atau null memakai nomor otomatis. Kode tidak dapat diubah setelah dibuat.
+            description: Kode manual hanya diterima bila diizinkan oleh Number Sequence Core dan unik dalam tenant. Tidak
+              wajib mengikuti format otomatis. Kosong atau null memakai nomor otomatis hanya jika diizinkan. Kode tidak dapat
+              diubah setelah dibuat.
     LokasiAsetPatch:
       allOf:
       - $ref: '#/components/schemas/MasterPatch'

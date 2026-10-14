@@ -147,7 +147,11 @@ Owner atau admin tenant mengatur tiap reference melalui **Nomor dokumen** (butuh
 - batas nomor dan kenaikan counter berikutnya (hanya boleh naik);
 - mode continuous/manual dan preallocation.
 
-Manual harus sesuai format dan unik. Manual tidak memajukan counter. Continuous dan manual tidak dapat digabung. Nomor yang melampaui lebar segmennya menghasilkan error, bukan nomor yang melebar diam-diam.
+`allow_automatic` dan `allow_manual` terpisah: otomatis saja, manual saja, atau keduanya. Manual tidak wajib mengikuti format otomatis, tetapi wajib terisi, maksimal 255 karakter, tanpa karakter kontrol, dan unik di dalam scope bahkan setelah periode berganti. Manual tidak memajukan counter. Continuous dan manual tidak dapat digabung; continuous memerlukan otomatis. Nomor otomatis yang melampaui lebar segmennya menghasilkan error.
+
+Segmen `context` mengambil nilai bisnis yang dikirim pemanggil melalui `values`, dengan nama field pada `value`, judul pada `name`, dan panjang maksimal pada `length`. Core tidak mengetahui tabel atau arti field module. Pemanggil mengambil kode dari record miliknya yang sudah disaring tenant. Semua segmen context ikut memisahkan counter lewat hash kombinasi pada `scope_key`; nilai wajib berisi huruf, angka, strip, atau underscore. Tahun perolehan yang dikirim module karena itu berbeda dari segmen `year` yang memakai tahun penerbitan.
+
+Manifest boleh menyatakan `default_settings` untuk izin otomatis/manual, rentang, dan segmen awal sebuah reference. Konfigurasi tenant yang sudah ada tidak ditimpa saat registrasi ulang. Nomenklatur aset memakai reference baru `management-aset.asset-code`; reference lama tetap tersimpan dengan judul format sebelumnya untuk audit dan rollback image, tanpa mengubah kode aset atau riwayat penerbitannya.
 
 ## Penerbitan dari module, di dalam proses
 

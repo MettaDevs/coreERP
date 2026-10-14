@@ -5,5 +5,12 @@ description: |
   fiskal wajib menyertakan `legal_entity_id` — kalender fiskal milik legal entity
   dan tidak pernah milik operating unit.
 properties:
+  values:
+    type: object
+    description: Nilai bisnis dari pemanggil untuk bagian format bertipe context. Setiap kombinasi memisahkan counter di dalam scope organisasi; hanya field yang dipakai format aktif yang diperhitungkan.
+    additionalProperties:
+      type: string
+      maxLength: 50
+      pattern: '^[A-Za-z0-9_-]+$'
   legal_entity_id: { type: [string, 'null'], format: ulid }
   org_unit_id: { type: [string, 'null'], format: ulid }

@@ -94,7 +94,7 @@ class VendorTest extends TestCase
         $this->assertSame(1, DB::table('number_sequence_issues')->where('formatted_value', 'VND-000001')->count());
     }
 
-    public function test_nomor_manual_mengikuti_format_dan_unik_per_entitas_legal(): void
+    public function test_manual_number_is_independent_of_format_and_unique_per_legal_entity(): void
     {
         $leLain = $this->legalEntity('PT Metta Farma', 'MFAR');
 
@@ -103,13 +103,13 @@ class VendorTest extends TestCase
         $this->buat(['party_name' => 'CV Alkes Jaya', 'number' => 'VND-000777'])
             ->assertStatus(422)->assertJsonValidationErrors('number');
         $this->buat(['party_name' => 'CV Alkes Jaya', 'number' => 'SUP-01'])
-            ->assertStatus(422)->assertJsonValidationErrors('number');
+            ->assertCreated()->assertJsonPath('data.number', 'SUP-01');
         $this->buat(['legal_entity_id' => $leLain, 'party_name' => 'CV Alkes Jaya', 'number' => 'VND-000777'])
             ->assertCreated();
 
         $this->assertSame(2, Vendor::query()->where('number', 'VND-000777')->count());
         // Party dibuat di dalam transaksi yang sama: percobaan yang ditolak tidak meninggalkan party.
-        $this->assertSame(1, DB::table('parties')->where('name', 'CV Alkes Jaya')->count());
+        $this->assertSame(2, DB::table('parties')->where('name', 'CV Alkes Jaya')->count());
     }
 
     public function test_format_nomor_dapat_disesuaikan_di_nomor_dokumen_sebelum_vendor_pertama(): void
@@ -129,7 +129,7 @@ class VendorTest extends TestCase
 
         $this->actingAs($this->owner)->patchJson("/api/v1/number-sequences/{$urutan->id}", [
             'profile_code' => 'manual-compatible', 'scope_type' => 'legal_entity', 'status' => 'active',
-            'is_continuous' => false, 'allow_manual' => true, 'reset_period' => 'never',
+            'is_continuous' => false, 'allow_manual' => true, 'allow_automatic' => true, 'reset_period' => 'never',
             'preallocation_enabled' => true, 'preallocation_quantity' => 20,
             'minimum_number' => 1, 'maximum_number' => 99999,
             'segments' => [['type' => 'constant', 'value' => 'SUP'], ['type' => 'number', 'length' => 5]],

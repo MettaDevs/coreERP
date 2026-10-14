@@ -6,7 +6,7 @@ import {
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Field, FieldError } from '@apperp/ui/field';
+import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../DynamicField';
@@ -18,6 +18,7 @@ import type { MasterConfig, MasterRecord, Permission } from '../masters';
 import { permission } from '../masters';
 import { changeProfileField } from '../serviceLife';
 import ServiceLifeFields from '../ServiceLifeFields';
+import { useNumberPolicy } from '../useNumberPolicy';
 import AssetTypeConditions from './AssetTypeConditions';
 import JenisAsetCounters from './JenisAsetCounters';
 import JenisAsetCounterTypes from './JenisAsetCounterTypes';
@@ -80,6 +81,8 @@ export default function RecordDetailPane({
     );
 
     const [nama, setNama] = useState(() => record?.nama ?? '');
+    const [manualCode, setManualCode] = useState('');
+    const numberPolicy = useNumberPolicy(config.resource, mode === 'create');
     const [values, setValues] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(
             allFields.map((field) => [field.name, valueFrom(record, field)]),
@@ -252,11 +255,24 @@ export default function RecordDetailPane({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+
+        if (mode === 'create' && (numberPolicy.loading || numberPolicy.error)) {
+            setError(
+                numberPolicy.error || 'Tunggu pengaturan kode selesai dimuat.',
+            );
+
+            return;
+        }
+
         onSavingChange(true);
         setError('');
 
         try {
             const payload: Record<string, unknown> = { nama };
+
+            if (!record && numberPolicy.allowManual) {
+                payload.kode = manualCode.trim() || null;
+            }
 
             if (record) {
                 // Dari `record` saat menyimpan: rincian di panel ini dapat menaikkannya lebih dahulu.
@@ -634,15 +650,37 @@ export default function RecordDetailPane({
             <div className="shrink-0 border-b px-6 py-4">
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
                     <div className="w-60">
-                        {/* Kode diterbitkan saat disimpan dan tidak dapat disunting. */}
                         <Input
                             id="kode"
                             label={config.kodeLabel}
                             value={
-                                record?.kode ?? 'Dibuat otomatis saat disimpan'
+                                record?.kode ??
+                                (numberPolicy.loading
+                                    ? 'Memuat pengaturan kode…'
+                                    : numberPolicy.allowManual
+                                      ? manualCode
+                                      : 'Dibuat otomatis saat disimpan')
                             }
-                            disabled
+                            disabled={
+                                Boolean(record) ||
+                                numberPolicy.loading ||
+                                !numberPolicy.allowManual
+                            }
+                            required={!record && !numberPolicy.allowAutomatic}
+                            maxLength={50}
+                            onChange={(event) => {
+                                setManualCode(event.target.value);
+                                markDirty();
+                            }}
                         />
+                        {!record && numberPolicy.allowManual && (
+                            <FieldDescription>
+                                {numberPolicy.allowAutomatic
+                                    ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
+                                    : 'Isi kode yang mudah dikenali.'}
+                            </FieldDescription>
+                        )}
+                        <FieldError>{numberPolicy.error}</FieldError>
                     </div>
                     <div
                         className="min-w-64 flex-1"

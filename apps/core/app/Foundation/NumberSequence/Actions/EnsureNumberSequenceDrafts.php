@@ -90,6 +90,7 @@ class EnsureNumberSequenceDrafts
                         $reference->default_prefix ? ['type' => 'constant', 'value' => $reference->default_prefix] : null,
                         ['type' => 'number', 'length' => 5],
                     ])),
+                    ...($reference->default_settings ?? []),
                 ],
             );
         });
