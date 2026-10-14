@@ -6,6 +6,8 @@ Satu baris kelompok harta menyimpan klasifikasi dan nilai acuan penyusutan untuk
 
 Kelompok harta menyimpan nama klasifikasi, masa manfaat dan tarif acuan. Profil penyusutan menyimpan metode dan frekuensi yang dipakai untuk menghitung penyusutan. Data awal membuat profil dari nilai kelompok; setelah dibuat, kedua record berdiri sendiri. Mengubah kelompok tidak memperbarui profil maupun menghitung ulang penyusutan.
 
+Masa manfaat kelompok adalah acuan fiskal dalam tahun. Form profil dan matriks group menyajikan umur dalam tahun/bulan yang saling terkonversi; frekuensi menentukan konversinya ke jumlah periode untuk mesin. Buku komersial dan fiskal tetap boleh memakai umur berbeda. Belum ada aturan sinkronisasi otomatis dari perubahan kelompok ke profil atau buku; pola kelompok fiskal Indonesia ini tidak mempunyai padanan langsung pada FA Class/Subclass BC standar W1 yang diperiksa.
+
 Dalam [setup Fixed assets Dynamics 365](https://learn.microsoft.com/en-us/dynamics365/finance/fixed-assets/set-up-fixed-assets), profil dan buku adalah bagian pengaturan penyusutan. Kelompok harta di sini adalah referensi lokal Indonesia; bukan klaim padanan langsung master Dynamics.
 
 ## Data dan endpoint

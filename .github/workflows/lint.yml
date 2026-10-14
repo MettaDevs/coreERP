@@ -98,6 +98,9 @@ jobs:
       - name: Lint Frontend
         run: npm run lint:check
 
+      - name: Check Asset Service Life
+        run: node --test ../../modules/apperp/management-aset/ui/master/serviceLife.test.mjs
+
       - name: Check Upload Client
         run: node scripts/test-core-api.mjs
 

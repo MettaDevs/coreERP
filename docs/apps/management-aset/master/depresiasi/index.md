@@ -30,6 +30,12 @@ Master biasa dengan kolom tambahan yang menentukan hitungan:
 | `useful_life_periods` | Masa manfaat dalam jumlah periode |
 | `rate_percent` | Persentase, untuk metode yang memakainya |
 
+Form menyajikan masa manfaat dalam tahun dan bulan yang saling terkonversi, mengikuti pola `FA Depreciation Book` Business Central. Cukup isi salah satunya. Frekuensi mengatur jadwal penyusutan; menggantinya mempertahankan umur yang sedang disunting. Bentuk simpan tetap `useful_life_periods`: empat tahun menjadi 48 periode bulanan, 16 triwulan, delapan semester, atau empat periode tahunan. Mesin saat ini memerlukan periode utuh; umur yang tidak pas dengan frekuensi ditolak, bukan dibulatkan. Ini adaptasi antarmuka BC, bukan penggantian mesin hitung menjadi hitungan harian BC. Referensi: [Depreciation methods](https://learn.microsoft.com/en-us/dynamics365/business-central/fa-depreciation-methods).
+
+Profil yang sudah dipakai buku aset tetap tidak boleh diubah hitungannya. Frekuensi juga tidak dapat diganti bila profil efektifnya dipakai matriks dengan masa manfaat khusus, termasuk profil bawaan dari buku: angka periode khusus itu akan berubah arti. Buat profil baru lalu pilih di matriks; form mempertahankan umur khusus ketika frekuensi profil pilihan berubah.
+
+PATCH yang mengganti frekuensi harus menyertakan `useful_life_periods` baru bila profil memiliki umur. Mengganti metode bawaan buku ke frekuensi berbeda juga ditolak bila ada group yang mewarisi metode buku dengan umur khusus; pilihan baru dilakukan langsung di matriks agar form dapat mengonversi umur tersebut.
+
 ## Buku penyusutan dan lapisan posting
 
 `posting_layer` pada buku adalah **satu-satunya saklar posting** (K-15 feed posting finance): buku `none` (memorandum) dihitung dan dilaporkan, tetapi tidak pernah di-post ke aplikasi finance. Dari buku lainnya, hanya buku yang di-post group-nya — `current` lebih dulu — yang mengirim jurnal perolehan dan penyusutan aset itu (K-26, K-31); buku lain yang bukan `none` tetap menyusut di register saja.
@@ -52,6 +58,8 @@ Endpointnya `GET`/`PUT /api/v1/group-aset/{id}/buku-penyusutan`.
 **Kenapa masa manfaat bisa ditimpa di sini:** profil dipakai banyak group. "Garis lurus" sama caranya untuk kendaraan dan bangunan, yang berbeda hanya masa manfaatnya. Menyalin profil hanya untuk mengubah angka itu akan melahirkan puluhan profil yang nyaris sama.
 
 **Validasi yang penting:** kalau masa manfaat tidak diisi di baris matriks **dan** tidak ada di profilnya, penyimpanan ditolak dengan pesan yang menyebut baris mana. Kalau dibiarkan, kesalahannya baru muncul berbulan-bulan kemudian saat penyusutan gagal dihitung.
+
+Form menampilkan nama metode efektif dan umur bawaannya, termasuk ketika metode diwarisi dari buku. Secara bawaan tidak ada isian umur kedua. Saklar **Gunakan masa manfaat khusus** membuka isian tahun/bulan; mematikannya mengirim `null` agar kembali mengikuti profil. Umur khusus ikut dikonversi saat pengguna memilih profil dengan frekuensi lain. Nilai tidak dijumlahkan: umur khusus mengalahkan profil, lalu hasilnya disalin ke buku aset saat dibuat. Mengubah matriks tidak mengubah buku aset yang sudah ada.
 
 **Berapa baris yang diisi menentukan perlakuan asetnya**, dan itu keputusan per group, bukan per aset:
 
