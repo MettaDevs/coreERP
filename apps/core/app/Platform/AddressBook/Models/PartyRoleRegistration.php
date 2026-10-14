@@ -4,6 +4,7 @@ namespace App\Platform\AddressBook\Models;
 
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
+use App\Platform\Organization\Models\Organization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,5 +30,11 @@ class PartyRoleRegistration extends Model
     public function party(): BelongsTo
     {
         return $this->belongsTo(Party::class, 'party_id');
+    }
+
+    /** @return BelongsTo<Organization, $this> */
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'legal_entity_id');
     }
 }

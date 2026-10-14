@@ -51,6 +51,7 @@ final class VendorController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'legal_entity' => ['nullable', 'string', 'max:26'],
             'status' => ['nullable', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
+            'party' => ['nullable', 'ulid'],
         ]);
         $keyword = trim((string) ($filter['q'] ?? ''));
         $pattern = '%'.addcslashes($keyword, '\\%_').'%';
@@ -69,12 +70,17 @@ final class VendorController extends Controller
             ->withQueryString()
             ->through(fn (Vendor $vendor): array => $this->present($vendor));
 
+        $initialParty = empty($filter['party']) ? null : Party::query()->where('tenant_id', $tenant)->where('status', 'active')->whereKey($filter['party'])->firstOrFail(['id', 'name', 'type']);
+
         return Inertia::render('foundation/vendor/vendors', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
             'filters' => ['q' => $keyword, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'vendors' => $vendors,
             'manualNumbers' => $this->manualNumberAllowed($tenant),
+            'initialParty' => $initialParty === null ? null : ['id' => $initialParty->id, 'name' => $initialParty->name, 'type' => $initialParty->identityType()],
+            'canReadAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ),
+            'canManageAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
         ]);
     }
 
@@ -87,11 +93,13 @@ final class VendorController extends Controller
         return response()->json(['data' => Party::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('status', 'active')
-            ->when($keyword !== '', fn ($query) => $query->where('search_name', 'like', '%'.addcslashes(Party::searchName($keyword), '\\%_').'%'))
+            ->when($keyword !== '', fn ($query) => $query->where(fn ($names) => $names
+                ->where('search_name', 'like', '%'.addcslashes(Party::searchName($keyword), '\\%_').'%')
+                ->orWhere('name', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')))
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'name', 'type'])
-            ->map(static fn (Party $party): array => ['id' => $party->id, 'name' => $party->name, 'type' => $party->type])
+            ->map(static fn (Party $party): array => ['id' => $party->id, 'name' => $party->name, 'type' => $party->identityType()])
             ->values()]);
     }
 
@@ -105,6 +113,7 @@ final class VendorController extends Controller
             'party_type' => ['nullable', Rule::in(Party::TYPES)],
             'number' => ['nullable', 'string', 'max:40'],
             'tax_number' => ['nullable', 'string', 'max:32', 'regex:/^[0-9.\- ]+$/'],
+            'payment_priority' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:2147483647'],
             'status' => ['nullable', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
         ], [
             'party_id.required_without' => 'Pilih pihak dari buku alamat atau ketik nama vendor baru.',
@@ -122,6 +131,7 @@ final class VendorController extends Controller
             'number' => ($data['number'] ?? null) === null ? null : strtoupper(trim((string) $data['number'])),
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => $data['status'] ?? Vendor::ACTIVE,
+            'payment_priority' => $data['payment_priority'] ?? null,
         ], $key);
 
         return response()->json(['data' => $this->present($vendor->refresh()->load('party'))], $vendor->wasRecentlyCreated ? 201 : 200);
@@ -135,12 +145,14 @@ final class VendorController extends Controller
             'name' => ['required', 'string', 'max:200'],
             'tax_number' => ['nullable', 'string', 'max:32', 'regex:/^[0-9.\- ]+$/'],
             'status' => ['required', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
+            'payment_priority' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:2147483647'],
         ], ['tax_number.regex' => 'NPWP hanya boleh angka, titik, dan tanda hubung.']);
 
         $vendor = $saveVendor->update($membership, $vendor, [
             'name' => trim((string) $data['name']),
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => (string) $data['status'],
+            'payment_priority' => array_key_exists('payment_priority', $data) ? $data['payment_priority'] : $vendor->payment_priority,
         ], RowVersion::expected($request));
 
         return response()->json(['data' => $this->present($vendor->load('party'))]);
@@ -208,9 +220,10 @@ final class VendorController extends Controller
             'number' => $vendor->number,
             'name' => (string) $vendor->party->name,
             'party_id' => $vendor->party_id,
-            'party_type' => $vendor->party->type,
+            'party_type' => $vendor->party->identityType(),
             'legal_entity_id' => $vendor->legal_entity_id,
             'tax_number' => $vendor->tax_number,
+            'payment_priority' => $vendor->payment_priority,
             'status' => $vendor->status,
             'updated_at' => $vendor->updated_at?->toIso8601String(),
         ];

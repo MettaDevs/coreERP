@@ -6,6 +6,8 @@ namespace App\Foundation\NumberSequence;
 
 use App\Foundation\NumberSequence\Listeners\PrepareNumberSequences;
 use App\Foundation\NumberSequence\ModuleServices\NumberSequenceIssuerCore;
+use App\Foundation\NumberSequence\ModuleServices\PartyNumbersCore;
+use App\Platform\AddressBook\Contracts\PartyNumbers;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Events\AppCatalogRegistered;
 use App\Platform\Modules\Events\AppNumberSequenceReferencesDeclared;
@@ -25,6 +27,7 @@ final class NumberSequenceServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(NumberSequenceIssuer::class, NumberSequenceIssuerCore::class);
+        $this->app->bind(PartyNumbers::class, PartyNumbersCore::class);
     }
 
     /**

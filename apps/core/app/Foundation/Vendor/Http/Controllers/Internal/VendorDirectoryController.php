@@ -38,6 +38,7 @@ final class VendorDirectoryController extends Controller
         $query = Vendor::query()
             ->join('parties', 'parties.id', '=', 'vendors.party_id')
             ->where('vendors.tenant_id', $tenant)
+            ->whereNull('parties.deleted_at')
             ->select('vendors.*', 'parties.name as party_name', 'parties.type as party_type')
             ->selectRaw(self::CHANGED.' as changed_at');
 
@@ -75,7 +76,7 @@ final class VendorDirectoryController extends Controller
                 'id' => $vendor->id,
                 'number' => $vendor->number,
                 'name' => (string) $vendor->getAttribute('party_name'),
-                'party_type' => (string) $vendor->getAttribute('party_type'),
+                'party_type' => $vendor->getAttribute('party_type') === 'person' ? 'person' : 'organization',
                 'tax_number' => $vendor->tax_number,
                 'status' => $vendor->status,
                 'legal_entity' => ['id' => $vendor->legal_entity_id, 'code' => $code[$vendor->legal_entity_id] ?? null],

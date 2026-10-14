@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property string $formatted
  * @property string $country_region_code
+ * @property ?string $village
+ * @property ?string $rt
+ * @property ?string $rw
  */
 #[DataClassification(DataClass::CustomerContent)]
 class PostalAddress extends Model
@@ -31,11 +34,14 @@ class PostalAddress extends Model
         'postbox' => DataClass::EndUserIdentifiableInformation,
         'postal_code' => DataClass::EndUserIdentifiableInformation,
         'formatted' => DataClass::EndUserIdentifiableInformation,
+        'village' => DataClass::EndUserIdentifiableInformation,
+        'rt' => DataClass::EndUserIdentifiableInformation,
+        'rw' => DataClass::EndUserIdentifiableInformation,
     ];
 
     protected $fillable = [
         'tenant_id', 'location_id', 'country_region_code', 'province', 'city',
-        'district', 'street', 'building', 'postbox', 'postal_code', 'formatted',
+        'district', 'street', 'building', 'postbox', 'postal_code', 'formatted', 'village', 'rt', 'rw',
     ];
 
     /** @return BelongsTo<Location, $this> */

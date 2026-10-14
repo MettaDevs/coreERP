@@ -72,6 +72,9 @@ type Location = {
     province: string | null;
     city: string | null;
     district: string | null;
+    village: string | null;
+    rt: string | null;
+    rw: string | null;
     street: string | null;
     building: string | null;
     postbox: string | null;
@@ -94,6 +97,9 @@ type LocationForm = {
     street: string;
     building: string;
     district: string;
+    village: string;
+    rt: string;
+    rw: string;
     city: string;
     province: string;
     postal_code: string;
@@ -109,6 +115,9 @@ const emptyLocation = (countryCode: string): LocationForm => ({
     street: '',
     building: '',
     district: '',
+    village: '',
+    rt: '',
+    rw: '',
     city: '',
     province: '',
     postal_code: '',
@@ -124,6 +133,9 @@ const locationToForm = (location: Location): LocationForm => ({
     street: location.street ?? '',
     building: location.building ?? '',
     district: location.district ?? '',
+    village: location.village ?? '',
+    rt: location.rt ?? '',
+    rw: location.rw ?? '',
     city: location.city ?? '',
     province: location.province ?? '',
     postal_code: location.postal_code ?? '',
@@ -176,14 +188,16 @@ function useList<T, M>(url: string, fallback: string) {
 
 export function OrganizationAddressesSection({
     organizationId,
+    resource = 'organizations',
     countryCode,
     canManage,
 }: {
     organizationId: string;
+    resource?: 'organizations' | 'parties';
     countryCode: string;
     canManage: boolean;
 }) {
-    const base = `/api/v1/organizations/${organizationId}/locations`;
+    const base = `/api/v1/${resource}/${organizationId}/locations`;
     const list = useList<
         Location,
         { purposes: Purpose[]; countries: Country[] }
@@ -202,7 +216,7 @@ export function OrganizationAddressesSection({
 
         let cancelled = false;
         apiJson<{ data: SharableLocation[] }>(
-            `/api/v1/organizations/${organizationId}/sharable-locations`,
+            `/api/v1/${resource}/${organizationId}/sharable-locations`,
         )
             .then((result) => {
                 if (!cancelled) {
@@ -218,7 +232,7 @@ export function OrganizationAddressesSection({
         return () => {
             cancelled = true;
         };
-    }, [editing, canManage, organizationId]);
+    }, [editing, canManage, organizationId, resource]);
 
     const linkedLocationIds = new Set(
         list.items.map((location) => location.location_id),
@@ -633,9 +647,16 @@ export function OrganizationAddressesSection({
                                         )}
                                         {text(
                                             'district',
-                                            'Kelurahan / kecamatan',
-                                            'Mengwitani, Mengwi',
+                                            'Kecamatan',
+                                            'Nama kecamatan',
                                         )}
+                                        {text(
+                                            'village',
+                                            'Kelurahan / desa',
+                                            'Nama kelurahan atau desa',
+                                        )}
+                                        {text('rt', 'RT', 'Nomor RT')}
+                                        {text('rw', 'RW', 'Nomor RW')}
                                         {text(
                                             'city',
                                             'Kota / kabupaten',
@@ -755,12 +776,14 @@ const TYPE_PLACEHOLDER: Record<string, string> = {
 
 export function OrganizationContactsSection({
     organizationId,
+    resource = 'organizations',
     canManage,
 }: {
     organizationId: string;
+    resource?: 'organizations' | 'parties';
     canManage: boolean;
 }) {
-    const base = `/api/v1/organizations/${organizationId}/contacts`;
+    const base = `/api/v1/${resource}/${organizationId}/contacts`;
     const list = useList<Contact, { types: string[] }>(
         base,
         'Informasi kontak belum dapat dimuat.',
@@ -783,7 +806,7 @@ export function OrganizationContactsSection({
 
         let cancelled = false;
         apiJson<{ data: Location[] }>(
-            `/api/v1/organizations/${organizationId}/locations`,
+            `/api/v1/${resource}/${organizationId}/locations`,
         )
             .then((result) => {
                 if (cancelled) {
@@ -811,7 +834,7 @@ export function OrganizationContactsSection({
         return () => {
             cancelled = true;
         };
-    }, [editing, organizationId]);
+    }, [editing, organizationId, resource]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
 

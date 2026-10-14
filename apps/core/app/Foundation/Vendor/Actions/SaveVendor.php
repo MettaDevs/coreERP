@@ -8,10 +8,12 @@ use App\Foundation\NumberSequence\Actions\NumberSequenceService;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\AddressBook\Actions\SaveParty;
 use App\Platform\AddressBook\Models\Party;
 use App\Platform\AddressBook\Models\PartyRoleRegistration;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Models\OrganizationParty;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -33,7 +35,7 @@ final class SaveVendor
     ) {}
 
     /**
-     * @param  array{legal_entity_id: string, party_id: ?string, party_type: ?string, party_name: ?string, number: ?string, tax_number: ?string, status: string}  $data
+     * @param  array{legal_entity_id: string, party_id: ?string, party_type: ?string, party_name: ?string, number: ?string, tax_number: ?string, status: string, payment_priority?: ?int}  $data
      */
     public function create(TenantMembership $actor, array $data, string $creationKey): Vendor
     {
@@ -56,10 +58,13 @@ final class SaveVendor
         // Di luar transaksi: bentrokan dua vendor pertama yang bersamaan tidak boleh membatalkan
         // transaksi penyimpanan di bawah.
         $this->sequence->ensure($tenant, Vendor::NUMBER_SEQUENCE);
+        if ($data['party_id'] === null) {
+            $this->sequence->ensure($tenant, 'core.party');
+        }
 
         try {
             return DB::transaction(function () use ($actor, $tenant, $data, $creationKey, $legalEntity): Vendor {
-                $party = $this->party($tenant, $data);
+                $party = $this->party($tenant, $data, $creationKey);
 
                 $alreadyExists = Vendor::query()
                     ->where('tenant_id', $tenant)
@@ -92,6 +97,7 @@ final class SaveVendor
                     'party_id' => $party->id,
                     'number' => $publishedAt['number'],
                     'tax_number' => $data['tax_number'],
+                    'payment_priority' => $data['payment_priority'] ?? null,
                     'status' => $data['status'],
                     'creation_key' => $creationKey,
                     'created_by_user_id' => (string) $actor->user_id,
@@ -128,7 +134,7 @@ final class SaveVendor
      * Yang diklaim versinya akun vendor, record yang dibuka pengguna ({@see RowVersion}); party ikut
      * terkunci karena ditulis di transaksi yang sama.
      *
-     * @param  array{name: string, tax_number: ?string, status: string}  $data
+     * @param  array{name: string, tax_number: ?string, status: string, payment_priority?: ?int}  $data
      */
     public function update(TenantMembership $actor, Vendor $vendor, array $data, int $expectedVersion): Vendor
     {
@@ -138,9 +144,16 @@ final class SaveVendor
         }
 
         return DB::transaction(function () use ($vendor, $data, $expectedVersion): Vendor {
+            $party = $vendor->party()->lockForUpdate()->firstOrFail();
+            // Direktori juga menulis akun vendor sesudah party; urutan kunci harus sama.
             RowVersion::claim($vendor, $expectedVersion);
-            $vendor->fill(['tax_number' => $data['tax_number'], 'status' => $data['status']])->save();
-            $vendor->party->fill(['name' => $data['name'], 'search_name' => Party::searchName($data['name'])])->save();
+            if ($party->name !== $data['name'] && OrganizationParty::query()->where('tenant_id', $vendor->tenant_id)->where('party_id', $party->id)->exists()) {
+                throw ValidationException::withMessages(['name' => 'Ubah nama organisasi melalui halaman Organisasi agar identitasnya tetap sama.']);
+            }
+            $vendor->fill(['tax_number' => $data['tax_number'], 'status' => $data['status'],
+                'payment_priority' => array_key_exists('payment_priority', $data) ? $data['payment_priority'] : $vendor->payment_priority])->save();
+            $searchName = $party->search_name === Party::searchName($party->name) ? Party::searchName($data['name']) : $party->search_name;
+            $party->fill(['name' => $data['name'], 'search_name' => $searchName])->save();
             // Nama berubah di party, tetapi pembaca yang menyinkronkan vendor menyaring lewat
             // `updated_at` vendor. Disentuh supaya perubahan nama ikut terbawa tarikan berikutnya.
             $vendor->touch();
@@ -150,10 +163,10 @@ final class SaveVendor
     }
 
     /** @param array{party_id: ?string, party_type: ?string, party_name: ?string} $data */
-    private function party(string $tenant, array $data): Party
+    private function party(string $tenant, array $data, string $creationKey): Party
     {
         if ($data['party_id'] !== null) {
-            $party = Party::query()->where('tenant_id', $tenant)->find($data['party_id']);
+            $party = Party::query()->where('tenant_id', $tenant)->lockForUpdate()->find($data['party_id']);
             if ($party === null) {
                 throw ValidationException::withMessages(['party_id' => 'Pihak yang dipilih tidak ditemukan di buku alamat tenant ini.']);
             }
@@ -163,13 +176,12 @@ final class SaveVendor
 
         $name = trim((string) $data['party_name']);
 
-        return Party::query()->create([
-            'tenant_id' => $tenant,
+        return app(SaveParty::class)->create($tenant, [
             'type' => $data['party_type'] ?? 'organization',
             'name' => $name,
             'search_name' => Party::searchName($name),
             'status' => 'active',
-        ]);
+        ], 'vendor:'.$creationKey);
     }
 
     private function ensureAdmin(TenantMembership $actor): void

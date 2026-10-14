@@ -1,332 +1,483 @@
 import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import type {
-    PartyType,
-    AddressItem,
-    RelationshipItem,
-    ContactItem,
-    PartyRoleItem,
-} from '@/types/global-address-book';
-import { AddressSection } from './components/address-section';
-import { ContactInformationSection } from './components/contact-information-section';
-import { OrganizationForm } from './components/organization-form';
-import { PersonForm } from './components/person-form';
-import { RelationshipSection } from './components/relationship-section';
-import { RolesSection } from './components/roles-section';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
+import Heading from '@/components/heading';
+import { apiJson, errorText } from '@/lib/core-api';
+import type { BreadcrumbItem } from '@/types/navigation';
+import { AddressBookManager } from './components/address-book-manager';
+import { PartyCard } from './components/party-card';
+import { PartyForm } from './components/party-form';
+import type { DirectoryMetadata, Party } from './types';
 
-interface PartyTypeItem {
-    code: string;
-    name: string;
-}
+type Props = DirectoryMetadata & {
+    parties: {
+        data: Party[];
+        total: number;
+        from: number | null;
+        to: number | null;
+        prev_page_url: string | null;
+        next_page_url: string | null;
+    };
+    filters: {
+        q?: string;
+        type?: string;
+        status?: string;
+        role?: string;
+        address_book?: string;
+        party?: string;
+        section?: string;
+        archived?: string;
+    };
+};
 
-interface GlobalAddressBookProps {
-    partyTypes?: PartyTypeItem[];
-}
-
-export default function GlobalAddressBook({
-    partyTypes,
-}: GlobalAddressBookProps) {
-    const { url } = usePage();
-    const querySection =
-        new URLSearchParams(url.split('?')[1] || '').get('section') ||
-        'general';
-    const [partyType, setPartyType] = useState<PartyType>('organization');
-
-    const typeOptions =
-        partyTypes && partyTypes.length > 0
-            ? partyTypes
-                  .filter(
-                      (t) => t.code === 'person' || t.code === 'organization',
-                  )
-                  .map((t) => ({ value: t.code, label: t.name }))
-            : [
-                  { value: 'organization', label: 'Organisasi' },
-                  { value: 'person', label: 'Perorangan' },
-              ];
-
-    const { data, setData, processing, errors, reset } = useForm<
-        Record<string, any>
-    >({
-        party_id: '000004055',
-        type: 'organization',
-        active: true,
-        language: '',
-        // Person fields
-        personal_title: null,
-        first_name: '',
-        middle_name: '',
-        last_name_prefix: '',
-        last_name: '',
-        personal_suffix: null,
-        search_name: '',
-        payment_priority: '',
-        initials: '',
-        known_as: '',
-        professional_title: '',
-        professional_suffix: '',
-        phonetic_first: '',
-        phonetic_middle: '',
-        phonetic_last: '',
-        display_as: null,
-        gender: null,
-        marital_status: null,
-        birthday: '',
-        anniversary: '',
-        children: '',
-        hobbies: '',
-        address_books: null,
-        memo: '',
-        // Organization fields
-        name: '',
-        number_of_employees: 0,
-        organization_number: '',
-        abc_code: null,
-        duns_number: '',
-        phonetic_name: '',
-        // Sub-entities state
-        addresses: [] as AddressItem[],
-        relationships: [] as RelationshipItem[],
-        contacts: [] as ContactItem[],
-        roles: [] as PartyRoleItem[],
-    });
-
-    // Smooth scroll ke target section ketika link sidebar Shell (biru) diklik
-    useEffect(() => {
-        if (querySection) {
-            const targetElement = document.getElementById(querySection);
-
-            if (targetElement) {
-                targetElement.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start',
-                });
-            }
-        }
-    }, [querySection]);
-
-    // Scrollspy dengan Intersection Observer API untuk sinkronisasi realtime status aktif ke Sidebar Shell
-    useEffect(() => {
-        const sectionIds = [
-            'general',
-            'addresses',
-            'relationships',
-            'contacts',
-            'roles',
-        ];
-        const elements = sectionIds
-            .map((id) => document.getElementById(id))
-            .filter((el): el is HTMLElement => el !== null);
-
-        if (elements.length === 0) {
-            return;
-        }
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const intersectingEntries = entries.filter(
-                    (entry) => entry.isIntersecting,
-                );
-
-                if (intersectingEntries.length > 0) {
-                    intersectingEntries.sort(
-                        (a, b) =>
-                            Math.abs(a.boundingClientRect.top) -
-                            Math.abs(b.boundingClientRect.top),
-                    );
-                    const activeId = intersectingEntries[0].target.id;
-                    window.dispatchEvent(
-                        new CustomEvent('coreerp:section-change', {
-                            detail: { section: activeId },
-                        }),
-                    );
-                }
-            },
+export default function GlobalAddressBook(props: Props) {
+    const { parties, filters, canManage, partyTypes, addressBooks } = props;
+    const [creating, setCreating] = useState(false);
+    const [booksOpen, setBooksOpen] = useState(false);
+    const [query, setQuery] = useState(filters.q ?? '');
+    const [numbering, setNumbering] = useState(false);
+    const [error, setError] = useState('');
+    const [restoringId, setRestoringId] = useState<string | null>(null);
+    const applyFilter = (name: string, value: string) =>
+        router.get(
+            '/settings/global-address-book',
             {
-                root: null,
-                rootMargin: '-10% 0px -60% 0px',
-                threshold: [0, 0.2, 0.4, 0.6, 0.8, 1],
+                ...filters,
+                party: undefined,
+                section: undefined,
+                [name]: value || undefined,
             },
+            { preserveState: true, replace: true },
         );
-
-        elements.forEach((el) => observer.observe(el));
-
-        return () => {
-            elements.forEach((el) => observer.unobserve(el));
-            observer.disconnect();
-        };
-    }, [partyType]);
-
-    const handleFieldChange = (field: string, value: any) => {
-        setData((prev: Record<string, any>) => ({
-            ...prev,
-            [field]: value,
-        }));
-    };
-
-    const handleTypeChange = (newType: string | null) => {
-        if (!newType) {
+    const openParty = (party: Party) => {
+        if (party.deleted_at) {
             return;
         }
 
-        const selected = newType as PartyType;
-        setPartyType(selected);
-        setData((prev: Record<string, any>) => ({
-            ...prev,
-            type: selected,
-            party_id: selected === 'person' ? '000004584' : '000004055',
-            name: selected === 'person' ? '' : prev.name || '',
-        }));
+        router.get(
+            '/settings/global-address-book',
+            {
+                ...filters,
+                archived: undefined,
+                party: party.id,
+                section: 'general',
+            },
+            { preserveState: true },
+        );
     };
-
-    const handleSubmit = (e?: React.FormEvent) => {
-        if (e) {
-            e.preventDefault();
+    async function restoreParty(party: Party) {
+        if (restoringId) {
+            return;
         }
 
-        alert('Data berhasil disimpan secara lokal.');
-    };
+        setRestoringId(party.id);
+        setError('');
 
-    const currentPartyName =
-        partyType === 'person'
-            ? [data.first_name, data.middle_name, data.last_name]
-                  .filter(Boolean)
-                  .join(' ') || 'Perorangan Baru'
-            : data.name || 'Organisasi Baru';
+        try {
+            await apiJson(`/api/v1/parties/${party.id}/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ version: party.version }),
+            });
+            router.reload({ only: ['parties'] });
+        } catch (caught) {
+            setError(errorText(caught, 'Pihak belum dapat dipulihkan.'));
+        } finally {
+            setRestoringId(null);
+        }
+    }
+    async function assignNumbers() {
+        setNumbering(true);
+        setError('');
+
+        try {
+            await apiJson('/api/v1/parties/assign-numbers', { method: 'POST' });
+            router.reload({ only: ['parties'] });
+        } catch (caught) {
+            setError(errorText(caught, 'Nomor pihak belum dapat diterbitkan.'));
+        } finally {
+            setNumbering(false);
+        }
+    }
 
     return (
         <>
-            <Head title="Buku Alamat Global" />
-
-            {/* TOP RECORD ACTION BAR */}
-            <RecordActionBar
-                title="Buku Alamat Global"
-                trailing={
-                    <div className="flex items-center gap-2">
-                        <ActionButton
-                            action="create"
-                            size="sm"
-                            onClick={() => {
-                                reset();
-                                setData(
-                                    'party_id',
-                                    `00000${Math.floor(1000 + Math.random() * 9000)}`,
-                                );
-                            }}
-                        >
-                            Tambah Pihak
-                        </ActionButton>
-
-                        <ActionButton
-                            action="archive"
-                            size="sm"
-                            onClick={() => {
-                                alert(
-                                    `Pihak ${data.party_id} berhasil diarsipkan.`,
-                                );
-                            }}
-                        >
-                            Arsipkan
-                        </ActionButton>
-
-                        <div className="mx-1 h-4 w-px bg-border" />
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => reset()}
-                        >
-                            Batal
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            disabled={processing}
-                            onClick={() => handleSubmit()}
-                        >
-                            Simpan
-                        </Button>
-                    </div>
-                }
-            />
-
-            <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6">
-                {/* 1. SEKSI GENERAL */}
-                <section id="general" className="scroll-mt-6">
-                    {partyType === 'person' ? (
-                        <PersonForm
-                            data={data}
-                            partyType={partyType}
-                            typeOptions={typeOptions}
-                            onTypeChange={handleTypeChange}
-                            onChange={handleFieldChange}
-                            errors={errors}
-                        />
-                    ) : (
-                        <OrganizationForm
-                            data={data}
-                            partyType={partyType}
-                            typeOptions={typeOptions}
-                            onTypeChange={handleTypeChange}
-                            onChange={handleFieldChange}
-                            errors={errors}
-                        />
-                    )}
-                </section>
-
-                {/* 2. SEKSI ADDRESSES */}
-                <section id="addresses" className="scroll-mt-6">
-                    <AddressSection
-                        addresses={data.addresses || []}
-                        onChange={(addresses) =>
-                            handleFieldChange('addresses', addresses)
+            <Head title="Buku alamat global" />
+            {filters.party ? (
+                <PartyCard
+                    key={filters.party}
+                    partyId={filters.party}
+                    metadata={props}
+                    onBack={() =>
+                        router.get('/settings/global-address-book', {
+                            ...filters,
+                            party: undefined,
+                            section: undefined,
+                        })
+                    }
+                />
+            ) : (
+                <ListPageLayout
+                    header={
+                        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                            <Heading
+                                title="Buku alamat global"
+                                description="Identitas, alamat, dan kontak pihak yang berhubungan dengan perusahaan Anda."
+                            />
+                            {canManage && (
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setBooksOpen(true)}
+                                    >
+                                        Buku alamat
+                                    </Button>
+                                    {filters.archived !== 'only' &&
+                                        parties.data.some(
+                                            (party) => !party.number,
+                                        ) && (
+                                            <Button
+                                                variant="outline"
+                                                disabled={numbering}
+                                                onClick={() =>
+                                                    void assignNumbers()
+                                                }
+                                            >
+                                                {numbering
+                                                    ? 'Menerbitkan…'
+                                                    : 'Beri nomor pihak lama'}
+                                            </Button>
+                                        )}
+                                    <ActionButton
+                                        action="create"
+                                        onClick={() => setCreating(true)}
+                                    >
+                                        Tambah pihak
+                                    </ActionButton>
+                                </div>
+                            )}
+                        </div>
+                    }
+                    filters={
+                        <div className="space-y-2 px-4 pb-4">
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    applyFilter('q', query);
+                                }}
+                                className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"
+                            >
+                                <div className="w-full sm:w-64">
+                                    <Input
+                                        label="Cari nama atau nomor pihak"
+                                        value={query}
+                                        onChange={(event) =>
+                                            setQuery(event.target.value)
+                                        }
+                                    />
+                                </div>
+                                <Button type="submit" variant="outline">
+                                    Cari
+                                </Button>
+                                <div className="w-full sm:w-44">
+                                    <NativeSelect
+                                        label="Peran bisnis"
+                                        value={filters.role ?? ''}
+                                        onChange={(event) =>
+                                            applyFilter(
+                                                'role',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <NativeSelectOption value="">
+                                            Semua peran
+                                        </NativeSelectOption>
+                                        {(props.referenceValues.role ?? []).map(
+                                            (role) => (
+                                                <NativeSelectOption
+                                                    key={role.code}
+                                                    value={role.code}
+                                                >
+                                                    {role.name}
+                                                </NativeSelectOption>
+                                            ),
+                                        )}
+                                    </NativeSelect>
+                                </div>
+                                <div className="w-full sm:w-44">
+                                    <NativeSelect
+                                        label="Jenis pihak"
+                                        value={filters.type ?? ''}
+                                        onChange={(event) =>
+                                            applyFilter(
+                                                'type',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <NativeSelectOption value="">
+                                            Semua jenis
+                                        </NativeSelectOption>
+                                        {partyTypes.map((type) => (
+                                            <NativeSelectOption
+                                                key={type.code}
+                                                value={type.code}
+                                            >
+                                                {type.name}
+                                            </NativeSelectOption>
+                                        ))}
+                                    </NativeSelect>
+                                </div>
+                                <div className="w-full sm:w-40">
+                                    <NativeSelect
+                                        label="Status"
+                                        value={filters.status ?? ''}
+                                        onChange={(event) =>
+                                            applyFilter(
+                                                'status',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <NativeSelectOption value="">
+                                            Semua status
+                                        </NativeSelectOption>
+                                        <NativeSelectOption value="active">
+                                            Aktif
+                                        </NativeSelectOption>
+                                        <NativeSelectOption value="inactive">
+                                            Nonaktif
+                                        </NativeSelectOption>
+                                    </NativeSelect>
+                                </div>
+                                <div className="w-full sm:w-44">
+                                    <NativeSelect
+                                        label="Buku alamat"
+                                        value={filters.address_book ?? ''}
+                                        onChange={(event) =>
+                                            applyFilter(
+                                                'address_book',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <NativeSelectOption value="">
+                                            Semua buku alamat
+                                        </NativeSelectOption>
+                                        {addressBooks.map((book) => (
+                                            <NativeSelectOption
+                                                key={book.id}
+                                                value={book.id}
+                                            >
+                                                {book.name}
+                                            </NativeSelectOption>
+                                        ))}
+                                    </NativeSelect>
+                                </div>
+                                <div className="w-full sm:w-44">
+                                    <NativeSelect
+                                        label="Tampilkan"
+                                        value={filters.archived ?? ''}
+                                        onChange={(event) =>
+                                            applyFilter(
+                                                'archived',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        <NativeSelectOption value="">
+                                            Pihak belum terarsip
+                                        </NativeSelectOption>
+                                        <NativeSelectOption value="only">
+                                            Pihak terarsip
+                                        </NativeSelectOption>
+                                    </NativeSelect>
+                                </div>
+                            </form>
+                            {error && (
+                                <p
+                                    role="alert"
+                                    className="text-sm text-destructive"
+                                >
+                                    {error}
+                                </p>
+                            )}
+                        </div>
+                    }
+                    footer={
+                        <div className="flex items-center justify-between gap-3 border-t p-3 text-sm">
+                            <span>
+                                {parties.from ?? 0}–{parties.to ?? 0} dari{' '}
+                                {parties.total} pihak
+                            </span>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!parties.prev_page_url}
+                                    onClick={() =>
+                                        parties.prev_page_url &&
+                                        router.visit(parties.prev_page_url)
+                                    }
+                                >
+                                    Sebelumnya
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!parties.next_page_url}
+                                    onClick={() =>
+                                        parties.next_page_url &&
+                                        router.visit(parties.next_page_url)
+                                    }
+                                >
+                                    Berikutnya
+                                </Button>
+                            </div>
+                        </div>
+                    }
+                >
+                    <DataTable
+                        data={parties.data}
+                        getRowKey={(party) => party.id}
+                        getRowLabel={(party) => party.name}
+                        showRowNumbers
+                        actionsPlacement="inline"
+                        actions={
+                            filters.archived === 'only'
+                                ? canManage
+                                    ? [
+                                          {
+                                              id: 'restore',
+                                              label: 'Pulihkan pihak',
+                                          },
+                                      ]
+                                    : []
+                                : [{ id: 'open', label: 'Lihat pihak' }]
                         }
-                    />
-                </section>
-
-                {/* 3. SEKSI RELATIONSHIPS */}
-                <section id="relationships" className="scroll-mt-6">
-                    <RelationshipSection
-                        relationships={data.relationships || []}
-                        currentPartyId={data.party_id}
-                        currentPartyName={currentPartyName}
-                        onChange={(relationships) =>
-                            handleFieldChange('relationships', relationships)
+                        onRowAction={(action, party) =>
+                            action === 'restore'
+                                ? void restoreParty(party)
+                                : openParty(party)
                         }
+                        onRowClick={openParty}
+                        emptyMessage="Belum ada pihak yang sesuai. Tambahkan pihak atau ubah saringan."
+                        columns={[
+                            {
+                                id: 'number',
+                                header: 'Nomor pihak',
+                                width: 180,
+                                cell: (party) => (
+                                    <DataTableText>
+                                        {party.number ?? 'Belum bernomor'}
+                                    </DataTableText>
+                                ),
+                            },
+                            {
+                                id: 'name',
+                                header: 'Nama',
+                                width: 280,
+                                cell: (party) => (
+                                    <DataTableText>{party.name}</DataTableText>
+                                ),
+                            },
+                            {
+                                id: 'type',
+                                header: 'Jenis',
+                                width: 150,
+                                cell: (party) => (
+                                    <DataTableText>
+                                        {partyTypes.find(
+                                            (type) => type.code === party.type,
+                                        )?.name ?? party.type}
+                                    </DataTableText>
+                                ),
+                            },
+                            {
+                                id: 'city',
+                                header: 'Kota',
+                                width: 160,
+                                cell: (party) => (
+                                    <DataTableText>
+                                        {party.city ?? '—'}
+                                    </DataTableText>
+                                ),
+                            },
+                            {
+                                id: 'roles',
+                                header: 'Peran',
+                                width: 220,
+                                cell: (party) => (
+                                    <DataTableText>
+                                        {[
+                                            ...new Set(
+                                                party.roles.map(
+                                                    (role) =>
+                                                        props.referenceValues.role?.find(
+                                                            (value) =>
+                                                                value.code ===
+                                                                role.code,
+                                                        )?.name ?? role.code,
+                                                ),
+                                            ),
+                                        ].join(', ') || '—'}
+                                    </DataTableText>
+                                ),
+                            },
+                            {
+                                id: 'status',
+                                header: 'Status',
+                                width: 120,
+                                cell: (party) => (
+                                    <Badge
+                                        variant={
+                                            !party.deleted_at &&
+                                            party.status === 'active'
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {party.deleted_at
+                                            ? 'Terarsip'
+                                            : party.status === 'active'
+                                              ? 'Aktif'
+                                              : 'Nonaktif'}
+                                    </Badge>
+                                ),
+                            },
+                        ]}
                     />
-                </section>
-
-                {/* 4. SEKSI CONTACT INFORMATION */}
-                <section id="contacts" className="scroll-mt-6">
-                    <ContactInformationSection
-                        contacts={data.contacts || []}
-                        onChange={(contacts) =>
-                            handleFieldChange('contacts', contacts)
-                        }
-                    />
-                </section>
-
-                {/* 5. SEKSI ROLES */}
-                <section id="roles" className="scroll-mt-6">
-                    <RolesSection roles={data.roles || []} />
-                </section>
-            </main>
+                </ListPageLayout>
+            )}
+            {creating && (
+                <PartyForm
+                    metadata={props}
+                    party={null}
+                    onClose={() => setCreating(false)}
+                    onSaved={(party) => {
+                        setCreating(false);
+                        openParty(party);
+                    }}
+                />
+            )}
+            {booksOpen && (
+                <AddressBookManager
+                    metadata={props}
+                    onClose={() => setBooksOpen(false)}
+                />
+            )}
         </>
     );
 }
-
 GlobalAddressBook.layout = {
     breadcrumbs: [
-        {
-            title: 'Buku alamat',
-            href: '/settings/global-address-book',
-        },
-        {
-            title: 'Buku alamat global',
-            href: '/settings/global-address-book',
-        },
-    ],
+        { title: 'Buku alamat global', href: '/settings/global-address-book' },
+    ] satisfies BreadcrumbItem[],
 };

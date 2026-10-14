@@ -24,6 +24,16 @@ final class PostalAddressFormatter
         if (($fields['postbox'] ?? null) !== null) {
             $lines[] = 'PO Box '.$fields['postbox'];
         }
+        $neighborhood = implode(' / ', array_filter([
+            empty($fields['rt']) ? null : 'RT '.$fields['rt'],
+            empty($fields['rw']) ? null : 'RW '.$fields['rw'],
+        ]));
+        if ($neighborhood !== '') {
+            $lines[] = $neighborhood;
+        }
+        if (! empty($fields['village'])) {
+            $lines[] = $fields['village'];
+        }
         if (($fields['district'] ?? null) !== null) {
             $lines[] = $fields['district'];
         }

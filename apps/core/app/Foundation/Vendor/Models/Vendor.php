@@ -5,6 +5,7 @@ namespace App\Foundation\Vendor\Models;
 use App\Platform\AddressBook\Models\Party;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
+use App\Platform\Organization\Models\Organization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string $party_id
  * @property string $number
  * @property ?string $tax_number
+ * @property ?int $payment_priority
  * @property string $status
  * @property ?string $creation_key
  * @property ?string $created_by_user_id
@@ -51,12 +53,23 @@ class Vendor extends Model
 
     protected $fillable = [
         'tenant_id', 'legal_entity_id', 'party_id', 'number', 'tax_number', 'status',
-        'creation_key', 'created_by_user_id',
+        'creation_key', 'created_by_user_id', 'payment_priority',
     ];
+
+    protected function casts(): array
+    {
+        return ['payment_priority' => 'integer'];
+    }
 
     /** @return BelongsTo<Party, $this> */
     public function party(): BelongsTo
     {
         return $this->belongsTo(Party::class);
+    }
+
+    /** @return BelongsTo<Organization, $this> */
+    public function legalEntity(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'legal_entity_id');
     }
 }
