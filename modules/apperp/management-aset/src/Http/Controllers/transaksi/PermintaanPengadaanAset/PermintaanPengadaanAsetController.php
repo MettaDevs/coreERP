@@ -130,7 +130,7 @@ class PermintaanPengadaanAsetController extends Controller
     {
         $planningDetail = Rule::exists('aset_tr_perencanaan_aset_details', 'id')->where(function (QueryBuilder $query) use ($request): void {
             $tenantId = $this->tenant($request);
-            $plans = DB::table('aset_tr_perencanaan_aset')->where('tenant_id', $tenantId)->whereNull('deleted_at');
+            $plans = PerencanaanAset::query();
             app(OrganizationScope::class)->query($plans, $request, 'legal_entity_id', 'planning_org_unit_id');
             $query->where('tenant_id', $tenantId)->whereIn('planning_id', $plans->select('id'));
         });

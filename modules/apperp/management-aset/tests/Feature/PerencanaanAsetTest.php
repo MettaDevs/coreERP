@@ -89,7 +89,6 @@ class PerencanaanAsetTest extends TestCase
         $first = $this->create($typeId)->assertCreated()->json('data');
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
-        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $second = $this->create($typeId)->assertCreated()->json('data');
         $this->assertSame($first['kode'], $second['kode']);
         $this->assertNotSame($first['id'], $second['id']);

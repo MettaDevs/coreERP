@@ -205,7 +205,7 @@ export function siapkanTenant(jumlah, appIds, tag = '') {
             perluUnit.map((index) => [
                 'POST',
                 `${BASE}/api/v1/organizations`,
-                JSON.stringify({ classification: 'operating_unit', name: `Unit Beban ${FIXTURE}${tag}-${index}`, operating_unit_type: OPERATING_UNIT_TYPE }),
+                JSON.stringify({ classification: 'operating_unit', name: `Unit Beban ${FIXTURE}${tag}-${index}`, operating_unit_type: OPERATING_UNIT_TYPE, operating_unit_number: `LT${tag}${index}`.toUpperCase() }),
                 { jar: jars[index], headers: jsonHeaders(csrfDari(jars[index])) },
             ]),
             [201],

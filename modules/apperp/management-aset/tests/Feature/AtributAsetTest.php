@@ -584,10 +584,9 @@ class AtributAsetTest extends TestCase
     private function receive(string $jenisId, array $atribut): string
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
-        $this->selectCompany($this->tenantId, $this->legalEntityId);
 
         return $this->terimaAset($this->tenantId, [
-            'legal_entity_id' => $this->legalEntityId,
+            'legal_entity_id' => (string) Str::ulid(),
             'nama' => 'Aset atribut uji',
             'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
             'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,

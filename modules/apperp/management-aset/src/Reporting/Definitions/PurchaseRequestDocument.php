@@ -84,18 +84,18 @@ final class PurchaseRequestDocument implements ReportDefinition
                 'description' => $record->description,
                 'status' => $record->status === 'cancelled' ? 'Dibatalkan' : 'Draf',
             ],
-            tables: ['lines' => $lines->map(function ($line) use ($planningLines): array {
+            tables: ['lines' => array_values($lines->map(function ($line) use ($planningLines): array {
                 $planLine = $planningLines->get($line->planning_detail_id);
 
                 return [
-                    'number' => $line->line_number,
+                    'number' => (int) $line->line_number,
                     'planning_code' => $planLine?->perencanaan?->kode,
-                    'name' => $line->nama_aset,
+                    'name' => (string) $line->nama_aset,
                     'unit' => $planLine?->unit,
-                    'quantity' => $line->quantity,
-                    'specification' => $line->specification,
+                    'quantity' => (float) $line->quantity,
+                    'specification' => (string) $line->specification,
                 ];
-            })->all()],
+            })->all())],
             fileName: $record->kode,
         );
     }
