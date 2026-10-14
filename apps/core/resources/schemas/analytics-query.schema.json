@@ -7,7 +7,10 @@
     "required": ["dataset", "measures"],
     "allOf": [
         {
-            "if": { "required": ["records"], "properties": { "records": { "const": true } } },
+            "if": {
+                "required": ["records"],
+                "properties": { "records": { "const": true } }
+            },
             "then": {
                 "required": ["dimensions"],
                 "properties": {
@@ -21,8 +24,17 @@
         }
     ],
     "properties": {
-        "drill": { "type": "object", "additionalProperties": { "type": ["string", "integer", "boolean", "null"] }, "description": "Kesamaan tambahan untuk membuka detail; tidak mengganti filters." },
-        "records": { "type": "boolean", "description": "Daftar baris sumber tanpa agregasi. dimensions menjadi kolom dan measures harus kosong." },
+        "drill": {
+            "type": "object",
+            "additionalProperties": {
+                "type": ["string", "integer", "boolean", "null"]
+            },
+            "description": "Kesamaan tambahan untuk membuka detail; tidak mengganti filters."
+        },
+        "records": {
+            "type": "boolean",
+            "description": "Daftar baris sumber tanpa agregasi. dimensions menjadi kolom dan measures harus kosong."
+        },
         "dataset": {
             "description": "Kode dataset, berawalan id module.",
             "type": "string",
