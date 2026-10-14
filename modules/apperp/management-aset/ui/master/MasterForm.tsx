@@ -32,6 +32,8 @@ import type {
     ParentSummary,
 } from './masters';
 import { parentIdOf, parentSummaryOf } from './masters';
+import { changeProfileField } from './serviceLife';
+import ServiceLifeFields from './ServiceLifeFields';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
 
@@ -338,8 +340,22 @@ export default function MasterForm({
                                         isVisible(field, extra),
                                 )
                                 .map((field) =>
-                                    value?.data_type_locked &&
-                                    field.name === 'data_type' ? (
+                                    config.resource === 'profil-penyusutan' &&
+                                    field.name === 'useful_life_periods' ? (
+                                        <ServiceLifeFields
+                                            key={field.name}
+                                            value={extra[field.name]}
+                                            frequency={extra.frequency}
+                                            required={field.required}
+                                            onChange={(next) =>
+                                                setExtra((current) => ({
+                                                    ...current,
+                                                    [field.name]: next,
+                                                }))
+                                            }
+                                        />
+                                    ) : value?.data_type_locked &&
+                                      field.name === 'data_type' ? (
                                         <Field
                                             key={field.name}
                                             data-disabled="true"
@@ -372,10 +388,20 @@ export default function MasterForm({
                                             config={field}
                                             value={extra[field.name]}
                                             onChange={(next) =>
-                                                setExtra((current) => ({
-                                                    ...current,
-                                                    [field.name]: next,
-                                                }))
+                                                setExtra((current) =>
+                                                    config.resource ===
+                                                    'profil-penyusutan'
+                                                        ? changeProfileField(
+                                                              current,
+                                                              field.name,
+                                                              next,
+                                                          )
+                                                        : {
+                                                              ...current,
+                                                              [field.name]:
+                                                                  next,
+                                                          },
+                                                )
                                             }
                                             portalContainer={sheetContentRef}
                                         />

@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
@@ -97,6 +98,30 @@ class ProfilPenyusutanController extends MasterDataController
             throw ValidationException::withMessages([
                 'method' => 'Profil ini sudah dipakai buku aset. Buat profil baru atau versi dengan tanggal berlaku baru agar histori aset lama tetap utuh.',
             ]);
+        }
+
+        // Jumlah periode khusus pada group bergantung pada frekuensi profil ini.
+        // Mengganti frekuensinya akan mengubah umur group tanpa menyunting group itu.
+        if (in_array('frequency', $changed, true)) {
+            if ($record->useful_life_periods !== null && ! array_key_exists('useful_life_periods', $data)) {
+                throw ValidationException::withMessages([
+                    'useful_life_periods' => 'Kirim masa manfaat sesuai frekuensi baru agar umur aset tidak berubah tanpa sengaja.',
+                ]);
+            }
+            $hasCustomLife = GroupBukuPenyusutan::query()
+                ->whereNotNull('useful_life_periods')
+                ->where(fn ($query) => $query
+                    ->where('depreciation_profile_id', $record->getKey())
+                    ->orWhere(fn ($query) => $query
+                        ->whereNull('depreciation_profile_id')
+                        ->whereIn('buku_id', BukuPenyusutan::query()
+                            ->where('depreciation_profile_id', $record->getKey())->select('id'))))
+                ->exists();
+            if ($hasCustomLife) {
+                throw ValidationException::withMessages([
+                    'frequency' => 'Metode ini dipakai group dengan masa manfaat khusus. Buat metode baru lalu pilih pada group agar umur aset tetap sama.',
+                ]);
+            }
         }
     }
 
