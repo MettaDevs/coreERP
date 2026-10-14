@@ -1,5 +1,6 @@
 <?php
 
+use App\Foundation\FinancePosting\Http\Controllers\Internal\FinancePostingEvidenceController;
 use App\Foundation\FinancePosting\Http\Controllers\Internal\FinancePostingFeedController;
 use App\Foundation\FiscalCalendar\Http\Controllers\Internal\FiscalCalendarDirectoryController;
 use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceController;
@@ -59,6 +60,10 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
  */
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.read'])->group(function (): void {
     Route::get('finance-postings', [FinancePostingFeedController::class, 'index']);
+    Route::get('finance-postings/{posting_id}/receipts/{receipt}/attachments', [FinancePostingEvidenceController::class, 'index'])
+        ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*')->whereUlid('receipt');
+    Route::get('finance-postings/{posting_id}/receipts/{receipt}/attachments/{attachment}', [FinancePostingEvidenceController::class, 'download'])
+        ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*')->whereUlid(['receipt', 'attachment']);
 });
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.ack'])->group(function (): void {
     Route::post('finance-postings/{posting_id}/ack', [FinancePostingFeedController::class, 'ack'])

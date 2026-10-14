@@ -36,6 +36,7 @@ export type Aset = {
     group_aset_id?: string | null;
     jenis_aset_id?: string | null;
     lokasi_aset_id?: string | null;
+    penerimaan_aset_id?: string | null;
 };
 
 export type RincianAset = Aset &

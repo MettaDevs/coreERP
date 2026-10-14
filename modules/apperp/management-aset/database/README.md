@@ -183,3 +183,8 @@ Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr
 `tr_dokumen_siklus_aset` menyimpan `workflow_instance_id` untuk usulan dekomisioning. `processed_core_events` adalah inbox idempoten: satu event keputusan Core hanya dapat mengubah status aset satu kali.
 
 `aset_m_jenis_aset_kondisi` menyimpan kondisi yang boleh dipakai per jenis aset; pasangan tenant, jenis, dan kondisi unik selama belum diarsipkan. Jenis tanpa relasi memakai semua kondisi aktif.
+
+`aset_tr_penerimaan_aset.purchase_order_reference` adalah nomor PO manual opsional varchar(80),
+ditambahkan oleh migration `2026_10_14_100000_add_purchase_order_reference_to_asset_receipts`.
+Tidak ada tabel PO baru. Aset menelusuri bukti lewat `penerimaan_aset_id`; lampiran tetap
+disimpan layanan Core pada dokumen sumber, bukan tabel atau salinan berkas per aset/bulan.

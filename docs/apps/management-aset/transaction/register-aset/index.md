@@ -1,5 +1,7 @@
 # Register aset
 
+Lampiran Penerimaan yang dirujuk snapshot posting finance dapat dibaca sistem finance melalui GET `/api/internal/v1/finance-postings/{posting_id}/receipts/{receipt}/attachments` dan endpoint berkasnya. Core memeriksa token tenant, prefix jenis dan status pending/posted; module menjawab apakah parent Penerimaan aktif masih milik tenant/entitas posting melalui `FinanceEvidenceRecordType`. Ini hak integrasi atas bukti posting, terpisah dari izin sesi pengguna CoreERP. Pembaca BO memeriksa role/unit penggunanya sendiri. File tetap pada storage CoreERP, daftar mengirim metadata publik, dan unduh memeriksa hash/ukuran25MiB. Snapshot jurnal dan ACK tidak berubah saat bukti dibuka. Tidak berlaku bagi semua jenis dokumen aset; kiriman lama tanpa receipt tidak mendapat akses lewat tebakan.
+
 Halaman ini untuk developer. Isinya bukan cara memakai layar, melainkan cara kerja register aset di dalam: data apa yang disimpan, aturan mana yang dijaga kode, dan kenapa aturannya begitu.
 
 Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management-aset/inventarisasi-aset` — id entri menu pada `app.yaml` sekaligus jalur rutenya. Nama "register aset" dipakai di sini dan di kode untuk datanya, bukan untuk layarnya.
@@ -537,7 +539,34 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 
 ---
 
-## Lihat juga
+## Bukti perolehan dan nomor PO
+
+`purchase_order_reference` pada Penerimaan adalah nomor PO manual opsional, maksimal 80 karakter.
+Nilai kosong menjadi null. Field ini hanya dapat diubah bersama draf Penerimaan; ia tidak
+menerbitkan nomor baru dan tidak menganggap nomor permintaan pembelian sebagai nomor PO.
+
+Dokumen pendukung pada Penerimaan tersimpan memakai layanan lampiran Core untuk record
+`aset_tr_penerimaan_aset`, mengikuti hak baca/ubah dan lingkup organisasi Penerimaan. Panel
+ini mengunggah lampiran header yang berlaku pada seluruh aset hasil dokumen; jenis dan batas
+berkas mengikuti konfigurasi Core. Detail aset menyediakan tautan ke Penerimaan asal bila
+pengguna mempunyai hak baca Penerimaan. Berkas tidak disalin per aset atau periode penyusutan.
+Panel belum menyediakan upload khusus baris, karena penyimpanan draf Penerimaan saat ini
+mengganti seluruh baris dan hubungan bukti harus diamankan sebelum kemampuan itu ditambahkan.
+
+Posting perolehan menyertakan `details.receipt`; setiap aset pada posting penyusutan membawa
+`details.assets[].receipt` bila asal Penerimaan masih tersedia dalam tenant dan entitas yang
+sama. Referensi berisi ID/nomor Penerimaan, nomor PO atau null, dan jenis record lampiran.
+Aset tanpa asal Penerimaan membawa null. Data ini snapshot saat posting terbit, sehingga
+penambahan metadata tidak mengubah payload lama atau akun, nominal, dimensi, serta aturan ack.
+Metadata tersebut belum memberi klien BO akses unduh; contract dan otorisasi akses dokumen
+eksternal merupakan pekerjaan lanjutan.
+
+Regression terkait ada pada `PenerimaanAsetTest`, `AcquisitionPostingTest`, dan
+`DepreciationPostingTest`: panjang/pelepasan nomor PO, snapshot PO pada perolehan, dan
+penelusuran dokumen asal pada penyusutan. Penerapan runtime bergantung pada migration
+`2026_10_14_100000_add_purchase_order_reference_to_asset_receipts` setelah persetujuan database.
+
+## Referensi terkait
 
 - [Management Aset](/apps/management-aset/) — gambaran modul dan cara menjalankannya
 - [Penempatan dan mutasi](/apps/management-aset/transaction/penempatan/) — proses perpindahan aset

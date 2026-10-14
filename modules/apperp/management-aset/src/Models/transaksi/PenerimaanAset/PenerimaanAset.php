@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $lokasi_aset_id
  * @property string $currency_code
  * @property string $cara_perolehan
+ * @property ?string $purchase_order_reference
  * @property ?string $keterangan
  * @property string $status
  * @property int $version
@@ -63,7 +64,7 @@ class PenerimaanAset extends Model
         'receiving_org_unit_id', 'tanggal', 'tanggal_siap_pakai', 'diterima_oleh_user_id',
         'penanggung_jawab_user_id', 'lokasi_aset_id', 'currency_code', 'keterangan',
         'status', 'version', 'cara_perolehan', 'vendor_id', 'vendor_invoice_reference',
-        'vendor_invoice_date',
+        'vendor_invoice_date', 'purchase_order_reference',
     ];
 
     /** @return array<string, string> */

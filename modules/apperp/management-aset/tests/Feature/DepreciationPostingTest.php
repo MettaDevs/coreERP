@@ -82,6 +82,11 @@ class DepreciationPostingTest extends TestCase
         $this->assertSame(['debit' => '4000000.00', 'credit' => '4000000.00'], $payload['totals']);
         $this->assertTrue(BigDecimal::of($register)->isEqualTo((string) $posting->total_debit));
         $this->assertCount(3, $payload['details']['assets']);
+        foreach ($payload['details']['assets'] as $asset) {
+            $this->assertSame('PO-DEP-TEST', $asset['receipt']['purchase_order_reference']);
+            $this->assertSame('aset_tr_penerimaan_aset', $asset['receipt']['attachment_record_type']);
+            $this->assertSame($asset['receipt']['number'], DB::table('aset_tr_penerimaan_aset')->where('id', $asset['receipt']['id'])->value('kode'));
+        }
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('posted_posting_id', $postingId)->count());
         // Buku fiskal menyusut di register, tetapi tidak pernah di-post.
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('status', 'final')->whereNull('posted_posting_id')->count());
@@ -497,7 +502,7 @@ class DepreciationPostingTest extends TestCase
     /** Menerima `$jumlah` aset bernilai `$nilai` yang dipakai `$unit`, lalu menyelesaikannya. */
     private function terima(string $group, string $unit, int $jumlah, int $nilai): void
     {
-        $id = $this->draf(['responsible_org_unit_id' => $unit, 'receiving_org_unit_id' => $unit], [$this->baris($group, $jumlah, $nilai)]);
+        $id = $this->draf(['purchase_order_reference' => 'PO-DEP-TEST', 'responsible_org_unit_id' => $unit, 'receiving_org_unit_id' => $unit], [$this->baris($group, $jumlah, $nilai)]);
         $this->selesaikan($id)->assertOk();
     }
 

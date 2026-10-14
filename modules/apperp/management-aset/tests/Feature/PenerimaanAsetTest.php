@@ -5,8 +5,10 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
@@ -53,6 +55,74 @@ class PenerimaanAsetTest extends TestCase
 
         $this->assertSame('draft', (string) DB::table('aset_tr_penerimaan_aset')->where('id', $dokumen)->value('status'));
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->count());
+    }
+
+    public function test_nomor_po_manual_dapat_disimpan_dikosongkan_dan_dibatasi_panjangnya(): void
+    {
+        $payload = $this->payload([$this->baris(1)]);
+        $result = $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create', 'management-aset.penerimaan-aset.read'])
+            ->withHeader('Idempotency-Key', 'po-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', $payload + ['purchase_order_reference' => '0'])
+            ->assertCreated()->assertJsonPath('data.purchase_order_reference', '0');
+        $id = (string) $result->json('data.id');
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.update', 'management-aset.penerimaan-aset.read'])
+            ->patchJson($this->alamat($id), $payload + ['purchase_order_reference' => null, 'version' => $result->json('data.version')])
+            ->assertOk()->assertJsonPath('data.purchase_order_reference', null);
+        $this->assertNull(DB::table('aset_tr_penerimaan_aset')->where('id', $id)->value('purchase_order_reference'));
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create'])
+            ->withHeader('Idempotency-Key', 'po-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', $payload + ['purchase_order_reference' => str_repeat('P', 81)])
+            ->assertUnprocessable()->assertJsonValidationErrors('purchase_order_reference');
+    }
+
+    public function test_bukti_penerimaan_tetap_terhubung_setelah_edit_dan_izin_baca_tidak_mengizinkan_upload(): void
+    {
+        Storage::fake('s3');
+        $id = $this->draf([$this->baris(1)]);
+        $path = '/api/v1/records/aset_tr_penerimaan_aset/'.$id.'/attachments';
+        $pdf = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update']);
+        $attachmentId = (string) $this->post($path, [
+            'file' => UploadedFile::fake()->createWithContent('PO.pdf', $pdf),
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('data.line_number', null)->json('data.id');
+
+        $this->patchJson($this->alamat($id), $this->payload([$this->baris(1, nama: 'Nama dikoreksi')]) + [
+            'version' => $this->versiDokumen($id), 'purchase_order_reference' => 'PO-DOC-01',
+        ])->assertOk();
+        $this->getJson($path)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $attachmentId);
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read']);
+        $this->getJson($path)->assertOk()->assertJsonPath('meta.can_change', false);
+        $this->get('/api/v1/attachments/'.$attachmentId.'/download')->assertOk();
+        $this->post($path, ['file' => UploadedFile::fake()->createWithContent('PO-lain.pdf', $pdf)], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    public function test_penerimaan_dapat_menyimpan_lampiran_ke_disk_lokal_yang_dikonfigurasi(): void
+    {
+        $id = $this->draf([$this->baris(1)]);
+        $path = '/api/v1/records/aset_tr_penerimaan_aset/'.$id.'/attachments';
+        $pdf = "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
+        $storedPath = null;
+
+        try {
+            $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update']);
+            $attachmentId = (string) $this->post($path, [
+                'file' => UploadedFile::fake()->createWithContent('PO-lokal.pdf', $pdf),
+            ], ['Accept' => 'application/json'])->assertCreated()->json('data.id');
+            $storedPath = (string) DB::table('document_attachments')->where('id', $attachmentId)->value('storage_path');
+
+            $this->assertSame('local', config('coreerp.attachments.disk'));
+            $this->assertNotSame('', $storedPath);
+            $this->assertTrue(Storage::disk('local')->exists($storedPath));
+            $this->getJson($path)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $attachmentId);
+            $this->get('/api/v1/attachments/'.$attachmentId.'/download')->assertOk()->assertStreamedContent($pdf);
+        } finally {
+            if ($storedPath !== null && $storedPath !== '') {
+                Storage::disk('local')->delete($storedPath);
+            }
+        }
     }
 
     public function test_receipt_and_asset_numbers_are_independent_per_legal_entity(): void

@@ -306,7 +306,15 @@ final class AcquisitionPosting
                 'url' => '/management-aset/inventarisasi-aset/penerimaan/'.$receipt->id,
             ],
             'lines' => $baris,
-            'details' => $assets === null ? [] : ['assets' => array_map(fn (array $aset): array => $this->rincianAset($aset, $grup, $saldoAwal), $assets)],
+            'details' => [
+                'receipt' => [
+                    'id' => (string) $receipt->id,
+                    'number' => $kode,
+                    'purchase_order_reference' => $receipt->purchase_order_reference ?? null,
+                    'attachment_record_type' => 'aset_tr_penerimaan_aset',
+                ],
+                'assets' => $assets === null ? [] : array_map(fn (array $aset): array => $this->rincianAset($aset, $grup, $saldoAwal), $assets),
+            ],
         ];
     }
 

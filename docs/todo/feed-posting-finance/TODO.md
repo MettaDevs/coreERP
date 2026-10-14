@@ -1,5 +1,7 @@
 # TODO feed posting finance
 
+Adjustment baru (rencana, 9 Oktober 2026): [draft BO/edit akun serta nomor penerimaan, PO, dan image dokumen](ADJUSTMENT_TODO.md). Checklist terpisah ini tidak mengubah status kelulusan implementasi existing.
+
 Butir kerja untuk [Feed posting finance](/todo/feed-posting-finance/). Baca PRD-nya lebih dulu.
 Setiap keputusan yang dirujuk di sini (K-01 dan seterusnya) dijelaskan alasannya di sana.
 
@@ -631,21 +633,117 @@ site di admin.erp menampilkan kesehatan feed tiap server klien.
 **Tempat:** repo old-finance · **Setelah:** 6 (kontrak stabil) dan 8.7 (kode group dan buku sudah
 manual) · **Selesai bila:** skenario area 16 lulus. Kontrak CoreERP yang menjadi acuan (K-01).
 
-- [ ] 15.1 Tabel penerjemah.
-  - [ ] 15.1.1 Entitas legal (`legal_entity.code`) → buku/database Back Office.
-  - [ ] 15.1.2 Nomor BU → `UnitBisnisID`.
-  - [ ] 15.1.3 Nomor department → `SectionID`.
-  - [ ] 15.1.4 Vendor Core → `Supplier_ID`.
-- [ ] 15.2 Ekspor daftar akun ke CSV sesuai templat area 3.2.1, dengan `external_id` = `Akun_ID`.
-- [ ] 15.3 Sinkron vendor dan unit dari Core (`GET /vendors`, `GET /operating-units`).
-- [ ] 15.4 Job terjadwal untuk pull posting.
-  - [ ] 15.4.1 Pull posting `pending`, dan simpan dengan `UNIQUE(posting_id)`.
-  - [ ] 15.4.2 Jurnal diambil dari `journal_lines`. Jangan menjurnal dari `details`.
-  - [ ] 15.4.3 Tanggal diambil dari `posting_date`, bukan jam server Windows. `occurred_at` dan `published_at` disimpan apa adanya, lengkap dengan offset zona waktunya.
-  - [ ] 15.4.4 Nilai diterima sebagai string desimal sesuai `currency.decimals`. Presisi kolom di old-finance harus sama atau lebih halus. Tidak boleh dibulatkan ulang.
-- [ ] 15.5 Posting `direct_payable` jenis perolehan → faktur di modul hutang **tanpa jurnal kedua**. Nomor faktur vendor ditempel belakangan.
-- [ ] 15.6 Ack: `posted` + nomor voucher/faktur, atau `rejected` + kode alasan.
-- [ ] 15.7 Tanpa fallback: kode akun, vendor, unit, atau entitas yang tidak dikenal → `rejected`, bukan default.
+**Catatan progres 30 September 2026:** Implementasi BO untuk mapping, ekspor COA, sync, pull,
+posting, dan ack sudah memiliki bukti jalan di lingkungan dev; lihat laporan progres BO dan hasil
+E2E di bawah untuk rinciannya. Area 15 tetap terbuka karena kriteria penutupannya bergantung pada
+seluruh area 16, yang masih memiliki skenario belum lulus. Kebijakan 15.7 kini membedakan ID yang
+belum muncul pada snapshot direktori BO atau belum dipetakan (tetap di inbox, tanpa ack) dari ID
+yang tetap tidak ditemukan setelah full sync sesudah posting diterbitkan, atau data vendor/unit
+yang dipastikan tidak aktif/tidak cocok lewat sync setelah posting terbit (ditolak dengan alasan).
+Kolom checkpoint full sync sudah diterapkan pada database dev BO metta-demo-bo-penta pada
+30 September 2026. Full sync vendor dan operating unit untuk PTD1 berhasil pada pukul 22.45 WITA;
+uji negatif E2E masih perlu dilakukan sebelum 15.7 ditandai selesai.
+
+- [x] 15.1 Tabel penerjemah.
+  - [x] 15.1.1 Entitas legal (`legal_entity.code`) → buku/database Back Office.
+  - [x] 15.1.2 Nomor BU → `UnitBisnisID`.
+  - [x] 15.1.3 Nomor department → `SectionID`.
+  - [x] 15.1.4 Vendor Core → `Supplier_ID`.
+- [x] 15.2 Ekspor daftar akun ke CSV sesuai templat area 3.2.1, dengan `external_id` = `Akun_ID`.
+- [x] 15.3 Sinkron vendor dan unit dari Core (`GET /vendors`, `GET /operating-units`).
+- [x] 15.4 Job terjadwal untuk pull posting.
+  - [x] 15.4.1 Pull posting `pending`, dan simpan dengan `UNIQUE(posting_id)`.
+  - [x] 15.4.2 Jurnal diambil dari `journal_lines`. Jangan menjurnal dari `details`.
+  - [x] 15.4.3 Tanggal diambil dari `posting_date`, bukan jam server Windows. `occurred_at` dan `published_at` disimpan apa adanya, lengkap dengan offset zona waktunya.
+  - [x] 15.4.4 Nilai diterima sebagai string desimal sesuai `currency.decimals`. Presisi kolom di old-finance harus sama atau lebih halus. Tidak boleh dibulatkan ulang.
+- [x] 15.5 Posting `direct_payable` jenis perolehan → faktur di modul hutang **tanpa jurnal kedua**. Nomor faktur vendor ditempel belakangan.
+- [x] 15.6 Ack: `posted` + nomor voucher/faktur, atau `rejected` + kode alasan.
+  Bukti positif terbaru untuk 15.5–15.6, dev remote PTDI, 6 Oktober 2026: D18/PNRA00018,
+  posting `AST-ACQ-01M47R430R6P8M9PYWKGNB4VM2`, dibukukan pada 12.46.03 WITA sebagai
+  `2026/10/FAP/013`, Rp555.000.000, attempt_count=1, ack `posted`/sent HTTP 200.
+  Audit SELECT baca-saja pada WIN-LOBQ0DEAO40 / metta-demo-bo-penta menemukan tepat
+  satu AP, satu header GL dengan tiga ayat, dan satu kartu hutang; pencarian sumber
+  PNRA00018/ID penerimaan hanya menemukan FAP/013, tanpa jurnal kedua. Detail D18 ada di
+  Bukti D18 ada di register E2E repo BO, `docs/integrasi-bo-coreerp/E2E_PROGRESS.md` §4.10.
+- [x] 15.7 Tanpa fallback.
+  Rekonsiliasi 6 Oktober 2026: N1–N9 beserta varian N2 BU/department, N5 vendor/unit,
+  N7 tipe/nomor dan N8 akun/entity memiliki bukti yang dicocokkan di register E2E BO §3.4.
+  Bukti berasal dari dev lokal PTD1 dan dev remote PTDI; bukan klaim semua cabang diuji ulang
+  di satu deployment. N7 nomor dan N8 memakai injeksi fault inbox terkontrol dengan processor/ack
+  sungguhan, tanpa mock HTTP. N6 membuktikan BU tidak ada setelah full sync; tidak mengklaim
+  varian vendor hilang juga sudah diuji. Induk area 15 tetap terbuka karena bergantung pada area 16.
+  Progres bukti E2E lokal dan dev remote (lingkungan disebut per bukti; checklist ini tidak menggantikan kriteria 15.7):
+  - [x] N1 vendor aktif belum dipetakan: menunggu → sync/mapping → posted pada ID sama (PNRA00010).
+  - [x] N2 department belum dipetakan: menunggu → mapping SEC002 → posted tanpa AP (ASTA00012).
+  - [x] N2 BU dev remote PTDI, 5 Okt 2026: PNRA00013 / AST-ACQ-01M45KDG4Q9BM2Y413SBPNZRP5 menunggu setelah pull pertama; Sync/mapping UAT-N2-BU ke UnitBisnisID 2 kemudian menghasilkan posted pada ID sama, FAP/009 Rp1.000.000. UI menunjukkan satu AP/GL/kartu; query SELECT pengguna mengonfirmasi tepat dua ayat GL akun 91/133, keduanya UnitBisnisID=2/SEC097. Bukti D14 di register E2E BO; N2 BU lokal tetap sebagian.
+  - [x] N3 akun BO nonaktif: UNKNOWN_ACCOUNT, ack HTTP 200, 0 dokumen (PNRA00013).
+  - [x] N4 supplier BO nonaktif: UNKNOWN_VENDOR, ack HTTP 200, 0 dokumen (PNRA00012).
+  - [x] N5 vendor: snapshot lama menunggu tanpa ack; snapshot baru nonaktif ditolak, ack HTTP 200, 0 dokumen (PNRA00014).
+  - [x] N5 unit: snapshot lama menunggu tanpa ack; setelah sync baru yang lebih baru dari publikasi dikonfirmasi, BU CoreERP inactive ditolak sebagai UNKNOWN_DIMENSION, ack HTTP 200, 0 AP/GL/kartu (PNRA00018 lokal PTD1; berbeda dari PNRA00018 remote D18).
+  - [x] N6 unit tidak ada setelah full sync: ID BU tetap tidak muncul pada full sync sukses yang lebih baru dari publikasi; posting ditolak UNKNOWN_DIMENSION, ack HTTP 200, 0 AP/GL/kartu (PNRA00019).
+  - [x] N7 mismatch tipe/nomor unit setelah snapshot baru: kedua cabang terbukti di dev remote PTDI.
+    - Rename sah PNRA00014 tetap posted sebagai FAP/010. Audit baca-saja 6 Okt mengonfirmasi alias UAT-N2-BU dan UAT-N7-BU; rename beralias bukan fixture penolakan. Waktu pembuatan alias D15 tidak diaudit.
+    - [x] Nomor tidak cocok tanpa alias sah, 6 Okt: PNRA00021 / AST-ACQ-01M483ZVB8FWMAY9T2BVXJK5CV. SQL 031 yang dijalankan pengguna mengganti hanya nomor BU pada kedua baris payload menjadi UAT-N7-NO-ALIAS-20261006 dan hash, ID tetap valid; master/alias tidak diubah. Sync vendor/unit sukses 08:09:14 UTC lebih baru dari publikasi 08:08:50 UTC. BO rejected UNKNOWN_DIMENSION dengan alasan nomor tidak cocok dengan mapping/alias, ack sent HTTP 200, nomor AP/GL NULL dan source AP/GL=0. Pantau CoreERP menampilkan Ditolak. Bukti dan batas fault injection inbox ada di register E2E BO.
+    - [x] Tipe BU diubah menjadi Department setelah posting terbit lalu Sync baru: D16/PNRA00015 ditolak CoreERP dengan alasan “Dimensinya tidak dikenal aplikasi finance”; BO tetap AP 12, GL 29 ayat, kartu hutang 7 baris, tanpa dokumen baru. Audit baca-saja lanjutan 6 Okt melengkapi inbox rejected/sent HTTP 200, UNKNOWN_DIMENSION, AP/GL NULL; hitungan dokumen tetap mengacu audit UI semula.
+    - Pemulihan fixture 6 Okt selesai: unit dikembalikan ke Business unit/UAT-N2-BU dan mapping BO ke UnitBisnisID 2 disimpan; Setup setelah reload menunjukkan 0 unit/vendor menunggu. Detail D15–D16 ada di register E2E BO.
+  - [x] N8 akun/entity tidak dikenal: kedua cabang lulus pada batas inbox BO dev remote PTDI, 6 Okt, dengan processor/ack sungguhan dan fault injection terkontrol.
+    - [x] Akun tidak dikenal, dev remote PTDI 6 Okt: PNRA00019 / AST-ACQ-01M480WNSFZ7XW00V9XGW830TT. Fault injection terkontrol pada inbox BO mengganti external_id akun debit menjadi 2147483647 (tidak ada di master) lewat SQL 027 berpersetujuan; processor sungguhan menolak UNKNOWN_ACCOUNT, ack sent HTTP 200. Nomor AP/GL NULL dan source AP/GL=0; CoreERP setelah Cari menampilkan Ditolak. PNRA00017 yang waiting mapping tetap menunggu dan tidak menghalangi rejection/ack N8. Bukti dan batas audit pada register E2E BO; ini bukan bukti UI CoreERP menerbitkan akun invalid.
+    - [x] Legal entity payload tidak cocok dengan feed setting: PNRA00020 / AST-ACQ-01M4836RFV004N6RX7YXRHH60N. SQL 029 yang dijalankan pengguna mengganti hanya payload legal_entity.code PTDI menjadi UAT-N8-WRONG-ENTITY serta hash, routing inbox tetap PTDI dan akun valid. BO rejected UNKNOWN_LEGAL_ENTITY, ack sent HTTP 200; source AP/GL=0 dan nomor voucher NULL. Pantau CoreERP baru menunjukkan Ditolak. Batas: injeksi pada inbox BO, bukan payload invalid yang diterbitkan UI CoreERP normal. Detail/capture/audit pada register E2E BO.
+  - [x] N9 kelanjutan pada satu halaman pull: A waiting, B rejected, C posted; setelah mapping A, posting yang sama posted tepat satu kali.
+
+  N5 vendor lulus 1 Oktober: snapshot nonaktif sync 17.36.22 WITA lebih tua daripada
+  published_at 17.37.36, sehingga PNRA00014 / `AST-ACQ-01M3VD0XA7Y238DYQTQMNS71AN`
+  tetap received/pending tanpa ack/AP/GL. Setelah status nonaktif dikonfirmasi sync
+  17.39.09, posting yang sama rejected UNKNOWN_VENDOR / Vendor CoreERP tidak aktif,
+  ack sent HTTP 200. Total AP/GL/kartu 38/102/54 tetap. Vendor dan direktori aktif kembali,
+  kedua worker Ready. Bukti BO `scratch/UAT_N5_VENDOR_*_RESULT.json` dan log perubahan.
+
+  N5 unit lulus 1 Oktober: PNRA00018 / `AST-ACQ-01M3VWFAE4CRTSBY9RWT359A45` mula-mula tetap
+  received tanpa ack saat snapshot BU BO inactive berumur lebih lama daripada `published_at`.
+  Sesudah BU CoreERP benar-benar inactive dan sync sukses 14:34:26 UTC (lebih baru dari
+  `published_at` 14:22:18 UTC), posting ditolak `UNKNOWN_DIMENSION` / “Operating unit CoreERP
+  tidak aktif.”, ack sent HTTP 200. AP/GL/kartu tetap 40/104/56, source AP/GL=0. Core BU
+  dipulihkan active dan sync BO 14:35:09 UTC mengembalikan mapping Active=1; worker tetap
+  Disabled selama uji. Histori kurs lokal ID 51669 untuk 2 Nov dipakai sementara dan menunggu
+  rollback aman setelah N6. Bukti BO `scratch/UAT_N5_UNIT_*_RESULT.json`.
+
+  N6 unit lulus 2 Oktober: PNRA00019 / `AST-ACQ-01M3VYTNY9CZXBFH5ZMF4HZM8D` terbit 00:15:15 UTC.
+  Full sync operating-units selesai 00:18:22 UTC tanpa error, lebih baru daripada publikasi,
+  tetapi ID `01m3vynreavw5vgq5nqz9dt09a` tetap tidak ada di mapping BO. Pull menolak
+  `UNKNOWN_DIMENSION` / “Operating unit tidak ditemukan pada sinkronisasi penuh CoreERP yang
+  selesai setelah posting diterbitkan.”, ack HTTP 200. AP/GL/kartu tetap 40/104/56; source
+  AP/GL=0. Core BU aktif lagi, sync incremental BO mengembalikan mapping Active=1 (target
+  UnitBisnisID belum dipetakan). Checkpoint full sync dipulihkan ke nilai sebelumnya dan
+  histori kurs sementara ID 51669 dihapus setelah pemeriksaan referensi; kedua worker Ready.
+  Bukti BO `scratch/UAT_N6_UNIT_*_RESULT.json` dan catatan perubahan.
+
+  N9 lulus 1 Oktober: satu respons pull (`pages=1, received=3`) memproses A waiting tanpa
+  ack, B rejected UNKNOWN_VENDOR, dan C posted. Setelah A dipetakan, posting A yang sama
+  posted satu kali; C tidak terduplikasi dan B tetap rejected. Total akhir 40 AP / 104 GL /
+  56 kartu, tepat dua set baru untuk A+C. Supplier/mapping kembali aktif, worker Ready,
+  CoreERP pending=0. Bukti rinci `scratch/UAT_N9_*_RESULT.json` pada repo BO.
+
+  Catatan E2E lokal 1 Oktober 2026: cabang akun BO nonaktif (N3) juga lulus.
+  PNRA00013 / `AST-ACQ-01M3VANXAGJQATKYBSB199A9H5` bernilai Rp15.540.000 memakai
+  external_id fixture 358 / 1030199. Setelah posting terbit dan terverifikasi pending, akun
+  dinonaktifkan memakai SQL 020 yang disetujui pengguna. BO menolak UNKNOWN_ACCOUNT,
+  ack sent HTTP 200, GL/AP NULL, tanpa fallback; total AP/GL/kartu tetap 38/102/54.
+  SQL pemulihan 021 mengaktifkan akun kembali, mapping harga perolehan KENDARAAN-UJI kembali
+  103010401, kedua worker Ready. Bukti rinci pada log BO dan `scratch/UAT_N3_*_RESULT.json`.
+  Catatan E2E lokal 1 Oktober 2026: cabang supplier BO nonaktif (N4) lulus.
+  PNRA00012 / `AST-ACQ-01M3V9F3RGNYZK3JH1WVATQG55` memakai vendor VND-000003
+  yang dipetakan ke supplier fixture SUP0002 / 975. Setelah posting terbit, supplier dinonaktifkan
+  melalui UI BO saat worker pull ditahan. BO menolak `UNKNOWN_VENDOR` dengan alasan
+  “Supplier BO tidak aktif.”, ack sent HTTP 200, tanpa AP/GL atau supplier pengganti.
+  Total AP 38, GL 102, kartu hutang 54 sama sebelum/sesudah. Supplier sudah aktif kembali dan
+  kedua worker Ready. Bukti serta cara pemulihan dicatat pada repo BO
+  arsip BO `docs/integrasi-bo-coreerp/arsip/UAT_15_7_CHANGE_LOG.md` dan `scratch/UAT_N4_*_RESULT.json`. Checkpoint lama menyatakan 15.7 terbuka
+  sampai cabang lain, termasuk kelanjutan posting valid pada halaman pull yang sama, terbukti.
+  - [x] ID vendor atau unit yang belum muncul pada snapshot direktori BO, atau belum memiliki target BO, tetap di inbox tanpa ack sampai sinkronisasi/pemetaan selesai. Bukti N1/N2 dan waiting N9.
+  - [x] Akun yang tidak dikenal/tidak aktif, vendor/unit yang dipastikan tidak aktif atau tidak cocok oleh sync setelah posting terbit, dan legal entity yang tidak cocok → `rejected` dengan kode alasan; jangan memilih nilai default. Bukti N3–N8, dokumen sumber nol pada kasus rejected.
+  - [x] Uji negatif E2E membuktikan penolakan, tidak ada fallback, dan posting lain di halaman yang sama tetap diproses. N9 satu halaman: A waiting/B rejected/C posted, lalu A dipetakan dan posted tanpa duplikasi C.
+  - [x] Status vendor/unit atau perubahan tipe/nomor hanya ditolak setelah sync berhasil yang lebih baru dari posting; bila snapshot masih lama, tunggu sync berikutnya. Bukti snapshot lama/baru N5 serta snapshot baru N7.
+  - [x] ID yang tetap tidak ditemukan pada full sync yang selesai setelah tanggal terbit dikirim sebagai UNKNOWN_VENDOR atau UNKNOWN_DIMENSION. N6 BU: full sync baru, mapping kosong, UNKNOWN_DIMENSION dan dokumen nol; varian vendor bukan bukti run ini.
 
 ---
 
@@ -655,19 +753,50 @@ manual) · **Selesai bila:** skenario area 16 lulus. Kontrak CoreERP yang menjad
 **Selesai bila:** semua skenario lulus di sistem sungguhan, bukan lewat tiruan HTTP, dan hasilnya
 dicatat di PRD.
 
-- [ ] 16.1 Perolehan satu ambulans + PPN → satu faktur di hutang old-finance, hutang 555, tanpa jurnal kedua.
-- [ ] 16.2 Post penyusutan satu bulan → jurnal ringkas per klinik/poli, dan total sama dengan register.
-- [ ] 16.3 Reversal satu periode → jurnal balik yang merujuk posting asal.
-- [ ] 16.4 Posting ke periode tertutup → `rejected` dengan `PERIOD_CLOSED`, dan tampil di layar pantau.
-- [ ] 16.5 Saldo awal satu aset lama → terbukukan, dan penyusutan berikutnya melanjutkan dari offset.
-- [ ] 16.6 Ganti nama dan nomor satu akun di old-finance → impor ulang → posting berikutnya memakai nomor baru.
+- [x] 16.1 Perolehan satu ambulans + PPN → satu faktur di hutang old-finance, hutang 555, tanpa jurnal kedua.
+  - [x] Kasus positif fixture dev remote PTDI sebelum UAT SPV, 6 Oktober 2026:
+    D18/PNRA00018 → ASTA00029, satu unit Rp500.000.000 + PPN Rp55.000.000,
+    tanggal penerimaan/faktur vendor 5 Oktober, referensi
+    `TEST-FF-SPV-16.1-PTDI-20261006-001`. Preview tiga ayat/0 masalah/seimbang;
+    posted/ack HTTP 200 pada 12.46.03 WITA → `2026/10/FAP/013`.
+    Audit BO: tepat 1 AP Supplier_ID 1210, Posted=1/Diakui_Hutang=1;
+    1 GL dengan Dr 103010401 Rp500 juta + Dr 101060405 Rp55 juta / Cr 2010104 Rp555 juta,
+    seluruh ayat UnitBisnisID 2/SEC097; 1 kartu hutang kredit Rp555 juta.
+    Tidak ditemukan jurnal kedua berdasarkan sumber. Pantau CoreERP setelah reload/Cari
+    menunjukkan Sudah dibukukan. Ketunggalan dokumen diaudit sesudah pemrosesan pertama;
+    satu siklus jadwal tambahan belum diaudit.
+  D18 memenuhi kriteria terima asli di instance dev: satu aset ambulans uji, PPN,
+  hutang Rp555 juta, dan tanpa jurnal kedua. Master KENDARAAN-UJI serta vendor
+  VND-000001/Test → TDO0001 adalah data uji yang dipakai. Kriteria asli tidak mensyaratkan
+  master produksi; syarat tambahan “master ambulans/vendor resmi” dicabut pada 6 Oktober
+  setelah dicocokkan dengan PRD. Persiapan master pilihan SPV merupakan kebutuhan UAT
+  tersendiri bila diminta, bukan penghalang penutupan 16.1.
+    Bukti preview, status, dan audit SQL D18 ada di register E2E repo BO, `docs/integrasi-bo-coreerp/E2E_PROGRESS.md` §4.10.
+- [x] 16.2 Post penyusutan satu bulan → jurnal ringkas per klinik/poli, dan total sama dengan register. Uji E2E `ASTA00001` tercatat di PRD; retest setelah pull `main`, 2 Okt 2026, memakai `ASTA00000/KOMERSIAL` periode Oktober, posting `AST-DEP-01m3bxqhezkx2xv31c1q76fy8f-01M3BXCYBNE2QEXR7SJG2D3RJT-20261031-3` dibukukan BO sebagai `2026/10/JUM/0004` Rp208.333,33, seimbang, tanpa faktur hutang.
+  - [x] Dev remote PTDI/D19, 6 Okt: ASTA00014 di Poli Umum, 1–31 Okt, total register Rp5.208.333,33. Preview 2 ayat/0 masalah/seimbang; posting `AST-DEP-01m343swf0b6mcvy4ns1ehg37n-01M3410Q8Z4SV68WMMT7ZFPZ6M-20261031-4` posted/ack HTTP 200 sebagai `2026/10/JUM/0007`. Audit BO baca-saja: tepat 1 GL/2 ayat (Dr 80103, SectionID SEC001; Cr 103010402, SEC097), 0 AP, 0 kartu hutang. Kasus remote satu poli lulus. Detail D19 ada di register E2E repo BO, `docs/integrasi-bo-coreerp/E2E_PROGRESS.md` §4.11.
+  - [x] Perluasan multi-poli dev remote PTDI/D20, 6 Okt: ASTA00012 (Poli Umum) + ASTA00013 (Poli Gigi uji), Oktober, total register Rp229.166,68. Preview 3 ayat/0 masalah/seimbang; BO `2026/10/JUM/0008`, posted/ack HTTP 200. Audit baca-saja: tepat 1 GL/3 ayat; Dr 80103 terbagi SEC001 dan SEC002, Cr 103010402 memakai SEC097; 0 AP, 0 kartu hutang. Detail D20 ada di register E2E repo BO, `docs/integrasi-bo-coreerp/E2E_PROGRESS.md`.
+- [x] 16.3 Reversal satu periode → jurnal balik yang merujuk posting asal. Uji E2E lama tercatat di PRD; retest setelah pull `main`, 2 Okt 2026, membalik posting ASTA00000 Oktober `AST-DEP-01m3bxqhezkx2xv31c1q76fy8f-01M3BXCYBNE2QEXR7SJG2D3RJT-20261031-3` dengan `AST-DRV-01M3XQZ69ES0Y9ZE66KSNP3CQW`. BO membukukan `2026/10/JUM/0005` seimbang Rp208.333,33, tanpa faktur hutang; nilai buku kembali ke Rp9.791.666,67.
+- [x] 16.4 Posting ke periode tertutup → `rejected` dengan `PERIOD_CLOSED`, dan tampil di layar pantau. Uji E2E September 2026 tercatat di PRD; ack penolakan dikonfirmasi aplikasi finance.
+- [x] 16.5 Saldo awal satu aset lama → terbukukan, dan penyusutan berikutnya melanjutkan dari offset. Uji E2E `PNRA00003` tercatat di PRD.
+- [x] 16.6 Ganti nama dan nomor satu akun di old-finance → impor ulang → posting berikutnya memakai nomor baru. Lulus E2E lokal, 30 September 2026: akun fixture `external_id=358` berubah dari `1030112` ke `1030199` dan impor ulang mencatat tepat 1 perubahan. PNRA00004 dibukukan BO sebagai `2026/10/FAP/001`; detail GL memakai akun 358 / `1030199`, debit dan kredit masing-masing Rp11.000.000, ack `posted` HTTP 200.
 - [ ] 16.7 Salinan sandbox environment → endpoint menjawab 503, dan tidak ada posting tersaji.
-- [ ] 16.8 Mode diganti `direct_payable` → `clearing` → koreksi atas penerimaan lama tetap ke Hutang.
-- [ ] 16.9 Old-finance mati satu jam → setelah hidup lagi, semua posting tersaji tanpa ada yang hilang.
+- [x] 16.8 Mode diganti `direct_payable` → `clearing` → koreksi atas penerimaan lama tetap ke Hutang.
+  Dev remote PTDI, 6 Okt: source PNRA00022/ASTA00033 FAP/014 Rp1 juta direct_payable.
+  Kebijakan clearing efektif 6 Okt ditambahkan setelah source posted. Koreksi nilai ke Rp1,1 juta
+  menghasilkan AST-ADJ-01m486dk94kw0afcbn7exek78z-1 yang tetap direct_payable dan merujuk source;
+  BO posted/sent HTTP 200 sebagai FAP/015 Rp100 ribu. Audit: tepat satu AP delta supplier 1210,
+  satu GL dua ayat Dr 103010401/Cr 2010104 (BU 2/SEC097), satu kartu hutang delta; tanpa jurnal kedua.
+  AP/kartu source+koreksi total Rp1,1 juta, register CoreERP Rp1,1 juta dan Pantau Sudah dibukukan.
+  Bukti dan batas di register E2E BO; Run manual digunakan setelah worker tertahan, repeat-cycle belum diaudit.
+  Pemulihan direct_payable dijadwalkan lewat UI mulai 7 Okt; 6 Okt tetap clearing, Run perlu kembali Enabled.
+  Uji hanya kenaikan; pengurangan hutang direct_payable belum didukung. Retest lokal 2 Okt yang rejected/INVALID
+  karena jenis belum didukung tetap bukti historis, digantikan kelulusan positif remote ini.
+- [x] 16.9 Old-finance mati satu jam → setelah hidup lagi, semua posting tersaji tanpa ada yang hilang. Lulus E2E, 30 September 2026: setelah worker dipulihkan, PNRA00007 dan PNRA00008 masing-masing dibukukan tepat satu kali, memiliki satu faktur dan satu kartu hutang, jurnal seimbang Rp11.000.000 dan Rp12.000.000, serta ack `posted` HTTP 200. Task Scheduler aktif kembali; hasil audit ada di laporan BO.
 - [ ] 16.10 Halaman site di admin.erp menampilkan angka feed yang sama dengan layar pantau Core.
-- [ ] 16.11 Penerimaan dengan harga satuan berdesimal → jurnal seimbang, dan total di old-finance sama persis.
-- [ ] 16.12 Group aset tanpa pemetaan → masalahnya tampil di pratinjau sebelum konfirmasi, lengkap dengan jalan pintas → setelah dipetakan, "Validasi ulang" memindahkan posting ke `pending`.
-- [ ] 16.13 Pembaca dijalankan dari server lain di luar jaringan server klien → mode `pull` tetap berjalan lewat HTTPS.
+- [x] 16.11 Penerimaan dengan harga satuan berdesimal → jurnal seimbang, dan total di old-finance sama persis. Lulus E2E lokal, 30 September 2026: PNRA00006, 3 unit × nilai 11.000.000,33 dan PPN 1.210.000,04 per unit. BO `2026/10/FAP/003`: debit aset 33.000.000,99, debit PPN 3.630.000,12, kredit hutang dan nilai faktur 36.630.001,11, ack `posted` HTTP 200.
+- [x] 16.12 Group aset tanpa pemetaan → masalahnya tampil di pratinjau sebelum konfirmasi, lengkap dengan jalan pintas → setelah dipetakan, "Validasi ulang" memindahkan posting ke `pending`. Lulus di CoreERP lokal, 30 September 2026: PNRA00005 tertahan karena akun harga perolehan kosong; setelah mapping dipulihkan, `AST-ACQ-01M3RVFXFYYK0X7VNX23X1Q2J6` divalidasi ulang menjadi `pending`.
+- [x] 16.13 Pembaca dijalankan dari server lain di luar jaringan server klien → mode `pull` tetap berjalan lewat HTTPS.
+  Lulus pada dev remote PTDI, 6–7 Okt 2026: pengguna mengonfirmasi CoreERP berada di VPS dan BO di server kantor. Worker BO dijalankan dari PowerShell pada server BO melalui wrapper `run-finance-feed.ps1`; CoreERP diakses dengan Base URL `https://dio.erp.grenery.xyz`. Run sumber PNRA00022 dan koreksi `AST-ADJ-01m486dk94kw0afcbn7exek78z-1` mengembalikan `posted=1, ack_sent=1`; audit inbox mengonfirmasi dua ack HTTP 200 (`2026/10/FAP/014` dan `/015`) pada koneksi terpisah WIN-LOBQ0DEAO40 / metta-demo-bo-penta. Klien BO mengaktifkan TLS peer/hostname verification (`CURLOPT_SSL_VERIFYPEER=true`, `CURLOPT_SSL_VERIFYHOST=2`). Bukti, topologi asal, serta batasnya dicatat di register E2E BO §3.5; ini bukan packet capture jaringan.
 
 ---
 

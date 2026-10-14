@@ -1,0 +1,43 @@
+get:
+  tags: [Finance feed]
+  operationId: internal.finance-postings.evidence.index
+  summary: Daftar bukti Penerimaan yang dirujuk posting
+  security:
+    - integrationClient: []
+  description: |
+    Scope finance-postings.read. Tenant berasal dari token; prefix posting klien diterapkan.
+    Hanya posting pending/posted. Receipt harus tercantum pada details.receipt atau
+    details.assets[].receipt. Pemilik record memeriksa parent Penerimaan aktif pada tenant
+    dan legal_entity_id posting. Tidak membuka seluruh koleksi lampiran atau memerlukan sesi
+    pengguna CoreERP. Lampiran terarsip tidak disajikan. Daftar mencerminkan berkas saat ini,
+    bukan salinan saat posting. Tidak mengubah jurnal, snapshot posting atau ACK.
+    Hanya metadata publik disajikan; storage path, hash, URL S3 dan token tidak dikirim.
+  parameters:
+    - { name: posting_id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$' } }
+    - { name: receipt, in: path, required: true, schema: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' } }
+  responses:
+    '200':
+      description: Daftar lampiran, dapat kosong
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  required: [id, file_name, mime_type, size_bytes, kind, line_number]
+                  properties:
+                    id: { type: string }
+                    file_name: { type: string }
+                    mime_type: { type: string }
+                    size_bytes: { type: integer }
+                    kind: { type: string, enum: [document, picture] }
+                    line_number: { type: [integer, 'null'] }
+    '401': { description: Token tidak sah }
+    '403': { description: Scope atau IP tidak diizinkan }
+    '404': { description: Posting atau Penerimaan tidak tersedia bagi klien }
+    '429': { description: Batas permintaan tercapai }
+    '503': { description: Integrasi tidak tersedia pada lingkungan ini }

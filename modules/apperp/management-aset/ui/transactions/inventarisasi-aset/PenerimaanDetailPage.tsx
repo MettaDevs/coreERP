@@ -2,6 +2,7 @@ import { usePage } from '@inertiajs/react';
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { RecordAttachments } from '@/components/record-attachments';
 import { useWorkDate } from '@/hooks/use-work-date';
 import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -188,6 +189,8 @@ export default function PenerimaanDetailPage({
                     vendor_id: result.data.vendor_id ?? '',
                     vendor_invoice_reference:
                         result.data.vendor_invoice_reference ?? '',
+                    purchase_order_reference:
+                        result.data.purchase_order_reference ?? '',
                     vendor_invoice_date:
                         result.data.vendor_invoice_date?.slice(0, 10) ?? '',
                     details: (result.data.details ?? []).map((baris) => ({
@@ -351,6 +354,8 @@ export default function PenerimaanDetailPage({
             lokasi_aset_id: record.lokasi_aset_id || null,
             currency_code: record.currency_code || 'IDR',
             keterangan: record.keterangan || null,
+            purchase_order_reference:
+                record.purchase_order_reference?.trim() || null,
             cara_perolehan: record.cara_perolehan || 'pembelian',
             // Hibah dan saldo awal tidak punya pemasok yang ditagih, jadi vendor dan fakturnya
             // tidak dikirim.
@@ -913,6 +918,29 @@ export default function PenerimaanDetailPage({
                                         )}
                                     </Field>
                                 )}
+
+                                <Field>
+                                    <Input
+                                        label="Nomor PO"
+                                        maxLength={80}
+                                        readOnly={readOnly}
+                                        value={
+                                            record.purchase_order_reference ??
+                                            ''
+                                        }
+                                        onChange={(event) =>
+                                            setRecord({
+                                                ...record,
+                                                purchase_order_reference:
+                                                    event.target.value,
+                                            })
+                                        }
+                                    />
+                                    <FieldDescription>
+                                        {pesan('purchase_order_reference') ??
+                                            'Isi nomor pada dokumen PO. Kosongkan jika tidak ada.'}
+                                    </FieldDescription>
+                                </Field>
 
                                 {!tanpaVendor && (
                                     <Field>
@@ -1488,6 +1516,29 @@ export default function PenerimaanDetailPage({
                                     </div>
                                 ))}
                             </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection
+                            value="dokumen-pendukung"
+                            title="Dokumen pendukung"
+                            summary="PO, invoice, dan bukti penerimaan"
+                        >
+                            <p className="text-muted-foreground mb-3 text-sm">
+                                Bukti di sini berlaku untuk seluruh aset dari
+                                penerimaan ini.
+                            </p>
+                            {tersimpan ? (
+                                <RecordAttachments
+                                    key={tersimpan.id}
+                                    recordType="aset_tr_penerimaan_aset"
+                                    recordId={tersimpan.id}
+                                />
+                            ) : (
+                                <p className="text-muted-foreground text-sm">
+                                    Simpan draf penerimaan terlebih dahulu untuk
+                                    menambahkan dokumen.
+                                </p>
+                            )}
                         </CollapsibleSection>
 
                         <CollapsibleSection

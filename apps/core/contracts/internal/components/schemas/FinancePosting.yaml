@@ -75,6 +75,13 @@ properties:
     type: object
     description: Metadata untuk pelacakan dan laporan. Akun, nilai, dan dimensi jurnal hanya dibaca dari `journal_lines`.
     properties:
+      receipt:
+        $ref: '#/components/schemas/AssetReceiptReference'
+      assets:
+        description: |
+          Metadata existing tetap terbuka. Producer aset mengirim daftar rincian; setiap item
+          penyusutan boleh membawa receipt berbentuk AssetReceiptReference atau null untuk
+          penelusuran bukti perolehan. Tidak mempersempit bentuk metadata existing v1.
       journal_groups:
         type: array
         minItems: 1

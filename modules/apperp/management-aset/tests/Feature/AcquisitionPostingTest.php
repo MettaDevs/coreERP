@@ -38,7 +38,7 @@ class AcquisitionPostingTest extends TestCase
         $this->petakan($kendaraan, ['acquisition_account_id' => $this->akun['kendaraan'], 'input_vat_account_id' => $this->akun['ppn'], 'payable_account_id' => $this->akun['hutang']]);
         $this->petakan($alkes, ['acquisition_account_id' => $this->akun['alkes'], 'input_vat_account_id' => $this->akun['ppn'], 'payable_account_id' => $this->akun['hutang']]);
 
-        $id = $this->draf(['vendor_invoice_reference' => 'INV-77', 'vendor_invoice_date' => '2026-09-25'], [
+        $id = $this->draf(['purchase_order_reference' => 'PO-77', 'vendor_invoice_reference' => 'INV-77', 'vendor_invoice_date' => '2026-09-25'], [
             $this->baris($kendaraan, 2, 250_000_000, 27_500_000, 'Ambulans'),
             $this->baris($alkes, 1, 100_000_000, 0, 'Monitor pasien'),
         ]);
@@ -56,6 +56,12 @@ class AcquisitionPostingTest extends TestCase
         $this->assertMatchesRegularExpression('/[+-]\d{2}:\d{2}$/', $payload['occurred_at']);
         $this->assertSame('PT Karoseri Sehat', $payload['vendor']['name']);
         $this->assertSame('INV-77', $payload['vendor_invoice_reference']);
+        $this->assertEquals([
+            'id' => $id,
+            'number' => $kode,
+            'purchase_order_reference' => 'PO-77',
+            'attachment_record_type' => 'aset_tr_penerimaan_aset',
+        ], $payload['details']['receipt']);
         // assertEquals: payload disimpan sebagai jsonb, yang tidak menjaga urutan kunci objek.
         $this->assertEquals(['module' => 'management-aset', 'type' => 'penerimaan-aset', 'number' => $kode, 'description' => 'Penerimaan aset '.$kode], $payload['source_document']);
 

@@ -69,6 +69,7 @@ export type Penerimaan = {
     cara_perolehan: CaraPerolehan;
     vendor_id: string | null;
     vendor_invoice_reference: string | null;
+    purchase_order_reference: string | null;
     vendor_invoice_date: string | null;
     /** Vendor milik Core, dibaca ulang saat dokumen dibuka. */
     vendor?: VendorRingkas | null;
@@ -253,6 +254,7 @@ export const penerimaanKosong = (
     cara_perolehan: 'pembelian',
     vendor_id: '',
     vendor_invoice_reference: '',
+    purchase_order_reference: '',
     vendor_invoice_date: '',
     details: [barisKosong()],
 });
