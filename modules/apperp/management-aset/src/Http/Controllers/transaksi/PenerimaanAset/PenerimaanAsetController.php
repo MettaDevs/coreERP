@@ -577,7 +577,6 @@ class PenerimaanAsetController extends Controller
 
         try {
             DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover, $numbers): void {
-                $this->assertSisaPermintaan($lines, $id);
                 // Versi diklaim lebih dahulu, lalu status dipindahkan dengan status draf sebagai
                 // syarat. Dua penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan
                 // tidak ada cara mengetahui mana yang berlebih. Yang kalah ditolak klaimnya dan

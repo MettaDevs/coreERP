@@ -3,7 +3,6 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\AddressDirectory;
-use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\LokasiAset;

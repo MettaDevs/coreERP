@@ -328,7 +328,7 @@ class AssetPostingGroupTest extends TestCase
     {
         return (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
             ->withHeader('Idempotency-Key', 'group-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/group-aset', ['kode' => $kode, 'nama' => 'Group '.$kode])
+            ->postJson('/api/modules/management-aset/v1/group-aset', ['nama' => 'Group '.$kode])
             ->assertCreated()
             ->json('data.id');
     }
