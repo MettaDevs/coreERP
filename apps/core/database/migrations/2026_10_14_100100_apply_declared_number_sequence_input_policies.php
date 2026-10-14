@@ -9,6 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Pada skema baru belum ada pilihan tenant yang perlu diperbarui.
+        // Konsol juga membangun skema Core untuk test tanpa memuat registry module.
+        if (! DB::table('tenant_number_sequences')->exists()) {
+            return;
+        }
+
         // Kebijakan datang dari pemilik reference; Core tidak menyebut satu pun nama module.
         foreach (app(ModuleRegistry::class)->all() as $module) {
             $manifest = ModuleManifestFiles::read($module->folder);

@@ -11,6 +11,7 @@ use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\AppServiceCredential;
 use App\Platform\Modules\Models\ModuleInstallation;
+use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -25,6 +26,17 @@ class NumberSequenceTest extends TestCase
 {
     use GrantsCoreRoles;
     use RefreshDatabase;
+
+    public function test_empty_number_policy_migration_does_not_require_a_module_registry(): void
+    {
+        $this->app->bind(ModuleRegistry::class, static function (): never {
+            throw new \LogicException('Registry module tidak tersedia pada pembangun skema.');
+        });
+        $migration = require database_path('migrations/2026_10_14_100100_apply_declared_number_sequence_input_policies.php');
+        $migration->up();
+
+        $this->assertDatabaseCount('tenant_number_sequences', 0);
+    }
 
     public function test_non_continuous_sequence_uses_a_durable_preallocated_block_and_is_idempotent(): void
     {
