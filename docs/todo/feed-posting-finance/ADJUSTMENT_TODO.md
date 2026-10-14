@@ -318,3 +318,9 @@ USER memilih impor manual seperti COA. Foundation Vendor memiliki parser preview
 
 
 Pembaruan SUP-MANUAL: login USER selesai; AGENT memverifikasi layar dan preview terautentikasi CSV BO. Full3baris ditolak aman karena kandidat existing VND-000001; subset2baris preview bersih, belum apply. Lint UI eksplisit --no-ignore dan format config Core lulus. Bukti runtime/preview tidak membuktikan apply/idempotency database atau AP/Kartu Hutang.
+
+## Rencana perbaikan quality PR #329 — 14 Oktober 2026
+
+Masalah: setelah Pint diperbaiki, analisa tipe CI menandai resource CSV yang mungkin gagal dibuka, kolom `null` yang diteruskan ke `trim`, dan tipe hasil `run()` yang belum dinyatakan.
+
+Rencana: validasi resource `fopen`/`fwrite`, pastikan field hasil CSV semuanya string sebelum trim/combine, nyatakan tipe hasil laporan secara terstruktur, lalu jalankan ulang Pint dan pemeriksaan tipe terarah. Pemilik: AGENT. Status: DIKERJAKAN sebelum push koreksi. Belum mengubah database atau transaksi.

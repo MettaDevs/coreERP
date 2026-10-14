@@ -27,7 +27,16 @@ final class SupplierCsvImporter
         $first = strtok($contents, "\r\n") ?: '';
         $delimiter = substr_count($first, ';') > substr_count($first, ',') ? ';' : ',';
         $stream = fopen('php://temp', 'r+');
-        fwrite($stream, $contents);
+
+        if ($stream === false) {
+            throw ValidationException::withMessages(['file' => 'Berkas tidak dapat dibaca.']);
+        }
+
+        if (fwrite($stream, $contents) !== strlen($contents)) {
+            fclose($stream);
+            throw ValidationException::withMessages(['file' => 'Berkas tidak dapat dibaca.']);
+        }
+
         rewind($stream);
         try {
             if (fgetcsv($stream, null, $delimiter, '"', '') !== self::HEADER) {
@@ -45,7 +54,16 @@ final class SupplierCsvImporter
                 if (count($values) !== count(self::HEADER) || count($rows) >= 5000) {
                     throw ValidationException::withMessages(['file' => "Baris {$line}: kolom tidak lengkap atau melebihi 5.000 supplier."]);
                 }
-                $row = array_combine(self::HEADER, array_map('trim', $values));
+                $fields = [];
+                foreach ($values as $value) {
+                    if (! is_string($value)) {
+                        throw ValidationException::withMessages(['file' => "Baris {$line}: semua kolom harus berisi teks."]);
+                    }
+
+                    $fields[] = trim($value);
+                }
+
+                $row = array_combine(self::HEADER, $fields);
                 $nameKey = Party::searchName($row['name']);
                 if ($row['source'] === '' || mb_strlen($row['source']) > 256
                     || ! preg_match('/^[1-9][0-9]{0,18}$/D', $row['external_id'])
@@ -72,6 +90,9 @@ final class SupplierCsvImporter
         }
     }
 
+    /**
+     * @return array{status: 'rejected'|'applied'|'preview', created_count: int, unchanged_count: int, rejected: list<string>}
+     */
     public function run(TenantMembership $actor, string $entity, string $contents, bool $apply): array
     {
         $rows = $this->parse($contents);
