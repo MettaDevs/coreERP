@@ -31,6 +31,10 @@ export function ResultTable({
     columns,
     showTotals = true,
     className,
+    scrollMode,
+    columnTools,
+    onResetColumns,
+    onResetFilters,
 }: {
     result: ResultSet;
     /** Kunci kolom yang ditampilkan, urut; kosong berarti semua pengelompok lalu semua nilai. */
@@ -38,6 +42,17 @@ export function ResultTable({
     showTotals?: boolean;
     /** Pembungkus bergulir, misalnya batas tinggi widget. */
     className?: string;
+    scrollMode?: 'inline' | 'viewport';
+    columnTools?: Record<
+        string,
+        {
+            headerFilter?: React.ReactNode;
+            filterActive?: boolean;
+            headerActions?: { label: string; onSelect: () => void }[];
+        }
+    >;
+    onResetColumns?: () => void;
+    onResetFilters?: () => void;
 }) {
     const chosen: ResultColumn[] = (
         columns && columns.length > 0
@@ -70,6 +85,7 @@ export function ResultTable({
 
     const tableColumns: DataTableColumn<Line>[] = chosen.map(
         (column, index) => ({
+            ...columnTools?.[column.key],
             id: column.key,
             header: column.caption,
             width:
@@ -118,10 +134,54 @@ export function ResultTable({
         0,
     );
 
+    if (scrollMode === 'viewport') {
+        return (
+            <div
+                className={cn(
+                    'flex min-h-0 min-w-0 flex-1 flex-col',
+                    className,
+                )}
+            >
+                <DataTable
+                    showColumnMenu={Boolean(columnTools)}
+                    onResetColumns={onResetColumns}
+                    onResetFilters={onResetFilters}
+                    columns={tableColumns}
+                    data={lines}
+                    getRowKey={(line) => line.key}
+                    showRowNumbers={false}
+                    scrollMode="viewport"
+                    emptyMessage="Belum ada data untuk ditampilkan."
+                />
+            </div>
+        );
+    }
+
+    if (scrollMode === 'inline') {
+        return (
+            <DataTable
+                showColumnMenu={Boolean(columnTools)}
+                onResetColumns={onResetColumns}
+                onResetFilters={onResetFilters}
+                columns={tableColumns}
+                data={lines}
+                getRowKey={(line) => line.key}
+                showRowNumbers={false}
+                scrollMode="inline"
+                className={className}
+                emptyMessage="Belum ada data untuk ditampilkan."
+            />
+        );
+    }
+
     return (
         <div className={cn('overflow-auto', className)}>
             <div style={{ minWidth }}>
                 <DataTable
+                    showColumnMenu={Boolean(columnTools)}
+                    onResetColumns={onResetColumns}
+                    onResetFilters={onResetFilters}
+                    scrollMode="inline"
                     columns={tableColumns}
                     data={lines}
                     getRowKey={(line) => line.key}

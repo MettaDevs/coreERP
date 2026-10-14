@@ -54,9 +54,21 @@ final class DatasetCatalog
      */
     public function describe(CompiledDataset $dataset, AnalyticsPrincipal $principal): array
     {
+        $labelKeys = [];
+        foreach ($dataset->fields() as $key => $field) {
+            $reference = $dataset->reference($key);
+            if ($reference !== null) {
+                $labelKeys[$reference->filterKey()] = true;
+            }
+        }
+        $filterFields = [];
         $fields = [];
         foreach ($this->personalData->visibleFields($dataset, $principal) as $field) {
-            $fields[] = $this->field($dataset, $field);
+            if (isset($labelKeys[$field->key])) {
+                $filterFields[] = $this->field($dataset, $field);
+            } else {
+                $fields[] = $this->field($dataset, $field);
+            }
         }
 
         $measures = [];
@@ -65,6 +77,7 @@ final class DatasetCatalog
                 'key' => $measure->key,
                 'caption' => $measure->caption,
                 'aggregate' => $measure->aggregate->value,
+                'field_key' => in_array($measure->field, array_column($fields, 'key'), true) ? $measure->field : null,
                 'format' => $measure->format->value,
                 'currency_key' => $measure->currency,
                 'unit_key' => $measure->unit,
@@ -76,8 +89,10 @@ final class DatasetCatalog
         return [
             ...$this->summary($dataset),
             'fields' => $fields,
+            'filter_fields' => $filterFields,
             'measures' => $measures,
             'times' => array_values(array_intersect($dataset->times(), $visible)),
+            'partitions' => $dataset->partitions,
             'default_time' => in_array($dataset->defaultTime(), $visible, true) ? $dataset->defaultTime() : null,
         ];
     }
@@ -100,6 +115,10 @@ final class DatasetCatalog
         }
         if ($dataset->sharedDimension($field->key) !== null) {
             $out['shared_dimension'] = $dataset->sharedDimension($field->key)->value;
+        }
+        $reference = $dataset->reference($field->key);
+        if ($reference !== null) {
+            $out['label_filter_key'] = $reference->filterKey();
         }
         if ($field->lookup !== null) {
             $out['lookup'] = $field->lookup;

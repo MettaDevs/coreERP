@@ -38,8 +38,14 @@ final class QueryValidator
         /** @var array<string, true> $chosen kunci yang menjadi kolom hasil, dan karenanya tidak boleh ganda */
         $chosen = [];
 
-        $this->assertWithin($query->dimensions, 'limits.dimensions', 4, 'dimensions', 'Terlalu banyak kolom pengelompokan. Maksimal %d.');
+        $this->assertWithin($query->dimensions, $query->records ? 'limits.record_columns' : 'limits.dimensions', $query->records ? 40 : 4, 'dimensions', $query->records ? 'Terlalu banyak kolom. Maksimal %d.' : 'Terlalu banyak kolom pengelompokan. Maksimal %d.');
+        if ($query->records && ($query->dimensions === [] || $query->measures !== [] || $query->totals || $query->fillGaps)) {
+            throw AnalyticsQueryException::invalidQuery('records', 'Mode daftar membutuhkan kolom, tanpa nilai agregat, total, atau isian celah.');
+        }
         foreach ($query->dimensions as $i => $dimension) {
+            if ($query->records && $dimension->granularity !== null) {
+                throw AnalyticsQueryException::invalidQuery("dimensions.{$i}", 'Mode daftar menampilkan tanggal transaksi apa adanya.');
+            }
             if (! $dataset->hasField($dimension->field)) {
                 throw AnalyticsQueryException::fieldUnknown("dimensions.{$i}", $dimension->field);
             }
@@ -79,6 +85,13 @@ final class QueryValidator
         }
 
         $this->assertWithin($query->filters, 'limits.filters', 20, 'filters', 'Terlalu banyak saringan. Maksimal %d.');
+        $this->assertWithin($query->drill, 'limits.filters', 20, 'drill', 'Terlalu banyak batas detail. Maksimal %d.');
+        foreach (array_keys($query->drill) as $key) {
+            if (! $dataset->hasField($key)) {
+                throw AnalyticsQueryException::fieldUnknown("drill.{$key}", $key);
+            }
+            $uses['drill.'.$key] = $key;
+        }
         foreach (array_keys($query->filters) as $key) {
             if (! $dataset->hasField($key)) {
                 throw AnalyticsQueryException::fieldUnknown("filters.{$key}", $key);

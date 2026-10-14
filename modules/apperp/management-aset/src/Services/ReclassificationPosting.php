@@ -283,6 +283,7 @@ final class ReclassificationPosting
      */
     public function post(AssetReclassification $header, array $plan, array $codes): array
     {
+        FixedAssetLedgerContext::set('reclassification', $header->tanggal->toDateString(), self::SOURCE_TYPE, (string) $header->id, (string) $header->kode);
         $tenant = (string) $header->tenant_id;
         $tanggal = $header->tanggal->toDateString();
         $susunan = $this->susun($header, $plan, $codes);

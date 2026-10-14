@@ -22,6 +22,7 @@ use Modules\Apperp\ManagementAset\Analytics\AssetScrapsDataset;
 use Modules\Apperp\ManagementAset\Analytics\BookValuesDataset;
 use Modules\Apperp\ManagementAset\Analytics\DepreciationEntriesDataset;
 use Modules\Apperp\ManagementAset\Analytics\DowntimeDataset;
+use Modules\Apperp\ManagementAset\Analytics\FixedAssetLedgerDataset;
 use Modules\Apperp\ManagementAset\Analytics\InsurancePoliciesDataset;
 use Modules\Apperp\ManagementAset\Analytics\MaintenanceRequestsDataset;
 use Modules\Apperp\ManagementAset\Analytics\PhysicalChecksDataset;
@@ -140,6 +141,7 @@ final class ModuleServiceProvider extends ServiceProvider
             AssetReceiptsDataset::class,
             DepreciationEntriesDataset::class,
             BookValuesDataset::class,
+            FixedAssetLedgerDataset::class,
             WorkOrdersDataset::class,
             MaintenanceRequestsDataset::class,
             DowntimeDataset::class,

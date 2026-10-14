@@ -192,6 +192,9 @@ ui:
         #   label: Reklasifikasi aset
         #   permission: management-aset.reklasifikasi-aset.read
       laporan:
+        - id: transaksi-nilai-aset
+          label: Transaksi nilai aset
+          permission: management-aset.penyusutan.read
         - id: laporan-penyusutan-aset
           label: Laporan penyusutan aset
           permission: management-aset.penyusutan.read

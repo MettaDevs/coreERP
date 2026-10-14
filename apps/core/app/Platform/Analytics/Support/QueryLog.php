@@ -92,6 +92,12 @@ final class QueryLog
         }
         ksort($filters);
         $normalized['filters'] = $filters;
+        $normalized['drill'] = [];
+        $drill = $query->drill;
+        ksort($drill);
+        foreach ($drill as $key => $value) {
+            $normalized['drill'][$key] = self::plain($dataset, $key) ? $value : self::MASK;
+        }
 
         if ($query->timeRange !== null) {
             $field = $query->timeRange->field ?? $dataset?->defaultTime();

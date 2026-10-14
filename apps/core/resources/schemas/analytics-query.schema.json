@@ -5,7 +5,24 @@
     "type": "object",
     "additionalProperties": false,
     "required": ["dataset", "measures"],
+    "allOf": [
+        {
+            "if": { "required": ["records"], "properties": { "records": { "const": true } } },
+            "then": {
+                "required": ["dimensions"],
+                "properties": {
+                    "measures": { "maxItems": 0 },
+                    "dimensions": { "minItems": 1 },
+                    "totals": { "const": false },
+                    "fill_gaps": { "const": false }
+                }
+            },
+            "else": { "properties": { "measures": { "minItems": 1 } } }
+        }
+    ],
     "properties": {
+        "drill": { "type": "object", "additionalProperties": { "type": ["string", "integer", "boolean", "null"] }, "description": "Kesamaan tambahan untuk membuka detail; tidak mengganti filters." },
+        "records": { "type": "boolean", "description": "Daftar baris sumber tanpa agregasi. dimensions menjadi kolom dan measures harus kosong." },
         "dataset": {
             "description": "Kode dataset, berawalan id module.",
             "type": "string",
@@ -33,7 +50,7 @@
         "measures": {
             "description": "Kunci measure dataset yang dihitung. Sedikitnya satu.",
             "type": "array",
-            "minItems": 1,
+            "minItems": 0,
             "items": { "$ref": "#/$defs/key" }
         },
         "filters": {

@@ -92,6 +92,8 @@ export function buildQuery(parts: AnalyticsQuery): AnalyticsQuery {
         dataset: parts.dataset,
         ...(parts.dimensions?.length ? { dimensions: parts.dimensions } : {}),
         measures: parts.measures,
+        ...(parts.records ? { records: true } : {}),
+        ...(parts.drill ? { drill: parts.drill } : {}),
         ...(Object.keys(filters).length > 0 ? { filters } : {}),
         ...(parts.time_range ? { time_range: parts.time_range } : {}),
         ...(parts.sort?.length ? { sort: parts.sort } : {}),

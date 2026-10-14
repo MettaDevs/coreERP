@@ -144,6 +144,7 @@ final class DatasetValidator
         }
 
         return new DeclaredDataset(
+            partitions: $this->names($raw['partitions'] ?? [], 'dimensi pemisah'),
             code: $code,
             caption: $caption,
             moduleId: $moduleId,
@@ -292,17 +293,29 @@ final class DatasetValidator
                     throw new InvalidDatasetDefinition("kolom {$column} tidak ada di tabel {$master->getTable()} (rujukan {$key}).");
                 }
             }
+            $localColumn = $fields[$key]->column;
+            if (($reference['localColumn'] ?? null) !== null) {
+                [$localColumn] = $this->resolve($reference['localColumn'], $tables, "kolom lokal rujukan {$key}");
+            }
             $alias = 'r'.count($references);
             $references[$key] = new CompiledReference(
                 key: $key,
                 model: $reference['model'],
                 table: $master->getTable(),
                 alias: $alias,
-                localColumn: $fields[$key]->column,
+                localColumn: $localColumn,
                 foreignColumn: $alias.'.id',
                 labelColumn: $alias.'.'.$reference['label'],
                 codeColumn: $reference['code'] === null ? null : $alias.'.'.$reference['code'],
             );
+            // Filter nama rujukan memakai join berizin yang sama dengan label tampilannya.
+            $labelKey = $references[$key]->filterKey();
+            if (isset($fields[$labelKey])) {
+                throw new InvalidDatasetDefinition("kunci filter nama {$labelKey} sudah dipakai.");
+            }
+            $fields[$labelKey] = new FilterField($labelKey, $fields[$key]->caption, FieldType::Text, $references[$key]->labelColumn);
+            $classes[$labelKey] = $classes[$key];
+            $types[$labelKey] = $masterColumns[$reference['label']];
         }
 
         foreach ($declared->shared as $key => $dimension) {
@@ -378,13 +391,20 @@ final class DatasetValidator
             }
         }
 
+        foreach ($declared->partitions as $partition) {
+            if (! isset($fields[$partition]) || $classifications[$partition] !== DataClass::CustomerContent) {
+                throw new InvalidDatasetDefinition('Dimensi pemisah harus merupakan field data bisnis yang dinyatakan.');
+            }
+        }
         $hash = hash('sha256', json_encode([
+            $declared->partitions,
             $declared->code, $declared->version, $declared->model, $table, $sourceSql, $declared->permission, $declared->policy,
             $fields, $classifications, $types, $references, $declared->shared, $joins, $declared->measures,
             $declared->times, $declared->defaultTime, $declared->renamed,
         ], JSON_THROW_ON_ERROR));
 
         return new CompiledDataset(
+            partitions: $declared->partitions,
             code: $declared->code,
             caption: $declared->caption,
             moduleId: $declared->moduleId,
@@ -585,7 +605,7 @@ final class DatasetValidator
         return $out;
     }
 
-    /** @return array<string, array{model: class-string<Model>, label: string, code: ?string}> */
+    /** @return array<string, array{model: class-string<Model>, label: string, code: ?string, localColumn: ?string}> */
     private function references(mixed $references, ModuleManifest $module): array
     {
         if (! is_array($references)) {
@@ -605,6 +625,7 @@ final class DatasetValidator
                 'model' => $model,
                 'label' => $this->key($reference['label'] ?? null, "kolom label rujukan {$key}"),
                 'code' => $code === null ? null : $this->key($code, "kolom kode rujukan {$key}"),
+                'localColumn' => $reference['localColumn'] ?? null,
             ];
         }
 

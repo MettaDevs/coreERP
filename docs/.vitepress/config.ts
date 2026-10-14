@@ -173,6 +173,7 @@ export default withMermaid({
             { text: 'Asuransi aset', link: '/apps/management-aset/transaction/asuransi-aset/' },
             { text: 'Laporan dan ekspor', link: '/apps/management-aset/transaction/laporan/' },
             { text: 'Dataset analitik', link: '/apps/management-aset/transaction/analitik/' },
+            { text: 'Ledger aset dan analisis bersama', link: '/apps/management-aset/transaction/analitik/ledger-aset' },
             { text: 'Dokumen siklus aset', link: '/apps/management-aset/transaction/siklus-aset/' },
             { text: 'Monitoring aset', link: '/apps/management-aset/transaction/monitoring-aset/' },
             { text: 'Layar setup yang belum berisi', link: '/apps/management-aset/transaction/monitoring/' },

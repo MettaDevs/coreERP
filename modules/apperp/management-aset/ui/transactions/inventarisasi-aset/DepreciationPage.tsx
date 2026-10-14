@@ -5,6 +5,7 @@ import {
     Card,
     CardAction,
     CardContent,
+    CardDescription,
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
@@ -68,7 +69,14 @@ function pilihanPost(periods: Period[]): { books: BukuPost[]; akhir: string } {
     let akhir = '';
 
     for (const period of periods) {
-        if (!period.buku_id || period.posting_layer === 'none') {
+        if (
+            !period.buku_id ||
+            period.posting_layer === 'none' ||
+            period.status !== 'final' ||
+            period.reverses_period_id !== null ||
+            period.cancelled_at !== null ||
+            period.posted_posting_id !== null
+        ) {
             continue;
         }
 
@@ -224,7 +232,7 @@ export default function DepreciationPage({
     const finalize = async (period: Period) => {
         if (
             !window.confirm(
-                `Finalisasi penyusutan ${period.aset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
+                `Post penyusutan ${period.aset_code} untuk periode ini ke buku aset? Koreksi berikutnya memakai pembalikan.`,
             )
         ) {
             return;
@@ -246,15 +254,24 @@ export default function DepreciationPage({
         <div className="space-y-4">
             <Card className="rounded-none border-x-0 shadow-none">
                 <CardHeader className="border-b px-5 py-3">
-                    <CardTitle>Aset Book aktif</CardTitle>
+                    <CardTitle>Buku aset aktif</CardTitle>
+                    <CardDescription>
+                        Hitung usulan, periksa nilainya, lalu post ke buku aset.
+                        Jurnal untuk Finance dapat disiapkan terpisah.
+                    </CardDescription>
                     <CardAction>
+                        <Button variant="outline" asChild>
+                            <a href="/management-aset/transaksi-nilai-aset">
+                                Transaksi nilai aset
+                            </a>
+                        </Button>
                         {canCreate && (
                             <Button
                                 variant="outline"
                                 onClick={() => setBulkOpen(true)}
                                 disabled={!books.length}
                             >
-                                Proposal seluruh buku
+                                Hitung penyusutan
                             </Button>
                         )}
                     </CardAction>
@@ -331,7 +348,7 @@ export default function DepreciationPage({
                                 onClick={() => setPostOpen(true)}
                                 disabled={!opsiPost.books.length}
                             >
-                                Post penyusutan
+                                Siapkan jurnal Finance
                             </Button>
                         )}
                     </CardAction>
@@ -364,9 +381,11 @@ export default function DepreciationPage({
                                         <p className="text-muted-foreground text-sm">
                                             {period.period_starts_on} s.d.{' '}
                                             {period.period_ends_on} ·{' '}
-                                            {period.status}
+                                            {period.status === 'final'
+                                                ? 'Sudah dipost ke buku aset'
+                                                : 'Usulan'}
                                             {period.posted_posting_id &&
-                                                ' · sudah di-post'}
+                                                ' · jurnal Finance disiapkan'}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -383,7 +402,7 @@ export default function DepreciationPage({
                                                         void finalize(period)
                                                     }
                                                 >
-                                                    Finalisasi
+                                                    Post ke buku aset
                                                 </Button>
                                             )}
                                         {!period.reverses_period_id &&
@@ -427,7 +446,7 @@ export default function DepreciationPage({
                 >
                     <SheetContent side="right">
                         <SheetHeader>
-                            <SheetTitle>Proposal seluruh buku</SheetTitle>
+                            <SheetTitle>Hitung usulan penyusutan</SheetTitle>
                         </SheetHeader>
                         <form
                             className="space-y-4 p-5"
@@ -480,7 +499,9 @@ export default function DepreciationPage({
                 <Sheet open onOpenChange={(open) => !open && setSelected(null)}>
                     <SheetContent side="right">
                         <SheetHeader>
-                            <SheetTitle>Buat proposal penyusutan</SheetTitle>
+                            <SheetTitle>
+                                Hitung usulan penyusutan aset
+                            </SheetTitle>
                         </SheetHeader>
                         <form
                             className="space-y-4 p-5"

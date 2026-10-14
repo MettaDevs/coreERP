@@ -22,6 +22,8 @@ export type AnalyticsQuery = {
     limit?: number;
     totals?: boolean;
     fill_gaps?: boolean;
+    records?: boolean;
+    drill?: Record<string, string | number | boolean | null>;
 };
 
 export type ResultColumn = {
@@ -103,9 +105,11 @@ export type DatasetField = {
     /** Kode dimensi bersama, misalnya `core.operating-unit`. */
     shared_dimension?: string;
     lookup?: string;
+    label_filter_key?: string;
 };
 
 export type DatasetMeasure = {
+    field_key?: string;
     key: string;
     caption: string;
     aggregate: 'count' | 'count_distinct' | 'sum' | 'avg' | 'min' | 'max';
@@ -116,7 +120,9 @@ export type DatasetMeasure = {
 
 /** Isi dataset yang boleh dipakai pengguna ini; field dan nilai data pribadi sudah disaring server. */
 export type DatasetDescription = DatasetSummary & {
+    partitions: string[];
     fields: DatasetField[];
+    filter_fields?: DatasetField[];
     measures: DatasetMeasure[];
     times: string[];
     default_time: string | null;

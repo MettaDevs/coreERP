@@ -42,34 +42,37 @@ type PemuatHalaman = () => Promise<{ default: ComponentType<PropsHalaman> }>;
  * kunjungan ulang ke halaman yang sama — termasuk muat ulang sebagian milik Inertia —
  * membuang state halaman module dan menampilkan penangguhan sekali lagi.
  */
-const simpanan = new Map<string, ComponentType<PropsHalaman>>();
+const pageCache = new Map<string, ComponentType<PropsHalaman>>();
 
-export default function halamanModule(
-    nama: string,
-    muat: PemuatHalaman,
+export default function resolveModulePage(
+    name: string,
+    load: PemuatHalaman,
 ): ComponentType<PropsHalaman> {
-    let Halaman = simpanan.get(nama);
+    const cached = pageCache.get(name);
 
-    if (!Halaman) {
-        Halaman = lazy(muat);
-        simpanan.set(nama, Halaman);
+    if (cached) {
+        return cached;
     }
 
-    const Termuat = Halaman;
+    const LoadedPage = lazy(load);
 
-    function TuanRumahModule(props: PropsHalaman) {
+    function ModulePageHost(props: PropsHalaman) {
         return (
-            <BatasKesalahan nama={nama}>
+            <BatasKesalahan
+                key={JSON.stringify([props.auth, props.konteks])}
+                nama={name}
+            >
                 <Suspense fallback={<SedangMemuat />}>
-                    <Termuat {...props} />
+                    <LoadedPage {...props} />
                 </Suspense>
             </BatasKesalahan>
         );
     }
 
-    TuanRumahModule.displayName = `TuanRumahModule(${nama})`;
+    ModulePageHost.displayName = `ModulePageHost(${name})`;
+    pageCache.set(name, ModulePageHost);
 
-    return TuanRumahModule;
+    return ModulePageHost;
 }
 
 function SedangMemuat() {

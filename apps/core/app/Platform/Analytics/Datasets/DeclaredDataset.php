@@ -28,10 +28,11 @@ final readonly class DeclaredDataset
      * @param  array{only: list<string>, except: list<string>}|null  $fromModel
      * @param  array<string, array{caption: string, type: FieldType, column: ?string, options: array<string, string>, classification: ?DataClass}>  $fields
      * @param  array<string, array{model: class-string<Model>, local: string, foreign: string, include_archived: bool}>  $joins
-     * @param  array<string, array{model: class-string<Model>, label: string, code: ?string}>  $references
+     * @param  array<string, array{model: class-string<Model>, label: string, code: ?string, localColumn: ?string}>  $references
      * @param  array<string, SharedDimension>  $shared
      * @param  array<string, CompiledMeasure>  $measures
      * @param  list<string>  $times
+     * @param  list<string>  $partitions
      * @param  array<string, string>  $renamed
      */
     public function __construct(
@@ -54,5 +55,6 @@ final readonly class DeclaredDataset
         public ?string $recordRoute,
         public int $version,
         public array $renamed,
+        public array $partitions = [],
     ) {}
 }

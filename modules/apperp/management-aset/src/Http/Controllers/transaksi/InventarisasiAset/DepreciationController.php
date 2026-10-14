@@ -19,6 +19,7 @@ use Modules\Apperp\ManagementAset\Services\AssetCancellationEngine;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\DepreciationPosting;
 use Modules\Apperp\ManagementAset\Services\DepreciationPostingFailed;
+use Modules\Apperp\ManagementAset\Services\FixedAssetLedgerContext;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\PostingCheckLines;
 use stdClass;
@@ -279,6 +280,7 @@ class DepreciationController extends Controller
             $amount = BigDecimal::of((string) $period->amount);
             $book = BukuAset::query()->where('id', $period->buku_aset_id)->where('status', 'active')->lockForUpdate()->first();
             abort_unless($book !== null, 409, 'Buku aset sudah ditutup; penyusutan belum dapat difinalkan.');
+            FixedAssetLedgerContext::set('depreciation', (string) $period->period_ends_on, 'depreciation-period', (string) $period->id, '', 'Penyusutan final');
             $book->update([
                 'accumulated_depreciation' => (string) BigDecimal::of($book->accumulated_depreciation)->plus($amount),
                 'net_book_value' => (string) BigDecimal::of($book->net_book_value)->minus($amount),

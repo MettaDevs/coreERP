@@ -51,6 +51,9 @@ const AssetClassificationPage = lazy(
         import('./transactions/asset-classifications/AssetClassificationPage'),
 );
 const MasterDetailPage = lazy(() => import('./master/detail/MasterDetailPage'));
+const FixedAssetLedgerPage = lazy(
+    () => import('./transactions/ledger/FixedAssetLedgerPage'),
+);
 const AsetPage = lazy(
     () => import('./transactions/inventarisasi-aset/AsetPage'),
 );
@@ -224,6 +227,13 @@ export default function App({
                 />
             </main>
         );
+    }
+
+    if (
+        view === 'transaksi-nilai-aset' &&
+        permissions.includes('management-aset.penyusutan.read')
+    ) {
+        return <FixedAssetLedgerPage />;
     }
 
     if (
