@@ -400,6 +400,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
         Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
         Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');
+        Route::post('vendors/imports', [VendorController::class, 'importSuppliers'])->middleware('throttle:10,1')->name('vendors.imports.store');
         Route::patch('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
         Route::get('finance-postings/{financePosting}', [FinancePostingMonitorController::class, 'show'])->name('finance-postings.show');
         Route::post('finance-postings/{financePosting}/revalidate', [FinancePostingMonitorController::class, 'revalidate'])->middleware('throttle:30,1')->name('finance-postings.revalidate');

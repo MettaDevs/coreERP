@@ -311,3 +311,10 @@ menjalankan POST upload, list, dan GET download stream pada disk `local` konfigu
 50 pada run pertama, dua yang gagal test diperbaiki lalu rerun lulus46 assertion, dan dua
 test lampiran tambahan lulus1/11 serta1/10 assertion. Berkas receipt pengguna belum terunggah;
 otomasi browser masih terhalang kernel.
+
+## Supplier BO CSV manual — 14 Oktober 2026
+
+USER memilih impor manual seperti COA. Foundation Vendor memiliki parser preview/apply dan form pada settings/vendors dengan izin vendor-update existing; BO memiliki ekspor mSupplier dan mapping existing. Tidak menambah schema/permission/number reference. Detail keputusan, checklist owner/status/dependensi ada di ../../../../bo_metta_anggaran_new/docs/integrasi-bo-coreerp/SUPPLIER_SYNC_PLAN.md (dari akar repo CoreERP: ../bo_metta_anggaran_new/docs/integrasi-bo-coreerp/SUPPLIER_SYNC_PLAN.md). Build/type-check/parser8/lint lulus; runtime lokal healthy dan route terdaftar. Login USER selesai, preview dua supplier berhasil dan aman tanpa apply. Apply data, database regression, dan E2E Faktur/Kartu Hutang belum dijalankan. Tidak ada deploy dev atau DDL/DML langsung.
+
+
+Pembaruan SUP-MANUAL: login USER selesai; AGENT memverifikasi layar dan preview terautentikasi CSV BO. Full3baris ditolak aman karena kandidat existing VND-000001; subset2baris preview bersih, belum apply. Lint UI eksplisit --no-ignore dan format config Core lulus. Bukti runtime/preview tidak membuktikan apply/idempotency database atau AP/Kartu Hutang.
