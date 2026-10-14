@@ -139,6 +139,7 @@ class PenerimaanAsetTest extends TestCase
         $firstEntityId = $this->legalEntityId;
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $secondReceipt = $this->draf([$this->baris(jumlah: 1)]);
         $this->selesaikan($secondReceipt)->assertOk();
 
@@ -152,6 +153,7 @@ class PenerimaanAsetTest extends TestCase
         $this->assertCount(2, $assets->pluck('legal_entity_id')->unique());
 
         $this->legalEntityId = $firstEntityId;
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $nextReceipt = $this->draf([$this->baris(jumlah: 1)]);
         $this->assertNotSame($receipts->first()->kode, DB::table('aset_tr_penerimaan_aset')->where('id', $nextReceipt)->value('kode'));
     }

@@ -46,8 +46,12 @@ final class DatasetDefinition
 
     private ?string $permission = null;
 
-    /** @var array{code: string, legal_entity: string, operating_unit: ?string}|null */
+    /** @var array{code: string, legal_entity: ?string, operating_unit: ?string}|null */
     private ?array $policy = null;
+
+    private ?string $companyColumn = null;
+
+    private bool $dataScopeDeclared = false;
 
     /** @var array{only: list<string>, except: list<string>}|null */
     private ?array $fromModel = null;
@@ -140,9 +144,27 @@ final class DatasetDefinition
      * `OrganizationScope::legalEntityQuery()` untuk record tanpa unit kerja. Kolom tabel yang di-join
      * ditulis `alias.kolom`.
      */
-    public function dataPolicy(string $code, string $legalEntity, ?string $operatingUnit = null): self
+    public function dataPolicy(string $code, ?string $legalEntity = null, ?string $operatingUnit = null): self
     {
         $this->policy = ['code' => $code, 'legal_entity' => $legalEntity, 'operating_unit' => $operatingUnit];
+
+        return $this;
+    }
+
+    /** Kolom pemilik perusahaan; terpisah dari policy hak akses. */
+    public function company(string $legalEntityColumn): self
+    {
+        $this->companyColumn = $legalEntityColumn;
+        $this->dataScopeDeclared = true;
+
+        return $this;
+    }
+
+    /** Data bersama dalam satu tenant. */
+    public function tenantWide(): self
+    {
+        $this->companyColumn = null;
+        $this->dataScopeDeclared = true;
 
         return $this;
     }

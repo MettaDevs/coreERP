@@ -76,6 +76,8 @@ class ServiceContractController extends Controller
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
         if ($existing = ServiceContract::withTrashed()->where('creation_key', $key)->first()) {
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
+
             return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -108,6 +110,8 @@ class ServiceContractController extends Controller
             if ($existing === null) {
                 throw $exception;
             }
+
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
 
             return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
         }

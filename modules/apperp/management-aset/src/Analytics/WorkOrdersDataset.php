@@ -42,6 +42,7 @@ final class WorkOrdersDataset implements Dataset
             ->description('Satu baris per work order: status, tipe, tingkat layanan, dan waktu pengerjaannya.')
             ->model(PemeliharaanAset::class)
             ->permission('management-aset.pemeliharaan-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->fieldsFromModel(except: ['keterangan', 'penanggung_jawab_user_id'])
             ->reference('tipe_work_order_id', TipeWorkOrder::class)

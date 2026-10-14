@@ -144,7 +144,7 @@ class PenerimaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -172,7 +172,7 @@ class PenerimaanAsetController extends Controller
                 return (string) $record['id'];
             });
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -352,7 +352,7 @@ class PenerimaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $form['legal_entity_id'], $form['responsible_org_unit_id']);
         $apply = filter_var($form['apply'] ?? false, FILTER_VALIDATE_BOOL);
         $awalanKunci = $apply ? substr($this->creationKey($request), 0, self::MAX_CREATION_KEY - 13).':impor:' : null;
-        if ($awalanKunci !== null && ($sudah = $this->drafImpor($awalanKunci)) !== []) {
+        if ($awalanKunci !== null && ($sudah = $this->drafImpor($request, $awalanKunci)) !== []) {
             return response()->json(['data' => ['status' => 'applied', 'rows' => null, 'receipts' => $sudah, 'rejected' => []]], 200, ['Idempotent-Replayed' => 'true']);
         }
         $file = $request->file('file');
@@ -415,12 +415,12 @@ class PenerimaanAsetController extends Controller
                 }
             });
         } catch (QueryException $exception) {
-            if ($this->drafImpor((string) $awalanKunci) === []) {
+            if ($this->drafImpor($request, (string) $awalanKunci) === []) {
                 throw $exception;
             }
         }
 
-        return response()->json(['data' => ['status' => 'applied', 'rows' => $berkas['rows'], 'receipts' => $this->drafImpor((string) $awalanKunci), 'rejected' => []]], 201);
+        return response()->json(['data' => ['status' => 'applied', 'rows' => $berkas['rows'], 'receipts' => $this->drafImpor($request, (string) $awalanKunci), 'rejected' => []]], 201);
     }
 
     /** Baris judul templat impor saldo awal, untuk diisi di spreadsheet (TODO 10.6). */
@@ -439,20 +439,24 @@ class PenerimaanAsetController extends Controller
      *
      * @return list<array<string, mixed>>
      */
-    private function drafImpor(string $awalanKunci): array
+    private function drafImpor(Request $request, string $awalanKunci): array
     {
         return array_values(PenerimaanAset::query()
             ->where('creation_key', 'like', str_replace(['%', '_'], ['\\%', '\\_'], $awalanKunci).'%')
             ->orderBy('kode')
             ->toBase()
-            ->get(['id', 'kode', 'tanggal', 'tanggal_siap_pakai', 'status'])
-            ->map(static fn (stdClass $baris): array => [
-                'id' => (string) $baris->id,
-                'kode' => (string) $baris->kode,
-                'tanggal' => substr((string) $baris->tanggal, 0, 10),
-                'tanggal_siap_pakai' => $baris->tanggal_siap_pakai === null ? null : substr((string) $baris->tanggal_siap_pakai, 0, 10),
-                'status' => (string) $baris->status,
-            ])
+            ->get(['id', 'kode', 'tanggal', 'tanggal_siap_pakai', 'status', 'legal_entity_id', 'responsible_org_unit_id'])
+            ->map(function (stdClass $baris) use ($request): array {
+                app(OrganizationScope::class)->require($request, $baris->legal_entity_id, $baris->responsible_org_unit_id);
+
+                return [
+                    'id' => (string) $baris->id,
+                    'kode' => (string) $baris->kode,
+                    'tanggal' => substr((string) $baris->tanggal, 0, 10),
+                    'tanggal_siap_pakai' => $baris->tanggal_siap_pakai === null ? null : substr((string) $baris->tanggal_siap_pakai, 0, 10),
+                    'status' => (string) $baris->status,
+                ];
+            })
             ->all());
     }
 
@@ -513,6 +517,8 @@ class PenerimaanAsetController extends Controller
             'legal_entity_id' => ['required', 'ulid'],
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
+
+        app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
 
         return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
     }
@@ -850,7 +856,11 @@ class PenerimaanAsetController extends Controller
             'details.*.saldo_awal_buku.*.buku_id' => ['required', 'ulid'],
             'details.*.saldo_awal_buku.*.akumulasi_per_unit' => ['required', 'numeric', 'min:0'],
             'details.*.saldo_awal_buku.*.periode_berjalan' => ['required', 'integer', 'min:0', 'max:'.self::MAX_PERIODE_BERJALAN],
-            'details.*.permintaan_pembelian_detail_id' => ['nullable', 'ulid', Rule::exists('aset_tr_permintaan_pengadaan_aset_details', 'id')->where('tenant_id', $tenant)],
+            'details.*.permintaan_pembelian_detail_id' => ['nullable', 'ulid', Rule::exists('aset_tr_permintaan_pengadaan_aset_details', 'id')->where(function (QueryBuilder $query) use ($request, $tenant): void {
+                $requests = PermintaanPengadaanAset::query();
+                app(OrganizationScope::class)->query($requests, $request, 'legal_entity_id', 'requesting_org_unit_id');
+                $query->where('tenant_id', $tenant)->whereIn('request_id', $requests->select('id'));
+            })],
             'details.*.keterangan' => ['nullable', 'string', 'max:2000'],
             'details.*.atribut' => ['sometimes', 'array'],
             'details.*.atribut.*.tipe_atribut_id' => ['required', 'ulid'],
@@ -1174,9 +1184,14 @@ class PenerimaanAsetController extends Controller
         }
     }
 
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return PenerimaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        $record = PenerimaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     private function dokumen(Request $request, string $id): stdClass

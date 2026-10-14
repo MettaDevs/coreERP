@@ -64,6 +64,7 @@ final class AssetReceiptsDataset implements Dataset
                 ])
                 ->selectRaw('aset_tr_penerimaan_aset_details.jumlah * aset_tr_penerimaan_aset_details.nilai_per_unit as line_value'))
             ->permission('management-aset.penerimaan-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('receipt_number', 'Nomor penerimaan', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)

@@ -22,7 +22,7 @@ final class BarangDataset implements Dataset
 
     public function definition(): DatasetDefinition
     {
-        return DatasetDefinition::make('contoh-a.barang', 'Barang')
+        return DatasetDefinition::make('contoh-a.barang', 'Barang')->tenantWide()
             ->model(Barang::class)
             ->permission('contoh-a.barang.read')
             ->fieldsFromModel()

@@ -68,6 +68,7 @@ final class ValueAdjustmentsDataset implements Dataset
                 ])
                 ->selectRaw('case when adjustment.jenis = ? then -aset_tr_penyesuaian_nilai_aset_details.nilai else aset_tr_penyesuaian_nilai_aset_details.nilai end as net_effect', [AssetValueAdjustment::WRITE_DOWN]))
             ->permission('management-aset.penyesuaian-nilai-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('document_number', 'Nomor dokumen', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)

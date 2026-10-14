@@ -69,6 +69,7 @@ final class DowntimeDataset implements Dataset
                 ->selectRaw('aset_tr_downtime_aset.selesai is null as is_open')
                 ->selectRaw('extract(epoch from (aset_tr_downtime_aset.selesai - aset_tr_downtime_aset.mulai)) / 3600 as duration_hours'))
             ->permission('management-aset.downtime-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)
             ->field('responsible_org_unit_id', 'Unit penanggung jawab', FieldType::Reference, classification: DataClass::CustomerContent)

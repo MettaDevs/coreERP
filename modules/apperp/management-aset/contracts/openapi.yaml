@@ -11,6 +11,15 @@ info:
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.
 
+    Transaksi memakai perusahaan aktif dari session sebagai konteks kerja tambahan,
+    termasuk ketika policy memberi akses ke beberapa perusahaan atau seluruh organisasi.
+    Daftar, pencarian, detail, laporan, dan ekspor biasa dibatasi perusahaan aktif;
+    unit aktif hanya pilihan awal dan policy tetap menentukan unit yang diizinkan.
+    Perusahaan transaksi pada body harus sama dengan perusahaan aktif; ketidaksesuaian
+    ditolak 422. Record perusahaan lain pada lookup detail tidak ditemukan (404).
+    Tanpa perusahaan aktif, daftar resource perusahaan kosong dan penulisan ditolak.
+    Master bersama, termasuk group aset, buku, dan profil penyusutan, tetap tenant-wide.
+
     Permintaan yang mengubah data membawa X-XSRF-TOKEN. Tidak ada token konteks app
     tersendiri. Gap dokumentasi lama: sebagian path sumber masih memakai /api/v1 dari
     bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.

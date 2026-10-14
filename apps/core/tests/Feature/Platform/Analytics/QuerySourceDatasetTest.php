@@ -69,7 +69,7 @@ class QuerySourceDatasetTest extends TestCase
     public function test_a_query_source_dataset_reads_only_the_active_tenant(): void
     {
         $validator = app(DatasetValidator::class);
-        $dataset = $validator->compile($validator->declare($this->dataset(DatasetDefinition::make(self::DATASET, 'Barang per bawaan')
+        $dataset = $validator->compile($validator->declare($this->dataset(DatasetDefinition::make(self::DATASET, 'Barang per bawaan')->tenantWide()
             ->fromQuery(static fn () => Barang::query()->select(['tenant_id', 'bawaan'])->selectRaw('count(*) as jumlah')->groupBy('tenant_id', 'bawaan'))
             ->permission('contoh-a.barang.read')
             ->field('bawaan', 'Barang bawaan', FieldType::Boolean, classification: DataClass::CustomerContent)
@@ -104,7 +104,7 @@ class QuerySourceDatasetTest extends TestCase
     public function test_the_source_fails_closed_outside_an_active_tenant(): void
     {
         $validator = app(DatasetValidator::class);
-        $dataset = $validator->compile($validator->declare($this->dataset(DatasetDefinition::make(self::DATASET, 'Barang per bawaan')
+        $dataset = $validator->compile($validator->declare($this->dataset(DatasetDefinition::make(self::DATASET, 'Barang per bawaan')->tenantWide()
             ->fromQuery(static fn () => Barang::query()->select(['tenant_id', 'bawaan']))
             ->permission('contoh-a.barang.read')
             ->field('bawaan', 'Barang bawaan', FieldType::Boolean, classification: DataClass::CustomerContent)

@@ -107,7 +107,7 @@ final class CounterReadingController extends Controller
             ['key' => $request->header('Idempotency-Key')],
             ['key' => ['required', 'string', 'max:'.self::MAX_CREATION_KEY, 'regex:/^[A-Za-z0-9._:-]+$/']],
         )->validate()['key'];
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -159,7 +159,7 @@ final class CounterReadingController extends Controller
                 ]);
             });
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -167,7 +167,7 @@ final class CounterReadingController extends Controller
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
-        $created = $this->replay($key);
+        $created = $this->replay($request, $key);
 
         return response()->json(['data' => $created === null ? null : $this->withPerson($created, $this->tenant($request), $people)], 201);
     }
@@ -246,12 +246,17 @@ final class CounterReadingController extends Controller
     }
 
     /**
-     * Untuk replay tanpa saringan jangkauan: kunci idempotensi sudah membuktikan pemiliknya, dan
-     * replay harus menemukan pembacaan yang sudah diarsipkan juga.
+     * Replay mencakup pembacaan terarsip; perusahaan dan hak aset tetap diperiksa sebelum dikembalikan.
      */
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return $this->joined(CounterReading::withTrashed())->where(self::TABLE.'.creation_key', $key)->toBase()->first();
+        $record = $this->joined(CounterReading::withTrashed())->where(self::TABLE.'.creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            $asset = Aset::withTrashed()->whereKey($record->aset_id)->firstOrFail();
+            app(OrganizationScope::class)->require($request, $asset->legal_entity_id, $asset->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     /**

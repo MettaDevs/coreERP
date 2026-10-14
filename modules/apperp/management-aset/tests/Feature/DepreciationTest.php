@@ -15,16 +15,21 @@ class DepreciationTest extends TestCase
 
     private string $tenantId;
 
+    private string $legalEntityId;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
     }
 
     public function test_proposal_uses_usage_unit_effective_at_period_end_and_finalising_twice_adds_once(): void
     {
         [$book, $usageUnit] = $this->book();
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize']);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $period = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
 
         $this->assertSame($usageUnit, $period['usage_org_unit_id']);
@@ -46,6 +51,7 @@ class DepreciationTest extends TestCase
     {
         [$book] = $this->book();
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.cancel']);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $period = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
         $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk();
         $reversal = $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Koreksi periode'])->assertCreated()->json('data.period');
@@ -61,6 +67,7 @@ class DepreciationTest extends TestCase
     {
         [$book] = $this->book();
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read', 'management-aset.penyusutan.create']);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated();
         $this->getJson('/api/modules/management-aset/v1/penyusutan/buku')->assertOk()->assertJsonPath('data.0.id', $book);
         $this->getJson('/api/modules/management-aset/v1/penyusutan')->assertOk()->assertJsonCount(1, 'data');
@@ -72,6 +79,7 @@ class DepreciationTest extends TestCase
         [$book] = $this->book();
         DB::table('aset_m_profil_penyusutan')->where('tenant_id', $this->tenantId)->update(['method' => 'manual', 'manual_schedule' => json_encode([['amount' => 90], ['amount' => 70]]), 'useful_life_periods' => null]);
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create']);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $first = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
         $second = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['buku_aset_id' => $book, 'period_starts_on' => '2026-08-01', 'period_ends_on' => '2026-08-31'])->assertCreated()->json('data');
         $this->assertSame(90.0, (float) $first['amount']);
@@ -88,7 +96,7 @@ class DepreciationTest extends TestCase
         $book = (string) Str::ulid();
         $usage = (string) Str::ulid();
         DB::table('aset_m_profil_penyusutan')->insert(['id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-'.Str::ulid(), 'kode' => 'PRF'.Str::random(5), 'nama' => 'Garis lurus', 'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 12, 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('aset_tr_aset')->insert(['id' => $aset, 'tenant_id' => $this->tenantId, 'creation_key' => 'aset-'.Str::ulid(), 'kode' => 'AST'.Str::random(5), 'nama' => 'Aset penyusutan uji', 'legal_entity_id' => (string) Str::ulid(), ...$this->classification($now), 'acquired_on' => '2026-07-01', 'acquisition_value' => 1200, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_tr_aset')->insert(['id' => $aset, 'tenant_id' => $this->tenantId, 'creation_key' => 'aset-'.Str::ulid(), 'kode' => 'AST'.Str::random(5), 'nama' => 'Aset penyusutan uji', 'legal_entity_id' => $this->legalEntityId, ...$this->classification($now), 'acquired_on' => '2026-07-01', 'acquisition_value' => 1200, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now]);
         DB::table('aset_tr_penempatan_aset')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $aset, 'usage_org_unit_id' => $usage, 'effective_on' => '2026-07-15', 'created_at' => $now, 'updated_at' => $now]);
         DB::table('aset_tr_buku_aset')->insert(['id' => $book, 'tenant_id' => $this->tenantId, 'aset_id' => $aset, 'depreciation_profile_id' => $profile, 'book_code' => 'BOOK', 'acquisition_value' => 1200, 'net_book_value' => 1200, 'created_at' => $now, 'updated_at' => $now]);
 

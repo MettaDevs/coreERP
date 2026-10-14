@@ -98,6 +98,8 @@ class InsurancePolicyController extends Controller
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
+        app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
+
         return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
     }
 
@@ -107,6 +109,8 @@ class InsurancePolicyController extends Controller
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
         if ($existing = InsurancePolicy::withTrashed()->where('creation_key', $key)->first()) {
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
+
             return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -135,6 +139,8 @@ class InsurancePolicyController extends Controller
             if ($existing === null) {
                 throw $exception;
             }
+
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
 
             return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
         }

@@ -1,173 +1,274 @@
 import { Button } from '@apperp/ui/button';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from '@apperp/ui/dropdown-menu';
-import { router, usePage } from '@inertiajs/react';
-import { Building2, Check, ChevronDown, MapPin } from 'lucide-react';
-
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@apperp/ui/field';
+import { Select } from '@apperp/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@apperp/ui/sheet';
+import { usePage } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { apiRequest, errorText } from '@/lib/core-api';
 import type { Workspace } from '@/types';
 
 type PageProps = {
-    auth: {
-        membership: {
-            id: string;
-            tenant_name: string;
-        } | null;
-    };
+    auth: { membership: { id: string; tenant_name: string } | null };
     workspace: Workspace;
 };
 
 export function WorkspaceSwitcher() {
     const { auth, workspace } = usePage<PageProps>().props;
     const membership = auth.membership;
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [open, setOpen] = useState(false);
+    const [membershipId, setMembershipId] = useState(membership?.id ?? null);
+    const [legalEntityId, setLegalEntityId] = useState(
+        workspace.active_legal_entity?.id ?? null,
+    );
+    const [orgUnitId, setOrgUnitId] = useState(
+        workspace.active_org_unit?.id ?? null,
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     if (!membership) {
         return null;
     }
 
-    const activate = (
-        membershipId: string,
-        legalEntityId: string | null,
-        orgUnitId: string | null,
-    ) => {
-        router.put(
-            '/api/v1/workspace-context',
-            {
-                membership_id: membershipId,
-                legal_entity_id: legalEntityId,
-                org_unit_id: orgUnitId,
-            },
-            { preserveScroll: true },
-        );
+    const changingWorkspace = membershipId !== membership.id;
+    const changed =
+        changingWorkspace ||
+        legalEntityId !== (workspace.active_legal_entity?.id ?? null) ||
+        orgUnitId !== (workspace.active_org_unit?.id ?? null);
+    const contextLabel = [
+        membership.tenant_name,
+        workspace.active_legal_entity?.name,
+        workspace.active_org_unit?.name,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const changeOpen = (nextOpen: boolean) => {
+        if (saving) {
+            return;
+        }
+
+        if (nextOpen) {
+            setMembershipId(membership.id);
+            setLegalEntityId(workspace.active_legal_entity?.id ?? null);
+            setOrgUnitId(workspace.active_org_unit?.id ?? null);
+            setError(null);
+        }
+
+        setOpen(nextOpen);
+    };
+
+    const apply = async () => {
+        setSaving(true);
+        setError(null);
+
+        try {
+            await apiRequest('/api/v1/workspace-context', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    membership_id: membershipId,
+                    legal_entity_id: changingWorkspace ? null : legalEntityId,
+                    org_unit_id: changingWorkspace ? null : orgUnitId,
+                }),
+            });
+            // Muat ulang penuh agar daftar dan isian tidak menyimpan konteks sebelumnya.
+            window.location.reload();
+        } catch (caught) {
+            setError(
+                errorText(caught, 'Tempat kerja belum berubah. Coba lagi.'),
+            );
+            setSaving(false);
+        }
     };
 
     return (
-        <div className="flex min-w-0 flex-wrap items-center gap-1">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="max-w-48 justify-between"
-                        aria-label="Pilih tenant aktif"
-                    >
-                        <Building2 data-icon="inline-start" />
-                        <span className="truncate">
-                            {membership.tenant_name}
-                        </span>
-                        <ChevronDown data-icon="inline-end" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-64">
-                    <DropdownMenuLabel>Tenant</DropdownMenuLabel>
-                    <DropdownMenuGroup>
-                        {workspace.memberships.map((item) => (
-                            <DropdownMenuItem
-                                key={item.id}
-                                onSelect={() => activate(item.id, null, null)}
-                            >
-                                <Building2 />
-                                <span className="min-w-0 flex-1 truncate">
-                                    {item.tenant_name}
-                                </span>
-                                {item.id === membership.id && <Check />}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuGroup>
-                </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="max-w-52 justify-between"
-                        disabled={!workspace.legal_entities.length}
-                        aria-label="Pilih legal entity aktif"
-                    >
-                        <Building2 data-icon="inline-start" />
-                        <span className="truncate">
-                            {workspace.active_legal_entity?.name ??
-                                'Belum ada legal entity'}
-                        </span>
-                        <ChevronDown data-icon="inline-end" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-72">
-                    <DropdownMenuLabel>Legal entity</DropdownMenuLabel>
-                    <DropdownMenuGroup>
-                        {workspace.legal_entities.map((entity) => (
-                            <DropdownMenuItem
-                                key={entity.id}
-                                onSelect={() =>
-                                    activate(
-                                        membership.id,
-                                        entity.id,
-                                        workspace.active_org_unit?.id ?? null,
-                                    )
-                                }
-                            >
-                                <Building2 />
-                                <span className="min-w-0 flex-1 truncate">
-                                    {entity.name}
-                                </span>
-                                {entity.id ===
-                                    workspace.active_legal_entity?.id && (
-                                    <Check />
+        <Sheet open={open} onOpenChange={changeOpen}>
+            <SheetTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Pilih tempat kerja: ${contextLabel}`}
+                    title={contextLabel}
+                >
+                    <AppLogoIcon
+                        className="size-5 fill-current"
+                        aria-hidden="true"
+                    />
+                </Button>
+            </SheetTrigger>
+            <SheetContent
+                ref={contentRef}
+                side="right"
+                className="w-full gap-0 p-0 sm:max-w-lg"
+                showCloseButton={!saving}
+            >
+                <SheetHeader className="border-b px-6 py-5 pr-12">
+                    <SheetTitle>Tempat kerja</SheetTitle>
+                    <SheetDescription>
+                        Daftar transaksi mengikuti perusahaan aktif. Unit kerja
+                        menjadi pilihan awal transaksi baru. Hak akses Anda
+                        tetap berlaku.
+                    </SheetDescription>
+                </SheetHeader>
+                <form
+                    className="flex min-h-0 flex-1 flex-col"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        void apply();
+                    }}
+                >
+                    <div className="flex-1 overflow-y-auto px-6 py-6">
+                        <fieldset disabled={saving}>
+                            <FieldGroup>
+                                <Field>
+                                    {workspace.memberships.length > 1 ? (
+                                        <Select
+                                            label="Ruang kerja"
+                                            value={membershipId}
+                                            onValueChange={(value) =>
+                                                value && setMembershipId(value)
+                                            }
+                                            items={workspace.memberships.map(
+                                                (item) => ({
+                                                    value: item.id,
+                                                    label: item.tenant_name,
+                                                }),
+                                            )}
+                                            searchPlaceholder="Cari ruang kerja…"
+                                            emptyMessage="Ruang kerja tidak ditemukan."
+                                            portalContainer={contentRef}
+                                        />
+                                    ) : (
+                                        <>
+                                            <FieldLabel>Ruang kerja</FieldLabel>
+                                            <p className="text-sm">
+                                                {membership.tenant_name}
+                                            </p>
+                                        </>
+                                    )}
+                                </Field>
+                                {changingWorkspace ? (
+                                    <FieldDescription>
+                                        Terapkan untuk membuka ruang kerja ini.
+                                        Setelah itu, pilih perusahaan dan unit
+                                        yang tersedia di dalamnya.
+                                    </FieldDescription>
+                                ) : (
+                                    <>
+                                        <Field>
+                                            {workspace.legal_entities.length >
+                                            1 ? (
+                                                <Select
+                                                    label="Perusahaan"
+                                                    value={legalEntityId}
+                                                    onValueChange={(value) =>
+                                                        value &&
+                                                        setLegalEntityId(value)
+                                                    }
+                                                    items={workspace.legal_entities.map(
+                                                        (item) => ({
+                                                            value: item.id,
+                                                            label: item.name,
+                                                        }),
+                                                    )}
+                                                    searchPlaceholder="Cari perusahaan…"
+                                                    emptyMessage="Perusahaan tidak ditemukan."
+                                                    portalContainer={contentRef}
+                                                />
+                                            ) : (
+                                                <>
+                                                    <FieldLabel>
+                                                        Perusahaan
+                                                    </FieldLabel>
+                                                    <p className="text-sm">
+                                                        {workspace
+                                                            .active_legal_entity
+                                                            ?.name ??
+                                                            'Belum ada perusahaan yang tersedia.'}
+                                                    </p>
+                                                </>
+                                            )}
+                                        </Field>
+                                        <Field>
+                                            {workspace.org_units.length > 1 ? (
+                                                <Select
+                                                    label="Unit kerja"
+                                                    value={orgUnitId}
+                                                    onValueChange={(value) =>
+                                                        value &&
+                                                        setOrgUnitId(value)
+                                                    }
+                                                    items={workspace.org_units.map(
+                                                        (item) => ({
+                                                            value: item.id,
+                                                            label: item.name,
+                                                        }),
+                                                    )}
+                                                    searchPlaceholder="Cari unit kerja…"
+                                                    emptyMessage="Unit kerja tidak ditemukan."
+                                                    portalContainer={contentRef}
+                                                />
+                                            ) : (
+                                                <>
+                                                    <FieldLabel>
+                                                        Unit kerja
+                                                    </FieldLabel>
+                                                    <p className="text-sm">
+                                                        {workspace
+                                                            .active_org_unit
+                                                            ?.name ??
+                                                            'Belum ada unit kerja yang tersedia.'}
+                                                    </p>
+                                                </>
+                                            )}
+                                        </Field>
+                                    </>
                                 )}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuGroup>
-                </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="max-w-52 justify-between"
-                        disabled={!workspace.org_units.length}
-                        aria-label="Pilih outlet atau unit aktif"
-                    >
-                        <MapPin data-icon="inline-start" />
-                        <span className="truncate">
-                            {workspace.active_org_unit?.name ??
-                                'Tidak ada unit'}
-                        </span>
-                        <ChevronDown data-icon="inline-end" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-72">
-                    <DropdownMenuLabel>Outlet / unit kerja</DropdownMenuLabel>
-                    <DropdownMenuGroup>
-                        {workspace.org_units.map((unit) => (
-                            <DropdownMenuItem
-                                key={unit.id}
-                                onSelect={() =>
-                                    activate(
-                                        membership.id,
-                                        workspace.active_legal_entity?.id ??
-                                            null,
-                                        unit.id,
-                                    )
-                                }
-                            >
-                                <MapPin />
-                                <span className="min-w-0 flex-1 truncate">
-                                    {unit.name}
-                                </span>
-                                {unit.id === workspace.active_org_unit?.id && (
-                                    <Check />
-                                )}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuGroup>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
+                                <FieldDescription>
+                                    Halaman akan dimuat ulang saat diterapkan.
+                                    Selesaikan isian yang belum disimpan sebelum
+                                    berpindah. Mengganti ruang kerja atau
+                                    perusahaan juga mengembalikan tanggal kerja
+                                    ke hari ini.
+                                </FieldDescription>
+                                {error && <FieldError>{error}</FieldError>}
+                            </FieldGroup>
+                        </fieldset>
+                    </div>
+                    <SheetFooter className="border-t sm:flex-row sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={saving}
+                            onClick={() => changeOpen(false)}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={saving || !changed || !membershipId}
+                        >
+                            {saving ? 'Menerapkan…' : 'Terapkan'}
+                        </Button>
+                    </SheetFooter>
+                </form>
+            </SheetContent>
+        </Sheet>
     );
 }

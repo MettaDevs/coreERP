@@ -262,6 +262,11 @@ class AssetDowntimeController extends Controller
 
     private function replay(Request $request, string $key): ?stdClass
     {
+        $existing = AssetDowntime::withTrashed()->where('creation_key', $key)->first();
+        if ($existing !== null) {
+            $asset = Aset::withTrashed()->findOrFail($existing->aset_id);
+            app(OrganizationScope::class)->require($request, $asset->legal_entity_id, $asset->responsible_org_unit_id);
+        }
         $row = $this->joined(AssetDowntime::withTrashed(), $request)->where(self::TABLE.'.creation_key', $key)->toBase()->first();
 
         return $row === null ? null : $this->present($row);

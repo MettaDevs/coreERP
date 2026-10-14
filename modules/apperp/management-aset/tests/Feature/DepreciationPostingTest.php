@@ -403,7 +403,8 @@ class DepreciationPostingTest extends TestCase
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.post'], [[
             'policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $lain,
             'organization_id' => $lain, 'include_descendants' => true,
-        ]])->postJson(self::API.'penyusutan/posting', $this->masukanPost($komersial))->assertForbidden();
+        ]])->postJson(self::API.'penyusutan/posting', $this->masukanPost($komersial))
+            ->assertUnprocessable()->assertJsonValidationErrors('legal_entity_id');
     }
 
     public function test_the_preview_shows_the_journal_the_run_publishes_and_an_unmapped_group_holds_it(): void

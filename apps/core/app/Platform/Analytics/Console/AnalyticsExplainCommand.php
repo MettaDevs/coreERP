@@ -13,6 +13,7 @@ use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Security\DatasetAccess;
 use App\Platform\Analytics\Security\UserPrincipal;
+use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Identity\Models\User;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Contracts\TenantRunner;
@@ -34,6 +35,7 @@ final class AnalyticsExplainCommand extends Command
     protected $signature = 'analytics:explain
         {--query= : Query analitik dalam JSON, bentuk yang sama dengan POST /api/v1/analytics/query}
         {--tenant= : Id tenant tempat query disusun}
+        {--company= : Id perusahaan milik tenant dan dalam hak pengguna, wajib untuk data per perusahaan}
         {--user= : Email pengguna tenant itu; query disusun dengan hak dan zona waktunya}';
 
     protected $description = 'Tampilkan SQL hasil compile satu query analitik beserta EXPLAIN-nya, tanpa menjalankan query';
@@ -48,6 +50,7 @@ final class AnalyticsExplainCommand extends Command
         QueryExecutor $executor,
         TenantRunner $tenants,
         UserClock $clock,
+        CurrentWorkspace $workspace,
     ): int {
         $json = $this->option('query');
         $tenant = $this->option('tenant');
@@ -74,12 +77,26 @@ final class AnalyticsExplainCommand extends Command
 
             return self::FAILURE;
         }
-        $principal = UserPrincipal::fromMembership($membership, $clock->timezoneFor($user, null));
+        $company = $this->option('company');
+        $legalEntity = is_string($company) && $company !== ''
+            ? $workspace->organizations($membership)->where('classification', 'legal_entity')->firstWhere('id', $company)
+            : null;
+        if (is_string($company) && $company !== '' && $legalEntity === null) {
+            $this->error('Perusahaan tidak tersedia dalam hak pengguna tenant ini.');
+
+            return self::FAILURE;
+        }
+        $principal = UserPrincipal::fromMembership($membership, $clock->timezoneFor($user, $legalEntity?->id), $legalEntity?->id);
 
         try {
             $query = $normalizer->normalize($parser->parse(is_array($input) ? $input : []));
             $dataset = $datasets->find($query->dataset) ?? throw AnalyticsQueryException::datasetUnknown();
             $access->authorize($principal, $dataset);
+            if ($dataset->companyColumn !== null && $legalEntity === null) {
+                $this->error('Sebutkan --company untuk data milik perusahaan.');
+
+                return self::FAILURE;
+            }
             $validator->validate($dataset, $query, $principal);
 
             [$sql, $plan] = $tenants->runFor($principal->tenantId(), static function () use ($compiler, $executor, $dataset, $query, $principal): array {

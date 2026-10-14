@@ -29,6 +29,7 @@ final class FixedAssetLedgerDataset implements Dataset
             ->description('Perolehan, penyusutan final, penyesuaian, reklasifikasi, pelepasan, dan pembalikan per buku aset.')
             ->model(FixedAssetLedgerEntry::class)
             ->permission('management-aset.penyusutan.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->partition('book_code')
             ->join('asset_book', BukuAset::class, 'buku_aset_id', includeArchived: true);

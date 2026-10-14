@@ -299,12 +299,16 @@ class AssetMonitoringTest extends TestCase
             ->where('reference_id', DB::table('app_number_sequence_references')->where('code', 'management-aset.monitoring-aset')->value('id'))
             ->update(['scope_type' => 'legal_entity']);
         $gudang = $this->location('Gudang nomor');
+        $this->sebagaiPenggunaBernama('monitoring-company-user', $this->tenantId, self::ALL);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
 
         $key = 'monitoring-'.Str::ulid();
-        $pertama = $this->create($gudang, [], $key)->assertCreated();
-        $ulang = $this->create($gudang, [], $key)->assertOk()->assertHeader('Idempotent-Replayed', 'true');
-        $lain = $this->create($gudang, ['legal_entity_id' => $entitasLain])->assertCreated();
-        $kedua = $this->create($gudang)->assertCreated();
+        $pertama = $this->withHeader('Idempotency-Key', $key)->postJson(self::URL, $this->header($gudang))->assertCreated();
+        $ulang = $this->withHeader('Idempotency-Key', $key)->postJson(self::URL, $this->header($gudang))->assertOk()->assertHeader('Idempotent-Replayed', 'true');
+        $this->selectCompany($this->tenantId, $entitasLain);
+        $lain = $this->withHeader('Idempotency-Key', 'monitoring-'.Str::ulid())->postJson(self::URL, $this->header($gudang, ['legal_entity_id' => $entitasLain]))->assertCreated();
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
+        $kedua = $this->withHeader('Idempotency-Key', 'monitoring-'.Str::ulid())->postJson(self::URL, $this->header($gudang))->assertCreated();
 
         $this->assertSame($pertama->json('data.id'), $ulang->json('data.id'));
         $this->assertMatchesRegularExpression('/^'.preg_quote($this->awalanNomor('management-aset.monitoring-aset'), '/').'/', (string) $pertama->json('data.kode'));

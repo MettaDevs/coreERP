@@ -25,11 +25,16 @@ final class DataPolicyFilter
      * Nama kolom datang dari definisi yang didaftarkan module, tidak pernah dari pemanggil. Tanpa
      * `$operatingUnitColumn`, hanya legal entity yang dicocokkan — sama dengan
      * `OrganizationScope::legalEntityQuery()` untuk record tanpa unit kerja.
+     * Tanpa `$legalEntityColumn`, hanya unit yang dicocokkan; perusahaan aktif tidak ikut aturan ini.
+     * Tanpa kedua dimensi, nol baris bahkan bila scope mengizinkan seluruh organisasi.
      *
      * @param  array{all?: mixed, scope_grants?: mixed}  $scope
      */
-    public static function apply(Builder $query, array $scope, string $legalEntityColumn, ?string $operatingUnitColumn): Builder
+    public static function apply(Builder $query, array $scope, ?string $legalEntityColumn, ?string $operatingUnitColumn): Builder
     {
+        if ($legalEntityColumn === null && $operatingUnitColumn === null) {
+            return $query->whereRaw('1 = 0');
+        }
         if (($scope['all'] ?? false) === true) {
             return $query;
         }
@@ -37,6 +42,12 @@ final class DataPolicyFilter
         $grants = self::grants($scope);
         if ($grants === []) {
             return $query->whereRaw('1 = 0');
+        }
+
+        if ($legalEntityColumn === null) {
+            $units = array_values(array_unique(array_merge(...array_column($grants, 'operating_unit_ids'))));
+
+            return $units === [] ? $query->whereRaw('1 = 0') : $query->whereIn($operatingUnitColumn, $units);
         }
 
         if ($operatingUnitColumn === null) {

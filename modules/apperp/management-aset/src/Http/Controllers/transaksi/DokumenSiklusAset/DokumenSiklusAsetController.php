@@ -95,6 +95,7 @@ class DokumenSiklusAsetController extends Controller
         }
         $existing = DokumenSiklusAset::query()->where('creation_key', $key)->toBase()->first();
         if ($existing) {
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, $existing->responsible_org_unit_id);
             // Perbaikan untuk dokumen yang dibuat **sebelum** pengajuan berada di dalam
             // transaksi. Waktu itu penyimpanan bisa berhasil sementara pengajuannya gagal,
             // dan dokumen tertinggal berstatus `submitted` tanpa instance mana pun. Dokumen

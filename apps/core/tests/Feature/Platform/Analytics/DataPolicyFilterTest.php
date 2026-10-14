@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Platform\Analytics;
 
+use App\Platform\Analytics\Datasets\CompiledDataset;
+use App\Platform\Analytics\Security\CompanyContextPrincipal;
+use App\Platform\Analytics\Security\DataPolicyScope;
+use App\Platform\Modules\Contracts\CompanyContextFilter;
 use App\Platform\Modules\Contracts\DataPolicyFilter;
+use App\Platform\Modules\Contracts\FieldFilterExpression;
+use App\Platform\Modules\Contracts\FieldType;
+use App\Platform\Modules\Contracts\FilterField;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -13,11 +21,9 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Tests\TestCase;
 
 /**
- * Paritas `DataPolicyFilter` dengan `OrganizationScope` module aset (area 4.7): analitik dan layar module
- * menyaring kebijakan data dengan dua salinan aturan, dan test ini yang membuktikan keduanya memulangkan
- * baris yang sama — untuk mode legal entity + unit (`OrganizationScope::query()`) maupun legal entity saja
- * (`legalEntityQuery()`). `OrganizationScope` tidak diubah di area ini; memindahkan module ke
- * `DataPolicyFilter` adalah pekerjaan module (area 23), dan sampai itu test ini menjaga keduanya sama.
+ * Hak policy tetap mencakup semua grant; konteks perusahaan menyempitkan pekerjaan biasa.
+ * Test menjaga paritas gabungan CompanyContextFilter + DataPolicyFilter dengan OrganizationScope,
+ * termasuk pengguna A+B, grant penuh, dan perusahaan aktif yang belum dipilih.
  *
  * Setiap kasus juga menyebut hasil yang diharapkan, supaya dua salinan yang sama-sama salah tidak lulus
  * berdua. Barisnya di tabel sementara di dalam transaksi test, bukan di tabel module: yang diuji aturan
@@ -80,11 +86,83 @@ class DataPolicyFilterTest extends TestCase
             $module = new OrganizationScope;
 
             $this->assertSame($withUnits, $this->ids(DataPolicyFilter::apply($this->rows(), $engineScope, 'policy_parity_rows.legal_entity_id', 'policy_parity_rows.unit_id')), "{$case}: legal entity + unit");
-            $this->assertSame($withUnits, $this->ids($module->query($this->rows(), $request, 'policy_parity_rows.legal_entity_id', 'policy_parity_rows.unit_id')), "{$case}: legal entity + unit, OrganizationScope");
-
             $this->assertSame($legalEntityOnly, $this->ids(DataPolicyFilter::apply($this->rows(), $engineScope, 'policy_parity_rows.legal_entity_id', null)), "{$case}: legal entity saja");
-            $this->assertSame($legalEntityOnly, $this->ids($module->legalEntityQuery($this->rows(), $request, 'policy_parity_rows.legal_entity_id')), "{$case}: legal entity saja, OrganizationScope");
+
+            foreach (['le-1', 'le-2', null] as $company) {
+                $request->attributes->set('coreerp.legal_entity_id', $company);
+                $expectedWithUnits = array_values(array_filter($withUnits, static fn (string $id): bool => $company !== null && self::ROWS[$id][0] === $company));
+                $expectedLegalEntityOnly = array_values(array_filter($legalEntityOnly, static fn (string $id): bool => $company !== null && self::ROWS[$id][0] === $company));
+                $engine = CompanyContextFilter::apply($this->rows(), 'policy_parity_rows.legal_entity_id', $company);
+                DataPolicyFilter::apply($engine, $engineScope, 'policy_parity_rows.legal_entity_id', 'policy_parity_rows.unit_id');
+                $this->assertSame($expectedWithUnits, $this->ids($engine), "{$case}: konteks perusahaan dan policy");
+                $this->assertSame($expectedWithUnits, $this->ids($module->query($this->rows(), $request, 'policy_parity_rows.legal_entity_id', 'policy_parity_rows.unit_id')), "{$case}: legal entity + unit, OrganizationScope");
+                $this->assertSame($expectedLegalEntityOnly, $this->ids($module->legalEntityQuery($this->rows(), $request, 'policy_parity_rows.legal_entity_id')), "{$case}: legal entity saja, OrganizationScope");
+            }
         }
+    }
+
+    public function test_unit_only_policy_reads_granted_units_without_a_company_and_filters_only_narrow(): void
+    {
+        $scope = ['all' => false, 'scope_grants' => [
+            ['legal_entity_id' => null, 'operating_unit_ids' => ['unit-a']],
+            ['legal_entity_id' => null, 'operating_unit_ids' => ['unit-c']],
+        ]];
+        $query = DataPolicyFilter::apply($this->rows(), $scope, null, 'policy_parity_rows.unit_id');
+        $this->assertSame(['r1', 'r3', 'r5', 'r7'], $this->ids($query));
+        $principal = $this->createStub(CompanyContextPrincipal::class);
+        $principal->method('activeLegalEntityId')->willReturn(null);
+        $principal->method('policyScope')->willReturn($scope);
+        $principal->method('lockedFilters')->willReturn([]);
+        $dataset = new CompiledDataset(
+            code: 'unit-example', caption: 'Unit', moduleId: 'example', version: 1,
+            model: Model::class, table: 'policy_parity_rows', permission: 'example.read',
+            policy: ['code' => 'example.unit-responsibility', 'legal_entity' => null, 'operating_unit' => 'unit_id'],
+            fields: [], measures: [], times: [], defaultTime: null,
+        );
+        $ordinaryQuery = $this->rows();
+        (new DataPolicyScope)->apply($ordinaryQuery, $dataset, $principal);
+        $this->assertSame(['r1', 'r3', 'r5', 'r7'], $this->ids($ordinaryQuery));
+        $outside = DataPolicyFilter::apply($this->rows(), $scope, null, 'policy_parity_rows.unit_id')->where('unit_id', 'unit-b');
+        $this->assertSame([], $this->ids($outside));
+        $this->assertSame([], $this->ids(DataPolicyFilter::apply($this->rows(), ['all' => false, 'scope_grants' => []], null, 'policy_parity_rows.unit_id')));
+        $this->assertSame([], $this->ids(DataPolicyFilter::apply($this->rows(), ['all' => true, 'scope_grants' => []], null, null)));
+        $this->assertSame(array_keys(self::ROWS), $this->ids(DataPolicyFilter::apply($this->rows(), ['all' => true, 'scope_grants' => []], null, 'policy_parity_rows.unit_id')));
+    }
+
+    public function test_public_field_aliases_cannot_replace_declared_company_or_policy_columns(): void
+    {
+        DB::statement('alter table policy_parity_rows add column financial_unit_id text, add column reporting_legal_entity_id text');
+        foreach (self::ROWS as $id => [$legalEntity, $unit]) {
+            DB::table('policy_parity_rows')->where('id', $id)->update([
+                'financial_unit_id' => $unit === 'unit-a' ? 'unit-b' : 'unit-a',
+                'reporting_legal_entity_id' => $legalEntity === 'le-1' ? 'le-2' : 'le-1',
+            ]);
+        }
+        $principal = $this->createStub(CompanyContextPrincipal::class);
+        $principal->method('activeLegalEntityId')->willReturn('le-1');
+        $principal->method('policyScope')->willReturn(['all' => false, 'scope_grants' => [
+            ['legal_entity_id' => 'le-1', 'operating_unit_ids' => ['unit-a']],
+        ]]);
+        $principal->method('lockedFilters')->willReturn([]);
+        $dataset = new CompiledDataset(
+            code: 'alias-example', caption: 'Alias', moduleId: 'example', version: 1,
+            model: Model::class, table: 'policy_parity_rows', permission: 'example.read',
+            policy: ['code' => 'example.responsibility', 'legal_entity' => 'legal_entity_id', 'operating_unit' => 'unit_id'],
+            fields: [
+                'unit_id' => new FilterField('unit_id', 'Unit keuangan', FieldType::Reference, 'policy_parity_rows.financial_unit_id'),
+                'legal_entity_id' => new FilterField('legal_entity_id', 'Perusahaan laporan', FieldType::Reference, 'policy_parity_rows.reporting_legal_entity_id'),
+            ], measures: [], times: [], defaultTime: null, companyColumn: 'legal_entity_id',
+        );
+        $query = $this->rows();
+        (new DataPolicyScope)->apply($query, $dataset, $principal);
+        $this->assertSame(['r1'], $this->ids(clone $query));
+        $this->assertSame('policy_parity_rows.reporting_legal_entity_id', $dataset->qualified('legal_entity_id'));
+        $this->assertSame('policy_parity_rows.legal_entity_id', $dataset->qualifiedColumn('legal_entity_id'));
+        $narrowed = clone $query;
+        FieldFilterExpression::apply($narrowed, $dataset->filterField('unit_id'), ['unit-a'], 'UTC');
+        $this->assertSame([], $this->ids($narrowed));
+        FieldFilterExpression::apply($query, $dataset->filterField('unit_id'), ['unit-b'], 'UTC');
+        $this->assertSame(['r1'], $this->ids($query));
     }
 
     private function rows(): Builder

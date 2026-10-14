@@ -39,6 +39,7 @@ class WorkOrderTest extends TestCase
         $first = $this->create($seed)->assertCreated()->json('data');
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $seed['aset'] = $this->aset($this->tenantId, $seed, 'AST-WO-SECOND');
         $second = $this->create($seed)->assertCreated()->json('data');
         $this->assertSame($first['kode'], $second['kode']);

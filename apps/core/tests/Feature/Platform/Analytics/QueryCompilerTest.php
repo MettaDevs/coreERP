@@ -17,6 +17,7 @@ use App\Platform\Analytics\Query\QueryParser;
 use App\Platform\Analytics\Query\QueryValidator;
 use App\Platform\Analytics\Query\ResultSet;
 use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\CompanyContextPrincipal;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\Analytics\Aggregate;
 use App\Platform\Modules\Contracts\Analytics\Dataset;
@@ -112,6 +113,35 @@ class QueryCompilerTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/"contoh_a_tr_penjualan"\s+as\s/i', (string) $statement, "SQL {$part} memberi alias tabel dasar; scope tenant menunjuk nama tabel sebenarnya.");
             $this->assertStringContainsString('"contoh_a_tr_penjualan"."tenant_id" = ?', (string) $statement, "SQL {$part} kehilangan saringan tenant model.");
         }
+    }
+
+    public function test_company_ownership_join_is_attached_even_when_no_selected_field_uses_it(): void
+    {
+        $dataset = $this->compileDataset(DatasetDefinition::make(self::SALES, 'Penjualan')
+            ->model(Penjualan::class)
+            ->permission('contoh-a.penjualan.read')
+            ->join('ownership', Penjualan::class, 'id')
+            ->company('ownership.legal_entity_id')
+            ->dataPolicy('contoh-a.penjualan-unit', legalEntity: 'legal_entity_id')
+            ->measure('count', 'Jumlah', Aggregate::Count));
+        $principal = $this->createStub(CompanyContextPrincipal::class);
+        $principal->method('tenantId')->willReturn($this->tenantA);
+        $principal->method('activeLegalEntityId')->willReturn($this->legalEntity);
+        $principal->method('policyScope')->willReturn(['all' => true, 'scope_grants' => []]);
+        $principal->method('lockedFilters')->willReturn([]);
+        $principal->method('rowLimit')->willReturn(5000);
+        $principal->method('timezone')->willReturn('UTC');
+        $query = app(QueryNormalizer::class)->normalize(app(QueryParser::class)->parse(['dataset' => self::SALES, 'measures' => ['count'], 'totals' => true]));
+
+        app(TenantRunner::class)->runFor($this->tenantA, function () use ($dataset, $principal, $query): void {
+            $compiled = app(QueryCompiler::class)->compile($dataset, $query, $principal);
+            foreach ([$compiled->builder, $compiled->totals] as $builder) {
+                $this->assertNotNull($builder);
+                $this->assertStringContainsString('as "ownership"', $builder->toSql());
+                $this->assertStringContainsString('"ownership"."legal_entity_id" = ?', $builder->toSql());
+                $this->assertContains($this->legalEntity, $builder->getBindings());
+            }
+        });
     }
 
     public function test_only_the_joins_a_query_mentions_are_attached_and_each_carries_the_tenant(): void
@@ -248,7 +278,7 @@ class QueryCompilerTest extends TestCase
         // Rata-rata yang kosong jatuh di akhir pada urutan turun, bukan di depan.
         DB::table('contoh_a_tr_penjualan')->where('status', 'terbit')->where('currency_code', 'IDR')->update(['dicatat_oleh_user_id' => 7]);
         DB::table('contoh_a_tr_penjualan')->where('status', 'draf')->update(['dicatat_oleh_user_id' => 9]);
-        $dataset = $this->compileDataset(DatasetDefinition::make('contoh-a.penjualan-pencatat', 'Penjualan per pencatat')
+        $dataset = $this->compileDataset(DatasetDefinition::make('contoh-a.penjualan-pencatat', 'Penjualan per pencatat')->tenantWide()
             ->model(Penjualan::class)
             ->permission('contoh-a.penjualan.read')
             ->dataPolicy('contoh-a.penjualan-unit', legalEntity: 'legal_entity_id', operatingUnit: 'org_unit_id')
@@ -315,7 +345,7 @@ class QueryCompilerTest extends TestCase
 
     public function test_a_query_past_its_time_limit_is_stopped_and_answered_as_too_heavy(): void
     {
-        $dataset = $this->compileDataset(DatasetDefinition::make('contoh-a.barang-lambat', 'Barang lambat')
+        $dataset = $this->compileDataset(DatasetDefinition::make('contoh-a.barang-lambat', 'Barang lambat')->tenantWide()
             ->fromQuery(static fn () => Barang::query()->select('tenant_id')->selectRaw('pg_sleep(5)::text as tidur'))
             ->permission('contoh-a.barang.read')
             ->field('tidur', 'Tidur', FieldType::Text, classification: DataClass::SystemMetadata)

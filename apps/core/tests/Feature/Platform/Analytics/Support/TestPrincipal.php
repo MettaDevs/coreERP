@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Platform\Analytics\Support;
 
 use App\Platform\Analytics\Datasets\CompiledDataset;
-use App\Platform\Analytics\Security\AnalyticsPrincipal;
+use App\Platform\Analytics\Security\CrossCompanyPrincipal;
 use App\Platform\Analytics\Security\ScopeFingerprint;
 use Carbon\CarbonImmutable;
 
@@ -18,7 +18,7 @@ use Carbon\CarbonImmutable;
  * `now()` mengikuti jam test (`travel()`, `Carbon::setTestNow()`), dalam zona principal. `$fixedFingerprint`
  * hanya untuk test kunci cache yang perlu mengubah satu komponen kunci tanpa ikut mengubah sidik jari.
  */
-final readonly class TestPrincipal implements AnalyticsPrincipal
+final readonly class TestPrincipal implements CrossCompanyPrincipal
 {
     /**
      * @param  array{all: bool, scope_grants: list<array{legal_entity_id: ?string, operating_unit_ids: list<string>}>}  $scope
@@ -84,7 +84,7 @@ final readonly class TestPrincipal implements AnalyticsPrincipal
 
     public function fingerprint(CompiledDataset $dataset): string
     {
-        return $this->fixedFingerprint ?? ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null);
+        return $this->fixedFingerprint ?? ScopeFingerprint::of($this, $dataset->code, $dataset->policy['code'] ?? null, $dataset->companyColumn);
     }
 
     public function describe(): string

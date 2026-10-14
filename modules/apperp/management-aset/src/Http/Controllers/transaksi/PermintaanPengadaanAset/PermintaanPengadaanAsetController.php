@@ -70,6 +70,8 @@ class PermintaanPengadaanAsetController extends Controller
         // `withTrashed`: replay idempoten harus tetap menemukan permintaan yang sudah
         // diarsipkan, kalau tidak permintaan ulang mencoba menyisipkan baris kembar.
         if ($existing = PermintaanPengadaanAset::withTrashed()->where('creation_key', $key)->toBase()->first()) {
+            app(OrganizationScope::class)->require($request, $existing->legal_entity_id, $existing->requesting_org_unit_id);
+
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
         $data = $this->data($request);

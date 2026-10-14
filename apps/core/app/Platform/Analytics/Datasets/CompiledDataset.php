@@ -37,7 +37,7 @@ final readonly class CompiledDataset
 
     /**
      * @param  class-string<Model>  $model
-     * @param  array{code: string, legal_entity: string, operating_unit: ?string}|null  $policy
+     * @param  array{code: string, legal_entity: ?string, operating_unit: ?string}|null  $policy
      * @param  array<string, FilterField>  $fields
      * @param  array<string, CompiledMeasure>  $measures
      * @param  list<string>  $times
@@ -74,6 +74,7 @@ final readonly class CompiledDataset
         private ?Closure $source = null,
         private string $hash = '',
         public array $partitions = [],
+        public ?string $companyColumn = null,
     ) {}
 
     /**
@@ -221,6 +222,13 @@ final readonly class CompiledDataset
         if (isset($this->fields[$name])) {
             return $this->fields[$name]->column;
         }
+
+        return $this->qualifiedColumn($name);
+    }
+
+    /** Kolom fisik; alias field publik tidak mengubah scope. */
+    public function qualifiedColumn(string $name): string
+    {
 
         $parts = explode('.', $name);
         $valid = match (count($parts)) {

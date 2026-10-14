@@ -23,6 +23,8 @@ class AtributAsetTest extends TestCase
 
     private string $tenantId;
 
+    private string $legalEntityId;
+
     private int $issued = 0;
 
     /** Satuan milik Core yang dikenali stub di bawah; yang lain dianggap tidak ada. */
@@ -32,6 +34,8 @@ class AtributAsetTest extends TestCase
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
+        $this->legalEntityId = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
         $this->unitId = $this->buatSatuanUji($this->tenantId);
         $unit = fn (string $id): array => [
             'id' => $id, 'code' => 'cm', 'name' => 'Sentimeter', 'symbol' => 'cm', 'decimal_places' => 2,
@@ -584,9 +588,10 @@ class AtributAsetTest extends TestCase
     private function receive(string $jenisId, array $atribut): string
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
 
         return $this->terimaAset($this->tenantId, [
-            'legal_entity_id' => (string) Str::ulid(),
+            'legal_entity_id' => $this->legalEntityId,
             'nama' => 'Aset atribut uji',
             'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
             'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,
@@ -602,9 +607,10 @@ class AtributAsetTest extends TestCase
     private function receiveRaw(string $jenisId, array $atribut): TestResponse
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
 
         return $this->drafPenerimaan($this->tenantId, [
-            'legal_entity_id' => (string) Str::ulid(),
+            'legal_entity_id' => $this->legalEntityId,
             'nama' => 'Aset atribut uji',
             'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
             'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,

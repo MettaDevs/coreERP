@@ -27,7 +27,7 @@ final class PenjualanDataset implements Dataset
 
     public function definition(): DatasetDefinition
     {
-        return DatasetDefinition::make('contoh-a.penjualan', 'Penjualan barang')
+        return DatasetDefinition::make('contoh-a.penjualan', 'Penjualan barang')->tenantWide()
             ->description('Satu baris per penjualan barang.')
             ->model(Penjualan::class)
             ->permission('contoh-a.penjualan.read')

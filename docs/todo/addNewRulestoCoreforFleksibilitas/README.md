@@ -21,13 +21,15 @@ Membership → role assignment → role → duty → privilege → permission
   kombinator eksplisit di kontrak resource.
 - `include_descendants` selalu menyimpan hierarchy dan versi published yang
   dipakai. Perubahan struktur kemudian tidak mengubah arti grant lama.
-- Workspace legal entity/unit hanya memberi nilai awal filter atau dokumen
-  baru. Ia bukan bukti akses.
+- Perusahaan aktif adalah konteks kerja untuk transaksi/resource perusahaan pada
+  jalur biasa; grant policy tetap utuh dan dipasang sebagai pembatas tambahan.
+  Unit aktif tetap nilai awal/filter opsional. Workspace bukan bukti akses.
 - Bypass bukan efek samping role platform `owner`; bila dibutuhkan, ia harus
   menjadi security role khusus yang eksplisit dan diaudit.
 
 Contoh: seorang holding memiliki grant policy Asset untuk `FO Negarow` dan
-`Sales Negarow`. Ia melihat union dua unit itu untuk Asset saja. User yang
+`Sales Negarow`. Grant menjangkau union dua unit itu untuk Asset saja; pada
+jalur transaksi biasa hasilnya juga dibatasi perusahaan aktif. User yang
 hanya memiliki grant `FO Negarow` tidak dapat membaca Sales Negarow. Grant
 `Kantor Negarow` tanpa descendants tidak memberi akses ke FO Negarow.
 

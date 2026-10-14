@@ -51,6 +51,15 @@ bukan tentang module yang dibuat darinya.
 
 ## Yang harus diganti sesudahnya
 
+Sebelum mengubah domain contoh, tanyakan scope **setiap resource** dengan panduan
+[gate keputusan](../../docs/dev/18-module-discovery-and-decision-gate.md#scope-diputuskan-per-resource).
+Contoh pada cetakan ini hanya data bersama dalam tenant; ia tidak menetapkan bahwa seluruh
+resource modul baru harus bersama. Sajikan padanan F&O sebagai rekomendasi, lalu catat pilihan
+pengguna dan alasan bila berbeda. Resource perusahaan memakai konteks perusahaan aktif selain
+policy, resource unit memakai policy yang disetujui, dan detail mewarisi batas induknya.
+Tambahkan kasus A+B bekerja di A lalu B pada daftar/detail/tulis/laporan/ekspor/analitik yang
+relevan; test penyaringan tenant saja belum membuktikan batas perusahaan.
+
 Module yang keluar dari cetakan ini lulus seluruh penjaga batas apa adanya — folder, manifest,
 namespace, awalan tabel, dan penyaringan tenantnya sudah benar — tetapi isinya belum menjadi
 module. Yang diganti sesudahnya:

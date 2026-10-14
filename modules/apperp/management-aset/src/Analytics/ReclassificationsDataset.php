@@ -65,6 +65,7 @@ final class ReclassificationsDataset implements Dataset
                     $lines.'.nilai_perolehan_dipindah as moved_value',
                 ]))
             ->permission('management-aset.reklasifikasi-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('document_number', 'Nomor dokumen', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)

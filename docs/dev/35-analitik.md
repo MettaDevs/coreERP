@@ -198,9 +198,41 @@ Hanya role Owner memegang duty ini otomatis, termasuk data pribadi. Role lain me
 
 **Query dijalankan di dalam `TenantRunner::runFor()`.** Model module menyaring tenant lewat `TenantScope`, yang gagal tertutup (fail closed) bila tenant belum terikat, dan rute Core tidak melewati middleware konteks module yang biasanya mengikatnya. Tanpa `runFor()`, query atas model module tidak menemukan apa pun.
 
+**Perusahaan aktif dinyatakan terpisah dari hak akses.** Dataset milik perusahaan menyebut
+`company('legal_entity_id')`, atau kolom perusahaan yang benar dari sumbernya. Validator memeriksa
+kolom tersebut, termasuk keluaran query sumber. Query layar dengan `UserPrincipal` mengambil
+perusahaan dari workspace sesi yang sudah divalidasi, lalu menyaringnya sebelum saringan pengguna.
+Tidak ada perusahaan aktif berarti nol baris; hak atas dua perusahaan tidak membuat layar satu
+perusahaan membaca keduanya. Dataset bersama tidak menyebut `company()` dan tetap membaca data
+bersama menurut tenant serta policy-nya. Pilihan scope wajib dinyatakan: data bersama memakai
+`tenantWide()`, data milik perusahaan memakai `company(kolom)`. Dataset yang tidak memilih salah satu
+ditolak saat registrasi; lupa memberi pilihan tidak dianggap data bersama.
+`dataPolicy()` tetap menentukan hak atas record, sehingga
+pilihan perusahaan tidak bisa memperluas hak. Sidik jari cache ikut memuat perusahaan aktif hanya
+untuk dataset yang menyatakannya. Bacaan lintas perusahaan wajib dinyatakan melalui
+`CrossCompanyPrincipal` pada jalur tepercaya, dengan permission, policy, serta saringan terkuncinya
+tetap berlaku; ia tidak membaca perusahaan dari sesi browser. Principal yang tidak menyatakan
+`CompanyContextPrincipal` maupun `CrossCompanyPrincipal` mendapat nol baris pada dataset perusahaan.
+Mode ini ikut dalam sidik jari cache; hilangnya deklarasi tidak bisa memakai cache lintas perusahaan.
+
+**Policy unit kerja tidak mewajibkan perusahaan.** Resource yang haknya hanya menurut unit menyatakan
+`tenantWide()->dataPolicy(kode, operatingUnit: 'operating_unit_id')`. Kolom legal entity boleh kosong;
+hibah unit digabung, dan filter pengguna tetap hanya menyempitkan hasil. Setidaknya satu dimensi
+policy wajib disebut. Validator menjaga dimensi yang diwajibkan manifest: policy per-company tidak
+bisa diubah menjadi unit-only, dan policy unit-only harus menyebut kolom unit. Dimensi hibah dan
+dimensi record dapat berbeda: grant policy aset menyebut perusahaan serta unit, tetapi polis dan
+kontrak servis milik perusahaan tanpa unit memakai proyeksi legal entity dari grant tersebut.
+Pengecualian ini mempertahankan akses perusahaan bagi record yang memang tidak punya unit kerja.
+
+Kolom perusahaan dan policy adalah nama kolom fisik yang sudah diperiksa validator, bukan alias
+field publik. `CompiledDataset::qualifiedColumn()` menjaga pembedaan ini pada filter akses dan
+perencanaan join. `qualified()` tetap menerjemahkan field publik untuk pengelompokan serta filter
+pengguna. Mengganti alias field tidak boleh mengubah siapa yang memiliki record atau unit yang
+menentukan hak membacanya.
+
 **Tabel dasar tidak pernah diberi alias.** `TenantScope` disisipkan dengan nama tabel sebenarnya; tabel beralias membuat saringan tenant menunjuk nama yang tidak ada di query itu. Dataset bersumber query (`fromQuery()`) wajib memilih `tenant_id`, dan Core menyaring tenant sekali lagi di query luarnya, karena subquery tidak membawa scope ke luar. Sumber query yang melepas scope tenant ditolak validator.
 
-**Urutan jangkauan: tenant, lalu kebijakan data, lalu saringan terkunci, lalu saringan pengguna.** Setiap langkah sesudahnya hanya dapat menyempitkan. `DataPolicyScope` memasang kebijakan lewat `DataPolicyFilter` — aturan yang sama dengan layar module — pada kolom yang dinyatakan dataset. Tanpa hibah, hasilnya nol baris; tidak pernah semua.
+**Urutan jangkauan: tenant, lalu perusahaan aktif untuk dataset perusahaan, lalu kebijakan data, lalu saringan terkunci, lalu saringan pengguna.** Setiap langkah sesudahnya hanya dapat menyempitkan. `DataPolicyScope` memasang kebijakan lewat `DataPolicyFilter` — aturan yang sama dengan layar module — pada kolom yang dinyatakan dataset. Tanpa hibah, hasilnya nol baris; tidak pernah semua.
 
 **Saringan terkunci yang kosong berarti nol baris.** `FieldFilterExpression` membaca nilai kosong sebagai "tanpa saringan", jadi daftar nilai `[]` yang tidak dijaga akan diam-diam melepas saringannya. Hal yang sama berlaku untuk saringan terkunci yang menyebut field yang tidak lagi dikenal dataset. Saringan terkunci belum dipakai pengguna biasa (principal pengguna selalu mengembalikan kosong); ia disiapkan untuk publikasi dan embed.
 
@@ -338,7 +370,7 @@ php artisan analytics:datasets
 Daftar dataset per module, versi, jumlah field dan measure, dan hasil pemeriksaan. Dataset rusak tampil beserta sebabnya, dan perintahnya keluar dengan kode gagal, sehingga dapat dipakai di CI. Pertanyaan pertama saat dataset "tidak muncul": jalankan ini.
 
 ```bash
-php artisan analytics:explain --query='<json>' --tenant=<id tenant> --user=<email>
+php artisan analytics:explain --query='<json>' --tenant=<id tenant> --user=<email> --company=<id perusahaan>
 ```
 
 SQL hasil compile (dan SQL total bila diminta) beserta `EXPLAIN` tanpa `ANALYZE`, untuk melihat indeks yang dipakai dan bentuk join tanpa membaca data. Query disusun **sebagai pengguna yang disebut** — hak, hibah kebijakan data, dan zona waktunya — lewat langkah yang sama dengan `RunQuery`, jadi SQL-nya sama dengan yang dijalankan untuk orang itu. `--query` memakai bentuk yang sama dengan badan `POST /api/v1/analytics/query`. Perintah ini belum menerima widget; untuk menjelaskan query widget, salin isi `query` widget dari dasbornya.

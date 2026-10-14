@@ -57,6 +57,7 @@ final class WarrantiesDataset implements Dataset
                     $warranties.'.berlaku_sampai as valid_until',
                 ]))
             ->permission('management-aset.garansi-aset.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)
             ->field('responsible_org_unit_id', 'Unit penanggung jawab', FieldType::Reference, classification: DataClass::CustomerContent)

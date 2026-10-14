@@ -381,6 +381,29 @@ Satu bentuk query yang juga dilarang: **memberi alias pada tabel utama**. Penyar
 disisipkan dengan nama tabel yang sebenarnya, jadi tabel utama yang beralias membuat penyaringannya
 menunjuk nama yang tidak ada lagi di query itu. Tabel yang di-`join` tetap boleh beralias.
 
+### Konteks perusahaan pada resource milik perusahaan
+
+Scope diputuskan per resource pada [gate keputusan](18-module-discovery-and-decision-gate.md#scope-diputuskan-per-resource),
+bukan satu pilihan untuk seluruh module. Resource bersama memakai penyaringan tenant dan haknya;
+resource perusahaan pada jalur biasa menambahkan perusahaan aktif; resource unit memakai policy
+unit yang disetujui; detail mengikuti pemiliknya. Kepemilikan perusahaan dan policy unit dapat
+berlaku bersamaan. Pilihan unit aktif tidak otomatis menyaring semua resource operasional.
+
+Gunakan `App\Platform\Modules\Contracts\CompanyContextFilter` untuk konteks perusahaan yang
+tepercaya, dengan nama kolom yang dinyatakan pemilik resource. `apply()` memasang perusahaan aktif
+pada query; tanpa perusahaan, hasilnya nol baris. `require()` menolak penulisan tanpa perusahaan
+atau ke perusahaan yang berbeda. Sesudah itu policy tetap dijalankan: konteks perusahaan tidak
+menambah hak. Management Aset menggabungkan kedua lapisan pada `OrganizationScope`; master bersama
+tidak memakainya. Ini bukan global scope pada setiap model dan tidak menebak kolom atau scope
+dari nama tabel. Pemanggil wajib mencakup query detail/relasi, replay idempotency, dan aksi yang
+memakai query mentah atau lookup induk.
+
+Analitik menyatakan kolom yang sama dengan `DatasetDefinition::company()`, terpisah dari
+`dataPolicy()`. Deklarasi diperiksa terhadap schema, dipasang pada query interaktif, dan masuk
+kunci cache. Laporan/ekspor menyimpan perusahaan permintaan; callback bisnis memproses perusahaan
+dokumen. Proses lintas perusahaan harus dinyatakan secara eksplisit dan tetap menyaring tenant
+dan policy. Jangan melepas scope atau menyempitkan resolver grant sebagai jalan pintas.
+
 ### Kolom jejak pembuat dan pengubah
 
 Setiap tabel ber-`tenant_id`, di Core maupun module, membawa `created_by_user_id` dan

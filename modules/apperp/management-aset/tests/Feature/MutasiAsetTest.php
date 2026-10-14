@@ -53,6 +53,7 @@ class MutasiAsetTest extends TestCase
         $first = $this->draftResponse([$this->receive()], $locationId)->assertCreated()->json('data');
         $this->legalEntityId = (string) Str::ulid();
         $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $this->selectCompany($this->tenantId, $this->legalEntityId);
         $second = $this->draftResponse([$this->receive()], $locationId)->assertCreated()->json('data');
         $this->assertSame($first['kode'], $second['kode']);
         $this->assertNotSame($first['id'], $second['id']);

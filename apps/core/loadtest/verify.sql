@@ -149,7 +149,7 @@ insert into hasil_core
 select 'terbitan nomor menembus batas tenant', count(*)
 from number_sequence_issues i
 join tenant_number_sequences s on s.id = i.sequence_id
-where s.scope_type = 'tenant' and i.scope_key <> 'tenant:' || rtrim(s.tenant_id);
+where s.scope_type = 'tenant' and split_part(i.scope_key, '|', 1) <> 'tenant:' || rtrim(s.tenant_id);
 
 insert into hasil_core
 select 'terbitan nomor atas nama app yang bukan pemilik reference', count(*)

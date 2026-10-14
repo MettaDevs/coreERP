@@ -104,7 +104,7 @@ class AssetMonitoringController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = $this->replay($key)) {
+        if ($existing = $this->replay($request, $key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -138,7 +138,7 @@ class AssetMonitoringController extends Controller
                 return $id;
             });
         } catch (QueryException $exception) {
-            $existing = $this->replay($key);
+            $existing = $this->replay($request, $key);
             if (! $existing) {
                 throw $exception;
             }
@@ -362,6 +362,7 @@ class AssetMonitoringController extends Controller
     private function requireOwner(Request $request, string $legalEntityId, ?string $unitId): void
     {
         $scope = app(OrganizationScope::class);
+        $scope->require($request, $legalEntityId, null);
         if ($unitId === null) {
             if (! $scope->unrestricted($request)) {
                 throw ValidationException::withMessages([
@@ -601,9 +602,14 @@ class AssetMonitoringController extends Controller
         return $query->firstOrFail();
     }
 
-    private function replay(string $key): ?stdClass
+    private function replay(Request $request, string $key): ?stdClass
     {
-        return AssetMonitoring::withTrashed()->where('creation_key', $key)->toBase()->first();
+        $record = AssetMonitoring::withTrashed()->where('creation_key', $key)->toBase()->first();
+        if ($record !== null) {
+            app(OrganizationScope::class)->require($request, $record->legal_entity_id, $record->responsible_org_unit_id);
+        }
+
+        return $record;
     }
 
     /**

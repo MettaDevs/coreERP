@@ -147,6 +147,8 @@ class AssetWarrantyController extends Controller
             'q' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
+        app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
+
         return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
     }
 
@@ -308,9 +310,14 @@ class AssetWarrantyController extends Controller
         return $row === null ? null : $this->present($this->tenant($request), $row, $this->today());
     }
 
-    /** Replay tanpa saringan arsip: kunci idempotensi sudah membuktikan pemiliknya. */
+    /** Replay tetap memeriksa perusahaan dan hak akses, termasuk bila garansinya sudah diarsipkan. */
     private function replay(Request $request, string $key): ?stdClass
     {
+        $existing = AssetWarranty::withTrashed()->where('creation_key', $key)->first();
+        if ($existing !== null) {
+            $asset = Aset::withTrashed()->findOrFail($existing->aset_id);
+            app(OrganizationScope::class)->require($request, $asset->legal_entity_id, $asset->responsible_org_unit_id);
+        }
         $row = $this->joined(AssetWarranty::withTrashed(), $request)->where(self::TABLE.'.creation_key', $key)->toBase()->first();
 
         return $row === null ? null : $this->present($this->tenant($request), $row, $this->today());

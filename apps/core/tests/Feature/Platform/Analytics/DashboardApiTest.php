@@ -300,6 +300,7 @@ class DashboardApiTest extends TestCase
             public function definition(): DatasetDefinition
             {
                 return DatasetDefinition::make('management-aset.asset-register-renamed', 'Register aset (uji ganti nama)')
+                    ->company('legal_entity_id')
                     ->model(Aset::class)
                     ->permission('management-aset.aset.read')
                     ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')

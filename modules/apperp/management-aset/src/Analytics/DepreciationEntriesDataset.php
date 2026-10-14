@@ -71,6 +71,7 @@ final class DepreciationEntriesDataset implements Dataset
                 ->selectRaw('aset_tr_penyusutan_aset.reverses_period_id is not null as is_reversal')
                 ->selectRaw('aset_tr_penyusutan_aset.posted_posting_id is not null as is_posted'))
             ->permission('management-aset.penyusutan.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'usage_org_unit_id')
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)
             ->field('usage_org_unit_id', 'Unit pengguna', FieldType::Reference, classification: DataClass::CustomerContent)

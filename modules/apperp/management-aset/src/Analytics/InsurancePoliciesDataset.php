@@ -40,6 +40,7 @@ final class InsurancePoliciesDataset implements Dataset
             ->description('Satu baris per polis asuransi aset: jenis, penanggung, masa berlaku, dan status blokirnya.')
             ->model(InsurancePolicy::class)
             ->permission('management-aset.polis-asuransi.read')
+            ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id')
             ->field('kode', 'Kode polis', FieldType::Text)
             ->field('jenis_asuransi_id', 'Jenis asuransi', FieldType::Reference)

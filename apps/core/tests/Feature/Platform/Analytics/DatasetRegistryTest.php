@@ -71,16 +71,16 @@ class DatasetRegistryTest extends TestCase
         $registry = $this->registry();
 
         // Kode yang tidak berawalan id module pemiliknya.
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-b.barang', 'Barang')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-b.barang', 'Barang')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count)));
         // Model tanpa BelongsToTenant: penyaringan tenant tidak ikut dari model.
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.pemasangan', 'Pemasangan')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.pemasangan', 'Pemasangan')->tenantWide()
             ->model(ModuleInstallation::class)->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count)));
         // Uang tanpa kolom mata uang tidak dapat dicegah dijumlah lintas mata uang (KA-22).
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.nilai', 'Nilai')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.nilai', 'Nilai')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('total', 'Total', Aggregate::Sum, field: 'nilai', format: MeasureFormat::Money)));
         // Lolos tahap tanpa database, tetapi kolomnya tidak ada di tabel: dilewati juga, dengan sebabnya.
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count)->field('warna', 'Warna', FieldType::Text)));
         // Definisi module yang melempar apa pun adalah dataset rusak, bukan aplikasi yang rusak.
         $registry->register(new class implements Dataset
@@ -95,7 +95,7 @@ class DatasetRegistryTest extends TestCase
                 throw new LogicException('definisi rusak di kode module');
             }
         });
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.barang', 'Barang')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.barang', 'Barang')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('count', 'Jumlah', Aggregate::Count)));
 
         $this->assertNull($registry->find('contoh-b.barang'));
@@ -165,7 +165,7 @@ class DatasetRegistryTest extends TestCase
         $registry = $this->registry();
         $registry->register(new BarangDataset);
         $registry->register(new BarangDataset);
-        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')
+        $registry->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('total', 'Total', Aggregate::Sum, field: 'warna')));
 
         $rows = array_map(static fn (array $row): array => [$row['code'], $row['status'], $row['problem']], $registry->diagnose());
@@ -187,7 +187,7 @@ class DatasetRegistryTest extends TestCase
             ->expectsOutputToContain('management-aset.asset-register')
             ->assertSuccessful();
 
-        app(DatasetRegistry::class)->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')
+        app(DatasetRegistry::class)->register($this->dataset('contoh-a', DatasetDefinition::make('contoh-a.warna', 'Warna')->tenantWide()
             ->model(Barang::class)->permission('contoh-a.barang.read')->measure('total', 'Total', Aggregate::Sum, field: 'warna')));
 
         $this->artisan('analytics:datasets')

@@ -53,6 +53,9 @@ trait ProbesAssetDatasets
     /** @var array<string, array{group: string, jenis: string}> */
     private array $masterIds = [];
 
+    /** @var array<string, string> Perusahaan yang sedang diuji pada tiap tenant. */
+    private array $workspaceLegalEntities = [];
+
     /** @var array<string, string> id aset menurut kodenya; kode aset unik di seluruh test karena memuat tag tenant */
     protected array $assetIds = [];
 
@@ -126,9 +129,11 @@ trait ProbesAssetDatasets
         $this->owner = $this->business('Tenant analitik A', 'owner-a@analitik.test');
         $this->tenantId = (string) $this->owner->activeMembership()?->tenant_id;
         $this->legalEntity = $this->organization($this->tenantId, 'legal_entity', 'CV Analitik');
+        $this->workspaceLegalEntities[$this->tenantId] = $this->legalEntity;
         $this->unitA = $this->organization($this->tenantId, 'operating_unit', 'Unit A');
         $this->unitB = $this->organization($this->tenantId, 'operating_unit', 'Unit B');
         $this->seedRows($this->tenantId, $this->legalEntity, $this->unitA, $this->unitB, 'A');
+        $this->withSession(['workspace.legal_entity_id' => $this->legalEntity]);
     }
 
     public function test_two_tenants_never_mix(): void
@@ -138,9 +143,11 @@ trait ProbesAssetDatasets
         // Tenant lain dengan data awal yang sama: bila saringan tenant bocor, jumlah baris menggandakan diri.
         $ownerOfOtherTenant = $this->business('Tenant analitik B', 'owner-b@analitik.test');
         $otherTenant = (string) $ownerOfOtherTenant->activeMembership()?->tenant_id;
+        $otherLegalEntity = $this->organization($otherTenant, 'legal_entity', 'PT Tenant B');
+        $this->workspaceLegalEntities[$otherTenant] = $otherLegalEntity;
         $this->seedRows(
             $otherTenant,
-            $this->organization($otherTenant, 'legal_entity', 'PT Tenant B'),
+            $otherLegalEntity,
             $this->organization($otherTenant, 'operating_unit', 'Unit B1'),
             $this->organization($otherTenant, 'operating_unit', 'Unit B2'),
             'B',
@@ -186,7 +193,9 @@ trait ProbesAssetDatasets
      */
     protected function analyze(User $user, array $query): TestResponse
     {
-        return $this->actingAs($user)->postJson('/api/v1/analytics/query', $query);
+        return $this->actingAs($user)->withSession([
+            'workspace.legal_entity_id' => $this->workspaceLegalEntities[(string) $user->activeMembership()?->tenant_id],
+        ])->postJson('/api/v1/analytics/query', $query);
     }
 
     /** @return list<string> kombinasi `dimensions()` yang dikembalikan dataset untuk pengguna ini, terurut */
@@ -206,7 +215,9 @@ trait ProbesAssetDatasets
     /** @return list<string> nilai pembeda yang dikembalikan daftar module untuk pengguna ini, terurut */
     protected function listKeys(User $user): array
     {
-        $rows = $this->actingAs($user)->getJson('/api/modules/management-aset/v1/'.$this->listResource())
+        $rows = $this->actingAs($user)->withSession([
+            'workspace.legal_entity_id' => $this->workspaceLegalEntities[(string) $user->activeMembership()?->tenant_id],
+        ])->getJson('/api/modules/management-aset/v1/'.$this->listResource())
             ->assertOk()->json('data');
 
         return $this->sorted(array_values(array_unique(array_map(fn (array $row): string => $this->listKey($row), $rows))));
