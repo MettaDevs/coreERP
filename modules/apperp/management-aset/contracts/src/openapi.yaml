@@ -15,8 +15,8 @@ info:
     bentuk app terpisah; runtime sebenarnya memakai /api/modules/management-aset/v1.
     Path pembatalan sudah memakai alamat runtime tersebut.
 
-    Kode setiap master diterbitkan Number Sequence Core. Lokasi aset menerima kode manual
-    bila konfigurasi tenant mengizinkannya; kode kosong tetap otomatis. Master lain mengabaikan kode klien.
+    Kode setiap master diterbitkan Number Sequence Core. Master menerima kode manual
+    bila konfigurasi tenant mengizinkannya; kode kosong hanya otomatis jika diizinkan. Grup dan lokasi dibawakan ke manual saja.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
     Penerbitan nomor berjalan di dalam proses Core. Penolakan konfigurasi atau scope menjawab

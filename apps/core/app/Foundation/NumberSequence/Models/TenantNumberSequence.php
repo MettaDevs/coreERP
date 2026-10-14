@@ -20,7 +20,7 @@ class TenantNumberSequence extends Model
 
     protected $fillable = [
         'tenant_id', 'reference_id', 'profile_code', 'scope_type', 'status', 'is_continuous',
-        'allow_manual', 'reset_period', 'preallocation_enabled', 'preallocation_quantity',
+        'allow_manual', 'allow_automatic', 'reset_period', 'preallocation_enabled', 'preallocation_quantity',
         'minimum_number', 'maximum_number', 'segments',
     ];
 
@@ -29,6 +29,7 @@ class TenantNumberSequence extends Model
         return [
             'is_continuous' => 'boolean',
             'allow_manual' => 'boolean',
+            'allow_automatic' => 'boolean',
             'preallocation_enabled' => 'boolean',
             'segments' => 'array',
         ];

@@ -27,7 +27,9 @@ type Segment = {
         | 'year'
         | 'scope'
         | 'fiscal_year'
-        | 'fiscal_period';
+        | 'fiscal_period'
+        | 'context';
+    name?: string;
     value?: string;
     length?: number;
 };
@@ -42,12 +44,14 @@ type Sequence = {
     status: string;
     is_continuous: boolean;
     allow_manual: boolean;
+    allow_automatic: boolean;
     reset_period: string;
     preallocation_enabled: boolean;
     preallocation_quantity: number;
     minimum_number: number;
     maximum_number: number | null;
     segments: Segment[];
+    context_fields: Segment[];
     version: number;
 };
 type Props = {
@@ -57,12 +61,30 @@ type Props = {
     profiles: { code: string; name: string }[];
 };
 
+function numberPreview(segments: Segment[], number: number): string {
+    return segments
+        .map((segment) =>
+            segment.type === 'constant'
+                ? segment.value
+                : segment.type === 'context'
+                  ? `[${segment.name ?? 'Bagian kode'}]`
+                  : segment.type === 'number'
+                    ? String(number).padStart(segment.length ?? 5, '0')
+                    : segment.type === 'year'
+                      ? String(new Date().getFullYear())
+                      : '[Organisasi atau periode]',
+        )
+        .join('');
+}
+
 function SegmentEditor({
     value,
     onChange,
+    contextFields,
     disabled = false,
 }: {
     value: Segment[];
+    contextFields: Segment[];
     onChange: (segments: Segment[]) => void;
     disabled?: boolean;
 }) {
@@ -119,7 +141,7 @@ function SegmentEditor({
                         </span>
                     </div>
 
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
                         {/* Wrapper berukuran tetap untuk Dropdown Tipe */}
                         <div className="w-48 shrink-0">
                             <NativeSelect
@@ -131,17 +153,25 @@ function SegmentEditor({
                                             .value as Segment['type'],
                                         value: '',
                                         length:
-                                            event.target.value === 'number'
-                                                ? 5
+                                            event.target.value === 'context'
+                                                ? 20
                                                 : event.target.value ===
-                                                    'fiscal_period'
-                                                  ? 2
-                                                  : undefined,
+                                                    'number'
+                                                  ? 5
+                                                  : event.target.value ===
+                                                      'fiscal_period'
+                                                    ? 2
+                                                    : undefined,
                                     })
                                 }
                             >
                                 <option value="constant">Teks tetap</option>
                                 <option value="number">Nomor urut</option>
+                                {contextFields.length > 0 && (
+                                    <option value="context">
+                                        Data dari formulir
+                                    </option>
+                                )}
                                 <option value="year">Tahun kalender</option>
                                 <option value="scope">Kode organisasi</option>
                                 <option value="fiscal_year">
@@ -154,6 +184,34 @@ function SegmentEditor({
                         </div>
 
                         {/* Input Textfield Mengisi Sisa Ruang (flex-1) */}
+                        {segment.type === 'context' && (
+                            <NativeSelect
+                                aria-label="Bagian kode"
+                                value={segment.value ?? ''}
+                                disabled={disabled}
+                                onChange={(event) => {
+                                    const field = contextFields.find(
+                                        (item) =>
+                                            item.value === event.target.value,
+                                    );
+                                    update(index, {
+                                        value: field?.value ?? '',
+                                        name: field?.name,
+                                        length: field?.length ?? 20,
+                                    });
+                                }}
+                            >
+                                <option value="">Pilih bagian kode</option>
+                                {contextFields.map((field) => (
+                                    <option
+                                        key={field.value}
+                                        value={field.value}
+                                    >
+                                        {field.name}
+                                    </option>
+                                ))}
+                            </NativeSelect>
+                        )}
                         {segment.type === 'constant' && (
                             <div className="min-w-0 flex-1">
                                 <Input
@@ -170,14 +228,19 @@ function SegmentEditor({
                                 />
                             </div>
                         )}
-                        {segment.type === 'number' && (
+                        {(segment.type === 'number' ||
+                            segment.type === 'context') && (
                             <div className="flex min-w-0 flex-1 items-center gap-2">
                                 <Input
-                                    aria-label="Jumlah digit"
+                                    aria-label={
+                                        segment.type === 'context'
+                                            ? 'Panjang maksimal kode'
+                                            : 'Jumlah digit'
+                                    }
                                     className="min-w-0 flex-1 font-mono text-xs"
                                     type="number"
                                     min="1"
-                                    max="18"
+                                    max={segment.type === 'context' ? 50 : 18}
                                     disabled={disabled}
                                     value={segment.length ?? 5}
                                     onChange={(event) =>
@@ -187,11 +250,20 @@ function SegmentEditor({
                                     }
                                 />
                                 <span className="shrink-0 font-mono text-xs whitespace-nowrap text-muted-foreground">
-                                    digit (
-                                    {'0'.repeat(
-                                        Math.min(segment.length ?? 5, 8),
+                                    {segment.type === 'context' ? (
+                                        'karakter'
+                                    ) : (
+                                        <>
+                                            digit (
+                                            {'0'.repeat(
+                                                Math.min(
+                                                    segment.length ?? 5,
+                                                    8,
+                                                ),
+                                            )}
+                                            )
+                                        </>
                                     )}
-                                    )
                                 </span>
                             </div>
                         )}
@@ -289,6 +361,7 @@ function SequenceForm({
         status: sequence.status,
         is_continuous: sequence.is_continuous,
         allow_manual: sequence.allow_manual,
+        allow_automatic: sequence.allow_automatic,
         reset_period: sequence.reset_period,
         preallocation_enabled: sequence.preallocation_enabled,
         preallocation_quantity: sequence.preallocation_quantity,
@@ -537,6 +610,19 @@ function SequenceForm({
                         </label>
                         <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
                             <Checkbox
+                                checked={form.data.allow_automatic}
+                                disabled={!canManage}
+                                onCheckedChange={(checked) =>
+                                    form.setData(
+                                        'allow_automatic',
+                                        checked === true,
+                                    )
+                                }
+                            />
+                            Buat nomor otomatis
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                            <Checkbox
                                 checked={form.data.preallocation_enabled}
                                 disabled={!canManage}
                                 onCheckedChange={(checked) =>
@@ -553,16 +639,40 @@ function SequenceForm({
 
                 {/* Section 3: Susunan Format Nomor */}
                 <div className="space-y-3">
+                    {form.data.allow_manual && (
+                        <p className="text-xs text-muted-foreground">
+                            Kode manual boleh berbeda dari format otomatis,
+                            tetapi harus unik.
+                        </p>
+                    )}
                     <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                         SUSUNAN FORMAT NOMOR
                     </h3>
                     <SegmentEditor
                         value={form.data.segments}
+                        contextFields={sequence.context_fields}
                         disabled={!canManage}
                         onChange={(segments) =>
                             form.setData('segments', segments)
                         }
                     />
+                    <p className="text-xs text-muted-foreground">
+                        Contoh:{' '}
+                        {numberPreview(
+                            form.data.segments,
+                            form.data.minimum_number,
+                        )}
+                        {form.data.maximum_number !== '' && (
+                            <>
+                                {' '}
+                                –{' '}
+                                {numberPreview(
+                                    form.data.segments,
+                                    Number(form.data.maximum_number),
+                                )}
+                            </>
+                        )}
+                    </p>
                 </div>
 
                 {error && (

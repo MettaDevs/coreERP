@@ -62,6 +62,8 @@ class NumberSequenceController extends Controller
         abort_unless($sequence->tenant_id === $membership->tenant_id, 404);
         $data = $request->validate([
             'next_number' => ['required', 'integer', 'min:1'],
+            'values' => ['sometimes', 'array'],
+            'values.*' => ['required', 'string', 'max:50', 'regex:/\A[A-Za-z0-9_-]+\z/'],
             'legal_entity_id' => ['nullable', 'string'],
             'org_unit_id' => ['nullable', 'string'],
         ]);
@@ -69,6 +71,7 @@ class NumberSequenceController extends Controller
             'tenant_id' => $membership->tenant_id,
             'legal_entity_id' => $data['legal_entity_id'] ?? null,
             'org_unit_id' => $data['org_unit_id'] ?? null,
+            'values' => $data['values'] ?? [],
         ], (int) $data['next_number'], $request->user()->id);
 
         return response()->json(['message' => 'Nomor berikutnya diperbarui.']);
@@ -88,12 +91,14 @@ class NumberSequenceController extends Controller
             'status' => $sequence->status,
             'is_continuous' => $sequence->is_continuous,
             'allow_manual' => $sequence->allow_manual,
+            'allow_automatic' => $sequence->allow_automatic,
             'reset_period' => $sequence->reset_period,
             'preallocation_enabled' => $sequence->preallocation_enabled,
             'preallocation_quantity' => $sequence->preallocation_quantity,
             'minimum_number' => $sequence->minimum_number,
             'maximum_number' => $sequence->maximum_number,
             'segments' => $sequence->segments,
+            'context_fields' => array_values(array_filter($sequence->reference->default_settings['segments'] ?? [], fn (array $segment): bool => $segment['type'] === 'context')),
             'version' => $sequence->version,
         ];
     }

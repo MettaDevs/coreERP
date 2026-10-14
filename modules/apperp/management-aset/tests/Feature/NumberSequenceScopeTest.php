@@ -19,7 +19,7 @@ class NumberSequenceScopeTest extends TestCase
     // Satu tabel berarti satu namespace dokumen, kecuali tiga reference siklus hidup yang
     // dibedakan jenis_dokumen. Daftar ini harus ikut berubah ketika manifest menambah reference.
     private const DOCUMENTS = [
-        'management-aset.aset' => 'aset_tr_aset',
+        'management-aset.asset-code' => 'aset_tr_aset',
         'management-aset.penerimaan-aset' => 'aset_tr_penerimaan_aset',
         'management-aset.perencanaan-aset' => 'aset_tr_perencanaan_aset',
         'management-aset.permintaan-pembelian-aset' => 'aset_tr_permintaan_pengadaan_aset',

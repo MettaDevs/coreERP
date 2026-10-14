@@ -2,6 +2,7 @@
 
 namespace App\Platform\Modules\Http\Requests;
 
+use App\Platform\Modules\Contracts\NumberSequenceFormat;
 use App\Platform\Modules\Support\ModuleRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -116,6 +117,16 @@ class AppCatalogRequest extends FormRequest
             'number_sequences.references.*.default_prefix' => ['required', 'string', 'size:4', 'regex:/^[A-Z]{4}$/'],
             'number_sequences.references.*.allowed_scopes' => ['required', 'array', 'min:1'],
             'number_sequences.references.*.allowed_scopes.*' => ['required', Rule::in(['tenant', 'legal_entity', 'operating_unit'])],
+            'number_sequences.references.*.default_settings' => ['sometimes', 'array:allow_automatic,allow_manual,minimum_number,maximum_number,segments'],
+            'number_sequences.references.*.default_settings.allow_automatic' => ['sometimes', 'boolean'],
+            'number_sequences.references.*.default_settings.allow_manual' => ['sometimes', 'boolean'],
+            'number_sequences.references.*.default_settings.minimum_number' => ['sometimes', 'integer', 'min:0'],
+            'number_sequences.references.*.default_settings.maximum_number' => ['sometimes', 'integer', 'min:1'],
+            'number_sequences.references.*.default_settings.segments' => ['sometimes', 'array', 'min:1', 'max:10'],
+            'number_sequences.references.*.default_settings.segments.*.type' => ['required', Rule::in(NumberSequenceFormat::SEGMENT_TYPES)],
+            'number_sequences.references.*.default_settings.segments.*.value' => ['nullable', 'string', 'max:80'],
+            'number_sequences.references.*.default_settings.segments.*.length' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'number_sequences.references.*.default_settings.segments.*.name' => ['nullable', 'string', 'max:100'],
 
             'workflow_types' => ['nullable', 'array'],
             'workflow_types.*.code' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9._-]*$/'],
@@ -274,6 +285,13 @@ class AppCatalogRequest extends FormRequest
             }
 
             $workflowCodes = $this->collect('workflow_types')->pluck('code')->all();
+            foreach ($this->collect('number_sequences.references') as $index => $reference) {
+                $defaults = $reference['default_settings'] ?? [];
+                if (! ($defaults['allow_automatic'] ?? true) && ! ($defaults['allow_manual'] ?? false)) {
+                    $validator->errors()->add('number_sequences.references.'.$index.'.default_settings', 'Nomor manual harus diizinkan jika otomatis dimatikan.');
+                }
+
+            }
             if (count($workflowCodes) !== count(array_unique($workflowCodes))) {
                 $validator->errors()->add('workflow_types', 'Kode jenis workflow tidak boleh duplikat.');
             }
@@ -469,6 +487,7 @@ class AppCatalogRequest extends FormRequest
             'name' => (string) $reference['name'],
             'default_prefix' => isset($reference['default_prefix']) ? (string) $reference['default_prefix'] : null,
             'allowed_scopes' => array_values(array_map(fn (mixed $scope): string => (string) $scope, $reference['allowed_scopes'])),
+            'default_settings' => $reference['default_settings'] ?? null,
         ])->all());
     }
 

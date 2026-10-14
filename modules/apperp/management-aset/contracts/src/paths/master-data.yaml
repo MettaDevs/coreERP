@@ -1224,9 +1224,11 @@
               properties:
                 data:
                   type: object
-                  required: [allow_manual]
+                  required: [allow_manual, allow_automatic]
                   properties:
                     allow_manual:
+                      type: boolean
+                    allow_automatic:
                       type: boolean
       '401':
         $ref: '#/components/responses/Unauthenticated'

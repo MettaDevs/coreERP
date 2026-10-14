@@ -35,6 +35,21 @@ final class NumberSequenceIssuerCore implements NumberSequenceIssuer
         return $this->service->issue($context, $referenceCode, $idempotencyKey, $manualValue);
     }
 
+    public function allowsAutomatic(string $tenantId, string $appId, string $referenceCode): bool
+    {
+        return TenantNumberSequence::query()->where('tenant_id', $tenantId)
+            ->whereHas('reference', fn ($query) => $query->where('app_id', $appId)->where('code', $referenceCode))
+            ->where('status', 'active')->where('allow_automatic', true)->exists();
+    }
+
+    public function contextFields(string $tenantId, string $appId, string $referenceCode): array
+    {
+        $sequence = TenantNumberSequence::query()->where('tenant_id', $tenantId)
+            ->whereHas('reference', fn ($query) => $query->where('app_id', $appId)->where('code', $referenceCode))->sharedLock()->first();
+
+        return array_values(array_unique(array_column(array_filter($sequence->segments ?? [], fn (array $segment): bool => $segment['type'] === 'context'), 'value')));
+    }
+
     public function reserve(array $context, string $referenceCode, string $idempotencyKey): array
     {
         return $this->service->reserve($context, $referenceCode, $idempotencyKey);

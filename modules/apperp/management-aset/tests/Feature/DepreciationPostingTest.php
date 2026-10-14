@@ -477,6 +477,8 @@ class DepreciationPostingTest extends TestCase
     /** @param  array<string, mixed>  $payload */
     private function master(string $resource, array $payload): string
     {
+        unset($payload['kode']);
+
         return (string) $this->sebagaiPengguna($this->tenantId, $this->izin($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
             ->postJson(self::API.$resource, $payload)

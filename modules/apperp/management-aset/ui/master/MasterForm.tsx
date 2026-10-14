@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -34,6 +34,7 @@ import type {
 import { parentIdOf, parentSummaryOf } from './masters';
 import { changeProfileField } from './serviceLife';
 import ServiceLifeFields from './ServiceLifeFields';
+import { useNumberPolicy } from './useNumberPolicy';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
 
@@ -82,35 +83,12 @@ export default function MasterForm({
     );
     const isAsetLocation = config.resource === 'lokasi-aset';
     const [manualCode, setManualCode] = useState('');
-    const [allowManual, setAllowManual] = useState(false);
-    const [numberPolicyError, setNumberPolicyError] = useState('');
-    useEffect(() => {
-        if (!isAsetLocation || value) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: { allow_manual: boolean } }>('/lokasi-aset/number-policy')
-            .then((result) => {
-                if (!cancelled) {
-                    setAllowManual(result.data.allow_manual);
-                }
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    setNumberPolicyError(
-                        errorMessage(
-                            caught,
-                            'Pengaturan kode belum dapat dimuat.',
-                        ),
-                    );
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [isAsetLocation, value]);
+    const {
+        allowManual,
+        allowAutomatic,
+        error: numberPolicyError,
+        loading: numberPolicyLoading,
+    } = useNumberPolicy(config.resource, !value);
     const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(
             extraFields.map((field) => [field.name, valueFrom(value, field)]),
@@ -142,6 +120,15 @@ export default function MasterForm({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+
+        if (!value && (numberPolicyLoading || numberPolicyError)) {
+            setError(
+                numberPolicyError || 'Tunggu pengaturan kode selesai dimuat.',
+            );
+
+            return;
+        }
+
         const missing = parents.find(
             (parent) => parent.required !== false && !parentIds[parent.field],
         );
@@ -167,7 +154,7 @@ export default function MasterForm({
                         // Versi dibaca dari `value` saat menyimpan, bukan disalin ke state form:
                         // rincian di bawah form dapat menaikkannya lebih dahulu.
                         ...(value ? { version: value.version } : {}),
-                        ...(!value && isAsetLocation && allowManual
+                        ...(!value && allowManual
                             ? { kode: manualCode.trim() || null }
                             : {}),
                         nama: form.nama,
@@ -264,7 +251,12 @@ export default function MasterForm({
                                             ? manualCode
                                             : 'Dibuat otomatis saat disimpan')
                                     }
-                                    placeholder="Kosongkan untuk membuat kode otomatis"
+                                    placeholder={
+                                        allowAutomatic
+                                            ? 'Kosongkan untuk membuat kode otomatis'
+                                            : 'Masukkan kode'
+                                    }
+                                    required={!value && !allowAutomatic}
                                     maxLength={50}
                                     disabled={Boolean(value) || !allowManual}
                                     onChange={(event) =>
@@ -273,8 +265,9 @@ export default function MasterForm({
                                 />
                                 {!value && allowManual && (
                                     <FieldDescription>
-                                        Isi kode sesuai format nomor, atau
-                                        kosongkan untuk membuatnya otomatis.
+                                        {allowAutomatic
+                                            ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
+                                            : 'Isi kode yang mudah dikenali.'}
                                     </FieldDescription>
                                 )}
                                 {numberPolicyError && (

@@ -576,15 +576,7 @@ class PenerimaanAsetController extends Controller
         $cutover = $penerimaan->cara_perolehan === AcquisitionMethod::OPENING_BALANCE ? $perolehan->cutover($penerimaan) : null;
 
         try {
-            foreach ($kunci as $i => $satuan) {
-                $kunci[$i]['kode'] = $numbers->issue('management-aset.aset', $tenant, 'aset:'.$satuan['key'], $penerimaan->legal_entity_id);
-            }
-        } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
-        }
-
-        try {
-            DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover): void {
+            DB::transaction(function () use ($penerimaan, $id, $version, $kunci, $tenant, $pembuat, $perolehan, $lines, $cutover, $numbers): void {
                 // Versi diklaim lebih dahulu, lalu status dipindahkan dengan status draf sebagai
                 // syarat. Dua penyelesaian yang berlomba akan melahirkan dua kali lipat aset, dan
                 // tidak ada cara mengetahui mana yang berlebih. Yang kalah ditolak klaimnya dan
@@ -595,8 +587,13 @@ class PenerimaanAsetController extends Controller
                     ->update(['status' => PenerimaanStatus::SELESAI, 'updated_at' => now()]);
                 abort_unless($updated > 0, 422, 'Penerimaan ini sudah diselesaikan.');
 
+                $assetCodes = $numbers->issueAssets($tenant, $penerimaan->legal_entity_id, array_map(static fn (array $item): array => [
+                    'key' => 'aset:'.$item['key'], 'group_id' => (string) $item['line']->group_aset_id,
+                    'location_id' => $penerimaan->lokasi_aset_id, 'acquired_on' => substr((string) $penerimaan->tanggal, 0, 10),
+                ], $kunci));
                 $terbit = [];
                 foreach ($kunci as $satuan) {
+                    $satuan['kode'] = $assetCodes['aset:'.$satuan['key']];
                     $aset = $pembuat->buat($tenant, $satuan['key'], $satuan['kode'], $this->spesifikasiAset($penerimaan, $satuan['line'], $satuan['value'], $cutover));
                     $terbit[] = [
                         'asset_code' => (string) $aset->kode,
@@ -608,6 +605,8 @@ class PenerimaanAsetController extends Controller
                 }
                 $perolehan->publish($penerimaan, $lines, $terbit);
             });
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (AcquisitionPostingFailed $kegagalan) {
             return response()->json(['error' => ['code' => 'posting_failed', 'message' => $kegagalan->getMessage()]], 500);
         }

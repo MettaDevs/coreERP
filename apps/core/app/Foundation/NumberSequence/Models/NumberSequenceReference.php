@@ -8,18 +8,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** @property list<string> $allowed_scopes */
+/**
+ * @property list<string> $allowed_scopes
+ * @property array{allow_automatic?:bool,allow_manual?:bool,minimum_number?:int,maximum_number?:int,segments?:list<array<string,mixed>>}|null $default_settings
+ */
 class NumberSequenceReference extends Model
 {
     use HasUlids;
 
     protected $table = 'app_number_sequence_references';
 
-    protected $fillable = ['app_id', 'code', 'name', 'default_prefix', 'allowed_scopes'];
+    protected $fillable = ['app_id', 'code', 'name', 'default_prefix', 'allowed_scopes', 'default_settings'];
 
     protected function casts(): array
     {
-        return ['allowed_scopes' => 'array'];
+        return ['allowed_scopes' => 'array', 'default_settings' => 'array'];
     }
 
     /** @return BelongsTo<CoreApp, $this> */

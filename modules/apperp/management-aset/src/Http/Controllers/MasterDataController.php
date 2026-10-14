@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -156,6 +157,18 @@ abstract class MasterDataController extends Controller
         ]);
     }
 
+    public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse
+    {
+        $this->requirePermission($request, 'create');
+        $tenantId = $this->tenantId($request);
+        $reference = static::APP_ID.'.'.$this->resource();
+
+        return response()->json(['data' => [
+            'allow_manual' => $numbers->allowsManual($tenantId, static::APP_ID, $reference),
+            'allow_automatic' => $numbers->allowsAutomatic($tenantId, static::APP_ID, $reference),
+        ]]);
+    }
+
     public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->requirePermission($request, 'create');
@@ -167,7 +180,7 @@ abstract class MasterDataController extends Controller
         $tenantId = $this->tenantId($request);
         $data = $request->validate($this->writeRules($tenantId, creating: true));
         $payload = $this->payload($data);
-        if ($this->resource() === 'lokasi-aset' && ($manualValue = $this->trimmedOrNull($data['kode'] ?? null)) !== null) {
+        if (($manualValue = $this->trimmedOrNull($data['kode'] ?? null)) !== null) {
             $payload['kode'] = $manualValue;
         }
 
@@ -392,6 +405,7 @@ abstract class MasterDataController extends Controller
         $required = $creating ? ['required'] : ['sometimes', 'required'];
         $optional = $creating ? ['nullable'] : ['sometimes', 'nullable'];
         $rules = [
+            ...($creating ? ['kode' => ['nullable', 'string', 'max:50']] : []),
             'nama' => [...$required, 'string', 'max:150'],
             'keterangan' => [...$optional, 'string', 'max:2000'],
             'aktif' => ['sometimes', 'boolean'],

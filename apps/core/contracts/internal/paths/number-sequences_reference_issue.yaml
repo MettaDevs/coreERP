@@ -28,6 +28,9 @@ post:
                   description: |
                     Hanya sah bila sequence mengizinkan nilai manual. Sequence
                     berkelanjutan tidak pernah mengizinkannya.
+                    Nilai manual tidak wajib mengikuti format otomatis; harus
+                    tidak kosong, tanpa karakter kontrol, dan unik dalam scope
+                    meskipun periode berubah. Jika otomatis dimatikan, nilai ini wajib.
   responses:
     '200':
       description: Nomor diterbitkan, atau pemutaran ulang idempotency key yang sama.

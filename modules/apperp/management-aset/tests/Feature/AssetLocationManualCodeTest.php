@@ -36,23 +36,23 @@ class AssetLocationManualCodeTest extends TestCase
     public function test_manual_code_replays_and_a_changed_code_conflicts(): void
     {
         $this->getJson(self::URL.'/number-policy')->assertOk()->assertJsonPath('data.allow_manual', true);
-        $payload = ['nama' => 'Lokasi uji', 'kode' => 'LOCA00001'];
+        $payload = ['nama' => 'Lokasi uji', 'kode' => 'UGD'];
         $this->withHeader('Idempotency-Key', 'location:'.Str::ulid());
-        $created = $this->postJson(self::URL, $payload)->assertCreated()->assertJsonPath('data.kode', 'LOCA00001');
+        $created = $this->postJson(self::URL, $payload)->assertCreated()->assertJsonPath('data.kode', 'UGD');
         $this->postJson(self::URL, $payload)->assertOk()->assertJsonPath('data.id', $created->json('data.id'));
         $this->postJson(self::URL, [...$payload, 'kode' => 'LOCA00002'])->assertConflict();
         $this->patchJson(self::URL.'/'.$created->json('data.id'), ['nama' => 'Nama baru', 'kode' => 'LOCA00002', 'version' => $created->json('data.version')])
-            ->assertOk()->assertJsonPath('data.kode', 'LOCA00001');
+            ->assertOk()->assertJsonPath('data.kode', 'UGD');
         $this->assertSame(1, $this->jumlahNomorTerbit());
-        $this->assertDatabaseHas('number_sequence_issues', ['formatted_value' => 'LOCA00001', 'is_manual' => true]);
+        $this->assertDatabaseHas('number_sequence_issues', ['formatted_value' => 'UGD', 'is_manual' => true]);
         $this->withHeader('Idempotency-Key', 'location:'.Str::ulid())->postJson(self::URL, ['nama' => 'Otomatis', 'kode' => ''])
-            ->assertCreated()->assertJsonPath('data.kode', 'LOCA00002');
+            ->assertCreated()->assertJsonPath('data.kode', 'LOCA00001');
     }
 
     public function test_disallowed_or_invalid_manual_codes_do_not_issue_numbers(): void
     {
         $this->withHeader('Idempotency-Key', 'location:'.Str::ulid());
-        $this->postJson(self::URL, ['nama' => 'Lokasi uji', 'kode' => 'INVALID'])->assertUnprocessable();
+        $this->postJson(self::URL, ['nama' => 'Lokasi uji', 'kode' => "UGD\nPOLI"])->assertUnprocessable();
         $this->postJson(self::URL, ['nama' => 'Lokasi uji', 'kode' => str_repeat('A', 51)])->assertUnprocessable();
         $this->configureSequence($this->tenantId, false);
         $this->getJson(self::URL.'/number-policy')->assertOk()->assertJsonPath('data.allow_manual', false);

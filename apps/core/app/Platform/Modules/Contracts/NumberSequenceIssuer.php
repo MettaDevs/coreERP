@@ -21,8 +21,13 @@ interface NumberSequenceIssuer
     /** Membaca izin input manual tanpa menerbitkan nomor atau mengubah konfigurasi. */
     public function allowsManual(string $tenantId, string $appId, string $referenceCode): bool;
 
+    public function allowsAutomatic(string $tenantId, string $appId, string $referenceCode): bool;
+
+    /** @return list<string> Nama nilai bisnis yang diperlukan format aktif. */
+    public function contextFields(string $tenantId, string $appId, string $referenceCode): array;
+
     /**
-     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $context
+     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null, values?: array<string,string>}  $context
      * @return array{id: string, number: string, status: string}
      */
     public function issue(array $context, string $referenceCode, string $idempotencyKey, ?string $manualValue = null): array;
@@ -31,7 +36,7 @@ interface NumberSequenceIssuer
      * Menyiapkan nomor tanpa memakainya. Dipakai layar yang menampilkan nomor sebelum
      * pengguna menekan simpan.
      *
-     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null}  $context
+     * @param  array{tenant_id: string, app_id: string, legal_entity_id?: string|null, org_unit_id?: string|null, values?: array<string,string>}  $context
      * @return array{id: string, number: string, status: string}
      */
     public function reserve(array $context, string $referenceCode, string $idempotencyKey): array;

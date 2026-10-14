@@ -17,6 +17,8 @@ class InternalNumberSequenceRequest extends FormRequest
         return [
             'idempotency_key' => ['required', 'string', 'max:160', 'regex:/^[A-Za-z0-9._:-]+$/'],
             'manual_value' => ['nullable', 'string', 'max:255'],
+            'values' => ['sometimes', 'array'],
+            'values.*' => ['required', 'string', 'max:50', 'regex:/\A[A-Za-z0-9_-]+\z/'],
             // Rejected at the edge so a malformed id fails as a field error rather than inside the issuing transaction.
             'legal_entity_id' => ['nullable', 'string', 'ulid'],
             'org_unit_id' => ['nullable', 'string', 'ulid'],

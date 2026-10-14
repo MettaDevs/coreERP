@@ -16,6 +16,13 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 
 final class AssetClassificationController extends Controller
 {
+    private const CODE_MESSAGES = [
+        'kode.required' => 'Isi kode kelompok aset.',
+        'kode.string' => 'Isi kode kelompok aset berupa teks.',
+        'kode.max' => 'Kode kelompok aset maksimal 10 karakter.',
+        'kode.regex' => 'Gunakan huruf, angka, strip, atau underscore untuk kode kelompok aset.',
+    ];
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize($request, 'read');
@@ -46,8 +53,9 @@ final class AssetClassificationController extends Controller
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
         $rules = $this->writeRules();
         $rules['label'] = ['required', 'string', 'max:150'];
+        $rules['kode'] = ['required', 'string', 'max:10', 'regex:/\A[A-Za-z0-9_-]+\z/'];
         unset($rules['effective_from'], $rules['effective_to']);
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, self::CODE_MESSAGES);
         $payload = [
             'useful_life_years' => null, 'straight_line_rate_percent' => null,
             'reducing_balance_rate_percent' => null, 'regulation_reference' => null,
@@ -90,7 +98,7 @@ final class AssetClassificationController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $this->authorize($request, 'update');
-        $data = $request->validate($this->writeRules());
+        $data = $request->validate($this->writeRules(), self::CODE_MESSAGES);
         $expected = RowVersion::expected($request);
 
         return DB::transaction(function () use ($request, $id, $data, $expected): JsonResponse {
@@ -133,6 +141,7 @@ final class AssetClassificationController extends Controller
     {
         return [
             'label' => ['sometimes', 'required', 'string', 'max:150'],
+            'kode' => ['sometimes', 'required', 'string', 'max:10', 'regex:/\A[A-Za-z0-9_-]+\z/'],
             'regulation_reference' => ['sometimes', 'nullable', 'string', 'max:250'],
             'effective_from' => ['sometimes', 'required', 'date_format:Y-m-d'],
             'effective_to' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -190,7 +199,7 @@ final class AssetClassificationController extends Controller
     private function present(KelompokHartaFiskal $record): array
     {
         return [...$record->only([
-            'id', 'template_key', 'label', 'jurisdiction', 'regulation_reference', 'useful_life_years',
+            'id', 'template_key', 'label', 'kode', 'jurisdiction', 'regulation_reference', 'useful_life_years',
             'straight_line_rate_percent', 'reducing_balance_rate_percent',
             'allow_reducing_balance', 'allow_straight_line', 'depreciable', 'aktif', 'version',
         ]), 'effective_from' => $record->effective_from->toDateString(), 'effective_to' => $record->effective_to?->toDateString()];

@@ -22,6 +22,7 @@ class NumberSequenceSettingsRequest extends FormRequest
             'status' => ['required', Rule::in(['draft', 'active', 'stopped'])],
             'is_continuous' => ['required', 'boolean'],
             'allow_manual' => ['required', 'boolean'],
+            'allow_automatic' => ['required', 'boolean'],
             'reset_period' => ['required', Rule::in(NumberSequenceService::RESET_PERIODS)],
             'preallocation_enabled' => ['required', 'boolean'],
             'preallocation_quantity' => ['required', 'integer', 'min:1', 'max:1000'],
@@ -30,11 +31,12 @@ class NumberSequenceSettingsRequest extends FormRequest
             'segments' => ['required', 'array', 'min:1', 'max:10'],
             'segments.*.type' => ['required', Rule::in(NumberSequenceService::SEGMENT_TYPES)],
             'segments.*.value' => ['nullable', 'string', 'max:80'],
-            'segments.*.length' => ['nullable', 'integer', 'min:1', 'max:18'],
+            'segments.*.length' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'segments.*.name' => ['nullable', 'string', 'max:100'],
         ];
     }
 
-    /** @return array{profile_code:string,scope_type:string,status:string,is_continuous:bool,allow_manual:bool,reset_period:string,preallocation_enabled:bool,preallocation_quantity:int,minimum_number:int,maximum_number:?int,segments:list<array<string,mixed>>} */
+    /** @return array{profile_code:string,scope_type:string,status:string,is_continuous:bool,allow_manual:bool,allow_automatic:bool,reset_period:string,preallocation_enabled:bool,preallocation_quantity:int,minimum_number:int,maximum_number:?int,segments:list<array<string,mixed>>} */
     public function payload(): array
     {
         return [
@@ -43,6 +45,7 @@ class NumberSequenceSettingsRequest extends FormRequest
             'status' => $this->string('status')->toString(),
             'is_continuous' => $this->boolean('is_continuous'),
             'allow_manual' => $this->boolean('allow_manual'),
+            'allow_automatic' => $this->boolean('allow_automatic'),
             'reset_period' => $this->string('reset_period')->toString(),
             'preallocation_enabled' => $this->boolean('preallocation_enabled'),
             'preallocation_quantity' => $this->integer('preallocation_quantity'),
