@@ -166,7 +166,7 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
-/api/v1/perencanaan-aset:
+/api/modules/management-aset/v1/perencanaan-aset:
   get:
     tags:
     - Perencanaan aset
@@ -205,7 +205,31 @@
         $ref: '#/components/responses/ValidationError'
       '503':
         description: Number Sequence Core belum tersedia
-/api/v1/perencanaan-aset/{id}:
+/api/modules/management-aset/v1/perencanaan-aset/number-policy:
+  get:
+    tags:
+    - Perencanaan aset
+    operationId: getAssetPlanningNumberPolicy
+    summary: Membaca pilihan kode manual dan otomatis; memerlukan izin membuat perencanaan
+    responses:
+      '200':
+        description: Pengaturan kode perencanaan
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  required: [allow_manual, allow_automatic]
+                  properties:
+                    allow_manual:
+                      type: boolean
+                    allow_automatic:
+                      type: boolean
+      '403':
+        $ref: '#/components/responses/Forbidden'
+/api/modules/management-aset/v1/perencanaan-aset/{id}:
   get:
     tags:
     - Perencanaan aset
@@ -282,7 +306,7 @@
     tags:
     - Lifecycle aset
     operationId: listLifecycleDocument
-    summary: Menampilkan permintaan pembelian, dekomisioning, penjualan, atau pemusnahan
+    summary: Menampilkan dekomisioning, penjualan, atau pemusnahan
     parameters:
     - name: lifecycleDocument
       in: path
@@ -290,7 +314,6 @@
       schema:
         type: string
         enum:
-        - permintaan-pembelian-aset
         - dekomisioning-aset
         - penjualan-aset
         - pemusnahan-aset
@@ -309,7 +332,6 @@
       schema:
         type: string
         enum:
-        - permintaan-pembelian-aset
         - dekomisioning-aset
         - penjualan-aset
         - pemusnahan-aset

@@ -283,6 +283,40 @@ class PenerimaanAsetTest extends TestCase
         // Sisa persis pun diterima: batasnya "lebih dari", bukan "sama dengan".
         $ketiga = $this->draf([$this->baris(jumlah: 4, group: $group, permintaan: $permintaan)]);
         $this->selesaikan($ketiga)->assertOk();
+        $requestId = DB::table('aset_tr_permintaan_pengadaan_aset_details')->where('id', $permintaan)->value('request_id');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.permintaan-pembelian-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/permintaan-pembelian-aset/'.$requestId)
+            ->assertOk()->assertJsonPath('data.details.0.remaining_quantity', 0);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.permintaan-pembelian-aset.read', 'management-aset.permintaan-pembelian-aset.cancel'])
+            ->postJson('/api/modules/management-aset/v1/permintaan-pembelian-aset/'.$requestId.'/batal', ['version' => 1])->assertUnprocessable();
+    }
+
+    public function test_multiple_receipt_lines_share_the_same_remaining_request_quantity(): void
+    {
+        $requestLine = $this->barisPermintaan(quantity: 10);
+        $group = $this->groupSiapSusut();
+        $receipt = $this->draf([
+            $this->baris(jumlah: 6, group: $group, permintaan: $requestLine),
+            $this->baris(jumlah: 6, group: $group, permintaan: $requestLine),
+        ]);
+        $this->selesaikan($receipt)->assertUnprocessable();
+        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $receipt, 'status' => 'draft']);
+        $this->assertDatabaseCount('aset_tr_aset', 0);
+    }
+
+    public function test_receipt_rejects_a_cancelled_request_and_a_different_asset_type(): void
+    {
+        $requestLine = $this->barisPermintaan(quantity: 10);
+        $line = $this->baris(jumlah: 1, permintaan: $requestLine);
+        $line['jenis_aset_id'] = $this->jenis();
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create'])
+            ->withHeader('Idempotency-Key', 'wrong-type-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', $this->payload([$line]))->assertUnprocessable();
+        DB::table('aset_tr_permintaan_pengadaan_aset')->update(['status' => 'cancelled']);
+        $line = $this->baris(jumlah: 1, permintaan: $requestLine);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create'])
+            ->withHeader('Idempotency-Key', 'cancelled-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', $this->payload([$line]))->assertUnprocessable();
     }
 
     /**
@@ -491,7 +525,7 @@ class PenerimaanAsetTest extends TestCase
         return [
             'nama' => $nama,
             'group_aset_id' => $group ?? $this->groupSiapSusut(),
-            'jenis_aset_id' => $this->jenis(),
+            'jenis_aset_id' => $permintaan ? DB::table('aset_tr_permintaan_pengadaan_aset_details')->where('id', $permintaan)->value('jenis_aset_id') : $this->jenis(),
             'jumlah' => $jumlah,
             'nilai_per_unit' => $nilai,
             'permintaan_pembelian_detail_id' => $permintaan,

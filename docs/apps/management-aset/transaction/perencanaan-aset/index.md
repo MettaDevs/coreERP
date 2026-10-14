@@ -4,6 +4,16 @@ Halaman ini untuk developer. Isinya dokumen rencana pengadaan aset — yang dibu
 
 Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuannya. Ia belum menjadi aset; aset baru lahir saat barangnya diterima.
 
+## Mengenali rencana dan membuat permintaan
+
+Field **Kode perencanaan** mengikuti pengaturan nomor Core: otomatis menampilkan pesan bahwa kode dibuat saat disimpan, manual mewajibkan kode yang diketik, dan keduanya membolehkan kode kosong untuk nomor otomatis. Kode tidak berubah setelah dokumen disimpan.
+
+Field `description` ditampilkan sebagai **Tujuan perencanaan**. Daftar dan pilihan perencanaan menampilkan kode bersama tujuan; pilihan juga menampilkan tanggal agar petugas mengenali sumber permintaan. Data lama tanpa tujuan memakai teks “Tanpa tujuan”.
+
+Dari **Buka rincian**, petugas memilih baris lalu menekan **Buat permintaan**. Form permintaan terbuka dengan rencana dan baris terpilih untuk diperiksa sebelum disimpan. Dropdown perencanaan tetap tersedia saat membuat permintaan dari halamannya sendiri.
+
+Pola ini mengadaptasi identitas Name/Description dan tindakan dari baris pada [Planning Worksheet Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/application/base-application/page/microsoft.inventory.requisition.planning-worksheet). CoreERP meneruskannya ke permintaan pembelian sesuai alur yang disepakati.
+
 ## Bentuknya: satu dokumen, banyak baris
 
 | Tabel | Isi |
@@ -52,13 +62,24 @@ Pola yang sama dipakai work order.
 
 ## Hubungannya dengan pengadaan
 
-Rencana **belum** memesan apa pun. Langkah berikutnya dokumen permintaan pembelian (`RPPA`), yang tiap barisnya boleh menunjuk baris rencana lewat `planning_detail_id`. Yang sudah dikerjakan:
+Rencana **belum** memesan apa pun. Langkah berikutnya dokumen permintaan pembelian (`RPPA`), yang tiap baris barunya **wajib** menunjuk baris rencana lewat `planning_detail_id`. Perusahaan, jenis aset, dan satuan harus sesuai dengan rencana asal. Baris rencana tidak boleh diulang dalam satu permintaan. Yang sudah dikerjakan:
 
 - daftar, lihat, dan buat permintaan (nomor dari Core per entitas legal, `Idempotency-Key` wajib),
 - ubah selama masih **draf**,
 - batalkan selama masih draf atau diajukan (`POST …/permintaan-pembelian-aset/{id}/batal`).
+- cetak satu permintaan lewat dataset `purchase-request` dan layout Word bawaan, dengan kop dari Core dan tempat tanda tangan.
 
-Yang belum ada: pengajuan dan persetujuan. Status `submitted` sudah dikenal kolomnya dan boleh dibatalkan, tetapi belum ada tindakan yang membawa permintaan ke sana, jadi semua permintaan yang hidup hari ini berstatus draf.
+Keputusan pemilik produk, 14 Oktober 2026: sampai Procurement tersedia, petugas cukup mencetak permintaan. Persetujuan dan pembelian di luar aplikasi tidak menjadi status atau syarat penerimaan di sistem. Tidak ada pengajuan atau workflow persetujuan baru untuk permintaan ini.
+
+Saat barang datang, petugas memilih nomor permintaan dan baris barang pada penerimaan di inventarisasi. Satu permintaan boleh diterima melalui beberapa dokumen penerimaan: meminta 10 unit, menerima 4, lalu menerima 6. `received_quantity` dan `remaining_quantity` pada rincian permintaan dihitung dari penerimaan selesai; draf dan penerimaan dibatalkan tidak dihitung. Penerimaan terhubung harus memakai perusahaan dan jenis aset yang sama; rujukan pembelian tidak berlaku untuk hibah atau saldo awal. Penerimaan tanpa rujukan tetap tersedia untuk pencatatan lain; yang diwajibkan saat ini adalah asal perencanaan pada permintaan.
+
+Penyelesaian mengunci dokumen permintaan sebelum menghitung sisa, dan menjumlah seluruh baris penerimaan yang menunjuk baris permintaan yang sama. Dua penyelesaian bersamaan tidak boleh menerima lebih dari jumlah diminta. Permintaan yang dipakai pada penerimaan tidak dapat diubah atau dibatalkan; rencana yang sudah dirujuk permintaan tidak dapat diubah atau diarsipkan. Ini menjaga hubungan dokumen asal tetap utuh.
+
+Regresinya ada di `PermintaanPembelianAsetTest` dan `PenerimaanAsetTest`; kontrak permintaan ada di `contracts/src/paths/purchase-requests.yaml`.
+
+Isian tambahan yang diwajibkan jenis aset, misalnya prosesor dan RAM, diisi per baris penerimaan dengan renderer yang sama seperti register. Nilainya ikut disimpan pada draf dan dipulangkan sebagai daftar `atribut` saat dokumen dibuka kembali, lalu diteruskan ke setiap aset yang lahir. Mengganti jenis aset mengosongkan atribut, kondisi, dan model yang bergantung padanya.
+
+Alur ini mengadaptasi pemisahan [permintaan pembelian](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/purchase-requisitions-overview) dan [penerimaan barang](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/product-receipt-against-purchase-orders) di Dynamics 365. Penerimaan CoreERP menunjuk permintaan langsung untuk saat ini; purchase order dan integrasi Procurement tidak dibuat pada perubahan ini.
 
 Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
 

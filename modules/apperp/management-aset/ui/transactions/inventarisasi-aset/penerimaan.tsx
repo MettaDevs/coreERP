@@ -6,6 +6,7 @@ import type {
 import { Badge } from '@apperp/ui/badge';
 import type { FieldConfig } from '../../master/fields';
 import type { CancellationSummary } from '../_shared/CancellationStatus';
+import type { AttributeValue } from './ReceiptAttributes';
 
 /**
  * Bentuk data, kosakata status, dan navigasi dokumen penerimaan aset.
@@ -23,6 +24,7 @@ export type Context = {
 
 export type BarisPenerimaan = {
     id?: string;
+    clientKey?: string;
     line_number?: number;
     nama: string;
     group_aset_id: string;
@@ -41,6 +43,9 @@ export type BarisPenerimaan = {
     /** Saldo awal: buku yang angkanya berbeda dari angka baris, lazimnya buku fiskal. */
     saldo_awal_buku: SaldoAwalBuku[];
     permintaan_pembelian_detail_id: string;
+    atribut: AttributeValue[];
+    purchase_request_code?: string | null;
+    purchase_request_id?: string | null;
     keterangan: string;
     /** Diisi server; kolom bacaan, bukan isian. */
     group_aset_nama?: string | null;
@@ -216,6 +221,8 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export const barisKosong = (): BarisPenerimaan => ({
+    // Pilihan permintaan dan atribut tetap bersama barisnya saat baris lain dihapus.
+    clientKey: crypto.randomUUID(),
     nama: '',
     group_aset_id: '',
     jenis_aset_id: '',
@@ -231,6 +238,7 @@ export const barisKosong = (): BarisPenerimaan => ({
     periode_berjalan: '',
     saldo_awal_buku: [],
     permintaan_pembelian_detail_id: '',
+    atribut: [],
     keterangan: '',
 });
 

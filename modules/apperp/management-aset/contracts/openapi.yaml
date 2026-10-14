@@ -4399,7 +4399,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-  /api/v1/perencanaan-aset:
+  /api/modules/management-aset/v1/perencanaan-aset:
     get:
       tags:
       - Perencanaan aset
@@ -4438,7 +4438,33 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '503':
           description: Number Sequence Core belum tersedia
-  /api/v1/perencanaan-aset/{id}:
+  /api/modules/management-aset/v1/perencanaan-aset/number-policy:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: getAssetPlanningNumberPolicy
+      summary: Membaca pilihan kode manual dan otomatis; memerlukan izin membuat perencanaan
+      responses:
+        '200':
+          description: Pengaturan kode perencanaan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - allow_manual
+                    - allow_automatic
+                    properties:
+                      allow_manual:
+                        type: boolean
+                      allow_automatic:
+                        type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/perencanaan-aset/{id}:
     get:
       tags:
       - Perencanaan aset
@@ -4515,7 +4541,7 @@ paths:
       tags:
       - Lifecycle aset
       operationId: listLifecycleDocument
-      summary: Menampilkan permintaan pembelian, dekomisioning, penjualan, atau pemusnahan
+      summary: Menampilkan dekomisioning, penjualan, atau pemusnahan
       parameters:
       - name: lifecycleDocument
         in: path
@@ -4523,7 +4549,6 @@ paths:
         schema:
           type: string
           enum:
-          - permintaan-pembelian-aset
           - dekomisioning-aset
           - penjualan-aset
           - pemusnahan-aset
@@ -4543,7 +4568,6 @@ paths:
         schema:
           type: string
           enum:
-          - permintaan-pembelian-aset
           - dekomisioning-aset
           - penjualan-aset
           - pemusnahan-aset
@@ -4551,6 +4575,108 @@ paths:
       responses:
         '201':
           description: Dokumen dibuat
+  /api/modules/management-aset/v1/permintaan-pembelian-aset:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: listAssetPurchaseRequests
+      summary: Daftar permintaan pada perusahaan aktif dan unit yang diizinkan
+      responses:
+        '200':
+          description: Daftar permintaan, termasuk status draf dan dibatalkan
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: createAssetPurchaseRequest
+      summary: Membuat permintaan wajib dari baris perencanaan
+      description: Jenis aset dan satuan harus sama dengan rencana, pada perusahaan yang sama. Dokumen dapat dicetak; persetujuan
+        di luar aplikasi tidak mengubah status dan tidak menjadi syarat penerimaan.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetPurchaseRequestInput'
+      responses:
+        '201':
+          description: Permintaan dibuat sebagai draf
+        '200':
+          description: Replay permintaan dengan kunci yang sama
+        '422':
+          description: Rencana tidak tersedia
+          berbeda perusahaan: null
+          atau jenis dan satuan tidak sesuai: null
+  /api/modules/management-aset/v1/permintaan-pembelian-aset/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: ulid
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: showAssetPurchaseRequest
+      summary: Rincian permintaan beserta perencanaan asal dan sisa penerimaan
+      responses:
+        '200':
+          description: details memuat planning_code, unit, received_quantity, dan remaining_quantity. Jumlah diterima dihitung
+            dari penerimaan selesai; draf dan penerimaan dibatalkan tidak dihitung.
+        '404':
+          description: Permintaan tidak tersedia dalam konteks pengguna
+    patch:
+      tags:
+      - Lifecycle aset
+      operationId: updateAssetPurchaseRequest
+      summary: Mengubah draf yang belum dipakai pada penerimaan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetPurchaseRequestInput'
+              - $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Permintaan diperbarui
+        '409':
+          description: Versi sudah berubah
+        '422':
+          description: Permintaan sudah dipakai pada penerimaan atau rencana tidak sesuai
+        '428':
+          description: Versi tidak dikirim
+  /api/modules/management-aset/v1/permintaan-pembelian-aset/{id}/batal:
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: cancelAssetPurchaseRequest
+      summary: Membatalkan permintaan yang belum dipakai pada penerimaan
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Permintaan dibatalkan
+        '409':
+          description: Versi sudah berubah
+        '422':
+          description: Sudah dipakai pada penerimaan atau tidak dapat dibatalkan
+        '428':
+          description: Versi tidak dikirim
   /api/v1/penerimaan-aset:
     get:
       tags:
@@ -9455,6 +9581,12 @@ components:
       - planning_type
       - details
       properties:
+        kode:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Kode manual saat membuat dokumen bila diizinkan pengaturan nomor. Kosong memakai nomor otomatis bila
+            diizinkan. Kode dokumen tersimpan tidak berubah.
         legal_entity_id:
           $ref: '#/components/schemas/Ulid'
         planning_org_unit_id:
@@ -14208,6 +14340,59 @@ components:
           type:
           - string
           - 'null'
+    AssetPurchaseRequestInput:
+      type: object
+      required:
+      - legal_entity_id
+      - requesting_org_unit_id
+      - requested_on
+      - details
+      properties:
+        legal_entity_id:
+          type: string
+          format: ulid
+        requesting_org_unit_id:
+          type: string
+          format: ulid
+        requested_on:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        details:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - planning_detail_id
+            - jenis_aset_id
+            - satuan_id
+            - quantity
+            - specification
+            properties:
+              planning_detail_id:
+                type: string
+                format: ulid
+                description: Baris rencana aktif milik perusahaan yang sama. Tidak boleh diulang dalam satu dokumen.
+              jenis_aset_id:
+                type: string
+                format: ulid
+              satuan_id:
+                type: string
+                format: ulid
+              quantity:
+                type: number
+                exclusiveMinimum: 0
+              specification:
+                type: string
+                maxLength: 2000
+              note:
+                type: string
+                nullable: true
+                maxLength: 2000
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

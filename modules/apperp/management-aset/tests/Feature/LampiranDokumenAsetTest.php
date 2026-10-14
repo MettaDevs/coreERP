@@ -140,13 +140,15 @@ class LampiranDokumenAsetTest extends TestCase
         $this->assertSame(0, Artisan::call('app:register-manifest', ['module' => 'management-aset']), Artisan::output());
         $jenis = $this->jenisAset('Kursi tunggu');
         $permintaan = $this->permintaanPengadaan($jenis);
+        $planId = $this->perencanaan($jenis);
+        $planLine = DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $planId)->first();
         $this->denganDuty(['management-aset.permintaan-pembelian-aset.manage']);
 
         $this->patchJson('/api/modules/management-aset/v1/permintaan-pembelian-aset/'.$permintaan, [
             'legal_entity_id' => $this->legalEntityId, 'requesting_org_unit_id' => $this->unitId,
             'requested_on' => '2026-06-01', 'description' => 'Diubah pemegang duty', 'version' => 1,
             'details' => [[
-                'jenis_aset_id' => $jenis, 'satuan_id' => (string) Str::ulid(), 'quantity' => 2, 'specification' => 'Kursi besi',
+                'planning_detail_id' => $planLine->id, 'jenis_aset_id' => $jenis, 'satuan_id' => $planLine->satuan_id, 'quantity' => 2, 'specification' => 'Kursi besi',
             ]],
         ])->assertOk();
         $this->assertDatabaseHas('aset_tr_permintaan_pengadaan_aset', ['id' => $permintaan, 'description' => 'Diubah pemegang duty']);
@@ -265,11 +267,13 @@ class LampiranDokumenAsetTest extends TestCase
         return $id;
     }
 
-    private function perencanaan(): string
+    private function perencanaan(?string $typeId = null): string
     {
-        $jenis = (string) Str::ulid();
+        $jenis = $typeId ?? (string) Str::ulid();
         $now = now();
-        DB::table('aset_m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.$jenis, 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        if ($typeId === null) {
+            DB::table('aset_m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.$jenis, 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        }
 
         return (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.perencanaan-aset.create'])
             ->withHeader('Idempotency-Key', 'plan-'.Str::ulid())

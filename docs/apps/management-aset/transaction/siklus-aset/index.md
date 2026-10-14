@@ -100,7 +100,7 @@ Contoh: ambulans 48.000.000, akumulasi 1.000.000, dijual 50.000.000 — Dr Akumu
 
 ## Yang belum dirancang
 
-`permintaan-pembelian-aset` sudah bisa dibuat, diubah selama draf, dan dibatalkan (rinciannya di [Perencanaan aset](/apps/management-aset/transaction/perencanaan-aset/#hubungannya-dengan-pengadaan)). Yang belum dirancang adalah pengajuan dan persetujuannya: belum ada tindakan yang membawa permintaan ke status `submitted`, dan belum ada tipe workflow untuknya. Laporan pengadaan aset karena itu menghitung permintaan draf sebagai "diminta"; aturan itu ditinjau ulang begitu persetujuannya ada.
+`permintaan-pembelian-aset` wajib berasal dari perencanaan dan dapat dicetak (rinciannya di [Perencanaan aset](/apps/management-aset/transaction/perencanaan-aset/#hubungannya-dengan-pengadaan)). Keputusan pemilik produk, 14 Oktober 2026: persetujuan dan pembelian di luar aplikasi tidak menjadi status di sistem. Petugas mencatat kedatangan barang pada penerimaan yang menunjuk baris permintaan, boleh bertahap. Laporan pengadaan menghitung permintaan draf sebagai "diminta". Integrasi Procurement belum dibuat.
 
 ## Di mana kodenya
 
@@ -113,9 +113,10 @@ Contoh: ambulans 48.000.000, akumulasi 1.000.000, dijual 50.000.000 — Dr Akumu
 | `tests/Feature/DisposalPostingTest.php` | Draf, pratinjau, posting, laba/rugi, penghalang, hak akses |
 | `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan workflow |
 | `src/Services/AssetApprovalWorkflow.php` | Pengajuan ke Core lewat kontrak |
-| `src/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — buat, ubah draf, batal; belum ada pengajuan dan persetujuan |
+| `src/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan dari perencanaan, ubah draf, batal, jumlah diterima dan sisa |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
-| `ui/transactions/_shared/LifecycleDocumentPage.tsx` | Layar permintaan pembelian dan dekomisioning |
+| `ui/transactions/permintaan-pembelian-aset/PurchaseRequestPage.tsx` | Layar permintaan dan cetak |
+| `ui/transactions/_shared/LifecycleDocumentPage.tsx` | Layar dekomisioning |
 | `ui/transactions/disposal/` | Layar penjualan dan pemusnahan: daftar, draf, pratinjau, posting |
 
 ## Halaman terkait

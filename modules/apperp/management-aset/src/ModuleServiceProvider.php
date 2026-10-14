@@ -46,6 +46,7 @@ use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetMonitoringReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\AssetProcurementReport;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\BeritaAcaraSerahTerima;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\DaftarMutasiAset;
+use Modules\Apperp\ManagementAset\Reporting\Definitions\PurchaseRequestDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderDocument;
 use Modules\Apperp\ManagementAset\Reporting\Definitions\WorkOrderList;
 use Modules\Apperp\ManagementAset\Reporting\Lists\AssetRegisterList;
@@ -94,6 +95,7 @@ final class ModuleServiceProvider extends ServiceProvider
         $this->app->singleton(ReportRegistry::class, function (): ReportRegistry {
             $registry = new ReportRegistry;
             $registry->register(new WorkOrderDocument);
+            $registry->register(new PurchaseRequestDocument);
             $registry->register(new WorkOrderList);
             $registry->register(new BeritaAcaraSerahTerima);
             $registry->register(new DaftarMutasiAset);

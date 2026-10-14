@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
 import type { RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
@@ -11,6 +12,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { Checkbox } from '@apperp/ui/checkbox';
 import {
     Empty,
     EmptyDescription,
@@ -39,6 +41,9 @@ type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
 type AsetType = { id: string; kode: string; nama: string };
 type Detail = {
+    id?: string;
+    nama_aset?: string;
+    unit?: string;
     jenis_aset_id: string;
     satuan_id: string;
     quantity: string;
@@ -219,6 +224,13 @@ export default function PlanningPage({
     const [editing, setEditing] = useState<
         (Plan & { details: Detail[] }) | null | undefined
     >();
+    const [viewing, setViewing] = useState<Plan | null>(null);
+    const [selectedLines, setSelectedLines] = useState<string[]>([]);
+    const [manualCode, setManualCode] = useState('');
+    const [numberPolicy, setNumberPolicy] = useState<{
+        allow_manual: boolean;
+        allow_automatic: boolean;
+    } | null>(null);
     const [saving, setSaving] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
@@ -296,6 +308,39 @@ export default function PlanningPage({
         return () => window.clearTimeout(timer);
     }, [bolehSunting, typeSearch]);
 
+    const openCreate = async () => {
+        setNumberPolicy(null);
+        setManualCode('');
+
+        try {
+            const result = await api<{
+                data: { allow_manual: boolean; allow_automatic: boolean };
+            }>('/perencanaan-aset/number-policy');
+            setNumberPolicy(result.data);
+            setEditing(emptyPlan(workDate) as never);
+        } catch (caught) {
+            toast.error(
+                errorMessage(caught, 'Pengaturan kode belum dapat dimuat.'),
+            );
+        }
+    };
+
+    const openDetails = async (id: string) => {
+        try {
+            const result = await api<{ data: Plan }>(`/perencanaan-aset/${id}`);
+            setViewing(result.data);
+            setSelectedLines(
+                (result.data.details ?? []).flatMap((line) =>
+                    line.id ? [line.id] : [],
+                ),
+            );
+        } catch (caught) {
+            toast.error(
+                errorMessage(caught, 'Rincian perencanaan belum dapat dimuat.'),
+            );
+        }
+    };
+
     const openEdit = async (id: string) => {
         try {
             const result = await api<{ data: Plan & { details: Detail[] } }>(
@@ -368,8 +413,19 @@ export default function PlanningPage({
             return;
         }
 
+        if (
+            !('id' in editing) &&
+            !numberPolicy?.allow_automatic &&
+            !manualCode.trim()
+        ) {
+            toast.error('Isi kode perencanaan terlebih dahulu.');
+
+            return;
+        }
+
         setSaving(true);
         const body = {
+            ...(!('id' in editing) ? { kode: manualCode.trim() || null } : {}),
             legal_entity_id: context.legal_entity_id,
             planning_org_unit_id: context.org_unit_id,
             planned_on: editing.planned_on,
@@ -414,11 +470,7 @@ export default function PlanningPage({
                 <CardTitle>Perencanaan aset</CardTitle>
                 {can('create') && (
                     <CardAction>
-                        <Button
-                            onClick={() =>
-                                setEditing(emptyPlan(workDate) as never)
-                            }
-                        >
+                        <Button onClick={() => void openCreate()}>
                             Tambah rencana
                         </Button>
                     </CardAction>
@@ -442,8 +494,14 @@ export default function PlanningPage({
                                 key={plan.id}
                                 className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
                             >
-                                <div>
-                                    <p className="font-medium">{plan.kode}</p>
+                                <div className="min-w-0 flex-1">
+                                    <p
+                                        className="truncate font-medium"
+                                        title={`${plan.kode} - ${plan.description || 'Tanpa tujuan'}`}
+                                    >
+                                        {plan.kode} ·{' '}
+                                        {plan.description || 'Tanpa tujuan'}
+                                    </p>
                                     <p className="text-muted-foreground text-sm">
                                         {plan.planned_on} ·{' '}
                                         {plan.planning_type === 'regular'
@@ -461,6 +519,15 @@ export default function PlanningPage({
                                             ? 'Draf'
                                             : plan.status}
                                     </Badge>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            void openDetails(plan.id)
+                                        }
+                                    >
+                                        Buka rincian
+                                    </Button>
                                     {can('update') && (
                                         <Button
                                             variant="outline"
@@ -489,6 +556,96 @@ export default function PlanningPage({
             </CardContent>
 
             <Sheet
+                open={viewing !== null}
+                onOpenChange={(open) => !open && setViewing(null)}
+            >
+                <SheetContent
+                    side="right"
+                    className="overflow-y-auto sm:max-w-3xl"
+                >
+                    <SheetHeader>
+                        <SheetTitle
+                            className="truncate"
+                            title={`${viewing?.kode ?? ''} - ${viewing?.description || 'Tanpa tujuan'}`}
+                        >
+                            {viewing?.kode} ·{' '}
+                            {viewing?.description || 'Tanpa tujuan'}
+                        </SheetTitle>
+                    </SheetHeader>
+                    <div className="space-y-4 p-4">
+                        <p className="text-muted-foreground text-sm">
+                            {viewing?.planned_on.slice(0, 10)} · Pilih baris
+                            yang akan dibuatkan permintaan.
+                        </p>
+                        {viewing?.details?.map((line, index) => (
+                            <label
+                                key={line.id ?? index}
+                                className="flex items-start gap-3 rounded-lg border p-3"
+                            >
+                                <Checkbox
+                                    aria-label={`Pilih baris ${index + 1}`}
+                                    checked={selectedLines.includes(
+                                        line.id ?? '',
+                                    )}
+                                    onCheckedChange={(checked) => {
+                                        if (line.id) {
+                                            setSelectedLines((current) =>
+                                                checked
+                                                    ? [...current, line.id!]
+                                                    : current.filter(
+                                                          (id) =>
+                                                              id !== line.id,
+                                                      ),
+                                            );
+                                        }
+                                    }}
+                                />
+                                <span className="space-y-1">
+                                    <span className="block font-medium">
+                                        {line.nama_aset}
+                                    </span>
+                                    <span className="block text-sm">
+                                        {line.quantity} {line.unit} ·{' '}
+                                        {line.requested_specification}
+                                    </span>
+                                </span>
+                            </label>
+                        ))}
+                        <SheetFooter>
+                            {permissions.includes(
+                                'management-aset.permintaan-pembelian-aset.create',
+                            ) && (
+                                <Button
+                                    disabled={selectedLines.length === 0}
+                                    onClick={() => {
+                                        if (!viewing) {
+                                            return;
+                                        }
+
+                                        const query = new URLSearchParams({
+                                            planning: viewing.id,
+                                            lines: selectedLines.join(','),
+                                        });
+                                        router.visit(
+                                            `/management-aset/permintaan-pembelian-aset?${query.toString()}`,
+                                        );
+                                    }}
+                                >
+                                    Buat permintaan
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline"
+                                onClick={() => setViewing(null)}
+                            >
+                                Tutup
+                            </Button>
+                        </SheetFooter>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            <Sheet
                 open={editing !== undefined}
                 onOpenChange={(open) => !open && setEditing(undefined)}
             >
@@ -510,6 +667,32 @@ export default function PlanningPage({
                                 Unit perencanaan dan penanggung jawab mengikuti
                                 konteks aktif Anda.
                             </p>
+                            <Input
+                                label="Kode perencanaan"
+                                value={
+                                    'id' in editing
+                                        ? editing.kode
+                                        : numberPolicy?.allow_manual
+                                          ? manualCode
+                                          : 'Dibuat otomatis saat disimpan'
+                                }
+                                disabled={
+                                    'id' in editing ||
+                                    !numberPolicy?.allow_manual
+                                }
+                                required={
+                                    !('id' in editing) &&
+                                    !numberPolicy?.allow_automatic
+                                }
+                                placeholder={
+                                    numberPolicy?.allow_automatic
+                                        ? 'Kosongkan untuk membuat kode otomatis'
+                                        : 'Masukkan kode'
+                                }
+                                onChange={(event) =>
+                                    setManualCode(event.target.value)
+                                }
+                            />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field>
                                     <Input
@@ -587,7 +770,7 @@ export default function PlanningPage({
                             </div>
                             <Field>
                                 <FieldLabel htmlFor="planning-description">
-                                    Keterangan
+                                    Tujuan perencanaan
                                 </FieldLabel>
                                 <Textarea
                                     id="planning-description"

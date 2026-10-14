@@ -277,9 +277,7 @@ export default function DynamicField({
                 <Input
                     id={config.name}
                     label={
-                        config.suffix
-                            ? `${inputLabel} (${config.suffix})`
-                            : inputLabel
+                        config.suffix ? `${label} (${config.suffix})` : label
                     }
                     type={
                         config.type === 'number'

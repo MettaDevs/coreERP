@@ -57,6 +57,11 @@ AsetPlanningWrite:
   - planning_type
   - details
   properties:
+    kode:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Kode manual saat membuat dokumen bila diizinkan pengaturan nomor. Kosong memakai nomor otomatis bila diizinkan. Kode dokumen tersimpan tidak berubah.
     legal_entity_id:
       $ref: '#/components/schemas/Ulid'
     planning_org_unit_id:
@@ -3305,3 +3310,27 @@ AssetCancellation:
     acted_by_user_id: {type: [string, 'null']}
     posting_ids: {type: [array, 'null'], items: {type: string}}
     failure_message: {type: [string, 'null']}
+AssetPurchaseRequestInput:
+  type: object
+  required: [legal_entity_id, requesting_org_unit_id, requested_on, details]
+  properties:
+    legal_entity_id: {type: string, format: ulid}
+    requesting_org_unit_id: {type: string, format: ulid}
+    requested_on: {type: string, format: date}
+    description: {type: string, nullable: true, maxLength: 2000}
+    details:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required: [planning_detail_id, jenis_aset_id, satuan_id, quantity, specification]
+        properties:
+          planning_detail_id:
+            type: string
+            format: ulid
+            description: Baris rencana aktif milik perusahaan yang sama. Tidak boleh diulang dalam satu dokumen.
+          jenis_aset_id: {type: string, format: ulid}
+          satuan_id: {type: string, format: ulid}
+          quantity: {type: number, exclusiveMinimum: 0}
+          specification: {type: string, maxLength: 2000}
+          note: {type: string, nullable: true, maxLength: 2000}
