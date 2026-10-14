@@ -109,8 +109,8 @@ join app_number_sequence_references ref on ref.id = s.reference_id
 left join number_sequence_profiles p on p.code = s.profile_code
 where ref.app_id <> 'core' and (
       s.status <> 'active'
-   or s.minimum_number <> 1
-   or s.maximum_number <> 19999
+   or s.minimum_number is distinct from coalesce((ref.default_settings->>'minimum_number')::integer, 1)
+   or s.maximum_number is distinct from coalesce((ref.default_settings->>'maximum_number')::integer, 19999)
    or not (ref.allowed_scopes::jsonb ? s.scope_type)
    or p.code is null
    or s.is_continuous is distinct from coalesce((ref.default_settings->>'is_continuous')::boolean, p.is_continuous)
