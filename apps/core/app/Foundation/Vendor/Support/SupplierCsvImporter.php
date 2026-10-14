@@ -38,7 +38,9 @@ final class SupplierCsvImporter
             $names = [];
             $source = null;
             while (($values = fgetcsv($stream, null, $delimiter, '"', '')) !== false) {
-                if ($values === [null]) { continue; }
+                if ($values === [null]) {
+                    continue;
+                }
                 $line = count($rows) + 2;
                 if (count($values) !== count(self::HEADER) || count($rows) >= 5000) {
                     throw ValidationException::withMessages(['file' => "Baris {$line}: kolom tidak lengkap atau melebihi 5.000 supplier."]);
@@ -60,7 +62,10 @@ final class SupplierCsvImporter
                 $names[$nameKey] = true;
                 $rows[] = $row;
             }
-            if ($rows === []) { throw ValidationException::withMessages(['file' => 'Berkas tidak berisi supplier.']); }
+            if ($rows === []) {
+                throw ValidationException::withMessages(['file' => 'Berkas tidak berisi supplier.']);
+            }
+
             return $rows;
         } finally {
             fclose($stream);
@@ -73,6 +78,7 @@ final class SupplierCsvImporter
         if (! Organization::query()->where('tenant_id', $actor->tenant_id)->where('classification', 'legal_entity')->whereKey($entity)->exists()) {
             throw ValidationException::withMessages(['legal_entity_id' => 'Pilih entitas legal milik tenant ini.']);
         }
+
         return DB::transaction(function () use ($actor, $entity, $rows, $apply): array {
             if ($apply) {
                 DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['supplier-csv|'.$actor->tenant_id.'|'.$entity]);
@@ -89,12 +95,16 @@ final class SupplierCsvImporter
                 if ($vendor !== null) {
                     if ($vendor->party->name !== $row['name'] || $vendor->status !== ($row['active'] === '1' ? 'active' : 'inactive')) {
                         $rejected[] = $row['code'].': nama/status berubah; periksa vendor existing '.$vendor->number.' terlebih dahulu.';
-                    } else { $unchanged++; }
+                    } else {
+                        $unchanged++;
+                    }
+
                     continue;
                 }
                 $conflict = $existing->first(fn (Vendor $item): bool => Party::searchName($item->party->name) === Party::searchName($row['name']) || $item->number === $row['code']);
                 if ($conflict !== null) {
                     $rejected[] = $row['code'].': sudah ada kandidat '.$conflict->number.'; gunakan mapping supplier pada Setup BO.';
+
                     continue;
                 }
                 $pending[] = [$row, $key];
@@ -109,6 +119,7 @@ final class SupplierCsvImporter
                     ], $key);
                 }
             }
+
             return ['status' => $rejected !== [] ? 'rejected' : ($apply ? 'applied' : 'preview'), 'created_count' => $created, 'unchanged_count' => $unchanged, 'rejected' => $rejected];
         });
     }
