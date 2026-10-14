@@ -249,6 +249,52 @@ class DepreciationBookTest extends TestCase
         $this->assertSame(10.0, (float) DB::table('aset_tr_buku_aset')->where('aset_id', $asetFallback)->value('round_off_depreciation'));
     }
 
+    public function test_frequency_change_cannot_reinterpret_custom_group_life(): void
+    {
+        foreach ([false, true] as $explicitProfile) {
+            $profile = $this->profil('Umur empat tahun', 'straight_line', 48);
+            $book = $this->master('buku-penyusutan', ['nama' => 'Buku uji', 'depreciation_profile_id' => $profile]);
+            $group = $this->master('group-aset', ['nama' => 'Group umur khusus']);
+            $this->matrix($group, [['buku_id' => $book, 'depreciation_profile_id' => $explicitProfile ? $profile : null, 'useful_life_periods' => 60]])->assertOk();
+            $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('profil-penyusutan'))
+                ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profile, [
+                    'frequency' => 'yearly', 'useful_life_periods' => 4, 'version' => 1,
+                ])->assertUnprocessable()->assertJsonValidationErrors('frequency');
+            $this->assertDatabaseHas('aset_m_profil_penyusutan', ['id' => $profile, 'frequency' => 'monthly', 'useful_life_periods' => 48, 'version' => 1]);
+        }
+    }
+
+    public function test_book_default_cannot_reinterpret_inherited_custom_group_life(): void
+    {
+        $monthly = $this->profil('Bulanan', 'straight_line', 48);
+        $yearly = $this->master('profil-penyusutan', ['nama' => 'Tahunan', 'method' => 'straight_line', 'frequency' => 'yearly', 'year_basis' => 'calendar', 'useful_life_periods' => 4]);
+        $book = $this->master('buku-penyusutan', ['nama' => 'Buku uji', 'depreciation_profile_id' => $monthly]);
+        $group = $this->master('group-aset', ['nama' => 'Group umur khusus']);
+        $this->matrix($group, [['buku_id' => $book, 'useful_life_periods' => 60]])->assertOk();
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('buku-penyusutan'))
+            ->patchJson('/api/modules/management-aset/v1/buku-penyusutan/'.$book, ['depreciation_profile_id' => $yearly, 'version' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('depreciation_profile_id');
+        $this->assertDatabaseHas('aset_m_buku_penyusutan', ['id' => $book, 'depreciation_profile_id' => $monthly, 'version' => 1]);
+    }
+
+    public function test_group_inherits_profile_life_without_duplicate_input(): void
+    {
+        $profile = $this->profil('Umur empat tahun', 'straight_line', 48);
+        $book = $this->master('buku-penyusutan', ['nama' => 'Buku uji', 'depreciation_profile_id' => $profile]);
+        $group = $this->master('group-aset', ['nama' => 'Group bawaan']);
+        $type = $this->master('jenis-aset', ['nama' => 'Jenis uji']);
+        $this->matrix($group, [['buku_id' => $book]])->assertOk()->assertJsonPath('data.0.useful_life_periods', null);
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('profil-penyusutan'))
+            ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profile, ['frequency' => 'yearly', 'version' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('useful_life_periods');
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('profil-penyusutan'))
+            ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profile, [
+                'frequency' => 'yearly', 'useful_life_periods' => 4, 'version' => 1,
+            ])->assertOk();
+        $asset = $this->receive($group, $type);
+        $this->assertDatabaseHas('aset_tr_buku_aset', ['aset_id' => $asset, 'useful_life_periods' => 4]);
+    }
+
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload, ?string $tenantId = null): string
     {

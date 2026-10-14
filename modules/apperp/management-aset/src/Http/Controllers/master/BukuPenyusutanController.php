@@ -6,6 +6,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
@@ -76,6 +78,19 @@ class BukuPenyusutanController extends MasterDataController
             throw ValidationException::withMessages([
                 'depreciation_profile_id' => 'Buku ini sudah dipakai aset. Buat buku baru untuk perubahan aturan agar histori aset lama tetap utuh.',
             ]);
+        }
+
+        if (in_array('depreciation_profile_id', $changed, true)) {
+            $oldFrequency = ProfilPenyusutan::withTrashed()->whereKey($record->depreciation_profile_id)->value('frequency');
+            $newFrequency = ProfilPenyusutan::query()->whereKey($data['depreciation_profile_id'])->value('frequency');
+            if ($oldFrequency !== $newFrequency && GroupBukuPenyusutan::query()
+                ->where('buku_id', $record->getKey())
+                ->whereNull('depreciation_profile_id')
+                ->whereNotNull('useful_life_periods')->exists()) {
+                throw ValidationException::withMessages([
+                    'depreciation_profile_id' => 'Buku ini dipakai group dengan masa manfaat khusus. Pilih metode baru langsung pada group agar umur aset tetap sama.',
+                ]);
+            }
         }
     }
 

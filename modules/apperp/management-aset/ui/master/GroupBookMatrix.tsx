@@ -5,9 +5,20 @@ import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { api, errorMessage } from '../api';
+import {
+    monthsPerPeriod,
+    serviceLifeMonths,
+    serviceLifeLabel,
+} from './serviceLife';
+import ServiceLifeFields from './ServiceLifeFields';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
-type Buku = { id: string; kode: string; nama: string };
+type Buku = {
+    id: string;
+    kode: string;
+    nama: string;
+    depreciation_profile_id: string | null;
+};
 
 type Row = {
     buku_id: string;
@@ -35,37 +46,6 @@ const CONVENTIONS: { value: string; label: string }[] = [
         label: 'Setengah tahun (mulai tahun depan)',
     },
 ];
-
-/** Berapa periode dalam satu tahun, per frekuensi metode penyusutan. */
-const PERIODS_PER_YEAR: Record<string, number> = {
-    monthly: 12,
-    quarterly: 4,
-    half_yearly: 2,
-    yearly: 1,
-};
-
-/**
- * Masa manfaat disimpan sebagai jumlah periode karena itulah satuan yang dipakai mesin
- * penyusutan. Tetapi "330 periode" tidak terbaca oleh siapa pun, jadi bentuk tahunannya
- * ikut ditampilkan. Konversinya butuh frekuensi, dan frekuensi milik profil — selama
- * profilnya belum dipilih, angkanya memang belum punya arti dalam tahun.
- */
-function serviceLifeHint(periods: string, frequency: unknown): string | null {
-    const count = Number(periods);
-    const perYear = PERIODS_PER_YEAR[String(frequency)];
-
-    if (!Number.isFinite(count) || count <= 0) {
-        return null;
-    }
-
-    if (!perYear) {
-        return 'Setara berapa tahun baru terlihat setelah metode dipilih.';
-    }
-
-    const years = count / perYear;
-
-    return `Setara ${years.toFixed(2).replace(/\.00$/, '')} tahun.`;
-}
 
 const emptyRow = (bukuId: string): Row => ({
     buku_id: bukuId,
@@ -173,7 +153,32 @@ export default function GroupBookMatrix({
             ),
         );
 
+    const profileFor = (row: Row) =>
+        profiles.options.find(
+            (profile) =>
+                profile.id ===
+                (row.depreciation_profile_id ||
+                    books.find((book) => book.id === row.buku_id)
+                        ?.depreciation_profile_id),
+        );
+
     async function save() {
+        if (
+            rows.some(
+                (row) =>
+                    row.useful_life_periods !== '' &&
+                    (!Number.isInteger(Number(row.useful_life_periods)) ||
+                        Number(row.useful_life_periods) < 1 ||
+                        !profileFor(row)),
+            )
+        ) {
+            setError(
+                'Masa manfaat harus sesuai frekuensi metode yang dipakai. Periksa tahun dan bulan pada baris buku.',
+            );
+
+            return;
+        }
+
         setSaving(true);
         setError('');
         setSaved(false);
@@ -233,188 +238,240 @@ export default function GroupBookMatrix({
                 </p>
             )}
 
-            {rows.map((row, index) => (
-                <div
-                    key={row.buku_id}
-                    className="space-y-3 rounded-md border p-3"
-                >
-                    <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">
-                            {label(row.buku_id) || 'Buku tidak dikenal'}
-                        </span>
-                        {canEdit && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                onClick={() =>
-                                    setRows(rows.filter((_, i) => i !== index))
-                                }
-                            >
-                                Hapus
-                            </Button>
-                        )}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <Field>
-                            <Select
-                                label="Metode utama untuk group ini"
-                                items={profiles.options.map(optionLabel)}
-                                value={
-                                    profiles.options
-                                        .filter(
-                                            (item) =>
-                                                item.id ===
-                                                row.depreciation_profile_id,
+            {rows.map((row, index) => {
+                const profile = profileFor(row);
+                const inheritedLife = serviceLifeLabel(
+                    profile?.useful_life_periods,
+                    profile?.frequency,
+                );
+
+                return (
+                    <div
+                        key={row.buku_id}
+                        className="space-y-3 rounded-md border p-3"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium">
+                                {label(row.buku_id) || 'Buku tidak dikenal'}
+                            </span>
+                            {canEdit && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() =>
+                                        setRows(
+                                            rows.filter((_, i) => i !== index),
                                         )
-                                        .map(optionLabel)[0]
-                                }
-                                placeholder="Ikuti metode utama buku"
-                                searchPlaceholder="Cari metode penyusutan"
-                                emptyMessage="Metode Penyusutan tidak ditemukan."
-                                ariaLabel="Pilih metode utama untuk group ini"
-                                portalContainer={containerRef}
-                                onValueChange={(item) =>
-                                    patch(index, {
-                                        depreciation_profile_id:
+                                    }
+                                >
+                                    Hapus
+                                </Button>
+                            )}
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Field>
+                                <Select
+                                    label="Metode utama untuk group ini"
+                                    items={profiles.options.map(optionLabel)}
+                                    value={
+                                        profiles.options
+                                            .filter(
+                                                (item) =>
+                                                    item.id ===
+                                                    row.depreciation_profile_id,
+                                            )
+                                            .map(optionLabel)[0]
+                                    }
+                                    placeholder="Ikuti metode utama buku"
+                                    searchPlaceholder="Cari metode penyusutan"
+                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+                                    ariaLabel="Pilih metode utama untuk group ini"
+                                    portalContainer={containerRef}
+                                    onValueChange={(item) => {
+                                        const id =
                                             profiles.options.find(
                                                 (option) =>
                                                     optionLabel(option) ===
                                                     item,
-                                            )?.id ?? '',
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                {profiles.error ||
-                                    'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Select
-                                label="Metode pengganti (opsional)"
-                                items={profiles.options.map(optionLabel)}
-                                value={
-                                    profiles.options
-                                        .filter(
+                                            )?.id ?? '';
+                                        const nextProfile = profileFor({
+                                            ...row,
+                                            depreciation_profile_id: id,
+                                        });
+                                        const months = serviceLifeMonths(
+                                            row.useful_life_periods,
+                                            profile?.frequency,
+                                        );
+                                        const nextPeriod = monthsPerPeriod(
+                                            nextProfile?.frequency,
+                                        );
+                                        patch(index, {
+                                            depreciation_profile_id: id,
+                                            useful_life_periods:
+                                                months !== null && nextPeriod
+                                                    ? String(
+                                                          months / nextPeriod,
+                                                      )
+                                                    : '',
+                                        });
+                                    }}
+                                />
+                                <FieldDescription>
+                                    {profiles.error ||
+                                        'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
+                                </FieldDescription>
+                            </Field>
+                            <Field>
+                                <Select
+                                    label="Metode pengganti (opsional)"
+                                    items={profiles.options.map(optionLabel)}
+                                    value={
+                                        profiles.options
+                                            .filter(
+                                                (item) =>
+                                                    item.id ===
+                                                    row.alternative_profile_id,
+                                            )
+                                            .map(optionLabel)[0]
+                                    }
+                                    placeholder="Tanpa pengganti"
+                                    searchPlaceholder="Cari metode pengganti"
+                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+                                    ariaLabel="Pilih metode pengganti"
+                                    portalContainer={containerRef}
+                                    onValueChange={(item) =>
+                                        patch(index, {
+                                            alternative_profile_id:
+                                                profiles.options.find(
+                                                    (option) =>
+                                                        optionLabel(option) ===
+                                                        item,
+                                                )?.id ?? '',
+                                        })
+                                    }
+                                />
+                                <FieldDescription>
+                                    Dipakai begitu saldo menurun menghasilkan
+                                    angka lebih kecil daripada garis lurus sisa
+                                    umur, agar aset tetap habis di akhir masa
+                                    manfaat.
+                                </FieldDescription>
+                            </Field>
+                            <div className="space-y-3">
+                                <Field orientation="horizontal">
+                                    <Switch
+                                        id={`custom-life-${row.buku_id}`}
+                                        disabled={!canEdit || !profile}
+                                        checked={row.useful_life_periods !== ''}
+                                        onCheckedChange={(checked) =>
+                                            patch(index, {
+                                                useful_life_periods: checked
+                                                    ? String(
+                                                          profile?.useful_life_periods ??
+                                                              1,
+                                                      )
+                                                    : '',
+                                            })
+                                        }
+                                    />
+                                    <FieldLabel
+                                        htmlFor={`custom-life-${row.buku_id}`}
+                                    >
+                                        Gunakan masa manfaat khusus
+                                    </FieldLabel>
+                                </Field>
+                                <FieldDescription>
+                                    {profile
+                                        ? `Bawaan metode ${profile.nama}: ${inheritedLife ?? 'belum diisi'}.`
+                                        : profiles.error ||
+                                          'Pilih metode pada baris ini atau pada buku untuk melihat masa manfaat bawaan.'}
+                                </FieldDescription>
+                                {row.useful_life_periods !== '' && (
+                                    <ServiceLifeFields
+                                        value={row.useful_life_periods}
+                                        frequency={profile?.frequency}
+                                        readOnly={!canEdit}
+                                        required
+                                        onChange={(next) =>
+                                            patch(index, {
+                                                useful_life_periods:
+                                                    String(next),
+                                            })
+                                        }
+                                    />
+                                )}
+                            </div>
+                            <Field>
+                                <Select
+                                    label="Perlakuan periode pertama"
+                                    items={CONVENTIONS.map(
+                                        (item) => item.label,
+                                    )}
+                                    value={
+                                        CONVENTIONS.find(
                                             (item) =>
-                                                item.id ===
-                                                row.alternative_profile_id,
-                                        )
-                                        .map(optionLabel)[0]
-                                }
-                                placeholder="Tanpa pengganti"
-                                searchPlaceholder="Cari metode pengganti"
-                                emptyMessage="Metode Penyusutan tidak ditemukan."
-                                ariaLabel="Pilih metode pengganti"
-                                portalContainer={containerRef}
-                                onValueChange={(item) =>
-                                    patch(index, {
-                                        alternative_profile_id:
-                                            profiles.options.find(
-                                                (option) =>
-                                                    optionLabel(option) ===
-                                                    item,
-                                            )?.id ?? '',
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Dipakai begitu saldo menurun menghasilkan angka
-                                lebih kecil daripada garis lurus sisa umur, agar
-                                aset tetap habis di akhir masa manfaat.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Input
-                                id={`life-${row.buku_id}`}
-                                label="Masa manfaat (jumlah periode)"
-                                type="number"
-                                min={1}
-                                disabled={!canEdit}
-                                value={row.useful_life_periods}
-                                onChange={(event) =>
-                                    patch(index, {
-                                        useful_life_periods: event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                {serviceLifeHint(
-                                    row.useful_life_periods,
-                                    profiles.options.find(
-                                        (option) =>
-                                            option.id ===
-                                            row.depreciation_profile_id,
-                                    )?.frequency,
-                                ) ??
-                                    'Kosong berarti memakai masa manfaat pada metode penyusutan.'}
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Select
-                                label="Perlakuan periode pertama"
-                                items={CONVENTIONS.map((item) => item.label)}
-                                value={
-                                    CONVENTIONS.find(
-                                        (item) => item.value === row.convention,
-                                    )?.label
-                                }
-                                placeholder="Pilih perlakuan"
-                                searchPlaceholder="Cari perlakuan"
-                                emptyMessage="Perlakuan tidak ditemukan."
-                                ariaLabel="Pilih perlakuan periode pertama"
-                                portalContainer={containerRef}
-                                onValueChange={(item) =>
-                                    patch(index, {
-                                        convention:
-                                            CONVENTIONS.find(
-                                                (c) => c.label === item,
-                                            )?.value ?? '',
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Dihitung dari tanggal aset mulai digunakan.
-                            </FieldDescription>
-                        </Field>
-                        <Field>
-                            <Input
-                                id={`round-off-${row.buku_id}`}
-                                label="Kelipatan pembulatan penyusutan"
-                                type="number"
-                                min={0}
-                                step={0.01}
-                                disabled={!canEdit}
-                                value={row.round_off_depreciation}
-                                onChange={(event) =>
-                                    patch(index, {
-                                        round_off_depreciation:
-                                            event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                Kosong mengikuti Book. Periode terakhir tidak
-                                dibulatkan.
-                            </FieldDescription>
-                        </Field>
-                        <Field orientation="horizontal">
-                            <Switch
-                                id={`depreciate-${row.buku_id}`}
-                                disabled={!canEdit}
-                                checked={row.depreciate}
-                                onCheckedChange={(checked) =>
-                                    patch(index, { depreciate: checked })
-                                }
-                            />
-                            <FieldLabel htmlFor={`depreciate-${row.buku_id}`}>
-                                Hitung penyusutan
-                            </FieldLabel>
-                        </Field>
+                                                item.value === row.convention,
+                                        )?.label
+                                    }
+                                    placeholder="Pilih perlakuan"
+                                    searchPlaceholder="Cari perlakuan"
+                                    emptyMessage="Perlakuan tidak ditemukan."
+                                    ariaLabel="Pilih perlakuan periode pertama"
+                                    portalContainer={containerRef}
+                                    onValueChange={(item) =>
+                                        patch(index, {
+                                            convention:
+                                                CONVENTIONS.find(
+                                                    (c) => c.label === item,
+                                                )?.value ?? '',
+                                        })
+                                    }
+                                />
+                                <FieldDescription>
+                                    Dihitung dari tanggal aset mulai digunakan.
+                                </FieldDescription>
+                            </Field>
+                            <Field>
+                                <Input
+                                    id={`round-off-${row.buku_id}`}
+                                    label="Kelipatan pembulatan penyusutan"
+                                    type="number"
+                                    min={0}
+                                    step={0.01}
+                                    disabled={!canEdit}
+                                    value={row.round_off_depreciation}
+                                    onChange={(event) =>
+                                        patch(index, {
+                                            round_off_depreciation:
+                                                event.target.value,
+                                        })
+                                    }
+                                />
+                                <FieldDescription>
+                                    Kosong mengikuti Book. Periode terakhir
+                                    tidak dibulatkan.
+                                </FieldDescription>
+                            </Field>
+                            <Field orientation="horizontal">
+                                <Switch
+                                    id={`depreciate-${row.buku_id}`}
+                                    disabled={!canEdit}
+                                    checked={row.depreciate}
+                                    onCheckedChange={(checked) =>
+                                        patch(index, { depreciate: checked })
+                                    }
+                                />
+                                <FieldLabel
+                                    htmlFor={`depreciate-${row.buku_id}`}
+                                >
+                                    Hitung penyusutan
+                                </FieldLabel>
+                            </Field>
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
 
             {canEdit && unused.length > 0 && (
                 <div className="sm:w-72">

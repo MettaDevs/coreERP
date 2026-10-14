@@ -1891,6 +1891,11 @@ ProfilPenyusutanFields:
     `useful_life_periods` untuk garis lurus dan saldo menurun, `rate_percent` untuk
     saldo menurun, `manual_schedule` untuk metode manual. `effective_from` dan
     `effective_to` membatasi versi profil; nilai null berarti tidak dibatasi pada sisi itu.
+    `useful_life_periods` tetap jumlah periode sesuai `frequency`; form menyajikannya
+    dalam tahun/bulan. Frekuensi profil yang dipakai matriks dengan masa manfaat khusus
+    tidak dapat diganti agar umur khusus tidak berubah arti. Profil yang sudah dipakai
+    buku aset juga menolak perubahan field perhitungan.
+    PATCH frekuensi wajib menyertakan jumlah periode baru bila profil memiliki umur.
   type: object
   properties:
     method:

@@ -16,6 +16,8 @@ import GroupBookMatrix from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
 import type { MasterConfig, MasterRecord, Permission } from '../masters';
 import { permission } from '../masters';
+import { changeProfileField } from '../serviceLife';
+import ServiceLifeFields from '../ServiceLifeFields';
 import AssetTypeConditions from './AssetTypeConditions';
 import JenisAsetCounters from './JenisAsetCounters';
 import JenisAsetCounterTypes from './JenisAsetCounterTypes';
@@ -573,22 +575,50 @@ export default function RecordDetailPane({
                 <div className="grid gap-5 pt-1 sm:grid-cols-2">
                     {section.fields
                         .filter((field) => isVisible(field, values))
-                        .map((field) => (
-                            <DynamicField
-                                key={field.name}
-                                config={field}
-                                value={values[field.name]}
-                                readOnly={readOnly}
-                                onRequestEdit={enterEdit}
-                                onChange={(next) => {
-                                    markDirty();
-                                    setValues((current) => ({
-                                        ...current,
-                                        [field.name]: next,
-                                    }));
-                                }}
-                            />
-                        ))}
+                        .map((field) =>
+                            config.resource === 'profil-penyusutan' &&
+                            field.name === 'useful_life_periods' ? (
+                                <ServiceLifeFields
+                                    key={field.name}
+                                    value={values[field.name]}
+                                    frequency={values.frequency}
+                                    required={field.required}
+                                    readOnly={readOnly}
+                                    onRequestEdit={() => enterEdit(field.name)}
+                                    onChange={(next) => {
+                                        markDirty();
+                                        setValues((current) => ({
+                                            ...current,
+                                            [field.name]: next,
+                                        }));
+                                    }}
+                                />
+                            ) : (
+                                <DynamicField
+                                    key={field.name}
+                                    config={field}
+                                    value={values[field.name]}
+                                    readOnly={readOnly}
+                                    onRequestEdit={enterEdit}
+                                    onChange={(next) => {
+                                        markDirty();
+                                        setValues((current) =>
+                                            config.resource ===
+                                            'profil-penyusutan'
+                                                ? changeProfileField(
+                                                      current,
+                                                      field.name,
+                                                      next,
+                                                  )
+                                                : {
+                                                      ...current,
+                                                      [field.name]: next,
+                                                  },
+                                        );
+                                    }}
+                                />
+                            ),
+                        )}
                 </div>
             </div>
         );
