@@ -13,6 +13,10 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -350,105 +354,131 @@ export default function DisposalDetailPage({
 
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field>
-                            {baru ? (
-                                <Select
-                                    label="Aset"
-                                    required
-                                    items={aset.map(labelAset)}
-                                    value={dipilih ? labelAset(dipilih) : null}
-                                    placeholder="Pilih aset yang sudah didekomisioning"
-                                    searchPlaceholder="Cari kode atau nama aset"
-                                    emptyMessage="Tidak ada aset yang sudah disetujui untuk dekomisioning."
-                                    ariaLabel="Aset"
-                                    portalContainer={panelRef}
-                                    onValueChange={(item) =>
-                                        setIsian({
-                                            ...isian,
-                                            aset_id:
-                                                aset.find(
-                                                    (calon) =>
-                                                        labelAset(calon) ===
-                                                        item,
-                                                )?.id ?? '',
-                                        })
-                                    }
-                                />
-                            ) : (
-                                <Input
-                                    label="Aset"
-                                    readOnly
-                                    value={
-                                        [dokumen?.aset_kode, dokumen?.aset_nama]
-                                            .filter(Boolean)
-                                            .join(' · ') || '—'
-                                    }
-                                />
-                            )}
-                            {pesan('aset_id') && (
-                                <FieldDescription>
-                                    {pesan('aset_id')}
-                                </FieldDescription>
-                            )}
-                        </Field>
-                        <Field>
-                            <Input
-                                label={`Tanggal ${jenis.noun}`}
-                                type="date"
-                                required
-                                readOnly={!bolehUbah}
-                                value={isian.tanggal}
-                                onChange={(event) =>
-                                    setIsian({
-                                        ...isian,
-                                        tanggal: event.target.value,
-                                    })
-                                }
-                            />
-                            <FieldDescription>
-                                {pesan('tanggal') ||
-                                    'Tanggal jurnal dan tanggal buku aset ditutup. Penyusutan sampai tanggal ini harus sudah difinalkan.'}
-                            </FieldDescription>
-                        </Field>
-                        {jenis.hasProceeds && (
-                            <Field>
-                                <Input
-                                    label="Nilai penjualan"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    readOnly={!bolehUbah}
-                                    value={isian.nilai}
-                                    onChange={(event) =>
-                                        setIsian({
-                                            ...isian,
-                                            nilai: event.target.value,
-                                        })
-                                    }
-                                />
-                                <FieldDescription>
-                                    {pesan('nilai') ||
-                                        'Selisihnya dengan nilai buku menjadi laba atau rugi pelepasan.'}
-                                </FieldDescription>
-                            </Field>
-                        )}
-                    </div>
-                    <Field>
-                        <Textarea
-                            label="Keterangan"
-                            rows={2}
-                            readOnly={!bolehUbah}
-                            value={isian.keterangan}
-                            onChange={(event) =>
-                                setIsian({
-                                    ...isian,
-                                    keterangan: event.target.value,
-                                })
-                            }
-                        />
-                    </Field>
-
+                    <CollapsibleSectionGroup defaultValue={['general']}>
+                        <CollapsibleSection
+                            value="general"
+                            title="Umum"
+                            summary={tanggalTampil(isian.tanggal)}
+                        >
+                            <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field>
+                                        {baru ? (
+                                            <Select
+                                                label="Aset"
+                                                required
+                                                items={aset.map(labelAset)}
+                                                value={
+                                                    dipilih
+                                                        ? labelAset(dipilih)
+                                                        : null
+                                                }
+                                                placeholder="Pilih aset yang sudah didekomisioning"
+                                                searchPlaceholder="Cari kode atau nama aset"
+                                                emptyMessage="Tidak ada aset yang sudah disetujui untuk dekomisioning."
+                                                ariaLabel="Aset"
+                                                portalContainer={panelRef}
+                                                onValueChange={(item) =>
+                                                    setIsian({
+                                                        ...isian,
+                                                        aset_id:
+                                                            aset.find(
+                                                                (calon) =>
+                                                                    labelAset(
+                                                                        calon,
+                                                                    ) === item,
+                                                            )?.id ?? '',
+                                                    })
+                                                }
+                                            />
+                                        ) : (
+                                            <Input
+                                                label="Aset"
+                                                readOnly
+                                                value={
+                                                    [
+                                                        dokumen?.aset_kode,
+                                                        dokumen?.aset_nama,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(' · ') || '—'
+                                                }
+                                            />
+                                        )}
+                                        {pesan('aset_id') && (
+                                            <FieldDescription>
+                                                {pesan('aset_id')}
+                                            </FieldDescription>
+                                        )}
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label={`Tanggal ${jenis.noun}`}
+                                            type="date"
+                                            required
+                                            readOnly={!bolehUbah}
+                                            value={isian.tanggal}
+                                            onChange={(event) =>
+                                                setIsian({
+                                                    ...isian,
+                                                    tanggal: event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <FieldDescription>
+                                            {pesan('tanggal') ||
+                                                'Tanggal jurnal dan tanggal buku aset ditutup. Penyusutan sampai tanggal ini harus sudah difinalkan.'}
+                                        </FieldDescription>
+                                    </Field>
+                                    {jenis.hasProceeds && (
+                                        <Field>
+                                            <Input
+                                                label="Nilai penjualan"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                readOnly={!bolehUbah}
+                                                value={isian.nilai}
+                                                onChange={(event) =>
+                                                    setIsian({
+                                                        ...isian,
+                                                        nilai: event.target
+                                                            .value,
+                                                    })
+                                                }
+                                            />
+                                            <FieldDescription>
+                                                {pesan('nilai') ||
+                                                    'Selisihnya dengan nilai buku menjadi laba atau rugi pelepasan.'}
+                                            </FieldDescription>
+                                        </Field>
+                                    )}
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="notes"
+                            title="Keterangan"
+                            summary={isian.keterangan || 'Belum ada keterangan'}
+                        >
+                            <div className="space-y-4">
+                                <Field>
+                                    <Textarea
+                                        label="Keterangan"
+                                        rows={2}
+                                        readOnly={!bolehUbah}
+                                        value={isian.keterangan}
+                                        onChange={(event) =>
+                                            setIsian({
+                                                ...isian,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                            </div>
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
                     {dokumen?.status === 'posted' && (
                         <p className="text-sm">
                             Aset ini sudah dilepas per{' '}
@@ -464,7 +494,6 @@ export default function DisposalDetailPage({
                             Draf ini dibatalkan. Asetnya tidak berubah.
                         </p>
                     )}
-
                     {pratinjau && (
                         <div className="space-y-3 rounded-md border px-4 py-3">
                             <p className="text-sm font-medium">
