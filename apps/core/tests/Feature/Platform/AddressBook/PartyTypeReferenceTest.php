@@ -18,11 +18,11 @@ class PartyTypeReferenceTest extends TestCase
             ->all();
 
         $this->assertSame([
-            'legal_entity' => 'Legal entity',
-            'operating_unit' => 'Operating unit',
-            'organization' => 'Organization',
-            'person' => 'Person',
-            'team' => 'Team',
+            'legal_entity' => 'Entitas legal',
+            'operating_unit' => 'Unit operasional',
+            'organization' => 'Organisasi',
+            'person' => 'Perorangan',
+            'team' => 'Tim',
         ], $types);
         $this->assertArrayNotHasKey('any', $types);
     }

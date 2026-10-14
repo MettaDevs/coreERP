@@ -30,6 +30,15 @@ final class CoreNumberSequences
      * @var array<string, array{name: string, default_prefix: string, allowed_scopes: list<string>, profile: string, scope: string, segments: list<array<string, mixed>>, maximum: int}>
      */
     private const DEFAULTS = [
+        'core.party' => [
+            'name' => 'Nomor pihak',
+            'default_prefix' => 'PIHK',
+            'allowed_scopes' => ['tenant'],
+            'profile' => 'non-continuous-default',
+            'scope' => 'tenant',
+            'segments' => [['type' => 'constant', 'value' => 'PIHK'], ['type' => 'number', 'length' => 5]],
+            'maximum' => 19999,
+        ],
         // Boleh diketik manual supaya nomor pemasok lama dapat dipindahkan apa adanya.
         'core.vendor' => [
             'name' => 'Nomor vendor',

@@ -47,7 +47,88 @@ Aturan yang ditegakkan kode, dan alasannya:
 
 **Identitas cetak** ([Dokumen cetak, layout, dan ekspor](23-document-rendering.md)) mengisi `kop.alamat*` dari alamat utama dan `kop.telepon`, `kop.whatsapp`, `kop.fax`, `kop.email`, `kop.laman` dari kontak utama tiap jenis — dari tempat alamat utama lebih dulu, lalu dari tempat party yang lain. Ringkasan itu dibaca lewat `OrganizationAddressBook::summary()` tanpa membuat party, supaya sekadar mencetak tidak menulis apa pun. Halaman identitas cetak hanya menampilkan alamat dan kontak yang akan tercetak; mengubahnya dilakukan di dua bagian di atas.
 
-## Vendor
+## Direktori pihak dan kartu detail
+
+Halaman `settings/global-address-book` membaca pihak nyata dari database. Daftar memakai
+`DataTable` SDK, pencarian nama/nomor, saringan jenis/peran/status/buku alamat, dan pagination.
+Membuka pihak menampilkan identitas, alamat, informasi kontak, hubungan, peran bisnis,
+dan akun vendor. Simpan dan Arsipkan tidak lagi mengubah state lokal saja.
+
+Modelnya tetap **F&O Global Address Book**, sesuai keputusan sebelumnya. BC memiliki
+Contacts Company/Person, Contacts list, Vendor Card, dan hubungan kontak–vendor, tetapi
+bukan pengganti model party bersama lintas perusahaan yang dipakai CoreERP. Referensi:
+[Party and global address book](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/dual-write/party-gab),
+[Contacts BC](https://learn.microsoft.com/en-us/dynamics365/business-central/marketing-contacts),
+dan [sinkronisasi kontak BC](https://learn.microsoft.com/en-us/dynamics365/business-central/marketing-setup-contacts#synchronize-contacts-with-customers-vendors-and-bank-accounts).
+Diagram dual-write menjelaskan hubungan antarsistem; tabel Dataverse tidak disalin menjadi skema CoreERP.
+
+### Identitas dan nomor
+
+`parties.id` tetap id teknis untuk seluruh relasi. `parties.number` adalah nomor yang
+dibaca pengguna, diterbitkan melalui reference `core.party`, scope tenant, non-continuous,
+tanpa nomor manual, tanpa reset. Prefix awal adalah `PIHK`, dengan contoh
+`PIHK00001`–`PIHK19999`; setelan tetap ada di Atur nomor. Nomor vendor memakai reference
+`core.vendor` sendiri dan tetap berlaku per entitas legal. Membuat pihak lewat Vendor
+atau alamat Organisasi memakai `SaveParty`, bukan nomor acak dari browser.
+
+Pihak yang sudah ada sebelum revamp mempunyai nomor nullable. Aksi **Beri nomor pihak
+lama** menerbitkannya sekali melalui layanan nomor yang sama; tidak mengganti id relasi.
+Replay pembuatan memakai `Idempotency-Key` yang tetap, sehingga nomor/pihak tidak dibuat ulang.
+
+Untuk Indonesia, nama lengkap wajib, tetapi nama belakang dan pemecahan nama tidak wajib.
+Profil orang meliputi gelar, rincian nama, alias, profesi, tanggal lahir/pernikahan,
+jenis kelamin, status pernikahan, jumlah anak, minat, bahasa, dan catatan; rincian pribadi
+opsional. Profil organisasi meliputi nomor registrasi/NIB, jumlah karyawan, klasifikasi ABC,
+dan DUNS opsional. **Nomor registrasi/NIB tidak digabung dengan NPWP.** NPWP masih milik akun
+vendor pada desain yang tersedia hari ini. Pilihan klasifikasi/bahasa dan label jenis pihak
+dibaca dari database; nilai awal baru dikirim melalui migration.
+
+Prioritas pembayaran disimpan pada **akun vendor per perusahaan**, bukan identitas global.
+Nilai kosong berarti tidak diberi prioritas; bilangan positif yang lebih kecil menandakan
+prioritas lebih tinggi, mengadaptasi [prioritas vendor BC](https://learn.microsoft.com/en-us/dynamics365/business-central/purchasing-how-prioritize-vendors).
+Revamp ini menyimpan nilainya sebagai informasi; tidak membuat saran pembayaran atau
+menjalankan pembayaran otomatis.
+
+### Alamat, hubungan, dan peran
+
+- Party dibagi seluruh tenant; akun vendor dan registry peran menyimpan entitas legal.
+  Buku alamat adalah kelompok pencarian milik tenant, bukan pemberi hak akses.
+- `address_books` dan `party_address_books` mengelompokkan pihak. Mengarsipkan buku alamat
+  melepas keanggotaan aktifnya, tetapi tidak mengarsipkan pihak.
+- Alamat vendor memakai `party_locations` dan `locations` yang sama dengan buku alamat.
+  Layanan `OrganizationAddressBook` juga menerima `Party`, sehingga aturan utama, lokasi
+  bersama, dan arsip tautan tidak diduplikasi. Kecamatan, kelurahan/desa, RT, RW, kota/kabupaten,
+  provinsi, kode pos, jalan, gedung, dan PO Box disimpan pada alamat pos; lokasi di luar
+  Indonesia tetap dapat memakai negara yang sesuai.
+- `party_relationships` mencatat hubungan berarah dengan masa berlaku, memakai katalog
+  `party_relationship_types`. Kedua pihak wajib satu tenant; hubungan ke diri sendiri dan
+  periode tumpang tindih untuk hubungan yang sama ditolak. Hubungan cabang/anak perusahaan
+  tidak mengganti hierarki organisasi Core.
+- Peran bisnis dibaca dari `party_role_registrations`, tidak diketik sebagai hubungan.
+  Akun vendor dibuat lewat halaman Vendor memakai `party_id` existing. Nama bukan kunci
+  identitas dan tidak dipakai untuk menggabungkan pihak secara otomatis.
+- Perubahan nama pihak terlihat pada semua akun vendor pihak itu. Nama organisasi internal
+  tetap diubah melalui halaman Organisasi; direktori menolak menggantinya agar tidak bersaing
+  dengan penulis identitas organisasi.
+- Pihak yang masih dipakai organisasi atau peran bisnis tidak dapat diarsipkan dari direktori.
+  Status nonaktif menghentikan pilihan baru; riwayat dan akun yang sudah ada tetap tersimpan.
+  Pihak terarsip dapat ditemukan lewat saringan **Tampilkan → Pihak terarsip** dan dipulihkan
+  melalui menu baris. Pemulihan mempertahankan id, nomor, profil, alamat, dan kontaknya.
+
+Pintu UI berada di `api/v1/parties`, `.../{party}/locations`, `.../contacts`,
+`.../relationships`, dan `api/v1/address-books`. Seluruhnya memakai session tenant dan
+permission `core.organization.read`/`core.organization.update` yang sudah menjaga layar ini.
+Nomor, tenant, dan peran tidak diterima sebagai field bebas dari browser. Update/archive
+memakai versi record. Endpoint POST untuk **klien integrasi luar tetap ditunda**; tidak
+dibuka melalui token integrasi oleh revamp ini.
+
+Kode utama: `GlobalAddressBookController`, `SaveParty`, dan
+`apps/core/resources/js/pages/platform/address-book/index.tsx` beserta komponen dan `types.ts`.
+Migration `2026_10_14_190000_complete_party_directory` menambah kolom profil/nomor, kelompok,
+hubungan, dan rincian alamat Indonesia. Pengguna meminta rebuild runtime serta pengujian
+akhir dilakukan sendiri; perubahan ini belum diverifikasi di container sesudah revamp.
+
+## Akun vendor per entitas legal
 
 Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed posting finance membutuhkan vendor sebelum ada modul hutang ([PRD](../todo/feed-posting-finance/README.md), K-06). Layarnya di **Buku alamat › Vendor** (`settings/vendors`).
 
@@ -59,7 +140,11 @@ Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed p
 
 ## Yang belum ada
 
-Party untuk pelanggan dan pegawai belum punya API. Saat app pertama membutuhkannya, endpoint-nya masuk di `api/v1/parties` dengan aturan "satu utama" yang sama, dan app menulis registry perannya lewat API internal, bukan menyalin alamat ke databasenya sendiri.
+Direktori sudah mempunyai API session untuk party, alamat, kontak, dan hubungan. Akun
+pelanggan/pegawai tetap dimiliki fitur pemiliknya; revamp ini tidak membuat akun bisnis
+tersebut hanya karena pihak atau hubungan kontak sudah ada. API tulis party untuk sistem
+luar, sinkronisasi otomatis, merge party, riwayat alamat pos, dan aturan pajak lengkap belum
+dibangun.
 
 ## Di mana kodenya
 
@@ -69,12 +154,12 @@ Party untuk pelanggan dan pegawai belum punya API. Saat app pertama membutuhkann
 | `apps/core/app/Platform/AddressBook/Support/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
 | `apps/core/app/Platform/AddressBook/Support/PostalAddressFormatter.php` | Bentuk tercetak alamat |
 | `apps/core/app/Platform/AddressBook/Http/Controllers/` | Endpoint alamat dan kontak organisasi |
-| `apps/core/resources/js/components/organization/address-book-section.tsx` | Dua bagian pada kartu organisasi |
-| `apps/core/tests/Feature/ControlPlane/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
-| `apps/core/tests/Feature/ControlPlane/SharedLocationTest.php` | Tempat bersama, arsip tautan, kegunaan ganda, kontak per tempat, isolasi tenant |
-| `apps/core/tests/Feature/ControlPlane/SharedLocationConcurrencyTest.php` | Index yang menolak dua utama dan tautan ganda dari dua koneksi |
+| `apps/core/resources/js/pages/platform/organization/components/address-book-section.tsx` | Dua bagian pada kartu organisasi |
+| `apps/core/tests/Feature/Platform/AddressBook/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
+| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationTest.php` | Tempat bersama, arsip tautan, kegunaan ganda, kontak per tempat, isolasi tenant |
+| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationConcurrencyTest.php` | Index yang menolak dua utama dan tautan ganda dari dua koneksi |
 | `apps/core/app/Foundation/Vendor/Actions/SaveVendor.php`, `apps/core/app/Foundation/Vendor/Models/Vendor.php` | Vendor: party, akun vendor per legal entity, dan registry perannya |
-| `apps/core/tests/Feature/ControlPlane/VendorTest.php` | Nomor vendor, satu vendor per party per legal entity, isolasi tenant, sinkron `updated_since` |
+| `apps/core/tests/Feature/Foundation/Vendor/VendorTest.php` | Nomor vendor, satu vendor per party per legal entity, isolasi tenant, sinkron `updated_since` |
 
 ## Halaman terkait
 

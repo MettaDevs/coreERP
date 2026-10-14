@@ -1,21 +1,7 @@
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
 import {
     Field,
     FieldDescription,
@@ -24,6 +10,14 @@ import {
     FieldLabel,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from '@apperp/ui/dialog';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { Select } from '@apperp/ui/select';
 import {
@@ -35,15 +29,7 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Switch } from '@apperp/ui/switch';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -55,6 +41,10 @@ import {
     toastSaveError,
 } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
+import {
+    OrganizationAddressesSection,
+    OrganizationContactsSection,
+} from '../../platform/organization/components/address-book-section';
 import SupplierImport from './supplier-import';
 
 type PartyType = 'organization' | 'person';
@@ -68,6 +58,7 @@ type Vendor = {
     party_type: PartyType;
     legal_entity_id: string;
     tax_number: string | null;
+    payment_priority: number | null;
     status: Status;
     updated_at: string | null;
 };
@@ -89,6 +80,9 @@ type Props = {
     legalEntities: LegalEntity[];
     vendors: Paginated<Vendor>;
     manualNumbers: boolean;
+    initialParty: PartyOption | null;
+    canReadAddressBook: boolean;
+    canManageAddressBook: boolean;
 };
 
 const PARTY_TYPE_LABEL: Record<PartyType, string> = {
@@ -180,6 +174,7 @@ type Form = {
     number: string;
     name: string;
     tax_number: string;
+    payment_priority: string;
     active: boolean;
 };
 
@@ -195,6 +190,7 @@ function toForm(vendor: Vendor | null, legalEntities: LegalEntity[]): Form {
         number: '',
         name: vendor?.name ?? '',
         tax_number: vendor?.tax_number ?? '',
+        payment_priority: vendor?.payment_priority?.toString() ?? '',
         // Vendor baru langsung aktif supaya dapat dipilih di dokumen tanpa langkah kedua.
         active: vendor ? vendor.status === 'active' : true,
     };
@@ -211,19 +207,39 @@ function VendorSheet({
     legalEntities,
     manualNumbers,
     onClose,
+    initialParty,
+    canReadAddressBook,
+    canManageAddressBook,
+    onCreated,
 }: {
     vendor: Vendor | null;
     legalEntities: LegalEntity[];
     manualNumbers: boolean;
     onClose: () => void;
+    initialParty: PartyOption | null;
+    canReadAddressBook: boolean;
+    canManageAddressBook: boolean;
+    onCreated: (vendor: Vendor) => void;
 }) {
     const contentRef = useRef<HTMLDivElement>(null);
     // Satu kunci per form yang dibuka: klik ganda atau kiriman ulang tidak membuat vendor kedua.
     const [idempotencyKey] = useState(newKey);
-    const [form, setForm] = useState<Form>(() => toForm(vendor, legalEntities));
+    const [form, setForm] = useState<Form>(() => ({
+        ...toForm(vendor, legalEntities),
+        ...(!vendor && initialParty
+            ? {
+                  party_source: 'existing' as const,
+                  party_id: initialParty.id,
+                  party_name: initialParty.name,
+              }
+            : {}),
+    }));
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);
-    const [parties, setParties] = useState<PartyOption[]>([]);
+    const [saveError, setSaveError] = useState('');
+    const [parties, setParties] = useState<PartyOption[]>(
+        initialParty ? [initialParty] : [],
+    );
     const [partyQuery, setPartyQuery] = useState('');
     const [partyError, setPartyError] = useState('');
     const set = <K extends keyof Form>(key: K, value: Form[K]) =>
@@ -234,18 +250,28 @@ function VendorSheet({
             ?.name ?? '—';
 
     useEffect(() => {
-        if (vendor || form.party_source !== 'existing') {
+        if (
+            vendor ||
+            (form.party_source === 'new' && form.party_name.trim().length < 2)
+        ) {
             return;
         }
 
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             apiJson<{ data: PartyOption[] }>(
-                `/api/v1/vendors/party-options?q=${encodeURIComponent(partyQuery)}`,
+                `/api/v1/vendors/party-options?q=${encodeURIComponent(form.party_source === 'new' ? form.party_name : partyQuery)}`,
                 { signal: controller.signal },
             )
                 .then((result) => {
-                    setParties(result.data);
+                    setParties(
+                        initialParty &&
+                            !result.data.some(
+                                (party) => party.id === initialParty.id,
+                            )
+                            ? [initialParty, ...result.data]
+                            : result.data,
+                    );
                     setPartyError('');
                 })
                 .catch((caught) => {
@@ -264,11 +290,12 @@ function VendorSheet({
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [vendor, form.party_source, partyQuery]);
+    }, [vendor, form.party_source, form.party_name, partyQuery, initialParty]);
 
     const save = async () => {
         setSaving(true);
         setErrors({});
+        setSaveError('');
 
         try {
             const result = await apiJson<{ data: Vendor }>(
@@ -279,6 +306,9 @@ function VendorSheet({
                           body: JSON.stringify({
                               name: form.name,
                               tax_number: form.tax_number || null,
+                              payment_priority: form.payment_priority
+                                  ? Number(form.payment_priority)
+                                  : null,
                               status: form.active ? 'active' : 'inactive',
                               version: vendor.version,
                           }),
@@ -302,6 +332,9 @@ function VendorSheet({
                                       : null,
                               number: form.number.trim() || null,
                               tax_number: form.tax_number || null,
+                              payment_priority: form.payment_priority
+                                  ? Number(form.payment_priority)
+                                  : null,
                               status: form.active ? 'active' : 'inactive',
                           }),
                       },
@@ -312,8 +345,13 @@ function VendorSheet({
                     : `Vendor ${result.data.number} dibuat untuk ${legalEntityName}.`,
             );
             router.reload({ only: ['vendors'] });
-            onClose();
+            if (vendor) {
+                onClose();
+            } else {
+                onCreated(result.data);
+            }
         } catch (caught) {
+            setSaveError(errorText(caught, 'Vendor belum dapat disimpan.'));
             if (caught instanceof CoreApiError) {
                 setErrors(caught.errors);
             }
@@ -343,6 +381,11 @@ function VendorSheet({
                             : 'Vendor dibuat per entitas legal. Pihak yang sama dapat menjadi vendor di entitas legal lain dengan nomor tersendiri.'}
                     </SheetDescription>
                 </SheetHeader>
+                {saveError && (
+                    <p role="alert" className="px-6 text-sm text-destructive">
+                        {saveError}
+                    </p>
+                )}
                 <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                     <FieldGroup>
                         {vendor ? (
@@ -435,7 +478,7 @@ function VendorSheet({
                                                 label="Nama vendor"
                                                 required
                                                 maxLength={200}
-                                                placeholder="Contoh: PT Sarana Medika"
+                                                placeholder="Nama pemasok"
                                                 value={form.party_name}
                                                 onChange={(event) =>
                                                     set(
@@ -504,6 +547,35 @@ function VendorSheet({
                                         </FieldError>
                                     </Field>
                                 )}
+                                {form.party_source === 'new' &&
+                                    parties.length > 0 &&
+                                    form.party_name.trim().length >= 2 && (
+                                        <Field>
+                                            <FieldDescription>
+                                                Ada pihak dengan nama yang
+                                                mirip. Periksa sebelum membuat
+                                                identitas baru.
+                                            </FieldDescription>
+                                            <Select
+                                                label="Pakai pihak yang sudah ada"
+                                                portalContainer={contentRef}
+                                                items={parties.map((party) => ({
+                                                    value: party.id,
+                                                    label: party.name,
+                                                }))}
+                                                value={null}
+                                                onValueChange={(value) => {
+                                                    if (value)
+                                                        setForm((current) => ({
+                                                            ...current,
+                                                            party_source:
+                                                                'existing',
+                                                            party_id: value,
+                                                        }));
+                                                }}
+                                            />
+                                        </Field>
+                                    )}
                                 {manualNumbers && (
                                     <Field
                                         data-invalid={Boolean(error('number'))}
@@ -559,12 +631,50 @@ function VendorSheet({
                                 Aktif
                             </FieldLabel>
                         </Field>
+                        <Field>
+                            <Input
+                                label="Prioritas pembayaran"
+                                type="number"
+                                min={1}
+                                value={form.payment_priority}
+                                onChange={(event) =>
+                                    set('payment_priority', event.target.value)
+                                }
+                            />
+                            <FieldDescription>
+                                Kosongkan bila tidak diberi prioritas. Angka
+                                kecil menunjukkan prioritas lebih tinggi;
+                                pengisian ini tidak memproses pembayaran.
+                            </FieldDescription>
+                            <FieldError>{error('payment_priority')}</FieldError>
+                        </Field>
                         <FieldDescription>
                             Vendor nonaktif tidak muncul di pilihan dokumen
                             baru. Dokumen dan posting lama tetap menunjuknya.
                         </FieldDescription>
                     </FieldGroup>
                 </div>
+                {vendor && canReadAddressBook && (
+                    <div className="max-h-80 overflow-y-auto border-t px-6 py-4">
+                        <Link
+                            href={`/settings/global-address-book?party=${vendor.party_id}`}
+                            className="text-sm text-primary underline"
+                        >
+                            Lihat identitas lengkap di buku alamat
+                        </Link>
+                        <OrganizationAddressesSection
+                            organizationId={vendor.party_id}
+                            resource="parties"
+                            countryCode="ID"
+                            canManage={canManageAddressBook}
+                        />
+                        <OrganizationContactsSection
+                            organizationId={vendor.party_id}
+                            resource="parties"
+                            canManage={canManageAddressBook}
+                        />
+                    </div>
+                )}
                 <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
                     <Button variant="outline" type="button" onClick={onClose}>
                         Batal
@@ -578,198 +688,320 @@ function VendorSheet({
     );
 }
 
+function VendorReadSheet({
+    vendor,
+    company,
+    canReadAddressBook,
+    onClose,
+}: {
+    vendor: Vendor;
+    company: string;
+    canReadAddressBook: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <Sheet
+            open
+            onOpenChange={(open) => {
+                if (!open) onClose();
+            }}
+        >
+            <SheetContent className="sm:max-w-2xl">
+                <SheetHeader>
+                    <SheetTitle>
+                        {vendor.number} · {vendor.name}
+                    </SheetTitle>
+                    <SheetDescription>
+                        Akun vendor di {company}. Nama, alamat, dan kontak
+                        memakai identitas pihak yang sama.
+                    </SheetDescription>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4">
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                Perusahaan
+                            </dt>
+                            <dd>{company}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                NPWP
+                            </dt>
+                            <dd>{vendor.tax_number ?? '—'}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                Jenis pihak
+                            </dt>
+                            <dd>{PARTY_TYPE_LABEL[vendor.party_type]}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                Status
+                            </dt>
+                            <dd>
+                                {vendor.status === 'active'
+                                    ? 'Aktif'
+                                    : 'Nonaktif'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-sm text-muted-foreground">
+                                Prioritas pembayaran
+                            </dt>
+                            <dd>
+                                {vendor.payment_priority ??
+                                    'Tidak diberi prioritas'}
+                            </dd>
+                        </div>
+                    </dl>
+                    {canReadAddressBook && (
+                        <>
+                            <Link
+                                href={`/settings/global-address-book?party=${vendor.party_id}`}
+                                className="text-sm text-primary underline"
+                            >
+                                Lihat identitas lengkap di buku alamat
+                            </Link>
+                            <OrganizationAddressesSection
+                                organizationId={vendor.party_id}
+                                resource="parties"
+                                countryCode="ID"
+                                canManage={false}
+                            />
+                            <OrganizationContactsSection
+                                organizationId={vendor.party_id}
+                                resource="parties"
+                                canManage={false}
+                            />
+                        </>
+                    )}
+                </div>
+                <SheetFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        Tutup
+                    </Button>
+                </SheetFooter>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
 export default function Vendors({
     canManage,
     filters,
     legalEntities,
     vendors,
     manualNumbers,
+    initialParty,
+    canReadAddressBook,
+    canManageAddressBook,
 }: Props) {
-    // `undefined` = form tertutup, `null` = vendor baru.
     const [editing, setEditing] = useState<Vendor | null | undefined>(
-        undefined,
+        initialParty && canManage ? null : undefined,
     );
+    const [viewing, setViewing] = useState<Vendor | null>(null);
+    const [importing, setImporting] = useState(false);
     const legalEntityName = (id: string) =>
         legalEntities.find((entity) => entity.id === id)?.name ?? id;
-    const filtered = Boolean(
-        filters.q || filters.legal_entity || filters.status,
-    );
-
     return (
         <>
             <Head title="Vendor" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <Heading
-                    title="Vendor"
-                    description="Pemasok per entitas legal. Nomor vendor ikut di setiap posting ke aplikasi finance."
-                />
-                {canManage && <SupplierImport legalEntities={legalEntities} />}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Daftar vendor</CardTitle>
-                        <CardDescription>
-                            Nama, alamat, dan kontak vendor dicatat di buku
-                            alamat. Yang dicatat di sini nomor, NPWP, dan status
-                            vendor di tiap entitas legal.
-                        </CardDescription>
+            <ListPageLayout
+                header={
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                        <Heading
+                            title="Vendor"
+                            description="Akun pemasok per perusahaan. Identitas, alamat, dan kontak memakai buku alamat bersama."
+                        />
                         {canManage && (
-                            <CardAction>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setImporting(true)}
+                                >
+                                    Impor supplier CSV
+                                </Button>
                                 <ActionButton
                                     action="create"
-                                    size="sm"
                                     disabled={legalEntities.length === 0}
                                     onClick={() => setEditing(null)}
                                 >
                                     Tambah vendor
                                 </ActionButton>
-                            </CardAction>
+                            </div>
                         )}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                    </div>
+                }
+                filters={
+                    <div className="px-4 pb-4">
                         <Filters
                             key={JSON.stringify(filters)}
                             filters={filters}
                             legalEntities={legalEntities}
                         />
-                        {vendors.data.length === 0 ? (
-                            <Empty className="py-12">
-                                <EmptyHeader>
-                                    <EmptyTitle>Belum ada vendor</EmptyTitle>
-                                    <EmptyDescription>
-                                        {filtered
-                                            ? 'Tidak ada vendor yang cocok dengan saringan ini.'
-                                            : legalEntities.length === 0
-                                              ? 'Buat entitas legal di Organisasi lebih dulu; vendor selalu milik satu entitas legal.'
-                                              : 'Tambahkan pemasok yang asetnya akan diterima dan diposting ke aplikasi finance.'}
-                                    </EmptyDescription>
-                                </EmptyHeader>
-                            </Empty>
-                        ) : (
-                            <div className="overflow-x-auto rounded-lg border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Nomor</TableHead>
-                                            <TableHead>Nama</TableHead>
-                                            <TableHead>Entitas legal</TableHead>
-                                            <TableHead>NPWP</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            {canManage && (
-                                                <TableHead className="w-28 text-right">
-                                                    Aksi
-                                                </TableHead>
-                                            )}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {vendors.data.map((vendor) => (
-                                            <TableRow key={vendor.id}>
-                                                <TableCell className="font-mono">
-                                                    {vendor.number}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {vendor.name}
-                                                    <span className="block text-xs text-muted-foreground">
-                                                        {
-                                                            PARTY_TYPE_LABEL[
-                                                                vendor
-                                                                    .party_type
-                                                            ]
-                                                        }
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {legalEntityName(
-                                                        vendor.legal_entity_id,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="font-mono text-muted-foreground">
-                                                    {vendor.tax_number ?? '—'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            vendor.status ===
-                                                            'active'
-                                                                ? 'secondary'
-                                                                : 'outline'
-                                                        }
-                                                    >
-                                                        {vendor.status ===
-                                                        'active'
-                                                            ? 'Aktif'
-                                                            : 'Nonaktif'}
-                                                    </Badge>
-                                                </TableCell>
-                                                {canManage && (
-                                                    <TableCell className="text-right">
-                                                        <ActionButton
-                                                            action="edit"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                setEditing(
-                                                                    vendor,
-                                                                )
-                                                            }
-                                                        >
-                                                            Ubah
-                                                        </ActionButton>
-                                                    </TableCell>
-                                                )}
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </CardContent>
-                    {vendors.last_page > 1 && (
-                        <CardFooter className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                            <span>
-                                {vendors.from}–{vendors.to} dari {vendors.total}{' '}
-                                vendor
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.prev_page_url}
-                                    onClick={() =>
-                                        vendors.prev_page_url &&
-                                        router.visit(vendors.prev_page_url, {
-                                            preserveScroll: true,
-                                        })
+                    </div>
+                }
+                footer={
+                    <div className="flex items-center justify-between gap-3 border-t p-3 text-sm">
+                        <span>
+                            {vendors.from ?? 0}–{vendors.to ?? 0} dari{' '}
+                            {vendors.total} vendor
+                        </span>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!vendors.prev_page_url}
+                                onClick={() =>
+                                    vendors.prev_page_url &&
+                                    router.visit(vendors.prev_page_url)
+                                }
+                            >
+                                Sebelumnya
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!vendors.next_page_url}
+                                onClick={() =>
+                                    vendors.next_page_url &&
+                                    router.visit(vendors.next_page_url)
+                                }
+                            >
+                                Berikutnya
+                            </Button>
+                        </div>
+                    </div>
+                }
+            >
+                <DataTable
+                    data={vendors.data}
+                    getRowKey={(vendor) => vendor.id}
+                    getRowLabel={(vendor) => vendor.name}
+                    showRowNumbers
+                    actionsPlacement="inline"
+                    actions={[
+                        { id: 'view', label: 'Lihat vendor' },
+                        ...(canManage
+                            ? [{ id: 'edit', label: 'Ubah vendor' }]
+                            : []),
+                    ]}
+                    onRowAction={(action, vendor) =>
+                        action === 'edit'
+                            ? setEditing(vendor)
+                            : setViewing(vendor)
+                    }
+                    onRowClick={setViewing}
+                    emptyMessage={
+                        legalEntities.length === 0
+                            ? 'Buat perusahaan di Organisasi lebih dulu sebelum menambahkan vendor.'
+                            : 'Belum ada vendor yang sesuai. Tambahkan vendor atau ubah saringan.'
+                    }
+                    columns={[
+                        {
+                            id: 'number',
+                            header: 'Nomor vendor',
+                            width: 180,
+                            cell: (vendor) => (
+                                <DataTableText>{vendor.number}</DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'name',
+                            header: 'Nama',
+                            width: 280,
+                            cell: (vendor) => (
+                                <DataTableText>{vendor.name}</DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'company',
+                            header: 'Perusahaan',
+                            width: 220,
+                            cell: (vendor) => (
+                                <DataTableText>
+                                    {legalEntityName(vendor.legal_entity_id)}
+                                </DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'tax',
+                            header: 'NPWP',
+                            width: 200,
+                            cell: (vendor) => (
+                                <DataTableText>
+                                    {vendor.tax_number ?? '—'}
+                                </DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'type',
+                            header: 'Jenis pihak',
+                            width: 140,
+                            cell: (vendor) => (
+                                <DataTableText>
+                                    {PARTY_TYPE_LABEL[vendor.party_type]}
+                                </DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'status',
+                            header: 'Status',
+                            width: 120,
+                            cell: (vendor) => (
+                                <Badge
+                                    variant={
+                                        vendor.status === 'active'
+                                            ? 'secondary'
+                                            : 'outline'
                                     }
                                 >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.next_page_url}
-                                    onClick={() =>
-                                        vendors.next_page_url &&
-                                        router.visit(vendors.next_page_url, {
-                                            preserveScroll: true,
-                                        })
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </CardFooter>
-                    )}
-                </Card>
-            </main>
+                                    {vendor.status === 'active'
+                                        ? 'Aktif'
+                                        : 'Nonaktif'}
+                                </Badge>
+                            ),
+                        },
+                    ]}
+                />
+            </ListPageLayout>
             {editing !== undefined && (
                 <VendorSheet
-                    key={editing?.id ?? 'baru'}
+                    key={editing?.id ?? initialParty?.id ?? 'new'}
                     vendor={editing}
                     legalEntities={legalEntities}
                     manualNumbers={manualNumbers}
                     onClose={() => setEditing(undefined)}
+                    initialParty={initialParty}
+                    canReadAddressBook={canReadAddressBook}
+                    canManageAddressBook={canManageAddressBook}
+                    onCreated={setEditing}
                 />
             )}
+            {viewing && (
+                <VendorReadSheet
+                    vendor={viewing}
+                    company={legalEntityName(viewing.legal_entity_id)}
+                    canReadAddressBook={canReadAddressBook}
+                    onClose={() => setViewing(null)}
+                />
+            )}
+            <Dialog open={importing} onOpenChange={setImporting}>
+                <DialogContent size="wide">
+                    <DialogHeader>
+                        <DialogTitle>Impor supplier</DialogTitle>
+                        <DialogDescription>
+                            Gunakan CSV untuk pengisian awal. Periksa pratinjau
+                            sebelum menerapkan.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                        <SupplierImport legalEntities={legalEntities} />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

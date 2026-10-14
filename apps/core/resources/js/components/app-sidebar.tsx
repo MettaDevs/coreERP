@@ -92,6 +92,19 @@ export function AppSidebar() {
             ),
         ) ?? primaryItems[0];
     const isChildActive = (item: NavigationItem) => {
+        if (
+            path === '/settings/global-address-book' &&
+            item.href.startsWith('/settings/global-address-book?')
+        ) {
+            const currentSection =
+                new URLSearchParams(url.split('?')[1] ?? '').get('section') ??
+                'general';
+            return (
+                new URLSearchParams(item.href.split('?')[1] ?? '').get(
+                    'section',
+                ) === currentSection
+            );
+        }
         if (realtimeSection && path === '/settings/global-address-book') {
             return (
                 item.href ===
@@ -259,7 +272,18 @@ export function AppSidebar() {
                             {displayedItem.children.map((item) => (
                                 <Link
                                     key={item.label}
-                                    href={item.href}
+                                    href={
+                                        path ===
+                                            '/settings/global-address-book' &&
+                                        item.href.startsWith(
+                                            '/settings/global-address-book?',
+                                        ) &&
+                                        new URLSearchParams(
+                                            url.split('?')[1] ?? '',
+                                        ).has('party')
+                                            ? `${item.href}&party=${new URLSearchParams(url.split('?')[1] ?? '').get('party')}`
+                                            : item.href
+                                    }
                                     onClick={() => {
                                         setPreviewLabel(null);
 

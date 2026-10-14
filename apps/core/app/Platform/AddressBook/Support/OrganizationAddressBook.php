@@ -2,6 +2,8 @@
 
 namespace App\Platform\AddressBook\Support;
 
+use App\Foundation\NumberSequence\Support\CoreNumberSequences;
+use App\Platform\AddressBook\Actions\SaveParty;
 use App\Platform\AddressBook\Models\ElectronicAddress;
 use App\Platform\AddressBook\Models\Location;
 use App\Platform\AddressBook\Models\LocationPurpose;
@@ -40,26 +42,36 @@ final class OrganizationAddressBook
     /** @var list<string>|null */
     private ?array $purposeOrder = null;
 
-    public function party(Organization $organization): Party
+    public function party(Organization|Party $organization): Party
     {
-        $link = OrganizationParty::query()->where('organization_id', $organization->id)->first();
+        if ($organization instanceof Party) {
+            return $organization;
+        }
+
+        $link = OrganizationParty::query()->where('tenant_id', $organization->tenant_id)->where('organization_id', $organization->id)->first();
         if ($link !== null) {
             $party = $link->party;
-            if ($party->name !== $organization->name) {
-                $party->update(['name' => $organization->name, 'search_name' => Party::searchName($organization->name)]);
+            if ($party->name !== $organization->name || $party->type !== $organization->classification) {
+                $party->update(['name' => $organization->name, 'search_name' => Party::searchName($organization->name), 'type' => $organization->classification]);
             }
 
             return $party;
         }
 
+        app(CoreNumberSequences::class)->ensure($organization->tenant_id, 'core.party');
+
         return DB::transaction(function () use ($organization): Party {
-            $party = Party::create([
-                'tenant_id' => $organization->tenant_id,
-                'type' => 'organization',
+            Organization::query()->where('tenant_id', $organization->tenant_id)->whereKey($organization->id)->lockForUpdate()->firstOrFail();
+            $existing = OrganizationParty::query()->where('tenant_id', $organization->tenant_id)->where('organization_id', $organization->id)->first();
+            if ($existing !== null) {
+                return $existing->party;
+            }
+            $party = app(SaveParty::class)->create($organization->tenant_id, [
+                'type' => $organization->classification,
                 'name' => $organization->name,
                 'search_name' => Party::searchName($organization->name),
                 'status' => 'active',
-            ]);
+            ], 'organization:'.$organization->id);
             OrganizationParty::create([
                 'organization_id' => $organization->id,
                 'tenant_id' => $organization->tenant_id,
@@ -71,7 +83,7 @@ final class OrganizationAddressBook
     }
 
     /** @return list<array<string, mixed>> */
-    public function locations(Organization $organization): array
+    public function locations(Organization|Party $organization): array
     {
         return array_values($this->addressLinks($this->party($organization)->id)
             ->with(['location.postalAddress', 'purposes'])
@@ -115,7 +127,7 @@ final class OrganizationAddressBook
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function saveLocation(Organization $organization, array $data, ?string $linkId = null, int $expectedVersion = 0): array
+    public function saveLocation(Organization|Party $organization, array $data, ?string $linkId = null, int $expectedVersion = 0): array
     {
         $party = $this->party($organization);
 
@@ -136,6 +148,7 @@ final class OrganizationAddressBook
                 $link = new PartyLocation(['tenant_id' => $party->tenant_id, 'party_id' => $party->id, 'location_id' => $location->id]);
             }
 
+            Location::query()->where('tenant_id', $party->tenant_id)->whereKey($location->id)->lockForUpdate()->firstOrFail();
             // Alamat pertama otomatis utama; tanpa ini kop kosong sampai seseorang ingat
             // mencentang "utama".
             $hasOthers = $this->addressLinks($party->id)->when($link->exists, fn (Builder $query) => $query->whereKeyNot($link->id))->exists();
@@ -161,7 +174,7 @@ final class OrganizationAddressBook
      * Melepas alamat dari organisasi: tautannya diarsipkan, tempatnya tidak. Pihak lain yang memakai tempat
      * yang sama tidak kehilangan apa pun.
      */
-    public function deleteLocation(Organization $organization, string $linkId, int $expectedVersion): void
+    public function deleteLocation(Organization|Party $organization, string $linkId, int $expectedVersion): void
     {
         $party = $this->party($organization);
         DB::transaction(function () use ($party, $linkId, $expectedVersion): void {
@@ -181,7 +194,7 @@ final class OrganizationAddressBook
     }
 
     /** @return list<array<string, mixed>> */
-    public function contacts(Organization $organization): array
+    public function contacts(Organization|Party $organization): array
     {
         $party = $this->party($organization);
         $links = PartyLocation::query()->where('party_id', $party->id)->with('location.postalAddress')->get()->keyBy('location_id');
@@ -204,7 +217,7 @@ final class OrganizationAddressBook
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function saveContact(Organization $organization, array $data, ?string $contactId = null, int $expectedVersion = 0): array
+    public function saveContact(Organization|Party $organization, array $data, ?string $contactId = null, int $expectedVersion = 0): array
     {
         $party = $this->party($organization);
 
@@ -212,14 +225,19 @@ final class OrganizationAddressBook
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $contact = $contactId === null ? null : $this->partyContacts($party->id)->whereKey($contactId)->firstOrFail();
-            if ($contact !== null) {
-                RowVersion::claim($contact, $expectedVersion);
-            }
             $locationId = match (true) {
                 ($data['address_id'] ?? null) !== null => $this->addressLinks($party->id)->whereKey($data['address_id'])->firstOrFail()->location_id,
                 $contact !== null && ! array_key_exists('address_id', $data) => $contact->location_id,
                 default => $this->defaultContactLocation($party),
             };
+            $previousLocation = $contact?->location_id;
+            $previousType = $contact?->type;
+            $previousPrimary = $contact?->is_primary ?? false;
+            // Semua penulis kontak mengunci tempat dahulu; perpindahan memakai urutan id yang sama.
+            Location::query()->where('tenant_id', $party->tenant_id)->whereIn('id', array_filter([$locationId, $previousLocation]))->orderBy('id')->lockForUpdate()->get();
+            if ($contact !== null) {
+                RowVersion::claim($contact, $expectedVersion);
+            }
             $contact ??= new ElectronicAddress(['tenant_id' => $party->tenant_id]);
 
             $siblings = ElectronicAddress::query()->where('location_id', $locationId)->where('type', $data['type'])
@@ -238,19 +256,25 @@ final class OrganizationAddressBook
                 'is_primary' => $primary,
             ])->save();
 
+            if ($previousPrimary && ($previousLocation !== $locationId || $previousType !== $data['type'])) {
+                ElectronicAddress::query()->where('tenant_id', $party->tenant_id)->where('location_id', $previousLocation)->where('type', $previousType)
+                    ->orderBy('created_at')->limit(1)->update(['is_primary' => true]);
+            }
+
             $link = PartyLocation::query()->where('party_id', $party->id)->where('location_id', $locationId)->with('location.postalAddress')->first();
 
             return $this->presentContact($contact->fresh(), $link);
         });
     }
 
-    public function deleteContact(Organization $organization, string $contactId, int $expectedVersion): void
+    public function deleteContact(Organization|Party $organization, string $contactId, int $expectedVersion): void
     {
         $party = $this->party($organization);
         DB::transaction(function () use ($party, $contactId, $expectedVersion): void {
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $contact = $this->partyContacts($party->id)->whereKey($contactId)->firstOrFail();
+            Location::query()->where('tenant_id', $party->tenant_id)->whereKey($contact->location_id)->lockForUpdate()->firstOrFail();
             RowVersion::claim($contact, $expectedVersion);
             $wasPrimary = $contact->is_primary;
             $contact->fill(['is_primary' => false])->save();
@@ -340,6 +364,9 @@ final class OrganizationAddressBook
             'province' => $this->clean($data['province'] ?? null),
             'city' => $this->clean($data['city'] ?? null),
             'district' => $this->clean($data['district'] ?? null),
+            'village' => $this->clean(array_key_exists('village', $data) ? $data['village'] : $address->village),
+            'rt' => $this->clean(array_key_exists('rt', $data) ? $data['rt'] : $address->rt),
+            'rw' => $this->clean(array_key_exists('rw', $data) ? $data['rw'] : $address->rw),
             'street' => $this->clean($data['street'] ?? null),
             'building' => $this->clean($data['building'] ?? null),
             'postbox' => $this->clean($data['postbox'] ?? null),
@@ -383,6 +410,9 @@ final class OrganizationAddressBook
             'province' => $address?->province,
             'city' => $address?->city,
             'district' => $address?->district,
+            'village' => $address?->village,
+            'rt' => $address?->rt,
+            'rw' => $address?->rw,
             'street' => $address?->street,
             'building' => $address?->building,
             'postbox' => $address?->postbox,
