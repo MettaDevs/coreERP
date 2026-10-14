@@ -20,7 +20,9 @@ class AssetNomenclatureTest extends TestCase
     {
         $tenantId = $this->buatTenantUji();
         $manifest = ModuleManifestFiles::read(base_path('../../modules/apperp/management-aset'));
-        $settings = collect($manifest['number_sequences']['references'])->firstWhere('code', 'management-aset.asset-code')['default_settings'];
+        /** @var list<array{code:string,default_settings:array{segments:list<array<string,mixed>>,maximum_number:int}}> $references */
+        $references = $manifest['number_sequences']['references'];
+        $settings = collect($references)->firstWhere('code', 'management-aset.asset-code')['default_settings'];
         $reference = DB::table('app_number_sequence_references')->where('code', 'management-aset.asset-code')->value('id');
         DB::table('tenant_number_sequences')->where('tenant_id', $tenantId)->where('reference_id', $reference)->update([
             'segments' => json_encode($settings['segments'], JSON_THROW_ON_ERROR), 'maximum_number' => $settings['maximum_number'],
