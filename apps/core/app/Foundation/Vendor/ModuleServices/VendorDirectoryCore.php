@@ -58,7 +58,7 @@ final class VendorDirectoryCore implements VendorDirectory
 
     public function forParty(string $tenantId, string $partyId): array
     {
-        return Vendor::query()->where('tenant_id', $tenantId)->where('party_id', $partyId)->with('legalEntity')->get()
-            ->map(fn (Vendor $vendor): array => ['id' => $vendor->id, 'number' => $vendor->number, 'status' => $vendor->status, 'legal_entity_id' => $vendor->legal_entity_id, 'company' => $vendor->legalEntity?->name])->all();
+        return array_values(Vendor::query()->where('tenant_id', $tenantId)->where('party_id', $partyId)->with('legalEntity')->get()
+            ->map(fn (Vendor $vendor): array => ['id' => $vendor->id, 'number' => $vendor->number, 'status' => $vendor->status, 'legal_entity_id' => $vendor->legal_entity_id, 'company' => $vendor->legalEntity?->name])->all());
     }
 }

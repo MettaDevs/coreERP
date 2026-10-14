@@ -232,7 +232,7 @@ final class OrganizationAddressBook
             };
             $previousLocation = $contact?->location_id;
             $previousType = $contact?->type;
-            $previousPrimary = $contact?->is_primary ?? false;
+            $previousPrimary = $contact !== null ? $contact->is_primary : false;
             // Semua penulis kontak mengunci tempat dahulu; perpindahan memakai urutan id yang sama.
             Location::query()->where('tenant_id', $party->tenant_id)->whereIn('id', array_filter([$locationId, $previousLocation]))->orderBy('id')->lockForUpdate()->get();
             if ($contact !== null) {

@@ -259,7 +259,9 @@ final class GlobalAddressBookController extends Controller
             'relationship_type_code' => ['required', Rule::exists('party_relationship_types', 'code')],
             'valid_from' => ['required', 'date_format:Y-m-d'], 'valid_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:valid_from'],
         ]);
-        abort_unless(in_array($party->id, [$data['from_party_id'], $data['to_party_id']], true), 422);
+        if ($party->id !== $data['from_party_id'] && $party->id !== $data['to_party_id']) {
+            throw ValidationException::withMessages(['from_party_id' => 'Hubungan harus menyertakan pihak yang sedang dibuka.']);
+        }
         $participants = Party::query()->where('tenant_id', $party->tenant_id)->whereIn('id', [$data['from_party_id'], $data['to_party_id']])->get()->keyBy('id');
         abort_unless($participants->count() === 2, 404);
         $type = DB::table('party_relationship_types')->where('code', $data['relationship_type_code'])->first();
