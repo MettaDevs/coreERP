@@ -173,11 +173,7 @@ export function setup() {
 
     // Kunci seed stabil per RUN_ID: menjalankan ulang pada database yang sama memakai kembali
     // record yang sama, bukan menumbuhkan data seed.
-    const fiscalIds = tahapRespons('kelompok aset', semua((tenant) => ['GET', ASET('reference-data/kelompok-harta-fiskal'), null, params(tenant)]), [200])
-        .map((response) => response.json('data').find((item) => item.kode)?.id);
-    if (fiscalIds.some((id) => !id)) {
-        fail('Fixture kelompok aset belum mempunyai kode.');
-    }
+    const fiscalIds = tahap('kelompok aset', semua((tenant, index) => ['POST', ASET('kelompok-harta'), JSON.stringify({ kode: 'LT', label: `Kelompok seed ${index}`, useful_life_years: 5, straight_line_rate_percent: 20 }), params(tenant, `seed-${RUN_ID}-classification-${index}`)]));
     const locationIds = tahap('lokasi-aset', semua((tenant, index) => ['POST', ASET('lokasi-aset'), JSON.stringify({ kode: `LOCA-${RUN_ID}-${index}`, nama: `Lokasi seed ${index}` }), params(tenant, `seed-${RUN_ID}-location-${index}`)]));
     const groupResponses = tahapRespons('group-aset', semua((tenant, index) => ['POST', ASET('group-aset'), JSON.stringify({ kode: `GRPA-${RUN_ID}-S${index}`, kelompok_harta_fiskal_id: fiscalIds[index], lokasi_aset_id: locationIds[index], nama: `Group seed ${index}`, keterangan: 'seed load test' }), params(tenant, `seed-${RUN_ID}-group-${index}`)]));
     const groupIds = groupResponses.map((response) => response.json('data.id'));
@@ -300,6 +296,7 @@ function createMaster(tenant) {
     const chained = CHAINED[resource];
     const kunci = `${RUN_ID}-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}-${resource}`;
     const body = { nama: `${resource} ${kunci}`, keterangan: 'load test' };
+
     if (resource === 'group-aset') {
         body.kode = `GRPA-${RUN_ID}-M${exec.vu.idInTest}-${exec.scenario.iterationInTest}`;
     }
