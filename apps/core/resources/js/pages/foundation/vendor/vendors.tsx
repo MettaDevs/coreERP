@@ -55,6 +55,7 @@ import {
     toastSaveError,
 } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
+import SupplierImport from './supplier-import';
 
 type PartyType = 'organization' | 'person';
 type Status = 'active' | 'inactive';
@@ -602,6 +603,7 @@ export default function Vendors({
                     title="Vendor"
                     description="Pemasok per entitas legal. Nomor vendor ikut di setiap posting ke aplikasi finance."
                 />
+                {canManage && <SupplierImport legalEntities={legalEntities} />}
                 <Card>
                     <CardHeader>
                         <CardTitle>Daftar vendor</CardTitle>

@@ -7,6 +7,7 @@ use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Actions\SaveVendor;
 use App\Foundation\Vendor\Models\Vendor;
+use App\Foundation\Vendor\Support\SupplierCsvImporter;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\Party;
@@ -27,6 +28,20 @@ use Inertia\Response;
 final class VendorController extends Controller
 {
     private const PER_PAGE = 50;
+
+    public function importSuppliers(Request $request, SupplierCsvImporter $importer): JsonResponse
+    {
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:2048', 'extensions:csv,txt'],
+            'legal_entity_id' => ['required', 'string', 'size:26'],
+            'apply' => ['sometimes', 'boolean'],
+        ]);
+        $file = $request->file('file');
+        abort_if($file === null || is_array($file), 422);
+
+        return response()->json(['data' => $importer->run($membership, $data['legal_entity_id'], (string) $file->get(), filter_var($data['apply'] ?? false, FILTER_VALIDATE_BOOL))]);
+    }
 
     public function index(Request $request): Response
     {
