@@ -111,7 +111,7 @@ final class OrganizationAddressBook
                 ->orWhereHas('postalAddress', fn (Builder $address) => $address->where('formatted', 'ilike', '%'.addcslashes($search, '\\%_').'%'))))
             ->orderBy('name')->orderBy('id')->cursorPaginate(40);
 
-        return ['data' => $locations->getCollection()->map(fn (Location $location): array => [
+        return ['data' => array_values($locations->getCollection()->map(fn (Location $location): array => [
             ...($location->postalAddress?->only([
                 'country_region_code', 'province_id', 'regency_id', 'district_id',
                 'village_id', 'postal_code_id', 'province', 'city', 'district',
@@ -121,7 +121,7 @@ final class OrganizationAddressBook
             'name' => $location->name,
             'formatted' => (string) $location->postalAddress?->formatted,
         ])
-            ->values()->all(), 'next_cursor' => $locations->nextCursor()?->encode()];
+            ->all()), 'next_cursor' => $locations->nextCursor()?->encode()];
     }
 
     /**
