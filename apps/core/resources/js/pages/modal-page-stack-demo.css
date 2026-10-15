@@ -1,0 +1,115 @@
+/* Eksperimen BC hanya untuk UI playground. */
+.modal-rnd-title {
+    margin: 0 68px 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-rnd-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin: 0 68px;
+    min-height: 40px;
+    border-bottom: 1px solid var(--border);
+}
+.modal-rnd-factbox-toggle {
+    margin-left: auto;
+}
+.modal-rnd-workspace {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    margin: 12px 68px 0;
+    gap: 16px;
+}
+.modal-rnd-body {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    padding-right: 12px;
+    padding-bottom: 32px;
+    container-type: inline-size;
+}
+.modal-rnd-section {
+    margin-bottom: 40px;
+}
+.modal-rnd-section > h3,
+.modal-rnd-section > summary {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+}
+.modal-rnd-section > summary {
+    cursor: pointer;
+}
+.modal-rnd-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 28px;
+}
+@container (max-width: 560px) {
+    .modal-rnd-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.modal-rnd-factbox {
+    width: 348px;
+    flex-shrink: 0;
+    overflow: auto;
+    border-left: 1px solid var(--border);
+}
+
+.modal-rnd-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 32px;
+}
+.modal-rnd-stat > span:first-child {
+    color: var(--muted-foreground);
+}
+.modal-rnd-mobile-tabs {
+    display: none;
+}
+@container shell-content (max-width: 699px) {
+    .modal-rnd-title {
+        margin-inline: 20px;
+    }
+    .modal-rnd-status {
+        display: none;
+    }
+    .modal-rnd-actions {
+        margin-inline: 20px;
+    }
+    .modal-rnd-factbox-toggle {
+        display: none;
+    }
+    .modal-rnd-workspace {
+        margin-inline: 20px;
+    }
+    .modal-rnd-workspace > .modal-rnd-factbox {
+        display: none;
+    }
+    .modal-rnd-mobile-tabs {
+        display: flex;
+        margin-inline: 20px;
+        border-bottom: 1px solid var(--border);
+    }
+    .modal-rnd-mobile-tabs [aria-selected='true'] {
+        border-bottom: 2px solid var(--primary);
+    }
+    .core-page-dialog[data-details='true'] .modal-rnd-body {
+        display: none;
+    }
+    .core-page-dialog[data-details='true'] .modal-rnd-factbox {
+        display: block;
+        width: 100%;
+        border-left: 0;
+        padding: 0;
+    }
+}

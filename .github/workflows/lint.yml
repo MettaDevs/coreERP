@@ -101,6 +101,9 @@ jobs:
       - name: Check Asset Service Life
         run: node --test ../../modules/apperp/management-aset/ui/master/serviceLife.test.mjs
 
+      - name: Check Page Dialog Stack
+        run: node --test ../../packages/ui/scripts/page-dialog-stack.test.mjs
+
       - name: Check Upload Client
         run: node scripts/test-core-api.mjs
 

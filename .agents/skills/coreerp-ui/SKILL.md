@@ -38,6 +38,16 @@ Saat memberi tugas ke AI, nyatakan kebutuhan ini secara langsung, misalnya: “B
 - A select or combobox popup must match its trigger width and alignment. Do not add decorative width or offset that makes it extend beyond the field.
 - For `Select` or combobox controls inside an SDK `Sheet`, `Dialog`, Popover, or another overlay, pass that overlay's content ref as `portalContainer`. Without it, the menu can render beneath the overlay and look open while its options cannot be clicked. This is a mandatory implementation rule; see the repository-wide rule in [`AGENTS.md`](../../../AGENTS.md#ui-overlay-dropdowns).
 
+## Page/card stack decision gate
+
+- Kartu/form/pemilih yang memang diluncurkan sebagai modal halaman memakai `@apperp/ui/page-dialog`: `PageDialog`, `PageDialogContent`, `PageDialogHeader`, `PageDialogTitle`, `PageDialogDescription`, `PageDialogBody`, serta Footer/Action bila diperlukan. Jangan menyalin frame/registri/CSS dari R&D; demo dan pemakai kartu/modal harus memakai SDK yang sama.
+- Scope awal penerapan adalah modal Address Book dan lookup terkait. Pertahankan halaman standalone PartyCard/PartyForm dan RecordActionBar/navigasinya; jangan membungkus halaman penuh lalu menggandakan header/back. `Dialog` compact, `AlertDialog` arsip/konfirmasi, popover kecil, tooltip, dan FieldHint tidak berubah menjadi page stack.
+- `PageDialogContent` otomatis memakai outlet `[data-shell-overlay-host]`, atau viewport bila tidak berada di Shell. Tidak memakai prop `size`. Header menyediakan Kembali, count stack, expand, dan Tutup satu lapisan. `expanded`/`defaultExpanded`/`onExpandedChange` mengatur ukuran. Ref content tetap diberikan ke `portalContainer` Select/lookup.
+- Fade adalah milik mesin overlay, bukan field. Isi `PageDialog` beserta portal pada content ref berada dalam satu stacking context (`core-page-dialog-contents`, z0); scrim inactive adalah sibling di atasnya (z1). Shell page-content juga terisolasi di bawah outlet overlay. Jangan menaikkan z-index scrim secara acak atau menambal warna/z-index label Input/Select/Textarea per halaman. Uji label kosong/fokus/terisi dan header tabel agar seluruh parent ikut fade, lalu kembali normal saat child ditutup.
+- Pertahankan parent mounted saat membuka child; jangan menutup/unmount parent hanya untuk menampilkan kartu turunannya. SDK membuat lapisan bawah inert dan meredup serta mengembalikan fokus; state draft, pilihan, scroll, dan expand tetap milik halaman. Back/Close/Escape tidak melakukan save atau rollback record yang sudah tersimpan: caller menentukan commit/cancel draft melalui onOpenChange/aksi bisnis.
+- Shell search/navbar tetap hidup; area halaman utama yang ditutup dibuat inert. Outside click tidak membuang draft. Escape diproses lapisan teratas dan popup field lebih dulu. Konfirmasi kecil di atas kartu tetap menggunakan AlertDialog/compact Dialog. Hormati reduced motion; jangan menambah blur/animasi layout.
+- Uji stack minimal tiga lapisan, count pada layar sempit, Back/Close/Escape, fokus pemanggil, nilai draft dan scroll setelah kembali, popup portal, Shell search, dan penutupan semua lapisan yang memulihkan inert halaman utama.
+
 ## Build a screen
 
 1. Import `@apperp/ui/styles.css` after Tailwind and add `@source '../node_modules/@apperp/ui/dist'`.

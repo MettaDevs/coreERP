@@ -36,13 +36,23 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                     {/* Tanggal kerja yang bukan hari ini; yang ini boleh ditutup untuk sisa sesi. */}
                     <WorkDateNotice />
                     <div
-                        scroll-region=""
-                        className="min-h-0 min-w-0 flex-1 overflow-auto bg-muted/30 has-[[data-layout=full-height]]:overflow-hidden"
-                        onScroll={(event) =>
-                            setIsScrolled(event.currentTarget.scrollTop > 8)
-                        }
+                        data-shell-content=""
+                        className="@container/shell-content relative isolate min-h-0 min-w-0 flex-1 overflow-hidden"
                     >
-                        {children}
+                        <div
+                            data-shell-page-content=""
+                            scroll-region=""
+                            className="relative isolate z-0 h-full min-h-0 min-w-0 overflow-auto bg-muted/30 has-[[data-layout=full-height]]:overflow-hidden"
+                            onScroll={(event) =>
+                                setIsScrolled(event.currentTarget.scrollTop > 8)
+                            }
+                        >
+                            {children}
+                        </div>
+                        <div
+                            data-shell-overlay-host=""
+                            className="pointer-events-none absolute inset-0 z-10"
+                        />
                     </div>
                 </div>
             </AppContent>
