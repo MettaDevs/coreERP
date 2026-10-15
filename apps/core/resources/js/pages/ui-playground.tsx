@@ -182,8 +182,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ModalPageStackDemo } from './modal-page-stack-demo';
 import { InlineLookupDemo } from './inline-lookup-demo';
+import { ModalPageStackDemo } from './modal-page-stack-demo';
 
 const availableComponents = [
     'Accordion',
@@ -350,9 +350,9 @@ export default function UiPlayground() {
     return (
         <>
             <Head title="UI Playground" />
-            <main className="bg-muted/30 min-h-screen">
+            <main className="min-h-screen bg-muted/30">
                 <div className="flex w-full flex-col gap-4 p-4">
-                    <header className="bg-background overflow-hidden rounded-lg border p-5 shadow-sm">
+                    <header className="overflow-hidden rounded-lg border bg-background p-5 shadow-sm">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div className="max-w-3xl space-y-3">
                                 <Badge variant="secondary">
@@ -362,7 +362,7 @@ export default function UiPlayground() {
                                 <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
                                     Shadcn UI Playground
                                 </h1>
-                                <p className="text-muted-foreground text-lg">
+                                <p className="text-lg text-muted-foreground">
                                     Satu halaman untuk menguji warna, radius,
                                     spacing, typography, dan interaction sebelum
                                     dipakai di aplikasi.
@@ -687,7 +687,7 @@ export default function UiPlayground() {
                                                 <p className="font-medium">
                                                     Design system
                                                 </p>
-                                                <p className="text-muted-foreground text-sm">
+                                                <p className="text-sm text-muted-foreground">
                                                     Shared component library.
                                                 </p>
                                             </div>
@@ -823,7 +823,7 @@ export default function UiPlayground() {
                                             />
                                         </Button>
                                     </CollapsibleTrigger>
-                                    <CollapsibleContent className="text-muted-foreground rounded-lg border p-3 text-sm">
+                                    <CollapsibleContent className="rounded-lg border p-3 text-sm text-muted-foreground">
                                         Additional filtering options would live
                                         here.
                                     </CollapsibleContent>
@@ -990,7 +990,7 @@ export default function UiPlayground() {
                                 className="min-h-56 rounded-lg border"
                             >
                                 <ResizablePanel defaultSize={35}>
-                                    <div className="bg-muted/40 flex h-full items-center justify-center p-6 text-sm">
+                                    <div className="flex h-full items-center justify-center bg-muted/40 p-6 text-sm">
                                         Navigation
                                     </div>
                                 </ResizablePanel>
@@ -1010,10 +1010,10 @@ export default function UiPlayground() {
                             <div className="space-y-6">
                                 <AspectRatio
                                     ratio={16 / 5}
-                                    className="from-primary/20 via-primary/5 to-background overflow-hidden rounded-xl bg-gradient-to-r"
+                                    className="overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-primary/5 to-background"
                                 >
                                     <div className="flex h-full items-center justify-center">
-                                        <PackageOpen className="text-primary size-12" />
+                                        <PackageOpen className="size-12 text-primary" />
                                     </div>
                                 </AspectRatio>
                                 <Carousel className="mx-10">
@@ -1093,17 +1093,17 @@ export default function UiPlayground() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-3">
-                            <div className="bg-primary text-primary-foreground rounded-xl p-5">
+                            <div className="rounded-xl bg-primary p-5 text-primary-foreground">
                                 Primary
                             </div>
-                            <div className="bg-secondary text-secondary-foreground rounded-xl p-5">
+                            <div className="rounded-xl bg-secondary p-5 text-secondary-foreground">
                                 Secondary
                             </div>
-                            <div className="bg-destructive text-destructive-foreground rounded-xl p-5">
+                            <div className="rounded-xl bg-destructive p-5 text-destructive-foreground">
                                 Destructive
                             </div>
                         </CardContent>
-                        <CardFooter className="text-muted-foreground text-sm">
+                        <CardFooter className="text-sm text-muted-foreground">
                             Route: /ui-playground
                         </CardFooter>
                     </Card>
