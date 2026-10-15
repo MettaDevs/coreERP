@@ -20,9 +20,11 @@ afterEach(() => {
     flushFocus();
 });
 after(() => {
-    if (previousAnimationFrame)
+    if (previousAnimationFrame) {
         globalThis.requestAnimationFrame = previousAnimationFrame;
-    else delete globalThis.requestAnimationFrame;
+    } else {
+        delete globalThis.requestAnimationFrame;
+    }
 });
 
 function button(isInert = () => false) {
@@ -40,15 +42,18 @@ function shell(initiallyInert = false) {
     const host = {
         closest(selector) {
             assert.equal(selector, '[data-shell-content]');
+
             return {
                 querySelector(selector) {
                     assert.equal(selector, '[data-shell-page-content]');
+
                     return background;
                 },
             };
         },
     };
     const launcher = button(() => background.inert);
+
     return { host, background, launcher };
 }
 function open(host, opener) {
@@ -63,6 +68,7 @@ function open(host, opener) {
         cleanup();
     };
     cleanups.add(close);
+
     return close;
 }
 
