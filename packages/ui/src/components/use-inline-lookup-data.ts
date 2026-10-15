@@ -174,7 +174,7 @@ export function useInlineLookupData<T>({
             controller.current?.abort();
             busy.current = false;
         };
-    }, [active, loadItems, fetchBatch]);
+    }, [active, loadItems, fetchBatch, query]);
 
     const normalized = query.trim().toLocaleLowerCase('id-ID');
     const filtered = loadItems
