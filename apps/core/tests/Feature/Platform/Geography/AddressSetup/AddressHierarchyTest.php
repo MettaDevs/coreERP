@@ -4,6 +4,7 @@ namespace Tests\Feature\Platform\Geography\AddressSetup;
 
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Geography\Models\AddressHierarchy\Province;
+use App\Platform\Geography\Models\AddressHierarchy\Regency;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -55,7 +56,7 @@ class AddressHierarchyTest extends TestCase
         $this->assertDatabaseHas('ref_provinces', [
             'country_code' => 'ID',
             'code' => '31',
-            'name' => 'DKI Jakarta',
+            'name' => 'Daerah Khusus Ibukota Jakarta',
         ]);
 
         $this->assertDatabaseHas('ref_regencies', [
@@ -84,40 +85,39 @@ class AddressHierarchyTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_can_create_new_province(): void
+    public function test_tenant_cannot_create_a_shared_province(): void
     {
+        $count = Province::query()->count();
         $response = $this->actingAs($this->user)
             ->withSession(['workspace_tenant_id' => $this->tenant->id])
             ->post('/settings/address-setup/provinces', [
                 'country_code' => 'ID',
-                'code' => '71',
-                'name' => 'Sulawesi Utara',
+                'code' => 'TEST-PROVINCE',
+                'name' => 'Provinsi uji',
             ]);
 
-        $this->assertDatabaseHas('ref_provinces', [
-            'country_code' => 'ID',
-            'code' => '71',
-            'name' => 'Sulawesi Utara',
-        ]);
+        // Master wilayah bersama hanya diisi migration/import, bukan rute tenant.
+        $response->assertNotFound();
+        $this->assertSame($count, Province::query()->count());
+        $this->assertDatabaseMissing('ref_provinces', ['code' => 'TEST-PROVINCE']);
     }
 
-    public function test_can_create_new_regency(): void
+    public function test_tenant_cannot_create_a_shared_regency(): void
     {
-        $prov = Province::where('code', '32')->firstOrFail();
+        $province = Province::where('code', '31')->firstOrFail();
+        $count = Regency::query()->count();
 
         $response = $this->actingAs($this->user)
             ->withSession(['workspace_tenant_id' => $this->tenant->id])
             ->post('/settings/address-setup/regencies', [
-                'province_id' => $prov->id,
-                'code' => '3278',
-                'name' => 'Kota Tasikmalaya',
+                'province_id' => $province->id,
+                'code' => '3199',
+                'name' => 'Kota uji',
                 'type' => 'kota',
             ]);
 
-        $this->assertDatabaseHas('ref_regencies', [
-            'province_id' => $prov->id,
-            'code' => '3278',
-            'name' => 'Kota Tasikmalaya',
-        ]);
+        $response->assertNotFound();
+        $this->assertSame($count, Regency::query()->count());
+        $this->assertDatabaseMissing('ref_regencies', ['province_id' => $province->id, 'code' => '3199']);
     }
 }
