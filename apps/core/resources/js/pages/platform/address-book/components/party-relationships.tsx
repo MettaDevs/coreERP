@@ -10,24 +10,17 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import {
+    PageDialog as Dialog,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogFooter as DialogFooter,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+} from '@apperp/ui/page-dialog';
 import { Select } from '@apperp/ui/select';
 import { useEffect, useRef, useState } from 'react';
 import { useToday } from '@/hooks/use-work-date';
@@ -37,6 +30,7 @@ import type {
     PartyDetail,
     PartyRelationship,
 } from '../types';
+import { AddressBookHint } from './address-book-hint';
 
 export function PartyRelationships({
     party,
@@ -204,21 +198,20 @@ export function PartyRelationships({
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Hubungan antar pihak</CardTitle>
+        <div className="space-y-3">
+            <div className="flex justify-end">
                 {metadata.canManage && (
-                    <CardAction>
+                    <>
                         <ActionButton
                             action="create"
                             onClick={() => open('new')}
                         >
                             Tambah hubungan
                         </ActionButton>
-                    </CardAction>
+                    </>
                 )}
-            </CardHeader>
-            <CardContent className="space-y-3">
+            </div>
+            <div className="space-y-3">
                 {error && !editing && (
                     <p role="alert" className="text-sm text-destructive">
                         {error}
@@ -311,14 +304,21 @@ export function PartyRelationships({
                         }
                     }}
                 >
-                    <DialogContent ref={contentRef} size="panel">
+                    <DialogContent ref={contentRef}>
                         <DialogHeader>
                             <DialogTitle>
-                                {editing === 'new'
-                                    ? 'Tambah hubungan'
-                                    : 'Ubah hubungan'}
+                                <span className="inline-flex items-center gap-2">
+                                    {editing === 'new'
+                                        ? 'Tambah hubungan'
+                                        : 'Ubah hubungan'}
+                                    <AddressBookHint label="hubungan">
+                                        Hubungan mencatat keterkaitan pihak.
+                                        Akun vendor dan peran bisnis dikelola
+                                        pada halaman masing-masing.
+                                    </AddressBookHint>
+                                </span>
                             </DialogTitle>
-                            <DialogDescription>
+                            <DialogDescription className="sr-only">
                                 Hubungan mencatat keterkaitan pihak. Akun vendor
                                 dan peran bisnis dikelola pada halaman
                                 masing-masing.
@@ -483,7 +483,7 @@ export function PartyRelationships({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

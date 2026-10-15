@@ -54,6 +54,65 @@ Halaman `settings/global-address-book` membaca pihak nyata dari database. Daftar
 Membuka pihak menampilkan identitas, alamat, informasi kontak, hubungan, peran bisnis,
 dan akun vendor. Simpan dan Arsipkan tidak lagi mengubah state lokal saja.
 
+Shell menyediakan satu pintu **Buku alamat › Party**. Detail, tambah, dan ubah Party
+memakai halaman penuh dengan FastTab dari `CollapsibleSectionGroup` dan
+`CollapsibleSection` SDK; identitas, alamat, kontak, hubungan, dan peran bukan menu
+Shell terpisah. `RecordActionBar` memuat tindakan record. Font, kontrol, dan tema
+mengikuti SDK serta Shell, tanpa stylesheet atau font khusus halaman.
+
+General memakai dua kolom pada desktop dan satu kolom pada layar kecil. Label nama
+dibedakan antara organisasi dan perorangan; status memakai Switch. Nama pencarian
+mengikuti ketikan nama hingga pengguna mengubah nama pencarian sendiri, lalu menjadi
+nilai mandiri. Bahasa pihak baru memakai Bahasa Indonesia. Alias dan pemecahan nama
+perorangan (gelar, nama depan/tengah/belakang, inisial, profesi, sertifikasi) disembunyikan
+dari form dan detail tanpa menghapus nilai yang sudah tersimpan.
+
+NIB (`organization_number`) berada pada General untuk pihak organisasi. DUNS
+disembunyikan dari form dan detail. Jumlah karyawan tidak dikirim oleh form;
+nilai kosong/0 disembunyikan dan nilai positif yang sudah tersimpan ditampilkan
+read-only. Pembaca integrasi jumlah karyawan belum tersedia, sebagaimana catatan
+di kode. Klasifikasi ABC disembunyikan sampai ada proses yang memakainya.
+
+Pemilihan alamat memakai master wilayah secara berurutan: negara, provinsi,
+kota/kabupaten, kecamatan, kelurahan/desa, lalu kode pos. `postal_addresses`
+menyimpan ID setiap master beserta teks untuk tampilan dan cetakan. Server menolak
+anak wilayah yang bukan milik induk pilihan dan mengambil nama dari master, bukan
+memercayai teks kiriman. Migration hanya menambah relasi nullable; teks alamat lama
+tetap utuh dan tidak dipetakan otomatis berdasarkan nama. Jalan, gedung, RT/RW,
+dan PO Box tetap input bebas. Pilihan penagihan/pembayaran disembunyikan dari form,
+tetapi kegunaan lama tetap disimpan.
+
+Daftar kontak memakai DataTable SDK dengan keterangan, tipe, nomor/alamat, serta
+checkbox utama. Input nomor/alamat mengikuti tipe kontak; keterangan memakai
+Textarea. Kontak baru dihubungkan ke alamat utama secara otomatis, sedangkan tautan
+alamat kontak lama dipertahankan. Ikon mengikuti tipe; link telepon/email/web memakai
+scheme yang sesuai. Daftar peran kosong memakai Empty SDK; DataTable baru dirender
+setelah ada peran sehingga tabel kosong tidak memunculkan scrollbar horizontal.
+
+Dataset detail wilayah yang disertakan hanya Indonesia. `DatabaseSeeder` tetap
+memasang daftar negara dan zona waktu, tetapi seeder provinsi/kota/desa dunia serta
+pembangkit wilayah/kode pos sintetis sudah dihapus. Alamat luar Indonesia memakai
+teks wilayah; data dunia yang pernah tersimpan tidak dihapus dari database.
+
+`IndonesianAddressHierarchySeeder`, `address:import-indonesia`, dan migration
+`2026_10_15_030000_populate_indonesian_address_hierarchy.php` memakai pembaca yang sama
+di `database/data/import_indonesia_hierarchy.php`. Pembaca mencocokkan kode resmi
+dalam scope Indonesia, mempertahankan PK baris terstruktur, menolak kode ganda atau
+induk yang hilang, dan menyimpan kode pos per desa dari dataset bundel. SQL sumber
+dibaca sebagai pasangan data, tidak dieksekusi. Pengulangan impor melewati baris yang
+sudah sama. Impor tidak mengganti ID tabel terstruktur dengan ID registry generik.
+
+Provenance bundel saat ini: `wilayah.sql` menyatakan Kepmendagri 300.2.2-2138/2025,
+last edit 13 Februari 2026; `wilayah_kodepos.sql` menyatakan rujukan yang sama,
+last edit 30 Juni 2025, keduanya dari cahyadsn dengan lisensi MIT. Ini bukan klaim bahwa
+seluruh perubahan administratif terbaru sudah tercakup. Pembaruan dataset berikutnya
+perlu mencatat keputusan dan versi sumber serta membandingkan kode yang berubah.
+
+Alamat, kontak, serta peran tetap terlihat sebagai FastTab saat mengubah pihak.
+Pihak baru perlu disimpan sebelum alamat atau kontak ditambahkan, karena keduanya
+memerlukan identitas record yang sudah tersimpan. Peran diturunkan dari akun bisnis,
+bukan checkbox yang menciptakan akun vendor sendiri.
+
 Modelnya tetap **F&O Global Address Book**, sesuai keputusan sebelumnya. BC memiliki
 Contacts Company/Person, Contacts list, Vendor Card, dan hubungan kontak–vendor, tetapi
 bukan pengganti model party bersama lintas perusahaan yang dipakai CoreERP. Referensi:
@@ -137,11 +196,113 @@ akhir dilakukan sendiri; perubahan ini belum diverifikasi di container sesudah r
 
 Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed posting finance membutuhkan vendor sebelum ada modul hutang ([PRD](../todo/feed-posting-finance/README.md), K-06). Layarnya di **Buku alamat › Vendor** (`settings/vendors`).
 
-- Tabel `vendors` menyimpan akun vendor per legal entity: nomor, NPWP, dan status. Nama, alamat, dan kontak tetap milik party, jadi mengganti nama vendor mengganti nama party-nya di semua legal entity.
+- Tabel `vendors` menyimpan akun vendor per legal entity: nomor, status, dan prioritas pembayaran. Nama, NPWP, alamat, dan kontak milik party, jadi mengganti identitasnya berlaku pada semua akun vendor pihak tersebut. Kolom `vendors.tax_number` dipertahankan sebagai salinan untuk pembaca dan image N-1; pengelolaannya di UI melalui Party.
 - Menyimpan vendor baru menulis party (bila baru), akun vendor, dan baris `party_role_registrations` berperan `vendor` dengan `owning_app_id = core` dalam satu transaksi.
 - Satu party paling banyak satu vendor per legal entity; database menolak yang kedua.
 - Nomor dari reference `core.vendor` ([Number sequences](14-number-sequences.md#reference-milik-core-sendiri)); nomor dan legal entity tidak dapat diubah sesudah disimpan.
 - Module membaca vendor lewat kontrak `VendorDirectory`, sistem di luar CoreERP lewat `GET /api/internal/v1/vendors` dengan token klien integrasi.
+
+Detail baca, tambah, dan ubah Vendor memakai halaman penuh dengan FastTab General,
+Alamat, dan Informasi kontak, bukan Sheet. Sesudah membuat vendor, record hasil
+respons tetap terbuka dalam mode ubah agar alamat dan kontak dapat dilengkapi.
+Keduanya tetap ditulis lewat Party; halaman Vendor tidak membuat salinan data tersebut.
+Lookup pemasok menampilkan akun vendor yang sudah dimiliki Party beserta perusahaan
+dan status akunnya. Satu Party tetap satu pilihan walaupun mempunyai akun di beberapa
+perusahaan. Informasi akun berasal dari tenant yang sama; pemilihan tetap menyimpan
+`party_id`, bukan nomor akun perusahaan lain. Membuat akun kedua pada perusahaan yang
+sama tetap ditolak backend.
+
+Pada form vendor baru, **Nomor vendor** juga merupakan lookup akun pada perusahaan
+tujuan. Memilih akun membuka kartu baca akun tersebut tanpa membuat akun baru.
+Memilih Party yang sudah mempunyai akun di perusahaan tujuan, termasuk sesudah
+mengganti perusahaan, memeriksa akun lewat backend lalu membuka kartu yang sama.
+Simpan dinonaktifkan selama pemeriksaan; validasi unik backend tetap menjadi
+pengaman permintaan bersamaan. Nomor baru tetap mengikuti pengaturan number sequence.
+
+Lookup memakai `GET /api/v1/vendors/lookup`, `vendors/party-options`, dan
+`vendors/company-options`, masing-masing dengan query pencarian dan cursor internal.
+Respons berisi `data` serta `next_cursor`; batch dibatasi 40 record tanpa total count
+atau offset. Query akun dibatasi perusahaan tujuan; query Party memuat akun dan
+perusahaannya sekaligus, bukan satu query tambahan per baris. Lookup alamat bersama
+pada Party/organisasi memakai envelope yang sama dan mengecualikan tautan aktif
+milik Party pemanggil. Semua endpoint tersebut adalah API session UI, bukan kontrak
+integrasi lintas runtime.
+Popup dan Daftar lengkap berbagi hasil/cursor; batch awal tidak diminta ulang hanya
+karena pengguna membuka daftar lengkap. Cache singkat milik instance field tidak
+menyimpan data lintas halaman/tenant. API JSON juga melewati penyusunan props Shell
+di `HandleInertiaRequests`, karena respons tersebut tidak memakai props Inertia;
+middleware otentikasi dan pemeriksaan izin controller tetap berjalan.
+Pada kartu baca maupun kartu ubah vendor, pemegang izin ubah buku alamat dapat
+langsung menambah atau mengubah alamat dan kontak lewat form yang sama dengan GAB.
+Pengguna tidak perlu berpindah halaman. Hak baca vendor saja tidak memberi hak
+mengubah identitas bersama; endpoint Party tetap memeriksa izin buku alamat.
+
+### Pemilik tempat bersama
+
+`locations.owner_party_id` menentukan satu Party pemilik tempat. Tempat baru dimiliki
+Party pembuatnya; menautkan tempat yang sudah ada tidak memindahkan kepemilikan.
+`is_location_owner` pada respons alamat/kontak dihitung server, bukan diterima dari
+form. Hanya melalui Party pemilik alamat dan kontak pada tempat tersebut dapat
+diubah, termasuk kontak utama. Hak ubah buku alamat tetap diwajibkan.
+Pemakai lain dapat menautkan, menjadikan alamat utama, atau mengarsipkan tautannya sendiri; alamat bersama
+tidak diubah dan pemilik tidak otomatis berganti. Pemilik yang melepas tautan dapat
+menautkannya kembali untuk mengelola alamat tersebut. Pemindahan pemilik belum
+disediakan pada UI.
+
+Migration menetapkan pemilik data lama dari tautan aktif tertua, lalu tautan
+terarsip bila tidak ada tautan aktif; ini aturan pengisian data lama, bukan bukti
+siapa pembuat historisnya. Tempat tanpa Party yang masih tersedia tidak diberi
+pemilik secara tebakan dan tidak dapat diubah lewat Party lain.
+
+Kebutuhan aset tetap saat ini memakai akun ini untuk penerimaan, penjamin garansi,
+penanggung asuransi, dan vendor kontrak servis. Nomor/referensi faktur dan mata uang
+transaksi tetap berada pada dokumen pemiliknya. Grup vendor, syarat/metode pembayaran,
+rekening bank, dan posting hutang belum menjadi pengaturan master pada halaman ini;
+FastTab tidak menampilkan field kosong yang prosesnya belum tersedia.
+
+Migration `2026_10_15_010000_share_party_tax_number.php` memindahkan NPWP akun lama
+ke pihaknya. Bila satu pihak mempunyai NPWP berbeda pada akun-akunnya, migration
+berhenti sebelum mengubah skema; nomor harus disamakan terlebih dahulu. Perbedaan
+format titik/tanda hubung tidak dianggap NPWP berbeda. Foundation mendengarkan
+`PartyTaxNumberChanged` dalam transaksi yang sama dan memperbarui salinan serta
+waktu/versi akun vendor agar sinkronisasi incremental melihat perubahan tersebut.
+Membuat akun vendor dari Party existing mewarisi NPWP; kiriman NPWP yang berbeda
+ditolak agar pembuatan akun lain tidak menimpa identitas bersama. Ini identitas pajak
+Indonesia yang sederhana, bukan implementasi seluruh Registration IDs F&O dengan
+jenis registrasi, negara, alamat, dan masa berlaku.
+
+Lookup pemasok pada vendor menyediakan **Baru** hanya bagi pemegang izin ubah buku
+alamat. Aksi itu membuka `PartyForm` yang sama di `PageDialog`, dengan metadata dari
+`GET /api/v1/parties/metadata` (izin ubah buku alamat, tenant aktif). Setelah Party
+aktif tersimpan, responsnya langsung dimasukkan ke lookup dan dipilih; perusahaan,
+nomor manual, prioritas, serta status draft vendor tetap terjaga. Vendor belum dibuat
+sampai pengguna menyimpan form vendor. Party yang disimpan nonaktif tetap tersimpan,
+tetapi tidak dipilih sebagai pemasok aktif.
+
+Prioritas pembayaran vendor tetap disimpan untuk kompatibilitas data, tetapi field
+dan FastTab Pembayaran disembunyikan sampai ada proses atau integrasi yang memakainya.
+Perubahan vendor tetap mempertahankan nilai lama yang tidak ditampilkan tersebut.
+
+### FactBox vendor untuk perolehan aset
+
+Daftar dan kartu `/settings/vendors` memakai FactBox SDK untuk identitas, lampiran
+record `vendors`, dan perolehan aset. Memilih baris hanya mengganti konteks FactBox;
+nomor vendor atau menu baris membuka kartu. Tidak ada salinan alamat/kontak vendor:
+FastTab membaca Party yang sama dengan Buku Alamat Global.
+
+`GET /api/v1/vendors/{vendor}/activity` adalah endpoint UI, dijaga izin baca vendor
+dan tenant record. `VendorActivity` meminta dataset `management-aset.asset-receipts`
+melalui `RunQuery` dan principal pengguna. Ia tidak membaca tabel module secara
+langsung dan tidak memerlukan izin membuka penjelajah analitik. Perusahaan aktif
+harus sama dengan perusahaan vendor; izin dataset, pemasangan module, dan policy
+`management-aset.asset-responsibility` tetap diterapkan engine.
+
+Ringkasan hanya memakai penerimaan berstatus selesai: jumlah dokumen unik, jumlah
+unit, dan nilai sebelum PPN per mata uang. Daftar penerimaan terbaru memakai
+`receipt_id` dari dataset versi 2 untuk membuka dokumen asal. Angka ini bukan nilai
+buku aset saat ini dan bukan saldo utang. Feed posting tidak menyimpan pelunasan atau
+buku pembantu vendor, sehingga halaman tidak menyimpulkan saldo dari total debit
+jurnal. Pengaturan pembayaran yang belum mempunyai proses tetap tidak ditampilkan.
 
 ## Yang belum ada
 

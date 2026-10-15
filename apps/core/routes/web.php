@@ -377,6 +377,7 @@ Route::middleware(['auth'])->group(function () {
         // Identitas cetak: kop, footer, dan logo per organisasi; lihat docs/dev/23-document-rendering.md.
         Route::get('organizations/{organization}/locations', [OrganizationLocationController::class, 'index'])->name('organizations.locations.index');
         Route::post('parties/assign-numbers', [GlobalAddressBookController::class, 'assignNumbers'])->middleware('throttle:5,1')->name('parties.assign-numbers');
+        Route::get('parties/metadata', [GlobalAddressBookController::class, 'metadata'])->name('parties.metadata');
         Route::get('parties/options', [GlobalAddressBookController::class, 'options'])->name('parties.options');
         Route::post('parties', [GlobalAddressBookController::class, 'store'])->middleware('throttle:60,1')->name('parties.store');
         Route::get('parties/{party}', [GlobalAddressBookController::class, 'show'])->name('parties.show');
@@ -422,6 +423,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('integration-clients/{integrationClient}/rotate-signing-secret', [IntegrationClientController::class, 'rotateSigningSecret'])->middleware('throttle:20,1')->name('integration-clients.rotate-signing-secret');
         Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
         Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
+        Route::get('vendors/company-options', [VendorController::class, 'companyOptions'])->name('vendors.company-options');
+        Route::get('vendors/lookup', [VendorController::class, 'lookup'])->name('vendors.lookup');
+        Route::get('vendors/{vendor}/activity', [VendorController::class, 'activity'])->middleware('throttle:60,1')->name('vendors.activity');
         Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');
         Route::post('vendors/imports', [VendorController::class, 'importSuppliers'])->middleware('throttle:10,1')->name('vendors.imports.store');
         Route::patch('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');

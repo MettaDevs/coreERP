@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { ApiError, api } from '../api';
 
 /**
  * Bentuk minimum yang dipakai setiap dropdown. Field lain milik master tetap dibawa
@@ -41,11 +41,16 @@ export function useMasterOptions(
     // pada render yang sama, tanpa effect yang perlu mengosongkannya lebih dulu dan
     // tanpa satu frame pun yang memperlihatkan pilihan milik master sebelumnya.
     const lookupKey = `${resource ?? ''}?${query}`;
+    const [attempt, setAttempt] = useState(0);
     const [muatan, setMuatan] = useState<{
         resource: string;
         options: MasterOption[];
         error: string;
     } | null>(null);
+    const reload = useCallback(() => {
+        setMuatan(null);
+        setAttempt((value) => value + 1);
+    }, []);
     const termuat =
         resource && muatan?.resource === lookupKey ? muatan : undefined;
 
@@ -57,6 +62,7 @@ export function useMasterOptions(
         let cancelled = false;
         api<{ data: MasterOption[] }>(
             `/${resource}?per_page=100&aktif=true&${query}`,
+            { headers: { Accept: 'application/json' } },
         )
             .then((result) => {
                 if (cancelled) {
@@ -69,7 +75,7 @@ export function useMasterOptions(
                     error: '',
                 });
             })
-            .catch(() => {
+            .catch((caught: unknown) => {
                 if (cancelled) {
                     return;
                 }
@@ -77,17 +83,25 @@ export function useMasterOptions(
                 setMuatan({
                     resource: lookupKey,
                     options: [],
-                    error: `Pilihan belum dapat dimuat. Anda memerlukan akses lihat pada ${resource}.`,
+                    error:
+                        caught instanceof ApiError && caught.status === 403
+                            ? 'Anda belum memiliki akses untuk melihat pilihan ini.'
+                            : caught instanceof ApiError &&
+                                caught.status === 401
+                              ? 'Sesi Anda sudah berakhir. Silakan masuk kembali.'
+                              : 'Pilihan gagal dimuat. Coba muat ulang.',
                 });
             });
 
         return () => {
             cancelled = true;
         };
-    }, [resource, query, lookupKey]);
+    }, [resource, query, lookupKey, attempt]);
 
     return {
         options: termuat?.options ?? TANPA_PILIHAN,
         error: termuat?.error ?? '',
+        loading: Boolean(resource && !termuat),
+        reload,
     };
 }

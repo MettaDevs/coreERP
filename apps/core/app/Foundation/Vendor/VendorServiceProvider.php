@@ -9,6 +9,7 @@ use App\Foundation\Vendor\ModuleServices\VendorDirectoryCore;
 use App\Foundation\Vendor\Support\VendorAttachments;
 use App\Foundation\Vendor\Support\VendorLabels;
 use App\Platform\AddressBook\Events\PartyNameChanged;
+use App\Platform\AddressBook\Events\PartyTaxNumberChanged;
 use App\Platform\Modules\Contracts\Analytics\SharedDimensions;
 use App\Platform\Modules\Contracts\AttachmentRecordTypes;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -30,6 +31,9 @@ final class VendorServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(PartyTaxNumberChanged::class, function (PartyTaxNumberChanged $event): void {
+            Vendor::query()->where('tenant_id', $event->tenantId)->where('party_id', $event->partyId)->update(['tax_number' => $event->taxNumber, 'updated_at' => now()]);
+        });
         Event::listen(PartyNameChanged::class, function (PartyNameChanged $event): void {
             Vendor::query()->where('tenant_id', $event->tenantId)->where('party_id', $event->partyId)->update(['updated_at' => now()]);
         });

@@ -183,6 +183,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ModalPageStackDemo } from './modal-page-stack-demo';
+import { InlineLookupDemo } from './inline-lookup-demo';
 
 const availableComponents = [
     'Accordion',
@@ -349,9 +350,9 @@ export default function UiPlayground() {
     return (
         <>
             <Head title="UI Playground" />
-            <main className="min-h-screen bg-muted/30">
+            <main className="bg-muted/30 min-h-screen">
                 <div className="flex w-full flex-col gap-4 p-4">
-                    <header className="overflow-hidden rounded-lg border bg-background p-5 shadow-sm">
+                    <header className="bg-background overflow-hidden rounded-lg border p-5 shadow-sm">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                             <div className="max-w-3xl space-y-3">
                                 <Badge variant="secondary">
@@ -361,7 +362,7 @@ export default function UiPlayground() {
                                 <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
                                     Shadcn UI Playground
                                 </h1>
-                                <p className="text-lg text-muted-foreground">
+                                <p className="text-muted-foreground text-lg">
                                     Satu halaman untuk menguji warna, radius,
                                     spacing, typography, dan interaction sebelum
                                     dipakai di aplikasi.
@@ -527,6 +528,13 @@ export default function UiPlayground() {
                         </DemoCard>
 
                         <DemoCard
+                            title="Inline Search Dropdown R&D"
+                            description="Label tetap terbaca, pencarian langsung di field, dan pilihan dengan kode serta deskripsi."
+                        >
+                            <InlineLookupDemo />
+                        </DemoCard>
+
+                        <DemoCard
                             title="Feedback & loading"
                             description="Alert, progress, skeleton, spinner, badges, dan toast."
                         >
@@ -679,7 +687,7 @@ export default function UiPlayground() {
                                                 <p className="font-medium">
                                                     Design system
                                                 </p>
-                                                <p className="text-sm text-muted-foreground">
+                                                <p className="text-muted-foreground text-sm">
                                                     Shared component library.
                                                 </p>
                                             </div>
@@ -815,7 +823,7 @@ export default function UiPlayground() {
                                             />
                                         </Button>
                                     </CollapsibleTrigger>
-                                    <CollapsibleContent className="rounded-lg border p-3 text-sm text-muted-foreground">
+                                    <CollapsibleContent className="text-muted-foreground rounded-lg border p-3 text-sm">
                                         Additional filtering options would live
                                         here.
                                     </CollapsibleContent>
@@ -982,7 +990,7 @@ export default function UiPlayground() {
                                 className="min-h-56 rounded-lg border"
                             >
                                 <ResizablePanel defaultSize={35}>
-                                    <div className="flex h-full items-center justify-center bg-muted/40 p-6 text-sm">
+                                    <div className="bg-muted/40 flex h-full items-center justify-center p-6 text-sm">
                                         Navigation
                                     </div>
                                 </ResizablePanel>
@@ -1002,10 +1010,10 @@ export default function UiPlayground() {
                             <div className="space-y-6">
                                 <AspectRatio
                                     ratio={16 / 5}
-                                    className="overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-primary/5 to-background"
+                                    className="from-primary/20 via-primary/5 to-background overflow-hidden rounded-xl bg-gradient-to-r"
                                 >
                                     <div className="flex h-full items-center justify-center">
-                                        <PackageOpen className="size-12 text-primary" />
+                                        <PackageOpen className="text-primary size-12" />
                                     </div>
                                 </AspectRatio>
                                 <Carousel className="mx-10">
@@ -1085,17 +1093,17 @@ export default function UiPlayground() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-3">
-                            <div className="rounded-xl bg-primary p-5 text-primary-foreground">
+                            <div className="bg-primary text-primary-foreground rounded-xl p-5">
                                 Primary
                             </div>
-                            <div className="rounded-xl bg-secondary p-5 text-secondary-foreground">
+                            <div className="bg-secondary text-secondary-foreground rounded-xl p-5">
                                 Secondary
                             </div>
-                            <div className="rounded-xl bg-destructive p-5 text-destructive-foreground">
+                            <div className="bg-destructive text-destructive-foreground rounded-xl p-5">
                                 Destructive
                             </div>
                         </CardContent>
-                        <CardFooter className="text-sm text-muted-foreground">
+                        <CardFooter className="text-muted-foreground text-sm">
                             Route: /ui-playground
                         </CardFooter>
                     </Card>

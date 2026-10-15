@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
  * @property ?string $number
  * @property ?string $creation_key
  * @property string $search_name
+ * @property ?string $tax_number
  * @property string $status
  * @property int $version
  * @property-read Collection<int, PartyLocation> $locations
@@ -39,6 +40,7 @@ class Party extends Model
     public const COLUMN_CLASSIFICATION = [
         'name' => DataClass::EndUserIdentifiableInformation,
         'search_name' => DataClass::EndUserIdentifiableInformation,
+        'tax_number' => DataClass::EndUserIdentifiableInformation,
         'known_as' => DataClass::EndUserIdentifiableInformation,
         'personal_title' => DataClass::EndUserIdentifiableInformation,
         'personal_suffix' => DataClass::EndUserIdentifiableInformation,
@@ -61,8 +63,8 @@ class Party extends Model
 
     protected $fillable = ['tenant_id', 'type', 'name', 'search_name', 'status'];
 
-    /** Field profil yang divalidasi pengelola direktori; tidak dipakai sebagai identitas vendor. */
-    public const PROFILE_FIELDS = ['known_as', 'language', 'personal_title', 'personal_suffix', 'first_name', 'middle_name', 'last_name', 'initials', 'professional_title', 'professional_suffix', 'gender', 'marital_status', 'organization_number', 'duns_number', 'abc_code', 'birth_date', 'anniversary_date', 'number_of_children', 'number_of_employees', 'interests', 'memo'];
+    /** Identitas bersama yang divalidasi pengelola direktori dan dibaca akun bisnis. */
+    public const PROFILE_FIELDS = ['tax_number', 'known_as', 'language', 'personal_title', 'personal_suffix', 'first_name', 'middle_name', 'last_name', 'initials', 'professional_title', 'professional_suffix', 'gender', 'marital_status', 'organization_number', 'duns_number', 'abc_code', 'birth_date', 'anniversary_date', 'number_of_children', 'number_of_employees', 'interests', 'memo'];
 
     protected function casts(): array
     {

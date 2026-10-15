@@ -9,6 +9,8 @@ use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Actions\SaveParty;
+use App\Platform\AddressBook\Events\PartyNameChanged;
+use App\Platform\AddressBook\Events\PartyTaxNumberChanged;
 use App\Platform\AddressBook\Models\Party;
 use App\Platform\AddressBook\Models\PartyRoleRegistration;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -39,7 +41,7 @@ final class SaveVendor
      */
     public function create(TenantMembership $actor, array $data, string $creationKey): Vendor
     {
-        $this->ensureAdmin($actor);
+        $this->ensureAuthorized($actor);
         $tenant = $actor->tenant_id;
 
         $retry = Vendor::query()->where('tenant_id', $tenant)->where('creation_key', $creationKey)->first();
@@ -65,6 +67,15 @@ final class SaveVendor
         try {
             return DB::transaction(function () use ($actor, $tenant, $data, $creationKey, $legalEntity): Vendor {
                 $party = $this->party($tenant, $data, $creationKey);
+                if ($data['tax_number'] !== null) {
+                    if ($party->tax_number !== null && preg_replace('/\D/', '', $party->tax_number) !== preg_replace('/\D/', '', $data['tax_number'])) {
+                        throw ValidationException::withMessages(['tax_number' => 'NPWP berbeda dari pihak yang dipilih. Periksa identitasnya di buku alamat.']);
+                    }
+                    if ($party->tax_number === null) {
+                        $party->forceFill(['tax_number' => $data['tax_number']])->save();
+                        event(new PartyTaxNumberChanged($tenant, $party->id, $party->tax_number));
+                    }
+                }
 
                 $alreadyExists = Vendor::query()
                     ->where('tenant_id', $tenant)
@@ -96,7 +107,7 @@ final class SaveVendor
                     'legal_entity_id' => $legalEntity->id,
                     'party_id' => $party->id,
                     'number' => $publishedAt['number'],
-                    'tax_number' => $data['tax_number'],
+                    'tax_number' => $party->tax_number,
                     'payment_priority' => $data['payment_priority'] ?? null,
                     'status' => $data['status'],
                     'creation_key' => $creationKey,
@@ -138,7 +149,7 @@ final class SaveVendor
      */
     public function update(TenantMembership $actor, Vendor $vendor, array $data, int $expectedVersion): Vendor
     {
-        $this->ensureAdmin($actor);
+        $this->ensureAuthorized($actor);
         if ($vendor->tenant_id !== $actor->tenant_id) {
             throw new AuthorizationException;
         }
@@ -153,7 +164,13 @@ final class SaveVendor
             $vendor->fill(['tax_number' => $data['tax_number'], 'status' => $data['status'],
                 'payment_priority' => array_key_exists('payment_priority', $data) ? $data['payment_priority'] : $vendor->payment_priority])->save();
             $searchName = $party->search_name === Party::searchName($party->name) ? Party::searchName($data['name']) : $party->search_name;
-            $party->fill(['name' => $data['name'], 'search_name' => $searchName])->save();
+            $party->forceFill(['name' => $data['name'], 'search_name' => $searchName, 'tax_number' => $data['tax_number']])->save();
+            if ($party->wasChanged('name')) {
+                event(new PartyNameChanged($party->tenant_id, $party->id));
+            }
+            if ($party->wasChanged('tax_number')) {
+                event(new PartyTaxNumberChanged($party->tenant_id, $party->id, $party->tax_number));
+            }
             // Nama berubah di party, tetapi pembaca yang menyinkronkan vendor menyaring lewat
             // `updated_at` vendor. Disentuh supaya perubahan nama ikut terbawa tarikan berikutnya.
             $vendor->touch();
@@ -170,6 +187,9 @@ final class SaveVendor
             if ($party === null) {
                 throw ValidationException::withMessages(['party_id' => 'Pihak yang dipilih tidak ditemukan di buku alamat tenant ini.']);
             }
+            if ($party->status !== 'active') {
+                throw ValidationException::withMessages(['party_id' => 'Pihak yang dipilih nonaktif. Aktifkan di buku alamat sebelum membuat vendor baru.']);
+            }
 
             return $party;
         }
@@ -184,7 +204,7 @@ final class SaveVendor
         ], 'vendor:'.$creationKey);
     }
 
-    private function ensureAdmin(TenantMembership $actor): void
+    private function ensureAuthorized(TenantMembership $actor): void
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE)) {
             throw new AuthorizationException;

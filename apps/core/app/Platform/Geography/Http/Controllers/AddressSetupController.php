@@ -1292,6 +1292,12 @@ final class AddressSetupController extends Controller
         $regencyId = $request->query('regency_id');
         $districtId = $request->query('district_id');
 
+        if ($request->query('parent_type') === 'village') {
+            $data = $request->validate(['parent_id' => ['required', 'ulid']]);
+
+            return response()->json(PostalCode::query()->whereNull('tenant_id')->where('village_id', $data['parent_id'])->where('active', true)->orderBy('postal_code')->get(['id', 'postal_code', 'area_name']));
+        }
+
         if ($provinceId || $regencyId || $districtId) {
             $provinceQuery = Province::query();
             if ($countryCode) {

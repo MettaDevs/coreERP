@@ -44,6 +44,11 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // API JSON tidak memakai props Shell; otorisasi tetap diperiksa oleh route/controller.
+        if ($request->is('api/*') && ! $request->headers->has('X-Inertia')) {
+            return [];
+        }
+
         $user = $request->user();
         $workspace = app(CurrentWorkspace::class);
         $memberships = $workspace->memberships($request);

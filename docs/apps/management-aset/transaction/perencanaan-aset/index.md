@@ -73,6 +73,14 @@ Keputusan pemilik produk, 14 Oktober 2026: sampai Procurement tersedia, petugas 
 
 Saat barang datang, petugas memilih nomor permintaan dan baris barang pada penerimaan di inventarisasi. Satu permintaan boleh diterima melalui beberapa dokumen penerimaan: meminta 10 unit, menerima 4, lalu menerima 6. `received_quantity` dan `remaining_quantity` pada rincian permintaan dihitung dari penerimaan selesai; draf dan penerimaan dibatalkan tidak dihitung. Penerimaan terhubung harus memakai perusahaan dan jenis aset yang sama; rujukan pembelian tidak berlaku untuk hibah atau saldo awal. Penerimaan tanpa rujukan tetap tersedia untuk pencatatan lain; yang diwajibkan saat ini adalah asal perencanaan pada permintaan.
 
+Pemilih permintaan pada penerimaan menyediakan **Tanpa permintaan asal** untuk
+penerimaan langsung. Pilihan ini mengosongkan `permintaan_pembelian_detail_id`;
+ia tidak membuat permintaan atau rencana pengganti. Nama, klasifikasi, jumlah,
+dan nilai barang diisi langsung pada baris penerimaan. Mengganti rujukan menjadi
+tanpa permintaan mempertahankan rincian barang yang sudah diisi. Laporan perolehan
+tetap mencakup penerimaan tersebut; laporan pengadaan berbasis rencana/permintaan
+tidak memasukkannya karena tidak mempunyai kebutuhan asal.
+
 Penyelesaian mengunci dokumen permintaan sebelum menghitung sisa, dan menjumlah seluruh baris penerimaan yang menunjuk baris permintaan yang sama. Dua penyelesaian bersamaan tidak boleh menerima lebih dari jumlah diminta. Permintaan yang dipakai pada penerimaan tidak dapat diubah atau dibatalkan; rencana yang sudah dirujuk permintaan tidak dapat diubah atau diarsipkan. Ini menjaga hubungan dokumen asal tetap utuh.
 
 Regresinya ada di `PermintaanPembelianAsetTest` dan `PenerimaanAsetTest`; kontrak permintaan ada di `contracts/src/paths/purchase-requests.yaml`.

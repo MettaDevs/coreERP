@@ -16,6 +16,7 @@ use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationParty;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Buku alamat satu organisasi: legal entity dan operating unit adalah party, jadi
@@ -86,7 +87,7 @@ final class OrganizationAddressBook
     public function locations(Organization|Party $organization): array
     {
         return array_values($this->addressLinks($this->party($organization)->id)
-            ->with(['location.postalAddress', 'purposes'])
+            ->with(['location.postalAddress', 'location.ownerParty', 'purposes'])
             ->orderByDesc('is_primary')->orderBy('created_at')
             ->get()
             ->map(fn (PartyLocation $link): array => $this->presentLocation($link))
@@ -96,24 +97,31 @@ final class OrganizationAddressBook
     /**
      * Tempat beralamat pos milik tenant, untuk dipilih sebagai alamat bersama.
      *
-     * @return list<array{id: string, name: string, formatted: string}>
+     * @return array{data: list<array<string, mixed>>, next_cursor: ?string}
      */
-    public function sharableLocations(string $tenantId, string $search = ''): array
+    public function sharableLocations(string $tenantId, string $search = '', ?string $partyId = null): array
     {
-        return array_values(Location::query()
+        $locations = Location::query()
             ->where('tenant_id', $tenantId)
             ->whereHas('postalAddress')
+            ->when($partyId !== null, fn (Builder $query) => $query->whereDoesntHave('partyLinks', fn (Builder $links) => $links->where('party_id', $partyId)))
             ->with('postalAddress')
-            ->when($search !== '', fn (Builder $query) => $query->where('name', 'ilike', '%'.addcslashes($search, '\\%_').'%'))
-            ->orderBy('name')
-            ->limit(20)
-            ->get()
-            ->map(fn (Location $location): array => [
-                'id' => $location->id,
-                'name' => $location->name,
-                'formatted' => (string) $location->postalAddress?->formatted,
-            ])
-            ->all());
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match
+                ->where('name', 'ilike', '%'.addcslashes($search, '\\%_').'%')
+                ->orWhereHas('postalAddress', fn (Builder $address) => $address->where('formatted', 'ilike', '%'.addcslashes($search, '\\%_').'%'))))
+            ->orderBy('name')->orderBy('id')->cursorPaginate(40);
+
+        return ['data' => $locations->getCollection()->map(fn (Location $location): array => [
+            ...($location->postalAddress?->only([
+                'country_region_code', 'province_id', 'regency_id', 'district_id',
+                'village_id', 'postal_code_id', 'province', 'city', 'district',
+                'village', 'rt', 'rw', 'street', 'building', 'postbox', 'postal_code',
+            ]) ?? []),
+            'id' => $location->id,
+            'name' => $location->name,
+            'formatted' => (string) $location->postalAddress?->formatted,
+        ])
+            ->values()->all(), 'next_cursor' => $locations->nextCursor()?->encode()];
     }
 
     /**
@@ -139,12 +147,13 @@ final class OrganizationAddressBook
                 $link = $this->addressLinks($party->id)->whereKey($linkId)->firstOrFail();
                 RowVersion::claim($link, $expectedVersion);
                 $location = $link->location;
+                $this->ensureLocationOwner($party, $location);
             } elseif (($data['location_id'] ?? null) !== null) {
                 $location = Location::query()->where('tenant_id', $party->tenant_id)->whereHas('postalAddress')->whereKey($data['location_id'])->firstOrFail();
                 $link = PartyLocation::query()->where('party_id', $party->id)->where('location_id', $location->id)->first()
                     ?? new PartyLocation(['tenant_id' => $party->tenant_id, 'party_id' => $party->id, 'location_id' => $location->id]);
             } else {
-                $location = Location::create(['tenant_id' => $party->tenant_id, 'name' => $data['name']]);
+                $location = Location::create(['tenant_id' => $party->tenant_id, 'name' => $data['name'], 'owner_party_id' => $party->id]);
                 $link = new PartyLocation(['tenant_id' => $party->tenant_id, 'party_id' => $party->id, 'location_id' => $location->id]);
             }
 
@@ -166,7 +175,7 @@ final class OrganizationAddressBook
             }
             $this->syncPurposes($link, $data['purposes']);
 
-            return $this->presentLocation($link->fresh(['location.postalAddress', 'purposes']));
+            return $this->presentLocation($link->fresh(['location.postalAddress', 'location.ownerParty', 'purposes']));
         });
     }
 
@@ -234,7 +243,10 @@ final class OrganizationAddressBook
             $previousType = $contact?->type;
             $previousPrimary = $contact !== null ? $contact->is_primary : false;
             // Semua penulis kontak mengunci tempat dahulu; perpindahan memakai urutan id yang sama.
-            Location::query()->where('tenant_id', $party->tenant_id)->whereIn('id', array_filter([$locationId, $previousLocation]))->orderBy('id')->lockForUpdate()->get();
+            $locations = Location::query()->where('tenant_id', $party->tenant_id)->whereIn('id', array_filter([$locationId, $previousLocation]))->orderBy('id')->lockForUpdate()->get();
+            foreach ($locations as $location) {
+                $this->ensureLocationOwner($party, $location);
+            }
             if ($contact !== null) {
                 RowVersion::claim($contact, $expectedVersion);
             }
@@ -274,7 +286,8 @@ final class OrganizationAddressBook
             Party::query()->whereKey($party->id)->lockForUpdate()->first();
 
             $contact = $this->partyContacts($party->id)->whereKey($contactId)->firstOrFail();
-            Location::query()->where('tenant_id', $party->tenant_id)->whereKey($contact->location_id)->lockForUpdate()->firstOrFail();
+            $location = Location::query()->where('tenant_id', $party->tenant_id)->whereKey($contact->location_id)->lockForUpdate()->firstOrFail();
+            $this->ensureLocationOwner($party, $location);
             RowVersion::claim($contact, $expectedVersion);
             $wasPrimary = $contact->is_primary;
             $contact->fill(['is_primary' => false])->save();
@@ -338,27 +351,39 @@ final class OrganizationAddressBook
 
     private function defaultContactLocation(Party $party): string
     {
-        $primary = $this->addressLinks($party->id)->where('is_primary', true)->value('location_id');
+        $primary = $this->addressLinks($party->id)->where('is_primary', true)
+            ->whereHas('location', fn (Builder $query) => $query->where('owner_party_id', $party->id))->value('location_id');
         if ($primary !== null) {
             return $primary;
         }
 
         $existing = PartyLocation::query()->where('party_id', $party->id)->whereDoesntHave('location.postalAddress')
+            ->whereHas('location', fn (Builder $query) => $query->where('owner_party_id', $party->id))
             ->orderBy('created_at')->value('location_id');
         if ($existing !== null) {
             return $existing;
         }
 
-        $location = Location::create(['tenant_id' => $party->tenant_id, 'name' => self::CONTACT_LOCATION_NAME]);
+        $location = Location::create(['tenant_id' => $party->tenant_id, 'name' => self::CONTACT_LOCATION_NAME, 'owner_party_id' => $party->id]);
         PartyLocation::create(['tenant_id' => $party->tenant_id, 'party_id' => $party->id, 'location_id' => $location->id, 'is_primary' => false]);
 
         return $location->id;
+    }
+
+    private function ensureLocationOwner(Party $party, Location $location): void
+    {
+        if ($location->owner_party_id !== $party->id) {
+            throw ValidationException::withMessages([
+                'address_id' => 'Alamat dan kontak bersama hanya dapat diubah melalui pihak pemiliknya. Buka pihak pemilik di buku alamat, atau tambahkan alamat baru untuk pihak ini.',
+            ]);
+        }
     }
 
     /** @param  array<string, mixed>  $data */
     private function savePostalAddress(Location $location, array $data): void
     {
         $address = $location->postalAddress ?? new PostalAddress(['tenant_id' => $location->tenant_id, 'location_id' => $location->id]);
+        $data = app(PostalAddressReferences::class)->resolve($data, $address->exists ? $address : null);
         $fields = [
             'country_region_code' => strtoupper($data['country_region_code']),
             'province' => $this->clean($data['province'] ?? null),
@@ -372,7 +397,7 @@ final class OrganizationAddressBook
             'postbox' => $this->clean($data['postbox'] ?? null),
             'postal_code' => $this->clean($data['postal_code'] ?? null),
         ];
-        $address->fill([...$fields, 'formatted' => PostalAddressFormatter::format($fields)])->save();
+        $address->fill([...$fields, ...array_intersect_key($data, PostalAddressReferences::rules()), 'formatted' => PostalAddressFormatter::format($fields)])->save();
     }
 
     /** @param  list<string>  $purposes */
@@ -400,6 +425,8 @@ final class OrganizationAddressBook
             'id' => $link->id,
             'version' => (int) $link->version,
             'location_id' => $link->location_id,
+            'is_location_owner' => $link->location->owner_party_id === $link->party_id,
+            'owner_party_name' => $link->location->ownerParty?->name,
             'name' => $link->location->name,
             'purposes' => array_values(array_intersect($this->purposeOrder(), $link->purposes->pluck('purpose_code')->all())),
             'is_primary' => $link->is_primary,
@@ -407,6 +434,11 @@ final class OrganizationAddressBook
             'shared_with' => PartyLocation::query()
                 ->where('location_id', $link->location_id)->where('party_id', '<>', $link->party_id)->count(),
             'country_region_code' => $address?->country_region_code,
+            'province_id' => $address?->getAttribute('province_id'),
+            'regency_id' => $address?->getAttribute('regency_id'),
+            'district_id' => $address?->getAttribute('district_id'),
+            'village_id' => $address?->getAttribute('village_id'),
+            'postal_code_id' => $address?->getAttribute('postal_code_id'),
             'province' => $address?->province,
             'city' => $address?->city,
             'district' => $address?->district,
@@ -429,6 +461,7 @@ final class OrganizationAddressBook
         return [
             'id' => $contact->id,
             'version' => (int) $contact->version,
+            'is_location_owner' => $link !== null && $link->location->owner_party_id === $link->party_id,
             'type' => $contact->type,
             'value' => $contact->value,
             'purpose' => $contact->purpose,

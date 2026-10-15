@@ -7,7 +7,6 @@ use App\Platform\Geography\Models\AddressHierarchy\Province;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
@@ -24,7 +23,8 @@ class AddressHierarchyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(IndonesianAddressHierarchySeeder::class);
+        $import = require database_path('data/import_indonesia_hierarchy.php');
+        $import(base_path('tests/Fixtures/indonesia-address'));
 
         $this->user = User::factory()->create();
         $client = Client::create([
@@ -60,7 +60,7 @@ class AddressHierarchyTest extends TestCase
 
         $this->assertDatabaseHas('ref_regencies', [
             'code' => '3171',
-            'name' => 'Kota Jakarta Pusat',
+            'name' => 'Kota Administrasi Jakarta Pusat',
         ]);
 
         $this->assertDatabaseHas('ref_districts', [

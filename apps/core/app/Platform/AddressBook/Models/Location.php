@@ -6,6 +6,7 @@ use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -29,7 +30,13 @@ class Location extends Model
         'name' => DataClass::CustomerContent,
     ];
 
-    protected $fillable = ['tenant_id', 'name'];
+    protected $fillable = ['tenant_id', 'name', 'owner_party_id'];
+
+    /** @return BelongsTo<Party, $this> */
+    public function ownerParty(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'owner_party_id')->withTrashed();
+    }
 
     /** @return HasOne<PostalAddress, $this> */
     public function postalAddress(): HasOne

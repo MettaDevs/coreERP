@@ -3,7 +3,7 @@ import { Sidebar, useSidebar } from '@apperp/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import { ProductLauncher } from '@/components/product-launcher';
 import { useShellNavigation } from '@/hooks/use-shell-navigation';
@@ -53,33 +53,12 @@ export function AppSidebar() {
     const { url, props } = usePage();
     const [previewLabel, setPreviewLabel] = useState<string | null>(null);
     const path = url.split('?')[0];
-    const [realtimeSection, setRealtimeSection] = useState<string | null>(null);
     const [prevUrl, setPrevUrl] = useState(url);
 
     if (prevUrl !== url) {
         setPrevUrl(url);
-        setRealtimeSection(null);
         setPreviewLabel(null);
     }
-
-    useEffect(() => {
-        const handleSectionChange = (event: Event) => {
-            const customEvent = event as CustomEvent<{ section: string }>;
-
-            if (customEvent.detail?.section) {
-                setRealtimeSection(customEvent.detail.section);
-            }
-        };
-
-        window.addEventListener('coreerp:section-change', handleSectionChange);
-
-        return () => {
-            window.removeEventListener(
-                'coreerp:section-change',
-                handleSectionChange,
-            );
-        };
-    }, []);
 
     const { primaryItems } = useShellNavigation();
     const isHostedApp = props.app !== undefined;
@@ -92,34 +71,10 @@ export function AppSidebar() {
             ),
         ) ?? primaryItems[0];
     const isChildActive = (item: NavigationItem) => {
-        if (
-            path === '/settings/global-address-book' &&
-            item.href.startsWith('/settings/global-address-book?')
-        ) {
-            const currentSection =
-                new URLSearchParams(url.split('?')[1] ?? '').get('section') ??
-                'general';
-
-            return (
-                new URLSearchParams(item.href.split('?')[1] ?? '').get(
-                    'section',
-                ) === currentSection
-            );
-        }
-
-        if (realtimeSection && path === '/settings/global-address-book') {
-            return (
-                item.href ===
-                `/settings/global-address-book?section=${realtimeSection}`
-            );
-        }
-
         return (
             url === item.href ||
+            (!item.href.includes('?') && path === item.href) ||
             (isHostedApp && path.startsWith(`${item.href}/`)) ||
-            (item.href === '/settings/global-address-book?section=general' &&
-                path === '/settings/global-address-book' &&
-                !url.includes('?section=')) ||
             (item.href === '/settings/access?section=members' &&
                 path === '/settings/access' &&
                 !url.includes('?section='))
@@ -274,22 +229,11 @@ export function AppSidebar() {
                             {displayedItem.children.map((item) => (
                                 <Link
                                     key={item.label}
-                                    href={
-                                        path ===
-                                            '/settings/global-address-book' &&
-                                        item.href.startsWith(
-                                            '/settings/global-address-book?',
-                                        ) &&
-                                        new URLSearchParams(
-                                            url.split('?')[1] ?? '',
-                                        ).has('party')
-                                            ? `${item.href}&party=${new URLSearchParams(url.split('?')[1] ?? '').get('party')}`
-                                            : item.href
-                                    }
+                                    href={item.href}
                                     onClick={() => {
-                                        setPreviewLabel(null);
-
+                                        // Desktop mempertahankan menu hover selama URL tujuan belum terpasang.
                                         if (isMobile) {
+                                            setPreviewLabel(null);
                                             setOpenMobile(false);
                                         }
                                     }}

@@ -10,19 +10,19 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
+import {
+    PageDialog as Dialog,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+} from '@apperp/ui/page-dialog';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 import type { AddressBook, DirectoryMetadata } from '../types';
+import { AddressBookHint } from './address-book-hint';
 
 export function AddressBookManager({
     metadata,
@@ -112,8 +112,17 @@ export function AddressBookManager({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Buku alamat</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle>
+                        <span className="inline-flex items-center gap-2">
+                            Buku alamat
+                            <AddressBookHint label="Buku alamat">
+                                Kelompok pihak untuk memudahkan pencarian.
+                                Mengarsipkan kelompok tidak mengarsipkan pihak
+                                di dalamnya.
+                            </AddressBookHint>
+                        </span>
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
                         Kelompok pihak untuk memudahkan pencarian. Mengarsipkan
                         kelompok tidak mengarsipkan pihak di dalamnya.
                     </DialogDescription>
@@ -225,11 +234,6 @@ export function AddressBookManager({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-                <DialogFooter>
-                    <Button variant="outline" disabled={busy} onClick={onClose}>
-                        Tutup
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

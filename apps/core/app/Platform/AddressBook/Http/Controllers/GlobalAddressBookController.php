@@ -7,6 +7,7 @@ use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Actions\SaveParty;
 use App\Platform\AddressBook\Contracts\PartyNumbers;
 use App\Platform\AddressBook\Events\PartyNameChanged;
+use App\Platform\AddressBook\Events\PartyTaxNumberChanged;
 use App\Platform\AddressBook\Models\AddressBook;
 use App\Platform\AddressBook\Models\ElectronicAddress;
 use App\Platform\AddressBook\Models\LocationPurpose;
@@ -15,10 +16,12 @@ use App\Platform\AddressBook\Models\PartyAddressBook;
 use App\Platform\AddressBook\Models\PartyRelationship;
 use App\Platform\AddressBook\Models\PartyType;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
+use App\Platform\AddressBook\Support\PostalAddressReferences;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Organization\Models\OrganizationParty;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,14 +70,31 @@ final class GlobalAddressBookController extends Controller
 
         return Inertia::render('platform/address-book/index', [
             'parties' => $query->orderBy('name')->paginate(50)->withQueryString()->through(fn (Party $party): array => $this->present($party)),
-            'filters' => $filters, 'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
+            'filters' => $filters,
+            ...$this->formMetadata($membership),
+        ]);
+    }
+
+    public function metadata(Request $request): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE), 403);
+
+        return response()->json(['data' => $this->formMetadata($membership)]);
+    }
+
+    /** @return array<string, mixed> */
+    private function formMetadata(TenantMembership $membership): array
+    {
+        return [
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
             'canManageVendors' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
             'canReadVendors' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_READ),
             'partyTypes' => PartyType::query()->get(['code', 'name']),
             'referenceValues' => DB::table('party_reference_values')->orderBy('name')->get()->groupBy('category'),
             'relationshipTypes' => DB::table('party_relationship_types')->get(),
-            'addressBooks' => AddressBook::query()->where('tenant_id', $tenant)->orderBy('name')->get(['id', 'name', 'version']),
-        ]);
+            'addressBooks' => AddressBook::query()->where('tenant_id', $membership->tenant_id)->orderBy('name')->get(['id', 'name', 'version']),
+        ];
     }
 
     public function show(Request $request, Party $party): JsonResponse
@@ -152,6 +172,9 @@ final class GlobalAddressBookController extends Controller
             // Pembaca vendor yang lama juga menyaring lewat waktu perubahan akun vendor.
             if ($party->wasChanged('name')) {
                 event(new PartyNameChanged($party->tenant_id, $party->id));
+            }
+            if ($party->wasChanged('tax_number')) {
+                event(new PartyTaxNumberChanged($party->tenant_id, $party->id, $party->tax_number));
             }
 
             return $party->refresh();
@@ -318,15 +341,17 @@ final class GlobalAddressBookController extends Controller
     public function sharableLocations(Request $request, Party $party): JsonResponse
     {
         $this->guardParty($request, $party, true);
-        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']]);
 
-        return response()->json(['data' => $this->addresses->sharableLocations($party->tenant_id, trim($data['q'] ?? ''))]);
+        return response()->json($this->addresses->sharableLocations($party->tenant_id, trim($data['q'] ?? ''), $party->id));
     }
 
     public function saveLocation(Request $request, Party $party, ?string $location = null): JsonResponse
     {
         $this->guardParty($request, $party, true);
-        $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
+        if ($request->filled('country_region_code')) {
+            $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
+        }
         $linking = $request->filled('location_id');
         $data = $request->validate([
             'location_id' => ['nullable', 'ulid'], 'name' => [$linking ? 'nullable' : 'required', 'string', 'max:120'],
@@ -336,6 +361,7 @@ final class GlobalAddressBookController extends Controller
             'province' => ['nullable', 'string', 'max:100'], 'city' => ['nullable', 'string', 'max:100'], 'district' => ['nullable', 'string', 'max:100'],
             'village' => ['nullable', 'string', 'max:100'], 'rt' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'], 'rw' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'],
             'street' => ['nullable', 'string', 'max:250'], 'building' => ['nullable', 'string', 'max:120'], 'postbox' => ['nullable', 'string', 'max:60'], 'postal_code' => ['nullable', 'string', 'max:20'],
+            ...PostalAddressReferences::rules(),
         ]);
 
         return response()->json(['data' => $this->addresses->saveLocation($party, $data, $location, $location === null ? 0 : RowVersion::expected($request))], $location === null ? 201 : 200);
@@ -397,15 +423,24 @@ final class GlobalAddressBookController extends Controller
         }
         $rules['memo'] = ['sometimes', 'nullable', 'string', 'max:10000'];
         $rules['interests'] = ['sometimes', 'nullable', 'string', 'max:2000'];
+        $rules['tax_number'] = ['sometimes', 'nullable', 'string', 'max:32', 'regex:/^[0-9.\- ]+$/'];
         $data = $request->validate($rules, [], [
-            'name' => 'nama lengkap', 'type' => 'jenis pihak', 'status' => 'status', 'search_name' => 'nama pencarian',
+            'name' => 'nama', 'type' => 'jenis pihak', 'status' => 'status', 'search_name' => 'nama pencarian', 'tax_number' => 'NPWP',
             'birth_date' => 'tanggal lahir', 'anniversary_date' => 'tanggal pernikahan', 'number_of_children' => 'jumlah anak',
             'number_of_employees' => 'jumlah karyawan', 'organization_number' => 'nomor registrasi organisasi',
             'duns_number' => 'nomor DUNS', 'gender' => 'jenis kelamin', 'marital_status' => 'status pernikahan',
             'abc_code' => 'klasifikasi ABC', 'language' => 'bahasa', 'address_book_ids' => 'buku alamat', 'address_book_ids.*' => 'buku alamat',
         ]);
         $data['name'] = trim($data['name']);
-        $data['search_name'] = Party::searchName(trim((string) ($data['search_name'] ?? '')) ?: $data['name']);
+        if (! array_key_exists('search_name', $data) && $party !== null && $party->search_name !== Party::searchName($party->name)) {
+            $data['search_name'] = $party->search_name;
+        } else {
+            $data['search_name'] = Party::searchName(trim((string) ($data['search_name'] ?? '')) ?: $data['name']);
+        }
+        if (array_key_exists('tax_number', $data)) {
+            $data['tax_number'] = trim((string) $data['tax_number']);
+            $data['tax_number'] = $data['tax_number'] === '' ? null : $data['tax_number'];
+        }
 
         return $data;
     }

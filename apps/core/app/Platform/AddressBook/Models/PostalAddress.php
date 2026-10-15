@@ -42,6 +42,7 @@ class PostalAddress extends Model
     protected $fillable = [
         'tenant_id', 'location_id', 'country_region_code', 'province', 'city',
         'district', 'street', 'building', 'postbox', 'postal_code', 'formatted', 'village', 'rt', 'rw',
+        'province_id', 'regency_id', 'district_id', 'village_id', 'postal_code_id',
     ];
 
     /** @return BelongsTo<Location, $this> */
