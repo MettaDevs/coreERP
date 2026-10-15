@@ -31,7 +31,7 @@ function ComboboxTrigger({
       {children}
       <ChevronDownIcon
         data-slot="combobox-trigger-icon"
-        className="pointer-events-none size-4 text-muted-foreground"
+        className="text-muted-foreground pointer-events-none size-4"
       />
     </ComboboxPrimitive.Trigger>
   )
@@ -57,23 +57,50 @@ function ComboboxInput({
   showTrigger = true,
   showClear = false,
   showSearchIcon = false,
+  label,
+  id,
   ...props
 }: ComboboxPrimitive.Input.Props & {
+  label?: string
   showTrigger?: boolean
   showClear?: boolean
   showSearchIcon?: boolean
 }) {
+  const generatedId = React.useId()
+  const inputId = id ?? (label ? generatedId : undefined)
+
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn(label ? "w-full" : "w-auto", className)}>
       {showSearchIcon && (
         <InputGroupAddon>
           <SearchIcon />
         </InputGroupAddon>
       )}
       <ComboboxPrimitive.Input
-        render={<InputGroupInput disabled={disabled} />}
+        render={
+          <InputGroupInput
+            disabled={disabled}
+            className={label ? "peer" : undefined}
+          />
+        }
         {...props}
+        id={inputId}
+        placeholder={label ? " " : props.placeholder}
       />
+      {label && (
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "text-foreground dark:bg-input/30 pointer-events-none absolute start-3 top-0 z-10 -translate-y-1/2 bg-white px-1 text-xs leading-none transition-all duration-150 ease-out",
+            "peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm",
+            "peer-focus:text-foreground peer-focus:top-0 peer-focus:text-xs",
+            "peer-aria-invalid:text-destructive peer-disabled:opacity-50"
+          )}
+        >
+          {label}
+          {props.required && <span className="text-destructive"> *</span>}
+        </label>
+      )}
       <InputGroupAddon align="inline-end">
         {showTrigger && (
           <InputGroupButton
@@ -107,7 +134,11 @@ function ComboboxContent({
   Pick<
     ComboboxPrimitive.Positioner.Props,
     "side" | "align" | "sideOffset" | "alignOffset" | "anchor"
-  > & { container?: React.ComponentProps<typeof ComboboxPrimitive.Portal>["container"] }) {
+  > & {
+    container?: React.ComponentProps<
+      typeof ComboboxPrimitive.Portal
+    >["container"]
+  }) {
   return (
     <ComboboxPrimitive.Portal container={container}>
       <ComboboxPrimitive.Positioner
@@ -122,7 +153,7 @@ function ComboboxContent({
           data-slot="combobox-content"
           data-chips={!!anchor}
           className={cn(
-            "group/combobox-content relative max-h-96 w-(--anchor-width) max-w-(--available-width) min-w-(--anchor-width) origin-(--transform-origin) overflow-hidden rounded-[4px] border border-[#d9dfe7] bg-white text-[#1f2937] shadow-lg duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 *:data-[slot=input-group]:m-2 *:data-[slot=input-group]:mb-0 *:data-[slot=input-group]:border-[#d9dfe7] *:data-[slot=input-group]:bg-white *:data-[slot=input-group]:shadow-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            "group/combobox-content w-(--anchor-width) max-w-(--available-width) min-w-(--anchor-width) origin-(--transform-origin) data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 relative max-h-96 overflow-hidden rounded-[4px] border border-[#d9dfe7] bg-white text-[#1f2937] shadow-lg duration-100 *:data-[slot=input-group]:m-2 *:data-[slot=input-group]:mb-0 *:data-[slot=input-group]:border-[#d9dfe7] *:data-[slot=input-group]:bg-white *:data-[slot=input-group]:shadow-none",
             className
           )}
           {...props}
@@ -137,7 +168,7 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
     <ComboboxPrimitive.List
       data-slot="combobox-list"
       className={cn(
-        "max-h-[min(calc(--spacing(96)---spacing(9)),calc(var(--available-height)---spacing(9)))] scroll-py-1 overflow-y-auto p-1 data-empty:p-0",
+        "data-empty:p-0 max-h-[min(calc(--spacing(96)---spacing(9)),calc(var(--available-height)---spacing(9)))] scroll-py-1 overflow-y-auto p-1",
         className
       )}
       {...props}
@@ -154,7 +185,7 @@ function ComboboxItem({
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
       {...props}
@@ -166,7 +197,7 @@ function ComboboxItem({
           <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
         }
       >
-        <CheckIcon className="pointer-events-none size-4 pointer-coarse:size-5" />
+        <CheckIcon className="pointer-coarse:size-5 pointer-events-none size-4" />
       </ComboboxPrimitive.ItemIndicator>
     </ComboboxPrimitive.Item>
   )
@@ -190,7 +221,7 @@ function ComboboxLabel({
     <ComboboxPrimitive.GroupLabel
       data-slot="combobox-label"
       className={cn(
-        "px-2 py-1.5 text-xs text-muted-foreground pointer-coarse:px-3 pointer-coarse:py-2 pointer-coarse:text-sm",
+        "text-muted-foreground pointer-coarse:px-3 pointer-coarse:py-2 pointer-coarse:text-sm px-2 py-1.5 text-xs",
         className
       )}
       {...props}
@@ -209,7 +240,7 @@ function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
     <ComboboxPrimitive.Empty
       data-slot="combobox-empty"
       className={cn(
-        "hidden w-full justify-center py-2 text-center text-sm text-muted-foreground group-data-empty/combobox-content:flex",
+        "text-muted-foreground group-data-empty/combobox-content:flex hidden w-full justify-center py-2 text-center text-sm",
         className
       )}
       {...props}
@@ -224,7 +255,7 @@ function ComboboxSeparator({
   return (
     <ComboboxPrimitive.Separator
       data-slot="combobox-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn("bg-border -mx-1 my-1 h-px", className)}
       {...props}
     />
   )
@@ -239,7 +270,7 @@ function ComboboxChips({
     <ComboboxPrimitive.Chips
       data-slot="combobox-chips"
       className={cn(
-        "flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent bg-clip-padding px-2.5 py-1.5 text-sm shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-[3px] has-aria-invalid:ring-destructive/20 has-data-[slot=combobox-chip]:px-1.5 dark:bg-input/30 dark:has-aria-invalid:border-destructive/50 dark:has-aria-invalid:ring-destructive/40",
+        "border-input shadow-xs focus-within:border-ring focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-[3px] has-aria-invalid:ring-destructive/20 has-data-[slot=combobox-chip]:px-1.5 dark:bg-input/30 dark:has-aria-invalid:border-destructive/50 dark:has-aria-invalid:ring-destructive/40 flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-transparent bg-clip-padding px-2.5 py-1.5 text-sm transition-[color,box-shadow] focus-within:ring-[3px]",
         className
       )}
       {...props}
@@ -259,7 +290,7 @@ function ComboboxChip({
     <ComboboxPrimitive.Chip
       data-slot="combobox-chip"
       className={cn(
-        "flex h-[calc(--spacing(5.5))] w-fit items-center justify-center gap-1 rounded-sm bg-muted px-1.5 text-xs font-medium whitespace-nowrap text-foreground has-disabled:pointer-events-none has-disabled:cursor-not-allowed has-disabled:opacity-50 has-data-[slot=combobox-chip-remove]:pr-0",
+        "bg-muted text-foreground has-disabled:pointer-events-none has-disabled:cursor-not-allowed has-disabled:opacity-50 has-data-[slot=combobox-chip-remove]:pr-0 flex h-[calc(--spacing(5.5))] w-fit items-center justify-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-xs font-medium",
         className
       )}
       {...props}

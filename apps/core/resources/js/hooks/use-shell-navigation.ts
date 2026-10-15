@@ -1,7 +1,6 @@
 import { usePage } from '@inertiajs/react';
 import {
     BookOpen,
-    Briefcase,
     Building2,
     CalendarCheck,
     CalendarDays,
@@ -19,8 +18,6 @@ import {
     Hash,
     History,
     Map,
-    MapPin,
-    PhoneCall,
     Plug,
     Ruler,
     Package,
@@ -188,33 +185,9 @@ export function useShellNavigation() {
                 href: '/settings/global-address-book',
                 children: [
                     {
-                        label: 'General',
+                        label: 'Party',
                         icon: UserRound,
-                        href: '/settings/global-address-book?section=general',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Addresses',
-                        icon: MapPin,
-                        href: '/settings/global-address-book?section=addresses',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Relationships',
-                        icon: Users,
-                        href: '/settings/global-address-book?section=relationships',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Contact Information',
-                        icon: PhoneCall,
-                        href: '/settings/global-address-book?section=contacts',
-                        permission: 'core.organization.read',
-                    },
-                    {
-                        label: 'Roles',
-                        icon: Briefcase,
-                        href: '/settings/global-address-book?section=roles',
+                        href: '/settings/global-address-book',
                         permission: 'core.organization.read',
                     },
                     {

@@ -93,6 +93,34 @@ class SharedLocationTest extends TestCase
             ->assertJsonPath('data.0.shared_with', 0);
     }
 
+    public function test_only_the_location_owner_can_change_shared_addresses_and_contacts(): void
+    {
+        $holding = $this->legalEntity('Pemilik tempat');
+        $branch = $this->legalEntity('Pemakai tempat');
+        $address = $this->addAddress($holding, ['name' => 'Tempat bersama', 'street' => 'Alamat awal']);
+        $contact = $this->actingAs($this->owner)->postJson("/api/v1/organizations/{$holding}/contacts", [
+            'type' => 'phone', 'value' => '0211234', 'address_id' => $address['id'],
+        ])->assertCreated()->json('data');
+        $linked = $this->postJson("/api/v1/organizations/{$branch}/locations", [
+            'location_id' => $address['location_id'], 'purposes' => ['business'],
+        ])->assertCreated()->assertJsonPath('data.is_location_owner', false)->json('data');
+        $this->putJson("/api/v1/organizations/{$branch}/locations/{$linked['id']}", [
+            'name' => 'Tempat bersama', 'street' => 'Perubahan ditolak', 'country_region_code' => 'ID',
+            'purposes' => ['business'], 'version' => $linked['version'],
+        ])->assertUnprocessable();
+        $this->putJson("/api/v1/organizations/{$branch}/contacts/{$contact['id']}", [
+            'type' => 'phone', 'value' => '999', 'address_id' => $linked['id'], 'version' => $contact['version'],
+        ])->assertUnprocessable();
+        $this->deleteJson("/api/v1/organizations/{$branch}/contacts/{$contact['id']}", ['version' => $contact['version']])->assertUnprocessable();
+        $this->assertDatabaseHas('postal_addresses', ['location_id' => $address['location_id'], 'street' => 'Alamat awal']);
+        $this->assertDatabaseHas('electronic_addresses', ['id' => $contact['id'], 'value' => '0211234', 'deleted_at' => null]);
+        $this->postJson("/api/v1/organizations/{$branch}/locations", [
+            'location_id' => $address['location_id'], 'purposes' => ['delivery'], 'is_primary' => true,
+        ])->assertCreated()->assertJsonPath('data.is_primary', true)->assertJsonPath('data.is_location_owner', false);
+        $this->deleteJson("/api/v1/organizations/{$branch}/locations/{$linked['id']}", ['version' => $this->versi('party_locations', $linked['id'])])->assertNoContent();
+        $this->getJson("/api/v1/organizations/{$holding}/locations")->assertOk()->assertJsonPath('data.0.is_location_owner', true);
+    }
+
     public function test_one_address_holds_several_purposes(): void
     {
         $organization = $this->legalEntity('PT Kegunaan');

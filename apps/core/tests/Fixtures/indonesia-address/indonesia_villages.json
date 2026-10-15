@@ -1,0 +1,74 @@
+[
+  {
+    "code": "31.71.01.1001",
+    "district_code": "31.71.01",
+    "name": "Gambir",
+    "type": "kelurahan"
+  },
+  {
+    "code": "31.71.01.1002",
+    "district_code": "31.71.01",
+    "name": "Cideng",
+    "type": "kelurahan"
+  },
+  {
+    "code": "31.71.01.1003",
+    "district_code": "31.71.01",
+    "name": "Petojo Utara",
+    "type": "kelurahan"
+  },
+  {
+    "code": "31.71.01.1004",
+    "district_code": "31.71.01",
+    "name": "Petojo Selatan",
+    "type": "kelurahan"
+  },
+  {
+    "code": "31.71.01.1005",
+    "district_code": "31.71.01",
+    "name": "Kebon Kelapa",
+    "type": "kelurahan"
+  },
+  {
+    "code": "31.71.01.1006",
+    "district_code": "31.71.01",
+    "name": "Duri Pulo",
+    "type": "kelurahan"
+  },
+  {
+    "code": "51.03.05.1004",
+    "district_code": "51.03.05",
+    "name": "Benoa",
+    "type": "kelurahan"
+  },
+  {
+    "code": "51.03.05.1005",
+    "district_code": "51.03.05",
+    "name": "Tanjung Benoa",
+    "type": "kelurahan"
+  },
+  {
+    "code": "51.03.05.1006",
+    "district_code": "51.03.05",
+    "name": "Jimbaran",
+    "type": "kelurahan"
+  },
+  {
+    "code": "51.03.05.2001",
+    "district_code": "51.03.05",
+    "name": "Pecatu",
+    "type": "desa"
+  },
+  {
+    "code": "51.03.05.2002",
+    "district_code": "51.03.05",
+    "name": "Ungasan",
+    "type": "desa"
+  },
+  {
+    "code": "51.03.05.2003",
+    "district_code": "51.03.05",
+    "name": "Kutuh",
+    "type": "desa"
+  }
+]

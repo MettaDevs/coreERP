@@ -12,27 +12,29 @@ import {
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import {
     Field,
-    FieldDescription,
     FieldGroup,
     FieldLabel,
     FieldLegend,
     FieldSet,
 } from '@apperp/ui/field';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
+import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import {
+    PageDialog as Dialog,
+    PageDialogAction as DialogAction,
+    PageDialogBody as DialogBody,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogFooter as DialogFooter,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+} from '@apperp/ui/page-dialog';
+import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import {
     Table,
@@ -42,10 +44,23 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Archive, Pencil, Plus, Star } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Textarea } from '@apperp/ui/textarea';
+import {
+    Archive,
+    Pencil,
+    Plus,
+    Star,
+    Mail,
+    Phone,
+    Globe,
+    MessageCircle,
+    Printer,
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
+import { loadLookupItems } from '@/lib/lookup-loader';
+import { AddressBookHint } from '../../address-book/components/address-book-hint';
 
 /**
  * Alamat dan informasi kontak satu organisasi, dibaca dari buku alamat party Core
@@ -64,6 +79,8 @@ type Location = {
     id: string;
     version: number;
     location_id: string;
+    is_location_owner: boolean;
+    owner_party_name: string | null;
     name: string;
     purposes: string[];
     is_primary: boolean;
@@ -79,6 +96,11 @@ type Location = {
     building: string | null;
     postbox: string | null;
     postal_code: string | null;
+    province_id: string | null;
+    regency_id: string | null;
+    district_id: string | null;
+    village_id: string | null;
+    postal_code_id: string | null;
     formatted: string;
 };
 
@@ -86,7 +108,18 @@ type Country = { code: string; name: string };
 
 type Purpose = { code: string; name: string };
 
-type SharableLocation = { id: string; name: string; formatted: string };
+type SharableLocation = Omit<
+    Location,
+    | 'version'
+    | 'location_id'
+    | 'purposes'
+    | 'is_primary'
+    | 'shared_with'
+    | 'is_location_owner'
+    | 'owner_party_name'
+>;
+type SharedLocationChoice =
+    SharableLocation | { id: string; name: string; formatted: string };
 
 type LocationForm = {
     location_id: string;
@@ -103,10 +136,20 @@ type LocationForm = {
     city: string;
     province: string;
     postal_code: string;
+    province_id: string;
+    regency_id: string;
+    district_id: string;
+    village_id: string;
+    postal_code_id: string;
     postbox: string;
 };
 
 const emptyLocation = (countryCode: string): LocationForm => ({
+    province_id: '',
+    regency_id: '',
+    district_id: '',
+    village_id: '',
+    postal_code_id: '',
     location_id: '',
     name: '',
     purposes: ['business'],
@@ -124,7 +167,22 @@ const emptyLocation = (countryCode: string): LocationForm => ({
     postbox: '',
 });
 
-const locationToForm = (location: Location): LocationForm => ({
+const locationToForm = (
+    location: Omit<
+        Location,
+        | 'id'
+        | 'version'
+        | 'location_id'
+        | 'shared_with'
+        | 'is_location_owner'
+        | 'owner_party_name'
+    >,
+): LocationForm => ({
+    province_id: location.province_id ?? '',
+    regency_id: location.regency_id ?? '',
+    district_id: location.district_id ?? '',
+    village_id: location.village_id ?? '',
+    postal_code_id: location.postal_code_id ?? '',
     location_id: '',
     name: location.name,
     purposes: location.purposes,
@@ -208,31 +266,38 @@ export function OrganizationAddressesSection({
     const [formError, setFormError] = useState('');
     const [sharable, setSharable] = useState<SharableLocation[]>([]);
 
-    // Tempat yang sudah dipakai pihak lain, untuk dipilih alih-alih mengetik alamat yang sama lagi.
-    useEffect(() => {
-        if (editing !== 'new' || !canManage) {
-            return;
-        }
+    const loadSharedLocations = useCallback<LookupLoader<SharedLocationChoice>>(
+        async (request) => {
+            const result = await loadLookupItems<SharableLocation>(
+                `/api/v1/${resource}/${organizationId}/sharable-locations`,
+                request,
+            );
 
-        let cancelled = false;
-        apiJson<{ data: SharableLocation[] }>(
-            `/api/v1/${resource}/${organizationId}/sharable-locations`,
-        )
-            .then((result) => {
-                if (!cancelled) {
-                    setSharable(result.data);
-                }
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setSharable([]);
-                }
-            });
+            if (!request.signal.aborted) {
+                setSharable((current) => {
+                    const unique = new Map(
+                        current.map((location) => [location.id, location]),
+                    );
+                    result.items.forEach((location) =>
+                        unique.set(location.id, location),
+                    );
 
-        return () => {
-            cancelled = true;
-        };
-    }, [editing, canManage, organizationId, resource]);
+                    return [...unique.values()];
+                });
+            }
+
+            return {
+                ...result,
+                items: request.cursor
+                    ? result.items
+                    : [
+                          { id: '', name: 'Tulis alamat baru', formatted: '' },
+                          ...result.items,
+                      ],
+            };
+        },
+        [resource, organizationId],
+    );
 
     const linkedLocationIds = new Set(
         list.items.map((location) => location.location_id),
@@ -240,6 +305,160 @@ export function OrganizationAddressesSection({
     const sharableChoices = sharable.filter(
         (location) => !linkedLocationIds.has(location.id),
     );
+    const dialogRef = useRef<HTMLDivElement>(null);
+    type RegionOption = {
+        id: string;
+        name?: string;
+        postal_code?: string;
+        area_name?: string;
+    };
+    const regionKey = [
+        editing === 'new' ? 'new' : (editing?.id ?? ''),
+        form.country_region_code,
+        form.province_id,
+        form.regency_id,
+        form.district_id,
+        form.village_id,
+    ].join('|');
+    const [regionResult, setRegionResult] = useState<{
+        key: string;
+        regions: Record<string, RegionOption[]>;
+        error: string;
+    }>({ key: '', regions: {}, error: '' });
+    const regions = regionResult.key === regionKey ? regionResult.regions : {};
+    const regionError =
+        form.country_region_code === 'ID' && regionResult.key === regionKey
+            ? regionResult.error
+            : '';
+    const regionsLoading =
+        editing !== null &&
+        form.country_region_code === 'ID' &&
+        regionResult.key !== regionKey;
+    useEffect(() => {
+        if (editing === null || form.country_region_code !== 'ID') {
+            return;
+        }
+
+        const controller = new AbortController();
+        const lookups = [
+            ['province_id', 'country', form.country_region_code],
+            ['regency_id', 'province', form.province_id],
+            ['district_id', 'regency', form.regency_id],
+            ['village_id', 'district', form.district_id],
+            ['postal_code_id', 'village', form.village_id],
+        ];
+        Promise.all(
+            lookups.map(async ([field, parentType, parentId]) => [
+                field,
+                parentId
+                    ? await apiJson<RegionOption[]>(
+                          `/settings/address-setup/lookup/top-down?parent_type=${parentType}&parent_id=${encodeURIComponent(parentId)}`,
+                          { signal: controller.signal },
+                      )
+                    : [],
+            ]),
+        )
+            .then((items) => {
+                if (!controller.signal.aborted) {
+                    setRegionResult({
+                        key: regionKey,
+                        regions: Object.fromEntries(items),
+                        error: '',
+                    });
+                }
+            })
+            .catch((caught) => {
+                if (!controller.signal.aborted) {
+                    setRegionResult({
+                        key: regionKey,
+                        regions: {},
+                        error: errorText(
+                            caught,
+                            'Pilihan wilayah belum dapat dimuat.',
+                        ),
+                    });
+                }
+            });
+
+        return () => controller.abort();
+    }, [
+        editing,
+        form.country_region_code,
+        form.province_id,
+        form.regency_id,
+        form.district_id,
+        form.village_id,
+        regionKey,
+    ]);
+    const regionFields = [
+        ['province_id', 'province', 'Provinsi'],
+        ['regency_id', 'city', 'Kota / kabupaten'],
+        ['district_id', 'district', 'Kecamatan'],
+        ['village_id', 'village', 'Kelurahan / desa'],
+        ['postal_code_id', 'postal_code', 'Kode pos'],
+    ] as const;
+    const regionSelect = (index: number) => {
+        const [field, textField, label] = regionFields[index];
+        const choices = regions[field] ?? [];
+        const legacyText = !form[field] && form[textField];
+
+        return (
+            <FieldSet
+                key={field}
+                disabled={
+                    regionsLoading ||
+                    Boolean(regionError) ||
+                    (index > 0 && !form[regionFields[index - 1][0]])
+                }
+            >
+                <Field>
+                    <Select
+                        label={label}
+                        portalContainer={dialogRef}
+                        items={choices.map((item) => ({
+                            value: item.id,
+                            label:
+                                item.name ??
+                                `${item.postal_code} ${item.area_name ?? ''}`.trim(),
+                        }))}
+                        value={form[field] || null}
+                        placeholder={
+                            legacyText
+                                ? `Tersimpan: ${legacyText}`
+                                : `Pilih ${label.toLowerCase()}`
+                        }
+                        searchPlaceholder={`Cari ${label.toLowerCase()}`}
+                        emptyMessage="Belum ada data pada master wilayah."
+                        onValueChange={(value) => {
+                            const selected = choices.find(
+                                (item) => item.id === value,
+                            );
+                            setForm((current) => {
+                                const next = {
+                                    ...current,
+                                    [field]: value ?? '',
+                                    [textField]:
+                                        selected?.name ??
+                                        selected?.postal_code ??
+                                        '',
+                                };
+
+                                for (const [
+                                    child,
+                                    childText,
+                                ] of regionFields.slice(index + 1)) {
+                                    next[child] = '';
+                                    next[childText] = '';
+                                }
+
+                                return next;
+                            });
+                        }}
+                    />
+                </Field>
+            </FieldSet>
+        );
+    };
     const chosenShared =
         editing === 'new'
             ? sharableChoices.find(
@@ -266,6 +485,12 @@ export function OrganizationAddressesSection({
     };
 
     const save = async () => {
+        if (!chosenShared && (regionsLoading || regionError)) {
+            setFormError('Tunggu sampai pilihan wilayah berhasil dimuat.');
+
+            return;
+        }
+
         setSaving(true);
 
         try {
@@ -279,7 +504,16 @@ export function OrganizationAddressesSection({
                                   purposes: form.purposes,
                                   is_primary: form.is_primary,
                               }
-                            : { ...form, location_id: null },
+                            : {
+                                  ...form,
+                                  ...Object.fromEntries(
+                                      regionFields.map(([field]) => [
+                                          field,
+                                          form[field] || null,
+                                      ]),
+                                  ),
+                                  location_id: null,
+                              },
                     ),
                 });
                 toast.success('Alamat ditambahkan.');
@@ -288,6 +522,12 @@ export function OrganizationAddressesSection({
                     method: 'PUT',
                     body: JSON.stringify({
                         ...form,
+                        ...Object.fromEntries(
+                            regionFields.map(([field]) => [
+                                field,
+                                form[field] || null,
+                            ]),
+                        ),
                         location_id: null,
                         version: editing.version,
                     }),
@@ -319,13 +559,12 @@ export function OrganizationAddressesSection({
 
     const makePrimary = async (location: Location) => {
         try {
-            await apiJson(`${base}/${location.id}`, {
-                method: 'PUT',
+            await apiJson(base, {
+                method: 'POST',
                 body: JSON.stringify({
-                    ...locationToForm(location),
-                    location_id: null,
+                    location_id: location.location_id,
+                    purposes: location.purposes,
                     is_primary: true,
-                    version: location.version,
                 }),
             });
             toast.success('Alamat utama diganti.');
@@ -352,6 +591,22 @@ export function OrganizationAddressesSection({
                     setForm((current) => ({
                         ...current,
                         [key]: event.target.value,
+                        ...(current.country_region_code !== 'ID' &&
+                        [
+                            'province',
+                            'city',
+                            'district',
+                            'village',
+                            'postal_code',
+                        ].includes(key)
+                            ? {
+                                  province_id: '',
+                                  regency_id: '',
+                                  district_id: '',
+                                  village_id: '',
+                                  postal_code_id: '',
+                              }
+                            : {}),
                     }))
                 }
             />
@@ -367,12 +622,7 @@ export function OrganizationAddressesSection({
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                    Alamat utama tampil pada kop setiap dokumen yang dicetak
-                    atas nama organisasi ini. Alamat lain dipakai untuk
-                    pengiriman, penagihan, atau lokasi cabang.
-                </p>
+            <div className="flex flex-wrap items-center justify-end gap-2">
                 {canManage && (
                     <Button
                         type="button"
@@ -384,6 +634,10 @@ export function OrganizationAddressesSection({
                         Tambah alamat
                     </Button>
                 )}
+                <AddressBookHint label="alamat">
+                    Alamat utama tampil pada kop dokumen. Alamat lain dapat
+                    dipakai untuk pengiriman atau lokasi cabang.
+                </AddressBookHint>
             </div>
 
             {list.items.length === 0 ? (
@@ -412,6 +666,15 @@ export function OrganizationAddressesSection({
                                 <TableRow key={location.id}>
                                     <TableCell className="font-medium">
                                         {location.name}
+                                        {!location.is_location_owner && (
+                                            <span className="block text-xs font-normal text-muted-foreground">
+                                                Pemilik:{' '}
+                                                {location.owner_party_name ??
+                                                    'Belum ditetapkan'}
+                                                . Ubah alamat melalui pihak
+                                                pemilik di buku alamat.
+                                            </span>
+                                        )}
                                         {location.shared_with > 0 && (
                                             <span className="block text-xs font-normal text-muted-foreground">
                                                 Dipakai juga oleh{' '}
@@ -453,6 +716,14 @@ export function OrganizationAddressesSection({
                                                 variant="ghost"
                                                 size="icon"
                                                 aria-label={`Ubah ${location.name}`}
+                                                disabled={
+                                                    !location.is_location_owner
+                                                }
+                                                title={
+                                                    !location.is_location_owner
+                                                        ? 'Ubah alamat melalui pihak pemiliknya di buku alamat.'
+                                                        : undefined
+                                                }
                                                 onClick={() => open(location)}
                                             >
                                                 <Pencil className="size-4" />
@@ -512,18 +783,39 @@ export function OrganizationAddressesSection({
                 open={editing !== null}
                 onOpenChange={(isOpen) => !isOpen && setEditing(null)}
             >
-                <DialogContent size="wide">
+                <DialogContent
+                    ref={dialogRef}
+                    onEscapeKeyDown={(event) => {
+                        if (
+                            dialogRef.current?.querySelector(
+                                '[role="combobox"][aria-expanded="true"]',
+                            )
+                        ) {
+                            event.preventDefault();
+                        }
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
-                            {editing === 'new' ? 'Alamat baru' : 'Ubah alamat'}
+                            <span className="inline-flex items-center gap-2">
+                                {editing === 'new'
+                                    ? 'Alamat baru'
+                                    : 'Ubah alamat'}
+                                <AddressBookHint label="alamat">
+                                    Bentuk tercetaknya disusun otomatis: jalan
+                                    dan gedung, kelurahan atau kecamatan, lalu
+                                    kota, provinsi, dan kode pos.
+                                </AddressBookHint>
+                            </span>
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="sr-only">
                             Bentuk tercetaknya disusun otomatis: jalan dan
                             gedung, kelurahan atau kecamatan, lalu kota,
                             provinsi, dan kode pos.
                         </DialogDescription>
                     </DialogHeader>
                     <form
+                        className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             // Dialog dirender lewat portal di dalam form organisasi; React
                             // tetap meneruskan submit ke form induk bila tidak dihentikan.
@@ -533,63 +825,137 @@ export function OrganizationAddressesSection({
                         }}
                     >
                         <DialogBody className="space-y-4 py-3">
-                            {editing === 'new' &&
-                                sharableChoices.length > 0 && (
+                            {editing === 'new' && (
+                                <FieldGroup className="grid gap-4 md:grid-cols-2">
                                     <Field>
-                                        <NativeSelect
-                                            label="Sumber alamat"
-                                            value={form.location_id}
-                                            onChange={(event) =>
-                                                setForm((current) => ({
-                                                    ...current,
-                                                    location_id:
-                                                        event.target.value,
-                                                }))
+                                        <InlineLookup
+                                            hint="Pilih alamat yang sudah ada jika tempatnya sama, atau tulis alamat baru. Alamat yang dipilih akan dipakai bersama. Jika alamat tersebut diubah, perubahan berlaku untuk semua pihak yang memakainya."
+                                            loadItems={loadSharedLocations}
+                                            value={
+                                                chosenShared ?? {
+                                                    id: '',
+                                                    name: 'Tulis alamat baru',
+                                                    formatted: '',
+                                                }
                                             }
-                                        >
-                                            <NativeSelectOption value="">
-                                                Tulis alamat baru
-                                            </NativeSelectOption>
-                                            {sharableChoices.map((location) => (
-                                                <NativeSelectOption
-                                                    key={location.id}
-                                                    value={location.id}
-                                                >
-                                                    {location.name}
-                                                </NativeSelectOption>
-                                            ))}
-                                        </NativeSelect>
-                                        <FieldDescription>
-                                            {chosenShared
-                                                ? `${chosenShared.formatted.replaceAll('\n', ', ')}. Alamat ini dipakai bersama: perubahan jalan atau kota berlaku bagi semua pemakainya.`
-                                                : 'Pilih alamat yang sudah dipakai organisasi lain bila tempatnya sama, supaya tidak diketik dua kali.'}
-                                        </FieldDescription>
+                                            label="Gunakan alamat yang sudah ada"
+                                            placeholder="Cari nama atau alamat…"
+                                            emptyMessage="Alamat tidak ditemukan."
+                                            getItemValue={(item) => item.id}
+                                            getItemLabel={(item) => item.name}
+                                            getSearchText={(item) =>
+                                                `${item.name} ${item.formatted}`
+                                            }
+                                            columns={[
+                                                {
+                                                    id: 'name',
+                                                    header: 'Keterangan alamat',
+                                                    cell: (item) => item.name,
+                                                    sortValue: (item) =>
+                                                        item.name,
+                                                    width: 180,
+                                                },
+                                                {
+                                                    id: 'address',
+                                                    header: 'Alamat',
+                                                    cell: (item) =>
+                                                        item.formatted.replaceAll(
+                                                            '\n',
+                                                            ', ',
+                                                        ),
+                                                    sortValue: (item) =>
+                                                        item.formatted,
+                                                    width: 400,
+                                                },
+                                            ]}
+                                            portalContainer={dialogRef}
+                                            onValueChange={(item) => {
+                                                const location =
+                                                    sharableChoices.find(
+                                                        (choice) =>
+                                                            choice.id ===
+                                                            item?.id,
+                                                    );
+                                                setForm((current) => ({
+                                                    ...(location
+                                                        ? locationToForm({
+                                                              ...location,
+                                                              purposes:
+                                                                  current.purposes,
+                                                              is_primary:
+                                                                  current.is_primary,
+                                                          })
+                                                        : {
+                                                              ...emptyLocation(
+                                                                  countryCode,
+                                                              ),
+                                                              purposes:
+                                                                  current.purposes,
+                                                              is_primary:
+                                                                  current.is_primary,
+                                                          }),
+                                                    location_id:
+                                                        location?.id ?? '',
+                                                }));
+                                            }}
+                                        />
+                                        {chosenShared && (
+                                            <p
+                                                role="note"
+                                                className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+                                            >
+                                                Alamat ini dipakai bersama. Jika
+                                                alamat ini diubah, perubahan
+                                                berlaku untuk semua pihak yang
+                                                memakai alamat tersebut.
+                                            </p>
+                                        )}
                                     </Field>
-                                )}
+                                </FieldGroup>
+                            )}
                             {editing !== null &&
                                 editing !== 'new' &&
                                 editing.shared_with > 0 && (
                                     <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
                                         Alamat ini dipakai juga oleh{' '}
-                                        {editing.shared_with} pihak lain.
-                                        Perubahan nama, jalan, kota, atau kode
-                                        pos berlaku juga bagi mereka.
+                                        {editing.shared_with} pihak lain. Jika
+                                        alamat ini diubah, perubahan berlaku
+                                        untuk semua pihak yang memakai alamat
+                                        tersebut.
                                     </p>
                                 )}
-                            {!chosenShared && (
+                            <FieldSet disabled={Boolean(chosenShared)}>
                                 <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                    {text(
-                                        'name',
-                                        'Nama atau keterangan',
-                                        'Kantor pusat',
-                                    )}
+                                    <Field>
+                                        <Textarea
+                                            label="Keterangan alamat"
+                                            required
+                                            maxLength={120}
+                                            value={form.name}
+                                            onChange={(event) =>
+                                                setForm((current) => ({
+                                                    ...current,
+                                                    name: event.target.value,
+                                                }))
+                                            }
+                                        />
+                                    </Field>
                                 </FieldGroup>
-                            )}
+                            </FieldSet>
                             <FieldSet>
-                                <FieldLegend>Kegunaan</FieldLegend>
+                                <FieldLegend hint="Satu alamat boleh punya beberapa kegunaan, misalnya kantor sekaligus pengiriman.">
+                                    Kegunaan
+                                </FieldLegend>
                                 <div className="flex flex-wrap gap-x-5 gap-y-2">
-                                    {(list.meta?.purposes ?? []).map(
-                                        (purpose) => (
+                                    {(list.meta?.purposes ?? [])
+                                        .filter(
+                                            (purpose) =>
+                                                ![
+                                                    'invoice',
+                                                    'payment',
+                                                ].includes(purpose.code),
+                                        )
+                                        .map((purpose) => (
                                             <Field
                                                 key={purpose.code}
                                                 orientation="horizontal"
@@ -624,101 +990,90 @@ export function OrganizationAddressesSection({
                                                     {purpose.name}
                                                 </FieldLabel>
                                             </Field>
-                                        ),
-                                    )}
+                                        ))}
                                 </div>
-                                <FieldDescription>
-                                    Satu alamat boleh punya beberapa kegunaan,
-                                    misalnya kantor sekaligus penagihan.
-                                </FieldDescription>
                             </FieldSet>
-                            {!chosenShared && (
+                            <FieldSet disabled={Boolean(chosenShared)}>
                                 <>
                                     <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                        {text(
-                                            'street',
-                                            'Jalan dan nomor',
-                                            'Jl. I Gusti Ngurah Rai No. 8',
-                                        )}
-                                        {text(
-                                            'building',
-                                            'Gedung / blok / lantai',
-                                            'Rukan CBD Blok K',
-                                        )}
-                                        {text(
-                                            'district',
-                                            'Kecamatan',
-                                            'Nama kecamatan',
-                                        )}
-                                        {text(
-                                            'village',
-                                            'Kelurahan / desa',
-                                            'Nama kelurahan atau desa',
-                                        )}
-                                        {text('rt', 'RT', 'Nomor RT')}
-                                        {text('rw', 'RW', 'Nomor RW')}
-                                        {text(
-                                            'city',
-                                            'Kota / kabupaten',
-                                            'Badung',
-                                        )}
-                                        {text('province', 'Provinsi', 'Bali')}
-                                        {text(
-                                            'postal_code',
-                                            'Kode pos',
-                                            '80351',
-                                        )}
-                                    </FieldGroup>
-                                    <FieldGroup className="grid gap-4 md:grid-cols-2">
                                         <Field>
-                                            <NativeSelect
+                                            <Select
                                                 label="Negara"
+                                                portalContainer={dialogRef}
+                                                items={(
+                                                    list.meta?.countries ?? []
+                                                ).map((country) => ({
+                                                    value: country.code,
+                                                    label: country.name,
+                                                }))}
                                                 value={form.country_region_code}
-                                                onChange={(event) =>
+                                                onValueChange={(value) =>
                                                     setForm((current) => ({
                                                         ...current,
                                                         country_region_code:
-                                                            event.target.value,
+                                                            value ?? '',
+                                                        province_id: '',
+                                                        regency_id: '',
+                                                        district_id: '',
+                                                        village_id: '',
+                                                        postal_code_id: '',
+                                                        province: '',
+                                                        city: '',
+                                                        district: '',
+                                                        village: '',
+                                                        postal_code: '',
                                                     }))
                                                 }
-                                            >
-                                                {(
-                                                    list.meta?.countries ?? []
-                                                ).map((country) => (
-                                                    <NativeSelectOption
-                                                        key={country.code}
-                                                        value={country.code}
-                                                    >
-                                                        {country.name}
-                                                    </NativeSelectOption>
-                                                ))}
-                                            </NativeSelect>
-                                            <FieldDescription>
-                                                Nama negara ikut tercetak hanya
-                                                untuk alamat di luar Indonesia.
-                                            </FieldDescription>
+                                            />
                                         </Field>
+                                        {form.country_region_code === 'ID' &&
+                                        !chosenShared
+                                            ? regionFields.map((_, index) =>
+                                                  regionSelect(index),
+                                              )
+                                            : regionFields.map(
+                                                  ([, field, label]) =>
+                                                      text(field, label),
+                                              )}
+                                        {text('street', 'Jalan dan nomor')}
+                                        {text(
+                                            'building',
+                                            'Gedung / blok / lantai',
+                                        )}
+                                        {text('rt', 'RT')}
+                                        {text('rw', 'RW')}
                                         {text('postbox', 'PO Box')}
                                     </FieldGroup>
+                                    {regionError && (
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
+                                            {regionError}
+                                        </p>
+                                    )}
                                 </>
-                            )}
+                            </FieldSet>
                             <Field>
-                                <label className="flex items-center gap-3 text-sm">
-                                    <Switch
-                                        checked={form.is_primary}
-                                        onCheckedChange={(checked) =>
-                                            setForm((current) => ({
-                                                ...current,
-                                                is_primary: checked,
-                                            }))
-                                        }
-                                    />
-                                    Jadikan alamat utama (tampil pada kop
-                                    dokumen)
-                                </label>
-                                <FieldDescription>
-                                    Alamat pertama otomatis menjadi utama.
-                                </FieldDescription>
+                                <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-3 text-sm">
+                                        <Switch
+                                            checked={form.is_primary}
+                                            onCheckedChange={(checked) =>
+                                                setForm((current) => ({
+                                                    ...current,
+                                                    is_primary: checked,
+                                                }))
+                                            }
+                                        />
+                                        Jadikan alamat utama (tampil pada kop
+                                        dokumen)
+                                    </label>
+                                    <AddressBookHint label="alamat utama">
+                                        Alamat pertama otomatis menjadi utama.
+                                        Alamat utama tampil pada kop dokumen.
+                                    </AddressBookHint>
+                                </div>
                             </Field>
                             {formError && (
                                 <p className="text-sm text-destructive">
@@ -730,7 +1085,13 @@ export function OrganizationAddressesSection({
                             <DialogAction type="submit" disabled={saving}>
                                 {saving ? 'Menyimpan…' : 'Simpan alamat'}
                             </DialogAction>
-                            <DialogCancel />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setEditing(null)}
+                            >
+                                Batal
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -742,6 +1103,7 @@ export function OrganizationAddressesSection({
 type Contact = {
     id: string;
     version: number;
+    is_location_owner: boolean;
     type: string;
     value: string;
     purpose: string | null;
@@ -766,6 +1128,20 @@ const TYPE_LABEL: Record<string, string> = {
     url: 'Laman web',
 };
 
+const CONTACT_ICON: Record<string, typeof Phone> = {
+    phone: Phone,
+    email: Mail,
+    whatsapp: MessageCircle,
+    fax: Printer,
+    url: Globe,
+};
+const TYPE_VALUE_LABEL: Record<string, string> = {
+    phone: 'Nomor telepon',
+    whatsapp: 'Nomor WhatsApp',
+    email: 'Alamat email',
+    fax: 'Nomor faks',
+    url: 'Alamat website',
+};
 const TYPE_PLACEHOLDER: Record<string, string> = {
     phone: '(0361) 829769',
     whatsapp: '0812-3456-7890',
@@ -789,7 +1165,6 @@ export function OrganizationContactsSection({
         'Informasi kontak belum dapat dimuat.',
     );
     // Kontak menempel ke alamat; daftar alamat dibaca saat form dibuka.
-    const [addresses, setAddresses] = useState<Location[]>([]);
     const [editing, setEditing] = useState<Contact | 'new' | null>(null);
     const [form, setForm] = useState<ContactForm>({
         type: 'phone',
@@ -799,6 +1174,8 @@ export function OrganizationContactsSection({
         address_id: '',
     });
 
+    const [saving, setSaving] = useState(false);
+    const [formError, setFormError] = useState('');
     useEffect(() => {
         if (editing === null) {
             return;
@@ -813,11 +1190,10 @@ export function OrganizationContactsSection({
                     return;
                 }
 
-                setAddresses(result.data);
-
                 if (editing === 'new') {
                     const primary = result.data.find(
-                        (address) => address.is_primary,
+                        (address) =>
+                            address.is_primary && address.is_location_owner,
                     );
                     setForm((current) => ({
                         ...current,
@@ -827,7 +1203,9 @@ export function OrganizationContactsSection({
             })
             .catch(() => {
                 if (!cancelled) {
-                    setAddresses([]);
+                    setFormError(
+                        'Alamat utama belum dapat dimuat. Coba buka form kontak lagi.',
+                    );
                 }
             });
 
@@ -835,8 +1213,6 @@ export function OrganizationContactsSection({
             cancelled = true;
         };
     }, [editing, organizationId, resource]);
-    const [saving, setSaving] = useState(false);
-    const [formError, setFormError] = useState('');
 
     const open = (target: Contact | 'new') => {
         setForm(
@@ -938,12 +1314,7 @@ export function OrganizationContactsSection({
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                    Kontak utama tiap jenis (telepon, WhatsApp, email, faks,
-                    laman) tampil pada kop dokumen. Kontak lain disimpan untuk
-                    keperluan internal.
-                </p>
+            <div className="flex flex-wrap items-center justify-end gap-2">
                 {canManage && (
                     <Button
                         type="button"
@@ -955,6 +1326,11 @@ export function OrganizationContactsSection({
                         Tambah kontak
                     </Button>
                 )}
+                <AddressBookHint label="informasi kontak">
+                    Kontak utama tiap jenis (telepon, WhatsApp, email, faks,
+                    laman) tampil pada kop dokumen. Kontak lain disimpan untuk
+                    keperluan internal.
+                </AddressBookHint>
             </div>
 
             {list.items.length === 0 ? (
@@ -963,87 +1339,123 @@ export function OrganizationContactsSection({
                     sampai ada kontak utama.
                 </p>
             ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Keterangan</TableHead>
-                                <TableHead>Jenis</TableHead>
-                                <TableHead>Nomor atau alamat</TableHead>
-                                <TableHead>Alamat</TableHead>
-                                <TableHead>Utama</TableHead>
-                                {canManage && (
-                                    <TableHead className="w-28 text-right">
-                                        Aksi
-                                    </TableHead>
-                                )}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {list.items.map((contact) => (
-                                <TableRow key={contact.id}>
-                                    <TableCell className="text-muted-foreground">
-                                        {contact.purpose || '—'}
-                                    </TableCell>
-                                    <TableCell>
-                                        {TYPE_LABEL[contact.type] ??
-                                            contact.type}
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                        {contact.value}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        {contact.address_name ?? '—'}
-                                    </TableCell>
-                                    <TableCell>
-                                        {contact.is_primary ? (
-                                            <Badge>Utama</Badge>
-                                        ) : canManage ? (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 px-2 text-xs"
-                                                onClick={() =>
-                                                    void makePrimary(contact)
-                                                }
+                <DataTable
+                    scrollMode="inline"
+                    data={list.items}
+                    getRowKey={(contact) => contact.id}
+                    showRowNumbers={false}
+                    actionsPlacement="inline"
+                    actions={
+                        canManage
+                            ? [
+                                  { id: 'edit', label: 'Ubah' },
+                                  { id: 'archive', label: 'Arsipkan' },
+                              ]
+                            : []
+                    }
+                    onRowAction={(action, contact) => {
+                        if (!contact.is_location_owner) {
+                            toast.error(
+                                'Kontak bersama hanya dapat diubah melalui pihak pemilik alamat di buku alamat.',
+                            );
+
+                            return;
+                        }
+
+                        if (action === 'edit') {
+                            open(contact);
+                        } else {
+                            void remove(contact);
+                        }
+                    }}
+                    columns={[
+                        {
+                            id: 'description',
+                            header: 'Keterangan',
+                            cell: (contact) => (
+                                <DataTableText>
+                                    {contact.purpose || '—'}
+                                </DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'type',
+                            header: 'Tipe',
+                            width: 140,
+                            cell: (contact) => (
+                                <DataTableText>
+                                    {TYPE_LABEL[contact.type] ?? contact.type}
+                                </DataTableText>
+                            ),
+                        },
+                        {
+                            id: 'value',
+                            header: 'Nomor / alamat',
+                            width: 320,
+                            cell: (contact) => {
+                                const Icon =
+                                    CONTACT_ICON[contact.type] ?? Phone;
+                                const href =
+                                    contact.type === 'email'
+                                        ? `mailto:${contact.value}`
+                                        : ['phone', 'fax'].includes(
+                                                contact.type,
+                                            )
+                                          ? `tel:${contact.value.replace(/[^+0-9]/g, '')}`
+                                          : contact.type === 'url' &&
+                                              /^https?:\/\//i.test(
+                                                  contact.value,
+                                              )
+                                            ? contact.value
+                                            : undefined;
+
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        <DataTableText>
+                                            {contact.value}
+                                        </DataTableText>
+                                        {href ? (
+                                            <a
+                                                href={href}
+                                                aria-label={`${TYPE_LABEL[contact.type]} ${contact.value}`}
                                             >
-                                                <Star className="mr-1 size-3" />
-                                                Jadikan utama
-                                            </Button>
+                                                <Icon className="size-4 shrink-0" />
+                                            </a>
                                         ) : (
-                                            '—'
-                                        )}
-                                    </TableCell>
-                                    {canManage && (
-                                        <TableCell className="text-right">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label={`Ubah ${contact.value}`}
-                                                onClick={() => open(contact)}
-                                            >
-                                                <Pencil className="size-4" />
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                aria-label={`Arsipkan ${contact.value}`}
-                                                onClick={() =>
-                                                    void remove(contact)
+                                            <Icon
+                                                aria-label={
+                                                    TYPE_LABEL[contact.type]
                                                 }
-                                            >
-                                                <Archive className="size-4" />
-                                            </Button>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                                                className="size-4 shrink-0"
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            },
+                        },
+                        {
+                            id: 'primary',
+                            header: 'Utama',
+                            width: 90,
+                            cell: (contact) => (
+                                <Checkbox
+                                    checked={contact.is_primary}
+                                    disabled={
+                                        !canManage ||
+                                        !contact.is_location_owner ||
+                                        contact.is_primary
+                                    }
+                                    aria-label={`Kontak utama ${contact.value}`}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) {
+                                            void makePrimary(contact);
+                                        }
+                                    }}
+                                />
+                            ),
+                        },
+                    ]}
+                />
             )}
 
             <Dialog
@@ -1053,14 +1465,24 @@ export function OrganizationContactsSection({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {editing === 'new' ? 'Kontak baru' : 'Ubah kontak'}
+                            <span className="inline-flex items-center gap-2">
+                                {editing === 'new'
+                                    ? 'Kontak baru'
+                                    : 'Ubah kontak'}
+                                <AddressBookHint label="kontak">
+                                    Satu kontak utama per jenis di setiap
+                                    alamat; kontak utama di alamat utama yang
+                                    tampil pada kop dokumen.
+                                </AddressBookHint>
+                            </span>
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="sr-only">
                             Satu kontak utama per jenis di setiap alamat; kontak
                             utama di alamat utama yang tampil pada kop dokumen.
                         </DialogDescription>
                     </DialogHeader>
                     <form
+                        className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             // Dialog dirender lewat portal di dalam form organisasi; React
                             // tetap meneruskan submit ke form induk bila tidak dihentikan.
@@ -1071,6 +1493,20 @@ export function OrganizationContactsSection({
                     >
                         <DialogBody className="space-y-4 py-3">
                             <FieldGroup>
+                                {' '}
+                                <Field>
+                                    <Textarea
+                                        label="Keterangan"
+                                        maxLength={30}
+                                        value={form.purpose}
+                                        onChange={(event) =>
+                                            setForm((current) => ({
+                                                ...current,
+                                                purpose: event.target.value,
+                                            }))
+                                        }
+                                    />
+                                </Field>
                                 <Field>
                                     <NativeSelect
                                         label="Jenis"
@@ -1096,9 +1532,19 @@ export function OrganizationContactsSection({
                                 </Field>
                                 <Field>
                                     <Input
-                                        label="Nomor atau alamat"
+                                        label={
+                                            TYPE_VALUE_LABEL[form.type] ??
+                                            'Nomor / alamat'
+                                        }
                                         placeholder={
                                             TYPE_PLACEHOLDER[form.type]
+                                        }
+                                        type={
+                                            form.type === 'email'
+                                                ? 'email'
+                                                : form.type === 'url'
+                                                  ? 'url'
+                                                  : 'tel'
                                         }
                                         value={form.value}
                                         required
@@ -1110,68 +1556,26 @@ export function OrganizationContactsSection({
                                         }
                                     />
                                 </Field>
-                                {addresses.length > 0 && (
-                                    <Field>
-                                        <NativeSelect
-                                            label="Alamat"
-                                            value={form.address_id}
-                                            onChange={(event) =>
-                                                setForm((current) => ({
-                                                    ...current,
-                                                    address_id:
-                                                        event.target.value,
-                                                }))
-                                            }
-                                        >
-                                            {addresses.map((address) => (
-                                                <NativeSelectOption
-                                                    key={address.id}
-                                                    value={address.id}
-                                                >
-                                                    {address.name}
-                                                    {address.is_primary
-                                                        ? ' (utama)'
-                                                        : ''}
-                                                </NativeSelectOption>
-                                            ))}
-                                        </NativeSelect>
-                                        <FieldDescription>
-                                            Telepon cabang dipasang ke alamat
-                                            cabangnya. Kop dokumen membaca
-                                            kontak di alamat utama lebih dulu.
-                                        </FieldDescription>
-                                    </Field>
-                                )}
                                 <Field>
-                                    <Input
-                                        label="Keterangan"
-                                        placeholder="Resepsionis, bagian penjualan"
-                                        value={form.purpose}
-                                        onChange={(event) =>
-                                            setForm((current) => ({
-                                                ...current,
-                                                purpose: event.target.value,
-                                            }))
-                                        }
-                                    />
-                                </Field>
-                                <Field>
-                                    <label className="flex items-center gap-3 text-sm">
-                                        <Switch
-                                            checked={form.is_primary}
-                                            onCheckedChange={(checked) =>
-                                                setForm((current) => ({
-                                                    ...current,
-                                                    is_primary: checked,
-                                                }))
-                                            }
-                                        />
-                                        Jadikan kontak utama untuk jenis ini
-                                    </label>
-                                    <FieldDescription>
-                                        Kontak pertama dari suatu jenis otomatis
-                                        menjadi utama.
-                                    </FieldDescription>
+                                    <div className="flex items-center gap-2">
+                                        <label className="flex items-center gap-3 text-sm">
+                                            <Checkbox
+                                                checked={form.is_primary}
+                                                onCheckedChange={(checked) =>
+                                                    setForm((current) => ({
+                                                        ...current,
+                                                        is_primary:
+                                                            checked === true,
+                                                    }))
+                                                }
+                                            />
+                                            Jadikan kontak utama untuk jenis ini
+                                        </label>
+                                        <AddressBookHint label="kontak utama">
+                                            Kontak pertama dari suatu jenis
+                                            otomatis menjadi utama.
+                                        </AddressBookHint>
+                                    </div>
                                 </Field>
                             </FieldGroup>
                             {formError && (
@@ -1184,7 +1588,13 @@ export function OrganizationContactsSection({
                             <DialogAction type="submit" disabled={saving}>
                                 {saving ? 'Menyimpan…' : 'Simpan kontak'}
                             </DialogAction>
-                            <DialogCancel />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setEditing(null)}
+                            >
+                                Batal
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

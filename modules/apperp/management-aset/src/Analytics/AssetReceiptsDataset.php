@@ -50,6 +50,7 @@ final class AssetReceiptsDataset implements Dataset
                 ->whereNull('receipt.deleted_at')
                 ->select([
                     $details.'.tenant_id',
+                    'receipt.id as receipt_id',
                     'receipt.kode as receipt_number',
                     'receipt.legal_entity_id',
                     'receipt.responsible_org_unit_id',
@@ -66,6 +67,7 @@ final class AssetReceiptsDataset implements Dataset
             ->permission('management-aset.penerimaan-aset.read')
             ->company('legal_entity_id')
             ->dataPolicy('management-aset.asset-responsibility', legalEntity: 'legal_entity_id', operatingUnit: 'responsible_org_unit_id')
+            ->field('receipt_id', 'ID penerimaan', FieldType::Reference, classification: DataClass::CustomerContent)
             ->field('receipt_number', 'Nomor penerimaan', FieldType::Text, classification: DataClass::CustomerContent)
             ->field('legal_entity_id', 'Entitas legal', FieldType::Reference, classification: DataClass::CustomerContent)
             ->field('responsible_org_unit_id', 'Unit penanggung jawab', FieldType::Reference, classification: DataClass::CustomerContent)
@@ -89,6 +91,6 @@ final class AssetReceiptsDataset implements Dataset
                 field: 'line_value', format: MeasureFormat::Money, currency: 'currency_code')
             ->measure('completed_value', 'Nilai penerimaan yang sudah selesai (belum termasuk PPN)', Aggregate::Sum,
                 field: 'line_value', format: MeasureFormat::Money, currency: 'currency_code', where: ['status' => [PenerimaanStatus::SELESAI]])
-            ->version(1);
+            ->version(2);
     }
 }

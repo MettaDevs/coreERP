@@ -10,6 +10,7 @@ import { useState } from 'react';
 import Heading from '@/components/heading';
 import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
+import { AddressBookHint } from './components/address-book-hint';
 import { AddressBookManager } from './components/address-book-manager';
 import { PartyCard } from './components/party-card';
 import { PartyForm } from './components/party-form';
@@ -106,6 +107,23 @@ export default function GlobalAddressBook(props: Props) {
         }
     }
 
+    if (creating) {
+        return (
+            <>
+                <Head title="Tambah Party" />
+                <PartyForm
+                    metadata={props}
+                    party={null}
+                    onClose={() => setCreating(false)}
+                    onSaved={(party) => {
+                        setCreating(false);
+                        openParty(party);
+                    }}
+                />
+            </>
+        );
+    }
+
     return (
         <>
             <Head title="Buku alamat global" />
@@ -126,10 +144,13 @@ export default function GlobalAddressBook(props: Props) {
                 <ListPageLayout
                     header={
                         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-                            <Heading
-                                title="Buku alamat global"
-                                description="Identitas, alamat, dan kontak pihak yang berhubungan dengan perusahaan Anda."
-                            />
+                            <div className="flex items-center gap-2">
+                                <Heading title="Buku alamat global" />
+                                <AddressBookHint label="buku alamat global">
+                                    Identitas, alamat, dan kontak pihak yang
+                                    berhubungan dengan perusahaan Anda.
+                                </AddressBookHint>
+                            </div>
                             {canManage && (
                                 <div className="flex flex-wrap gap-2">
                                     <Button
@@ -455,17 +476,6 @@ export default function GlobalAddressBook(props: Props) {
                         ]}
                     />
                 </ListPageLayout>
-            )}
-            {creating && (
-                <PartyForm
-                    metadata={props}
-                    party={null}
-                    onClose={() => setCreating(false)}
-                    onSaved={(party) => {
-                        setCreating(false);
-                        openParty(party);
-                    }}
-                />
             )}
             {booksOpen && (
                 <AddressBookManager

@@ -8,9 +8,12 @@ use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Actions\SaveVendor;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Foundation\Vendor\Support\SupplierCsvImporter;
+use App\Foundation\Vendor\Support\VendorActivity;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\Party;
+use App\Platform\Analytics\Query\AnalyticsQueryException;
+use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -28,6 +31,18 @@ use Inertia\Response;
 final class VendorController extends Controller
 {
     private const PER_PAGE = 50;
+
+    public function activity(Request $request, Vendor $vendor, VendorActivity $activity, UserClock $clock): JsonResponse
+    {
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_READ);
+        abort_unless($vendor->tenant_id === $membership->tenant_id, 404);
+
+        try {
+            return response()->json(['data' => $activity->forVendor($vendor, $membership, $clock->timezone($request))]);
+        } catch (AnalyticsQueryException $exception) {
+            return $exception->toResponse();
+        }
+    }
 
     public function importSuppliers(Request $request, SupplierCsvImporter $importer): JsonResponse
     {
@@ -88,19 +103,72 @@ final class VendorController extends Controller
     public function partyOptions(Request $request): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
-        $keyword = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
+        $input = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']]);
+        $keyword = trim((string) ($input['q'] ?? ''));
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
 
-        return response()->json(['data' => Party::query()
+        $parties = Party::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('status', 'active')
             ->when($keyword !== '', fn ($query) => $query->where(fn ($names) => $names
                 ->where('search_name', 'like', '%'.addcslashes(Party::searchName($keyword), '\\%_').'%')
-                ->orWhere('name', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')))
-            ->orderBy('name')
-            ->limit(20)
-            ->get(['id', 'name', 'type'])
-            ->map(static fn (Party $party): array => ['id' => $party->id, 'name' => $party->name, 'type' => $party->identityType()])
-            ->values()]);
+                ->orWhere('name', 'ilike', $pattern)
+                ->orWhereIn('id', Vendor::query()->where('tenant_id', $membership->tenant_id)
+                    ->where(fn ($accounts) => $accounts->where('number', 'ilike', $pattern)
+                        ->orWhereHas('legalEntity', fn ($company) => $company->where('name', 'ilike', $pattern)))
+                    ->select('party_id'))))
+            ->orderBy('name')->orderBy('id')
+            ->cursorPaginate(40, ['id', 'name', 'type']);
+        $partyRows = $parties->getCollection();
+        $accounts = Vendor::query()->where('tenant_id', $membership->tenant_id)
+            ->whereIn('party_id', $partyRows->pluck('id')->all())->with('legalEntity:id,name')
+            ->orderBy('number')->get()->groupBy('party_id');
+
+        return response()->json(['data' => $partyRows->map(static fn (Party $party): array => [
+            'id' => $party->id, 'name' => $party->name, 'type' => $party->identityType(),
+            'vendor_accounts' => ($accounts->get($party->id) ?? collect())->map(static fn (Vendor $vendor): array => [
+                'id' => $vendor->id, 'number' => $vendor->number, 'legal_entity_id' => $vendor->legal_entity_id,
+                'company' => $vendor->legalEntity->name, 'status' => $vendor->status,
+            ])->values(),
+        ])->values(), 'next_cursor' => $parties->nextCursor()?->encode()]);
+    }
+
+    public function lookup(Request $request): JsonResponse
+    {
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_READ);
+        $data = $request->validate([
+            'legal_entity_id' => ['required', 'ulid'], 'q' => ['nullable', 'string', 'max:100'],
+            'party_id' => ['nullable', 'ulid'],
+            'cursor' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $keyword = trim($data['q'] ?? '');
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+        $vendors = Vendor::query()->where('tenant_id', $membership->tenant_id)
+            ->where('legal_entity_id', $data['legal_entity_id'])->with('party')
+            ->when(! empty($data['party_id']), fn ($query) => $query->where('party_id', $data['party_id']))
+            ->when($keyword !== '', fn ($query) => $query->where(fn ($match) => $match->where('number', 'ilike', $pattern)
+                ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pattern))))
+            ->orderBy('number')->orderBy('id')->cursorPaginate(40);
+
+        return response()->json(['data' => $vendors->getCollection()->map(fn (Vendor $vendor) => $this->present($vendor)),
+            'next_cursor' => $vendors->nextCursor()?->encode()]);
+    }
+
+    public function companyOptions(Request $request): JsonResponse
+    {
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']]);
+        $keyword = trim($data['q'] ?? '');
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+        $companies = Organization::query()->where('tenant_id', $membership->tenant_id)->where('classification', 'legal_entity')
+            ->with('legalEntity:organization_id,company_code')
+            ->when($keyword !== '', fn ($query) => $query->where(fn ($match) => $match->where('name', 'ilike', $pattern)
+                ->orWhereHas('legalEntity', fn ($entity) => $entity->where('company_code', 'ilike', $pattern))))
+            ->orderBy('name')->orderBy('id')->cursorPaginate(40);
+
+        return response()->json(['data' => $companies->getCollection()->map(static fn (Organization $company) => [
+            'id' => $company->id, 'name' => $company->name, 'company_code' => $company->legalEntity?->company_code,
+        ]), 'next_cursor' => $companies->nextCursor()?->encode()]);
     }
 
     public function store(Request $request, SaveVendor $saveVendor): JsonResponse
@@ -150,7 +218,7 @@ final class VendorController extends Controller
 
         $vendor = $saveVendor->update($membership, $vendor, [
             'name' => trim((string) $data['name']),
-            'tax_number' => $this->npwp($data['tax_number'] ?? null),
+            'tax_number' => array_key_exists('tax_number', $data) ? $this->npwp($data['tax_number']) : $vendor->tax_number,
             'status' => (string) $data['status'],
             'payment_priority' => array_key_exists('payment_priority', $data) ? $data['payment_priority'] : $vendor->payment_priority,
         ], RowVersion::expected($request));

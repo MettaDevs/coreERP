@@ -3,12 +3,17 @@
 namespace Tests\Feature\Platform\AddressBook;
 
 use App\Platform\AddressBook\Models\Party;
+use App\Platform\Geography\Models\AddressHierarchy\District;
+use App\Platform\Geography\Models\AddressHierarchy\Province;
+use App\Platform\Geography\Models\AddressHierarchy\Regency;
+use App\Platform\Geography\Models\AddressHierarchy\Village;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class GlobalAddressBookTest extends TestCase
@@ -31,6 +36,19 @@ class GlobalAddressBookTest extends TestCase
             ->assertCreated()->assertJsonPath('data.number', 'PIHK00001')->assertJsonPath('data.last_name', null);
         $this->createParty(['type' => 'person', 'name' => 'Mononym'], 'party-mononym-1')->assertOk()->assertJsonPath('data.id', $created->json('data.id'));
         $this->assertDatabaseCount('parties', 1);
+    }
+
+    public function test_directory_page_receives_the_controller_data_instead_of_rendering_without_props(): void
+    {
+        $this->actingAs($this->owner)->get('/settings/global-address-book?q=directory')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('platform/address-book/index')
+                ->where('filters.q', 'directory')
+                ->has('parties.data')
+                ->has('partyTypes')
+                ->has('addressBooks')
+                ->has('referenceValues')
+                ->has('relationshipTypes'));
     }
 
     public function test_shared_party_rename_reaches_vendor_and_rejects_stale_party_changes(): void
@@ -71,6 +89,43 @@ class GlobalAddressBookTest extends TestCase
     {
         $party = $this->createParty(['name' => 'Full supplier name', 'search_name' => 'short alias'])->assertCreated()->json('data');
         $this->getJson('/api/v1/vendors/party-options?q=Full%20supplier')->assertOk()->assertJsonPath('data.0.id', $party['id']);
+    }
+
+    public function test_party_name_changes_preserve_a_custom_search_name(): void
+    {
+        $party = $this->createParty(['search_name' => 'supplier alias'])->assertCreated()->json('data');
+        $this->patchJson('/api/v1/parties/'.$party['id'], [
+            'name' => 'Renamed supplier', 'type' => $party['type'], 'status' => 'active', 'version' => $party['version'],
+        ])->assertOk()->assertJsonPath('data.name', 'Renamed supplier')->assertJsonPath('data.search_name', 'supplier alias');
+    }
+
+    public function test_party_tax_number_is_shared_by_vendor_accounts_and_omitted_vendor_fields_do_not_clear_it(): void
+    {
+        $party = $this->createParty(['tax_number' => '01.234.567.8-901.000'])->assertCreated()
+            ->assertJsonPath('data.language', 'id')->json('data');
+        $vendors = [];
+        foreach (['TAXA', 'TAXB'] as $code) {
+            $this->post('/settings/organization/organizations', [
+                'classification' => 'legal_entity', 'name' => 'Tax test '.$code, 'company_code' => $code, 'country_code' => 'ID',
+            ])->assertSessionHasNoErrors();
+            $entity = (string) DB::table('legal_entities')->where('company_code', $code)->value('organization_id');
+            $vendors[] = $this->postJson('/api/v1/vendors', ['legal_entity_id' => $entity, 'party_id' => $party['id']],
+                ['Idempotency-Key' => 'party-tax-'.$code])->assertCreated()->assertJsonPath('data.tax_number', $party['tax_number'])->json('data');
+        }
+
+        $this->patchJson('/api/v1/parties/'.$party['id'], [
+            'name' => $party['name'], 'type' => $party['type'], 'status' => 'active', 'version' => $party['version'],
+            'tax_number' => '1234567890123456',
+        ])->assertOk()->assertJsonPath('data.tax_number', '1234567890123456');
+        foreach ($vendors as $vendor) {
+            $current = DB::table('vendors')->find($vendor['id']);
+            $this->assertNotNull($current);
+            $this->assertSame('1234567890123456', $current->tax_number);
+            $this->assertGreaterThan($vendor['version'], $current->version);
+            $this->patchJson('/api/v1/vendors/'.$vendor['id'], [
+                'name' => $party['name'], 'status' => 'active', 'version' => $current->version,
+            ])->assertOk()->assertJsonPath('data.tax_number', '1234567890123456');
+        }
     }
 
     public function test_archiving_unused_party_keeps_the_row_and_hides_it_from_the_directory(): void
@@ -116,6 +171,25 @@ class GlobalAddressBookTest extends TestCase
         ])->assertCreated()->assertJsonPath('data.village', 'Test village')->assertJsonPath('data.rt', '001')->assertJsonPath('data.is_primary', true);
         $this->getJson('/api/v1/parties/'.$party['id'].'/locations')->assertOk()->assertJsonCount(1, 'data');
         $this->assertDatabaseHas('postal_addresses', ['village' => 'Test village', 'rt' => '001', 'rw' => '002']);
+    }
+
+    public function test_address_region_ids_resolve_master_names_and_reject_an_inconsistent_parent(): void
+    {
+        $party = $this->createParty()->assertCreated()->json('data');
+        $province = Province::create(['country_code' => 'ID', 'code' => 'TEST', 'name' => 'Test province']);
+        $regency = Regency::create(['province_id' => $province->id, 'code' => 'TEST', 'name' => 'Test city']);
+        $district = District::create(['regency_id' => $regency->id, 'code' => 'TEST', 'name' => 'Test district']);
+        $village = Village::create(['district_id' => $district->id, 'code' => 'TEST', 'name' => 'Test village']);
+        $payload = ['name' => 'Test office', 'country_region_code' => 'ID', 'purposes' => ['business'],
+            'province_id' => $province->id, 'regency_id' => $regency->id, 'district_id' => $district->id, 'village_id' => $village->id,
+            'province' => 'Forged name', 'city' => 'Forged city'];
+        $this->postJson('/api/v1/parties/'.$party['id'].'/locations', $payload)->assertCreated()
+            ->assertJsonPath('data.province_id', $province->id)->assertJsonPath('data.province', 'Test province')
+            ->assertJsonPath('data.city', 'Test city')->assertJsonPath('data.village_id', $village->id);
+        $other = Province::create(['country_code' => 'ID', 'code' => 'OTHER', 'name' => 'Other province']);
+        $this->postJson('/api/v1/parties/'.$party['id'].'/locations', [...$payload, 'province_id' => $other->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('regency_id');
+        $this->assertDatabaseCount('party_locations', 1);
     }
 
     /** @param array<string, mixed> $changes */

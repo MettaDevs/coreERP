@@ -11,8 +11,17 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -22,6 +31,7 @@ import {
     OrganizationContactsSection,
 } from '../../organization/components/address-book-section';
 import type { DirectoryMetadata, PartyDetail } from '../types';
+import { AddressBookHint } from './address-book-hint';
 import {
     commonProfileFields,
     organizationProfileFields,
@@ -125,20 +135,50 @@ export function PartyCard({
         );
     }
 
+    if (editing) {
+        return (
+            <PartyForm
+                party={party}
+                metadata={metadata}
+                onClose={() => setEditing(false)}
+                onSaved={() => {
+                    setEditing(false);
+                    setReload((key) => key + 1);
+                    router.reload({ only: ['parties'] });
+                }}
+            />
+        );
+    }
+
     const profileFields = [
         ...commonProfileFields,
         ...(party.type === 'person'
             ? personProfileFields
-            : organizationProfileFields),
+            : [
+                  {
+                      key: 'organization_number' as const,
+                      label: 'NIB (Nomor Induk Berusaha)',
+                  },
+                  ...organizationProfileFields,
+                  // Jumlah karyawan belum terhubung integrasi; jangan tampilkan nilai kosong/0.
+                  ...(party.number_of_employees && party.number_of_employees > 0
+                      ? [
+                            {
+                                key: 'number_of_employees' as const,
+                                label: 'Jumlah karyawan',
+                            },
+                        ]
+                      : []),
+              ]),
     ];
     const roleLabel = (code: string) =>
         metadata.referenceValues.role?.find((value) => value.code === code)
             ?.name ?? code;
 
     return (
-        <>
+        <div className="flex h-full min-h-0 flex-col">
             <RecordActionBar
-                title="Buku alamat global"
+                title={`${party.number ?? 'Party'} · ${party.name}`}
                 trailing={
                     <>
                         <Button variant="outline" onClick={onBack}>
@@ -164,21 +204,19 @@ export function PartyCard({
                     </>
                 }
             />
-            <main className="mx-auto w-full max-w-7xl space-y-4 p-4">
+            <main className="min-h-0 flex-1 overflow-y-auto p-4">
                 {error && (
                     <p role="alert" className="text-sm text-destructive">
                         {error}
                     </p>
                 )}
-                <section id="general" className="scroll-mt-16">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                {party.number ?? 'Nomor belum diterbitkan'} ·{' '}
-                                {party.name}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
+                <CollapsibleSectionGroup defaultValue={['general', section]}>
+                    <CollapsibleSection
+                        value="general"
+                        title="General"
+                        summary={`${party.number ?? 'Nomor belum diterbitkan'} · ${party.name}`}
+                    >
+                        <div id="general" className="scroll-mt-16 space-y-4">
                             <dl className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <dt className="text-sm text-muted-foreground">
@@ -207,6 +245,12 @@ export function PartyCard({
                                                 : 'Nonaktif'}
                                         </Badge>
                                     </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-muted-foreground">
+                                        NPWP
+                                    </dt>
+                                    <dd>{party.tax_number ?? '—'}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-sm text-muted-foreground">
@@ -267,94 +311,113 @@ export function PartyCard({
                                     Organisasi
                                 </Link>
                             )}
-                        </CardContent>
-                    </Card>
-                </section>
-                <section id="addresses" className="scroll-mt-16">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Alamat</CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                        </div>
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                        value="addresses"
+                        title="Alamat"
+                        summary={`Alamat bersama Party`}
+                    >
+                        <div id="addresses" className="scroll-mt-16">
                             <OrganizationAddressesSection
                                 organizationId={party.id}
                                 resource="parties"
                                 countryCode="ID"
                                 canManage={metadata.canManage}
                             />
-                        </CardContent>
-                    </Card>
-                </section>
-                <section id="contacts" className="scroll-mt-16">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Informasi kontak</CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                        </div>
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                        value="contacts"
+                        title="Informasi kontak"
+                        summary={`Telepon, email, dan kontak lainnya`}
+                    >
+                        <div id="contacts" className="scroll-mt-16">
                             <OrganizationContactsSection
                                 organizationId={party.id}
                                 resource="parties"
                                 canManage={metadata.canManage}
                             />
-                        </CardContent>
-                    </Card>
-                </section>
-                <section id="relationships" className="scroll-mt-16">
-                    <PartyRelationships
-                        party={party}
-                        metadata={metadata}
-                        onChanged={() => setReload((key) => key + 1)}
-                    />
-                </section>
-                <section id="roles" className="scroll-mt-16">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Peran bisnis</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <DataTable
-                                scrollMode="inline"
-                                data={party.roles}
-                                getRowKey={(role) =>
-                                    `${role.code}-${role.legal_entity_id}`
-                                }
-                                emptyMessage="Pihak ini belum dipakai sebagai akun bisnis."
-                                columns={[
-                                    {
-                                        id: 'role',
-                                        header: 'Peran',
-                                        cell: (role) => (
-                                            <DataTableText>
-                                                {roleLabel(role.code)}
-                                            </DataTableText>
-                                        ),
-                                    },
-                                    {
-                                        id: 'company',
-                                        header: 'Perusahaan',
-                                        cell: (role) => (
-                                            <DataTableText>
-                                                {role.company ?? '—'}
-                                            </DataTableText>
-                                        ),
-                                    },
-                                ]}
+                        </div>
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                        value="relationships"
+                        title="Hubungan antar pihak"
+                        summary={`${party.relationships.length} hubungan`}
+                    >
+                        <div id="relationships" className="scroll-mt-16">
+                            <PartyRelationships
+                                party={party}
+                                metadata={metadata}
+                                onChanged={() => setReload((key) => key + 1)}
                             />
-                        </CardContent>
-                    </Card>
-                </section>
-                {metadata.canReadVendors && (
-                    <section id="vendor" className="scroll-mt-16">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Akun vendor</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <p className="text-sm text-muted-foreground">
-                                    Nomor dan status vendor berlaku per
-                                    perusahaan. Nama, alamat, serta kontak
-                                    memakai pihak yang sama.
-                                </p>
+                        </div>
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                        value="roles"
+                        title="Peran bisnis"
+                        summary={`${party.roles.length} peran bisnis`}
+                    >
+                        <div id="roles" className="scroll-mt-16">
+                            {party.roles.length === 0 ? (
+                                <Empty>
+                                    <EmptyHeader>
+                                        <EmptyTitle>
+                                            Belum ada peran bisnis
+                                        </EmptyTitle>
+                                        <EmptyDescription>
+                                            Peran muncul setelah pihak ini
+                                            dipakai sebagai akun bisnis,
+                                            misalnya vendor.
+                                        </EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            ) : (
+                                <DataTable
+                                    scrollMode="inline"
+                                    data={party.roles}
+                                    getRowKey={(role) =>
+                                        `${role.code}-${role.legal_entity_id}`
+                                    }
+                                    emptyMessage="Pihak ini belum dipakai sebagai akun bisnis."
+                                    columns={[
+                                        {
+                                            id: 'role',
+                                            header: 'Peran',
+                                            cell: (role) => (
+                                                <DataTableText>
+                                                    {roleLabel(role.code)}
+                                                </DataTableText>
+                                            ),
+                                        },
+                                        {
+                                            id: 'company',
+                                            header: 'Perusahaan',
+                                            cell: (role) => (
+                                                <DataTableText>
+                                                    {role.company ?? '—'}
+                                                </DataTableText>
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            )}
+                        </div>
+                    </CollapsibleSection>
+                    {metadata.canReadVendors && (
+                        <CollapsibleSection
+                            value="vendor"
+                            title="Akun vendor"
+                            summary={`${party.vendors.length} akun vendor`}
+                        >
+                            <div id="vendor" className="scroll-mt-16 space-y-3">
+                                <div className="flex justify-end">
+                                    <AddressBookHint label="akun vendor">
+                                        Nomor dan status vendor berlaku per
+                                        perusahaan. Nama, alamat, serta kontak
+                                        memakai pihak yang sama.
+                                    </AddressBookHint>
+                                </div>
                                 <DataTable
                                     scrollMode="inline"
                                     data={party.vendors}
@@ -415,23 +478,11 @@ export function PartyCard({
                                         Buat akun vendor dari pihak ini
                                     </Button>
                                 )}
-                            </CardContent>
-                        </Card>
-                    </section>
-                )}
+                            </div>
+                        </CollapsibleSection>
+                    )}
+                </CollapsibleSectionGroup>
             </main>
-            {editing && (
-                <PartyForm
-                    party={party}
-                    metadata={metadata}
-                    onClose={() => setEditing(false)}
-                    onSaved={() => {
-                        setEditing(false);
-                        setReload((key) => key + 1);
-                        router.reload({ only: ['parties'] });
-                    }}
-                />
-            )}
             <AlertDialog open={confirmArchive} onOpenChange={setConfirmArchive}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -457,6 +508,6 @@ export function PartyCard({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </div>
     );
 }

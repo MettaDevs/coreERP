@@ -15,6 +15,8 @@ artifacts
 packages/ui/dist
 **/.env
 apps/core/public/build
+# Penunjuk Vite hanya milik mesin development, bukan bagian image.
+apps/core/public/hot
 # Seluruh isi `storage/` milik mesin pembangun, bukan milik rilis. Yang dikirim hanya rangka
 # foldernya, lewat berkas `.gitignore` yang dikecualikan di baris berikutnya.
 #

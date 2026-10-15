@@ -182,6 +182,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { InlineLookupDemo } from './inline-lookup-demo';
 import { ModalPageStackDemo } from './modal-page-stack-demo';
 
 const availableComponents = [
@@ -524,6 +525,13 @@ export default function UiPlayground() {
                                     </Label>
                                 </RadioGroup>
                             </FieldGroup>
+                        </DemoCard>
+
+                        <DemoCard
+                            title="Inline Search Dropdown R&D"
+                            description="Label tetap terbaca, pencarian langsung di field, dan pilihan dengan kode serta deskripsi."
+                        >
+                            <InlineLookupDemo />
                         </DemoCard>
 
                         <DemoCard

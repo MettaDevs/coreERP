@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\LocationPurpose;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
+use App\Platform\AddressBook\Support\PostalAddressReferences;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
@@ -67,9 +68,9 @@ class OrganizationLocationController extends Controller
     public function sharable(Request $request, Organization $organization): JsonResponse
     {
         $this->guardOrganization($request, $organization, manage: true);
-        $search = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? ''));
+        $search = trim((string) ($request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']])['q'] ?? ''));
 
-        return response()->json(['data' => $this->addressBook->sharableLocations($organization->tenant_id, $search)]);
+        return response()->json($this->addressBook->sharableLocations($organization->tenant_id, $search, $this->addressBook->party($organization)->id));
     }
 
     /** @return array<string, mixed> */
@@ -102,6 +103,7 @@ class OrganizationLocationController extends Controller
             'building' => ['nullable', 'string', 'max:120'],
             'postbox' => ['nullable', 'string', 'max:60'],
             'postal_code' => ['nullable', 'string', 'max:20'],
+            ...PostalAddressReferences::rules(),
         ]);
         $data['purposes'] = array_values(array_unique($data['purposes']));
 

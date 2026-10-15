@@ -11,7 +11,6 @@ use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
-use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
@@ -26,7 +25,9 @@ class AddressHierarchyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(IndonesianAddressHierarchySeeder::class);
+        $import = require database_path('data/import_indonesia_hierarchy.php');
+        $import(base_path('tests/Fixtures/indonesia-address'));
+
         $this->user = User::factory()->create();
 
         // Mengubah wilayah butuh duty Kelola data referensi (SEC-22).
@@ -36,6 +37,16 @@ class AddressHierarchyTest extends TestCase
             TenantMembership::create(['tenant_id' => $tenant->id, 'user_id' => $this->user->id, 'status' => 'active']),
             ['core.reference-data.manage'],
         );
+    }
+
+    public function test_hierarchy_import_replay_preserves_existing_record_ids(): void
+    {
+        $ids = Village::query()->pluck('id', 'code')->all();
+        $import = require database_path('data/import_indonesia_hierarchy.php');
+        $stats = $import(base_path('tests/Fixtures/indonesia-address'));
+        $this->assertSame(0, $stats['new']);
+        $this->assertSame(0, $stats['updated']);
+        $this->assertSame($ids, Village::query()->pluck('id', 'code')->all());
     }
 
     /** Test 1 — Top Down Traversal: Indonesia -> Bali -> Badung -> Kuta Selatan -> Benoa */

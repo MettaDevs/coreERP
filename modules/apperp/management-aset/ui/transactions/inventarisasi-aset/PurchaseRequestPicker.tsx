@@ -7,6 +7,9 @@ import type {
     RequestLine,
 } from '../permintaan-pembelian-aset/PurchaseRequestPage';
 
+// Nilai UI saja; rujukan yang dikirim ke dokumen tetap kosong/null.
+const DIRECT_RECEIPT = '__direct_receipt__';
+
 export default function PurchaseRequestPicker({
     companyId,
     initialRequestId,
@@ -97,18 +100,22 @@ export default function PurchaseRequestPicker({
         <fieldset className="space-y-2" disabled={readOnly || busy}>
             <Select
                 label="No. permintaan pembelian"
-                items={requests.map((item) => ({
-                    value: item.id,
-                    label: item.kode,
-                }))}
-                value={requestId}
+                items={[
+                    { value: DIRECT_RECEIPT, label: 'Tanpa permintaan asal' },
+                    ...requests.map((item) => ({
+                        value: item.id,
+                        label: item.kode,
+                    })),
+                ]}
+                value={requestId ?? DIRECT_RECEIPT}
                 portalContainer={portalContainer}
                 placeholder="Pilih permintaan"
                 emptyMessage="Tidak ada permintaan yang tersedia."
                 onValueChange={(id) => {
-                    setRequestId(id);
+                    const nextId = id === DIRECT_RECEIPT ? null : id;
+                    setRequestId(nextId);
                     setSelected(null);
-                    setBusy(Boolean(id));
+                    setBusy(Boolean(nextId));
                     onChange(null);
                 }}
             />

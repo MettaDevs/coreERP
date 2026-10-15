@@ -378,6 +378,52 @@ class VendorTest extends TestCase
         $this->assertSame(2, $gagal);
     }
 
+    public function test_vendor_lookup_streams_unique_batches_and_resolves_the_existing_account_in_its_company(): void
+    {
+        $otherCompany = $this->legalEntity('Perusahaan pengukuran lain', 'BATCH');
+        for ($index = 0; $index < 45; $index++) {
+            $partyId = (string) str()->ulid();
+            $name = 'Cursor supplier '.str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+            DB::table('parties')->insert([
+                'id' => $partyId, 'tenant_id' => $this->membership->tenant_id, 'type' => 'organization',
+                'name' => $name, 'search_name' => strtolower($name), 'status' => 'active',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('vendors')->insert([
+                'id' => (string) str()->ulid(), 'tenant_id' => $this->membership->tenant_id,
+                'legal_entity_id' => $this->le, 'party_id' => $partyId, 'number' => 'CURSOR-'.$index,
+                'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        foreach (['party-options', 'lookup'] as $endpoint) {
+            $query = ['q' => 'Cursor', 'legal_entity_id' => $this->le];
+            $first = $this->actingAs($this->owner)->getJson('/api/v1/vendors/'.$endpoint.'?'.http_build_query($query))
+                ->assertOk()->assertJsonCount(40, 'data');
+            $this->assertNotNull($first->json('next_cursor'));
+            $last = $this->getJson('/api/v1/vendors/'.$endpoint.'?'.http_build_query([...$query, 'cursor' => $first->json('next_cursor')]))
+                ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+            $this->assertCount(45, array_unique(array_merge($first->json('data.*.id'), $last->json('data.*.id'))));
+        }
+        $account = Vendor::query()->where('number', 'CURSOR-0')->firstOrFail();
+        $this->getJson('/api/v1/vendors/lookup?'.http_build_query(['legal_entity_id' => $this->le, 'party_id' => $account->party_id]))
+            ->assertOk()->assertJsonPath('data.0.id', $account->id);
+        $this->getJson('/api/v1/vendors/lookup?'.http_build_query(['legal_entity_id' => $otherCompany, 'party_id' => $account->party_id]))
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/vendors/party-options?q=CURSOR-0')->assertOk()
+            ->assertJsonPath('data.0.vendor_accounts.0.id', $account->id)
+            ->assertJsonPath('data.0.vendor_accounts.0.legal_entity_id', $this->le);
+    }
+
+    public function test_an_inactive_party_cannot_create_a_vendor_account(): void
+    {
+        $created = $this->buat()->assertCreated()->json('data');
+        $otherCompany = $this->legalEntity('Perusahaan pihak nonaktif', 'OFF');
+        DB::table('parties')->where('id', $created['party_id'])->update(['status' => 'inactive']);
+        $this->buat(['legal_entity_id' => $otherCompany, 'party_id' => $created['party_id'], 'party_name' => null])
+            ->assertUnprocessable()->assertJsonValidationErrors('party_id');
+        $this->assertSame(1, Vendor::query()->where('party_id', $created['party_id'])->count());
+    }
+
     /** @param array<string, mixed> $ubah */
     private function buat(array $ubah = [], ?string $kunci = null): TestResponse
     {

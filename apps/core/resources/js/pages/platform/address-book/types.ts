@@ -6,6 +6,7 @@ export type RelationshipType = ReferenceValue & {
 };
 export type AddressBook = { id: string; name: string; version: number };
 export type PartyProfile = {
+    tax_number: string | null;
     known_as: string | null;
     language: string | null;
     personal_title: string | null;

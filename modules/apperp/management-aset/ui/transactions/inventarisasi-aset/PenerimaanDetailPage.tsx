@@ -570,7 +570,12 @@ export default function PenerimaanDetailPage({
     /** Satu Select penunjuk master, dipakai berkali-kali pada kepala dan baris. */
     const pilihan = (
         label: string,
-        sumber: { options: MasterOption[]; error?: string | null },
+        sumber: {
+            options: MasterOption[];
+            error?: string | null;
+            loading?: boolean;
+            reload?: () => void;
+        },
         nilai: unknown,
         onPilih: (id: string) => void,
         opsi: { required?: boolean; placeholder?: string } = {},
@@ -582,18 +587,42 @@ export default function PenerimaanDetailPage({
                 penerimaanId && !selesai && bukaPenerimaanUbah(penerimaanId)
             }
         >
-            <Select
-                label={label}
-                required={opsi.required}
-                items={sumber.options.map(optionLabel)}
-                value={labelDari(sumber.options, nilai)}
-                placeholder={opsi.placeholder ?? `Pilih ${label.toLowerCase()}`}
-                searchPlaceholder={`Cari ${label.toLowerCase()}`}
-                emptyMessage={`${label} tidak ditemukan.`}
-                ariaLabel={label}
-                portalContainer={panelRef}
-                onValueChange={(item) => onPilih(idDari(sumber.options, item))}
-            />
+            <div>
+                <Select
+                    label={label}
+                    required={opsi.required}
+                    items={sumber.options.map(optionLabel)}
+                    value={labelDari(sumber.options, nilai)}
+                    placeholder={
+                        opsi.placeholder ?? `Pilih ${label.toLowerCase()}`
+                    }
+                    searchPlaceholder={`Cari ${label.toLowerCase()}`}
+                    emptyMessage={
+                        sumber.loading
+                            ? 'Memuat pilihan…'
+                            : sumber.error || `${label} tidak ditemukan.`
+                    }
+                    ariaLabel={label}
+                    portalContainer={panelRef}
+                    onValueChange={(item) =>
+                        onPilih(idDari(sumber.options, item))
+                    }
+                />
+                {sumber.error && (
+                    <div role="alert" className="text-destructive mt-1 text-sm">
+                        <p>{sumber.error}</p>
+                        {sumber.reload && (
+                            <Button
+                                type="button"
+                                variant="link"
+                                onClick={sumber.reload}
+                            >
+                                Muat ulang pilihan
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
         </EditShield>
     );
 
@@ -1136,7 +1165,7 @@ export default function PenerimaanDetailPage({
                                                                 {readOnly ? (
                                                                     <span>
                                                                         {baris.purchase_request_code ??
-                                                                            '—'}
+                                                                            'Tanpa permintaan asal'}
                                                                     </span>
                                                                 ) : (
                                                                     <PurchaseRequestPicker

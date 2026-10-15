@@ -26,7 +26,7 @@ final class SaveParty
             $number = $this->numbers->issue($tenantId, $creationKey);
             $party = new Party;
             $party->forceFill([...$data, 'tenant_id' => $tenantId, 'number' => $number, 'creation_key' => $creationKey,
-                'search_name' => Party::searchName($data['search_name'] ?? $data['name']), 'status' => $data['status'] ?? 'active'])->save();
+                'search_name' => Party::searchName($data['search_name'] ?? $data['name']), 'status' => $data['status'] ?? 'active', 'language' => $data['language'] ?? 'id'])->save();
 
             return $party;
         });
