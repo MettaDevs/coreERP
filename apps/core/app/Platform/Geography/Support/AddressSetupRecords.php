@@ -4,6 +4,7 @@ namespace App\Platform\Geography\Support;
 
 use App\Platform\Modules\Contracts\IncrementalList;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -19,6 +20,7 @@ final class AddressSetupRecords
         'postalCodes' => 'ref_postal_codes',
     ];
 
+    /** @return array{data: Collection<int, \stdClass>, next_cursor: ?string} */
     public static function batch(Request $request): array
     {
         $input = $request->validate([

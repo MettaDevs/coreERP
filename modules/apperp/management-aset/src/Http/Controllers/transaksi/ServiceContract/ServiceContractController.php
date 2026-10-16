@@ -62,7 +62,7 @@ class ServiceContractController extends Controller
         $today = $this->today();
 
         $batch = IncrementalList::query($request, $query->toBase(), ['id' => 'id', 'periode' => 'berlaku_sampai'], ['kode', 'nomor_kontrak', 'keterangan'], 'periode', [], 'desc');
-        $vendors = app(VendorDirectory::class)->findMany($tenant, $batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->values()->all());
+        $vendors = app(VendorDirectory::class)->findMany($tenant, array_values($batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->all()));
         $batch['data'] = ServiceContract::hydrate($batch['data']->map(fn ($row) => (array) $row)->all())->map(fn (ServiceContract $contract): array => $this->present($tenant, $contract, $today, $vendors));
 
         return response()->json($batch);
@@ -290,6 +290,7 @@ class ServiceContractController extends Controller
     }
 
     /** @return array<string, mixed> */
+    /** @param array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null $vendors */
     private function present(string $tenant, ServiceContract $contract, string $today, ?array $vendors = null): array
     {
         $vendor = $vendors !== null ? ($vendors[$contract->vendor_id] ?? null) : app(VendorDirectory::class)->find($tenant, $contract->vendor_id);

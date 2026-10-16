@@ -68,7 +68,7 @@ class AssetWarrantyController extends Controller
         $batch = IncrementalList::query($request, $query->toBase(), [
             'id' => 'id', 'aset' => 'aset_kode', 'periode' => 'berlaku_sampai',
         ], ['aset_kode', 'aset_nama', 'nomor_referensi', 'catatan'], 'periode', [], 'desc');
-        $vendors = app(VendorDirectory::class)->findMany($tenant, $batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->values()->all());
+        $vendors = app(VendorDirectory::class)->findMany($tenant, array_values($batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->all()));
         $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, $today, $vendors));
 
         return response()->json($batch);
@@ -326,6 +326,7 @@ class AssetWarrantyController extends Controller
         return $query;
     }
 
+    /** @param array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null $vendors */
     private function present(string $tenant, stdClass $row, string $today, ?array $vendors = null): stdClass
     {
         $vendor = $vendors !== null ? ($vendors[$row->vendor_id] ?? null) : ($row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id));

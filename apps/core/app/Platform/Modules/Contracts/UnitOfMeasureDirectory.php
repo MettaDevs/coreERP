@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Contracts;
 
+use Illuminate\Support\Collection;
+
 /**
  * Satuan ukur milik tenant, beserta konversinya.
  */
 interface UnitOfMeasureDirectory
 {
     /** @param array<string, mixed> $input
-     * @return array{data: mixed, next_cursor: ?string}
+     * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
      */
     public function lookup(string $tenantId, array $input): array;
 

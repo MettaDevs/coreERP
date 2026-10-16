@@ -36,7 +36,7 @@ final class OrganizationPageRecords
             $query->where('organizations.status', 'active');
         }
         if ($request->filled('exclude_version_id')) {
-            $version = OrganizationHierarchyVersion::query()->whereHas('hierarchy', fn ($query) => $query->where('tenant_id', $tenantId))->findOrFail($request->input('exclude_version_id'));
+            $version = OrganizationHierarchyVersion::query()->whereHas('hierarchy', fn ($query) => $query->where('tenant_id', $tenantId))->findOrFail($request->string('exclude_version_id')->toString());
             $query->whereNotIn('organizations.id', $version->nodes()->select('organization_id'));
         }
         $batch = IncrementalList::query($request, $query->toBase(), ['name' => 'name', 'code' => 'code'], ['name', 'code'], 'name');

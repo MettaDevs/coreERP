@@ -83,7 +83,7 @@ class InsurancePolicyController extends Controller
             'id' => 'id', 'periode' => 'berlaku_mulai', 'tertanggung' => 'total_nilai_tertanggung',
         ], ['kode', 'nama', 'nomor_polis'], 'periode', ['total_nilai_tertanggung'], 'desc');
         $tenant = $this->tenant($request);
-        $vendors = app(VendorDirectory::class)->findMany($tenant, $batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->values()->all());
+        $vendors = app(VendorDirectory::class)->findMany($tenant, array_values($batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->all()));
         $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, number_format((float) $row->total_nilai_tertanggung, 2, '.', ''), $today, $vendors));
 
         return response()->json($batch);
@@ -508,6 +508,7 @@ class InsurancePolicyController extends Controller
     }
 
     /** Total yang ditanggung, selisih terhadap plafon, status berlaku, dan nama penanggung. */
+    /** @param array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null $vendors */
     private function present(string $tenant, stdClass $row, ?string $totalInsured, string $today, ?array $vendors = null): stdClass
     {
         $vendor = $vendors !== null ? ($vendors[$row->vendor_id] ?? null) : ($row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id));

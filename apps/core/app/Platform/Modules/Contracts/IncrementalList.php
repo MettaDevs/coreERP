@@ -6,6 +6,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -43,7 +44,7 @@ final class IncrementalList
             $pattern = '%'.addcslashes(mb_strtolower($keyword), '\\%_').'%';
             $list->where(function (Builder $match) use ($searchColumns, $pattern): void {
                 foreach ($searchColumns as $column) {
-                    $match->orWhereRaw('LOWER(CAST('.$match->getGrammar()->wrap($column).' AS TEXT)) LIKE ?', [$pattern]);
+                    $match->orWhere(DB::raw('LOWER(CAST('.$match->getGrammar()->wrap($column).' AS TEXT))'), 'like', $pattern);
                 }
             });
         }
@@ -52,8 +53,7 @@ final class IncrementalList
         // NULL juga harus memiliki posisi supaya cursor tidak melewatkan record.
         $wrapped = $list->getGrammar()->wrap($sort);
         $value = in_array($sort, $numericColumns, true) ? "COALESCE($wrapped, 0)" : "COALESCE(CAST($wrapped AS TEXT), '')";
-        $list->select('list_records.*')->selectRaw('CASE WHEN '.$wrapped.' IS NULL THEN 1 ELSE 0 END AS list_sort_null')
-            ->selectRaw($value.' AS list_sort_value');
+        $list->select('list_records.*')->addSelect(DB::raw('CASE WHEN '.$wrapped.' IS NULL THEN 1 ELSE 0 END AS list_sort_null'), DB::raw($value.' AS list_sort_value'));
         $list = $list->newQuery()->fromSub($list, 'sorted_records');
         $list->orderBy('list_sort_null')->orderBy('list_sort_value', $direction);
         if ($sort !== $identity) {
@@ -75,7 +75,7 @@ final class IncrementalList
         }
         $batch = $list->cursorPaginate((int) ($input['per_page'] ?? 40), ['*'], 'cursor', $cursor);
         $nextCursor = $batch->nextCursor()?->encode();
-        $rows = $batch->getCollection()->map(function ($row) {
+        $rows = collect($batch->items())->map(function ($row) {
             unset($row->list_sort_null, $row->list_sort_value);
 
             return $row;

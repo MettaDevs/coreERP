@@ -149,7 +149,7 @@ abstract class MasterDataController extends Controller
             'id' => 'id', 'kode' => 'kode', 'nama' => 'nama',
         ], [], 'kode');
         // Pertahankan cast, eager-load, dan presenter tiap master hanya untuk batch ini.
-        $records = $query->getModel()->hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        $records = $query->hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
         $records->load($query->getEagerLoads());
         $batch['data'] = $records->map($this->present(...));
 
