@@ -153,7 +153,7 @@ export default function ReportLayouts({
             setDefaultVersions(result.meta.default_versions);
             toast.success(
                 layout
-                    ? `${layout.name} dijadikan default ${scope === 'tenant' ? 'seluruh perusahaan' : (legalEntity?.name ?? 'entitas legal aktif')}.`
+                    ? `${layout.name} dijadikan default ${scope === 'tenant' ? 'seluruh perusahaan' : (legalEntity?.name ?? 'perusahaan aktif')}.`
                     : 'Pilihan default dihapus; laporan kembali memakai layout bawaan.',
             );
         } catch (caught) {
@@ -300,7 +300,7 @@ export default function ReportLayouts({
             cell: (layout) =>
                 layout.source === 'builtin' || !layout.legal_entity_id
                     ? 'Seluruh perusahaan'
-                    : (legalEntity?.name ?? 'Entitas legal aktif'),
+                    : (legalEntity?.name ?? 'Perusahaan aktif'),
             width: 180,
         },
         {
@@ -333,7 +333,7 @@ export default function ReportLayouts({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <Heading
                         title="Layout laporan"
-                        description="Tampilan dokumen cetak dan ekspor dari semua aplikasi, per laporan dan per entitas legal."
+                        description="Tampilan dokumen cetak dan ekspor dari semua aplikasi, per laporan dan per perusahaan."
                     />
                     {canManage && code && (
                         <ActionButton
@@ -623,8 +623,8 @@ function UploadSheet({
                             </label>
                         </RadioGroup>
                         <FieldDescription>
-                            Pilih entitas legal bila layout memuat kop atau
-                            tanda tangan perusahaan tertentu.
+                            Pilih perusahaan bila layout memuat kop atau tanda
+                            tangan perusahaan tertentu.
                         </FieldDescription>
                     </Field>
                 </div>

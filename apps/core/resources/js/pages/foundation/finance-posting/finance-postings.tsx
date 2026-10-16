@@ -202,11 +202,11 @@ const MANUAL_REASON = new Map<string, { short: string; long: string }>(
     Object.entries({
         before_cutover: {
             short: 'Sebelum cutover',
-            long: 'Tanggal posting jatuh sebelum tanggal cutover entitas legal ini. Transaksi sebelum cutover sudah dijurnal manual di aplikasi finance, jadi posting ini tidak dikirim. Bila tanggal cutover diubah, posting ini diperiksa ulang dengan sendirinya.',
+            long: 'Tanggal posting jatuh sebelum tanggal cutover perusahaan ini. Transaksi sebelum cutover sudah dijurnal manual di aplikasi finance, jadi posting ini tidak dikirim. Bila tanggal cutover diubah, posting ini diperiksa ulang dengan sendirinya.',
         },
         feed_disabled: {
             short: 'Posting ke finance dimatikan',
-            long: 'Pengiriman posting ke aplikasi finance dimatikan untuk entitas legal ini, jadi posting ini tidak dikirim. Bila pengirimannya dinyalakan lagi, posting ini diperiksa ulang dengan sendirinya.',
+            long: 'Pengiriman posting ke aplikasi finance dimatikan untuk perusahaan ini, jadi posting ini tidak dikirim. Bila pengirimannya dinyalakan lagi, posting ini diperiksa ulang dengan sendirinya.',
         },
         user: {
             short: 'Ditandai pengguna',
@@ -221,7 +221,7 @@ const REJECTION = new Map([
     ['UNKNOWN_ACCOUNT', 'Akunnya tidak dikenal aplikasi finance'],
     ['UNKNOWN_DIMENSION', 'Dimensinya tidak dikenal aplikasi finance'],
     ['UNKNOWN_VENDOR', 'Vendornya tidak dikenal aplikasi finance'],
-    ['UNKNOWN_LEGAL_ENTITY', 'Entitas legalnya tidak dikenal aplikasi finance'],
+    ['UNKNOWN_LEGAL_ENTITY', 'Perusahaannya tidak dikenal aplikasi finance'],
     ['INVALID', 'Isinya tidak diterima aplikasi finance'],
 ]);
 
@@ -498,7 +498,7 @@ function PostingFilters({
                 </div>
                 <div className="w-full sm:w-56">
                     <NativeSelect
-                        label="Entitas legal"
+                        label="Perusahaan"
                         value={filters.legal_entity_id ?? ''}
                         onChange={(event) =>
                             apply({
@@ -507,7 +507,7 @@ function PostingFilters({
                         }
                     >
                         <NativeSelectOption value="">
-                            Semua entitas legal
+                            Semua perusahaan
                         </NativeSelectOption>
                         {legalEntities.map((entity) => (
                             <NativeSelectOption
@@ -586,8 +586,8 @@ function PostingsEmpty({
                     <EmptyDescription>
                         Posting muncul di sini setiap kali sebuah app
                         menyelesaikan dokumen yang perlu dijurnal di aplikasi
-                        finance. Pengirimannya diatur per entitas legal di
-                        halaman Organisasi.
+                        finance. Pengirimannya diatur per perusahaan di halaman
+                        Organisasi.
                     </EmptyDescription>
                 </EmptyHeader>
             </Empty>
@@ -755,7 +755,7 @@ function PostingSummary({ posting, now }: { posting: Posting; now: number }) {
                     {posting.posting_type}
                 </span>
             </DetailItem>
-            <DetailItem label="Entitas legal">
+            <DetailItem label="Perusahaan">
                 {entityName(posting.legal_entity)}
             </DetailItem>
             <DetailItem label="Tanggal posting">
@@ -1573,7 +1573,7 @@ export default function FinancePostings({
                                         <TableRow>
                                             <TableHead>Nomor posting</TableHead>
                                             <TableHead>Jenis</TableHead>
-                                            <TableHead>Entitas legal</TableHead>
+                                            <TableHead>Perusahaan</TableHead>
                                             <TableHead>
                                                 Tanggal posting
                                             </TableHead>

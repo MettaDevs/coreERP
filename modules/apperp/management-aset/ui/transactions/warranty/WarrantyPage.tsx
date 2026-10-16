@@ -541,7 +541,7 @@ export default function WarrantyPage({
                         <EmptyHeader>
                             <EmptyTitle>Belum ada garansi tercatat</EmptyTitle>
                             <EmptyDescription>
-                                Catat garansi dari pemasok atau pabrikan supaya
+                                Catat garansi dari vendor atau pabrikan supaya
                                 perbaikan selama masa garansi diarahkan ke
                                 penjaminnya.
                             </EmptyDescription>

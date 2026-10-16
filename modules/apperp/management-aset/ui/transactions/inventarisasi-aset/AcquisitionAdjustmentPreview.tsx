@@ -66,7 +66,7 @@ function keadaan(status: string, adaPenghalang: boolean): string {
                 ? 'Jurnal koreksi ini akan tertahan sampai masalah di bawah dibenahi.'
                 : 'Jurnal koreksi ini akan tertahan sampai masalah di bawah dibenahi. Koreksinya tetap dapat disimpan; setelah dibenahi, owner atau admin menekan Validasi ulang di layar Posting finance.';
         case 'manual':
-            return 'Jurnal koreksi dicatat tetapi tidak dikirim: pengiriman posting entitas legal ini belum aktif, atau tanggalnya sebelum cutover.';
+            return 'Jurnal koreksi dicatat tetapi tidak dikirim: pengiriman posting perusahaan ini belum aktif, atau tanggalnya sebelum cutover.';
         default:
             return '';
     }

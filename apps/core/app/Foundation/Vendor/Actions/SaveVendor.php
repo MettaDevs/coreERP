@@ -130,6 +130,11 @@ final class SaveVendor
             if (str_contains($conflict->getMessage(), 'creation_key')) {
                 return Vendor::query()->where('tenant_id', $tenant)->where('creation_key', $creationKey)->firstOrFail();
             }
+            if (str_contains($conflict->getMessage(), 'vendors_tenant_number_unique')) {
+                throw ValidationException::withMessages([
+                    'number' => 'Nomor vendor sudah dipakai. Gunakan nomor lain, termasuk bila perusahaannya berbeda.',
+                ]);
+            }
 
             throw ValidationException::withMessages([
                 'party_id' => 'Vendor yang sama baru saja dibuat dari permintaan lain. Muat ulang daftar.',

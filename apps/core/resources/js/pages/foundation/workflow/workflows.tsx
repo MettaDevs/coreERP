@@ -174,7 +174,7 @@ export default function Workflows({
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div>
                                                 <NativeSelect
-                                                    label="Entitas Legal"
+                                                    label="Perusahaan"
                                                     value={
                                                         createForm.data
                                                             .legal_entity_id
@@ -188,7 +188,7 @@ export default function Workflows({
                                                     }
                                                 >
                                                     <option value="">
-                                                        Pilih entitas legal
+                                                        Pilih perusahaan
                                                     </option>
                                                     {legalEntities.map(
                                                         (entity) => (
@@ -217,7 +217,7 @@ export default function Workflows({
                                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/40 pt-2 md:col-span-2">
                                     <p className="text-xs text-muted-foreground">
                                         {needsLegalEntity
-                                            ? 'Semua dokumen proses ini akan mengikuti entitas legal yang dipilih.'
+                                            ? 'Semua dokumen proses ini akan mengikuti perusahaan yang dipilih.'
                                             : 'Workflow ini berlaku untuk seluruh bisnis (scope tenant).'}
                                     </p>
                                     <Button

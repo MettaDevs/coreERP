@@ -392,7 +392,7 @@ export default function PlanningPage({
     const save = async () => {
         if (!editing || !context.legal_entity_id || !context.org_unit_id) {
             toast.error(
-                'Pilih entitas legal dan unit kerja aktif sebelum membuat rencana.',
+                'Pilih perusahaan dan unit kerja aktif sebelum membuat rencana.',
             );
 
             return;

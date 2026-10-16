@@ -74,7 +74,7 @@ export default function SupplierImport({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="w-full sm:w-64">
                         <NativeSelect
-                            label="Entitas legal tujuan"
+                            label="Perusahaan tujuan"
                             value={entity}
                             disabled={busy}
                             onChange={(event) => {
@@ -83,7 +83,7 @@ export default function SupplierImport({
                             }}
                         >
                             <NativeSelectOption value="">
-                                Pilih entitas legal
+                                Pilih perusahaan
                             </NativeSelectOption>
                             {legalEntities.map((item) => (
                                 <NativeSelectOption

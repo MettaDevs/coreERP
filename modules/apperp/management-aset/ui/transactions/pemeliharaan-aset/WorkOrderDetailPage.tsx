@@ -869,7 +869,7 @@ export default function WorkOrderDetailPage({
     const save = async () => {
         if (!record || !context.legal_entity_id || !context.org_unit_id) {
             toast.error(
-                'Pilih entitas legal dan unit kerja aktif sebelum membuat work order.',
+                'Pilih perusahaan dan unit kerja aktif sebelum membuat work order.',
             );
 
             return;
@@ -1290,8 +1290,8 @@ export default function WorkOrderDetailPage({
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-4 p-5">
                     <p className="text-muted-foreground text-sm">
-                        Entitas legal dan unit penanggung jawab mengikuti
-                        konteks aktif Anda.
+                        Perusahaan dan unit penanggung jawab mengikuti konteks
+                        aktif Anda.
                     </p>
                     <CollapsibleSectionGroup
                         defaultValue={['general', 'lines']}

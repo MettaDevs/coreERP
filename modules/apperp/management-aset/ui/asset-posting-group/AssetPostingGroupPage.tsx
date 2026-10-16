@@ -95,9 +95,7 @@ function accountProblem(account: Account | undefined): string | null {
         return 'Nonaktif';
     }
 
-    return account.legal_entity_id === null
-        ? null
-        : 'Khusus satu entitas legal';
+    return account.legal_entity_id === null ? null : 'Khusus satu perusahaan';
 }
 
 function accountOf(row: PostingRow | null, column: string): string | null {
@@ -792,9 +790,9 @@ const ACCOUNT_HINTS: Record<string, string> = {
     depreciation_expense_account_id:
         'Akun beban di laba rugi untuk penyusutan tiap periode. Contoh: Dr Beban Penyusutan Kendaraan 3,7.',
     payable_account_id:
-        'Hutang ke pemasok bila penerimaan aset langsung menjadi hutang di aplikasi finance. Contoh ambulans 500 + PPN 55: Cr Hutang Usaha 555.',
+        'Hutang ke vendor bila penerimaan aset langsung menjadi hutang di aplikasi finance. Contoh ambulans 500 + PPN 55: Cr Hutang Usaha 555.',
     clearing_account_id:
-        'Akun penampung bila faktur pemasok dibuat terpisah di aplikasi finance. Contoh: Cr Aset Diterima Belum Difakturkan 555; saat fakturnya dibuat, Dr akun ini dan Cr Hutang Usaha 555 sampai saldonya kembali nol.',
+        'Akun penampung bila faktur vendor dibuat terpisah di aplikasi finance. Contoh: Cr Aset Diterima Belum Difakturkan 555; saat fakturnya dibuat, Dr akun ini dan Cr Hutang Usaha 555 sampai saldonya kembali nol.',
     input_vat_account_id:
         'PPN pembelian aset yang dapat dikreditkan. Contoh PPN ambulans: Dr PPN Masukan 55.',
     opening_balance_offset_account_id:

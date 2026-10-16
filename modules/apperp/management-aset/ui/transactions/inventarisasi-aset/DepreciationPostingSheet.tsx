@@ -60,7 +60,7 @@ function keadaan(status: string): string {
         case 'held':
             return 'Jurnal ini akan tertahan sampai masalah di bawah dibenahi. Penyusutannya tetap dapat di-post; setelah dibenahi, owner atau admin menekan Validasi ulang di layar Posting finance.';
         case 'manual':
-            return 'Jurnal dicatat tetapi tidak dikirim: pengiriman posting entitas legal ini belum aktif, atau tanggalnya sebelum cutover.';
+            return 'Jurnal dicatat tetapi tidak dikirim: pengiriman posting perusahaan ini belum aktif, atau tanggalnya sebelum cutover.';
         default:
             return '';
     }
@@ -183,8 +183,8 @@ export function DepreciationPostingSheet({
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     {!context.legal_entity_id ? (
                         <p className="text-destructive text-sm">
-                            Pilih entitas legal aktif terlebih dahulu pada
-                            header CoreERP.
+                            Pilih perusahaan aktif terlebih dahulu pada header
+                            CoreERP.
                         </p>
                     ) : (
                         <FieldGroup>

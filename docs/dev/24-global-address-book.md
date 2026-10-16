@@ -127,7 +127,7 @@ Diagram dual-write menjelaskan hubungan antarsistem; tabel Dataverse tidak disal
 dibaca pengguna, diterbitkan melalui reference `core.party`, scope tenant, non-continuous,
 tanpa nomor manual, tanpa reset. Prefix awal adalah `PIHK`, dengan contoh
 `PIHK00001`–`PIHK19999`; setelan tetap ada di Atur nomor. Nomor vendor memakai reference
-`core.vendor` sendiri dan tetap berlaku per entitas legal. Membuat pihak lewat Vendor
+`core.vendor` sendiri dan unik lintas perusahaan dalam tenant. Membuat pihak lewat Vendor
 atau alamat Organisasi memakai `SaveParty`, bukan nomor acak dari browser.
 
 Pihak yang sudah ada sebelum revamp mempunyai nomor nullable. Aksi **Beri nomor pihak
@@ -199,7 +199,8 @@ Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed p
 - Tabel `vendors` menyimpan akun vendor per legal entity: nomor, status, dan prioritas pembayaran. Nama, NPWP, alamat, dan kontak milik party, jadi mengganti identitasnya berlaku pada semua akun vendor pihak tersebut. Kolom `vendors.tax_number` dipertahankan sebagai salinan untuk pembaca dan image N-1; pengelolaannya di UI melalui Party.
 - Menyimpan vendor baru menulis party (bila baru), akun vendor, dan baris `party_role_registrations` berperan `vendor` dengan `owning_app_id = core` dalam satu transaksi.
 - Satu party paling banyak satu vendor per legal entity; database menolak yang kedua.
-- Nomor dari reference `core.vendor` ([Number sequences](14-number-sequences.md#reference-milik-core-sendiri)); nomor dan legal entity tidak dapat diubah sesudah disimpan.
+- Nomor dari reference `core.vendor` dengan scope tenant ([Number sequences](14-number-sequences.md#reference-milik-core-sendiri)). Setiap akun mendapat nomor berbeda, termasuk akun Party yang sama di perusahaan lain. Nomor dan legal entity tidak dapat diubah pengguna sesudah disimpan.
+- Migration penomoran bersama mempertahankan akun tertua untuk setiap nomor lama dan menerbitkan nomor pengganti untuk akun berikutnya yang kembar. ID akun dan relasi dokumen tidak berubah; salinan nomor pada posting yang sudah terbit tetap menjadi riwayat saat posting. Pemetaan nomor lama/baru tercatat di `number_sequence_audit_events`. Riwayat urutan lama dipindahkan ke reference `core.vendor-company-legacy` dan dihentikan tanpa dihapus; reference `core.vendor` menunjuk urutan bersama sehingga image N-1 tetap dapat menerbitkan nomor.
 - Module membaca vendor lewat kontrak `VendorDirectory`, sistem di luar CoreERP lewat `GET /api/internal/v1/vendors` dengan token klien integrasi.
 
 Detail baca, tambah, dan ubah Vendor memakai halaman penuh dengan FastTab General,
@@ -212,8 +213,10 @@ perusahaan. Informasi akun berasal dari tenant yang sama; pemilihan tetap menyim
 `party_id`, bukan nomor akun perusahaan lain. Membuat akun kedua pada perusahaan yang
 sama tetap ditolak backend.
 
-Pada form vendor baru, **Nomor vendor** juga merupakan lookup akun pada perusahaan
-tujuan. Memilih akun membuka kartu baca akun tersebut tanpa membuat akun baru.
+Pada form vendor baru, **Nomor vendor** menampilkan **Otomatis saat disimpan** dan
+tidak dapat diketik bila `allow_automatic` aktif, termasuk ketika manual juga diizinkan.
+Jika otomatis dimatikan, field menjadi input nomor wajib. Field ini tidak menyediakan
+dropdown akun lama; membuka akun lama dilakukan dari daftar vendor.
 Memilih Party yang sudah mempunyai akun di perusahaan tujuan, termasuk sesudah
 mengganti perusahaan, memeriksa akun lewat backend lalu membuka kartu yang sama.
 Simpan dinonaktifkan selama pemeriksaan; validasi unik backend tetap menjadi

@@ -223,7 +223,7 @@ export default function ReclassificationDetailPage({
 
         if (!legalEntity) {
             toast.error(
-                'Pilih entitas legal aktif terlebih dahulu pada header CoreERP.',
+                'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
             return;

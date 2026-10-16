@@ -3,6 +3,7 @@
 namespace Tests\Feature\Foundation\Vendor;
 
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -64,7 +65,7 @@ class VendorTest extends TestCase
             ->where('tenant_id', $this->membership->tenant_id)
             ->whereHas('reference', fn ($query) => $query->where('code', 'core.vendor'))
             ->firstOrFail();
-        $this->assertSame('legal_entity', $urutan->scope_type);
+        $this->assertSame('tenant', $urutan->scope_type);
         $this->assertTrue($urutan->allow_manual);
         $this->assertFalse($urutan->is_continuous);
     }
@@ -94,7 +95,7 @@ class VendorTest extends TestCase
         $this->assertSame(1, DB::table('number_sequence_issues')->where('formatted_value', 'VND-000001')->count());
     }
 
-    public function test_manual_number_is_independent_of_format_and_unique_per_legal_entity(): void
+    public function test_manual_number_is_independent_of_format_and_unique_across_companies(): void
     {
         $leLain = $this->legalEntity('PT Metta Farma', 'MFAR');
 
@@ -105,11 +106,68 @@ class VendorTest extends TestCase
         $this->buat(['party_name' => 'CV Alkes Jaya', 'number' => 'SUP-01'])
             ->assertCreated()->assertJsonPath('data.number', 'SUP-01');
         $this->buat(['legal_entity_id' => $leLain, 'party_name' => 'CV Alkes Jaya', 'number' => 'VND-000777'])
-            ->assertCreated();
+            ->assertStatus(422)->assertJsonValidationErrors('number');
 
-        $this->assertSame(2, Vendor::query()->where('number', 'VND-000777')->count());
+        $this->assertSame(1, Vendor::query()->where('number', 'VND-000777')->count());
         // Party dibuat di dalam transaksi yang sama: percobaan yang ditolak tidak meninggalkan party.
-        $this->assertSame(2, DB::table('parties')->where('name', 'CV Alkes Jaya')->count());
+        $this->assertSame(1, DB::table('parties')->where('name', 'CV Alkes Jaya')->count());
+    }
+
+    public function test_database_rejects_reused_vendor_number_in_another_company(): void
+    {
+        $first = $this->buat(['party_name' => 'First supplier'])->assertCreated()->json('data');
+        $otherCompany = $this->legalEntity('Other company', 'OTHR');
+        $second = $this->buat(['legal_entity_id' => $otherCompany, 'party_name' => 'Second supplier'])
+            ->assertCreated()->assertJsonPath('data.number', 'VND-000002')->json('data');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('vendors_tenant_number_unique');
+        DB::table('vendors')->where('id', $second['id'])->update(['number' => $first['number']]);
+    }
+
+    public function test_vendor_form_uses_the_automatic_number_setting(): void
+    {
+        $this->actingAs($this->owner)->get('/settings/vendors')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('automaticNumbers', true));
+        app(CoreNumberSequences::class)
+            ->ensure($this->membership->tenant_id, Vendor::NUMBER_SEQUENCE);
+        $sequence = TenantNumberSequence::query()->where('tenant_id', $this->membership->tenant_id)
+            ->whereHas('reference', fn ($query) => $query->where('code', Vendor::NUMBER_SEQUENCE))->firstOrFail();
+        $sequence->update(['allow_automatic' => false, 'allow_manual' => true]);
+
+        $this->get('/settings/vendors')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('automaticNumbers', false));
+        $this->buat(['party_name' => 'Manual supplier'])->assertUnprocessable()->assertJsonValidationErrors('number');
+        $this->buat(['party_name' => 'Manual supplier', 'number' => 'MANUAL-01'])
+            ->assertCreated()->assertJsonPath('data.number', 'MANUAL-01');
+    }
+
+    public function test_number_migration_preserves_accounts_and_the_previous_image_reference(): void
+    {
+        // Bentuk database rilis lama: nomor sama boleh berada di perusahaan berbeda.
+        DB::statement('DROP INDEX vendors_tenant_number_unique');
+        DB::table('app_number_sequence_references')->where('code', 'core.vendor-company-legacy')
+            ->update(['code' => 'core.vendor-company-before-test']);
+        app(CoreNumberSequences::class)->ensure($this->membership->tenant_id, Vendor::NUMBER_SEQUENCE);
+        $legacy = TenantNumberSequence::query()->where('tenant_id', $this->membership->tenant_id)
+            ->whereHas('reference', fn ($query) => $query->where('code', 'core.vendor'))->firstOrFail();
+        $legacy->update(['scope_type' => 'legal_entity']);
+        $first = $this->buat(['party_name' => 'First supplier'])->assertCreated()->json('data');
+        $otherCompany = $this->legalEntity('Other company', 'OTHR');
+        $second = $this->buat(['legal_entity_id' => $otherCompany, 'party_id' => $first['party_id'], 'party_name' => null])
+            ->assertCreated()->assertJsonPath('data.number', $first['number'])->json('data');
+
+        $migration = require base_path('database/migrations/2026_10_16_030000_make_vendor_numbers_unique_across_companies.php');
+        $migration->up();
+
+        $this->assertDatabaseHas('vendors', ['id' => $first['id'], 'number' => 'VND-000001', 'party_id' => $first['party_id']]);
+        $this->assertDatabaseHas('vendors', ['id' => $second['id'], 'number' => 'VND-000002', 'party_id' => $first['party_id']]);
+        $this->assertDatabaseHas('number_sequence_audit_events', ['event_type' => 'vendor_renumbered', 'formatted_value' => 'VND-000002']);
+        $this->assertSame('stopped', $legacy->fresh()->status);
+        $this->assertSame('core.vendor-company-legacy', $legacy->reference->code);
+        // Rilis sebelumnya masih meminta core.vendor; ia harus mendapat urutan bersama yang aktif.
+        $this->buat(['legal_entity_id' => $otherCompany, 'party_name' => 'Third supplier'])
+            ->assertCreated()->assertJsonPath('data.number', 'VND-000003');
     }
 
     public function test_format_nomor_dapat_disesuaikan_di_nomor_dokumen_sebelum_vendor_pertama(): void
@@ -128,7 +186,7 @@ class VendorTest extends TestCase
             ->firstOrFail();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/number-sequences/{$urutan->id}", [
-            'profile_code' => 'manual-compatible', 'scope_type' => 'legal_entity', 'status' => 'active',
+            'profile_code' => 'manual-compatible', 'scope_type' => 'tenant', 'status' => 'active',
             'is_continuous' => false, 'allow_manual' => true, 'allow_automatic' => true, 'reset_period' => 'never',
             'preallocation_enabled' => true, 'preallocation_quantity' => 20,
             'minimum_number' => 1, 'maximum_number' => 99999,
@@ -150,8 +208,8 @@ class VendorTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('party_id');
         $this->buat(['legal_entity_id' => $leLain, 'party_id' => $party, 'party_name' => null])
             ->assertCreated()
-            // Urutan berlingkup entitas legal: setiap entitas mulai dari nomornya sendiri.
-            ->assertJsonPath('data.number', 'VND-000001')
+            // Identitas bersama, tetapi setiap akun mendapat nomor dari urutan tenant yang sama.
+            ->assertJsonPath('data.number', 'VND-000002')
             ->assertJsonPath('data.name', 'PT Sarana Medika');
 
         $this->assertSame(1, DB::table('parties')->where('name', 'PT Sarana Medika')->count());
@@ -342,7 +400,7 @@ class VendorTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('foundation/vendor/vendors')
                 ->where('canManage', true)
-                ->where('manualNumbers', true)
+                ->where('automaticNumbers', true)
                 ->where('vendors.total', 3)
                 ->has('legalEntities', 2));
         $this->actingAs($this->owner)->get("/settings/vendors?legal_entity={$this->le}&status=active")

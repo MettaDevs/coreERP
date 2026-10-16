@@ -44,8 +44,8 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
         {
             value: FOLLOW_LEGAL_ENTITY,
             label: legalEntityZone
-                ? `Ikuti entitas legal (${legalEntityZone.label})`
-                : 'Ikuti entitas legal',
+                ? `Ikuti perusahaan (${legalEntityZone.label})`
+                : 'Ikuti perusahaan',
         },
         ...dateTime.timezones,
     ];
@@ -92,7 +92,7 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
                                 form.setData('work_date', event.target.value)
                             }
                         />
-                        <FieldHint hint="Tanggal bawaan untuk transaksi baru selama kamu masuk. Kembali ke hari ini saat kamu masuk lagi atau pindah tenant atau entitas legal.">
+                        <FieldHint hint="Tanggal bawaan untuk transaksi baru selama kamu masuk. Kembali ke hari ini saat kamu masuk lagi atau pindah tenant atau perusahaan.">
                             <button
                                 type="button"
                                 aria-label="Bantuan tanggal kerja"
