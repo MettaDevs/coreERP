@@ -264,12 +264,16 @@ services:
       core-db:
         condition: service_healthy
         required: false
-    environment: *app-environment
+    environment:
+      <<: *app-environment
+      OCTANE_WORKERS: ${OCTANE_WORKERS:-auto}
     networks: [default, renderer]
     volumes:
       # Hanya log. Unggahan sudah pindah ke object storage — volume bersama untuknya justru yang
       # membuat node tidak dapat dibuang begitu saja.
       - core-logs:/repo/apps/core/storage/logs
+      # /up memakai thread PHP biasa, terpisah dari antrean worker transaksi.
+      - ./Caddyfile:/repo/apps/core/vendor/laravel/octane/src/Commands/stubs/Caddyfile:ro
     # Terikat privat: yang menghadap internet cuma Traefik. Di node yang menjalankan Traefik, ia
     # bahkan dihubungi lewat nama layanan dan porta ini tidak terpakai sama sekali.
     ports:
